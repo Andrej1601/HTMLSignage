@@ -183,6 +183,8 @@ cat >/var/www/signage/assets/design.css <<'CSS'
 
   /* sauna tile clamp (JS sets --tileTargetPx) */
   --tileMinPx:480px; --tileMaxPx:1100px; --tileTargetPx:860px;
+  --ovTitleScale:1; /* nur H1 der Übersicht */
+  --flamesColW: calc(var(--flameSizePx)*1px*var(--scale)*3 + 24px);
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--font)}
@@ -203,7 +205,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
 /* overview-only multiply with --ovAuto */
-.overview .h1{font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
+.overview .h1{font-size:calc(56px*var(--scale)*var(--ovTitleScale)*var(--ovAuto))}
 .overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
 .caption{opacity:.85;font-size:calc(20px*var(--scale))}
 
@@ -238,7 +240,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
 
 /* equal chips */
-.cellwrap{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;width:100%;min-width:0}
+.cellwrap{display:grid;grid-template-columns:1fr var(--flamesColW);align-items:center;gap:12px;width:100%;min-width:0}
 .chip{display:flex;align-items:center;justify-content:center;width:100%;height:var(--chipH);padding:0 .8em;border-radius:10px;background:var(--cell);color:var(--boxfg);border:2px solid var(--grid);font-weight:700;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chip sup{margin-left:.25em}
 
@@ -251,7 +253,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
   padding:14px 18px; background:var(--cell); border:3px solid var(--grid); border-radius:16px; color:var(--boxfg);
 }
 .title{font-size:calc(40px*var(--scale)*var(--tileTextScale)); font-weight:var(--tileWeight)}
-.flames{display:flex;gap:10px;align-items:center; justify-self:end}
+.flames{display:flex;gap:10px;align-items:center; justify-self:end; min-width:var(--flamesColW)}
 .flame{width:calc(var(--flameSizePx)*1px*var(--scale)); height:calc(var(--flameSizePx)*1px*var(--scale))}
 .flame img,.flame svg{width:100%;height:100%;object-fit:contain}
 .flame svg path{fill:var(--flame)}
@@ -260,7 +262,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .notewrap sup.note{font-weight:400; opacity:.75; font-size:.8em}
 
 /* highlight */
-.tile.highlight{border-color:var(--hlColor); box-shadow:0 0 0 4px var(--hlColor) inset}
+.tile.highlight{border-color:var(--hlColor); box-shadow:0 0 0 4px var(--hlColor)}
 .chip.highlight{outline:3px solid var(--hlColor); outline-offset:2px}
 
 /* footnotes inline */
@@ -284,6 +286,19 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
   const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+
+  // ---------- Presets ----------
+  function dayKey(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
+  function maybeApplyPreset(){
+    const auto = !!(settings && settings.presetAuto);
+    const presets = (settings && settings.presets) || {};
+    if (!auto) return;
+    const key = dayKey();
+    const preset = presets[key] || presets['Default'] || null;
+    if (preset && preset.saunas && Array.isArray(preset.rows)) {
+      schedule = preset; // gleiche Struktur wie schedule.json erwartet
+    }
+  }
 
   // ---------- IO ----------
   async function loadJSON(u) { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u); return await r.json(); }
@@ -605,7 +620,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     let lastSetVer   = settings?.version || 0;
     setInterval(async () => {
       try { const s = await loadJSON('/data/schedule.json'); if (s.version !== lastSchedVer) { schedule = s; lastSchedVer = s.version; buildQueue(); } } catch (e) {}
-      try { const cf = await loadJSON('/data/settings.json'); if (cf.version !== lastSetVer) { settings = cf; lastSetVer = cf.version; applyTheme(); applyDisplay(); buildQueue(); } } catch (e) {}
+      try { const cf = await loadJSON('/data/settings.json'); if (cf.version !== lastSetVer) { settings = cf; lastSetVer = cf.version; applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue(); } } catch (e) {}
     }, 3000);
 
     window.addEventListener('message', (ev) => {
@@ -613,7 +628,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       const p = ev.data.payload || {};
       if (p.schedule) schedule = p.schedule;
       if (p.settings) settings = p.settings;
-      applyTheme(); applyDisplay(); buildQueue(); idx = 0; step();
+      applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue(); idx = 0; step();
     });
   }
 
@@ -761,7 +776,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
           <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
           <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
-          <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="28" max="120" value="44"></div>
+          <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="20" max="120" value="44"></div>
           <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
 
           <div class="subh">Saunafolien (Kacheln)</div>
@@ -814,6 +829,29 @@ cat >/var/www/signage/admin/index.html <<'HTML'
             <div style="width:100%">Name · Preview · Upload · Default · Entfernen</div>
           </div>
           <div id="saunaList"></div>
+        </div>
+      </details>
+
+      <details class="ac">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Presets (Zeitpläne)</div>
+        </summary>
+        <div class="content">
+          <div class="kv"><label>Wochentag</label>
+            <select id="presetKey" class="input">
+              <option value="Mon">Montag</option><option value="Tue">Dienstag</option><option value="Wed">Mittwoch</option>
+              <option value="Thu">Donnerstag</option><option value="Fri">Freitag</option><option value="Sat">Samstag</option>
+              <option value="Sun">Sonntag</option><option value="Default">Default</option>
+            </select>
+          </div>
+          <div class="row" style="gap:8px">
+            <button class="btn sm" id="psSave">Preset speichern (aus aktueller Tabelle)</button>
+            <button class="btn sm" id="psLoad">Preset laden → Tabelle</button>
+          </div>
+          <div class="kv" style="margin-top:8px">
+            <label>Auto je Wochentag</label><input id="presetAuto" type="checkbox">
+          </div>
+          <div class="help">„Speichern“ legt das ausgewählte Wochentags-Preset an/aktualisiert (inkl. Saunenspalten). „Laden“ überschreibt die Tabelle.</div>
         </div>
       </details>
 
@@ -924,6 +962,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       renderSaunasPanel();
       renderColors();
       renderFootnotes();
+renderPresets();
     }
 
     // ------- Grid -------
@@ -1021,10 +1060,10 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       $('#fontScale').value   = f.scale ?? 1;
       $('#h1Scale').value     = f.h1Scale ?? 1;
       $('#h2Scale').value     = f.h2Scale ?? 1;
-      $('#ovTitleScale').value= f.overviewTitleScale ?? 1;
       $('#ovHeadScale').value = f.overviewHeadScale ?? 0.9;
       $('#ovCellScale').value = f.overviewCellScale ?? 0.8;
       $('#chipH').value       = f.chipHeight ?? 44;
+ $('#ovTitleScale').value = f.overviewTitleScale ?? 1;
 
       $('#tileTextScale').value = f.tileTextScale ?? 0.8;
       $('#tileWeight').value    = f.tileWeight ?? 600;
@@ -1098,6 +1137,30 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       (schedule.saunas||[]).forEach((_,i)=> host.appendChild(saunaRow(i)) );
       $('#btnAddSauna').onclick=()=>{ const name = prompt('Neuer Saunananame:', 'Neue Sauna'); if(!name) return; schedule.saunas.push(name); schedule.rows.forEach(r=> r.entries.push(null)); renderGrid(); renderSaunasPanel(); };
       $('#btnCleanup').onclick=cleanupAssets;
+    }
+
+    function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+    function renderPresets(){
+      settings.presets = settings.presets || {};
+      const sel = document.getElementById('presetKey');
+      const auto = document.getElementById('presetAuto');
+      auto.checked = !!settings.presetAuto;
+
+      document.getElementById('psSave').onclick = () => {
+        const key = sel.value || 'Default';
+        settings.presets[key] = deepClone(schedule);
+        alert('Preset "'+key+'" gespeichert.');
+      };
+      document.getElementById('psLoad').onclick = () => {
+        const key = sel.value || 'Default';
+        const p = settings.presets[key];
+        if (!p) { alert('Kein Preset für '+key); return; }
+        schedule = deepClone(p);
+        renderGrid();
+        renderSaunasPanel();
+      };
+      auto.onchange = () => { settings.presetAuto = auto.checked; };
     }
 
     // ------- Farben -------
@@ -1189,7 +1252,9 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           },
           assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
           display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080, rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
-          footnotes: settings.footnotes
+          footnotes: settings.footnotes,
+          presets: settings.presets || {},
+          presetAuto: !!document.getElementById('presetAuto')?.checked
         }
       };
     }
@@ -1484,6 +1549,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
