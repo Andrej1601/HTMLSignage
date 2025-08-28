@@ -169,35 +169,28 @@ cat >/var/www/signage/assets/design.css <<'CSS'
   --bg:#E8DEBD; --fg:#5C3101; --accent:#5C3101;
   --grid:#5C3101; --cell:#5C3101; --boxfg:#FFFFFF; --timecol:#E8DEBD;
   --flame:#FFD166; --zebra1:#EDDFAF; --zebra2:#E6D6A1; --hlColor:#FFDD66;
+  --timeZebra1:#EAD9A0; --timeZebra2:#E2CE91; /* Zeitspalte Zebra */
+  --headBg:#E8DEBD; --headFg:#5C3101;       /* Kopfzeile */
+  --cornerBg:#E8DEBD; --cornerFg:#5C3101;   /* Ecke (oben-links) */
   /* typography */
   --font:-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
-  --scale:1;            /* global */
-  --h1Scale:1.00;       /* extra multiplier for H1 */
-  --h2Scale:1.00;       /* extra multiplier for H2 */
-  --ovHeadScale:0.90;   /* overview thead */
-  --ovCellScale:0.80;   /* overview body */
-  --tileTextScale:0.80; /* sauna tile text (default 20% kleiner) */
-  --tileWeight:600;     /* 400/500/600/700 */
-  --flameSizePx:28;     /* base flame icon px */
-
-  /* 16:9 base canvas */
-  --baseW:1920; --baseH:1080;
+  --scale:1; --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80;
+  --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28; --chipH:44px;
+  --ovAuto:1; /* overview-only autoscale factor */
 
   /* right panel shape */
-  --rightW:38%;         /* percent of canvas width */
-  --cutTop:28%;         /* polygon anchor X top */
-  --cutBottom:12%;      /* polygon anchor X bottom */
+  --rightW:38%; --cutTop:28%; --cutBottom:12%;
 
-  /* sauna tile width clamp (works in design pixels, then scaled by canvas) */
-  --tileMinPx:480px; --tileMaxPx:1100px; --tileVW:45;
+  /* sauna tile clamp (JS sets --tileTargetPx) */
+  --tileMinPx:480px; --tileMaxPx:1100px; --tileTargetPx:860px;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--font)}
 .slideshow{overflow:hidden}
 
-/* 16:9 Canvas – fixed design, scaled to viewport */
-.fitbox{position:fixed; inset:0; display:grid; place-items:center; background:var(--bg); height:100svh; min-height:100vh}
-.canvas{position:relative; width:calc(var(--baseW) * 1px); height:calc(var(--baseH) * 1px); transform-origin:top left}
+/* Full-viewport – no transform */
+.fitbox{position:fixed; inset:0;}
+.canvas{position:relative; width:100vw; height:100vh;}
 .stage{position:relative; width:100%; height:100%; overflow:hidden}
 
 .fade{opacity:0;transition:opacity .5s}
@@ -209,13 +202,16 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .container.overview{padding-right:32px}
 .h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
+/* overview-only multiply with --ovAuto */
+.overview .h1{font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
+.overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
 .caption{opacity:.85;font-size:calc(20px*var(--scale))}
 
 /* content area under headings is vertically centered */
 .body{flex:1; display:flex}
 .list{display:flex;flex-direction:column;gap:18px;width:100%;align-items:flex-start;justify-content:center}
 
-/* right image panel with adjustable diagonal */
+/* right image panel */
 .rightPanel{
   position:absolute; top:0; right:0; height:100%; width:var(--rightW);
   background-size:cover; background-position:center; background-repeat:no-repeat;
@@ -226,24 +222,32 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 
 /* overview table */
 .grid{width:100%;max-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.grid col.c_time{width:10ch}
 .grid th,.grid td{border:2px solid var(--grid);white-space:nowrap}
-.grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale));padding:8px 12px;text-align:center;background:transparent;color:var(--fg)}
-.grid tbody tr:nth-child(odd) td{background:var(--zebra1)}
-.grid tbody tr:nth-child(even) td{background:var(--zebra2)}
-.grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale));padding:8px 12px}
-.grid .timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
-.cellwrap{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-width:0}
-.cellwrap .chip{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.cellwrap .flames{flex:0 0 auto}
-.chip{display:inline-block;padding:.35em .6em;border-radius:10px;background:var(--cell);color:var(--boxfg);border:2px solid var(--grid);font-weight:700;letter-spacing:.2px}
-.chip sup{font-weight:900;margin-left:.25em}
+.grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:8px 12px;text-align:center;background:var(--headBg);color:var(--headFg)}
+.grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
 
-/* overview auto-fit wrapper keeps left edge aligned */
-.ovwrap{transform-origin:top left; display:inline-block}
+/* zebra: rows for content cells, separate zebra for time column */
+.grid tbody tr:nth-child(odd) td:not(.timecol){background:var(--zebra1)}
+.grid tbody tr:nth-child(even) td:not(.timecol){background:var(--zebra2)}
+.grid tbody tr:nth-child(odd) td.timecol{background:var(--timeZebra1)!important}
+.grid tbody tr:nth-child(even) td.timecol{background:var(--timeZebra2)!important}
+
+.grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:8px 12px}
+.grid th.timecol, .grid td.timecol{width:10ch}
+.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
+
+/* equal chips */
+.cellwrap{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;width:100%;min-width:0}
+.chip{display:flex;align-items:center;justify-content:center;width:100%;height:var(--chipH);padding:0 .8em;border-radius:10px;background:var(--cell);color:var(--boxfg);border:2px solid var(--grid);font-weight:700;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip sup{margin-left:.25em}
+
+/* overview wrapper */
+.ovwrap{display:block;width:100%}
 
 /* sauna tiles */
 .tile{display:grid; grid-template-columns:1fr auto; align-items:center; gap:16px;
-  width: clamp(var(--tileMinPx), calc(var(--tileVW) * 1vw), var(--tileMaxPx));
+  width: clamp(var(--tileMinPx), var(--tileTargetPx), var(--tileMaxPx));
   padding:14px 18px; background:var(--cell); border:3px solid var(--grid); border-radius:16px; color:var(--boxfg);
 }
 .title{font-size:calc(40px*var(--scale)*var(--tileTextScale)); font-weight:var(--tileWeight)}
@@ -252,50 +256,43 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .flame img,.flame svg{width:100%;height:100%;object-fit:contain}
 .flame svg path{fill:var(--flame)}
 
+/* note markers subtle */
+.notewrap sup.note{font-weight:400; opacity:.75; font-size:.8em}
+
 /* highlight */
 .tile.highlight{border-color:var(--hlColor); box-shadow:0 0 0 4px var(--hlColor) inset}
 .chip.highlight{outline:3px solid var(--hlColor); outline-offset:2px}
 
-.footer-note{margin-top:12px;font-size:calc(16px*var(--scale));opacity:.9}
+/* footnotes inline */
+.footer-note{margin-top:12px;font-size:calc(16px*var(--scale)*var(--ovAuto));opacity:.9; display:flex; align-items:center; gap:16px; flex-wrap:wrap}
+.footer-note .fnitem{display:flex; align-items:baseline; gap:6px}
+
 .brand{position:absolute;right:20px;bottom:16px;opacity:.6;font-size:14px;color:var(--fg)}
 CSS
 
 cat >/var/www/signage/assets/slideshow.js <<'JS'
 (() => {
-  // Elements
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
 
-  // State
   let schedule = null;
   let settings = null;
   let nextQueue = [];
   let idx = 0;
 
   // ---------- Time helpers ----------
-  const nowMinutes = () => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  };
-  const parseHM = (hm) => {
-    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || '');
-    return m ? (+m[1]) * 60 + (+m[2]) : null;
-  };
+  const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+  const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
 
   // ---------- IO ----------
-  async function loadJSON(u) {
-    const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u);
-    return await r.json();
-  }
+  async function loadJSON(u) { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u); return await r.json(); }
   async function loadAll() {
     const [s, cfg] = await Promise.all([
       loadJSON('/data/schedule.json'),
       loadJSON('/data/settings.json')
     ]);
-    schedule = s;
-    settings = cfg;
+    schedule = s; settings = cfg;
     applyTheme();
     applyDisplay();
     buildQueue();
@@ -306,28 +303,24 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     const fam = settings?.fonts?.family || '';
     if (/montserrat/i.test(fam)) {
       if (!document.getElementById('gfont_mont')) {
-        const l = document.createElement('link');
-        l.id = 'gfont_mont';
-        l.rel = 'stylesheet';
+        const l = document.createElement('link'); l.id = 'gfont_mont'; l.rel = 'stylesheet';
         l.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap';
         document.head.appendChild(l);
       }
     }
   }
+  function setVars(map){ for (const [k,v] of Object.entries(map)) if (v!==undefined && v!==null) document.documentElement.style.setProperty(k, String(v)); }
 
   function applyTheme() {
     const t = settings?.theme || {};
-    const map = {
-      '--bg': t.bg,
-      '--fg': t.fg,
-      '--accent': t.accent,
-      '--grid': t.gridBorder,
-      '--cell': t.cellBg,
-      '--boxfg': t.boxFg,
-      '--timecol': t.timeColBg,
-      '--flame': t.flame,
-      '--zebra1': t.zebra1,
-      '--zebra2': t.zebra2,
+    setVars({
+      '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
+      '--grid': t.gridBorder, '--cell': t.cellBg, '--boxfg': t.boxFg,
+      '--timecol': t.timeColBg, '--flame': t.flame,
+      '--zebra1': t.zebra1, '--zebra2': t.zebra2,
+      '--timeZebra1': t.timeZebra1 || '#EAD9A0', '--timeZebra2': t.timeZebra2 || '#E2CE91',
+      '--headBg': t.headRowBg || t.timeColBg || '#E8DEBD', '--headFg': t.headRowFg || t.fg || '#5C3101',
+      '--cornerBg': t.cornerBg || t.headRowBg || '#E8DEBD', '--cornerFg': t.cornerFg || t.headRowFg || '#5C3101',
       '--hlColor': (settings?.highlightNext?.color || '#FFDD66'),
       '--scale': settings?.fonts?.scale,
       '--h1Scale': settings?.fonts?.h1Scale || 1,
@@ -336,46 +329,25 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       '--ovCellScale': settings?.fonts?.overviewCellScale || 0.8,
       '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
       '--tileWeight': settings?.fonts?.tileWeight || 600,
-    };
-    for (const [k, v] of Object.entries(map)) {
-      if (v !== undefined && v !== null) document.documentElement.style.setProperty(k, String(v));
-    }
+      '--chipH': (settings?.fonts?.chipHeight || 44) + 'px'
+    });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
     ensureFontFamily();
   }
 
   function applyDisplay() {
     const d = settings?.display || {};
-    const baseW = d.baseW || 1920;
-    const baseH = d.baseH || 1080;
-    document.documentElement.style.setProperty('--baseW', String(baseW));
-    document.documentElement.style.setProperty('--baseH', String(baseH));
-    // right panel shape
+    // 100vw/100vh responsive – no transform scaling anymore
     if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
-    if (typeof d.cutTopPercent === 'number') document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
-    if (typeof d.cutBottomPercent === 'number') document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
-
-    const fit = d.fit || 'contain';
-    const fitOnce = () => {
-      const vw = FITBOX.clientWidth;
-      const vh = FITBOX.clientHeight;
-      const sW = vw / baseW;
-      const sH = vh / baseH;
-      let s = (fit === 'width') ? sW : Math.min(sW, sH);
-      if (fit === 'width' && baseH * s > vh) s = Math.min(sW, sH);
-      CANVAS.style.transform = 'scale(' + s + ')';
-    };
-    window.onresize = fitOnce;
-    fitOnce();
+    if (typeof d.cutTopPercent === 'number')     document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
+    if (typeof d.cutBottomPercent === 'number')  document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
   }
 
-  // ---------- Slide queue (always include all saunas) ----------
+  // ---------- Slide queue ----------
   function buildQueue() {
     const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
     const allSaunas = (schedule?.saunas || []).slice();
-
-    const queue = [];
-    const seen = new Set();
+    const queue = []; const seen = new Set();
 
     if (!cfgOrder || cfgOrder.length === 0) {
       queue.push({ type: 'overview' });
@@ -383,21 +355,13 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     } else {
       let addedOverview = false;
       for (const e of cfgOrder) {
-        if (e === 'overview') {
-          if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; }
-          continue;
-        }
-        if (allSaunas.includes(e) && !seen.has(e)) {
-          seen.add(e);
-          queue.push({ type: 'sauna', sauna: e });
-        }
+        if (e === 'overview') { if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; } continue; }
+        if (allSaunas.includes(e) && !seen.has(e)) { seen.add(e); queue.push({ type: 'sauna', sauna: e }); }
       }
-      // Append any newly added saunas not listed in order
       for (const s of allSaunas) if (!seen.has(s)) queue.push({ type: 'sauna', sauna: s });
       if (!queue.some(x => x.type === 'overview')) queue.unshift({ type: 'overview' });
     }
-
-    nextQueue = queue;
+    nextQueue.splice(0, nextQueue.length, ...queue);
     idx = 0;
   }
 
@@ -405,43 +369,25 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   function h(tag, attrs = {}, children = []) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
-      if (k === 'class') el.className = v;
-      else if (k === 'style') el.setAttribute('style', v);
-      else el.setAttribute(k, v);
+      if (k === 'class') el.className = v; else if (k === 'style') el.setAttribute('style', v); else el.setAttribute(k, v);
     }
     for (const c of [].concat(children)) {
-      if (typeof c === 'string') el.appendChild(document.createTextNode(c));
-      else if (c) el.appendChild(c);
+      if (typeof c === 'string') el.appendChild(document.createTextNode(c)); else if (c) el.appendChild(c);
     }
     return el;
   }
 
   // ---------- Flames ----------
-  function inlineFlameSVG() {
-    return h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, [
-      h('path', { d: 'M12 2c2 4-1 5-1 7 0 1 1 2 2 2 2 0 3-2 3-4 2 2 4 4 4 7 0 4-3 8-8 8s-8-4-8-8c0-5 5-7 8-12z' })
-    ]);
-  }
+  function inlineFlameSVG() { return h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, [ h('path', { d: 'M12 2c2 4-1 5-1 7 0 1 1 2 2 2 2 0 3-2 3-4 2 2 4 4 4 7 0 4-3 8-8 8s-8-4-8-8c0-5 5-7 8-12z' }) ]); }
   function flameNode() {
     const url = settings?.assets?.flameImage || '/assets/img/flame_test.svg';
     const box = h('div', { class: 'flame' });
-    if (url) {
-      const img = h('img', { src: url, alt: '' });
-      img.addEventListener('error', () => { box.innerHTML = ''; box.appendChild(inlineFlameSVG()); });
-      box.appendChild(img);
-      return box;
-    }
-    box.appendChild(inlineFlameSVG());
-    return box;
+    if (url) { const img = h('img', { src: url, alt: '' }); img.addEventListener('error', () => { box.innerHTML = ''; box.appendChild(inlineFlameSVG()); }); box.appendChild(img); return box; }
+    box.appendChild(inlineFlameSVG()); return box;
   }
   function flamesWrap(spec) {
     let count = 0, approx = false;
-    if (!spec) count = 0;
-    else if (spec === '1') count = 1;
-    else if (spec === '2') count = 2;
-    else if (spec === '3') count = 3;
-    else if (spec === '1-2') { count = 2; approx = true; }
-    else if (spec === '2-3' || spec === '1-3') { count = 3; approx = true; }
+    if (!spec) count = 0; else if (spec === '1') count = 1; else if (spec === '2') count = 2; else if (spec === '3') count = 3; else if (spec === '1-2') { count = 2; approx = true; } else if (spec === '2-3' || spec === '1-3') { count = 3; approx = true; }
     const wrap = h('div', { class: 'flames' + (approx ? ' approx' : '') });
     wrap.appendChild(count >= 1 ? flameNode() : h('span'));
     wrap.appendChild(count >= 2 ? flameNode() : h('span'));
@@ -449,54 +395,60 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     return wrap;
   }
 
+  // ---------- Footnotes ----------
+  function footnoteMap() {
+    const list = Array.isArray(settings?.footnotes) ? settings.footnotes : [];
+    const map = new Map();
+    for (const fn of list) if (fn && fn.id) map.set(fn.id, { label: fn.label || '*', text: fn.text || '' });
+    return map;
+  }
+  function noteSup(cell, notes) {
+    const id = cell?.noteId; if (!id) return null;
+    const fn = notes.get(id); if (!fn) return null;
+    return h('sup', { class: 'note' }, String(fn.label || '*'));
+  }
+
   // ---------- Highlight logic ----------
   function getHighlightMap() {
     const HL = settings?.highlightNext || {};
     if (!HL.enabled) return { bySauna: {}, byCell: {} };
 
-    const before = Number.isFinite(+HL.minutesBeforeNext) ? +HL.minutesBeforeNext : 15;
-    const after  = Number.isFinite(+HL.minutesAfterStart) ? +HL.minutesAfterStart : 15;
+    const before = Number.isFinite(+HL.minutesBeforeNext) ? +HL.minutesBeforeNext : (Number.isFinite(+HL.minutesWindow) ? +HL.minutesWindow : 15);
+    const after  = Number.isFinite(+HL.minutesAfterStart) ? +HL.minutesAfterStart : (Number.isFinite(+HL.minutesAfter) ? +HL.minutesAfter : 15);
     const now = nowMinutes();
 
-    const bySauna = {};   // saunaName -> Set(times)
-    const byCell = {};    // r{row}c{col} -> true
-
+    const bySauna = {}; const byCell = {};
     (schedule.saunas || []).forEach((saunaName, colIdx) => {
       const times = [];
       (schedule.rows || []).forEach((row, ri) => {
         const cell = (row.entries || [])[colIdx];
-        if (cell && cell.title) {
-          const m = parseHM(row.time);
-          if (m !== null) times.push({ m, ri, time: row.time });
-        }
+        if (cell && cell.title) { const m = parseHM(row.time); if (m !== null) times.push({ m, ri, time: row.time }); }
       });
       times.sort((a, b) => a.m - b.m);
-
       let chosen = null;
-      // Within active window [start, start+after]
       for (const t of times) { if (now >= t.m && now <= t.m + after) { chosen = t; break; } }
-      // Or within "before" minutes ahead of next start
-      if (!chosen) {
-        for (const t of times) { if (t.m >= now && (t.m - now) <= before) { chosen = t; break; } }
-      }
-      if (chosen) {
-        bySauna[saunaName] = new Set([chosen.time]);
-        byCell['r' + chosen.ri + 'c' + colIdx] = true;
-      }
+      if (!chosen) for (const t of times) { if (t.m >= now && (t.m - now) <= before) { chosen = t; break; } }
+      if (chosen) { bySauna[saunaName] = new Set([chosen.time]); byCell['r' + chosen.ri + 'c' + colIdx] = true; }
     });
     return { bySauna, byCell };
   }
 
   // ---------- Overview table ----------
   function tableGrid(hlMap) {
+    const notes = footnoteMap();
     const t = h('table', { class: 'grid' });
+    const colg = h('colgroup');
+    colg.appendChild(h('col', { class: 'c_time' }));
+    for (const _ of (schedule.saunas || [])) colg.appendChild(h('col', { class: 'c_auto' }));
+    t.appendChild(colg);
+
     const thead = h('thead');
     const tr = h('tr');
-    tr.appendChild(h('th', { class: 'timecol' }, 'Zeit'));
+    tr.appendChild(h('th', { class: 'timecol corner' }, 'Zeit'));
     for (const s of (schedule.saunas || [])) tr.appendChild(h('th', {}, s));
-    thead.appendChild(tr);
-    t.appendChild(thead);
+    thead.appendChild(tr); t.appendChild(thead);
 
+    const usedNotes = new Map();
     const tb = h('tbody');
     (schedule.rows || []).forEach((row, ri) => {
       const trr = h('tr');
@@ -506,9 +458,11 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
         const key = 'r' + ri + 'c' + ci;
         if (cell && cell.title) {
           const title = String(cell.title).replace(/\*+$/, '');
-          const hasStar = /\*$/.test(cell.title || '');
+          const hasStarInText = /\*$/.test(cell.title || '');
           const chip = h('span', { class: 'chip' + (hlMap.byCell[key] ? ' highlight' : '') }, title);
-          if (hasStar) chip.appendChild(h('sup', {}, '*'));
+          if (hasStarInText) chip.appendChild(h('span', { class: 'notewrap' }, [h('sup', {class:'note legacy'}, '*')]));
+          const supNote = noteSup(cell, notes);
+          if (supNote) { chip.appendChild(h('span', { class: 'notewrap' }, [supNote])); const fn = notes.get(cell.noteId); if (fn) usedNotes.set(cell.noteId, fn); }
           const wrap = h('div', { class: 'cellwrap' }, [chip, flamesWrap(cell.flames || '')]);
           td.appendChild(wrap);
         } else {
@@ -520,25 +474,25 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     });
     t.appendChild(tb);
 
-    const anyStar = (schedule.rows || []).some(r => (r.entries || []).some(c => c && /\*$/.test(c.title || '')));
-    if (anyStar && settings?.footnote) return h('div', {}, [t, h('div', { class: 'footer-note' }, settings.footnote)]);
+    const footNodes = [];
+    usedNotes.forEach((v) => { footNodes.push(h('div', {class:'fnitem'}, [h('sup', {class:'note'}, String(v.label||'*')), ' ', v.text])); });
+
+    if (footNodes.length) return h('div', {}, [t, h('div', { class: 'footer-note' }, footNodes)]);
     return t;
   }
 
-  function fitOverview(container) {
+  function autoScaleOverview(container) {
+    // shrink overview content so all rows fit vertically; keeps header/body relative scales
+    container.style.setProperty('--ovAuto', '1');
     const headH = Array.from(container.querySelectorAll('.h1,.h2')).reduce((a, el) => a + el.getBoundingClientRect().height, 0);
-    const wrap = container.querySelector('.ovwrap');
-    if (!wrap) return;
-    wrap.style.transform = 'scale(1)';
-
-    const availW = container.clientWidth - 2; // padding accounted by parent
-    const availH = container.clientHeight - headH - 16;
-    const box = wrap.getBoundingClientRect();
-    const s = Math.min(
-      availW / Math.max(1, box.width),
-      availH / Math.max(1, box.height)
-    );
-    wrap.style.transform = 'scale(' + Math.min(1, s) + ')';
+    const wrap = container.querySelector('.ovwrap'); if (!wrap) return;
+    const foot = container.querySelector('.footer-note');
+    const wrapH = wrap.getBoundingClientRect().height;
+    const footH = foot ? foot.getBoundingClientRect().height : 0;
+    const total = headH + wrapH + footH + 8;
+    const avail = container.clientHeight;
+    const s = Math.min(1, avail / Math.max(1, total));
+    container.style.setProperty('--ovAuto', String(s));
   }
 
   function renderOverview() {
@@ -548,9 +502,33 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       h('h1', { class: 'h1' }, 'Aufgussplan'),
       h('div', { class: 'ovwrap' }, [table])
     ]);
-    setTimeout(() => fitOverview(c), 0);
-    window.onresize = () => fitOverview(c);
+    const recalc = () => autoScaleOverview(c);
+    setTimeout(recalc, 0);
+    window.addEventListener('resize', recalc, { passive:true });
     return c;
+  }
+
+  // ---------- Sauna tile sizing by unobscured width ----------
+  function computeAvailContentWidth(container) {
+    const cw = container.clientWidth;
+    const rightPct = (settings?.display?.rightWidthPercent ?? 38) / 100;
+    const cutTop = (settings?.display?.cutTopPercent ?? 28) / 100;
+    const cutBottom = (settings?.display?.cutBottomPercent ?? 12) / 100;
+    const panelW = cw * rightPct;
+    const minCut = Math.min(cutTop, cutBottom);
+    const intrude = panelW * (1 - minCut);
+    const padding = 32;
+    return Math.max(0, cw - intrude - padding);
+  }
+  function applyTileSizing(container) {
+    const avail = computeAvailContentWidth(container);
+    const pct = (settings?.slides?.tileWidthPercent ?? 45) / 100;
+    const target = Math.max(0, avail * pct);
+    const minPx = settings?.slides?.tileMinPx ?? 480;
+    const maxPx = settings?.slides?.tileMaxPx ?? 1100;
+    container.style.setProperty('--tileTargetPx', target + 'px');
+    container.style.setProperty('--tileMinPx', minPx + 'px');
+    container.style.setProperty('--tileMaxPx', maxPx + 'px');
   }
 
   // ---------- Sauna slide ----------
@@ -566,48 +544,48 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     const body = h('div', { class: 'body' });
     const list = h('div', { class: 'list' });
 
+    const notes = footnoteMap();
     const colIdx = (schedule.saunas || []).indexOf(name);
     const items = [];
     for (const row of (schedule.rows || [])) {
       const cell = (row.entries || [])[colIdx];
-      if (cell && cell.title) items.push({ time: row.time, title: cell.title, flames: cell.flames || '' });
+      if (cell && cell.title) items.push({ time: row.time, title: cell.title, flames: cell.flames || '', noteId: cell.noteId });
     }
     items.sort((a, b) => a.time.localeCompare(b.time));
 
+    const usedNotes = new Map();
     for (const it of items) {
       const baseTitle = String(it.title).replace(/\*+$/, '');
       const hasStar = /\*$/.test(it.title || '');
-      const label = it.time + ' Uhr – ' + baseTitle + (hasStar ? '*' : '');
+      const labelText = it.time + ' Uhr – ' + baseTitle;
+      const titleNode = h('div', { class: 'title' }, labelText);
+      const supNote = noteSup(it, notes);
+      if (supNote) { titleNode.appendChild(h('span', { class: 'notewrap' }, [supNote])); const fn = notes.get(it.noteId); if (fn) usedNotes.set(it.noteId, fn); }
+      else if (hasStar) { titleNode.appendChild(h('span', { class: 'notewrap' }, [h('sup',{class:'note legacy'}, '*')])); }
       const isHL = hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time);
-      const tile = h('div', { class: 'tile' + (isHL ? ' highlight' : '') }, [
-        h('div', { class: 'title' }, label),
-        flamesWrap(it.flames)
-      ]);
+      const tile = h('div', { class: 'tile' + (isHL ? ' highlight' : '') }, [ titleNode, flamesWrap(it.flames) ]);
       list.appendChild(tile);
     }
     if (items.length === 0) list.appendChild(h('div', { class: 'caption' }, 'Keine Einträge.'));
 
-    body.appendChild(list);
-    c.appendChild(body);
+    body.appendChild(list); c.appendChild(body);
 
-    const hasStar = items.some(x => /\*$/.test(x.title || ''));
-    if (hasStar && settings?.footnote) c.appendChild(h('div', { class: 'footer-note' }, settings.footnote));
+    const footNodes = [];
+    usedNotes.forEach((v) => { footNodes.push(h('div', {class:'fnitem'}, [h('sup', {class:'note'}, String(v.label||'*')), ' ', v.text])); });
+    if (footNodes.length) c.appendChild(h('div', { class: 'footer-note' }, footNodes));
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
+
+    const recalc = () => applyTileSizing(c);
+    setTimeout(recalc, 0);
+    window.addEventListener('resize', recalc, { passive:true });
+
     return c;
   }
 
   // ---------- Stage helpers ----------
-  function show(el) {
-    STAGE.innerHTML = '';
-    STAGE.appendChild(el);
-    requestAnimationFrame(() => { el.classList.add('show'); });
-  }
-  function hide(cb) {
-    const cur = STAGE.firstChild;
-    if (cur) cur.classList.remove('show');
-    setTimeout(cb, (settings?.slides?.transitionMs ?? 500));
-  }
+  function show(el) { STAGE.innerHTML = ''; STAGE.appendChild(el); requestAnimationFrame(() => { el.classList.add('show'); }); }
+  function hide(cb) { const cur = STAGE.firstChild; if (cur) cur.classList.remove('show'); setTimeout(cb, (settings?.slides?.transitionMs ?? 500)); }
 
   // ---------- Loop ----------
   function step() {
@@ -615,9 +593,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     const item = nextQueue[idx % nextQueue.length];
     const el = (item.type === 'overview') ? renderOverview() : renderSauna(item.sauna);
     show(el);
-    const dwell = (item.type === 'overview')
-      ? (settings?.slides?.overviewDurationSec ?? 10) * 1000
-      : (settings?.slides?.saunaDurationSec ?? 6) * 1000;
+    const dwell = (item.type === 'overview') ? (settings?.slides?.overviewDurationSec ?? 10) * 1000 : (settings?.slides?.saunaDurationSec ?? 6) * 1000;
     setTimeout(() => hide(() => { idx++; step(); }), dwell);
   }
 
@@ -625,31 +601,19 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   async function bootstrap() {
     await loadAll();
     step();
-
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
     setInterval(async () => {
-      try {
-        const s = await loadJSON('/data/schedule.json');
-        if (s.version !== lastSchedVer) { schedule = s; lastSchedVer = s.version; buildQueue(); }
-      } catch (e) {}
-      try {
-        const cf = await loadJSON('/data/settings.json');
-        if (cf.version !== lastSetVer) { settings = cf; lastSetVer = cf.version; applyTheme(); applyDisplay(); buildQueue(); }
-      } catch (e) {}
+      try { const s = await loadJSON('/data/schedule.json'); if (s.version !== lastSchedVer) { schedule = s; lastSchedVer = s.version; buildQueue(); } } catch (e) {}
+      try { const cf = await loadJSON('/data/settings.json'); if (cf.version !== lastSetVer) { settings = cf; lastSetVer = cf.version; applyTheme(); applyDisplay(); buildQueue(); } } catch (e) {}
     }, 3000);
 
-    // Preview channel from admin (live settings without save)
     window.addEventListener('message', (ev) => {
       if (!ev?.data || ev.data.type !== 'preview') return;
       const p = ev.data.payload || {};
       if (p.schedule) schedule = p.schedule;
       if (p.settings) settings = p.settings;
-      applyTheme();
-      applyDisplay();
-      buildQueue();
-      idx = 0;
-      step();
+      applyTheme(); applyDisplay(); buildQueue(); idx = 0; step();
     });
   }
 
@@ -681,7 +645,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     .btn{border:1px solid var(--inbr);background:linear-gradient(180deg,#131a2d,#0e1426);color:#eaf0ff;padding:9px 12px;border-radius:12px;cursor:pointer;transition:transform .06s ease,filter .2s}
     .btn:hover{filter:brightness(1.06)} .btn:active{transform:translateY(1px)} .btn.primary{background:var(--acc);color:#0b0d12;border-color:var(--acc);font-weight:700} .btn.ghost{background:transparent} .btn.sm{padding:6px 10px;border-radius:10px}
 
-    main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:16px;padding:16px 12px 18px 16px;align-items:start}
+    main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 580px;gap:16px;padding:16px 12px 18px 16px;align-items:start}
     .leftcol{display:flex;flex-direction:column;gap:16px;min-width:0}
     .rightbar{position:sticky;top:64px;max-height:calc(100svh - 64px);overflow:auto;padding-right:6px;justify-self:end}
 
@@ -702,10 +666,9 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     .cellbtn{width:100%;text-align:left;background:#0f1529;border:1px dashed #39486c;color:#d9e1ff;padding:9px;border-radius:12px}
     .cellbtn.filled{border-style:solid;background:#0b1224;border-color:#2a3450}
 
-    .kv{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center}
+    .kv{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
     .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
 
-    /* sauna rows (vertical list) */
     .saunarow{display:grid;grid-template-columns:1fr 64px auto auto auto auto;gap:10px;align-items:center;margin-bottom:10px}
     .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
 
@@ -715,11 +678,15 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     .color-item{display:flex;align-items:center;gap:8px}
     .swatch{width:24px;height:24px;border-radius:6px;border:1px solid #2f3f60}
 
+    .subh{margin:12px 0 6px;font-weight:800;opacity:.95}
+    .mut{opacity:.7}
+    .help{opacity:.7;font-size:12px}
+
     footer{display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--br);color:var(--mut)}
 
     .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:100}
-    .box{background:#0e1426;border:1px solid var(--inbr);border-radius:16px;min-width:340px;max-width:95vw;max-height:90svh;overflow:auto;padding:16px}
-    .grid2{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center}
+    .box{background:#0e1426;border:1px solid var(--inbr);border-radius:16px;min-width:360px;max-width:95vw;max-height:90svh;overflow:auto;padding:16px}
+    .grid2{display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center}
     .iframeWrap{width:min(92vw,1600px);height:min(85svh,900px);border:1px solid var(--inbr);border-radius:14px;overflow:hidden;background:#000}
     .iframeWrap iframe{width:100%;height:100%;display:block;border:0}
   </style>
@@ -739,15 +706,15 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       <div class="card">
         <div class="content" style="padding-bottom:0">
           <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:8px">
-            <div style="font-weight:700">Tabelle <span style="opacity:.7">(Zeiten × Saunen)</span></div>
-            <div class="row"><span style="opacity:.7">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span></div>
+            <div style="font-weight:700">Tabelle <span class="mut">(Zeiten × Saunen)</span></div>
+            <div class="row"><span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span></div>
           </div>
           <table id="grid" class="tbl"></table>
           <div class="row" style="margin:12px 0 4px">
             <button class="btn sm" id="btnAddAbove">Zeile darüber +</button>
             <button class="btn sm" id="btnAddBelow">Zeile darunter +</button>
             <button class="btn sm" id="btnDeleteRow">Ausgewählte Zeile löschen</button>
-            <span style="opacity:.7">Zelle klicken = Zeile markieren · Zeit im Dialog verschiebt korrekt.</span>
+            <span class="mut">Zelle klicken = Zeile markieren · Zeit im Dialog verschiebt korrekt.</span>
           </div>
         </div>
       </div>
@@ -760,9 +727,23 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
         </summary>
         <div class="content">
+          <div class="subh">Skalierung & 16:9</div>
+          <div class="kv"><label>Fit‑Modus</label>
+            <select id="fitMode" class="input">
+              <option value="cover">Cover (bildschirmfüllend, kann beschneiden)</option>
+              <option value="contain">Contain (einpassen, keine Beschneidung)</option>
+              <option value="width">Nur Breite anpassen</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
+          <div class="help">„Cover“ füllt 1080p/1440p **ohne Rand**. Andere Verhältnisse werden ggf. beschnitten. „Contain“ zeigt immer alles (Rand möglich).</div>
+
+          <div class="subh">Zeiten & Dauer</div>
           <div class="kv"><label>Übersicht (Sek.)</label><input id="overviewSec" class="input" type="number" min="1" value="10"></div>
           <div class="kv"><label>Saunafolie (Sek.)</label><input id="saunaSec" class="input" type="number" min="1" value="6"></div>
           <div class="kv"><label>Transition (ms)</label><input id="transMs" class="input" type="number" min="0" value="500"></div>
+
+          <div class="subh">Schrift</div>
           <div class="kv"><label>Schriftfamilie</label>
             <select id="fontFamily" class="input">
               <option value="system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif">System (Default)</option>
@@ -775,10 +756,17 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="kv"><label>Globaler Scale</label><input id="fontScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
           <div class="kv"><label>H1 Scale</label><input id="h1Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
           <div class="kv"><label>H2 Scale</label><input id="h2Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
-          <div class="kv"><label>Übersicht: Kopf-Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
-          <div class="kv"><label>Übersicht: Zellen-Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
-          <div class="kv"><label>Kachel-Text Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
-          <div class="kv"><label>Kachel Font-Weight</label>
+
+          <div class="subh">Übersicht (Tabelle)</div>
+          <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
+          <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
+          <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+          <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="28" max="120" value="44"></div>
+          <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
+
+          <div class="subh">Saunafolien (Kacheln)</div>
+          <div class="kv"><label>Text‑Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+          <div class="kv"><label>Font‑Weight</label>
             <select id="tileWeight" class="input">
               <option value="400">Normal (400)</option>
               <option value="500">Medium (500)</option>
@@ -787,23 +775,24 @@ cat >/var/www/signage/admin/index.html <<'HTML'
               <option value="800">Extra Bold (800)</option>
             </select>
           </div>
-          <div class="kv"><label>Fußnote</label><input id="footnote" class="input" type="text" placeholder="z. B. * Nur am Fr und Sa"></div>
-        </div>
-      </details>
+          <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
+          <div class="kv"><label>Kachel‑Breite min (px)</label><input id="tileMin" class="input" type="number" min="100" max="2000" value="480"></div>
+          <div class="kv"><label>Kachel‑Breite max (px)</label><input id="tileMax" class="input" type="number" min="200" max="3000" value="1100"></div>
 
-      <details class="ac" open>
-        <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Hervorhebungen</div>
-        </summary>
-        <div class="content">
-          <div class="kv"><label>Aktiv</label><input id="hlEnabled" type="checkbox"></div>
-          <div class="kv"><label>Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
-          <div class="kv"><label>Min. vor Start (+)</label><input id="hlBefore" class="input" type="number" min="0" max="120" value="15"></div>
-          <div class="kv"><label>Min. nach Start (−)</label><input id="hlAfter" class="input" type="number" min="0" max="120" value="15"></div>
-          <div class="kv"><label>Flammen-Bild</label>
+          <div class="subh">Bildspalte / Schrägschnitt</div>
+          <div class="kv"><label>Breite rechts (%)</label><input id="rightW" class="input" type="number" min="0" max="70" value="38"></div>
+          <div class="kv"><label>Schnitt oben (%)</label><input id="cutTop" class="input" type="number" min="0" max="100" value="28"></div>
+          <div class="kv"><label>Schnitt unten (%)</label><input id="cutBottom" class="input" type="number" min="0" max="100" value="12"></div>
+          <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
+
+          <div class="subh">Flammen / Hervorhebungen</div>
+          <div class="kv"><label>Highlight aktiv</label><input id="hlEnabled" type="checkbox"></div>
+          <div class="kv"><label>Highlight‑Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
+          <div class="kv"><label>Min. vor Start</label><input id="hlBefore" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Min. nach Start</label><input id="hlAfter" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Flammen‑Bild</label>
             <div class="row" style="gap:8px">
               <img id="flamePrev" class="prev" alt="">
-              <!-- URL-Feld versteckt: nur Preview + Upload/Reset -->
               <input id="flameImg" type="hidden" />
               <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="flameFile" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
               <button class="btn sm" id="resetFlame">Default</button>
@@ -821,19 +810,30 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           </div>
         </summary>
         <div class="content">
-          <div class="row" style="opacity:.7;font-weight:700;margin-bottom:6px">
+          <div class="row mut" style="font-weight:700;margin-bottom:6px">
             <div style="width:100%">Name · Preview · Upload · Default · Entfernen</div>
           </div>
           <div id="saunaList"></div>
         </div>
       </details>
 
-      <details class="ac">
+      <details class="ac" open>
         <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Farben (geclustert)</div>
+          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
         </summary>
         <div class="content color-cols" id="colorList"></div>
+      </details>
+
+      <details class="ac">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Fußnoten (Liste)</div>
+          <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+        </summary>
+        <div class="content">
+          <div id="fnList"></div>
+          <div class="help">Jede Fußnote hat ein <b>Label</b> (z. B. *, †, 1) und einen <b>Text</b>. Label erscheint als Hochstellung am Eintrag und in der Legende.</div>
+        </div>
       </details>
     </aside>
   </main>
@@ -852,6 +852,13 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <option>1</option><option>2</option><option>3</option>
           <option>1-2</option><option>2-3</option><option>1-3</option>
         </select>
+        <label>Fußnote</label>
+        <div>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="m_hasNote"> hinzufügen</label>
+          <div class="row" id="m_noteRow" style="margin-top:8px;display:none">
+            <select id="m_note" class="input"></select>
+          </div>
+        </div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:14px">
         <button class="btn" id="m_cancel">Abbrechen</button>
@@ -868,36 +875,64 @@ cat >/var/www/signage/admin/index.html <<'HTML'
         <div class="row"><button class="btn sm" id="prevReload">Neu laden</button><button class="btn sm" id="prevClose">Schließen</button></div>
       </div>
       <div class="iframeWrap"><iframe id="prevFrame" src="/"></iframe></div>
-      <small style="opacity:.7;display:block;margin-top:8px">Die Vorschau verwendet die aktuellen (nicht gespeicherten) Einstellungen.</small>
+      <small class="mut" style="display:block;margin-top:8px">Die Vorschau verwendet die aktuellen (nicht gespeicherten) Einstellungen.</small>
     </div>
   </div>
 
   <script>
     const DEFAULTS = {
-      slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500 },
-      display:{ fit:'contain', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
-      theme:{ bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101', gridBorder:'#5C3101', cellBg:'#5C3101', boxFg:'#FFFFFF', saunaColor:'#5C3101', timeColBg:'#E8DEBD', flame:'#FFD166', zebra1:'#EDDFAF', zebra2:'#E6D6A1' },
+      slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinPx:480, tileMaxPx:1100 },
+      display:{ fit:'cover', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
+      theme:{
+        bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
+        gridBorder:'#5C3101', cellBg:'#5C3101', boxFg:'#FFFFFF', saunaColor:'#5C3101',
+        timeColBg:'#E8DEBD', zebra1:'#EDDFAF', zebra2:'#E6D6A1',
+        headRowBg:'#E8DEBD', headRowFg:'#5C3101',
+        timeZebra1:'#EAD9A0', timeZebra2:'#E2CE91',
+        cornerBg:'#E8DEBD', cornerFg:'#5C3101',
+        flame:'#FFD166'
+      },
       highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
-      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600 },
-      assets:{ flameImage:'/assets/img/flame_test.svg' }
+      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600, chipHeight:44 },
+      assets:{ flameImage:'/assets/img/flame_test.svg' },
+      footnotes:[ {id:'star', label:'*', text:'Nur am Fr und Sa'} ]
     };
 
     let schedule=null, settings=null, curRow=0, curCol=0;
     const $=(s,r=document)=>r.querySelector(s);
     const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-    const sanitizeUrl=(s)=>{ s=(s||'').trim(); if(!s) return ''; const ok=/^(https?:\/\/[^\s]+|\/assets\/img\/[-A-Za-z0-9_.\/]+)$/i.test(s); return ok?s:'' };
     const preloadImg=(u)=> new Promise(res=>{ if(!u) return res({ok:false}); const i=new Image(); i.onload=()=>res({ok:true,w:i.naturalWidth,h:i.naturalHeight}); i.onerror=()=>res({ok:false}); i.src=u; });
     const parseTime = (s) => { const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec((s||'').trim()); return m ? (m[1]+':'+m[2]) : null; };
+    const genId = () => 'fn_' + Math.random().toString(36).slice(2,9);
 
-    async function loadAll(){ const [s,cfg]=await Promise.all([ fetch('/admin/api/load.php').then(r=>r.json()), fetch('/admin/api/load_settings.php').then(r=>r.json()) ]); schedule=s; settings=cfg; renderGrid(); renderSlides(); renderHighlightBox(); renderSaunasPanel(); renderColors(); }
+    async function loadAll(){
+      const [s,cfg]=await Promise.all([
+        fetch('/admin/api/load.php').then(r=>r.json()),
+        fetch('/admin/api/load_settings.php').then(r=>r.json())
+      ]);
+      schedule=s; settings=cfg;
+      settings.slides = { ...DEFAULTS.slides, ...(settings.slides||{}) };
+      settings.display= { ...DEFAULTS.display, ...(settings.display||{}) };
+      settings.theme  = { ...DEFAULTS.theme,   ...(settings.theme||{}) };
+      settings.fonts  = { ...DEFAULTS.fonts,   ...(settings.fonts||{}) };
+      settings.assets = { ...DEFAULTS.assets,  ...(settings.assets||{}) };
+      settings.footnotes = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes||[]);
+
+      renderGrid();
+      renderSlides();
+      renderHighlightBox();
+      renderSaunasPanel();
+      renderColors();
+      renderFootnotes();
+    }
 
     // ------- Grid -------
     function renderGrid(){
       const head=['Zeit',...(schedule.saunas||[])];
-      let html='<thead><tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>';
+      let html='<thead><tr>' + head.map((h,i)=>`<th class="${i===0?'timecol corner':''}">${h}</th>`).join('') + '</tr></thead><tbody>';
       (schedule.rows||[]).forEach((row,ri)=>{
         html+='<tr>';
-        html+=`<td class="time" data-ri="${ri}"><input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center"></td>`;
+        html+=`<td class="time timecol" data-ri="${ri}"><input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center"></td>`;
         (row.entries||[]).forEach((cell,ci)=>{
           const filled = (cell && cell.title) ? 'filled' : '';
           const label = (cell && cell.title) ? (cell.title + (cell.flames ? (' · '+cell.flames) : '')) : '—';
@@ -926,6 +961,11 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           $('#m_time').value=schedule.rows[curRow].time;
           $('#m_title').value=cell.title||'';
           $('#m_flames').value=cell.flames||'';
+          populateNoteSelect();
+          const has = !!cell.noteId;
+          $('#m_hasNote').checked = has;
+          $('#m_noteRow').style.display = has ? 'flex' : 'none';
+          if (has) $('#m_note').value = cell.noteId;
           $('#modal').style.display='grid';
           $('#m_title').focus();
         };
@@ -935,15 +975,26 @@ cat >/var/www/signage/admin/index.html <<'HTML'
 
     // Dialog
     $('#m_cancel').onclick=()=> $('#modal').style.display='none';
+    $('#m_hasNote').onchange=()=>{ $('#m_noteRow').style.display = $('#m_hasNote').checked ? 'flex' : 'none'; };
+    function populateNoteSelect(){
+      const sel = $('#m_note'); sel.innerHTML='';
+      (settings.footnotes||[]).forEach(fn=>{
+        const o=document.createElement('option'); o.value=fn.id; o.textContent=`${fn.label} — ${fn.text}`; sel.appendChild(o);
+      });
+    }
     $('#m_ok').onclick=()=>{
       const title=$('#m_title').value.trim();
       const flames=$('#m_flames').value;
       const newTime=parseTime($('#m_time').value);
+      const hasNote=$('#m_hasNote').checked;
+      const noteId= hasNote ? $('#m_note').value : null;
       if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; }
-      const newCell= title? {title,flames}:null;
+      const newCell= title? {title,flames} : null;
+      if (newCell && hasNote) newCell.noteId = noteId;
+
       if (newTime && newTime!==schedule.rows[curRow].time && newCell){
         let targetIdx=schedule.rows.findIndex(r => r.time===newTime);
-        if(targetIdx===-1){ const cols=schedule.saunas.length; schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)}); schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); targetIdx=schedule.rows.findIndex(r => r.time===newTime);}
+        if(targetIdx===-1){ const cols=schedule.saunas.length; schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)}); schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); targetIdx=schedule.rows.findIndex(r => r.time===newTime);} 
         schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null;
       } else {
         schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime;
@@ -958,38 +1009,51 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     $('#btnAddBelow').onclick=()=>{ const cols=schedule.saunas.length; schedule.rows.splice(curRow+1,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)}); renderGrid(); };
     $('#btnDeleteRow').onclick=()=>{ if(schedule.rows.length>1){ schedule.rows.splice(curRow,1); curRow=Math.max(0,curRow-1); renderGrid(); updateSelTime(); } };
 
-    // ------- Slides box -------
+    // ------- Slides & Settings -------
     function renderSlides(){
       const f=settings.fonts||{};
+      $('#fitMode').value   = settings.display?.fit || 'cover';
       $('#overviewSec').value = settings.slides?.overviewDurationSec??10;
       $('#saunaSec').value    = settings.slides?.saunaDurationSec??6;
       $('#transMs').value     = settings.slides?.transitionMs??500;
+
       $('#fontFamily').value  = f.family || DEFAULTS.fonts.family;
       $('#fontScale').value   = f.scale ?? 1;
       $('#h1Scale').value     = f.h1Scale ?? 1;
       $('#h2Scale').value     = f.h2Scale ?? 1;
+      $('#ovTitleScale').value= f.overviewTitleScale ?? 1;
       $('#ovHeadScale').value = f.overviewHeadScale ?? 0.9;
       $('#ovCellScale').value = f.overviewCellScale ?? 0.8;
+      $('#chipH').value       = f.chipHeight ?? 44;
+
       $('#tileTextScale').value = f.tileTextScale ?? 0.8;
       $('#tileWeight').value    = f.tileWeight ?? 600;
-      $('#footnote').value   = settings.footnote||'';
+      $('#tilePct').value = settings.slides?.tileWidthPercent ?? 45;
+      $('#tileMin').value = settings.slides?.tileMinPx ?? 480;
+      $('#tileMax').value = settings.slides?.tileMaxPx ?? 1100;
+
+      $('#rightW').value   = settings.display?.rightWidthPercent ?? 38;
+      $('#cutTop').value   = settings.display?.cutTopPercent ?? 28;
+      $('#cutBottom').value= settings.display?.cutBottomPercent ?? 12;
+
       $('#resetSlides').onclick = ()=>{
+        $('#fitMode').value='cover';
         $('#overviewSec').value=DEFAULTS.slides.overviewDurationSec;
         $('#saunaSec').value=DEFAULTS.slides.saunaDurationSec;
         $('#transMs').value=DEFAULTS.slides.transitionMs;
         $('#fontFamily').value=DEFAULTS.fonts.family;
-        $('#fontScale').value=1;
-        $('#h1Scale').value=1;
-        $('#h2Scale').value=1;
+        $('#fontScale').value=1; $('#h1Scale').value=1; $('#h2Scale').value=1;
+        $('#ovTitleScale').value=1;
         $('#ovHeadScale').value=DEFAULTS.fonts.overviewHeadScale;
         $('#ovCellScale').value=DEFAULTS.fonts.overviewCellScale;
-        $('#tileTextScale').value=0.8;
-        $('#tileWeight').value=600;
-        $('#footnote').value='';
+        $('#chipH').value=44;
+        $('#tileTextScale').value=0.8; $('#tileWeight').value=600;
+        $('#tilePct').value=45; $('#tileMin').value=480; $('#tileMax').value=1100;
+        $('#rightW').value=38; $('#cutTop').value=28; $('#cutBottom').value=12;
       };
     }
 
-    // ------- Hervorhebungen (incl. flame) -------
+    // ------- Highlights & Flames -------
     function renderHighlightBox(){
       const hl=settings.highlightNext||DEFAULTS.highlightNext;
       $('#hlEnabled').checked = !!hl.enabled;
@@ -998,7 +1062,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       $('#hlAfter').value  = Number.isFinite(+hl.minutesAfterStart)?hl.minutesAfterStart:DEFAULTS.highlightNext.minutesAfterStart;
       const setSw=()=> $('#hlSw').style.background = $('#hlColor').value; setSw();
       $('#hlColor').addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)) setSw(); });
-      // flame (URL hidden, only preview)
+
       $('#flameImg').value    = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
       updateFlamePreview($('#flameImg').value);
       $('#flameFile').onchange= ()=> uploadGeneric($('#flameFile'), (p)=>{ settings.assets=settings.assets||{}; settings.assets.flameImage=p; $('#flameImg').value=p; updateFlamePreview(p); });
@@ -1006,7 +1070,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     }
     function updateFlamePreview(u){ const img=$('#flamePrev'); preloadImg(u).then(r=>{ if(r.ok){ img.src=u; img.title=r.w+'×'+r.h; } else { img.removeAttribute('src'); img.title=''; } }); }
 
-    // ------- Saunen panel (vertical) -------
+    // ------- Saunen panel -------
     function saunaRow(i){
       const name=schedule.saunas[i];
       const id='sx_'+i;
@@ -1018,31 +1082,25 @@ cat >/var/www/signage/admin/index.html <<'HTML'
          <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="f_${id}" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
          <button class="btn sm" id="d_${id}">Default</button>
          <button class="btn sm" id="x_${id}">✕</button>
-         <span id="s_${id}" style="opacity:.7"></span>`;
+         <span id="s_${id}" class="mut"></span>`;
       const $name=$(`#n_${id}`,wrap), $img=$(`#p_${id}`,wrap), $file=$(`#f_${id}`,wrap), $def=$(`#d_${id}`,wrap), $del=$(`#x_${id}`,wrap), $st=$(`#s_${id}`,wrap);
       const url = (settings.assets?.rightImages?.[name]) || '';
       (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } } })();
-      // upload
       $file.onchange=()=> uploadGeneric($file, (p)=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]=p; $img.src=p; $st.textContent='gespeichert'; });
-      // default
       $def.onclick=()=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]='/assets/img/right_default.svg'; $img.src='/assets/img/right_default.svg'; $st.textContent='Default'; };
-      // delete sauna
       $del.onclick=()=>{ if(!confirm('Sauna wirklich entfernen?')) return; const removedName=schedule.saunas.splice(i,1)[0]; schedule.rows.forEach(r=> r.entries.splice(i,1)); if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName]; renderGrid(); renderSaunasPanel(); };
-      // rename sauna
       $name.onchange=()=>{ const newName=$name.value.trim()||name; if(newName===name) return; const old=name; schedule.saunas[i]=newName; if(settings.assets?.rightImages){ const val=settings.assets.rightImages[old]; delete settings.assets.rightImages[old]; settings.assets.rightImages[newName]=val; } renderGrid(); renderSaunasPanel(); };
       return wrap;
     }
     function renderSaunasPanel(){
-      const host=$('#saunaList');
-      host.innerHTML='';
-      settings.assets=settings.assets||{};
-      settings.assets.rightImages=settings.assets.rightImages||{};
+      const host=$('#saunaList'); host.innerHTML='';
+      settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{};
       (schedule.saunas||[]).forEach((_,i)=> host.appendChild(saunaRow(i)) );
       $('#btnAddSauna').onclick=()=>{ const name = prompt('Neuer Saunananame:', 'Neue Sauna'); if(!name) return; schedule.saunas.push(name); schedule.rows.forEach(r=> r.entries.push(null)); renderGrid(); renderSaunasPanel(); };
       $('#btnCleanup').onclick=cleanupAssets;
     }
 
-    // ------- Farben (clustered) -------
+    // ------- Farben -------
     function colorField(key,label,init){ const row=document.createElement('div'); row.className='kv'; row.innerHTML=`<label>${label}</label><div class="color-item"><div class="swatch" id="sw_${key}"></div><input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB"></div>`; return row; }
     function renderColors(){
       const host=$('#colorList'); host.innerHTML='';
@@ -1054,20 +1112,40 @@ cat >/var/www/signage/admin/index.html <<'HTML'
 
       const B=document.createElement('div'); B.className='fieldset'; B.innerHTML='<div class="legend">Übersichtstabelle</div>';
       B.appendChild(colorField('gridBorder','Tabellenrand', theme.gridBorder||DEFAULTS.theme.gridBorder));
-      B.appendChild(colorField('timeColBg','Zeitspalten-Hintergrund', theme.timeColBg||DEFAULTS.theme.timeColBg));
-      B.appendChild(colorField('zebra1','Zebra 1', theme.zebra1||DEFAULTS.theme.zebra1));
-      B.appendChild(colorField('zebra2','Zebra 2', theme.zebra2||DEFAULTS.theme.zebra2));
+      B.appendChild(colorField('headRowBg','Kopfzeile Hintergrund', theme.headRowBg||DEFAULTS.theme.headRowBg));
+      B.appendChild(colorField('headRowFg','Kopfzeile Schrift', theme.headRowFg||DEFAULTS.theme.headRowFg));
+      B.appendChild(colorField('zebra1','Zebra (Inhalt) 1', theme.zebra1||DEFAULTS.theme.zebra1));
+      B.appendChild(colorField('zebra2','Zebra (Inhalt) 2', theme.zebra2||DEFAULTS.theme.zebra2));
+      B.appendChild(colorField('timeZebra1','Zeitspalte Zebra 1', theme.timeZebra1||DEFAULTS.theme.timeZebra1));
+      B.appendChild(colorField('timeZebra2','Zeitspalte Zebra 2', theme.timeZebra2||DEFAULTS.theme.timeZebra2));
+      B.appendChild(colorField('cornerBg','Ecke (oben‑links) BG', theme.cornerBg||DEFAULTS.theme.cornerBg));
+      B.appendChild(colorField('cornerFg','Ecke (oben‑links) FG', theme.cornerFg||DEFAULTS.theme.cornerFg));
 
-      const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna-Folien & Flammen</div>';
-      C.appendChild(colorField('cellBg','Kachel-Hintergrund', theme.cellBg||DEFAULTS.theme.cellBg));
-      C.appendChild(colorField('boxFg','Kachel-Schrift', theme.boxFg||DEFAULTS.theme.boxFg));
-      C.appendChild(colorField('saunaColor','Sauna-Überschrift', theme.saunaColor||DEFAULTS.theme.saunaColor));
+      const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna‑Folien & Flammen</div>';
+      C.appendChild(colorField('cellBg','Kachel‑Hintergrund', theme.cellBg||DEFAULTS.theme.cellBg));
+      C.appendChild(colorField('boxFg','Kachel‑Schrift', theme.boxFg||DEFAULTS.theme.boxFg));
+      C.appendChild(colorField('saunaColor','Sauna‑Überschrift', theme.saunaColor||DEFAULTS.theme.saunaColor));
       C.appendChild(colorField('flame','Flammen', theme.flame||DEFAULTS.theme.flame));
 
       host.appendChild(A); host.appendChild(B); host.appendChild(C);
-      // previews
       $$('#colorList input[type="text"]').forEach(inp=>{ const sw=$('#sw_'+inp.id.replace(/^cl_/,'')); const setPrev=v=>sw.style.background=v; setPrev(inp.value); inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); }); });
       $('#resetColors').onclick=()=>{ $$('#colorList input[type="text"]').forEach(inp=>{ const k=inp.id.replace(/^cl_/,''); inp.value=(DEFAULTS.theme[k]||'#FFFFFF'); const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value; }); };
+    }
+
+    // ------- Fußnoten -------
+    function renderFootnotes(){
+      const host=$('#fnList'); host.innerHTML='';
+      const list = settings.footnotes || [];
+      list.forEach((fn,i)=> host.appendChild(fnRow(fn,i)));
+      $('#fnAdd').onclick=()=>{ (settings.footnotes ||= []).push({id:genId(), label:'*', text:''}); renderFootnotes(); };
+    }
+    function fnRow(fn,i){
+      const wrap=document.createElement('div'); wrap.className='kv';
+      wrap.innerHTML = `<label>Label/Text</label><div class="row" style="gap:8px;flex-wrap:nowrap"><input class="input" id="fn_l_${i}" value="${fn.label||'*'}" style="width:6ch"/><input class="input" id="fn_t_${i}" value="${fn.text||''}"/><button class="btn sm" id="fn_x_${i}">✕</button></div>`;
+      wrap.querySelector(`#fn_l_${i}`).onchange=(e)=>{ fn.label = (e.target.value||'*').slice(0,2); };
+      wrap.querySelector(`#fn_t_${i}`).onchange=(e)=>{ fn.text = e.target.value||''; };
+      wrap.querySelector(`#fn_x_${i}`).onclick=()=>{ settings.footnotes.splice(i,1); renderFootnotes(); };
+      return wrap;
     }
 
     // ------- Upload helper & cleanup -------
@@ -1081,14 +1159,15 @@ cat >/var/www/signage/admin/index.html <<'HTML'
         schedule:{...schedule},
         settings:{
           ...settings,
-          footnote: $('#footnote')?.value || settings.footnote || '',
           fonts:{
             family: $('#fontFamily').value,
             scale: +($('#fontScale')?.value||1),
             h1Scale:+($('#h1Scale').value||1),
             h2Scale:+($('#h2Scale').value||1),
+            overviewTitleScale:+($('#ovTitleScale').value||1),
             overviewHeadScale:+($('#ovHeadScale').value||0.9),
             overviewCellScale:+($('#ovCellScale').value||0.8),
+            chipHeight:+($('#chipH').value||44),
             tileTextScale:+($('#tileTextScale').value||0.8),
             tileWeight:+($('#tileWeight').value||600)
           },
@@ -1096,7 +1175,10 @@ cat >/var/www/signage/admin/index.html <<'HTML'
             ...(settings.slides||{}),
             overviewDurationSec:+($('#overviewSec')?.value||10),
             saunaDurationSec:+($('#saunaSec')?.value||6),
-            transitionMs:+($('#transMs')?.value||500)
+            transitionMs:+($('#transMs')?.value||500),
+            tileWidthPercent:+($('#tilePct').value||45),
+            tileMinPx:+($('#tileMin').value||480),
+            tileMaxPx:+($('#tileMax').value||1100)
           },
           theme: collectColors(),
           highlightNext:{
@@ -1106,7 +1188,8 @@ cat >/var/www/signage/admin/index.html <<'HTML'
             minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
           },
           assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
-          display:{ ...(settings.display||{}), fit:'contain', baseW:1920, baseH:1080 }
+          display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080, rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
+          footnotes: settings.footnotes
         }
       };
     }
@@ -1401,6 +1484,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
