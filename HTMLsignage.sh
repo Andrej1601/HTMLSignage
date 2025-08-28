@@ -189,7 +189,7 @@ cat >/var/www/signage/assets/design.css <<'CSS'
   --cutBottom:12%;      /* polygon anchor X bottom */
 
   /* sauna tile width clamp (works in design pixels, then scaled by canvas) */
-  --tileMinPx:480px; --tileMaxPx:1100px; --tileVW:45; /* vw relative, used only in vw-mode variants */
+  --tileMinPx:480px; --tileMaxPx:1100px; --tileVW:45;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--font)}
@@ -204,9 +204,9 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .fade.show{opacity:1}
 
 /* layout */
-.container{position:relative; height:100%; padding:32px 30px; display:flex; flex-direction:column; align-items:flex-start}
-.container.has-right{padding-right:calc(var(--rightW) + 30px)}
-.container.overview{padding-right:30px}
+.container{position:relative; height:100%; padding:32px; display:flex; flex-direction:column; align-items:flex-start}
+.container.has-right{padding-right:calc(var(--rightW) + 32px)}
+.container.overview{padding-right:32px}
 .h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
 .caption{opacity:.85;font-size:calc(20px*var(--scale))}
@@ -239,7 +239,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .chip sup{font-weight:900;margin-left:.25em}
 
 /* overview auto-fit wrapper keeps left edge aligned */
-.ovwrap{transform-origin:top left; width:100%}
+.ovwrap{transform-origin:top left; display:inline-block}
 
 /* sauna tiles */
 .tile{display:grid; grid-template-columns:1fr auto; align-items:center; gap:16px;
@@ -262,20 +262,31 @@ CSS
 
 cat >/var/www/signage/assets/slideshow.js <<'JS'
 (() => {
+  // Elements
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
-  const STAGE = document.getElementById('stage');
-  let schedule = null, settings = null, nextQueue = [], idx = 0;
+  const STAGE  = document.getElementById('stage');
 
+  // State
+  let schedule = null;
+  let settings = null;
+  let nextQueue = [];
+  let idx = 0;
+
+  // ---------- Time helpers ----------
   const nowMinutes = () => {
     const d = new Date();
-    return d.getHours()*60 + d.getMinutes();
+    return d.getHours() * 60 + d.getMinutes();
   };
-  const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm||''); return m ? (+m[1])*60 + (+m[2]) : null; };
+  const parseHM = (hm) => {
+    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || '');
+    return m ? (+m[1]) * 60 + (+m[2]) : null;
+  };
 
+  // ---------- IO ----------
   async function loadJSON(u) {
-    const r = await fetch(u + '?t=' + Date.now(), {cache:'no-store'});
-    if(!r.ok) throw new Error('HTTP '+r.status+' for '+u);
+    const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u);
     return await r.json();
   }
   async function loadAll() {
@@ -283,30 +294,40 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       loadJSON('/data/schedule.json'),
       loadJSON('/data/settings.json')
     ]);
-    schedule = s; settings = cfg;
+    schedule = s;
+    settings = cfg;
     applyTheme();
     applyDisplay();
     buildQueue();
   }
 
-  function ensureFontFamily(){
+  // ---------- Theme & Display ----------
+  function ensureFontFamily() {
     const fam = settings?.fonts?.family || '';
     if (/montserrat/i.test(fam)) {
-      if (!document.getElementById('gfont_mont')){
-        const l = document.createElement('link'); l.id='gfont_mont'; l.rel='stylesheet';
+      if (!document.getElementById('gfont_mont')) {
+        const l = document.createElement('link');
+        l.id = 'gfont_mont';
+        l.rel = 'stylesheet';
         l.href = 'https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap';
         document.head.appendChild(l);
       }
     }
   }
 
-  function applyTheme(){
+  function applyTheme() {
     const t = settings?.theme || {};
     const map = {
-      '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
-      '--grid': t.gridBorder, '--cell': t.cellBg, '--boxfg': t.boxFg,
-      '--timecol': t.timeColBg, '--flame': t.flame,
-      '--zebra1': t.zebra1, '--zebra2': t.zebra2,
+      '--bg': t.bg,
+      '--fg': t.fg,
+      '--accent': t.accent,
+      '--grid': t.gridBorder,
+      '--cell': t.cellBg,
+      '--boxfg': t.boxFg,
+      '--timecol': t.timeColBg,
+      '--flame': t.flame,
+      '--zebra1': t.zebra1,
+      '--zebra2': t.zebra2,
       '--hlColor': (settings?.highlightNext?.color || '#FFDD66'),
       '--scale': settings?.fonts?.scale,
       '--h1Scale': settings?.fonts?.h1Scale || 1,
@@ -316,213 +337,322 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
       '--tileWeight': settings?.fonts?.tileWeight || 600,
     };
-    for (const [k,v] of Object.entries(map)) if (v!==undefined && v!==null) document.documentElement.style.setProperty(k, String(v));
+    for (const [k, v] of Object.entries(map)) {
+      if (v !== undefined && v !== null) document.documentElement.style.setProperty(k, String(v));
+    }
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
     ensureFontFamily();
   }
 
-  function applyDisplay(){
-    const d = settings?.display || {}; const baseW = d.baseW||1920, baseH = d.baseH||1080;
-    document.documentElement.style.setProperty('--baseW', baseW);
-    document.documentElement.style.setProperty('--baseH', baseH);
+  function applyDisplay() {
+    const d = settings?.display || {};
+    const baseW = d.baseW || 1920;
+    const baseH = d.baseH || 1080;
+    document.documentElement.style.setProperty('--baseW', String(baseW));
+    document.documentElement.style.setProperty('--baseH', String(baseH));
     // right panel shape
-    if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent+'%');
-    if (typeof d.cutTopPercent === 'number') document.documentElement.style.setProperty('--cutTop', d.cutTopPercent+'%');
-    if (typeof d.cutBottomPercent === 'number') document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent+'%');
+    if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
+    if (typeof d.cutTopPercent === 'number') document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
+    if (typeof d.cutBottomPercent === 'number') document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
 
-    const fit = d.fit||'contain';
+    const fit = d.fit || 'contain';
     const fitOnce = () => {
-      const vw = FITBOX.clientWidth, vh = FITBOX.clientHeight;
-      const sW = vw / baseW; const sH = vh / baseH;
-      let s = (fit==='width') ? sW : Math.min(sW, sH);
-      if (fit==='width' && baseH*s > vh) s = Math.min(sW, sH); // fallback if too tall
-      CANVAS.style.transform = `scale(${s})`;
+      const vw = FITBOX.clientWidth;
+      const vh = FITBOX.clientHeight;
+      const sW = vw / baseW;
+      const sH = vh / baseH;
+      let s = (fit === 'width') ? sW : Math.min(sW, sH);
+      if (fit === 'width' && baseH * s > vh) s = Math.min(sW, sH);
+      CANVAS.style.transform = 'scale(' + s + ')';
     };
-    window.onresize = fitOnce; fitOnce();
+    window.onresize = fitOnce;
+    fitOnce();
   }
 
-  function buildQueue(){
-    nextQueue = [];
-    const order = settings?.slides?.order ?? ['overview', ...(schedule?.saunas||[])];
-    for (const entry of order) {
-      if (entry==='overview') nextQueue.push({type:'overview'});
-      else if (schedule.saunas.includes(entry)) nextQueue.push({type:'sauna', sauna: entry});
+  // ---------- Slide queue (always include all saunas) ----------
+  function buildQueue() {
+    const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
+    const allSaunas = (schedule?.saunas || []).slice();
+
+    const queue = [];
+    const seen = new Set();
+
+    if (!cfgOrder || cfgOrder.length === 0) {
+      queue.push({ type: 'overview' });
+      for (const s of allSaunas) queue.push({ type: 'sauna', sauna: s });
+    } else {
+      let addedOverview = false;
+      for (const e of cfgOrder) {
+        if (e === 'overview') {
+          if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; }
+          continue;
+        }
+        if (allSaunas.includes(e) && !seen.has(e)) {
+          seen.add(e);
+          queue.push({ type: 'sauna', sauna: e });
+        }
+      }
+      // Append any newly added saunas not listed in order
+      for (const s of allSaunas) if (!seen.has(s)) queue.push({ type: 'sauna', sauna: s });
+      if (!queue.some(x => x.type === 'overview')) queue.unshift({ type: 'overview' });
     }
+
+    nextQueue = queue;
     idx = 0;
   }
 
-  function h(tag, attrs={}, children=[]){
+  // ---------- DOM helpers ----------
+  function h(tag, attrs = {}, children = []) {
     const el = document.createElement(tag);
-    for (const [k,v] of Object.entries(attrs)) {
-      if (k==='class') el.className=v; else if (k==='style') el.setAttribute('style', v); else el.setAttribute(k,v);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') el.className = v;
+      else if (k === 'style') el.setAttribute('style', v);
+      else el.setAttribute(k, v);
     }
-    for (const c of [].concat(children)) { if (typeof c==='string') el.appendChild(document.createTextNode(c)); else if (c) el.appendChild(c); }
+    for (const c of [].concat(children)) {
+      if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+      else if (c) el.appendChild(c);
+    }
     return el;
   }
 
-  function inlineFlameSVG(){
-    return h('svg', {viewBox:'0 0 24 24', 'aria-hidden':'true'}, [h('path', {d:'M12 2c2 4-1 5-1 7 0 1 1 2 2 2 2 0 3-2 3-4 2 2 4 4 4 7 0 4-3 8-8 8s-8-4-8-8c0-5 5-7 8-12z'})]);
+  // ---------- Flames ----------
+  function inlineFlameSVG() {
+    return h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, [
+      h('path', { d: 'M12 2c2 4-1 5-1 7 0 1 1 2 2 2 2 0 3-2 3-4 2 2 4 4 4 7 0 4-3 8-8 8s-8-4-8-8c0-5 5-7 8-12z' })
+    ]);
   }
   function flameNode() {
     const url = settings?.assets?.flameImage || '/assets/img/flame_test.svg';
-    const box = h('div', {class:'flame'});
-    if (url) { const img = h('img', {src:url, alt:''}); img.addEventListener('error', () => { box.innerHTML=''; box.appendChild(inlineFlameSVG()); }); box.appendChild(img); return box; }
-    box.appendChild(inlineFlameSVG()); return box;
+    const box = h('div', { class: 'flame' });
+    if (url) {
+      const img = h('img', { src: url, alt: '' });
+      img.addEventListener('error', () => { box.innerHTML = ''; box.appendChild(inlineFlameSVG()); });
+      box.appendChild(img);
+      return box;
+    }
+    box.appendChild(inlineFlameSVG());
+    return box;
   }
-  function flamesWrap(spec){
+  function flamesWrap(spec) {
     let count = 0, approx = false;
-    if (!spec) count = 0; else if (spec==='1') count=1; else if (spec==='2') count=2; else if (spec==='3') count=3; else if (spec==='1-2'){count=2;approx=true;} else if (spec==='2-3'||spec==='1-3'){count=3;approx=true;}
-    const wrap = h('div', {class:'flames'+(approx?' approx':'')});
-    wrap.appendChild(count>=1 ? flameNode() : h('span'));
-    wrap.appendChild(count>=2 ? flameNode() : h('span'));
-    wrap.appendChild(count>=3 ? flameNode() : h('span'));
+    if (!spec) count = 0;
+    else if (spec === '1') count = 1;
+    else if (spec === '2') count = 2;
+    else if (spec === '3') count = 3;
+    else if (spec === '1-2') { count = 2; approx = true; }
+    else if (spec === '2-3' || spec === '1-3') { count = 3; approx = true; }
+    const wrap = h('div', { class: 'flames' + (approx ? ' approx' : '') });
+    wrap.appendChild(count >= 1 ? flameNode() : h('span'));
+    wrap.appendChild(count >= 2 ? flameNode() : h('span'));
+    wrap.appendChild(count >= 3 ? flameNode() : h('span'));
     return wrap;
   }
 
-  // ---- Highlight logic (window before/after start) ----
-  function getHighlightMap(){
+  // ---------- Highlight logic ----------
+  function getHighlightMap() {
     const HL = settings?.highlightNext || {};
-    if (!HL.enabled) return { bySauna:{}, byCell:{} };
-    const win = Number.isFinite(+HL.minutesWindow) ? +HL.minutesWindow : (Number.isFinite(+HL.minutesAfter) ? +HL.minutesAfter : 15);
-    const now = nowMinutes();
-    const bySauna = {};   // saunaName -> set of HM strings to highlight
-    const byCell = {};    // key `r{rowIdx}c{colIdx}` -> true for overview
+    if (!HL.enabled) return { bySauna: {}, byCell: {} };
 
-    schedule.saunas.forEach((saunaName, colIdx)=>{
+    const before = Number.isFinite(+HL.minutesBeforeNext) ? +HL.minutesBeforeNext : 15;
+    const after  = Number.isFinite(+HL.minutesAfterStart) ? +HL.minutesAfterStart : 15;
+    const now = nowMinutes();
+
+    const bySauna = {};   // saunaName -> Set(times)
+    const byCell = {};    // r{row}c{col} -> true
+
+    (schedule.saunas || []).forEach((saunaName, colIdx) => {
       const times = [];
-      schedule.rows.forEach((row, ri)=>{
-        const cell = row.entries[colIdx];
-        if (cell && cell.title){ const m = parseHM(row.time); if (m!==null) times.push({m, ri, time:row.time}); }
+      (schedule.rows || []).forEach((row, ri) => {
+        const cell = (row.entries || [])[colIdx];
+        if (cell && cell.title) {
+          const m = parseHM(row.time);
+          if (m !== null) times.push({ m, ri, time: row.time });
+        }
       });
-      times.sort((a,b)=>a.m-b.m);
+      times.sort((a, b) => a.m - b.m);
+
       let chosen = null;
-      // 1) active within [start, start+win]
-      for (const t of times){ if (now>=t.m && now<=t.m+win){ chosen=t; break; } }
-      // 2) pre-window highlight if within win minutes before next start
-      if (!chosen){ for (const t of times){ if (t.m>=now && (t.m-now)<=win){ chosen=t; break; } } }
-      // 3) else nothing
-      if (chosen){
+      // Within active window [start, start+after]
+      for (const t of times) { if (now >= t.m && now <= t.m + after) { chosen = t; break; } }
+      // Or within "before" minutes ahead of next start
+      if (!chosen) {
+        for (const t of times) { if (t.m >= now && (t.m - now) <= before) { chosen = t; break; } }
+      }
+      if (chosen) {
         bySauna[saunaName] = new Set([chosen.time]);
-        byCell[`r${chosen.ri}c${colIdx}`] = true;
+        byCell['r' + chosen.ri + 'c' + colIdx] = true;
       }
     });
-    return {bySauna, byCell};
+    return { bySauna, byCell };
   }
 
-  function tableGrid(hlMap){
-    const t = h('table', {class:'grid'});
-    const thead = h('thead'); const tr = h('tr');
-    tr.appendChild(h('th', {class:'timecol'}, 'Zeit'));
-    for (const s of schedule.saunas) tr.appendChild(h('th', {}, s));
-    thead.appendChild(tr); t.appendChild(thead);
+  // ---------- Overview table ----------
+  function tableGrid(hlMap) {
+    const t = h('table', { class: 'grid' });
+    const thead = h('thead');
+    const tr = h('tr');
+    tr.appendChild(h('th', { class: 'timecol' }, 'Zeit'));
+    for (const s of (schedule.saunas || [])) tr.appendChild(h('th', {}, s));
+    thead.appendChild(tr);
+    t.appendChild(thead);
+
     const tb = h('tbody');
-    schedule.rows.forEach((row, ri)=>{
-      const trr = h('tr'); trr.appendChild(h('td', {class:'timecol'}, row.time));
-      row.entries.forEach((cell, ci) => {
+    (schedule.rows || []).forEach((row, ri) => {
+      const trr = h('tr');
+      trr.appendChild(h('td', { class: 'timecol' }, row.time));
+      (row.entries || []).forEach((cell, ci) => {
         const td = h('td', {}, []);
-        const key = `r${ri}c${ci}`;
+        const key = 'r' + ri + 'c' + ci;
         if (cell && cell.title) {
-          const title = cell.title.replace(/\*+$/,'');
-          const hasStar = /\*$/.test(cell.title||'');
-          const chip = h('span', {class:'chip'+(hlMap.byCell[key]?' highlight':'' )}, title);
+          const title = String(cell.title).replace(/\*+$/, '');
+          const hasStar = /\*$/.test(cell.title || '');
+          const chip = h('span', { class: 'chip' + (hlMap.byCell[key] ? ' highlight' : '') }, title);
           if (hasStar) chip.appendChild(h('sup', {}, '*'));
-          const wrap = h('div', {class:'cellwrap'}, [ chip, flamesWrap(cell.flames||'') ]);
+          const wrap = h('div', { class: 'cellwrap' }, [chip, flamesWrap(cell.flames || '')]);
           td.appendChild(wrap);
-        } else { td.appendChild(h('div', {class:'caption'}, '—')); }
+        } else {
+          td.appendChild(h('div', { class: 'caption' }, '—'));
+        }
         trr.appendChild(td);
       });
       tb.appendChild(trr);
     });
     t.appendChild(tb);
 
-    const anyStar = schedule.rows.some(r => (r.entries||[]).some(c => c && /\*$/.test(c.title||'')));
-    if (anyStar && settings?.footnote) return h('div', {}, [t, h('div', {class:'footer-note'}, settings.footnote)]);
+    const anyStar = (schedule.rows || []).some(r => (r.entries || []).some(c => c && /\*$/.test(c.title || '')));
+    if (anyStar && settings?.footnote) return h('div', {}, [t, h('div', { class: 'footer-note' }, settings.footnote)]);
     return t;
   }
 
-  function fitOverview(container){
-    const headH = Array.from(container.querySelectorAll('.h1,.h2')).reduce((a,el)=>a+el.getBoundingClientRect().height,0);
-    const wrap = container.querySelector('.ovwrap'); if (!wrap) return;
+  function fitOverview(container) {
+    const headH = Array.from(container.querySelectorAll('.h1,.h2')).reduce((a, el) => a + el.getBoundingClientRect().height, 0);
+    const wrap = container.querySelector('.ovwrap');
+    if (!wrap) return;
     wrap.style.transform = 'scale(1)';
-    const availW = container.clientWidth - 2; // padding already applied by parent
+
+    const availW = container.clientWidth - 2; // padding accounted by parent
     const availH = container.clientHeight - headH - 16;
     const box = wrap.getBoundingClientRect();
-    const s = Math.min( availW / Math.max(1, box.width), availH / Math.max(1, box.height) );
-    wrap.style.transform = `scale(${Math.min(1, s)})`;
+    const s = Math.min(
+      availW / Math.max(1, box.width),
+      availH / Math.max(1, box.height)
+    );
+    wrap.style.transform = 'scale(' + Math.min(1, s) + ')';
   }
 
-  function renderOverview(){
+  function renderOverview() {
     const hlMap = getHighlightMap();
     const table = tableGrid(hlMap);
-    const c = h('div', {class:'container overview fade show'}, [ h('h1', {class:'h1'}, 'Aufgussplan'), h('div', {class:'ovwrap'}, [table]) ]);
-    setTimeout(()=>fitOverview(c),0); window.onresize = () => fitOverview(c);
+    const c = h('div', { class: 'container overview fade show' }, [
+      h('h1', { class: 'h1' }, 'Aufgussplan'),
+      h('div', { class: 'ovwrap' }, [table])
+    ]);
+    setTimeout(() => fitOverview(c), 0);
+    window.onresize = () => fitOverview(c);
     return c;
   }
 
-  function renderSauna(name){
+  // ---------- Sauna slide ----------
+  function renderSauna(name) {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
-    const c = h('div', {class:'container has-right fade show'}, [
-      h('div', {class:'rightPanel', style: rightUrl ? `background-image:url("${rightUrl}");` : 'display:none;'}),
-      h('h1', {class:'h1', style:'color:var(--saunaColor);'}, name),
-      h('h2', {class:'h2'}, 'Aufgusszeiten')
+    const c = h('div', { class: 'container has-right fade show' }, [
+      h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url("' + rightUrl + '")') : 'display:none;' }),
+      h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
+      h('h2', { class: 'h2' }, 'Aufgusszeiten')
     ]);
 
-    const body = h('div', {class:'body'}); const list = h('div', {class:'list'});
-    const colIdx = schedule.saunas.indexOf(name);
+    const body = h('div', { class: 'body' });
+    const list = h('div', { class: 'list' });
+
+    const colIdx = (schedule.saunas || []).indexOf(name);
     const items = [];
-    for (const row of schedule.rows) {
-      const cell = row.entries[colIdx];
-      if (cell && cell.title) items.push({time: row.time, title: cell.title, flames: cell.flames||''});
+    for (const row of (schedule.rows || [])) {
+      const cell = (row.entries || [])[colIdx];
+      if (cell && cell.title) items.push({ time: row.time, title: cell.title, flames: cell.flames || '' });
     }
-    items.sort((a,b)=>a.time.localeCompare(b.time));
+    items.sort((a, b) => a.time.localeCompare(b.time));
 
     for (const it of items) {
-      const title = it.title.replace(/\*+$/,'');
-      const hasStar = /\*$/.test(it.title||'');
-      const label = `${it.time} Uhr – ${title}`;
+      const baseTitle = String(it.title).replace(/\*+$/, '');
+      const hasStar = /\*$/.test(it.title || '');
+      const label = it.time + ' Uhr – ' + baseTitle + (hasStar ? '*' : '');
       const isHL = hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time);
-      const tile = h('div', {class:'tile'+(isHL?' highlight':'')}, [ h('div', {class:'title'}, label + (hasStar?'*':'')), flamesWrap(it.flames) ]);
+      const tile = h('div', { class: 'tile' + (isHL ? ' highlight' : '') }, [
+        h('div', { class: 'title' }, label),
+        flamesWrap(it.flames)
+      ]);
       list.appendChild(tile);
     }
-    if (items.length===0) list.appendChild(h('div', {class:'caption'}, 'Keine Einträge.'));
+    if (items.length === 0) list.appendChild(h('div', { class: 'caption' }, 'Keine Einträge.'));
 
-    body.appendChild(list); c.appendChild(body);
+    body.appendChild(list);
+    c.appendChild(body);
 
-    const hasStar = items.some(x => /\*$/.test(x.title));
-    if (hasStar && settings?.footnote) c.appendChild(h('div', {class:'footer-note'}, settings.footnote));
+    const hasStar = items.some(x => /\*$/.test(x.title || ''));
+    if (hasStar && settings?.footnote) c.appendChild(h('div', { class: 'footer-note' }, settings.footnote));
 
-    c.appendChild(h('div', {class:'brand'}, 'Signage'));
+    c.appendChild(h('div', { class: 'brand' }, 'Signage'));
     return c;
   }
 
-  function show(el){ STAGE.innerHTML=''; STAGE.appendChild(el); requestAnimationFrame(()=>{ el.classList.add('show'); }); }
-  function hide(cb){ const cur = STAGE.firstChild; if (cur) cur.classList.remove('show'); setTimeout(cb, (settings?.slides?.transitionMs ?? 500)); }
-
-  function step(){
-    if (!nextQueue.length) return;
-    const item = nextQueue[idx % nextQueue.length];
-    const el = (item.type==='overview') ? renderOverview() : renderSauna(item.sauna);
-    show(el);
-    const dwell = (item.type==='overview') ? (settings?.slides?.overviewDurationSec ?? 10)*1000 : (settings?.slides?.saunaDurationSec ?? 6)*1000;
-    setTimeout(()=> hide(()=>{ idx++; step(); }), dwell);
+  // ---------- Stage helpers ----------
+  function show(el) {
+    STAGE.innerHTML = '';
+    STAGE.appendChild(el);
+    requestAnimationFrame(() => { el.classList.add('show'); });
+  }
+  function hide(cb) {
+    const cur = STAGE.firstChild;
+    if (cur) cur.classList.remove('show');
+    setTimeout(cb, (settings?.slides?.transitionMs ?? 500));
   }
 
-  async function bootstrap(){
-    await loadAll(); step();
-    let lastSchedVer = schedule?.version || 0, lastSetVer = settings?.version || 0;
-    setInterval(async ()=>{
-      try { const s = await loadJSON('/data/schedule.json'); if (s.version !== lastSchedVer) { schedule=s; lastSchedVer=s.version; buildQueue(); } } catch(e){}
-      try { const cf = await loadJSON('/data/settings.json'); if (cf.version !== lastSetVer) { settings=cf; lastSetVer=cf.version; applyTheme(); applyDisplay(); } } catch(e){}
+  // ---------- Loop ----------
+  function step() {
+    if (!nextQueue.length) return;
+    const item = nextQueue[idx % nextQueue.length];
+    const el = (item.type === 'overview') ? renderOverview() : renderSauna(item.sauna);
+    show(el);
+    const dwell = (item.type === 'overview')
+      ? (settings?.slides?.overviewDurationSec ?? 10) * 1000
+      : (settings?.slides?.saunaDurationSec ?? 6) * 1000;
+    setTimeout(() => hide(() => { idx++; step(); }), dwell);
+  }
+
+  // ---------- Bootstrap & live update ----------
+  async function bootstrap() {
+    await loadAll();
+    step();
+
+    let lastSchedVer = schedule?.version || 0;
+    let lastSetVer   = settings?.version || 0;
+    setInterval(async () => {
+      try {
+        const s = await loadJSON('/data/schedule.json');
+        if (s.version !== lastSchedVer) { schedule = s; lastSchedVer = s.version; buildQueue(); }
+      } catch (e) {}
+      try {
+        const cf = await loadJSON('/data/settings.json');
+        if (cf.version !== lastSetVer) { settings = cf; lastSetVer = cf.version; applyTheme(); applyDisplay(); buildQueue(); }
+      } catch (e) {}
     }, 3000);
 
     // Preview channel from admin (live settings without save)
-    window.addEventListener('message', (ev)=>{
-      if (!ev?.data || ev.data.type!=='preview') return;
-      const p = ev.data.payload || {}; if (p.schedule) schedule=p.schedule; if (p.settings) settings=p.settings;
-      applyTheme(); applyDisplay(); buildQueue(); idx=0; step();
+    window.addEventListener('message', (ev) => {
+      if (!ev?.data || ev.data.type !== 'preview') return;
+      const p = ev.data.payload || {};
+      if (p.schedule) schedule = p.schedule;
+      if (p.settings) settings = p.settings;
+      applyTheme();
+      applyDisplay();
+      buildQueue();
+      idx = 0;
+      step();
     });
   }
+
   bootstrap();
 })();
 JS
@@ -551,7 +681,7 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     .btn{border:1px solid var(--inbr);background:linear-gradient(180deg,#131a2d,#0e1426);color:#eaf0ff;padding:9px 12px;border-radius:12px;cursor:pointer;transition:transform .06s ease,filter .2s}
     .btn:hover{filter:brightness(1.06)} .btn:active{transform:translateY(1px)} .btn.primary{background:var(--acc);color:#0b0d12;border-color:var(--acc);font-weight:700} .btn.ghost{background:transparent} .btn.sm{padding:6px 10px;border-radius:10px}
 
-    main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:16px;padding:16px 12px 18px 16px;align-items:start}
+    main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:16px;padding:16px 12px 18px 16px;align-items:start}
     .leftcol{display:flex;flex-direction:column;gap:16px;min-width:0}
     .rightbar{position:sticky;top:64px;max-height:calc(100svh - 64px);overflow:auto;padding-right:6px;justify-self:end}
 
@@ -575,10 +705,13 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     .kv{display:grid;grid-template-columns:170px 1fr;gap:10px;align-items:center}
     .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
 
-    /* Saunen list rows (vertical) */
-    .saunarow{display:grid;grid-template-columns:1fr 64px auto auto auto;gap:10px;align-items:center;margin-bottom:10px}
+    /* sauna rows (vertical list) */
+    .saunarow{display:grid;grid-template-columns:1fr 64px auto auto auto auto;gap:10px;align-items:center;margin-bottom:10px}
     .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
 
+    .color-cols{display:grid;grid-template-columns:1fr;gap:12px}
+    .fieldset{border:1px dashed var(--inbr);border-radius:12px;padding:10px}
+    .fieldset > .legend{opacity:.8;font-weight:700;margin-bottom:8px}
     .color-item{display:flex;align-items:center;gap:8px}
     .swatch{width:24px;height:24px;border-radius:6px;border:1px solid #2f3f60}
 
@@ -642,6 +775,8 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="kv"><label>Globaler Scale</label><input id="fontScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
           <div class="kv"><label>H1 Scale</label><input id="h1Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
           <div class="kv"><label>H2 Scale</label><input id="h2Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
+          <div class="kv"><label>Übersicht: Kopf-Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
+          <div class="kv"><label>Übersicht: Zellen-Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
           <div class="kv"><label>Kachel-Text Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
           <div class="kv"><label>Kachel Font-Weight</label>
             <select id="tileWeight" class="input">
@@ -652,8 +787,6 @@ cat >/var/www/signage/admin/index.html <<'HTML'
               <option value="800">Extra Bold (800)</option>
             </select>
           </div>
-          <div class="kv"><label>Übersicht Kopf Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
-          <div class="kv"><label>Übersicht Zellen Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
           <div class="kv"><label>Fußnote</label><input id="footnote" class="input" type="text" placeholder="z. B. * Nur am Fr und Sa"></div>
         </div>
       </details>
@@ -663,29 +796,44 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="ttl">▶<span class="chev">⮞</span> Hervorhebungen</div>
         </summary>
         <div class="content">
-          <div class="kv"><label>„Nächster Aufguss“ aktiv</label><input id="hlEnabled" type="checkbox"></div>
+          <div class="kv"><label>Aktiv</label><input id="hlEnabled" type="checkbox"></div>
           <div class="kv"><label>Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
-          <div class="kv"><label>Fenster (Min.) ±</label><input id="hlWindow" class="input" type="number" min="1" max="120" value="15"></div>
+          <div class="kv"><label>Min. vor Start (+)</label><input id="hlBefore" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Min. nach Start (−)</label><input id="hlAfter" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Flammen-Bild</label>
+            <div class="row" style="gap:8px">
+              <img id="flamePrev" class="prev" alt="">
+              <!-- URL-Feld versteckt: nur Preview + Upload/Reset -->
+              <input id="flameImg" type="hidden" />
+              <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="flameFile" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
+              <button class="btn sm" id="resetFlame">Default</button>
+            </div>
+          </div>
         </div>
       </details>
 
       <details class="ac" open>
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Saunen</div>
-          <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
+          <div class="actions">
+            <button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button>
+            <button class="btn sm ghost" id="btnCleanup">Assets aufräumen</button>
+          </div>
         </summary>
-        <div class="content" id="saunaBox">
-          <div class="row" style="opacity:.7;font-weight:700;margin-bottom:6px"><div style="width:100%">Name · Vorschau · Upload · Default · Entfernen</div></div>
-          <div id="saunaList" ></div>
+        <div class="content">
+          <div class="row" style="opacity:.7;font-weight:700;margin-bottom:6px">
+            <div style="width:100%">Name · Preview · Upload · Default · Entfernen</div>
+          </div>
+          <div id="saunaList"></div>
         </div>
       </details>
 
       <details class="ac">
         <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht)</div>
+          <div class="ttl">▶<span class="chev">⮞</span> Farben (geclustert)</div>
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
         </summary>
-        <div class="content" id="colorList"></div>
+        <div class="content color-cols" id="colorList"></div>
       </details>
     </aside>
   </main>
@@ -729,11 +877,14 @@ cat >/var/www/signage/admin/index.html <<'HTML'
       slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500 },
       display:{ fit:'contain', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
       theme:{ bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101', gridBorder:'#5C3101', cellBg:'#5C3101', boxFg:'#FFFFFF', saunaColor:'#5C3101', timeColBg:'#E8DEBD', flame:'#FFD166', zebra1:'#EDDFAF', zebra2:'#E6D6A1' },
-      highlightNext:{ enabled:false, color:'#FFDD66', minutesWindow:15 },
-      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600 }
+      highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
+      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600 },
+      assets:{ flameImage:'/assets/img/flame_test.svg' }
     };
 
-    let schedule=null, settings=null, curRow=0, curCol=0; const $=(s,r=document)=>r.querySelector(s); const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+    let schedule=null, settings=null, curRow=0, curCol=0;
+    const $=(s,r=document)=>r.querySelector(s);
+    const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
     const sanitizeUrl=(s)=>{ s=(s||'').trim(); if(!s) return ''; const ok=/^(https?:\/\/[^\s]+|\/assets\/img\/[-A-Za-z0-9_.\/]+)$/i.test(s); return ok?s:'' };
     const preloadImg=(u)=> new Promise(res=>{ if(!u) return res({ok:false}); const i=new Image(); i.onload=()=>res({ok:true,w:i.naturalWidth,h:i.naturalHeight}); i.onerror=()=>res({ok:false}); i.src=u; });
     const parseTime = (s) => { const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec((s||'').trim()); return m ? (m[1]+':'+m[2]) : null; };
@@ -741,12 +892,66 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     async function loadAll(){ const [s,cfg]=await Promise.all([ fetch('/admin/api/load.php').then(r=>r.json()), fetch('/admin/api/load_settings.php').then(r=>r.json()) ]); schedule=s; settings=cfg; renderGrid(); renderSlides(); renderHighlightBox(); renderSaunasPanel(); renderColors(); }
 
     // ------- Grid -------
-    function renderGrid(){ const head=['Zeit',...(schedule.saunas||[])]; let html='<thead><tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'; schedule.rows.forEach((row,ri)=>{ html+='<tr>'; html+=`<td class="time" data-ri="${ri}"><input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center"></td>`; row.entries.forEach((cell,ci)=>{ const filled= cell&&cell.title? 'filled':''; const label = cell&&cell.title? (cell.title+(cell.flames?(' · '+cell.flames):'')) : '—'; html+=`<td><button class="cellbtn ${filled}" data-ri="${ri}" data-ci="${ci}">${label}</button></td>`; }); html+='</tr>'; }); html+='</tbody>'; $('#grid').innerHTML=html; $$('#grid .time input').forEach(inp=>{ inp.onchange=()=>{ const ri=+inp.parentElement.dataset.ri; const t=parseTime(inp.value); if(!t){ alert('Bitte HH:MM'); inp.value=schedule.rows[ri].time; return;} schedule.rows[ri].time=t; schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); renderGrid(); }; inp.onclick=()=>{ curRow=+inp.parentElement.dataset.ri; updateSelTime(); }; }); $$('#grid .cellbtn').forEach(btn=>{ btn.onclick=()=>{ curRow=+btn.dataset.ri; curCol=+btn.dataset.ci; updateSelTime(); const cell=schedule.rows[curRow].entries[curCol]; $('#m_time').value=schedule.rows[curRow].time; $('#m_title').value=cell?.title||''; $('#m_flames').value=cell?.flames||''; $('#modal').style.display='grid'; $('#m_title').focus(); }; }); }
+    function renderGrid(){
+      const head=['Zeit',...(schedule.saunas||[])];
+      let html='<thead><tr>'+head.map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>';
+      (schedule.rows||[]).forEach((row,ri)=>{
+        html+='<tr>';
+        html+=`<td class="time" data-ri="${ri}"><input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center"></td>`;
+        (row.entries||[]).forEach((cell,ci)=>{
+          const filled = (cell && cell.title) ? 'filled' : '';
+          const label = (cell && cell.title) ? (cell.title + (cell.flames ? (' · '+cell.flames) : '')) : '—';
+          html+=`<td><button class="cellbtn ${filled}" data-ri="${ri}" data-ci="${ci}">${label}</button></td>`;
+        });
+        html+='</tr>';
+      });
+      html+='</tbody>';
+      $('#grid').innerHTML=html;
+
+      $$('#grid .time input').forEach(inp=>{
+        inp.onchange=()=>{
+          const ri=+inp.parentElement.dataset.ri;
+          const t=parseTime(inp.value);
+          if(!t){ alert('Bitte HH:MM'); inp.value=schedule.rows[ri].time; return;}
+          schedule.rows[ri].time=t;
+          schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
+          renderGrid();
+        };
+        inp.onclick=()=>{ curRow=+inp.parentElement.dataset.ri; updateSelTime(); };
+      });
+      $$('#grid .cellbtn').forEach(btn=>{
+        btn.onclick=()=>{
+          curRow=+btn.dataset.ri; curCol=+btn.dataset.ci; updateSelTime();
+          const cell=schedule.rows[curRow].entries[curCol]||{};
+          $('#m_time').value=schedule.rows[curRow].time;
+          $('#m_title').value=cell.title||'';
+          $('#m_flames').value=cell.flames||'';
+          $('#modal').style.display='grid';
+          $('#m_title').focus();
+        };
+      });
+    }
     function updateSelTime(){ $('#selTime').textContent=schedule.rows[curRow]?.time||'—'; }
 
     // Dialog
     $('#m_cancel').onclick=()=> $('#modal').style.display='none';
-    $('#m_ok').onclick=()=>{ const title=$('#m_title').value.trim(); const flames=$('#m_flames').value; const newTime=parseTime($('#m_time').value); if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; } const newCell= title? {title,flames}:null; if (newTime && newTime!==schedule.rows[curRow].time && newCell){ let targetIdx=schedule.rows.findIndex(r => r.time===newTime); if(targetIdx===-1){ const cols=schedule.saunas.length; schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)}); schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); targetIdx=schedule.rows.findIndex(r => r.time===newTime);} schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null; } else { schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime; } schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); $('#modal').style.display='none'; renderGrid(); };
+    $('#m_ok').onclick=()=>{
+      const title=$('#m_title').value.trim();
+      const flames=$('#m_flames').value;
+      const newTime=parseTime($('#m_time').value);
+      if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; }
+      const newCell= title? {title,flames}:null;
+      if (newTime && newTime!==schedule.rows[curRow].time && newCell){
+        let targetIdx=schedule.rows.findIndex(r => r.time===newTime);
+        if(targetIdx===-1){ const cols=schedule.saunas.length; schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)}); schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); targetIdx=schedule.rows.findIndex(r => r.time===newTime);}
+        schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null;
+      } else {
+        schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime;
+      }
+      schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
+      $('#modal').style.display='none';
+      renderGrid();
+    };
 
     // Row ops
     $('#btnAddAbove').onclick=()=>{ const cols=schedule.saunas.length; schedule.rows.splice(curRow,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)}); renderGrid(); };
@@ -754,42 +959,157 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     $('#btnDeleteRow').onclick=()=>{ if(schedule.rows.length>1){ schedule.rows.splice(curRow,1); curRow=Math.max(0,curRow-1); renderGrid(); updateSelTime(); } };
 
     // ------- Slides box -------
-    function renderSlides(){ const f=settings.fonts||{}; $('#overviewSec').value = settings.slides?.overviewDurationSec??10; $('#saunaSec').value = settings.slides?.saunaDurationSec??6; $('#transMs').value = settings.slides?.transitionMs??500; $('#fontFamily').value = f.family || DEFAULTS.fonts.family; $('#fontScale').value = f.scale ?? 1; $('#h1Scale').value = f.h1Scale ?? 1; $('#h2Scale').value = f.h2Scale ?? 1; $('#tileTextScale').value = f.tileTextScale ?? 0.8; $('#tileWeight').value = f.tileWeight ?? 600; $('#ovHeadScale').value = f.overviewHeadScale ?? 0.9; $('#ovCellScale').value = f.overviewCellScale ?? 0.8; $('#footnote').value = settings.footnote||''; $('#resetSlides').onclick = ()=>{ $('#overviewSec').value=DEFAULTS.slides.overviewDurationSec; $('#saunaSec').value=DEFAULTS.slides.saunaDurationSec; $('#transMs').value=DEFAULTS.slides.transitionMs; $('#fontFamily').value=DEFAULTS.fonts.family; $('#fontScale').value=1; $('#h1Scale').value=1; $('#h2Scale').value=1; $('#tileTextScale').value=0.8; $('#tileWeight').value=600; $('#ovHeadScale').value=0.9; $('#ovCellScale').value=0.8; $('#footnote').value=''; }; }
+    function renderSlides(){
+      const f=settings.fonts||{};
+      $('#overviewSec').value = settings.slides?.overviewDurationSec??10;
+      $('#saunaSec').value    = settings.slides?.saunaDurationSec??6;
+      $('#transMs').value     = settings.slides?.transitionMs??500;
+      $('#fontFamily').value  = f.family || DEFAULTS.fonts.family;
+      $('#fontScale').value   = f.scale ?? 1;
+      $('#h1Scale').value     = f.h1Scale ?? 1;
+      $('#h2Scale').value     = f.h2Scale ?? 1;
+      $('#ovHeadScale').value = f.overviewHeadScale ?? 0.9;
+      $('#ovCellScale').value = f.overviewCellScale ?? 0.8;
+      $('#tileTextScale').value = f.tileTextScale ?? 0.8;
+      $('#tileWeight').value    = f.tileWeight ?? 600;
+      $('#footnote').value   = settings.footnote||'';
+      $('#resetSlides').onclick = ()=>{
+        $('#overviewSec').value=DEFAULTS.slides.overviewDurationSec;
+        $('#saunaSec').value=DEFAULTS.slides.saunaDurationSec;
+        $('#transMs').value=DEFAULTS.slides.transitionMs;
+        $('#fontFamily').value=DEFAULTS.fonts.family;
+        $('#fontScale').value=1;
+        $('#h1Scale').value=1;
+        $('#h2Scale').value=1;
+        $('#ovHeadScale').value=DEFAULTS.fonts.overviewHeadScale;
+        $('#ovCellScale').value=DEFAULTS.fonts.overviewCellScale;
+        $('#tileTextScale').value=0.8;
+        $('#tileWeight').value=600;
+        $('#footnote').value='';
+      };
+    }
 
-    // ------- Hervorhebungen -------
-    function renderHighlightBox(){ const hl=settings.highlightNext||DEFAULTS.highlightNext; $('#hlEnabled').checked = !!hl.enabled; $('#hlColor').value = hl.color || DEFAULTS.highlightNext.color; $('#hlWindow').value = Number.isFinite(+hl.minutesWindow)?hl.minutesWindow:(hl.minutesAfter||15); const setSw=()=> $('#hlSw').style.background = $('#hlColor').value; setSw(); $('#hlColor').addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)) setSw(); }); }
+    // ------- Hervorhebungen (incl. flame) -------
+    function renderHighlightBox(){
+      const hl=settings.highlightNext||DEFAULTS.highlightNext;
+      $('#hlEnabled').checked = !!hl.enabled;
+      $('#hlColor').value = hl.color || DEFAULTS.highlightNext.color;
+      $('#hlBefore').value = Number.isFinite(+hl.minutesBeforeNext)?hl.minutesBeforeNext:DEFAULTS.highlightNext.minutesBeforeNext;
+      $('#hlAfter').value  = Number.isFinite(+hl.minutesAfterStart)?hl.minutesAfterStart:DEFAULTS.highlightNext.minutesAfterStart;
+      const setSw=()=> $('#hlSw').style.background = $('#hlColor').value; setSw();
+      $('#hlColor').addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)) setSw(); });
+      // flame (URL hidden, only preview)
+      $('#flameImg').value    = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
+      updateFlamePreview($('#flameImg').value);
+      $('#flameFile').onchange= ()=> uploadGeneric($('#flameFile'), (p)=>{ settings.assets=settings.assets||{}; settings.assets.flameImage=p; $('#flameImg').value=p; updateFlamePreview(p); });
+      $('#resetFlame').onclick= ()=>{ const def=DEFAULTS.assets.flameImage; settings.assets=settings.assets||{}; settings.assets.flameImage=def; $('#flameImg').value=def; updateFlamePreview(def); };
+    }
+    function updateFlamePreview(u){ const img=$('#flamePrev'); preloadImg(u).then(r=>{ if(r.ok){ img.src=u; img.title=r.w+'×'+r.h; } else { img.removeAttribute('src'); img.title=''; } }); }
 
     // ------- Saunen panel (vertical) -------
-    function saunaRow(i){ const name=schedule.saunas[i]; const id='sx_'+i; const wrap=document.createElement('div'); wrap.className='saunarow'; wrap.innerHTML=`
-        <input id="n_${id}" class="input" type="text" value="${name}" />
-        <img id="p_${id}" class="prev" alt=""/>
-        <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="f_${id}" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
-        <button class="btn sm" id="d_${id}">Default</button>
-        <button class="btn sm" id="x_${id}">✕</button>`;
-      const $name=$(`#n_${id}`,wrap), $img=$(`#p_${id}`,wrap), $file=$(`#f_${id}`,wrap), $def=$(`#d_${id}`,wrap), $del=$(`#x_${id}`,wrap);
+    function saunaRow(i){
+      const name=schedule.saunas[i];
+      const id='sx_'+i;
+      const wrap=document.createElement('div');
+      wrap.className='saunarow';
+      wrap.innerHTML=
+        `<input id="n_${id}" class="input" type="text" value="${name}" />
+         <img id="p_${id}" class="prev" alt=""/>
+         <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="f_${id}" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
+         <button class="btn sm" id="d_${id}">Default</button>
+         <button class="btn sm" id="x_${id}">✕</button>
+         <span id="s_${id}" style="opacity:.7"></span>`;
+      const $name=$(`#n_${id}`,wrap), $img=$(`#p_${id}`,wrap), $file=$(`#f_${id}`,wrap), $def=$(`#d_${id}`,wrap), $del=$(`#x_${id}`,wrap), $st=$(`#s_${id}`,wrap);
       const url = (settings.assets?.rightImages?.[name]) || '';
-      (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok) $img.src=url; } })();
+      (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } } })();
       // upload
-      $file.onchange=()=> uploadGeneric($file, (p)=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]=p; $img.src=p; });
+      $file.onchange=()=> uploadGeneric($file, (p)=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]=p; $img.src=p; $st.textContent='gespeichert'; });
       // default
-      $def.onclick=()=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]='/assets/img/right_default.svg'; $img.src='/assets/img/right_default.svg'; };
+      $def.onclick=()=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]='/assets/img/right_default.svg'; $img.src='/assets/img/right_default.svg'; $st.textContent='Default'; };
       // delete sauna
       $del.onclick=()=>{ if(!confirm('Sauna wirklich entfernen?')) return; const removedName=schedule.saunas.splice(i,1)[0]; schedule.rows.forEach(r=> r.entries.splice(i,1)); if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName]; renderGrid(); renderSaunasPanel(); };
       // rename sauna
       $name.onchange=()=>{ const newName=$name.value.trim()||name; if(newName===name) return; const old=name; schedule.saunas[i]=newName; if(settings.assets?.rightImages){ const val=settings.assets.rightImages[old]; delete settings.assets.rightImages[old]; settings.assets.rightImages[newName]=val; } renderGrid(); renderSaunasPanel(); };
       return wrap;
     }
-    function renderSaunasPanel(){ const host=$('#saunaList'); host.innerHTML=''; settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; (schedule.saunas||[]).forEach((_,i)=> host.appendChild(saunaRow(i)) ); $('#btnAddSauna').onclick=()=>{ const name = prompt('Neuer Saunananame:', 'Neue Sauna'); if(!name) return; schedule.saunas.push(name); schedule.rows.forEach(r=> r.entries.push(null)); renderGrid(); renderSaunasPanel(); }; }
+    function renderSaunasPanel(){
+      const host=$('#saunaList');
+      host.innerHTML='';
+      settings.assets=settings.assets||{};
+      settings.assets.rightImages=settings.assets.rightImages||{};
+      (schedule.saunas||[]).forEach((_,i)=> host.appendChild(saunaRow(i)) );
+      $('#btnAddSauna').onclick=()=>{ const name = prompt('Neuer Saunananame:', 'Neue Sauna'); if(!name) return; schedule.saunas.push(name); schedule.rows.forEach(r=> r.entries.push(null)); renderGrid(); renderSaunasPanel(); };
+      $('#btnCleanup').onclick=cleanupAssets;
+    }
 
-    // ------- Farben (Übersicht) -------
-    function renderColors(){ const host=$('#colorList'); host.innerHTML=''; const theme=settings.theme||{}; const fields=[ ['bg','Hintergrund'],['fg','Vordergrund/Schrift'],['accent','Akzent'],['gridBorder','Tabellenrand'],['cellBg','Zellen-Hintergrund'],['boxFg','Box-Schrift'],['saunaColor','Sauna-Überschrift'],['timeColBg','Zeitspalten-Hintergrund'],['flame','Flammen'],['zebra1','Zebra 1'],['zebra2','Zebra 2'] ]; fields.forEach(([key,label])=>{ const row=document.createElement('div'); row.className='kv'; row.innerHTML=`<label>${label}</label><div class="color-item"><div class="swatch" id="sw_${key}"></div><input class="input" id="cl_${key}" type="text" value="${theme[key]||DEFAULTS.theme[key]||'#FFFFFF'}" placeholder="#RRGGBB"></div>`; host.appendChild(row); }); fields.forEach(([key])=>{ const inp=$(`#cl_${key}`), sw=$(`#sw_${key}`); const setPrev=v=>sw.style.background=v; setPrev(inp.value); inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); }); }); $('#resetColors').onclick=()=>{ fields.forEach(([key])=>{ $(`#cl_${key}`).value=(DEFAULTS.theme[key]||'#FFFFFF'); $(`#sw_${key}`).style.background=(DEFAULTS.theme[key]||'#FFFFFF'); }); }; }
+    // ------- Farben (clustered) -------
+    function colorField(key,label,init){ const row=document.createElement('div'); row.className='kv'; row.innerHTML=`<label>${label}</label><div class="color-item"><div class="swatch" id="sw_${key}"></div><input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB"></div>`; return row; }
+    function renderColors(){
+      const host=$('#colorList'); host.innerHTML='';
+      const theme=settings.theme||{};
+      const A=document.createElement('div'); A.className='fieldset'; A.innerHTML='<div class="legend">Grundfarben</div>';
+      A.appendChild(colorField('bg','Hintergrund', theme.bg||DEFAULTS.theme.bg));
+      A.appendChild(colorField('fg','Vordergrund/Schrift', theme.fg||DEFAULTS.theme.fg));
+      A.appendChild(colorField('accent','Akzent', theme.accent||DEFAULTS.theme.accent));
 
-    // ------- Upload helper -------
+      const B=document.createElement('div'); B.className='fieldset'; B.innerHTML='<div class="legend">Übersichtstabelle</div>';
+      B.appendChild(colorField('gridBorder','Tabellenrand', theme.gridBorder||DEFAULTS.theme.gridBorder));
+      B.appendChild(colorField('timeColBg','Zeitspalten-Hintergrund', theme.timeColBg||DEFAULTS.theme.timeColBg));
+      B.appendChild(colorField('zebra1','Zebra 1', theme.zebra1||DEFAULTS.theme.zebra1));
+      B.appendChild(colorField('zebra2','Zebra 2', theme.zebra2||DEFAULTS.theme.zebra2));
+
+      const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna-Folien & Flammen</div>';
+      C.appendChild(colorField('cellBg','Kachel-Hintergrund', theme.cellBg||DEFAULTS.theme.cellBg));
+      C.appendChild(colorField('boxFg','Kachel-Schrift', theme.boxFg||DEFAULTS.theme.boxFg));
+      C.appendChild(colorField('saunaColor','Sauna-Überschrift', theme.saunaColor||DEFAULTS.theme.saunaColor));
+      C.appendChild(colorField('flame','Flammen', theme.flame||DEFAULTS.theme.flame));
+
+      host.appendChild(A); host.appendChild(B); host.appendChild(C);
+      // previews
+      $$('#colorList input[type="text"]').forEach(inp=>{ const sw=$('#sw_'+inp.id.replace(/^cl_/,'')); const setPrev=v=>sw.style.background=v; setPrev(inp.value); inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); }); });
+      $('#resetColors').onclick=()=>{ $$('#colorList input[type="text"]').forEach(inp=>{ const k=inp.id.replace(/^cl_/,''); inp.value=(DEFAULTS.theme[k]||'#FFFFFF'); const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value; }); };
+    }
+
+    // ------- Upload helper & cleanup -------
     function uploadGeneric(fileInput, onDone){ if(!fileInput.files || !fileInput.files[0]) return; const fd=new FormData(); fd.append('file', fileInput.files[0]); const xhr=new XMLHttpRequest(); xhr.open('POST','/admin/api/upload.php'); xhr.onload=()=>{ try{ const j=JSON.parse(xhr.responseText||'{}'); if(j.ok){ onDone(j.path); } else { alert('Upload-Fehler: '+(j.error||'')); } }catch{ alert('Upload fehlgeschlagen'); } }; xhr.onerror=()=> alert('Netzwerkfehler beim Upload'); xhr.send(fd); }
+    async function cleanupAssets(){ if(!confirm('Überflüssige Bilder in /assets/img/ löschen (Defaults & aktuell verwendete bleiben erhalten)?')) return; const r=await fetch('/admin/api/cleanup_assets.php'); const j=await r.json().catch(()=>({ok:false})); alert(j.ok? (`Bereinigt: ${j.removed} Dateien entfernt.`):('Fehler: '+(j.error||''))); }
 
     // ------- Save / Preview -------
     function collectColors(){ const theme={...(settings.theme||{})}; $$('#colorList input[type="text"]').forEach(inp=>{ const v=inp.value.toUpperCase(); if(/^#([0-9A-Fa-f]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v; }); return theme; }
-    function collectSettings(){ return { schedule:{...schedule}, settings:{ ...settings, footnote: $('#footnote')?.value || settings.footnote || '', fonts:{ family: $('#fontFamily').value, scale: +($('#fontScale')?.value||1), h1Scale:+($('#h1Scale').value||1), h2Scale:+($('#h2Scale').value||1), overviewHeadScale:+($('#ovHeadScale').value||0.9), overviewCellScale:+($('#ovCellScale').value||0.8), tileTextScale:+($('#tileTextScale').value||0.8), tileWeight:+($('#tileWeight').value||600) }, slides:{ ...(settings.slides||{}), overviewDurationSec:+($('#overviewSec')?.value||10), saunaDurationSec:+($('#saunaSec')?.value||6), transitionMs:+($('#transMs')?.value||500) }, theme: collectColors(), highlightNext:{ enabled: $('#hlEnabled').checked, color: /^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)? $('#hlColor').value.toUpperCase() : (settings.highlightNext?.color || DEFAULTS.highlightNext.color), minutesWindow: +( $('#hlWindow').value || DEFAULTS.highlightNext.minutesWindow ) }, display:{ ...(settings.display||{}), fit:'contain', baseW:1920, baseH:1080 } } }; }
+    function collectSettings(){
+      return {
+        schedule:{...schedule},
+        settings:{
+          ...settings,
+          footnote: $('#footnote')?.value || settings.footnote || '',
+          fonts:{
+            family: $('#fontFamily').value,
+            scale: +($('#fontScale')?.value||1),
+            h1Scale:+($('#h1Scale').value||1),
+            h2Scale:+($('#h2Scale').value||1),
+            overviewHeadScale:+($('#ovHeadScale').value||0.9),
+            overviewCellScale:+($('#ovCellScale').value||0.8),
+            tileTextScale:+($('#tileTextScale').value||0.8),
+            tileWeight:+($('#tileWeight').value||600)
+          },
+          slides:{
+            ...(settings.slides||{}),
+            overviewDurationSec:+($('#overviewSec')?.value||10),
+            saunaDurationSec:+($('#saunaSec')?.value||6),
+            transitionMs:+($('#transMs')?.value||500)
+          },
+          theme: collectColors(),
+          highlightNext:{
+            enabled: $('#hlEnabled').checked,
+            color: /^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)? $('#hlColor').value.toUpperCase() : (settings.highlightNext?.color || DEFAULTS.highlightNext.color),
+            minutesBeforeNext: +( $('#hlBefore').value || DEFAULTS.highlightNext.minutesBeforeNext ),
+            minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
+          },
+          assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
+          display:{ ...(settings.display||{}), fit:'contain', baseW:1920, baseH:1080 }
+        }
+      };
+    }
 
     $('#btnOpen').onclick=()=> window.open('/', '_blank');
     $('#btnPreview').onclick=()=>{ $('#prevModal').style.display='grid'; sendPreview(); };
@@ -1081,6 +1401,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
