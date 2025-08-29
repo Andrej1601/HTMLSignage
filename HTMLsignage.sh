@@ -206,6 +206,10 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .fade{opacity:0;transition:opacity .5s}
 .fade.show{opacity:1}
 
+/* interstitial image */
+.container.imgslide{padding:0}
+.imgFill{position:absolute; inset:0; background-size:cover; background-position:center; background-repeat:no-repeat}
+
 /* layout */
 .container{position:relative; height:100%; padding:calc(32px*var(--vwScale)); display:flex; flex-direction:column; align-items:flex-start}
 .container.has-right{padding-right:calc(var(--rightW) + 32px)}
@@ -418,26 +422,37 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   }
 
   // ---------- Slide queue ----------
-  function buildQueue() {
-    const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
-    const allSaunas = (schedule?.saunas || []).slice();
-    const queue = []; const seen = new Set();
+function buildQueue() {
+  const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
+  const allSaunas = (schedule?.saunas || []).slice();
+  let queue = []; const seen = new Set();
 
-    if (!cfgOrder || cfgOrder.length === 0) {
-      queue.push({ type: 'overview' });
-      for (const s of allSaunas) queue.push({ type: 'sauna', sauna: s });
-    } else {
-      let addedOverview = false;
-      for (const e of cfgOrder) {
-        if (e === 'overview') { if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; } continue; }
-        if (allSaunas.includes(e) && !seen.has(e)) { seen.add(e); queue.push({ type: 'sauna', sauna: e }); }
-      }
-      for (const s of allSaunas) if (!seen.has(s)) queue.push({ type: 'sauna', sauna: s });
-      if (!queue.some(x => x.type === 'overview')) queue.unshift({ type: 'overview' });
+  if (!cfgOrder || cfgOrder.length === 0) {
+    queue.push({ type: 'overview' });
+    for (const s of allSaunas) queue.push({ type: 'sauna', sauna: s });
+  } else {
+    let addedOverview = false;
+    for (const e of cfgOrder) {
+      if (e === 'overview') { if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; } continue; }
+      if (allSaunas.includes(e) && !seen.has(e)) { seen.add(e); queue.push({ type: 'sauna', sauna: e }); }
     }
-    nextQueue.splice(0, nextQueue.length, ...queue);
-    idx = 0;
+    for (const s of allSaunas) if (!seen.has(s)) queue.push({ type: 'sauna', sauna: s });
+    if (!queue.some(x => x.type === 'overview')) queue.unshift({ type: 'overview' });
   }
+
+  // Interstitials einfügen
+  const inter = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+  inter.filter(it=>it && it.enabled && it.url).forEach(it=>{
+    const after = it.after || 'overview';
+    const pos = queue.findIndex(x => after==='overview' ? x.type==='overview' : (x.type==='sauna' && x.sauna===after));
+    if (pos >= 0) {
+      queue.splice(pos+1, 0, { type:'image', url: it.url, dwell: (Number.isFinite(+it.dwellSec)? +it.dwellSec : 6) });
+    }
+  });
+
+  nextQueue.splice(0, nextQueue.length, ...queue);
+  idx = 0;
+}
 
   // ---------- DOM helpers ----------
   function h(tag, attrs = {}, children = []) {
@@ -635,6 +650,14 @@ while (m.totalH > availH && iter < 12) {
     return c;
   }
 
+// ---------- Interstitial image slide ----------
+function renderImage(url) {
+  const c = h('div', { class: 'container imgslide fade show' }, [
+    h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' })
+  ]);
+  return c;
+}
+
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -731,12 +754,14 @@ if (footNodes.length){
     clearTimers(); // verhindert Doppelplanung z. B. nach Preview/Reload
 
     const item = nextQueue[idx % nextQueue.length];
-    const el = (item.type === 'overview') ? renderOverview() : renderSauna(item.sauna);
+const el = (item.type === 'overview') ? renderOverview() : (item.type === 'sauna') ? renderSauna(item.sauna) : renderImage(item.url);
     show(el);
 
-    const base = (item.type === 'overview')
-      ? (settings?.slides?.overviewDurationSec ?? 10) * 1000
-      : (settings?.slides?.saunaDurationSec ?? 6) * 1000;
+const base = (item.type === 'overview')
+  ? (settings?.slides?.overviewDurationSec ?? 10) * 1000
+  : (item.type === 'sauna')
+    ? (settings?.slides?.saunaDurationSec ?? 6) * 1000
+    : ((item.dwell ?? (settings?.slides?.imageDurationSec ?? 6)) * 1000);
 
     // Standard: Sichtzeit = base, Transition kommt oben drauf
     const dwell = base;
@@ -858,8 +883,26 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     .kv{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
     .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
 
-    .saunarow{display:grid;grid-template-columns:1fr 64px auto auto auto auto;gap:10px;align-items:center;margin-bottom:10px}
-    .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
+.saunarow{
+  display:grid;
+  /* Name | Preview | Auflösung | Dauer | Upload | Default | X | Haken */
+  grid-template-columns: 1fr 64px auto auto 30px 30px 30px 22px;
+  gap:8px; align-items:center; margin-bottom:8px;
+}
+.btn.icon{ width:30px; min-width:30px; padding:6px 0; text-align:center }
+.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
+.res{ font-size:12px; opacity:.7; white-space:nowrap }
+/* kompakte Zeile für Bild-Slides */
+.interrow{
+  /* Name | Preview | Auflösung | Dauer | Upload | X | Nach-Slide | Haken */
+  display:grid;
+  grid-template-columns: 1fr 64px auto auto 30px 30px minmax(160px,1fr) 22px;
+  gap:8px; align-items:center; margin-bottom:8px;
+}
+.sel-after{ min-width:160px; }
+ 
+
+   .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
 
     .color-cols{display:grid;grid-template-columns:1fr;gap:12px}
     .fieldset{border:1px dashed var(--inbr);border-radius:12px;padding:10px}
@@ -934,11 +977,6 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
           </div>
           <div class="help">„Cover“ füllt 1080p/1440p **ohne Rand**. Andere Verhältnisse werden ggf. beschnitten. „Contain“ zeigt immer alles (Rand möglich).</div>
 
-          <div class="subh">Zeiten & Dauer</div>
-          <div class="kv"><label>Übersicht (Sek.)</label><input id="overviewSec" class="input" type="number" min="1" value="10"></div>
-          <div class="kv"><label>Saunafolie (Sek.)</label><input id="saunaSec" class="input" type="number" min="1" value="6"></div>
-          <div class="kv"><label>Transition (ms)</label><input id="transMs" class="input" type="number" min="0" value="500"></div>
-
           <div class="subh">Schrift</div>
           <div class="kv"><label>Schriftfamilie</label>
             <select id="fontFamily" class="input">
@@ -1008,22 +1046,74 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
           </div>
         </div>
       </details>
+      
+<!-- Slides – Masterbox -->
+<details class="ac" open id="slidesMaster">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
+    <div class="actions">
+      <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
+    </div>
+  </summary>
+  <div class="content">
 
-      <details class="ac" open>
-        <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Saunen</div>
-          <div class="actions">
-            <button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button>
-            <button class="btn sm ghost" id="btnCleanup">Assets aufräumen</button>
-          </div>
-        </summary>
-        <div class="content">
-          <div class="row mut" style="font-weight:700;margin-bottom:6px">
-            <div style="width:100%">Name · Preview · Upload · Default · Entfernen</div>
-          </div>
-          <div id="saunaList"></div>
+<!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
+<div class="kv" id="rowDurMode">
+  <label>Dauer-Modus</label>
+  <div class="row">
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
+  </div>
+</div>
+
+<div class="kv" id="rowDwellAll">
+  <label>Dauer (alle außer Übersicht)</label>
+  <input id="dwellAll" class="input" type="number" min="1" value="6">
+</div>
+
+<!-- Transition -->
+<div class="kv"><label>Transition (ms)</label>
+  <input id="transMs2" class="input" type="number" min="0" value="500">
+</div>
+
+    <!-- Unterbox 1: Saunen & Übersicht -->
+    <details class="ac sub" open id="boxSaunas">
+      <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
+ <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
+</summary>      
+<div class="content">
+
+        <!-- Übersicht im Saunen-Stil -->
+        <div class="fieldset" style="margin-bottom:10px">
+          <div class="legend">Übersicht (Aufgussplan)</div>
+          <div id="overviewRow"></div>
         </div>
-      </details>
+
+        <!-- Saunenliste -->
+<div class="row mut" style="font-weight:700;margin:0 0 6px">
+  <div style="width:100%">Name · Preview · Auflösung · Dauer (s)* · Upload · Default · ✕ · Anzeigen</div>
+</div>
+        <div id="saunaList"></div>
+        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+      </div>
+    </details>
+
+    <!-- Unterbox 2: Bild-Slides -->
+    <details class="ac sub" open id="boxImages">
+<summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div class="row mut" style="font-weight:700;margin-bottom:6px">
+      <div style="width:100%">Name · Preview · Auflösung · Dauer (s) · Upload · ✕ · Nach Slide · Anzeigen</div>
+    </div>
+    <div id="interList2"></div>
+  </div>
+</details>
+
+  </div>
+</details>
 
       <details class="ac">
         <summary>
@@ -1105,7 +1195,8 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
             <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
               <input type="checkbox" id="impWriteImg" checked>Bilder einspielen
             </label>
-          </div>
+         <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
+ </div>
           <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
         </div>
       </details>
@@ -1202,8 +1293,10 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
       renderGrid();
       renderSlides();
       renderHighlightBox();
-      renderSaunasPanel();
-      renderColors();
+      renderSlidesMasterBox(); // neue große Box (inkl. Bild-Slides) befüllen
+      settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+renderInterstitialsPanel();
+renderColors();
       renderFootnotes();
 renderPresets();
     }
@@ -1291,55 +1384,76 @@ renderPresets();
     $('#btnAddBelow').onclick=()=>{ const cols=schedule.saunas.length; schedule.rows.splice(curRow+1,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)}); renderGrid(); };
     $('#btnDeleteRow').onclick=()=>{ if(schedule.rows.length>1){ schedule.rows.splice(curRow,1); curRow=Math.max(0,curRow-1); renderGrid(); updateSelTime(); } };
 
-    // ------- Slides & Settings -------
-    function renderSlides(){
-      const f=settings.fonts||{};
-      $('#fitMode').value   = settings.display?.fit || 'cover';
-      $('#overviewSec').value = settings.slides?.overviewDurationSec??10;
-      $('#saunaSec').value    = settings.slides?.saunaDurationSec??6;
-      $('#transMs').value     = settings.slides?.transitionMs??500;
+// ------- Slides & Settings -------
+function renderSlides(){
+  const f = settings.fonts || {};
 
-      $('#fontFamily').value  = f.family || DEFAULTS.fonts.family;
-      $('#fontScale').value   = f.scale ?? 1;
-      $('#h1Scale').value     = f.h1Scale ?? 1;
-      $('#h2Scale').value     = f.h2Scale ?? 1;
-      $('#h2Mode').value = settings.h2?.mode ?? DEFAULTS.h2.mode;
-      $('#h2Text').value = settings.h2?.text ?? DEFAULTS.h2.text;
-      $('#h2ShowOverview').checked = (settings.h2?.showOnOverview ?? DEFAULTS.h2.showOnOverview);
-$('#ovHeadScale').value = f.overviewHeadScale ?? 0.9;
-      $('#ovCellScale').value = f.overviewCellScale ?? 0.8;
-      $('#chipH').value       = f.chipHeight ?? 44;
- $('#ovTitleScale').value = f.overviewTitleScale ?? 1;
+  // kleine Helfer, damit fehlende Felder keinen Fehler werfen
+  const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
+  const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
 
-      $('#tileTextScale').value = f.tileTextScale ?? 0.8;
-      $('#tileWeight').value    = f.tileWeight ?? 600;
-      $('#tilePct').value = settings.slides?.tileWidthPercent ?? 45;
-      $('#tileMin').value = settings.slides?.tileMinPx ?? 480;
-      $('#tileMax').value = settings.slides?.tileMaxPx ?? 1100;
+  // Anzeige/Scaling (vorhanden)
+  setV('#fitMode', settings.display?.fit || 'cover');
 
-      $('#rightW').value   = settings.display?.rightWidthPercent ?? 38;
-      $('#cutTop').value   = settings.display?.cutTopPercent ?? 28;
-      $('#cutBottom').value= settings.display?.cutBottomPercent ?? 12;
+  // Schrift
+  setV('#fontFamily', f.family ?? DEFAULTS.fonts.family);
+  setV('#fontScale',  f.scale  ?? 1);
+  setV('#h1Scale',    f.h1Scale ?? 1);
+  setV('#h2Scale',    f.h2Scale ?? 1);
 
-      $('#resetSlides').onclick = ()=>{
-        $('#fitMode').value='cover';
-        $('#overviewSec').value=DEFAULTS.slides.overviewDurationSec;
-        $('#saunaSec').value=DEFAULTS.slides.saunaDurationSec;
-        $('#transMs').value=DEFAULTS.slides.transitionMs;
-        $('#fontFamily').value=DEFAULTS.fonts.family;
-        $('#fontScale').value=1; $('#h1Scale').value=1; $('#h2Scale').value=1;
-        $('#ovTitleScale').value=1;
-        $('#h2Mode').value='text';
-        $('#h2Text').value='Aufgusszeiten';
-        $('#h2ShowOverview').checked=true;
-$('#ovHeadScale').value=DEFAULTS.fonts.overviewHeadScale;
-        $('#ovCellScale').value=DEFAULTS.fonts.overviewCellScale;
-        $('#chipH').value=44;
-        $('#tileTextScale').value=0.8; $('#tileWeight').value=600;
-        $('#tilePct').value=45; $('#tileMin').value=480; $('#tileMax').value=1100;
-        $('#rightW').value=38; $('#cutTop').value=28; $('#cutBottom').value=12;
-      };
-    }
+  // H2
+  setV('#h2Mode', settings.h2?.mode ?? DEFAULTS.h2.mode);
+  setV('#h2Text', settings.h2?.text ?? DEFAULTS.h2.text);
+  setC('#h2ShowOverview', (settings.h2?.showOnOverview ?? DEFAULTS.h2.showOnOverview));
+
+  // Übersicht (Tabelle)
+  setV('#ovTitleScale', f.overviewTitleScale ?? 1);
+  setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
+  setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
+  setV('#chipH',        f.chipHeight         ?? 44);
+
+  // Saunafolien (Kacheln)
+  setV('#tileTextScale', f.tileTextScale ?? 0.8);
+  setV('#tileWeight',    f.tileWeight    ?? 600);
+  setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
+  setV('#tileMin',       settings.slides?.tileMinPx ?? 480);
+  setV('#tileMax',       settings.slides?.tileMaxPx ?? 1100);
+
+  // Bildspalte / Schrägschnitt
+  setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
+  setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
+  setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
+
+  // "Standardwerte" in dieser Box: nur noch Felder, die hier real existieren.
+  const reset = document.querySelector('#resetSlides');
+  if (reset) reset.onclick = ()=>{
+    setV('#fitMode', 'cover');
+
+    setV('#fontFamily', DEFAULTS.fonts.family);
+    setV('#fontScale', 1);
+    setV('#h1Scale', 1);
+    setV('#h2Scale', 1);
+
+    setV('#h2Mode', DEFAULTS.h2.mode);
+    setV('#h2Text', DEFAULTS.h2.text);
+    setC('#h2ShowOverview', DEFAULTS.h2.showOnOverview);
+
+    setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
+    setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
+    setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
+    setV('#chipH',        DEFAULTS.fonts.chipHeight);
+
+    setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
+    setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
+    setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
+    setV('#tileMin',       DEFAULTS.slides.tileMinPx);
+    setV('#tileMax',       DEFAULTS.slides.tileMaxPx);
+
+    setV('#rightW',   DEFAULTS.display.rightWidthPercent);
+    setV('#cutTop',   DEFAULTS.display.cutTopPercent);
+    setV('#cutBottom',DEFAULTS.display.cutBottomPercent);
+  };
+}
 
     // ------- Highlights & Flames -------
     function renderHighlightBox(){
@@ -1358,37 +1472,325 @@ $('#ovHeadScale').value=DEFAULTS.fonts.overviewHeadScale;
     }
     function updateFlamePreview(u){ const img=$('#flamePrev'); preloadImg(u).then(r=>{ if(r.ok){ img.src=u; img.title=r.w+'×'+r.h; } else { img.removeAttribute('src'); img.title=''; } }); }
 
-    // ------- Saunen panel -------
-    function saunaRow(i){
-      const name=schedule.saunas[i];
-      const id='sx_'+i;
-      const wrap=document.createElement('div');
-      wrap.className='saunarow';
-      wrap.innerHTML=
-        `<input id="n_${id}" class="input" type="text" value="${name}" />
-         <img id="p_${id}" class="prev" alt=""/>
-         <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="f_${id}" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
-         <button class="btn sm" id="d_${id}">Default</button>
-         <button class="btn sm" id="x_${id}">✕</button>
-         <span id="s_${id}" class="mut"></span>`;
-      const $name=$(`#n_${id}`,wrap), $img=$(`#p_${id}`,wrap), $file=$(`#f_${id}`,wrap), $def=$(`#d_${id}`,wrap), $del=$(`#x_${id}`,wrap), $st=$(`#s_${id}`,wrap);
-      const url = (settings.assets?.rightImages?.[name]) || '';
-      (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } } })();
-      $file.onchange=()=> uploadGeneric($file, (p)=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]=p; $img.src=p; $st.textContent='gespeichert'; });
-      $def.onclick=()=>{ settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{}; settings.assets.rightImages[name]='/assets/img/right_default.svg'; $img.src='/assets/img/right_default.svg'; $st.textContent='Default'; };
-      $del.onclick=()=>{ if(!confirm('Sauna wirklich entfernen?')) return; const removedName=schedule.saunas.splice(i,1)[0]; schedule.rows.forEach(r=> r.entries.splice(i,1)); if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName]; renderGrid(); renderSaunasPanel(); };
-      $name.onchange=()=>{ const newName=$name.value.trim()||name; if(newName===name) return; const old=name; schedule.saunas[i]=newName; if(settings.assets?.rightImages){ const val=settings.assets.rightImages[old]; delete settings.assets.rightImages[old]; settings.assets.rightImages[newName]=val; } renderGrid(); renderSaunasPanel(); };
-      return wrap;
-    }
-    function renderSaunasPanel(){
-      const host=$('#saunaList'); host.innerHTML='';
-      settings.assets=settings.assets||{}; settings.assets.rightImages=settings.assets.rightImages||{};
-      (schedule.saunas||[]).forEach((_,i)=> host.appendChild(saunaRow(i)) );
-      $('#btnAddSauna').onclick=()=>{ const name = prompt('Neuer Saunananame:', 'Neue Sauna'); if(!name) return; schedule.saunas.push(name); schedule.rows.forEach(r=> r.entries.push(null)); renderGrid(); renderSaunasPanel(); };
-      $('#btnCleanup').onclick=cleanupAssets;
-    }
 
-    function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+function interAfterOptionsHTML(){
+  const opts = ['overview', ...(schedule.saunas||[])];
+  return opts.map(v=>{
+    const label = (v==='overview') ? 'Übersicht' : v;
+    return `<option value="${v}">${label}</option>`;
+  }).join('');
+}
+
+function interRow(i){
+  const it = settings.interstitials[i];
+  const id = 'inter_'+i;
+  const wrap = document.createElement('div');
+  wrap.className = 'interrow';
+
+  wrap.innerHTML = `
+    <input id="n_${id}" class="input" type="text" placeholder="Name" />
+    <img id="p_${id}" class="prev" alt=""/>
+    <span id="r_${id}" class="res">—</span>
+    <input id="d_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="u_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML()}</select>
+    <input id="e_${id}" type="checkbox" />
+  `;
+
+  const $name = wrap.querySelector('#n_'+id);
+  const $prev = wrap.querySelector('#p_'+id);
+  const $res  = wrap.querySelector('#r_'+id);
+  const $dur  = wrap.querySelector('#d_'+id);
+  const $upl  = wrap.querySelector('#u_'+id);
+  const $del  = wrap.querySelector('#x_'+id);
+  const $after= wrap.querySelector('#a_'+id);
+  const $ena  = wrap.querySelector('#e_'+id);
+
+  // Werte setzen
+  $name.value    = it.name || '';
+  $after.value   = it.after || 'overview';
+  $dur.value     = Number.isFinite(+it.dwellSec) ? it.dwellSec : 6;
+  $ena.checked   = !!it.enabled;
+
+  if (it.url){
+    preloadImg(it.url).then(r=>{
+      if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; $res.textContent = `${r.w}×${r.h}`; }
+    });
+  } else {
+    $res.textContent = '—';
+  }
+
+  // Events
+  $name.onchange  = ()=>{ it.name = ($name.value||'').trim(); };
+  $after.onchange = ()=>{ it.after = $after.value; };
+  $dur.onchange   = ()=>{ it.dwellSec = Math.max(1, Math.min(60, +$dur.value||6)); };
+  $ena.onchange   = ()=>{ it.enabled = $ena.checked; };
+
+  // Upload über unseren generic uploader
+  $upl.onclick = ()=>{
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*';
+    input.onchange = ()=> uploadGeneric(input, (p)=>{
+      it.url = p;
+      preloadImg(p).then(r=>{
+        if(r.ok){ $prev.src=p; $prev.title=`${r.w}×${r.h}`; $res.textContent=`${r.w}×${r.h}`; }
+      });
+    });
+    input.click();
+  };
+
+  $del.onclick = ()=>{ settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
+
+  // Sichtbarkeit der Dauer (globaler Modus)
+  const uniform = (settings.slides?.durationMode !== 'per');
+  $dur.style.display = uniform ? 'none' : 'block';
+
+  return wrap;
+}
+
+function renderInterstitialsPanel(hostId='interList2'){
+  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const host = document.getElementById(hostId);
+  if (!host) return;
+
+  host.innerHTML = '';
+  settings.interstitials.forEach((_,i)=> host.appendChild(interRow(i)));
+
+  const add = document.getElementById('btnInterAdd2');
+  if (add) add.onclick = ()=>{
+    (settings.interstitials ||= []).push({
+      id:'im_'+Math.random().toString(36).slice(2,9),
+      name:'',
+      enabled:true,
+      url:'',
+      after:'overview',
+      dwellSec:6
+    });
+    renderSlidesMasterBox();
+  };
+}
+
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+// Übersicht als Row im Saunen-Stil
+function overviewRowRender(){
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow';
+  wrap.innerHTML = `
+    <div style="font-weight:600">Übersicht</div>
+    <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
+    <span class="res">—</span>
+    <input id="ovSec" class="input num3" type="number" min="1" max="120" step="1" />
+    <span></span><span></span><span></span>
+    <input id="ovShow" type="checkbox" />
+  `;
+  const ovSecEl = wrap.querySelector('#ovSec');
+  const ovShowEl = wrap.querySelector('#ovShow');
+  ovSecEl.value  = settings.slides?.overviewDurationSec ?? 10;
+  ovShowEl.checked = (settings.slides?.showOverview !== false);
+  ovSecEl.onchange = ()=>{
+    settings.slides = settings.slides || {};
+    settings.slides.overviewDurationSec = Math.max(1, Math.min(120, +ovSecEl.value||10));
+  };
+  ovShowEl.onchange = ()=>{
+    settings.slides = settings.slides || {};
+    settings.slides.showOverview = !!ovShowEl.checked;
+  };
+  return wrap;
+}
+
+// Sauna-Zeile (kompakt mit Icon-Buttons, Sichtbarkeit & optionaler Dauer)
+function saunaMasterRow(i){
+  const name = schedule.saunas[i];
+  const id = 'sx_'+i;
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow';
+  wrap.innerHTML = `
+    <input id="n_${id}" class="input" type="text" value="${name}" />
+    <img id="p_${id}" class="prev" alt=""/>
+    <span id="s_${id}" class="res"></span>
+    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
+    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+    <input id="en_${id}" type="checkbox" checked />
+  `;
+
+  const $name = wrap.querySelector('#n_'+id);
+  const $img  = wrap.querySelector('#p_'+id);
+  const $st   = wrap.querySelector('#s_'+id);
+  const $up   = wrap.querySelector('#f_'+id);
+  const $def  = wrap.querySelector('#d_'+id);
+  const $del  = wrap.querySelector('#x_'+id);
+  const $sec  = wrap.querySelector('#sec_'+id);
+  const $en   = wrap.querySelector('#en_'+id);
+
+  // Preview laden
+  const url = (settings.assets?.rightImages?.[name]) || '';
+  (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } } })();
+
+  // Dauer (nur im Modus "per")
+  const per = (settings.slides?.durationMode === 'per');
+  const perMap = settings.slides?.saunaDurations || {};
+  $sec.disabled = !per;
+  $sec.style.visibility = per ? 'visible' : 'hidden';
+  $sec.value = Number.isFinite(+perMap[name]) ? perMap[name] : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
+  $sec.onchange = ()=>{
+    settings.slides = settings.slides || {};
+    settings.slides.saunaDurations = settings.slides.saunaDurations || {};
+    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value||6));
+  };
+
+  // Sichtbarkeit
+  const hidden = new Set(settings.slides?.hiddenSaunas || []);
+  $en.checked = !hidden.has(name);
+  $en.onchange = ()=>{
+    const set = new Set(settings.slides?.hiddenSaunas || []);
+    if ($en.checked) set.delete(name); else set.add(name);
+    settings.slides = settings.slides || {};
+    settings.slides.hiddenSaunas = Array.from(set);
+  };
+
+  // Upload (temporärer File-Input)
+  $up.onclick = ()=>{
+    const fi = document.createElement('input');
+    fi.type = 'file'; fi.accept = 'image/*';
+    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
+      settings.assets = settings.assets || {};
+      settings.assets.rightImages = settings.assets.rightImages || {};
+      settings.assets.rightImages[name] = p;
+      preloadImg(p).then(r=>{ if(r.ok){ $img.src=p; $st.textContent=`${r.w}×${r.h}`; } else { $img.removeAttribute('src'); $st.textContent=''; } });
+    });
+    fi.click();
+  };
+
+  // Default
+  $def.onclick = ()=>{
+    settings.assets = settings.assets || {};
+    settings.assets.rightImages = settings.assets.rightImages || {};
+    settings.assets.rightImages[name] = '/assets/img/right_default.svg';
+    $img.src = '/assets/img/right_default.svg';
+    $st.textContent = 'Default';
+  };
+
+  // Entfernen
+  $del.onclick = ()=>{
+    if(!confirm(`Sauna "${name}" wirklich entfernen?`)) return;
+    const removedName = schedule.saunas.splice(i,1)[0];
+    schedule.rows.forEach(r=> r.entries.splice(i,1));
+    if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName];
+    renderSlidesMasterBox();
+    renderGrid();
+  };
+
+  // Umbenennen
+  $name.onchange = ()=>{
+    const newName = ($name.value || '').trim() || name;
+    if (newName === name) return;
+    const old = name;
+    schedule.saunas[i] = newName;
+    if (settings.assets?.rightImages){
+      const val = settings.assets.rightImages[old];
+      delete settings.assets.rightImages[old];
+      settings.assets.rightImages[newName] = val;
+    }
+    if (settings.slides?.saunaDurations && settings.slides.saunaDurations[old] != null){
+      settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[old];
+      delete settings.slides.saunaDurations[old];
+    }
+    renderSlidesMasterBox();
+    renderGrid();
+  };
+
+  return wrap;
+}
+
+// Masterbox-Renderer (2 Unterboxen)
+function renderSlidesMasterBox(){
+  settings.slides = { ...(settings.slides||{}) };
+
+  // Transition
+  const transEl = document.getElementById('transMs2');
+  if (transEl){
+    transEl.value = settings.slides.transitionMs ?? 500;
+    transEl.onchange = ()=> {
+      settings.slides.transitionMs = Math.max(0, +transEl.value||0);
+    };
+    // Dauerfeld der Bild-Slides ein/ausblenden je Modus
+  const uniform = (settings.slides.durationMode !== 'per');
+  $$('.intSec').forEach(inp => { if (inp) inp.style.display = uniform ? 'none' : 'block'; });
+}
+
+  // Übersicht-Row
+  const ovHost = document.getElementById('overviewRow');
+  if (ovHost){ ovHost.innerHTML=''; ovHost.appendChild(overviewRowRender()); }
+
+  // Saunen-Liste
+  const sHost = document.getElementById('saunaList');
+  if (sHost){
+    sHost.innerHTML = '';
+    (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
+  }
+
+  // Modus-Schalter unten + Globaldauer
+  const uniform = (settings.slides.durationMode !== 'per');
+  const durUniform = document.getElementById('durUniform');
+  const durPer     = document.getElementById('durPer');
+  const dwellAll   = document.getElementById('dwellAll');
+  const rowDwell   = document.getElementById('rowDwellAll');
+
+  if (durUniform) durUniform.checked = uniform;
+  if (durPer)     durPer.checked     = !uniform;
+  if (dwellAll)   dwellAll.value     = settings.slides.globalDwellSec ?? (settings.slides.saunaDurationSec ?? 6);
+  if (rowDwell)   rowDwell.style.display = uniform ? 'grid' : 'none';
+
+  if (durUniform) durUniform.onchange = ()=>{
+    if (durUniform.checked){
+      settings.slides.durationMode = 'uniform';
+      const rowDwell = document.getElementById('rowDwellAll');
+      if (rowDwell) rowDwell.style.display = 'grid';
+      renderSlidesMasterBox();
+    }
+  };
+  if (durPer) durPer.onchange = ()=>{
+    if (durPer.checked){
+      settings.slides.durationMode = 'per';
+      const rowDwell = document.getElementById('rowDwellAll');
+      if (rowDwell) rowDwell.style.display = 'none';
+      renderSlidesMasterBox();
+    }
+  };
+  if (dwellAll) dwellAll.onchange = ()=>{
+    settings.slides.globalDwellSec = Math.max(1, Math.min(120, +dwellAll.value||6));
+  };
+
+  // Bild-Slides in diese Box
+  renderInterstitialsPanel('interList2');
+
+  // Reset & Add Sauna
+  const rs = document.getElementById('resetTiming');
+  if (rs) rs.onclick = ()=>{
+    settings.slides.showOverview = true;
+    settings.slides.overviewDurationSec = 10;
+    settings.slides.transitionMs = 500;
+    settings.slides.durationMode = 'uniform';
+    settings.slides.globalDwellSec = 6;
+    settings.slides.hiddenSaunas = [];
+    settings.slides.saunaDurations = {};
+    renderSlidesMasterBox();
+  };
+
+  const addBtn = document.getElementById('btnAddSauna');
+  if (addBtn) addBtn.onclick = ()=>{
+    const name = prompt('Neuer Saunananame:', 'Neue Sauna');
+    if(!name) return;
+    schedule.saunas.push(name);
+    schedule.rows.forEach(r=> r.entries.push(null));
+    renderSlidesMasterBox();
+    renderGrid();
+  };
+}
 
     function renderPresets(){
       settings.presets = settings.presets || {};
@@ -1407,7 +1809,7 @@ $('#ovHeadScale').value=DEFAULTS.fonts.overviewHeadScale;
         if (!p) { alert('Kein Preset für '+key); return; }
         schedule = deepClone(p);
         renderGrid();
-        renderSaunasPanel();
+renderSlidesMasterBox();
       };
       auto.onchange = () => { settings.presetAuto = auto.checked; };
     }
@@ -1501,7 +1903,15 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
               text: ($('#h2Text').value ?? '').trim(),
               showOnOverview: !!$('#h2ShowOverview').checked
             },
-            slides:{ ...(settings.slides||{}), overviewDurationSec:+($('#overviewSec')?.value||10), saunaDurationSec:+($('#saunaSec')?.value||6), transitionMs:+($('#transMs')?.value||500) },
+            slides:{
+              ...(settings.slides||{}),
+              // aus neuer großer Box
+              showOverview: !!document.getElementById('ovShow')?.checked,
+              overviewDurationSec: +(document.getElementById('ovSec')?.value || 10),
+              transitionMs: +(document.getElementById('transMs2')?.value || 500),
+              durationMode: (document.querySelector('input[name=durMode]:checked')?.value || 'uniform'),
+              globalDwellSec: +(document.getElementById('dwellAll')?.value || 6)
+            },
           theme: collectColors(),
           highlightNext:{
             enabled: $('#hlEnabled').checked,
@@ -1512,7 +1922,8 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
           assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
           display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080, rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
           footnotes: settings.footnotes,
-          presets: settings.presets || {},
+          interstitials: settings.interstitials || [],
+	presets: settings.presets || {},
           presetAuto: !!document.getElementById('presetAuto')?.checked
         }
       };
@@ -1572,6 +1983,26 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
 
     initThemeToggle();
 initBackupButtons();   
+
+(function initCleanupInSystem(){
+  const btn = document.getElementById('btnCleanupSys');
+  if(!btn) return;
+  btn.onclick = async ()=>{
+    const delSauna = confirm('Sauna-Bilder löschen? OK = Ja, Abbrechen = Nein');
+    const delInter = confirm('Bild-Slides löschen? OK = Ja, Abbrechen = Nein');
+    const delFlame = confirm('Flammen-Bild löschen? OK = Ja, Abbrechen = Nein');
+
+    const qs = new URLSearchParams({
+      sauna: delSauna ? '1' : '0',
+      inter: delInter ? '1' : '0',
+      flame: delFlame ? '1' : '0'
+    });
+    const r = await fetch('/admin/api/cleanup_assets.php?'+qs.toString());
+    const j = await r.json().catch(()=>({ok:false}));
+    alert(j.ok ? (`Bereinigt: ${j.removed||'?'} Dateien entfernt.`) : ('Fehler: '+(j.error||'')));
+  };
+})();
+
  loadAll();
   </script>
 </body>
@@ -1994,6 +2425,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
