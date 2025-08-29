@@ -212,6 +212,8 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .container.overview{padding-right:32px}
 .h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
+.overview .h1{font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
+.overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
 /* overview-only multiply with --ovAuto */
 .ovbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%;margin:0 0 10px}
 .overview .h1{font-size:calc(56px*var(--scale)*var(--ovTitleScale)*var(--ovAuto))}
@@ -233,9 +235,11 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 
 /* overview table */
 .grid{width:100%;max-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
-.grid col.c_time{width:10ch}
 .grid th,.grid td{border:var(--gridTableW) solid var(--gridTable);white-space:nowrap}
+.grid col.c_time{width:10ch}
+.grid col.c_auto{width:auto}
 .grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
+.overview .grid thead th{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
 
 /* zebra: rows for content cells, separate zebra for time column */
@@ -245,19 +249,21 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .grid tbody tr:nth-child(even) td.timecol{background:var(--timeZebra2)!important}
 
 .grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale))}
+.overview .grid td{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid th.timecol, .grid td.timecol{width:10ch}
 .grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
 
 /* equal chips */
 .cellwrap{display:block;width:100%;min-width:0}
 .chip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:var(--chipH);padding:0 .8em;padding-right:calc(3*(var(--flameSizePxOv)*1px*var(--scale))+24px);border-radius:10px;background:var(--cell);color:var(--boxfg);border:var(--chipBorderW) solid var(--chipBorder);font-weight:700;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.overview .chip{height:calc(var(--chipH)*var(--ovAuto))}
 .chip sup{margin-left:.25em}
 /* flames inside chip */
 .chip .flames{position:absolute;right:.6em;top:50%;transform:translateY(-50%);gap:6px}
 .overview .chip .flame{width:calc(var(--flameSizePxOv)*1px*var(--scale));height:calc(var(--flameSizePxOv)*1px*var(--scale))}
 
 /* overview wrapper */
-.ovwrap{display:block;width:100%}
+.ovwrap{transform-origin:top left; width:100%; will-change:contents}
 
 /* sauna tiles */
 .tile{display:grid; grid-template-columns:1fr auto; align-items:center; gap:calc(16px*var(--vwScale));
@@ -278,9 +284,33 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .chip.highlight{outline:3px solid var(--hlColor); outline-offset:2px}
 
 /* footnotes inline */
-.footer-note{margin-top:12px;font-size:calc(16px*var(--scale)*var(--ovAuto));opacity:.9; display:flex; align-items:center; gap:16px; flex-wrap:wrap}
-.footer-note .fnitem{display:flex; align-items:baseline; gap:6px}
+.footer-note{margin-top:12px;font-size:calc(16px*var(--scale)*var(--ovAuto));opacity:.9}
+/* Fußnoten-Layout: oneline bevorzugt, wrap nur zwischen Items */
+.footer-note .fnitem{display:flex;align-items:baseline;gap:.35em;min-width:0}
+.footer-note .fnitem sup.note{font-weight:400;opacity:.8}
 
+/* Einzeilig: keine Zeilenumbrüche, ggf. abgeschnitten */
+.footer-note.fn-one{display:flex;flex-wrap:nowrap;align-items:baseline;gap:calc(10px*var(--ovAuto));overflow:hidden;white-space:nowrap}
+.footer-note.fn-one .fnitem{white-space:inherit}
+
+/* Mehrzeilig: Container darf umbrechen; Items dürfen intern umbrechen */
+.footer-note.fn-multi{display:flex;flex-wrap:wrap;align-items:baseline;gap:calc(10px*var(--ovAuto));white-space:normal}
+.footer-note.fn-multi .fnitem{flex:1 1 260px;min-width:200px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+
+/* Gestapelt: jede Fußnote in eigener Zeile */
+.footer-note.fn-stack{
+  display:flex;
+  flex-direction:column;
+  gap:calc(6px*var(--ovAuto));
+}
+.footer-note.fn-stack .fnitem{
+  display:block;
+  white-space:normal;
+}
+.footer-note.fn-stack .fnsep{ display:none }
+
+/* Trenner-Punkt zwischen Items (nur optisch) */
+.footer-note .fnsep{ margin:0 calc(8px*var(--ovAuto)); opacity:.7 }
 .brand{position:absolute;right:20px;bottom:16px;opacity:.6;font-size:14px;color:var(--fg)}
 CSS
 
@@ -545,36 +575,47 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     });
     t.appendChild(tb);
 
-    const footNodes = [];
-    const order = (settings?.footnotes||[]).map(fn=>fn.id);
-    for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-    if (footNodes.length) return h('div', {}, [t, h('div', { class: 'footer-note' }, footNodes)]);
-    return t;
+const footNodes = [];
+const order = (settings?.footnotes||[]).map(fn=>fn.id);
+for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
+const layout = (settings?.footnoteLayout ?? 'one-line');
+const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : 'fn-one');
+if (footNodes.length){
+  const nodes = [];
+  footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
+  return h('div', {}, [ t, h('div', { class: fnClass }, nodes) ]);
+}
+return h('div', {}, [ t ]);
   }
 
   function autoScaleOverview(container) {
     const wrap = container.querySelector('.ovwrap'); if (!wrap) return;
+
+    // Reset (keine Breiten-Skalierung)
+    wrap.style.transform = 'none';
+    container.style.setProperty('--ovAuto', '1');
+
     const measure = () => {
       const headH = Array.from(container.querySelectorAll('.h1,.h2'))
         .reduce((a, el) => a + el.getBoundingClientRect().height, 0);
-      const foot = container.querySelector('.footer-note');
-      const wrapH = wrap.getBoundingClientRect().height;
-      const footH = foot ? foot.getBoundingClientRect().height : 0;
-      return headH + wrapH + footH + 8; // small safety
+      const footEl = container.querySelector('.footer-note');
+      const wrapRect = wrap.getBoundingClientRect();
+      const footH = footEl ? footEl.getBoundingClientRect().height : 0;
+      return { headH, footH, wrapH: wrapRect.height, totalH: headH + wrapRect.height + footH + 8 };
     };
-    const avail = container.clientHeight;
-    let s = 1, total, last = Infinity, iter = 0;
-    container.style.setProperty('--ovAuto', '1');
-    total = measure();
-    // iterate to converge (z. B. wenn Fonts/Paddings mitskalieren)
-    while (total > avail && iter < 6) {
-      const target = avail / total;
-      // leichte Dämpfung verhindert Übersteuern
-      s = Math.max(0.4, Math.min(1, target * (iter ? 0.98 : 1)));
+
+    const availH = container.clientHeight;
+
+    // Nur typografisch skalieren (breite bleibt 100%)
+    let iter = 0, lastTotal = Infinity;
+    let m = measure();
+while (m.totalH > availH && iter < 12) {
+  const target = availH / m.totalH;
+  const s = Math.max(0.25, Math.min(1, target * (iter ? 0.98 : 1)));
       container.style.setProperty('--ovAuto', String(s));
-      last = total;
-      total = measure();
-      if (Math.abs(total - last) < 0.5) break; // konvergiert
+      lastTotal = m.totalH;
+      m = measure();
+      if (Math.abs(m.totalH - lastTotal) < 0.5) break;
       iter++;
     }
   }
@@ -589,6 +630,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     const c = h('div', {class:'container overview fade show'}, [ bar, h('div', {class:'ovwrap'}, [table]) ]);
     const recalc = () => autoScaleOverview(c);
     setTimeout(recalc, 0);
+    if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
     onResizeCurrent = recalc;
     return c;
   }
@@ -655,10 +697,16 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
 
     body.appendChild(list); c.appendChild(body);
 
-    const footNodes = [];
-    const order = (settings?.footnotes||[]).map(fn=>fn.id);
-    for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-    if (footNodes.length) c.appendChild(h('div', { class: 'footer-note' }, footNodes));
+const footNodes = [];
+const order = (settings?.footnotes||[]).map(fn=>fn.id);
+for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
+const layout = (settings?.footnoteLayout ?? 'one-line');
+const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : 'fn-one');
+if (footNodes.length){
+  const nodes = [];
+  footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
+  c.appendChild(h('div', { class: fnClass }, nodes));
+}
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
@@ -1016,7 +1064,15 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
         <div class="content">
           <div id="fnList"></div>
           <div class="help">Jede Fußnote hat ein <b>Label</b> (z. B. *, †, 1) und einen <b>Text</b>. Label erscheint als Hochstellung am Eintrag und in der Legende.</div>
+        <div class="subh">Darstellung</div>
+        <div class="kv"><label>Fußnoten-Layout</label>
+          <select id="footnoteLayout" class="input">
+            <option value="one-line" selected>Möglichst einzeilig</option>
+            <option value="multi">Mehrzeilig</option>
+         <option value="stacked">Untereinander (jede Zeile)</option>
+ </select>
         </div>
+      </div>
       </details>
 
       <details class="ac">
@@ -1398,13 +1454,15 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
 // ------- Fußnoten -------
     function renderFootnotes(){
       const host=$('#fnList'); host.innerHTML='';
+      const layoutSel = document.getElementById('footnoteLayout');
+      if (layoutSel){ layoutSel.value = settings.footnoteLayout || 'one-line'; layoutSel.onchange = ()=>{ settings.footnoteLayout = layoutSel.value; }; }
       const list = settings.footnotes || [];
       list.forEach((fn,i)=> host.appendChild(fnRow(fn,i)));
       $('#fnAdd').onclick=()=>{ (settings.footnotes ||= []).push({id:genId(), label:'*', text:''}); renderFootnotes(); };
     }
     function fnRow(fn,i){
       const wrap=document.createElement('div'); wrap.className='kv';
-      wrap.innerHTML = `<label>Label/Text</label><div class="row" style="gap:8px;flex-wrap:nowrap"><input class="input" id="fn_l_${i}" value="${fn.label||'*'}" style="width:6ch"/><input class="input" id="fn_t_${i}" value="${fn.text||''}"/><button class="btn sm" id="fn_x_${i}">✕</button></div>`;
+      wrap.innerHTML = `<label>Label/Text</label><div class="row" style="gap:8px;flex-wrap:nowrap"><input class="input" id="fn_l_${i}" value="${fn.label||'*'}" style="width:6ch"/><input class="input" id="fn_t_${i}" value="${fn.text||''}" style="min-width:0"/><button class="btn sm" id="fn_x_${i}">✕</button></div>`;
       wrap.querySelector(`#fn_l_${i}`).onchange=(e)=>{ fn.label = (e.target.value||'*').slice(0,2); };
       wrap.querySelector(`#fn_t_${i}`).onchange=(e)=>{ fn.text = e.target.value||''; };
       wrap.querySelector(`#fn_x_${i}`).onclick=()=>{ settings.footnotes.splice(i,1); renderFootnotes(); };
@@ -1427,7 +1485,8 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
         schedule:{...schedule},
         settings:{
           ...settings,
-          fonts:{
+          footnoteLayout: document.getElementById('footnoteLayout')?.value || settings.footnoteLayout || 'one-line',
+  fonts:{
             family: $('#fontFamily').value,
             scale: +($('#fontScale')?.value||1),
             h1Scale:+($('#h1Scale').value||1),
@@ -1935,6 +1994,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
