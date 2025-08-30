@@ -327,6 +327,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   let schedule = null;
   let settings = null;
   let nextQueue = [];
+  let lastKey = null; // verhindert direkte Wiederholung derselben Folie
   let idx = 0;
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
@@ -358,6 +359,7 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     schedule = s; settings = cfg;
     applyTheme();
     applyDisplay();
+    maybeApplyPreset();
     buildQueue();
   }
 
@@ -421,34 +423,104 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
     window.addEventListener('resize', updateVwScale, { passive:true });
   }
 
-  // ---------- Slide queue ----------
+// ---------- Slide queue ----------
 function buildQueue() {
-  const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
-  const allSaunas = (schedule?.saunas || []).slice();
-  let queue = []; const seen = new Set();
+  // Tages-Preset ggf. anwenden
+  maybeApplyPreset();
 
-  if (!cfgOrder || cfgOrder.length === 0) {
-    queue.push({ type: 'overview' });
-    for (const s of allSaunas) queue.push({ type: 'sauna', sauna: s });
+  const showOverview = (settings?.slides?.showOverview !== false);
+  const hidden = new Set(settings?.slides?.hiddenSaunas || []);
+  const allSaunas = (schedule?.saunas || []);
+
+  // Referenz-Reihenfolge für Saunen (Order aus Settings, dann Rest)
+  const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
+  let saunaOrderRef = [];
+  if (cfgOrder && cfgOrder.length) {
+    const seen = new Set();
+    for (const e of cfgOrder) if (allSaunas.includes(e) && !seen.has(e)) { saunaOrderRef.push(e); seen.add(e); }
+    for (const s of allSaunas) if (!seen.has(s)) saunaOrderRef.push(s);
   } else {
-    let addedOverview = false;
-    for (const e of cfgOrder) {
-      if (e === 'overview') { if (!addedOverview) { queue.push({ type: 'overview' }); addedOverview = true; } continue; }
-      if (allSaunas.includes(e) && !seen.has(e)) { seen.add(e); queue.push({ type: 'sauna', sauna: e }); }
-    }
-    for (const s of allSaunas) if (!seen.has(s)) queue.push({ type: 'sauna', sauna: s });
-    if (!queue.some(x => x.type === 'overview')) queue.unshift({ type: 'overview' });
+    saunaOrderRef = allSaunas.slice();
   }
 
-  // Interstitials einfügen
-  const inter = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
-  inter.filter(it=>it && it.enabled && it.url).forEach(it=>{
-    const after = it.after || 'overview';
-    const pos = queue.findIndex(x => after==='overview' ? x.type==='overview' : (x.type==='sauna' && x.sauna===after));
-    if (pos >= 0) {
-      queue.splice(pos+1, 0, { type:'image', url: it.url, dwell: (Number.isFinite(+it.dwellSec)? +it.dwellSec : 6) });
+  // Sichtbare Saunen in der gleichen (reflektierten) Reihenfolge
+  const visibleSaunas = saunaOrderRef.filter(n => !hidden.has(n));
+
+  // Basis-Queue (ohne Bilder)
+  const queue = [];
+  if (showOverview) queue.push({ type: 'overview' });
+  for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
+
+  // Bilder vorbereiten (nur aktive mit URL)
+  const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+  const imgs = imgsAll.filter(it => it && it.enabled && it.url);
+
+  // Hilfen
+  const idxOverview = () => queue.findIndex(x => x.type === 'overview');
+
+  // Mehrpass-Einfügen, damit "nach Bild" funktioniert
+  let remaining = imgs.slice();
+  let guard = 0;
+  while (remaining.length && guard++ < imgs.length * 3) {
+    const postponed = [];
+    for (const it of remaining) {
+      const ref = (it.afterRef || it.after || 'overview');
+      let insPos = -1;
+
+      if (ref === 'overview') {
+        const io = idxOverview();
+        insPos = (io >= 0) ? io + 1 : 0;
+      } else if (String(ref).startsWith('img:')) {
+        // nach Bild: nur einfügen, wenn das Bild bereits platziert ist
+        const prevId = String(ref).slice(4);
+        const prevIndex = queue.findIndex(x => x.type === 'image' && x.__id === prevId);
+        if (prevIndex === -1) { postponed.push(it); continue; }
+        insPos = prevIndex + 1;
+      } else {
+        // nach Sauna (Name)
+        const saunaName = decodeURIComponent(String(ref));
+        const direct = queue.findIndex(x => x.type === 'sauna' && x.sauna === saunaName);
+        if (direct !== -1) {
+          // Zielsauna ist sichtbar → direkt dahinter
+          insPos = direct + 1;
+        } else {
+          // Zielsauna ist NICHT sichtbar → vor der nächsten sichtbaren Sauna in der Referenz-Reihenfolge
+          let nextVisible = null;
+          if (saunaOrderRef.length && visibleSaunas.length) {
+            const start = saunaOrderRef.indexOf(saunaName);
+            // falls die Referenzsauna gar nicht existiert, einfach ab 0 suchen
+            let k = (start >= 0 ? start : -1) + 1;
+            for (let step = 0; step < saunaOrderRef.length; step++, k++) {
+              const cand = saunaOrderRef[k % saunaOrderRef.length];
+              if (!hidden.has(cand)) { nextVisible = cand; break; }
+            }
+          }
+          if (nextVisible) {
+            const posQ = queue.findIndex(x => x.type === 'sauna' && x.sauna === nextVisible);
+            insPos = (posQ >= 0) ? posQ : -1; // vor nächster Sauna einfügen
+          }
+
+          // Fallback: nach Overview oder ganz vorn
+          if (insPos === -1) {
+            const io = idxOverview();
+            insPos = (io >= 0) ? io + 1 : 0;
+          }
+        }
+      }
+
+      // Bild-Node einfügen
+      const dwell = Number.isFinite(+it.dwellSec)
+        ? +it.dwellSec
+        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+
+      const node = { type:'image', url: it.url, dwell, __id: it.id || null };
+      queue.splice(insPos, 0, node);
     }
-  });
+    remaining = postponed;
+  }
+
+  // Falls nichts bleibt, notfalls Übersicht zeigen
+  if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
   nextQueue.splice(0, nextQueue.length, ...queue);
   idx = 0;
@@ -748,26 +820,63 @@ if (footNodes.length){
     transTimer = setTimeout(cb, t);
   }
 
-  // ---------- Loop ----------
-  function step() {
-    if (!nextQueue.length) return;
-    clearTimers(); // verhindert Doppelplanung z. B. nach Preview/Reload
+function dwellMsForItem(item) {
+  const slides = settings?.slides || {};
+  const mode = slides.durationMode || 'uniform';
+  const sec = (x) => Math.max(1, Math.floor(+x || 0));
 
-    const item = nextQueue[idx % nextQueue.length];
-const el = (item.type === 'overview') ? renderOverview() : (item.type === 'sauna') ? renderSauna(item.sauna) : renderImage(item.url);
-    show(el);
-
-const base = (item.type === 'overview')
-  ? (settings?.slides?.overviewDurationSec ?? 10) * 1000
-  : (item.type === 'sauna')
-    ? (settings?.slides?.saunaDurationSec ?? 6) * 1000
-    : ((item.dwell ?? (settings?.slides?.imageDurationSec ?? 6)) * 1000);
-
-    // Standard: Sichtzeit = base, Transition kommt oben drauf
-    const dwell = base;
-
-    slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
+  if (item.type === 'overview') {
+    return sec(slides.overviewDurationSec ?? 10) * 1000;
   }
+
+  if (item.type === 'sauna') {
+    if (mode !== 'per') {
+      const g = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
+      return sec(g) * 1000;
+    } else {
+      const perMap = slides.saunaDurations || {};
+      const v = perMap[item.sauna];
+      const fb = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
+      return sec(Number.isFinite(+v) ? v : fb) * 1000;
+    }
+  }
+
+  if (item.type === 'image') {
+    if (mode !== 'per') {
+      const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
+      return sec(g) * 1000;
+    } else {
+      const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
+      return sec(v) * 1000;
+    }
+  }
+
+  return 6000; // Fallback
+}
+
+  // ---------- Loop ----------
+function step() {
+  if (!nextQueue.length) return;
+  clearTimers();
+
+let item = nextQueue[idx % nextQueue.length];
+let key  = item.type + '|' + (item.sauna || item.url || '');
+if (key === lastKey && nextQueue.length > 1) {
+  // eine Folie würde direkt wiederholt → eine weiter
+  idx++;
+  item = nextQueue[idx % nextQueue.length];
+  key  = item.type + '|' + (item.sauna || item.url || '');
+}
+  const el =
+    (item.type === 'overview') ? renderOverview() :
+    (item.type === 'sauna')    ? renderSauna(item.sauna) :
+                                 renderImage(item.url);
+
+  show(el);
+lastKey = key;
+  const dwell = dwellMsForItem(item);
+  slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
+}
 
   // ---------- Bootstrap & live update ----------
   async function bootstrap() {
@@ -808,9 +917,7 @@ chmod -R 0644 /var/www/signage/assets/* /var/www/signage/index.html
 # Admin-UI (Editor) – Farben (Hex/Preview), Kachel-Min/Max, rechte Spalte %, Schrägschnitt, Flammen-Bild
 # ---------------------------
 cat >/var/www/signage/admin/index.html <<'HTML'
-<!doctype html>
-<html lang="de">
-<head>
+ <!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
@@ -883,12 +990,46 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     .kv{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
     .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
 
-.saunarow{
+ .saunarow{
   display:grid;
   /* Name | Preview | Auflösung | Dauer | Upload | Default | X | Haken */
   grid-template-columns: 1fr 64px auto auto 30px 30px 30px 22px;
   gap:8px; align-items:center; margin-bottom:8px;
 }
+/* Feste Breite für Sauna-Name */
+.saunarow .input.name{ width:160px; }
+
+/* Saunen, die nicht in der aktuellen Tabelle stehen (nur in Presets) */
+.saunarow .namewrap .input.name{ width:160px; }
+.saunarow.sauna-ghost{ opacity:.9; }
+.saunarow .tag{
+  display:inline-block; margin-left:6px; padding:2px 6px;
+  border:1px solid var(--inbr); border-radius:8px; font-size:11px; opacity:.8;
+}
+/* Visuelle Absetzung & Tages-Pillen */
+.saunarow.ghost{ opacity:.9; outline:1px dashed var(--inbr); }
+.saunarow .namewrap{ display:flex; flex-direction:column; gap:4px; }
+.pills{ display:flex; flex-wrap:wrap; gap:6px; }
+.pill{ font-size:11px; line-height:1; padding:3px 7px; border:1px solid var(--inbr); border-radius:999px; opacity:.9; }
+
+.saunarow .ghosttag{ background:#1b243b; }
+.theme-light .saunarow .ghosttag{ background:#e9eef7; }
+
+/* Nur für Bild-Slides-Zeilen */
+.imgrow{
+  /* Name | Preview | Dauer | Upload | X | Nach-Slide | Haken */
+  display:grid;
+  grid-template-columns: 1fr 64px auto 30px 30px minmax(140px,0.8fr) 22px; /* ≈30% schmaler */
+  gap:8px;
+  align-items:center;
+  margin-bottom:8px;
+}
+.sel-after{ min-width:140px; max-width:220px; } /* kompakt */
+.imgrow select.sel-after{ min-width:140px; width:100%; }
+.imgrow .dur{ width:6ch; text-align:center; }   /* 3-stellige Zahl */
+.imgrow input[type="checkbox"]{ justify-self:center; }
+.prev[title]{ cursor:help; } /* Zeigt Auflösung als Tooltip an */
+
 .btn.icon{ width:30px; min-width:30px; padding:6px 0; text-align:center }
 .input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
 .res{ font-size:12px; opacity:.7; white-space:nowrap }
@@ -945,7 +1086,7 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
       <div class="card">
         <div class="content" style="padding-bottom:0">
           <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:8px">
-            <div style="font-weight:700">Tabelle <span class="mut">(Zeiten × Saunen)</span></div>
+            <div style="font-weight:700">Aufgussplan <span class="mut">(Aufgussplan)</span></div>
             <div class="row"><span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span></div>
           </div>
           <table id="grid" class="tbl"></table>
@@ -1094,6 +1235,9 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
   <div style="width:100%">Name · Preview · Auflösung · Dauer (s)* · Upload · Default · ✕ · Anzeigen</div>
 </div>
         <div id="saunaList"></div>
+	<div class="subh" id="extraTitle" style="display:none">Weitere Saunen</div>
+	<div id="extraSaunaList"></div>
+
         <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
       </div>
     </details>
@@ -1104,9 +1248,10 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
     <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
   </summary>
+<small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
   <div class="content">
     <div class="row mut" style="font-weight:700;margin-bottom:6px">
-      <div style="width:100%">Name · Preview · Auflösung · Dauer (s) · Upload · ✕ · Nach Slide · Anzeigen</div>
+      <div style="width:100%">Name · Preview · Dauer (s) · Upload · ✕ · Nach Slide · Anzeigen</div>
     </div>
     <div id="interList2"></div>
   </div>
@@ -1472,79 +1617,190 @@ function renderSlides(){
     }
     function updateFlamePreview(u){ const img=$('#flamePrev'); preloadImg(u).then(r=>{ if(r.ok){ img.src=u; img.title=r.w+'×'+r.h; } else { img.removeAttribute('src'); img.title=''; } }); }
 
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
+}
 
-function interAfterOptionsHTML(){
-  const opts = ['overview', ...(schedule.saunas||[])];
-  return opts.map(v=>{
-    const label = (v==='overview') ? 'Übersicht' : v;
-    return `<option value="${v}">${label}</option>`;
-  }).join('');
+// Erzeugt den Wert für das Select aus vorhandenen Daten (Kompatibilität mit alten 'after'-Werten)
+function getAfterSelectValue(it, currentId){
+  if (it.afterRef) return it.afterRef; // neue, robuste Schreibweise schon vorhanden
+
+  const a = it.after;
+  if (a === 'overview' || !a) return 'overview';
+
+  // passt auf Sauna-Namen?
+  if ((schedule.saunas || []).includes(a)) return 'sauna:' + encodeURIComponent(a);
+
+  // passt auf ein anderes Bild (per Name)?
+  const hit = (settings.interstitials || []).find(im => im && im.id !== currentId && (im.name || '') === a);
+  if (hit) return 'img:' + hit.id;
+
+  return 'overview';
+}
+
+// setzt after/afterRef basierend auf der Select-Auswahl
+function applyAfterSelect(it, value){
+  it.afterRef = value;
+  if (value === 'overview'){
+    it.after = 'overview';
+  } else if (value.startsWith('sauna:')){
+    const name = decodeURIComponent(value.slice(6));
+    it.after = name;
+  } else if (value.startsWith('img:')){
+    const id = value.slice(4);
+    const img = (settings.interstitials || []).find(im => im && im.id === id);
+    it.after = img ? (img.name || '') : '';
+  }
+}
+
+function usedAfterImageIds(exceptId){
+  const set = new Set();
+  const list = settings.interstitials || [];
+  list.forEach(im=>{
+    if (!im || im.id === exceptId) return;
+    const v = im.afterRef || '';
+    if (v.startsWith('img:')) { set.add(v.slice(4)); return; }
+    // Legacy: nach Name
+    if (im.after && im.after !== 'overview' && !(schedule.saunas||[]).includes(im.after)){
+      const hit = list.find(x=>x && x.id !== im.id && (x.name||'') === im.after);
+      if (hit && hit.id) set.add(hit.id);
+    }
+  });
+  return set;
+}
+
+function interAfterOptionsHTML(currentId){
+  const used = usedAfterImageIds(currentId);
+
+  const saunaOpts = (schedule.saunas || [])
+    .map(v => `<option value="${v}">${escapeHtml(v)}</option>`);
+
+  const imgOpts = (settings.interstitials || [])
+    .filter(x => x && x.id && x.id !== currentId)
+    .map(x => {
+      const val = 'img:' + x.id;
+      const taken = used.has(x.id);
+      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
+      return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+    });
+
+  return [`<option value="overview">Übersicht</option>`, ...saunaOpts, ...imgOpts].join('');
 }
 
 function interRow(i){
   const it = settings.interstitials[i];
-  const id = 'inter_'+i;
+  const id = 'inter_' + i;
+
   const wrap = document.createElement('div');
-  wrap.className = 'interrow';
+wrap.className = 'imgrow';
+wrap.innerHTML = `
+  <input id="n_${id}" class="input" type="text" placeholder="Name" />
+  <img id="p_${id}" class="prev" alt="">
+  <input id="d_${id}" class="input num3 dur" type="number" min="1" max="60" step="1" />
+  <button class="btn sm ghost icon" id="u_${id}" title="Upload">⤴︎</button>
+  <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+  <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
+  <input id="e_${id}" type="checkbox" title="Anzeigen">
+`;
 
-  wrap.innerHTML = `
-    <input id="n_${id}" class="input" type="text" placeholder="Name" />
-    <img id="p_${id}" class="prev" alt=""/>
-    <span id="r_${id}" class="res">—</span>
-    <input id="d_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="u_${id}" title="Upload">⤴︎</button>
-    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML()}</select>
-    <input id="e_${id}" type="checkbox" />
-  `;
-
-  const $name = wrap.querySelector('#n_'+id);
-  const $prev = wrap.querySelector('#p_'+id);
-  const $res  = wrap.querySelector('#r_'+id);
-  const $dur  = wrap.querySelector('#d_'+id);
-  const $upl  = wrap.querySelector('#u_'+id);
-  const $del  = wrap.querySelector('#x_'+id);
-  const $after= wrap.querySelector('#a_'+id);
-  const $ena  = wrap.querySelector('#e_'+id);
+const $name  = wrap.querySelector('#n_' + id);
+const $prev  = wrap.querySelector('#p_' + id);
+const $dur   = wrap.querySelector('#d_' + id);
+const $up    = wrap.querySelector('#u_' + id);      // NEU: Button wie bei Sauna
+const $del   = wrap.querySelector('#x_' + id);
+const $after = wrap.querySelector('#a_' + id);
+const $ena   = wrap.querySelector('#e_' + id);
 
   // Werte setzen
   $name.value    = it.name || '';
-  $after.value   = it.after || 'overview';
-  $dur.value     = Number.isFinite(+it.dwellSec) ? it.dwellSec : 6;
+$after.value = (function(){
+  if (it.afterRef) return it.afterRef;
+  const a = it.after;
+  if (a === 'overview' || !a) return 'overview';
+  if ((schedule.saunas || []).includes(a)) return a;
+  const hit = (settings.interstitials || []).find(im => im && im.id !== it.id && (im.name || '') === a);
+  return hit ? ('img:' + hit.id) : 'overview';
+})();
+
+
   $ena.checked   = !!it.enabled;
+  $dur.value     = Number.isFinite(+it.dwellSec)
+                    ? +it.dwellSec
+                    : (settings.slides?.imageDurationSec ?? settings.slides?.saunaDurationSec ?? 6);
 
   if (it.url){
     preloadImg(it.url).then(r=>{
-      if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; $res.textContent = `${r.w}×${r.h}`; }
+      if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; }
     });
-  } else {
-    $res.textContent = '—';
   }
 
-  // Events
-  $name.onchange  = ()=>{ it.name = ($name.value||'').trim(); };
-  $after.onchange = ()=>{ it.after = $after.value; };
-  $dur.onchange   = ()=>{ it.dwellSec = Math.max(1, Math.min(60, +$dur.value||6)); };
-  $ena.onchange   = ()=>{ it.enabled = $ena.checked; };
+  // Dauer-Eingabe bei "Einheitlich" ausblenden
+  const uniform = (settings.slides?.durationMode !== 'per');
+  $dur.style.display = uniform ? 'none' : '';
 
-  // Upload über unseren generic uploader
-  $upl.onclick = ()=>{
-    const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'image/*';
-    input.onchange = ()=> uploadGeneric(input, (p)=>{
+  // Events
+  $name.onchange  = () => { it.name  = ($name.value || '').trim(); renderSlidesMasterBox(); };
+
+$after.onchange = () => {
+  const v = $after.value;
+
+  // 1) Selbstreferenz verhindern
+  if (v === 'img:' + it.id) {
+    alert('Ein Bild kann nicht nach sich selbst kommen.');
+    $after.value = 'overview';
+    it.afterRef = 'overview';
+    it.after = 'overview';
+    return;
+  }
+
+  // 2) Doppelbelegung verhindern
+  if (v.startsWith('img:')) {
+    const targetId = v.slice(4);
+    const used = usedAfterImageIds(it.id); // excludes current row
+    if (used.has(targetId)) {
+      alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
+      $after.value = 'overview';
+      it.afterRef = 'overview';
+      it.after = 'overview';
+      return;
+    }
+  }
+
+  // 3) Übernehmen
+  it.afterRef = v;
+  if (v === 'overview') {
+    it.after = 'overview';
+  } else if (v.startsWith('img:')) {
+    const id = v.slice(4);
+    const img = (settings.interstitials || []).find(im => im && im.id === id);
+    it.after = img ? (img.name || '') : '';
+  } else {
+    it.after = v; // Sauna
+  }
+
+  // 4) Disabled-Status in allen Reihen aktualisieren
+  renderSlidesMasterBox();
+};
+
+  $ena.onchange   = () => { it.enabled = $ena.checked; };
+
+  $dur.onchange   = () => { it.dwellSec = Math.max(1, Math.min(60, +$dur.value || 6)); };
+
+  // Upload-Button (gleich wie bei Saunen)
+  $up.onclick = () => {
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
       it.url = p;
-      preloadImg(p).then(r=>{
-        if(r.ok){ $prev.src=p; $prev.title=`${r.w}×${r.h}`; $res.textContent=`${r.w}×${r.h}`; }
+      preloadImg(p).then(r => {
+        if (r.ok) { $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
       });
     });
-    input.click();
+    fi.click();
   };
 
-  $del.onclick = ()=>{ settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
-
-  // Sichtbarkeit der Dauer (globaler Modus)
-  const uniform = (settings.slides?.durationMode !== 'per');
-  $dur.style.display = uniform ? 'none' : 'block';
+  $del.onclick    = () => { settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
 
   return wrap;
 }
@@ -1572,6 +1828,215 @@ function renderInterstitialsPanel(hostId='interList2'){
 }
 
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+function computePresetSaunaDays(){
+  const map = new Map();
+  const P = settings?.presets || {};
+  const days = [
+    ['Mon','Mo'], ['Tue','Di'], ['Wed','Mi'],
+    ['Thu','Do'], ['Fri','Fr'], ['Sat','Sa'], ['Sun','So']
+  ];
+  for (const [key, label] of days) {
+    const sc = P[key];
+    const list = Array.isArray(sc?.saunas) ? sc.saunas : [];
+    for (const name of list) {
+      const arr = map.get(name) || [];
+      if (!arr.includes(label)) arr.push(label);
+      map.set(name, arr);
+    }
+  }
+  return map; // Map: saunaName -> ['Mo','Di',...]
+}
+
+function saunaExtraRow(name, dayLabels){
+  const id = 'sx_extra_' + Math.random().toString(36).slice(2,8);
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow ghost';
+  wrap.innerHTML = `
+    <div class="namewrap">
+    <input id="n_${id}" class="input name" type="text" value="${name}" disabled />
+      <div class="pills">${(dayLabels||[]).map(d=>`<span class="pill">${d}</span>`).join('')}</div>
+    </div>
+    <img id="p_${id}" class="prev" alt=""/>
+    <span id="s_${id}" class="res"></span>
+    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
+    <span></span>
+    <input id="en_${id}" type="checkbox" />
+  `;
+
+  const $img  = wrap.querySelector('#p_'+id);
+  const $st   = wrap.querySelector('#s_'+id);
+  const $up   = wrap.querySelector('#f_'+id);
+  const $def  = wrap.querySelector('#d_'+id);
+  const $sec  = wrap.querySelector('#sec_'+id);
+  const $en   = wrap.querySelector('#en_'+id);
+
+  // Preview laden
+// Preview laden
+const url = (settings.assets?.rightImages?.[name]) || '';
+(async()=>{ 
+  if(url){ 
+    const r=await preloadImg(url); 
+if(r.ok){ 
+  $img.src=pOrUrl; 
+  $img.title = `${r.w}×${r.h}`;
+  $st.textContent = '';
+}
+  } 
+})();
+
+  // Dauer (nur im Modus "per" editierbar)
+  const per = (settings.slides?.durationMode === 'per');
+  const perMap = settings.slides?.saunaDurations || {};
+  $sec.disabled = !per;
+  $sec.style.visibility = per ? 'visible' : 'hidden';
+  $sec.value = Number.isFinite(+perMap[name]) ? perMap[name] : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
+  $sec.onchange = ()=>{
+    settings.slides = settings.slides || {};
+    settings.slides.saunaDurations = settings.slides.saunaDurations || {};
+    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value||6));
+  };
+
+  // Sichtbarkeit (Haken)
+  const hidden = new Set(settings.slides?.hiddenSaunas || []);
+  $en.checked = !hidden.has(name);
+  $en.onchange = ()=>{
+    const set = new Set(settings.slides?.hiddenSaunas || []);
+    if ($en.checked) set.delete(name); else set.add(name);
+    settings.slides = settings.slides || {};
+    settings.slides.hiddenSaunas = Array.from(set);
+  };
+
+// Upload
+$up.onclick = ()=>{
+  const fi = document.createElement('input');
+  fi.type = 'file'; fi.accept = 'image/*';
+  fi.onchange = ()=> uploadGeneric(fi, (p)=>{
+    settings.assets = settings.assets || {};
+    settings.assets.rightImages = settings.assets.rightImages || {};
+    settings.assets.rightImages[name] = p;
+    preloadImg(p).then(r=>{
+      if(r.ok){
+        $img.src = p;
+        $img.title = `${r.w}×${r.h}`;
+        $st.textContent = '';
+      } else {
+        $img.removeAttribute('src');
+        $img.removeAttribute('title');
+        $st.textContent = '';
+      }
+    });
+  });
+  fi.click();
+};
+
+// Default
+$def.onclick = ()=>{
+  settings.assets = settings.assets || {};
+  settings.assets.rightImages = settings.assets.rightImages || {};
+  settings.assets.rightImages[name] = '/assets/img/right_default.svg';
+  $img.src = '/assets/img/right_default.svg';
+  $img.title = '';      // Default hat keine echte Auflösung
+  $st.textContent = '';
+};
+
+  return wrap;
+}
+
+
+// Alle Saunen aus Presets, die NICHT in der aktuellen Tabelle sind
+function getPresetOnlySaunas(){
+  const inTable = new Set((schedule?.saunas)||[]);
+  const extras = new Set();
+  const P = settings?.presets || {};
+  Object.values(P).forEach(ps=>{
+    (ps?.saunas || []).forEach(n=>{
+      if (n && !inTable.has(n)) extras.add(n);
+    });
+  });
+  return Array.from(extras).sort((a,b)=> a.localeCompare(b,'de'));
+}
+
+// "Geister"-Sauna-Row: wie die normalen, aber Name nicht editierbar, kein Entfernen
+function saunaGhostRow(name){
+  const safe = (name||'').replace(/[^a-z0-9]+/gi,'_');
+  const id = 'gx_'+safe;
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow sauna-ghost';
+  wrap.innerHTML = `
+    <div class="row" style="gap:6px">
+      <input class="input" value="${escapeHtml(name)}" disabled title="Nicht in aktueller Tabelle (aus Presets)">
+      <span class="tag ghosttag">Preset</span>
+    </div>
+    <img id="p_${id}" class="prev" alt=""/>
+    <span id="s_${id}" class="res"></span>
+    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
+    <span></span>
+    <input id="en_${id}" type="checkbox" />
+  `;
+
+  const $img = wrap.querySelector('#p_'+id);
+  const $st  = wrap.querySelector('#s_'+id);
+  const $sec = wrap.querySelector('#sec_'+id);
+  const $up  = wrap.querySelector('#f_'+id);
+  const $def = wrap.querySelector('#d_'+id);
+  const $en  = wrap.querySelector('#en_'+id);
+
+  // Preview laden
+  const url = (settings.assets?.rightImages?.[name]) || '';
+  if (url){ preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } }); }
+
+  // Dauer (respektiert Modus "per"/"uniform")
+  const per = (settings.slides?.durationMode === 'per');
+  const perMap = settings.slides?.saunaDurations || {};
+  $sec.disabled = !per;
+  $sec.style.visibility = per ? 'visible' : 'hidden';
+  $sec.value = Number.isFinite(+perMap[name])
+    ? perMap[name]
+    : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
+  $sec.onchange = ()=>{
+    (settings.slides ||= {});
+    (settings.slides.saunaDurations ||= {});
+    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
+  };
+
+  // Upload
+  $up.onclick = ()=>{
+    const fi = document.createElement('input');
+    fi.type='file'; fi.accept='image/*';
+    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
+      (settings.assets ||= {}); (settings.assets.rightImages ||= {});
+      settings.assets.rightImages[name] = p;
+      preloadImg(p).then(r=>{ if(r.ok){ $img.src=p; $st.textContent=`${r.w}×${r.h}`; } else { $img.removeAttribute('src'); $st.textContent=''; } });
+    });
+    fi.click();
+  };
+
+  // Default setzen
+  $def.onclick = ()=>{
+    (settings.assets ||= {}); (settings.assets.rightImages ||= {});
+    settings.assets.rightImages[name] = '/assets/img/right_default.svg';
+    $img.src = '/assets/img/right_default.svg';
+    $st.textContent = 'Default';
+  };
+
+  // Anzeigen-Haken (hiddenSaunas)
+  const hidden = new Set(settings.slides?.hiddenSaunas || []);
+  $en.checked = !hidden.has(name);
+  $en.onchange = ()=>{
+    const set = new Set(settings.slides?.hiddenSaunas || []);
+    if ($en.checked) set.delete(name); else set.add(name);
+    (settings.slides ||= {});
+    settings.slides.hiddenSaunas = Array.from(set);
+  };
+
+  return wrap;
+}
+
 
 // Übersicht als Row im Saunen-Stil
 function overviewRowRender(){
@@ -1607,7 +2072,7 @@ function saunaMasterRow(i){
   const wrap = document.createElement('div');
   wrap.className = 'saunarow';
   wrap.innerHTML = `
-    <input id="n_${id}" class="input" type="text" value="${name}" />
+    <input id="n_${id}" class="input name" type="text" value="${name}" />
     <img id="p_${id}" class="prev" alt=""/>
     <span id="s_${id}" class="res"></span>
     <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
@@ -1653,14 +2118,25 @@ function saunaMasterRow(i){
   };
 
   // Upload (temporärer File-Input)
-  $up.onclick = ()=>{
+  $up.onclick = () => {
     const fi = document.createElement('input');
-    fi.type = 'file'; fi.accept = 'image/*';
-    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
+      // in Settings speichern & Preview/Resolution aktualisieren
       settings.assets = settings.assets || {};
       settings.assets.rightImages = settings.assets.rightImages || {};
       settings.assets.rightImages[name] = p;
-      preloadImg(p).then(r=>{ if(r.ok){ $img.src=p; $st.textContent=`${r.w}×${r.h}`; } else { $img.removeAttribute('src'); $st.textContent=''; } });
+
+      preloadImg(p).then(r => {
+        if (r.ok) { 
+          $img.src = p; 
+          $st.textContent = `${r.w}×${r.h}`;
+        } else {
+          $img.removeAttribute('src');
+          $st.textContent = '';
+        }
+      });
     });
     fi.click();
   };
@@ -1721,17 +2197,40 @@ function renderSlidesMasterBox(){
   const uniform = (settings.slides.durationMode !== 'per');
   $$('.intSec').forEach(inp => { if (inp) inp.style.display = uniform ? 'none' : 'block'; });
 }
+const uniform2 = (settings.slides.durationMode !== 'per');
+$$('.imgrow .dur').forEach(inp => { if (inp) inp.style.display = uniform2 ? 'none' : ''; });
 
   // Übersicht-Row
   const ovHost = document.getElementById('overviewRow');
   if (ovHost){ ovHost.innerHTML=''; ovHost.appendChild(overviewRowRender()); }
 
-  // Saunen-Liste
-  const sHost = document.getElementById('saunaList');
-  if (sHost){
-    sHost.innerHTML = '';
-    (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
+// Saunen-Liste (aktuelle Tabelle)
+const sHost = document.getElementById('saunaList');
+if (sHost){
+  sHost.innerHTML = '';
+  (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
+}
+
+// Weitere Saunen aus Presets
+const extraTitle = document.getElementById('extraTitle');
+const extraHost  = document.getElementById('extraSaunaList');
+if (extraHost){
+  const presentMap = computePresetSaunaDays();           // Map name -> ['Mo','Di',...]
+  const curSet = new Set(schedule.saunas || []);
+  const extraNames = Array.from(presentMap.keys()).filter(n => !curSet.has(n));
+
+  extraHost.innerHTML = '';
+  if (extraNames.length){
+    if (extraTitle) extraTitle.style.display = '';
+    // Kopfzeile (optional): gleiche Spaltenüberschriften brauchst du nicht erneut
+    extraNames.forEach(name => {
+      const pills = presentMap.get(name) || [];
+      extraHost.appendChild(saunaExtraRow(name, pills));
+    });
+  } else {
+    if (extraTitle) extraTitle.style.display = 'none';
   }
+}
 
   // Modus-Schalter unten + Globaldauer
   const uniform = (settings.slides.durationMode !== 'per');
@@ -2425,6 +2924,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
