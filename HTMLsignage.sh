@@ -12,7 +12,20 @@ ok(){   echo -e "${C_G}[OK  ]${C_0} $*"; }
 info(){ echo -e "${C_B}[INFO]${C_0} $*"; }
 err(){  echo -e "${C_R}[ERR ]${C_0} $*"; }
 trap 'rc=$?; line=${BASH_LINENO[0]:-0}; [[ $rc -ne 0 ]] && err "Abbruch in Zeile $line (RC=$rc)"; exit $rc' ERR
+shopt -s dotglob nullglob
 
+trap 'echo "[ERR] Abbruch in Zeile $LINENO (RC=$?)" >&2' ERR
+
+WEBROOT="/var/www/signage"
+
+ensure_dir() { install -d -m 755 -o www-data -g www-data "$1"; }
+write_file() {                # write_file /abs/pfad/datei <<'EOF' ... EOF
+  local f="$1"; shift
+  ensure_dir "$(dirname "$f")"
+  cat >"$f"
+  chown www-data:www-data "$f"
+  chmod 0644 "$f"
+}
 # ---------------------------
 # Defaults (anpassbar via ENV)
 # ---------------------------
@@ -34,10 +47,8 @@ apt-get install -y nginx php8.3-fpm php8.3-cli php8.3-xml php8.3-mbstring php8.3
 systemctl enable --now nginx php8.3-fpm
 
 # ---------------------------
-# Verzeichnisse
+# Misc
 # ---------------------------
-install -d -o www-data -g www-data -m 2775 /var/www/signage
-install -d -o www-data -g www-data -m 2775 /var/www/signage/{admin,assets,assets/img,data}
 install -o www-data -g www-data -m 0644 /dev/null /var/www/signage/favicon.ico || true
 
 # ---------------------------
@@ -917,12 +928,106 @@ chmod -R 0644 /var/www/signage/assets/* /var/www/signage/index.html
 # Admin-UI (Editor) – Farben (Hex/Preview), Kachel-Min/Max, rechte Spalte %, Schrägschnitt, Flammen-Bild
 # ---------------------------
 cat >/var/www/signage/admin/index.html <<'HTML'
- <!doctype html> <html lang="de"> <head>
+  <!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
+<link rel="stylesheet" href="/admin/css/admin.mobile.css">
   <style>
-    :root{ --bg:#070a12; --fg:#e8eeff; --mut:#9aa3b7; --acc:#E7B416; --acc2:#ffd560; --br:#21314e; --card:#0c1220; --card2:#0a0f1a; --input:#0e1426; --inbr:#2a3a5c; --ok:#22c55e; --err:#ef4444; --shadow:0 10px 30px rgba(0,0,0,.35); }
+/* ==== Dark Theme – inspiriert von Linear ==== */
+:root{
+  --bg:#0b0f19;
+  --fg:#e7ebf5;
+  --mut:#9aa3b2;
+  --acc:#8ea2ff;           /* Primär-Akzent (kühles Blau) */
+  --acc2:#b9c5ff;          /* helleres Blau für Hover/Fokus */
+  --br:#1a2236;            /* Rahmen */
+  --card:#0f1525;          /* Oberflächen */
+  --card2:#0c1220;
+  --input:#0e1628;         /* Eingaben */
+  --inbr:#1f2a44;
+  --ok:#22c55e;
+  --err:#f43f5e;
+  --shadow:0 12px 32px rgba(0,0,0,.35);
+}
+
+/* Background + Header-Glas */
+html,body{
+  background:radial-gradient(1200px 600px at 20% -5%, #0f1526, #0b0f19);
+  color:var(--fg);
+}
+header{
+  background:rgba(11,15,25,.75);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--br);
+}
+
+/* Cards / Details */
+.card, details.ac{
+  background:linear-gradient(180deg, var(--card), var(--card2));
+  border:1px solid var(--br);
+  box-shadow:var(--shadow);
+}
+
+/* Inputs & Selects */
+.input, select, textarea{
+  background:var(--input);
+  border-color:var(--inbr);
+  color:var(--fg);
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.input:focus, select:focus, textarea:focus{
+  outline:0;
+  border-color:var(--acc);
+  box-shadow:0 0 0 3px color-mix(in oklab, var(--acc) 25%, transparent);
+}
+
+/* Buttons */
+.btn{
+  border:1px solid var(--inbr);
+  background:linear-gradient(180deg, #121a2d, #0e1426);
+  color:var(--fg);
+}
+.btn:hover{ filter:brightness(1.06); }
+.btn.primary{
+  background:linear-gradient(180deg, var(--acc), var(--acc2));
+  color:#0b0d12;
+  border-color:var(--acc);
+  font-weight:700;
+}
+.btn.ghost{
+  background:transparent;
+  color:var(--fg);
+  border-color:var(--inbr);
+}
+.btn.ghost:hover{ border-color:var(--acc); color:var(--acc2); }
+
+/* Toggle */
+.toggle{ background:linear-gradient(180deg,#121a2d,#0e1426); border-color:var(--inbr); }
+.toggle input{ background:#3a475f; }
+.toggle input:checked{ background:var(--ok); }
+
+/* Tabelle kompakter & klarer */
+.tbl th, .tbl td{
+  background:#0f1529;
+  border-color:#1b2a46;
+}
+.tbl th{ background:#101a33; }
+
+/* Zell-Button (Plan) */
+.cellbtn{
+  background:#0f1529;
+  border:1px dashed #39507a;
+  color:#dce4ff;
+}
+.cellbtn.filled{
+  background:#0c162d;
+  border-color:#2a4774;
+}
+
+/* Hilfe-/Muted-Texte */
+.help, .mut{ color:var(--mut); }
+
     /* Light theme overrides (apply via <body class="theme-light">) */
     .theme-light{
       --bg:#f6f8ff; --fg:#0b1220; --mut:#5b6478; --acc:#C38700; --acc2:#E7B416;
@@ -966,9 +1071,9 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     .toggle input:checked::after{left:14px}
 
 
-    main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 580px;gap:16px;padding:16px 12px 18px 16px;align-items:start}
+main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,34vw,600px);gap:14px;padding:16px 12px 18px 16px;align-items:start}
     .leftcol{display:flex;flex-direction:column;gap:16px;min-width:0}
-    .rightbar{position:sticky;top:64px;max-height:calc(100svh - 64px);overflow:auto;padding-right:6px;justify-self:end}
+.rightbar{position:sticky;top:64px;max-height:calc(100svh - 64px);overflow:auto;padding-right:6px;justify-self:end;width:clamp(380px,34vw,600px)}
 
     .card, details.ac{border:1px solid var(--br);border-radius:16px;background:linear-gradient(180deg,var(--card),var(--card2));box-shadow:var(--shadow)}
     .card .content{padding:14px}
@@ -990,11 +1095,10 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     .kv{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
     .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
 
- .saunarow{
+.saunarow{
   display:grid;
-  /* Name | Preview | Auflösung | Dauer | Upload | Default | X | Haken */
-  grid-template-columns: 1fr 64px auto auto 30px 30px 30px 22px;
-  gap:8px; align-items:center; margin-bottom:8px;
+  gap:6px; align-items:center; margin-bottom:8px;
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 /* Feste Breite für Sauna-Name */
 .saunarow .input.name{ width:160px; }
@@ -1011,36 +1115,111 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
 .saunarow .namewrap{ display:flex; flex-direction:column; gap:4px; }
 .pills{ display:flex; flex-wrap:wrap; gap:6px; }
 .pill{ font-size:11px; line-height:1; padding:3px 7px; border:1px solid var(--inbr); border-radius:999px; opacity:.9; }
+/* Wochentags-Pills (Buttons) */
+.day-btn{ border:1px solid var(--inbr); border-radius:999px; padding:6px 10px; background:transparent; cursor:pointer; }
+.day-btn.active{ background:var(--acc); color:#0b0d12; border-color:var(--acc); font-weight:700; }
 
 .saunarow .ghosttag{ background:#1b243b; }
 .theme-light .saunarow .ghosttag{ background:#e9eef7; }
 
 /* Nur für Bild-Slides-Zeilen */
 .imgrow{
-  /* Name | Preview | Dauer | Upload | X | Nach-Slide | Haken */
   display:grid;
-  grid-template-columns: 1fr 64px auto 30px 30px minmax(140px,0.8fr) 22px; /* ≈30% schmaler */
-  gap:8px;
-  align-items:center;
-  margin-bottom:8px;
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+  gap:6px; align-items:center; margin-bottom:8px;
 }
 .sel-after{ min-width:140px; max-width:220px; } /* kompakt */
 .imgrow select.sel-after{ min-width:140px; width:100%; }
 .imgrow .dur{ width:6ch; text-align:center; }   /* 3-stellige Zahl */
 .imgrow input[type="checkbox"]{ justify-self:center; }
 .prev[title]{ cursor:help; } /* Zeigt Auflösung als Tooltip an */
+/* Verhindert, dass Grid-Inhalte die Sidebar in der Breite sprengen */
+.saunarow > *, .imgrow > * { min-width: 0; }
+
+/* ===== Dichte (XS/SM/LG) & kompakte Controls ===== */
+:root{
+  /* Defaults (SM) */
+  --dens-gap: 6px;
+  --dens-head: 11px;
+  --dens-btn: 30px;
+  --dens-input-h: 36px;
+  --prev-w: 64px;
+  --prev-h: 46px;
+
+  /* Spaltenbreiten (Saunen & Bilder) */
+  --col-name: 0.9fr;
+  --col-prev: 70px;
+  --col-dur: 74px;
+  --col-btn: 30px;
+  --col-del: 30px;
+  --col-vis: 22px;
+  --col-after: minmax(170px,1fr);
+}
+
+/* Dichteprofile */
+body.dens-lg{ --dens-gap:8px; --dens-head:12px; --dens-btn:34px; --dens-input-h:40px; --prev-w:72px; --prev-h:52px; }
+body.dens-sm{ /* already default */ }
+body.dens-xs{ --dens-gap:4px; --dens-head:10px; --dens-btn:28px; --dens-input-h:32px; --prev-w:56px; --prev-h:40px; }
+
+/* Einheitliche Zeilenhöhen & Abstände */
+.sl-head, .saunarow, .imgrow{ grid-auto-rows:minmax(46px,auto); }
+.saunarow, .imgrow{ gap:var(--dens-gap); }
+
+/* Header kleiner & ohne Überlappung */
+.sl-head{
+  display:grid; align-items:center; gap:var(--dens-gap);
+  font-weight:700; opacity:.85; font-size:var(--dens-head); line-height:1.2;
+  margin:0 0 6px;
+}
+.sl-head span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Spaltenzuordnung */
+.sl-saunas, .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+.sl-images, .imgrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+
+/* Controls skalieren */
+.prev{ width:var(--prev-w); height:var(--prev-h); border-radius:10px; border:1px solid var(--inbr); object-fit:cover; background:#0d1426 }
+.btn.icon{ width:var(--dens-btn); height:var(--dens-btn); padding:0; display:grid; place-items:center }
+.input, select, textarea{ min-height:var(--dens-input-h); }
+.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
+.input.name{ width:auto }
+
+/* Dauer-Spalte bei „einheitlich“ ausblenden/kollabieren */
+body.mode-uniform #headSaunaDur,
+body.mode-uniform #headImgDur{ display:none; }
+/* Einheitlich: Spalte "Dauer" vollständig aus dem Grid entfernen */
+body.mode-uniform .sl-saunas,
+body.mode-uniform .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+body.mode-uniform .sl-images,
+body.mode-uniform .imgrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+
+/* Header-Zelle "Dauer" ausblenden */
+body.mode-uniform #headSaunaDur,
+body.mode-uniform #headImgDur{ display:none; }
+
+/* Alle Dauer-Inputs in den Zeilen ausblenden */
+body.mode-uniform .intSec{ display:none !important; }
+
+/* Previews bündig links ausrichten (kein „driften“ nach rechts) */
+.saunarow .prev, .imgrow .prev{ justify-self:start; }
+
+.btn.icon{ width:30px;height:30px;padding:0;display:grid;place-items:center }
+.input.num3{ width:6ch !important;text-align:center;padding-left:0;padding-right:0 }
+.input.name{ width:auto }
+.res{ display:none } /* Saunen: Res-Spalte entfällt */
 
 .btn.icon{ width:30px; min-width:30px; padding:6px 0; text-align:center }
 .input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
 .res{ font-size:12px; opacity:.7; white-space:nowrap }
 /* kompakte Zeile für Bild-Slides */
-.interrow{
-  /* Name | Preview | Auflösung | Dauer | Upload | X | Nach-Slide | Haken */
-  display:grid;
-  grid-template-columns: 1fr 64px auto auto 30px 30px minmax(160px,1fr) 22px;
-  gap:8px; align-items:center; margin-bottom:8px;
-}
-.sel-after{ min-width:160px; }
  
 
    .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
@@ -1085,10 +1264,14 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     <section class="leftcol">
       <div class="card">
         <div class="content" style="padding-bottom:0">
-          <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:8px">
-            <div style="font-weight:700">Aufgussplan <span class="mut">(Aufgussplan)</span></div>
-            <div class="row"><span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span></div>
-          </div>
+<div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+  <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
+  <div class="row" style="gap:8px;flex-wrap:wrap">
+    <div id="weekdayPills" class="row" style="gap:6px"></div>
+    <button class="btn sm" id="btnSavePreset" title="Wochentag speichern">💾 Wochentag speichern</button>
+    <span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span>
+  </div>
+</div>
           <table id="grid" class="tbl"></table>
           <div class="row" style="margin:12px 0 4px">
             <button class="btn sm" id="btnAddAbove">Zeile darüber +</button>
@@ -1101,7 +1284,114 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
     </section>
 
     <aside class="rightbar">
-      <details class="ac" open>
+<!-- Slides – Masterbox -->
+<details class="ac" open id="slidesMaster">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
+    <div class="actions">
+      <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
+    </div>
+  </summary>
+  <div class="content">
+
+<!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
+<div class="kv" id="rowDurMode">
+  <label>Dauer-Modus</label>
+  <div class="row">
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
+  </div>
+</div>
+
+<div class="kv" id="rowDwellAll">
+  <label>Dauer (alle außer Übersicht)</label>
+  <input id="dwellAll" class="input" type="number" min="1" value="6">
+</div>
+
+<!-- Transition -->
+<div class="kv"><label>Transition (ms)</label>
+  <input id="transMs2" class="input" type="number" min="0" value="500">
+</div>
+
+<div class="kv"><label>Auto je Wochentag</label><input id="presetAuto" type="checkbox"></div>
+<div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+
+    <!-- Unterbox 1: Saunen & Übersicht -->
+    <details class="ac sub" id="boxSaunas">
+      <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
+ <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
+</summary>      
+<div class="content">
+
+        <!-- Übersicht im Saunen-Stil -->
+        <div class="fieldset" style="margin-bottom:10px">
+          <div class="legend">Übersicht (Aufgussplan)</div>
+          <div id="overviewRow"></div>
+        </div>
+
+        <!-- Saunenliste -->
+<div class="sl-head sl-saunas">
+  <span class="col-name">Name</span>
+  <span class="col-prev">Preview</span>
+  <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
+  <span class="col-up">Upload</span>
+  <span class="col-def">Default</span>
+  <span class="col-del">✕</span>
+  <span class="col-vis">Anzeigen</span>
+</div>
+        <div id="saunaList"></div>
+	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
+	<div id="extraSaunaList"></div>
+
+        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+      </div>
+    </details>
+
+    <!-- Unterbox 2: Bild-Slides -->
+    <details class="ac sub" id="boxImages">
+<summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
+  </summary>
+<small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
+  <div class="content">
+<div class="sl-head sl-images">
+    <span class="col-name">Name</span>
+    <span class="col-prev">Preview</span>
+    <span class="col-dur" id="headImgDur">Dauer (s)</span>
+    <span class="col-up">Upload</span>
+    <span class="col-del">✕</span>
+    <span class="col-after">Nach Slide</span>
+    <span class="col-vis">Anzeigen</span>
+  </div>
+    <div id="interList2"></div>
+  </div>
+</details>
+
+<!-- Unterbox 3: Fußnoten -->
+<details class="ac sub" id="boxFootnotes">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten</div>
+    <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div id="fnList"></div>
+    <div class="subh">Darstellung</div>
+    <div class="kv">
+      <label>Fußnoten-Layout</label>
+      <select id="footnoteLayout" class="input">
+        <option value="one-line" selected>Möglichst einzeilig</option>
+        <option value="multi">Mehrzeilig</option>
+        <option value="stacked">Untereinander (jede Zeile)</option>
+      </select>
+    </div>
+  </div>
+</details>
+
+  </div>
+</details>
+
+ <details class="ac" id="boxSlidesText">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
@@ -1187,127 +1477,13 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
           </div>
         </div>
       </details>
-      
-<!-- Slides – Masterbox -->
-<details class="ac" open id="slidesMaster">
-  <summary>
-    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
-    <div class="actions">
-      <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
-    </div>
-  </summary>
-  <div class="content">
-
-<!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
-<div class="kv" id="rowDurMode">
-  <label>Dauer-Modus</label>
-  <div class="row">
-    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
-    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
-  </div>
-</div>
-
-<div class="kv" id="rowDwellAll">
-  <label>Dauer (alle außer Übersicht)</label>
-  <input id="dwellAll" class="input" type="number" min="1" value="6">
-</div>
-
-<!-- Transition -->
-<div class="kv"><label>Transition (ms)</label>
-  <input id="transMs2" class="input" type="number" min="0" value="500">
-</div>
-
-    <!-- Unterbox 1: Saunen & Übersicht -->
-    <details class="ac sub" open id="boxSaunas">
-      <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
- <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
-</summary>      
-<div class="content">
-
-        <!-- Übersicht im Saunen-Stil -->
-        <div class="fieldset" style="margin-bottom:10px">
-          <div class="legend">Übersicht (Aufgussplan)</div>
-          <div id="overviewRow"></div>
-        </div>
-
-        <!-- Saunenliste -->
-<div class="row mut" style="font-weight:700;margin:0 0 6px">
-  <div style="width:100%">Name · Preview · Auflösung · Dauer (s)* · Upload · Default · ✕ · Anzeigen</div>
-</div>
-        <div id="saunaList"></div>
-	<div class="subh" id="extraTitle" style="display:none">Weitere Saunen</div>
-	<div id="extraSaunaList"></div>
-
-        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
-      </div>
-    </details>
-
-    <!-- Unterbox 2: Bild-Slides -->
-    <details class="ac sub" open id="boxImages">
-<summary>
-    <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
-    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
-  </summary>
-<small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
-  <div class="content">
-    <div class="row mut" style="font-weight:700;margin-bottom:6px">
-      <div style="width:100%">Name · Preview · Dauer (s) · Upload · ✕ · Nach Slide · Anzeigen</div>
-    </div>
-    <div id="interList2"></div>
-  </div>
-</details>
-
-  </div>
-</details>
 
       <details class="ac">
-        <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Presets (Zeitpläne)</div>
-        </summary>
-        <div class="content">
-          <div class="kv"><label>Wochentag</label>
-            <select id="presetKey" class="input">
-              <option value="Mon">Montag</option><option value="Tue">Dienstag</option><option value="Wed">Mittwoch</option>
-              <option value="Thu">Donnerstag</option><option value="Fri">Freitag</option><option value="Sat">Samstag</option>
-              <option value="Sun">Sonntag</option><option value="Default">Default</option>
-            </select>
-          </div>
-          <div class="row" style="gap:8px">
-            <button class="btn sm" id="psSave">Preset speichern (aus aktueller Tabelle)</button>
-            <button class="btn sm" id="psLoad">Preset laden → Tabelle</button>
-          </div>
-          <div class="kv" style="margin-top:8px">
-            <label>Auto je Wochentag</label><input id="presetAuto" type="checkbox">
-          </div>
-          <div class="help">„Speichern“ legt das ausgewählte Wochentags-Preset an/aktualisiert (inkl. Saunenspalten). „Laden“ überschreibt die Tabelle.</div>
-        </div>
-      </details>
-
-      <details class="ac" open>
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
         </summary>
         <div class="content color-cols" id="colorList"></div>
-      </details>
-
-      <details class="ac">
-        <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Fußnoten (Liste)</div>
-          <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
-        </summary>
-        <div class="content">
-          <div id="fnList"></div>
-          <div class="help">Jede Fußnote hat ein <b>Label</b> (z. B. *, †, 1) und einen <b>Text</b>. Label erscheint als Hochstellung am Eintrag und in der Legende.</div>
-        <div class="subh">Darstellung</div>
-        <div class="kv"><label>Fußnoten-Layout</label>
-          <select id="footnoteLayout" class="input">
-            <option value="one-line" selected>Möglichst einzeilig</option>
-            <option value="multi">Mehrzeilig</option>
-         <option value="stacked">Untereinander (jede Zeile)</option>
- </select>
-        </div>
-      </div>
       </details>
 
       <details class="ac">
@@ -1442,8 +1618,8 @@ h1{margin:0;font-size:16px;letter-spacing:.3px}
       settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
 renderInterstitialsPanel();
 renderColors();
-      renderFootnotes();
-renderPresets();
+renderFootnotes();
+initWeekdayUI();
     }
 
     // ------- Grid -------
@@ -1492,6 +1668,58 @@ renderPresets();
       });
     }
     function updateSelTime(){ $('#selTime').textContent=schedule.rows[curRow]?.time||'—'; }
+// ---- Wochentage (Presets) oben als Pills ----
+const DAYS = [['Mon','Mo'],['Tue','Di'],['Wed','Mi'],['Thu','Do'],['Fri','Fr'],['Sat','Sa'],['Sun','So']];
+const DAY_LABELS = Object.fromEntries(DAYS);
+function dayKeyToday(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
+
+let activeDayKey = 'Mon';
+
+function setActiveDay(key,{loadPreset=true}={}){
+  activeDayKey = key;
+  localStorage.setItem('adminActiveDay', key);
+  const lab = DAY_LABELS[key] || key;
+  const lbl = document.getElementById('activeDayLabel');
+  if (lbl) lbl.textContent = lab;
+
+  // Pills visuell updaten
+  document.querySelectorAll('#weekdayPills .day-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.key === key);
+  });
+
+  // Beim Wechsel optional Preset laden (wenn vorhanden)
+  const P = settings?.presets || {};
+  if (loadPreset && P[key]) {
+    schedule = JSON.parse(JSON.stringify(P[key]));
+    renderGrid();
+    renderSlidesMasterBox();
+  }
+}
+
+function initWeekdayUI(){
+  const host = document.getElementById('weekdayPills');
+  if (!host) return;
+  host.innerHTML = '';
+  DAYS.forEach(([key,lab])=>{
+    const b = document.createElement('button');
+    b.type='button'; b.className='day-btn'; b.dataset.key = key; b.textContent = lab;
+    b.onclick = ()=> setActiveDay(key,{loadPreset:true});
+    host.appendChild(b);
+  });
+
+  // Init aktiver Tag: Auto -> heute, sonst letzter Auswahl/Mon
+  const saved = localStorage.getItem('adminActiveDay');
+  const initKey = (settings.presetAuto ? dayKeyToday() : (saved || 'Mon'));
+  setActiveDay(initKey,{loadPreset: !!settings.presetAuto});
+
+  // Speichern-Button
+  const saveBtn = document.getElementById('btnSavePreset');
+  if (saveBtn) saveBtn.onclick = ()=>{
+    settings.presets = settings.presets || {};
+    settings.presets[activeDayKey] = JSON.parse(JSON.stringify(schedule));
+    alert('Wochentag gespeichert: ' + (DAY_LABELS[activeDayKey] || activeDayKey));
+  };
+}
 
     // Dialog
     $('#m_cancel').onclick=()=> $('#modal').style.display='none';
@@ -1672,8 +1900,8 @@ function usedAfterImageIds(exceptId){
 function interAfterOptionsHTML(currentId){
   const used = usedAfterImageIds(currentId);
 
-  const saunaOpts = (schedule.saunas || [])
-    .map(v => `<option value="${v}">${escapeHtml(v)}</option>`);
+const saunaOpts = (schedule.saunas || [])
+  .map(v => `<option value="sauna:${encodeURIComponent(v)}">${escapeHtml(v)}</option>`);
 
   const imgOpts = (settings.interstitials || [])
     .filter(x => x && x.id && x.id !== currentId)
@@ -1692,115 +1920,76 @@ function interRow(i){
   const id = 'inter_' + i;
 
   const wrap = document.createElement('div');
-wrap.className = 'imgrow';
-wrap.innerHTML = `
-  <input id="n_${id}" class="input" type="text" placeholder="Name" />
-  <img id="p_${id}" class="prev" alt="">
-  <input id="d_${id}" class="input num3 dur" type="number" min="1" max="60" step="1" />
-  <button class="btn sm ghost icon" id="u_${id}" title="Upload">⤴︎</button>
-  <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-  <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
-  <input id="e_${id}" type="checkbox" title="Anzeigen">
-`;
+  wrap.className = 'imgrow';
+  wrap.innerHTML = `
+    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name||'')}" />
+    <img id="p_${id}" class="prev" alt="" title=""/>
+    <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
+    <input id="en_${id}" type="checkbox" />
+  `;
 
-const $name  = wrap.querySelector('#n_' + id);
-const $prev  = wrap.querySelector('#p_' + id);
-const $dur   = wrap.querySelector('#d_' + id);
-const $up    = wrap.querySelector('#u_' + id);      // NEU: Button wie bei Sauna
-const $del   = wrap.querySelector('#x_' + id);
-const $after = wrap.querySelector('#a_' + id);
-const $ena   = wrap.querySelector('#e_' + id);
+  const $name  = wrap.querySelector('#n_'+id);
+  const $prev  = wrap.querySelector('#p_'+id);
+  const $sec   = wrap.querySelector('#sec_'+id);
+  const $up    = wrap.querySelector('#f_'+id);
+  const $del   = wrap.querySelector('#x_'+id);
+  const $after = wrap.querySelector('#a_'+id);
+  const $en    = wrap.querySelector('#en_'+id);
 
-  // Werte setzen
-  $name.value    = it.name || '';
-$after.value = (function(){
-  if (it.afterRef) return it.afterRef;
-  const a = it.after;
-  if (a === 'overview' || !a) return 'overview';
-  if ((schedule.saunas || []).includes(a)) return a;
-  const hit = (settings.interstitials || []).find(im => im && im.id !== it.id && (im.name || '') === a);
-  return hit ? ('img:' + hit.id) : 'overview';
-})();
-
-
-  $ena.checked   = !!it.enabled;
-  $dur.value     = Number.isFinite(+it.dwellSec)
-                    ? +it.dwellSec
-                    : (settings.slides?.imageDurationSec ?? settings.slides?.saunaDurationSec ?? 6);
+  $en.checked = !!it.enabled;
+  $sec.value  = Number.isFinite(+it.dwellSec)
+    ? +it.dwellSec
+    : (settings.slides?.imageDurationSec ?? settings.slides?.saunaDurationSec ?? 6);
+  $after.value = getAfterSelectValue(it, it.id);
 
   if (it.url){
-    preloadImg(it.url).then(r=>{
-      if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; }
-    });
+    preloadImg(it.url).then(r=>{ if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
   }
 
-  // Dauer-Eingabe bei "Einheitlich" ausblenden
   const uniform = (settings.slides?.durationMode !== 'per');
-  $dur.style.display = uniform ? 'none' : '';
+  $sec.style.display = uniform ? 'none' : '';
 
-  // Events
-  $name.onchange  = () => { it.name  = ($name.value || '').trim(); renderSlidesMasterBox(); };
+  $name.onchange = ()=>{ it.name = ($name.value||'').trim(); renderSlidesMasterBox(); };
 
-$after.onchange = () => {
-  const v = $after.value;
-
-  // 1) Selbstreferenz verhindern
-  if (v === 'img:' + it.id) {
-    alert('Ein Bild kann nicht nach sich selbst kommen.');
-    $after.value = 'overview';
-    it.afterRef = 'overview';
-    it.after = 'overview';
-    return;
-  }
-
-  // 2) Doppelbelegung verhindern
-  if (v.startsWith('img:')) {
-    const targetId = v.slice(4);
-    const used = usedAfterImageIds(it.id); // excludes current row
-    if (used.has(targetId)) {
-      alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
+  $after.onchange = ()=>{
+    const v = $after.value;
+    if (v === 'img:'+it.id){
+      alert('Ein Bild kann nicht nach sich selbst kommen.');
       $after.value = 'overview';
-      it.afterRef = 'overview';
-      it.after = 'overview';
+      applyAfterSelect(it, 'overview');
       return;
     }
-  }
+    if (v.startsWith('img:')){
+      const used = usedAfterImageIds(it.id);
+      const targetId = v.slice(4);
+      if (used.has(targetId)){
+        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
+        $after.value = 'overview';
+        applyAfterSelect(it, 'overview');
+        return;
+      }
+    }
+    applyAfterSelect(it, v);
+    renderSlidesMasterBox();
+  };
 
-  // 3) Übernehmen
-  it.afterRef = v;
-  if (v === 'overview') {
-    it.after = 'overview';
-  } else if (v.startsWith('img:')) {
-    const id = v.slice(4);
-    const img = (settings.interstitials || []).find(im => im && im.id === id);
-    it.after = img ? (img.name || '') : '';
-  } else {
-    it.after = v; // Sauna
-  }
+  $en.onchange  = ()=>{ it.enabled = !!$en.checked; };
+  $sec.onchange = ()=>{ it.dwellSec = Math.max(1, Math.min(60, +$sec.value||6)); };
 
-  // 4) Disabled-Status in allen Reihen aktualisieren
-  renderSlidesMasterBox();
-};
-
-  $ena.onchange   = () => { it.enabled = $ena.checked; };
-
-  $dur.onchange   = () => { it.dwellSec = Math.max(1, Math.min(60, +$dur.value || 6)); };
-
-  // Upload-Button (gleich wie bei Saunen)
-  $up.onclick = () => {
+  $up.onclick = ()=>{
     const fi = document.createElement('input');
-    fi.type = 'file';
-    fi.accept = 'image/*';
-    fi.onchange = () => uploadGeneric(fi, (p) => {
+    fi.type='file'; fi.accept='image/*';
+    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
       it.url = p;
-      preloadImg(p).then(r => {
-        if (r.ok) { $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
-      });
+      preloadImg(p).then(r=>{ if(r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
     });
     fi.click();
   };
 
-  $del.onclick    = () => { settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
+  $del.onclick = ()=>{ settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
 
   return wrap;
 }
@@ -1849,100 +2038,7 @@ function computePresetSaunaDays(){
 }
 
 function saunaExtraRow(name, dayLabels){
-  const id = 'sx_extra_' + Math.random().toString(36).slice(2,8);
-  const wrap = document.createElement('div');
-  wrap.className = 'saunarow ghost';
-  wrap.innerHTML = `
-    <div class="namewrap">
-    <input id="n_${id}" class="input name" type="text" value="${name}" disabled />
-      <div class="pills">${(dayLabels||[]).map(d=>`<span class="pill">${d}</span>`).join('')}</div>
-    </div>
-    <img id="p_${id}" class="prev" alt=""/>
-    <span id="s_${id}" class="res"></span>
-    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
-    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
-    <span></span>
-    <input id="en_${id}" type="checkbox" />
-  `;
-
-  const $img  = wrap.querySelector('#p_'+id);
-  const $st   = wrap.querySelector('#s_'+id);
-  const $up   = wrap.querySelector('#f_'+id);
-  const $def  = wrap.querySelector('#d_'+id);
-  const $sec  = wrap.querySelector('#sec_'+id);
-  const $en   = wrap.querySelector('#en_'+id);
-
-  // Preview laden
-// Preview laden
-const url = (settings.assets?.rightImages?.[name]) || '';
-(async()=>{ 
-  if(url){ 
-    const r=await preloadImg(url); 
-if(r.ok){ 
-  $img.src=pOrUrl; 
-  $img.title = `${r.w}×${r.h}`;
-  $st.textContent = '';
-}
-  } 
-})();
-
-  // Dauer (nur im Modus "per" editierbar)
-  const per = (settings.slides?.durationMode === 'per');
-  const perMap = settings.slides?.saunaDurations || {};
-  $sec.disabled = !per;
-  $sec.style.visibility = per ? 'visible' : 'hidden';
-  $sec.value = Number.isFinite(+perMap[name]) ? perMap[name] : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
-  $sec.onchange = ()=>{
-    settings.slides = settings.slides || {};
-    settings.slides.saunaDurations = settings.slides.saunaDurations || {};
-    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value||6));
-  };
-
-  // Sichtbarkeit (Haken)
-  const hidden = new Set(settings.slides?.hiddenSaunas || []);
-  $en.checked = !hidden.has(name);
-  $en.onchange = ()=>{
-    const set = new Set(settings.slides?.hiddenSaunas || []);
-    if ($en.checked) set.delete(name); else set.add(name);
-    settings.slides = settings.slides || {};
-    settings.slides.hiddenSaunas = Array.from(set);
-  };
-
-// Upload
-$up.onclick = ()=>{
-  const fi = document.createElement('input');
-  fi.type = 'file'; fi.accept = 'image/*';
-  fi.onchange = ()=> uploadGeneric(fi, (p)=>{
-    settings.assets = settings.assets || {};
-    settings.assets.rightImages = settings.assets.rightImages || {};
-    settings.assets.rightImages[name] = p;
-    preloadImg(p).then(r=>{
-      if(r.ok){
-        $img.src = p;
-        $img.title = `${r.w}×${r.h}`;
-        $st.textContent = '';
-      } else {
-        $img.removeAttribute('src');
-        $img.removeAttribute('title');
-        $st.textContent = '';
-      }
-    });
-  });
-  fi.click();
-};
-
-// Default
-$def.onclick = ()=>{
-  settings.assets = settings.assets || {};
-  settings.assets.rightImages = settings.assets.rightImages || {};
-  settings.assets.rightImages[name] = '/assets/img/right_default.svg';
-  $img.src = '/assets/img/right_default.svg';
-  $img.title = '';      // Default hat keine echte Auflösung
-  $st.textContent = '';
-};
-
-  return wrap;
+  return saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
 }
 
 
@@ -1961,95 +2057,20 @@ function getPresetOnlySaunas(){
 
 // "Geister"-Sauna-Row: wie die normalen, aber Name nicht editierbar, kein Entfernen
 function saunaGhostRow(name){
-  const safe = (name||'').replace(/[^a-z0-9]+/gi,'_');
-  const id = 'gx_'+safe;
-  const wrap = document.createElement('div');
-  wrap.className = 'saunarow sauna-ghost';
-  wrap.innerHTML = `
-    <div class="row" style="gap:6px">
-      <input class="input" value="${escapeHtml(name)}" disabled title="Nicht in aktueller Tabelle (aus Presets)">
-      <span class="tag ghosttag">Preset</span>
-    </div>
-    <img id="p_${id}" class="prev" alt=""/>
-    <span id="s_${id}" class="res"></span>
-    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
-    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
-    <span></span>
-    <input id="en_${id}" type="checkbox" />
-  `;
-
-  const $img = wrap.querySelector('#p_'+id);
-  const $st  = wrap.querySelector('#s_'+id);
-  const $sec = wrap.querySelector('#sec_'+id);
-  const $up  = wrap.querySelector('#f_'+id);
-  const $def = wrap.querySelector('#d_'+id);
-  const $en  = wrap.querySelector('#en_'+id);
-
-  // Preview laden
-  const url = (settings.assets?.rightImages?.[name]) || '';
-  if (url){ preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } }); }
-
-  // Dauer (respektiert Modus "per"/"uniform")
-  const per = (settings.slides?.durationMode === 'per');
-  const perMap = settings.slides?.saunaDurations || {};
-  $sec.disabled = !per;
-  $sec.style.visibility = per ? 'visible' : 'hidden';
-  $sec.value = Number.isFinite(+perMap[name])
-    ? perMap[name]
-    : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
-  $sec.onchange = ()=>{
-    (settings.slides ||= {});
-    (settings.slides.saunaDurations ||= {});
-    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
-  };
-
-  // Upload
-  $up.onclick = ()=>{
-    const fi = document.createElement('input');
-    fi.type='file'; fi.accept='image/*';
-    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
-      (settings.assets ||= {}); (settings.assets.rightImages ||= {});
-      settings.assets.rightImages[name] = p;
-      preloadImg(p).then(r=>{ if(r.ok){ $img.src=p; $st.textContent=`${r.w}×${r.h}`; } else { $img.removeAttribute('src'); $st.textContent=''; } });
-    });
-    fi.click();
-  };
-
-  // Default setzen
-  $def.onclick = ()=>{
-    (settings.assets ||= {}); (settings.assets.rightImages ||= {});
-    settings.assets.rightImages[name] = '/assets/img/right_default.svg';
-    $img.src = '/assets/img/right_default.svg';
-    $st.textContent = 'Default';
-  };
-
-  // Anzeigen-Haken (hiddenSaunas)
-  const hidden = new Set(settings.slides?.hiddenSaunas || []);
-  $en.checked = !hidden.has(name);
-  $en.onchange = ()=>{
-    const set = new Set(settings.slides?.hiddenSaunas || []);
-    if ($en.checked) set.delete(name); else set.add(name);
-    (settings.slides ||= {});
-    settings.slides.hiddenSaunas = Array.from(set);
-  };
-
-  return wrap;
+  return saunaRow({ name, mode:'ghost' });
 }
-
 
 // Übersicht als Row im Saunen-Stil
 function overviewRowRender(){
   const wrap = document.createElement('div');
   wrap.className = 'saunarow';
-  wrap.innerHTML = `
-    <div style="font-weight:600">Übersicht</div>
-    <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
-    <span class="res">—</span>
-    <input id="ovSec" class="input num3" type="number" min="1" max="120" step="1" />
-    <span></span><span></span><span></span>
-    <input id="ovShow" type="checkbox" />
-  `;
+wrap.innerHTML = `
+  <div style="font-weight:600">Übersicht</div>
+  <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
+  <input id="ovSec" class="input num3" type="number" min="1" max="120" step="1" />
+  <span></span><span></span><span></span>
+  <input id="ovShow" type="checkbox" />
+`;
   const ovSecEl = wrap.querySelector('#ovSec');
   const ovShowEl = wrap.querySelector('#ovShow');
   ovSecEl.value  = settings.slides?.overviewDurationSec ?? 10;
@@ -2065,189 +2086,199 @@ function overviewRowRender(){
   return wrap;
 }
 
-// Sauna-Zeile (kompakt mit Icon-Buttons, Sichtbarkeit & optionaler Dauer)
-function saunaMasterRow(i){
-  const name = schedule.saunas[i];
-  const id = 'sx_'+i;
+function saunaRow(cfg){
+  const name = cfg.name;
+  const id = 'sx_' + Math.random().toString(36).slice(2,8);
+  const mode = cfg.mode || 'normal'; // 'normal' | 'ghost' | 'extra'
+  const i = (cfg.index ?? null);
+
   const wrap = document.createElement('div');
-  wrap.className = 'saunarow';
+  wrap.className = 'saunarow' + (mode !== 'normal' ? ' sauna-ghost' : '');
+
+  const namePart = (() => {
+    if (mode === 'normal') {
+      return `<input id="n_${id}" class="input name" type="text" value="${name}" />`;
+    }
+    const tag = (mode === 'ghost') ? '<span class="tag ghosttag">Preset</span>' : '';
+    const pills = (Array.isArray(cfg.dayLabels) && cfg.dayLabels.length && mode === 'extra')
+      ? `<div class="pills">${cfg.dayLabels.map(d=>`<span class="pill">${d}</span>`).join('')}</div>` : '';
+    return `<div class="namewrap">
+      <input id="n_${id}" class="input name" type="text" value="${name}" disabled />
+      ${tag}${pills}
+    </div>`;
+  })();
+
   wrap.innerHTML = `
-    <input id="n_${id}" class="input name" type="text" value="${name}" />
-    <img id="p_${id}" class="prev" alt=""/>
-    <span id="s_${id}" class="res"></span>
-    <input id="sec_${id}" class="input num3" type="number" min="1" max="60" step="1" />
+    ${namePart}
+    <img id="p_${id}" class="prev" alt="" title=""/>
+<input id="sec_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
     <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
     <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
-    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-    <input id="en_${id}" type="checkbox" checked />
+    ${mode === 'normal' ? `<button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>` : `<span></span>`}
+    <input id="en_${id}" type="checkbox" ${mode === 'normal' ? 'checked' : ''} />
   `;
 
   const $name = wrap.querySelector('#n_'+id);
   const $img  = wrap.querySelector('#p_'+id);
-  const $st   = wrap.querySelector('#s_'+id);
+  const $sec  = wrap.querySelector('#sec_'+id);
   const $up   = wrap.querySelector('#f_'+id);
   const $def  = wrap.querySelector('#d_'+id);
   const $del  = wrap.querySelector('#x_'+id);
-  const $sec  = wrap.querySelector('#sec_'+id);
   const $en   = wrap.querySelector('#en_'+id);
 
-  // Preview laden
+  // Preview + Tooltip (Auflösung)
   const url = (settings.assets?.rightImages?.[name]) || '';
-  (async()=>{ if(url){ const r=await preloadImg(url); if(r.ok){ $img.src=url; $st.textContent=`${r.w}×${r.h}`; } } })();
+  if (url){ preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $img.title=`${r.w}×${r.h}`; } }); }
 
-  // Dauer (nur im Modus "per")
+  // Dauer-Feld (respektiert Modus "per")
   const per = (settings.slides?.durationMode === 'per');
   const perMap = settings.slides?.saunaDurations || {};
   $sec.disabled = !per;
-  $sec.style.visibility = per ? 'visible' : 'hidden';
+  $sec.style.display = per ? '' : 'none';
   $sec.value = Number.isFinite(+perMap[name]) ? perMap[name] : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
-  $sec.onchange = ()=>{
-    settings.slides = settings.slides || {};
-    settings.slides.saunaDurations = settings.slides.saunaDurations || {};
-    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value||6));
+  $sec.onchange = () => {
+    (settings.slides ||= {}); (settings.slides.saunaDurations ||= {});
+    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
   };
 
-  // Sichtbarkeit
+  // Anzeigen (hiddenSaunas)
   const hidden = new Set(settings.slides?.hiddenSaunas || []);
   $en.checked = !hidden.has(name);
-  $en.onchange = ()=>{
+  $en.onchange = () => {
     const set = new Set(settings.slides?.hiddenSaunas || []);
     if ($en.checked) set.delete(name); else set.add(name);
-    settings.slides = settings.slides || {};
-    settings.slides.hiddenSaunas = Array.from(set);
+    (settings.slides ||= {}); settings.slides.hiddenSaunas = Array.from(set);
   };
 
-  // Upload (temporärer File-Input)
+  // Upload
   $up.onclick = () => {
-    const fi = document.createElement('input');
-    fi.type = 'file';
-    fi.accept = 'image/*';
+    const fi = document.createElement('input'); fi.type='file'; fi.accept='image/*';
     fi.onchange = () => uploadGeneric(fi, (p) => {
-      // in Settings speichern & Preview/Resolution aktualisieren
-      settings.assets = settings.assets || {};
-      settings.assets.rightImages = settings.assets.rightImages || {};
+      (settings.assets ||= {}); (settings.assets.rightImages ||= {});
       settings.assets.rightImages[name] = p;
-
       preloadImg(p).then(r => {
-        if (r.ok) { 
-          $img.src = p; 
-          $st.textContent = `${r.w}×${r.h}`;
-        } else {
-          $img.removeAttribute('src');
-          $st.textContent = '';
-        }
+        if (r.ok) { $img.src = p; $img.title = `${r.w}×${r.h}`; }
+        else { $img.removeAttribute('src'); $img.removeAttribute('title'); }
       });
     });
     fi.click();
   };
 
   // Default
-  $def.onclick = ()=>{
-    settings.assets = settings.assets || {};
-    settings.assets.rightImages = settings.assets.rightImages || {};
+  $def.onclick = () => {
+    (settings.assets ||= {}); (settings.assets.rightImages ||= {});
     settings.assets.rightImages[name] = '/assets/img/right_default.svg';
     $img.src = '/assets/img/right_default.svg';
-    $st.textContent = 'Default';
+    $img.title = '';
   };
 
-  // Entfernen
-  $del.onclick = ()=>{
+  // Entfernen (nur normal)
+  if ($del) $del.onclick = () => {
     if(!confirm(`Sauna "${name}" wirklich entfernen?`)) return;
     const removedName = schedule.saunas.splice(i,1)[0];
     schedule.rows.forEach(r=> r.entries.splice(i,1));
     if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName];
-    renderSlidesMasterBox();
-    renderGrid();
+    renderSlidesMasterBox(); renderGrid();
   };
 
-  // Umbenennen
-  $name.onchange = ()=>{
-    const newName = ($name.value || '').trim() || name;
-    if (newName === name) return;
-    const old = name;
-    schedule.saunas[i] = newName;
-    if (settings.assets?.rightImages){
-      const val = settings.assets.rightImages[old];
-      delete settings.assets.rightImages[old];
-      settings.assets.rightImages[newName] = val;
-    }
-    if (settings.slides?.saunaDurations && settings.slides.saunaDurations[old] != null){
-      settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[old];
-      delete settings.slides.saunaDurations[old];
-    }
-    renderSlidesMasterBox();
-    renderGrid();
-  };
+  // Umbenennen (nur normal)
+  if ($name && mode === 'normal') {
+    $name.onchange = () => {
+      const newName = ($name.value || '').trim() || name;
+      if (newName === name) return;
+      const old = name;
+      schedule.saunas[i] = newName;
+      if (settings.assets?.rightImages) {
+        const val = settings.assets.rightImages[old];
+        delete settings.assets.rightImages[old];
+        settings.assets.rightImages[newName] = val;
+      }
+      if (settings.slides?.saunaDurations && settings.slides.saunaDurations[old] != null) {
+        settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[old];
+        delete settings.slides.saunaDurations[old];
+      }
+      renderSlidesMasterBox(); renderGrid();
+    };
+  }
 
   return wrap;
+}
+
+
+// Sauna-Zeile (kompakt mit Icon-Buttons, Sichtbarkeit & optionaler Dauer)
+function saunaMasterRow(i){
+  const name = schedule.saunas[i];
+  return saunaRow({ name, index:i, mode:'normal' });
 }
 
 // Masterbox-Renderer (2 Unterboxen)
 function renderSlidesMasterBox(){
   settings.slides = { ...(settings.slides||{}) };
 
-  // Transition
+  // Transition (optional vorhanden)
   const transEl = document.getElementById('transMs2');
   if (transEl){
-    transEl.value = settings.slides.transitionMs ?? 500;
-    transEl.onchange = ()=> {
-      settings.slides.transitionMs = Math.max(0, +transEl.value||0);
-    };
-    // Dauerfeld der Bild-Slides ein/ausblenden je Modus
-  const uniform = (settings.slides.durationMode !== 'per');
-  $$('.intSec').forEach(inp => { if (inp) inp.style.display = uniform ? 'none' : 'block'; });
-}
-const uniform2 = (settings.slides.durationMode !== 'per');
-$$('.imgrow .dur').forEach(inp => { if (inp) inp.style.display = uniform2 ? 'none' : ''; });
+    const val = Number.isFinite(+settings.slides.transitionMs) ? +settings.slides.transitionMs : 500;
+    transEl.value = val;
+    transEl.onchange = ()=>{ settings.slides.transitionMs = Math.max(0, +transEl.value||0); };
+  }
+
+  // Auto je Wochentag
+  const autoEl = document.getElementById('presetAuto');
+  if (autoEl){
+    autoEl.checked = !!settings.presetAuto;
+    autoEl.onchange = ()=>{ settings.presetAuto = !!autoEl.checked; };
+  }
+
+  // Dauer-Modus visualisieren
+  const perMode = (settings.slides.durationMode === 'per');
+  $$('.intSec').forEach(inp => { if (inp) inp.style.display = perMode ? '' : 'none'; });
+  document.body.classList.toggle('mode-uniform', !perMode);
+  document.body.classList.toggle('mode-per', perMode);
 
   // Übersicht-Row
   const ovHost = document.getElementById('overviewRow');
   if (ovHost){ ovHost.innerHTML=''; ovHost.appendChild(overviewRowRender()); }
 
-// Saunen-Liste (aktuelle Tabelle)
-const sHost = document.getElementById('saunaList');
-if (sHost){
-  sHost.innerHTML = '';
-  (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
-}
-
-// Weitere Saunen aus Presets
-const extraTitle = document.getElementById('extraTitle');
-const extraHost  = document.getElementById('extraSaunaList');
-if (extraHost){
-  const presentMap = computePresetSaunaDays();           // Map name -> ['Mo','Di',...]
-  const curSet = new Set(schedule.saunas || []);
-  const extraNames = Array.from(presentMap.keys()).filter(n => !curSet.has(n));
-
-  extraHost.innerHTML = '';
-  if (extraNames.length){
-    if (extraTitle) extraTitle.style.display = '';
-    // Kopfzeile (optional): gleiche Spaltenüberschriften brauchst du nicht erneut
-    extraNames.forEach(name => {
-      const pills = presentMap.get(name) || [];
-      extraHost.appendChild(saunaExtraRow(name, pills));
-    });
-  } else {
-    if (extraTitle) extraTitle.style.display = 'none';
+  // Saunen-Liste
+  const sHost = document.getElementById('saunaList');
+  if (sHost){
+    sHost.innerHTML = '';
+    (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
   }
-}
 
-  // Modus-Schalter unten + Globaldauer
-  const uniform = (settings.slides.durationMode !== 'per');
+  // Weitere Saunen aus Presets
+  const extraTitle = document.getElementById('extraTitle');
+  const extraHost  = document.getElementById('extraSaunaList');
+  if (extraHost){
+    const presentMap = computePresetSaunaDays();
+    const curSet = new Set(schedule.saunas || []);
+    const extraNames = Array.from(presentMap.keys()).filter(n => !curSet.has(n));
+    extraHost.innerHTML = '';
+    if (extraNames.length){
+      if (extraTitle) extraTitle.style.display = '';
+      extraNames.forEach(name => extraHost.appendChild(
+        saunaExtraRow(name, presentMap.get(name) || [])
+      ));
+    } else {
+      if (extraTitle) extraTitle.style.display = 'none';
+    }
+  }
+
+  // Modus-Schalter + Globaldauer
   const durUniform = document.getElementById('durUniform');
   const durPer     = document.getElementById('durPer');
   const dwellAll   = document.getElementById('dwellAll');
   const rowDwell   = document.getElementById('rowDwellAll');
 
-  if (durUniform) durUniform.checked = uniform;
-  if (durPer)     durPer.checked     = !uniform;
+  if (durUniform) durUniform.checked = !perMode;
+  if (durPer)     durPer.checked     = perMode;
   if (dwellAll)   dwellAll.value     = settings.slides.globalDwellSec ?? (settings.slides.saunaDurationSec ?? 6);
-  if (rowDwell)   rowDwell.style.display = uniform ? 'grid' : 'none';
+  if (rowDwell)   rowDwell.style.display = perMode ? 'none' : 'grid';
 
   if (durUniform) durUniform.onchange = ()=>{
     if (durUniform.checked){
       settings.slides.durationMode = 'uniform';
-      const rowDwell = document.getElementById('rowDwellAll');
       if (rowDwell) rowDwell.style.display = 'grid';
       renderSlidesMasterBox();
     }
@@ -2255,7 +2286,6 @@ if (extraHost){
   if (durPer) durPer.onchange = ()=>{
     if (durPer.checked){
       settings.slides.durationMode = 'per';
-      const rowDwell = document.getElementById('rowDwellAll');
       if (rowDwell) rowDwell.style.display = 'none';
       renderSlidesMasterBox();
     }
@@ -2264,7 +2294,7 @@ if (extraHost){
     settings.slides.globalDwellSec = Math.max(1, Math.min(120, +dwellAll.value||6));
   };
 
-  // Bild-Slides in diese Box
+  // Bild-Slides
   renderInterstitialsPanel('interList2');
 
   // Reset & Add Sauna
@@ -2291,27 +2321,6 @@ if (extraHost){
   };
 }
 
-    function renderPresets(){
-      settings.presets = settings.presets || {};
-      const sel = document.getElementById('presetKey');
-      const auto = document.getElementById('presetAuto');
-      auto.checked = !!settings.presetAuto;
-
-      document.getElementById('psSave').onclick = () => {
-        const key = sel.value || 'Default';
-        settings.presets[key] = deepClone(schedule);
-        alert('Preset "'+key+'" gespeichert.');
-      };
-      document.getElementById('psLoad').onclick = () => {
-        const key = sel.value || 'Default';
-        const p = settings.presets[key];
-        if (!p) { alert('Kein Preset für '+key); return; }
-        schedule = deepClone(p);
-        renderGrid();
-renderSlidesMasterBox();
-      };
-      auto.onchange = () => { settings.presetAuto = auto.checked; };
-    }
 
 // ------- Farben -------
     function colorField(key,label,init){ const row=document.createElement('div'); row.className='kv'; row.innerHTML=`<label>${label}</label><div class="color-item"><div class="swatch" id="sw_${key}"></div><input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB"></div>`; return row; }
@@ -2480,8 +2489,8 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
       cb.onchange = () => apply(cb.checked ? 'light' : 'dark');
     }
 
-    initThemeToggle();
-initBackupButtons();   
+initThemeToggle();
+initBackupButtons();
 
 (function initCleanupInSystem(){
   const btn = document.getElementById('btnCleanupSys');
@@ -2729,7 +2738,7 @@ PHP
 # ---------------------------
 # Import
 # ---------------------------
-cat >var/www/signage/admin/api/import.php <<'PHP'
+cat >/var/www/signage/admin/api/import.php <<'PHP'
 <?php
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -2924,6 +2933,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
