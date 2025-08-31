@@ -194,6 +194,8 @@ cat >/var/www/signage/assets/design.css <<'CSS'
   --font:-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
   --baseScale:1; --vwScale:1; --scale:calc(var(--baseScale)*var(--vwScale)); --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80;
   --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28; --chipH:44px;
+--chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
+--chipFlameGap:6px;   /* Abstand zwischen Flammen */
   --ovAuto:1; /* overview-only autoscale factor */
 
   /* right panel shape */
@@ -270,12 +272,37 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 
 /* equal chips */
 .cellwrap{display:block;width:100%;min-width:0}
-.chip{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:var(--chipH);padding:0 .8em;padding-right:calc(3*(var(--flameSizePxOv)*1px*var(--scale))+24px);border-radius:10px;background:var(--cell);color:var(--boxfg);border:var(--chipBorderW) solid var(--chipBorder);font-weight:700;letter-spacing:.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.chip{
+  display:flex; align-items:center; width:100%;
+  height:var(--chipH);
+  padding:0 .8em;
+  border-radius:10px;
+  background:var(--cell); color:var(--boxfg);
+  border:var(--chipBorderW) solid var(--chipBorder);
+  font-weight:700; letter-spacing:.2px;
+  overflow:hidden;
+}
 .overview .chip{height:calc(var(--chipH)*var(--ovAuto))}
-.chip sup{margin-left:.25em}
-/* flames inside chip */
-.chip .flames{position:absolute;right:.6em;top:50%;transform:translateY(-50%);gap:6px}
-.overview .chip .flame{width:calc(var(--flameSizePxOv)*1px*var(--scale));height:calc(var(--flameSizePxOv)*1px*var(--scale))}
+
+/* Text links, kann ellipsisieren oder (per JS) skaliert werden */
+.chip-text{
+  flex:1 1 auto; min-width:0;
+  white-space:nowrap;
+}
+.chip-text.ellipsis{
+  overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Flammen rechts, kompakt und nie über dem Text */
+.chip-flames{
+  flex:0 0 auto; display:inline-flex; margin-left:.6em;
+}
+.chip-flames .flames{ display:inline-flex; gap:var(--chipFlameGap); }
+.chip-flames .flame{
+  height:calc(var(--chipH) * var(--chipFlamePct));
+  width:auto;
+}
 
 /* overview wrapper */
 .ovwrap{transform-origin:top left; width:100%; will-change:contents}
@@ -415,7 +442,16 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       '--chipH': (settings?.fonts?.chipHeight || 44) + 'px'
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
-    ensureFontFamily();
+// Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
+const f = settings?.fonts || {};
+setVars({
+  '--chipFlamePct': Math.max(0.3, Math.min(1, (f.flamePct || 55) / 100)),
+  '--chipFlameGap': (f.flameGapPx ?? 6) + 'px'
+});
+// 'scale' = Text automatisch verkleinern, 'ellipsis' = auf „…“ kürzen
+document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
+
+ ensureFontFamily();
   }
 
   function applyDisplay() {
@@ -631,7 +667,44 @@ function buildQueue() {
   }
 
   // ---------- Overview table ----------
-  function tableGrid(hlMap) {
+
+// --- Chip-Text fitting (Übersicht) ---
+function fitChipText(el, mode){
+  const chip = el.closest('.chip'); if (!chip) return;
+
+  // Reset
+  el.style.fontSize = '';
+  el.classList.toggle('ellipsis', mode === 'ellipsis');
+  if (mode === 'ellipsis') return; // CSS erledigt Kürzung
+
+  const base = parseFloat(getComputedStyle(el).fontSize) || 16;
+  el.style.fontSize = base + 'px';
+
+  const cs = getComputedStyle(chip);
+  const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const flamesBox = chip.querySelector('.chip-flames');
+  const flamesW = flamesBox ? flamesBox.getBoundingClientRect().width : 0;
+  const free = chip.clientWidth - padX - flamesW - 1;
+
+  if (el.scrollWidth <= free) return;
+
+  let size = base;
+  const min = Math.max(10, base * 0.6);
+  while (size > min && el.scrollWidth > free){
+    size -= 0.5;
+    el.style.fontSize = size + 'px';
+  }
+  if (el.scrollWidth > free){
+    el.classList.add('ellipsis'); // letzte Sicherung
+  }
+}
+
+function fitChipsIn(container){
+  const mode = document.body.dataset.chipOverflow || 'scale';
+  container.querySelectorAll('.chip .chip-text').forEach(n => fitChipText(n, mode));
+}
+
+function tableGrid(hlMap) {
     const notes = footnoteMap();
     const t = h('table', { class: 'grid' });
     const colg = h('colgroup');
@@ -656,13 +729,18 @@ function buildQueue() {
         if (cell && cell.title) {
           const title = String(cell.title).replace(/\*+$/, '');
           const hasStarInText = /\*$/.test(cell.title || '');
-          const chip = h('span', { class: 'chip' + (hlMap.byCell[key] ? ' highlight' : '') }, title);
-          if (hasStarInText) chip.appendChild(h('span', { class: 'notewrap' }, [h('sup', {class:'note legacy'}, '*')]));
-          const supNote = noteSup(cell, notes);
-          if (supNote) { chip.appendChild(h('span', { class: 'notewrap' }, [supNote])); usedSet.add(cell.noteId); }
-          // Flames INSIDE the chip (overview-specific sizing via CSS)
-          chip.appendChild(flamesWrap(cell.flames || ''));
-          const wrap = h('div', { class: 'cellwrap' }, [chip]);
+// Textbereich
+const txt = h('div', { class: 'chip-text' }, title);
+if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', {class:'note legacy'}, '*')]));
+const supNote = noteSup(cell, notes);
+if (supNote) { txt.appendChild(h('span', { class: 'notewrap' }, [supNote])); usedSet.add(cell.noteId); }
+
+// Flammen kompakt rechts
+const flamesBox = h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]);
+
+// Chip-Container (Flex: Text links, Flammen rechts)
+const chip = h('div', { class: 'chip' + (hlMap.byCell[key] ? ' highlight' : '') }, [txt, flamesBox]);
+const wrap = h('div', { class: 'cellwrap' }, [chip]);
           td.appendChild(wrap);
         } else {
           td.appendChild(h('div', { class: 'caption' }, '—'));
@@ -726,10 +804,13 @@ while (m.totalH > availH && iter < 12) {
       : null;
     const bar = h('div',{class:'ovbar'}, [ h('h1',{class:'h1'}, 'Aufgussplan'), rightH2 ]);
     const c = h('div', {class:'container overview fade show'}, [ bar, h('div', {class:'ovwrap'}, [table]) ]);
-    const recalc = () => autoScaleOverview(c);
-    setTimeout(recalc, 0);
-    if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
-    onResizeCurrent = recalc;
+const recalc = () => { 
+  autoScaleOverview(c);
+  fitChipsIn(c); // nach dem Autoscale die Chip-Texte einpassen
+};
+setTimeout(recalc, 0);
+if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
+onResizeCurrent = recalc;
     return c;
   }
 
@@ -928,7 +1009,7 @@ chmod -R 0644 /var/www/signage/assets/* /var/www/signage/index.html
 # Admin-UI (Editor) – Farben (Hex/Preview), Kachel-Min/Max, rechte Spalte %, Schrägschnitt, Flammen-Bild
 # ---------------------------
 cat >/var/www/signage/admin/index.html <<'HTML'
-  <!doctype html> <html lang="de"> <head>
+   <!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
@@ -1048,7 +1129,12 @@ header{
     .theme-light .help{ color:#5b6478 !important; }
 
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 20% -5%, #0e1630, #070a12);color:var(--fg);font:14px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+html,body{
+  height:100%;
+  margin:0;
+  color:var(--fg);
+  font:14px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;
+}
     body.theme-light{ background:radial-gradient(1200px 600px at 20% -5%, #ffffff, #e9edf7); color:var(--fg); }
     a{color:#98c7ff}
     header{position:sticky;top:0;z-index:60;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--br);background:rgba(7,10,18,.85);backdrop-filter:blur(8px)}
@@ -1113,6 +1199,22 @@ main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) clamp(38
 /* Visuelle Absetzung & Tages-Pillen */
 .saunarow.ghost{ opacity:.9; outline:1px dashed var(--inbr); }
 .saunarow .namewrap{ display:flex; flex-direction:column; gap:4px; }
+
+/* Übersicht-Zeile: Checkbox auch in 'einheitlich' sauber im letzten Grid */
+.saunarow input[type="checkbox"]{ justify-self:center; }
+
+/* Wenn 'einheitlich' aktiv ist: das Dauer-Feld der Übersicht komplett ausblenden */
+body.mode-uniform #ovSec{ display:none; }
+
+/* Drag & Drop Styling */
+.sauna-bucket{ border:1px dashed var(--inbr); border-radius:12px; padding:8px; margin-top:6px; }
+.sauna-bucket.drag-over{ outline:2px solid var(--acc); }
+.saunarow[draggable="true"]{ cursor:grab; }
+.saunarow[draggable="true"]:active{ cursor:grabbing; }
+
+.groupHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.day-pills .day-btn{ /* nutzt deine vorhandenen .day-btn-Styles */ }
+
 .pills{ display:flex; flex-wrap:wrap; gap:6px; }
 .pill{ font-size:11px; line-height:1; padding:3px 7px; border:1px solid var(--inbr); border-radius:999px; opacity:.9; }
 /* Wochentags-Pills (Buttons) */
@@ -1317,7 +1419,7 @@ body.mode-uniform .intSec{ display:none !important; }
 <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
 
     <!-- Unterbox 1: Saunen & Übersicht -->
-    <details class="ac sub" id="boxSaunas">
+    <details class="ac sub" open id="boxSaunas">
       <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
  <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
 </summary>      
@@ -1330,6 +1432,12 @@ body.mode-uniform .intSec{ display:none !important; }
         </div>
 
         <!-- Saunenliste -->
+		<!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
+<div class="groupHead">
+  <div class="legend">Aufguss</div>
+  <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
+</div>
+ 	<!-- Aufguss -->
 <div class="sl-head sl-saunas">
   <span class="col-name">Name</span>
   <span class="col-prev">Preview</span>
@@ -1339,7 +1447,9 @@ body.mode-uniform .intSec{ display:none !important; }
   <span class="col-del">✕</span>
   <span class="col-vis">Anzeigen</span>
 </div>
-        <div id="saunaList"></div>
+        
+	<!-- kein Aufguss -->
+	<div id="saunaList"></div>
 	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
 	<div id="extraSaunaList"></div>
 
@@ -1440,6 +1550,18 @@ body.mode-uniform .intSec{ display:none !important; }
           <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
           <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="20" max="120" value="44"></div>
           <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
+<div class="kv"><label>Textüberlänge</label>
+  <select id="chipOverflowMode" class="input">
+    <option value="scale" selected>Automatisch skalieren</option>
+    <option value="ellipsis">Mit „…“ kürzen</option>
+  </select>
+</div>
+<div class="kv"><label>Flammen-Größe (% der Chip-Höhe)</label>
+  <input id="flamePct" class="input" type="number" min="30" max="100" value="55">
+</div>
+<div class="kv"><label>Flammen-Abstand (px)</label>
+  <input id="flameGap" class="input" type="number" min="0" max="24" value="6">
+</div>
 
           <div class="subh">Saunafolien (Kacheln)</div>
           <div class="kv"><label>Text‑Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
@@ -1585,7 +1707,7 @@ body.mode-uniform .intSec{ display:none !important; }
         saunaColor:'#5C3101'
       },
       highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
-      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600, chipHeight:44 },
+      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600, chipHeight:44, chipOverflowMode:'scale',flamePct:55,flameGapPx:6 },
       h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
  assets:{ flameImage:'/assets/img/flame_test.svg' },
       footnotes:[ {id:'star', label:'*', text:'Nur am Fr und Sa'} ]
@@ -1668,51 +1790,65 @@ initWeekdayUI();
       });
     }
     function updateSelTime(){ $('#selTime').textContent=schedule.rows[curRow]?.time||'—'; }
-// ---- Wochentage (Presets) oben als Pills ----
-const DAYS = [['Mon','Mo'],['Tue','Di'],['Wed','Mi'],['Thu','Do'],['Fri','Fr'],['Sat','Sa'],['Sun','So']];
+
+// ---- Wochentage inkl. "Opt" (manuell spielbar) ----
+const DAYS = [
+  ['Mon','Mo'],['Tue','Di'],['Wed','Mi'],['Thu','Do'],['Fri','Fr'],['Sat','Sa'],['Sun','So'],
+  ['Opt','Opt']
+];
 const DAY_LABELS = Object.fromEntries(DAYS);
 function dayKeyToday(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
-
 let activeDayKey = 'Mon';
 
 function setActiveDay(key,{loadPreset=true}={}){
   activeDayKey = key;
   localStorage.setItem('adminActiveDay', key);
-  const lab = DAY_LABELS[key] || key;
-  const lbl = document.getElementById('activeDayLabel');
-  if (lbl) lbl.textContent = lab;
 
-  // Pills visuell updaten
-  document.querySelectorAll('#weekdayPills .day-btn').forEach(btn=>{
+  // Label in der Plan-Überschrift
+  const lbl = document.getElementById('activeDayLabel');
+  if (lbl) lbl.textContent = DAY_LABELS[key] || key;
+
+  // Alle Pillen-Sets synchronisieren
+  document.querySelectorAll('.day-pills .day-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.key === key);
   });
 
-  // Beim Wechsel optional Preset laden (wenn vorhanden)
+  // Beim Wechsel optional Preset laden (nicht für "Opt", das ist manuell)
   const P = settings?.presets || {};
-  if (loadPreset && P[key]) {
+  if (loadPreset && key !== 'Opt' && P[key]) {
     schedule = JSON.parse(JSON.stringify(P[key]));
     renderGrid();
     renderSlidesMasterBox();
   }
 }
 
-function initWeekdayUI(){
-  const host = document.getElementById('weekdayPills');
+function buildDayPills(hostId){
+  const host = document.getElementById(hostId);
   if (!host) return;
+  host.classList.add('day-pills');
   host.innerHTML = '';
   DAYS.forEach(([key,lab])=>{
     const b = document.createElement('button');
-    b.type='button'; b.className='day-btn'; b.dataset.key = key; b.textContent = lab;
+    b.type='button';
+    b.className='day-btn';
+    b.dataset.key = key;
+    b.textContent = lab;
     b.onclick = ()=> setActiveDay(key,{loadPreset:true});
     host.appendChild(b);
   });
+}
 
-  // Init aktiver Tag: Auto -> heute, sonst letzter Auswahl/Mon
+function initWeekdayUI(){
+  // beide Sets rendern (Tabelle + Saunen-Box)
+  buildDayPills('weekdayPills');
+  buildDayPills('weekdayPills2');
+
+  // Start: Auto -> heutiger Wochentag, sonst letzter/Mon (Opt nie auto)
   const saved = localStorage.getItem('adminActiveDay');
   const initKey = (settings.presetAuto ? dayKeyToday() : (saved || 'Mon'));
   setActiveDay(initKey,{loadPreset: !!settings.presetAuto});
 
-  // Speichern-Button
+  // Speichern-Button: aktiven Tag (inkl. "Opt") sichern
   const saveBtn = document.getElementById('btnSavePreset');
   if (saveBtn) saveBtn.onclick = ()=>{
     settings.presets = settings.presets || {};
@@ -1721,41 +1857,61 @@ function initWeekdayUI(){
   };
 }
 
-    // Dialog
-    $('#m_cancel').onclick=()=> $('#modal').style.display='none';
-    $('#m_hasNote').onchange=()=>{ $('#m_noteRow').style.display = $('#m_hasNote').checked ? 'flex' : 'none'; };
-    function populateNoteSelect(){
-      const sel = $('#m_note'); sel.innerHTML='';
-      (settings.footnotes||[]).forEach(fn=>{
-        const o=document.createElement('option'); o.value=fn.id; o.textContent=`${fn.label} — ${fn.text}`; sel.appendChild(o);
-      });
-    }
-    $('#m_ok').onclick=()=>{
-      const title=$('#m_title').value.trim();
-      const flames=$('#m_flames').value;
-      const newTime=parseTime($('#m_time').value);
-      const hasNote=$('#m_hasNote').checked;
-      const noteId= hasNote ? $('#m_note').value : null;
-      if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; }
-      const newCell= title? {title,flames} : null;
-      if (newCell && hasNote) newCell.noteId = noteId;
+// Dialog (Zelle)
+$('#m_cancel').onclick=()=> $('#modal').style.display='none';
+$('#m_hasNote').onchange=()=>{ $('#m_noteRow').style.display = $('#m_hasNote').checked ? 'flex' : 'none'; };
+function populateNoteSelect(){
+  const sel = $('#m_note'); sel.innerHTML='';
+  (settings.footnotes||[]).forEach(fn=>{
+    const o=document.createElement('option'); o.value=fn.id; o.textContent=`${fn.label} — ${fn.text}`; sel.appendChild(o);
+  });
+}
+$('#m_ok').onclick=()=>{
+  const title=$('#m_title').value.trim();
+  const flames=$('#m_flames').value;
+  const newTime=parseTime($('#m_time').value);
+  const hasNote=$('#m_hasNote').checked;
+  const noteId= hasNote ? $('#m_note').value : null;
+  if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; }
+  const newCell= title? {title,flames} : null;
+  if (newCell && hasNote) newCell.noteId = noteId;
 
-      if (newTime && newTime!==schedule.rows[curRow].time && newCell){
-        let targetIdx=schedule.rows.findIndex(r => r.time===newTime);
-        if(targetIdx===-1){ const cols=schedule.saunas.length; schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)}); schedule.rows.sort((a,b)=>a.time.localeCompare(b.time)); targetIdx=schedule.rows.findIndex(r => r.time===newTime);} 
-        schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null;
-      } else {
-        schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime;
-      }
+  if (newTime && newTime!==schedule.rows[curRow].time && newCell){
+    let targetIdx=schedule.rows.findIndex(r => r.time===newTime);
+    if(targetIdx===-1){
+      const cols=schedule.saunas.length;
+      schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)});
       schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
-      $('#modal').style.display='none';
-      renderGrid();
-    };
+      targetIdx=schedule.rows.findIndex(r => r.time===newTime);
+    }
+    schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null;
+  } else {
+    schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime;
+  }
+  schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
+  $('#modal').style.display='none';
+  renderGrid();
+};
 
-    // Row ops
-    $('#btnAddAbove').onclick=()=>{ const cols=schedule.saunas.length; schedule.rows.splice(curRow,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)}); renderGrid(); };
-    $('#btnAddBelow').onclick=()=>{ const cols=schedule.saunas.length; schedule.rows.splice(curRow+1,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)}); renderGrid(); };
-    $('#btnDeleteRow').onclick=()=>{ if(schedule.rows.length>1){ schedule.rows.splice(curRow,1); curRow=Math.max(0,curRow-1); renderGrid(); updateSelTime(); } };
+// Row-Operationen
+$('#btnAddAbove').onclick=()=>{
+  const cols=schedule.saunas.length;
+  schedule.rows.splice(curRow,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)});
+  renderGrid();
+};
+$('#btnAddBelow').onclick=()=>{
+  const cols=schedule.saunas.length;
+  schedule.rows.splice(curRow+1,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)});
+  renderGrid();
+};
+$('#btnDeleteRow').onclick=()=>{
+  if(schedule.rows.length>1){
+    schedule.rows.splice(curRow,1);
+    curRow=Math.max(0,curRow-1);
+    renderGrid();
+    updateSelTime();
+  }
+};
 
 // ------- Slides & Settings -------
 function renderSlides(){
@@ -1773,6 +1929,9 @@ function renderSlides(){
   setV('#fontScale',  f.scale  ?? 1);
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
+setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
+setV('#flamePct',         f.flamePct         ?? 55);
+setV('#flameGap',         f.flameGapPx       ?? 6);
 
   // H2
   setV('#h2Mode', settings.h2?.mode ?? DEFAULTS.h2.mode);
@@ -1815,6 +1974,9 @@ function renderSlides(){
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
     setV('#chipH',        DEFAULTS.fonts.chipHeight);
+setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
+setV('#flamePct',         DEFAULTS.fonts.flamePct);
+setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
 
     setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
     setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
@@ -2016,6 +2178,93 @@ function renderInterstitialsPanel(hostId='interList2'){
   };
 }
 
+// ---- Inventar & Off-Liste (Kein Aufguss) ----
+function getAllSaunas(){
+  // vereinheitlichen: Inventar + aktuelle + Presets
+  const fromPresets = new Set();
+  const P = settings?.presets || {};
+  Object.values(P).forEach(ps => (ps?.saunas||[]).forEach(n => fromPresets.add(n)));
+
+  const all = new Set(settings.allSaunas || []);
+  (schedule.saunas||[]).forEach(n=> all.add(n));
+  fromPresets.forEach(n=> all.add(n));
+
+  settings.allSaunas = Array.from(all).sort((a,b)=> a.localeCompare(b,'de'));
+  return settings.allSaunas;
+}
+
+function addSaunaToActive(name){
+  if (!name) return;
+  if ((schedule.saunas||[]).includes(name)) return;
+  schedule.saunas.push(name);
+  schedule.rows.forEach(r=> r.entries.push(null));
+  renderSlidesMasterBox();
+  renderGrid();
+}
+
+function removeSaunaFromActive(name){
+  const idx = (schedule.saunas||[]).indexOf(name);
+  if (idx === -1) return;
+  if (!confirm(`Sauna "${name}" für ${DAY_LABELS[activeDayKey]||activeDayKey} auf „Kein Aufguss“ verschieben?\nDie Spalte wird gelöscht.`)) return;
+  schedule.saunas.splice(idx,1);
+  schedule.rows.forEach(r=> r.entries.splice(idx,1));
+  renderSlidesMasterBox();
+  renderGrid();
+}
+
+// Drag&Drop: Zeile draggable machen
+function makeRowDraggable(el, name, src){
+  if (!el) return;
+  el.setAttribute('draggable','true');
+  el.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/sauna', name);
+    e.dataTransfer.setData('text/src', src); // 'on' oder 'off'
+  });
+}
+
+// DnD Drop-Zonen aktivieren
+function applyDnD(){
+  const onHost  = document.getElementById('saunaList');      // Aufguss
+  const offHost = document.getElementById('extraSaunaList'); // Kein Aufguss
+  [onHost, offHost].forEach(h=>{
+    if (!h) return;
+    h.addEventListener('dragover', e=>{ e.preventDefault(); h.classList.add('drag-over'); });
+    h.addEventListener('dragleave', ()=> h.classList.remove('drag-over'));
+    h.addEventListener('drop', e=>{
+      e.preventDefault(); h.classList.remove('drag-over');
+      const name = e.dataTransfer.getData('text/sauna');
+      const src  = e.dataTransfer.getData('text/src');
+      if (!name) return;
+      if (h===onHost  && src!=='on')  addSaunaToActive(name);
+      if (h===offHost && src!=='off') removeSaunaFromActive(name);
+    });
+  });
+}
+
+function renderSaunaOffList(){
+  const all = getAllSaunas();
+  const activeSet = new Set(schedule.saunas||[]);
+  const off = all.filter(n=> !activeSet.has(n));
+  const extraTitle = document.getElementById('extraTitle');
+  const host = document.getElementById('extraSaunaList');
+  if (!host) return;
+  host.innerHTML = '';
+
+  // Pills unter "Kein Aufguss": zeigen, aus welchen Preset-Tagen die Sauna stammt (nice to have)
+  const presentMap = computePresetSaunaDays(); // Map name -> ['Mo','Di',...]
+
+  off.forEach(name=>{
+    const pills = presentMap.get(name) || [];
+    const row = saunaExtraRow(name, pills); // disabled/kompakte Row
+    row.title = 'Ziehen, um zu „Aufguss“ hinzuzufügen';
+    makeRowDraggable(row, name, 'off');
+    host.appendChild(row);
+  });
+
+  if (extraTitle) extraTitle.style.display = off.length ? '' : 'none';
+}
+
+
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
 function computePresetSaunaDays(){
@@ -2062,34 +2311,54 @@ function saunaGhostRow(name){
 
 // Übersicht als Row im Saunen-Stil
 function overviewRowRender(){
+  const perMode = (settings.slides?.durationMode === 'per');
   const wrap = document.createElement('div');
-  wrap.className = 'saunarow';
-wrap.innerHTML = `
-  <div style="font-weight:600">Übersicht</div>
-  <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
-  <input id="ovSec" class="input num3" type="number" min="1" max="120" step="1" />
-  <span></span><span></span><span></span>
-  <input id="ovShow" type="checkbox" />
-`;
-  const ovSecEl = wrap.querySelector('#ovSec');
+  wrap.className = 'saunarow overview';
+
+  if (perMode){
+    // 7 Spalten: name, prev, dur, up, def, del, vis
+    wrap.innerHTML = `
+      <div style="font-weight:600">Übersicht</div>
+      <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
+      <input id="ovSec" class="input num3 intSec" type="number" min="1" max="120" step="1" />
+      <span></span><span></span><span></span>
+      <input id="ovShow" type="checkbox" />
+    `;
+  } else {
+    // 6 Spalten: name, prev, up, def, del, vis  (keine "Dauer"-Spalte)
+    wrap.innerHTML = `
+      <div style="font-weight:600">Übersicht</div>
+      <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
+      <span></span><span></span><span></span>
+      <input id="ovShow" type="checkbox" />
+    `;
+  }
+
+  const ovSecEl  = wrap.querySelector('#ovSec');
   const ovShowEl = wrap.querySelector('#ovShow');
-  ovSecEl.value  = settings.slides?.overviewDurationSec ?? 10;
-  ovShowEl.checked = (settings.slides?.showOverview !== false);
-  ovSecEl.onchange = ()=>{
-    settings.slides = settings.slides || {};
-    settings.slides.overviewDurationSec = Math.max(1, Math.min(120, +ovSecEl.value||10));
-  };
-  ovShowEl.onchange = ()=>{
-    settings.slides = settings.slides || {};
-    settings.slides.showOverview = !!ovShowEl.checked;
-  };
+
+  if (ovSecEl){
+    ovSecEl.value = settings.slides?.overviewDurationSec ?? 10;
+    ovSecEl.onchange = ()=>{
+      settings.slides = settings.slides || {};
+      settings.slides.overviewDurationSec = Math.max(1, Math.min(120, +ovSecEl.value||10));
+    };
+  }
+  if (ovShowEl){
+    ovShowEl.checked = (settings.slides?.showOverview !== false);
+    ovShowEl.onchange = ()=>{
+      settings.slides = settings.slides || {};
+      settings.slides.showOverview = !!ovShowEl.checked;
+    };
+  }
   return wrap;
 }
+
 
 function saunaRow(cfg){
   const name = cfg.name;
   const id = 'sx_' + Math.random().toString(36).slice(2,8);
-  const mode = cfg.mode || 'normal'; // 'normal' | 'ghost' | 'extra'
+  const mode = cfg.mode || 'normal'; // 'normal' (Aufguss) | 'ghost' | 'extra' (Kein Aufguss/Inventar)
   const i = (cfg.index ?? null);
 
   const wrap = document.createElement('div');
@@ -2108,14 +2377,26 @@ function saunaRow(cfg){
     </div>`;
   })();
 
+  // Grundmarkup: Spaltenstruktur wie Head
   wrap.innerHTML = `
     ${namePart}
     <img id="p_${id}" class="prev" alt="" title=""/>
-<input id="sec_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
+    <input id="sec_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
     <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
     <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
-    ${mode === 'normal' ? `<button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>` : `<span></span>`}
-    <input id="en_${id}" type="checkbox" ${mode === 'normal' ? 'checked' : ''} />
+    ${
+      mode === 'normal'
+        ? `<button class="btn sm ghost icon" id="x_${id}" title="Kein Aufguss (Spalte für diesen Tag entfernen)">✕</button>`
+	: `<div class="row" style="gap:6px">
+      	<button class="btn sm ghost icon" id="mv_${id}" title="Zu Aufguss hinzufügen">➕</button>
+      	<button class="btn sm ghost icon" id="delinv_${id}" title="Dauerhaft löschen">🗑</button>
+    	</div>`   
+ }
+    ${
+      mode === 'normal'
+        ? `<input id="en_${id}" type="checkbox" checked />`
+        : `<span></span>`
+    }
   `;
 
   const $name = wrap.querySelector('#n_'+id);
@@ -2124,13 +2405,17 @@ function saunaRow(cfg){
   const $up   = wrap.querySelector('#f_'+id);
   const $def  = wrap.querySelector('#d_'+id);
   const $del  = wrap.querySelector('#x_'+id);
+  const $mv   = wrap.querySelector('#mv_'+id);
+  const $delinv = wrap.querySelector('#delinv_'+id); 
   const $en   = wrap.querySelector('#en_'+id);
 
   // Preview + Tooltip (Auflösung)
   const url = (settings.assets?.rightImages?.[name]) || '';
-  if (url){ preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $img.title=`${r.w}×${r.h}`; } }); }
+  if (url){
+    preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $img.title=`${r.w}×${r.h}`; } });
+  }
 
-  // Dauer-Feld (respektiert Modus "per")
+  // Dauer-Feld (nur sinnvoll, wenn individueller Modus)
   const per = (settings.slides?.durationMode === 'per');
   const perMap = settings.slides?.saunaDurations || {};
   $sec.disabled = !per;
@@ -2141,14 +2426,16 @@ function saunaRow(cfg){
     settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
   };
 
-  // Anzeigen (hiddenSaunas)
-  const hidden = new Set(settings.slides?.hiddenSaunas || []);
-  $en.checked = !hidden.has(name);
-  $en.onchange = () => {
-    const set = new Set(settings.slides?.hiddenSaunas || []);
-    if ($en.checked) set.delete(name); else set.add(name);
-    (settings.slides ||= {}); settings.slides.hiddenSaunas = Array.from(set);
-  };
+  // Anzeigen (nur "Aufguss" sinnvoll)
+  if ($en){
+    const hidden = new Set(settings.slides?.hiddenSaunas || []);
+    $en.checked = !hidden.has(name);
+    $en.onchange = () => {
+      const set = new Set(settings.slides?.hiddenSaunas || []);
+      if ($en.checked) set.delete(name); else set.add(name);
+      (settings.slides ||= {}); settings.slides.hiddenSaunas = Array.from(set);
+    };
+  }
 
   // Upload
   $up.onclick = () => {
@@ -2172,14 +2459,40 @@ function saunaRow(cfg){
     $img.title = '';
   };
 
-  // Entfernen (nur normal)
-  if ($del) $del.onclick = () => {
-    if(!confirm(`Sauna "${name}" wirklich entfernen?`)) return;
-    const removedName = schedule.saunas.splice(i,1)[0];
-    schedule.rows.forEach(r=> r.entries.splice(i,1));
-    if (settings.assets?.rightImages) delete settings.assets.rightImages[removedName];
-    renderSlidesMasterBox(); renderGrid();
+  // Entfernen = zurück zu "Kein Aufguss" (Spalte löschen) – nur normal
+  if ($del){
+    $del.onclick = () => {
+      if(!confirm(`Sauna "${name}" wirklich für ${DAY_LABELS[activeDayKey]||activeDayKey} auf „Kein Aufguss” setzen?\nDie Spalte in der Tabelle wird gelöscht.`)) return;
+      const idx = (schedule.saunas||[]).indexOf(name);
+      if (idx > -1){
+        schedule.saunas.splice(idx,1);
+        schedule.rows.forEach(r=> r.entries.splice(idx,1));
+        renderSlidesMasterBox();
+        renderGrid();
+      }
+    };
+  }
+
+  // ➕ von Inventar/Kein Aufguss nach Aufguss – nur extra
+  if ($mv){
+    $mv.onclick = () => {
+      addSaunaToActive(name); // legt Spalte an
+    };
+  }
+
+if ($delinv){
+  $delinv.onclick = ()=>{
+    const txt = prompt(
+      `Sauna „${name}“ dauerhaft löschen?\n\n`+
+      `Dies entfernt sie aus dem Inventar, aus dem aktuellen Tag, aus allen Presets,\n`+
+      `löscht Bildzuweisungen, Dauer-Einträge und Verweise.\n\n`+
+      `Zum Bestätigen bitte genau "Ja" eingeben:`,
+      ''
+    );
+    if ((txt||'').trim() !== 'Ja') return;
+    deleteSaunaEverywhere(name);
   };
+}
 
   // Umbenennen (nur normal)
   if ($name && mode === 'normal') {
@@ -2204,12 +2517,65 @@ function saunaRow(cfg){
   return wrap;
 }
 
-
 // Sauna-Zeile (kompakt mit Icon-Buttons, Sichtbarkeit & optionaler Dauer)
 function saunaMasterRow(i){
   const name = schedule.saunas[i];
   return saunaRow({ name, index:i, mode:'normal' });
 }
+
+function removeSaunaColumnFromSchedule(sc, name){
+  if (!sc || !Array.isArray(sc.saunas)) return;
+  const idx = sc.saunas.indexOf(name);
+  if (idx === -1) return;
+  sc.saunas.splice(idx,1);
+  (sc.rows||[]).forEach(r=>{
+    if (Array.isArray(r.entries)) r.entries.splice(idx,1);
+  });
+}
+
+function deleteSaunaEverywhere(name){
+  // 1) Inventar
+  settings.allSaunas = (settings.allSaunas||[]).filter(n => n !== name);
+
+  // 2) Aktueller Tag (Schedule)
+  removeSaunaColumnFromSchedule(schedule, name);
+
+  // 3) Presets
+  const P = settings.presets || {};
+  Object.keys(P).forEach(k => removeSaunaColumnFromSchedule(P[k]||{}, name));
+
+  // 4) Assets (Bild rechts)
+  if (settings.assets?.rightImages && settings.assets.rightImages[name]){
+    delete settings.assets.rightImages[name];
+  }
+
+  // 5) Per-Sauna-Dauern
+  if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name]!=null){
+    delete settings.slides.saunaDurations[name];
+  }
+
+  // 6) Sichtbarkeitsliste bereinigen
+  if (settings.slides?.hiddenSaunas){
+    settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
+  }
+
+  // 7) Verweise in Bild-Slides ("Nach Slide") auf Übersicht zurücksetzen
+  (settings.interstitials||[]).forEach(it=>{
+    const v = it.afterRef || '';
+    if (v && v.startsWith('sauna:')){
+      const n = decodeURIComponent(v.slice(6));
+      if (n === name){ it.afterRef = 'overview'; it.after = 'overview'; }
+    } else if (it.after === name){
+      it.after = 'overview';
+      it.afterRef = 'overview';
+    }
+  });
+
+  // UI neu zeichnen
+  renderSlidesMasterBox();
+  renderGrid();
+}
+
 
 // Masterbox-Renderer (2 Unterboxen)
 function renderSlidesMasterBox(){
@@ -2241,29 +2607,21 @@ function renderSlidesMasterBox(){
   if (ovHost){ ovHost.innerHTML=''; ovHost.appendChild(overviewRowRender()); }
 
   // Saunen-Liste
-  const sHost = document.getElementById('saunaList');
-  if (sHost){
-    sHost.innerHTML = '';
-    (schedule.saunas||[]).forEach((_,i)=> sHost.appendChild(saunaMasterRow(i)));
-  }
+// Saunen-Liste (aktuelle Tabelle)
+const sHost = document.getElementById('saunaList');
+if (sHost){
+  sHost.innerHTML = '';
+  (schedule.saunas||[]).forEach((_,i)=> {
+    const el = saunaMasterRow(i);
+    makeRowDraggable(el, schedule.saunas[i], 'on');
+    sHost.appendChild(el);
+  });
+}
+// "Kein Aufguss" (Inventar - aktuell aktive)
+renderSaunaOffList();
 
-  // Weitere Saunen aus Presets
-  const extraTitle = document.getElementById('extraTitle');
-  const extraHost  = document.getElementById('extraSaunaList');
-  if (extraHost){
-    const presentMap = computePresetSaunaDays();
-    const curSet = new Set(schedule.saunas || []);
-    const extraNames = Array.from(presentMap.keys()).filter(n => !curSet.has(n));
-    extraHost.innerHTML = '';
-    if (extraNames.length){
-      if (extraTitle) extraTitle.style.display = '';
-      extraNames.forEach(name => extraHost.appendChild(
-        saunaExtraRow(name, presentMap.get(name) || [])
-      ));
-    } else {
-      if (extraTitle) extraTitle.style.display = 'none';
-    }
-  }
+// Drag & Drop bereit machen
+applyDnD();
 
   // Modus-Schalter + Globaldauer
   const durUniform = document.getElementById('durUniform');
@@ -2310,15 +2668,19 @@ function renderSlidesMasterBox(){
     renderSlidesMasterBox();
   };
 
-  const addBtn = document.getElementById('btnAddSauna');
-  if (addBtn) addBtn.onclick = ()=>{
-    const name = prompt('Neuer Saunananame:', 'Neue Sauna');
-    if(!name) return;
-    schedule.saunas.push(name);
-    schedule.rows.forEach(r=> r.entries.push(null));
-    renderSlidesMasterBox();
-    renderGrid();
-  };
+const addBtn = document.getElementById('btnAddSauna');
+if (addBtn) addBtn.onclick = ()=>{
+  const name = (prompt('Neue Sauna anlegen (Inventar):', 'Neue Sauna')||'').trim();
+  if(!name) return;
+  settings.allSaunas = getAllSaunas();
+  if (settings.allSaunas.includes(name)){
+    alert('Diesen Namen gibt es bereits im Inventar.');
+    return;
+  }
+  settings.allSaunas.push(name);
+  settings.allSaunas.sort((a,b)=> a.localeCompare(b,'de'));
+  renderSlidesMasterBox(); // erscheint unter "Kein Aufguss"
+};
 }
 
 
@@ -2405,7 +2767,10 @@ B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gr
             overviewHeadScale:+($('#ovHeadScale').value||0.9),
             overviewCellScale:+($('#ovCellScale').value||0.8),
             chipHeight:+($('#chipH').value||44),
-            tileTextScale:+($('#tileTextScale').value||0.8), tileWeight:+($('#tileWeight').value||600) },
+chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
+flamePct:         +($('#flamePct')?.value || 55),
+flameGapPx:       +($('#flameGap')?.value || 6),
+tileTextScale:+($('#tileTextScale').value||0.8), tileWeight:+($('#tileWeight').value||600) },
             h2:{
               mode: $('#h2Mode').value || 'text',
               text: ($('#h2Text').value ?? '').trim(),
@@ -2933,6 +3298,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
