@@ -6,6 +6,7 @@
 # Ziel-OS : Ubuntu 24.04 (root erforderlich)
 
 set -Eeuo pipefail
+umask 0002   # Gruppen-Schreibrecht in setgid-Verzeichnissen
 IFS=$'\n\t'
 C_G="\033[1;32m"; C_B="\033[1;34m"; C_R="\033[1;31m"; C_0="\033[0m"
 ok(){   echo -e "${C_G}[OK  ]${C_0} $*"; }
@@ -14,18 +15,38 @@ err(){  echo -e "${C_R}[ERR ]${C_0} $*"; }
 trap 'rc=$?; line=${BASH_LINENO[0]:-0}; [[ $rc -ne 0 ]] && err "Abbruch in Zeile $line (RC=$rc)"; exit $rc' ERR
 shopt -s dotglob nullglob
 
-trap 'echo "[ERR] Abbruch in Zeile $LINENO (RC=$?)" >&2' ERR
 
 WEBROOT="/var/www/signage"
 
-ensure_dir() { install -d -m 755 -o www-data -g www-data "$1"; }
+# --- Helpers---
+ensure_dir_www() { install -d -m 2775 -o www-data -g www-data "$1"; }
+ensure_dir_root(){ install -d -m 755 "$1"; }  # für Systempfade (/etc/nginx/...)
 write_file() {                # write_file /abs/pfad/datei <<'EOF' ... EOF
   local f="$1"; shift
-  ensure_dir "$(dirname "$f")"
+  ensure_dir_root "$(dirname "$f")"
   cat >"$f"
-  chown www-data:www-data "$f"
+  chown root:root "$f"
   chmod 0644 "$f"
 }
+
+
+# Basis-Verzeichnisse anlegen (Owner/Gruppenrechte korrekt)
+ensure_dir_www  "$WEBROOT"
+ensure_dir_www  "$WEBROOT/data"
+ensure_dir_www  "$WEBROOT/assets"
+ensure_dir_www  "$WEBROOT/assets/img"
+ensure_dir_www  "$WEBROOT/admin"
+ensure_dir_www  "$WEBROOT/admin/api"
+ensure_dir_www  "$WEBROOT/admin/css"
+ensure_dir_www  "$WEBROOT/admin/js"
+ensure_dir_www  "$WEBROOT/admin/js/core"
+ensure_dir_www  "$WEBROOT/admin/js/ui"
+
+# Nginx-Verzeichnisstruktur (root)
+ensure_dir_root /etc/nginx/sites-available
+ensure_dir_root /etc/nginx/sites-enabled
+
+
 # ---------------------------
 # Defaults (anpassbar via ENV)
 # ---------------------------
@@ -153,8 +174,6 @@ cat >/var/www/signage/assets/img/flame_test.svg <<'SVG'
 </svg>
 SVG
 
-chown -R www-data:www-data /var/www/signage/data /var/www/signage/assets
-find /var/www/signage/assets -type f -exec chmod 0644 {} +
 
 # ---------------------------
 # Static: Slideshow (index.html + CSS + JS)
@@ -1003,352 +1022,415 @@ lastKey = key;
 JS
 
 chown -R www-data:www-data /var/www/signage/assets
-chmod -R 0644 /var/www/signage/assets/* /var/www/signage/index.html
 
 # ---------------------------
 # Admin-UI (Editor) – Farben (Hex/Preview), Kachel-Min/Max, rechte Spalte %, Schrägschnitt, Flammen-Bild
 # ---------------------------
+
+cat > /var/www/signage/admin/css/admin.css <<'CSS'
+/* ===================== Admin UI – Compact, Aligned, Themed ===================== */
+/* Light ist Default (body class="theme-light"), Dark via .theme-dark auf <body>  */
+/* ============================================================================== */
+
+/* ---------- Design Tokens: LIGHT (Default) ---------- */
+:root{
+  /* Flächen & Text */
+  --bg:#f6f8ff; --panel:#ffffff; --fg:#0b1220; --muted:#5b6478;
+  --border:#d6deee; --inbr:#c9d4ea;
+
+  /* Buttons – Flieder (default) + Orange (primary) */
+  --btn-accent:#7C3AED; --btn-accent-hover:#6D28D9; --btn-accent-fg:#ffffff;
+  --btn-primary:#F59E0B; --btn-primary-2:#FBBF24; --btn-primary-fg:#0b0d12;
+
+  /* Ghost-Buttons */
+  --ghost-bg:transparent; --ghost-border:#c9d4ea; --ghost-fg:#0b1220;
+
+  /* Inputs */
+  --input-bg:#ffffff; --input-fg:#0b1220; --input-border:#c9d4ea; --input-focus:#6D28D9;
+
+  /* Grid/Übersicht (Fallbacks – können per Settings überschrieben werden) */
+  --gridTable:#d1d5db; --gridTableW:2px;
+  --headRowBg:#f3f4f6; --headRowFg:#111827;
+  --zebra1:#ffffff; --zebra2:#f9fafb;
+  --timeZebra1:#f3f4f6; --timeZebra2:#eef2f7;
+  --cornerBg:#eef2f7; --cornerFg:#6b7280;
+
+  /* Grid: Zellen vs. Eingabe farblich trennen */
+  --grid-cell-bg:#f2f5fb;  /* Tabellenzelle */
+  --grid-entry-bg:#ffffff; /* Button in Zelle (.cellbtn) */
+
+  /* „Kein Aufguss“-Pillen (Light) */
+  --pill-bg:#edf1f7;
+
+  /* Größen */
+  --fs:14px;
+  --input-min-h:30px;          /* kompakt wie früher */
+  --input-pad:4px 8px;
+  --btn-pad:9px 12px;
+  --btn-sm-pad:6px 10px;
+  --radius:12px; --radius-sm:10px;
+
+  /* Innerer Rand rechts für Inputs, damit sie nicht am Boxrand kleben */
+  --edge-gap:6px;
+
+  /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
+  --col-name:minmax(140px,0.9fr);
+  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px; --col-after:minmax(150px,1fr);
+
+  /* Preview-Größe */
+  --prev-w:60px; --prev-h:42px;
+
+  /* Dichte */
+  --gap:6px;
+}
+
+/* ---------- Design Tokens: DARK (aktiv via .theme-dark) ---------- */
+.theme-dark{
+  --bg:#0b1220; --panel:#111827; --fg:#e5e7eb; --muted:#9ca3af;
+  --border:#1f2937; --inbr:#263041;
+
+  --btn-accent:#C4B5FD; --btn-accent-hover:#A78BFA; --btn-accent-fg:#111827;
+  --btn-primary:#F59E0B; --btn-primary-2:#FBBF24; --btn-primary-fg:#0b0d12;
+
+  --ghost-bg:rgba(255,255,255,.04); --ghost-border:#263041; --ghost-fg:var(--fg);
+
+  --input-bg:#0f1629; --input-fg:var(--fg); --input-border:#1f2937; --input-focus:#8B5CF6;
+
+  --gridTable:#374151; --headRowBg:#111827; --headRowFg:#e5e7eb;
+  --zebra1:#0f1629; --zebra2:#0d1426; --timeZebra1:#0e162b; --timeZebra2:#0c1324;
+  --cornerBg:#0d1426; --cornerFg:#9ca3af;
+
+  --grid-cell-bg:#0f1629; --grid-entry-bg:#121a34;
+  --pill-bg:#182134;
+}
+
+/* ---------- Base ---------- */
+html,body{height:100%}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:var(--fs)/1.45 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+}
+a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:none; }
+
+.row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.mut,.help{ color:var(--muted); }
+
+/* ---------- Header ---------- */
+header{
+  position:sticky; top:0; z-index:60;
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  background: color-mix(in oklab, var(--panel) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+h1{ margin:0; font-size:16px; letter-spacing:.3px; }
+
+/* ---------- Layout: Main + Rightbar ---------- */
+main.layout{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(360px, 32vw, 540px);
+  gap:14px; padding:16px 12px 18px 16px; align-items:start;
+}
+.leftcol{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.rightbar{
+  position:sticky; top:64px;
+  max-height:calc(100svh - 64px);
+  overflow:auto; padding-right:6px;
+  justify-self:end;
+  width: clamp(360px, 32vw, 540px);
+}
+
+/* ---------- Cards / Details ---------- */
+.card, details.ac{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:16px; box-shadow:0 8px 20px rgba(0,0,0,.06);
+}
+.card .content, .content{ padding:12px 14px; }
+summary{
+  list-style:none; cursor:pointer; display:flex; align-items:center;
+  justify-content:space-between; gap:12px; padding:12px 14px;
+  border-bottom:1px solid transparent;
+}
+details[open] > summary{ border-bottom-color:var(--border); }
+summary .ttl{ display:flex; align-items:center; gap:10px; font-weight:700; }
+summary .actions{ display:flex; gap:8px; }
+summary .chev{ transition: transform .2s ease; }
+details[open] .chev{ transform: rotate(90deg); }
+
+/* ---------- Inputs ---------- */
+.input, select, textarea{
+  background:var(--input-bg); color:var(--input-fg);
+  border:1px solid var(--input-border); border-radius:10px;
+  padding:var(--input-pad); min-height:var(--input-min-h);
+  width:100%;
+}
+.input::placeholder, textarea::placeholder{
+  color: color-mix(in oklab, var(--input-fg) 55%, transparent);
+}
+.input:focus, select:focus, textarea:focus{
+  outline:0; border-color:var(--input-focus);
+  box-shadow:0 0 0 3px color-mix(in oklab, var(--input-focus) 25%, transparent);
+}
+
+/* kleiner Innenabstand rechts in der Sidebar, damit Inputs nicht am Rand kleben */
+.rightbar .input,
+.rightbar select,
+.rightbar textarea{
+  width: calc(100% - var(--edge-gap));
+  margin-right: var(--edge-gap);
+  min-height:30px; padding:4px 8px; border-radius:10px; font-size:14px; line-height:1.2;
+}
+
+/* spezielle kompakte Inputs */
+.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0; }
+.input.name{ width:auto; min-width:140px; }
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; padding:var(--btn-pad); border-radius:12px;
+  border:1px solid transparent; cursor:pointer; user-select:none;
+  transition: transform .06s ease, filter .15s, background .15s, border-color .15s, color .15s;
+}
+.btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
+.btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
+
+/* Default (flieder) */
+.btn:not(.ghost):not(.primary){ background:var(--btn-accent); color:var(--btn-accent-fg); }
+.btn:not(.ghost):not(.primary):hover{ background:var(--btn-accent-hover); }
+.btn:not(.ghost):not(.primary):active{ transform:translateY(1px); }
+
+/* Primary (orange) */
+.btn.primary{
+  background: linear-gradient(180deg, var(--btn-primary), var(--btn-primary-2));
+  color: var(--btn-primary-fg); border-color: var(--btn-primary);
+}
+
+/* Ghost (grau) */
+.btn.ghost{
+  background:var(--ghost-bg); color:var(--ghost-fg); border:1px solid var(--ghost-border);
+}
+.btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+
+/* Toggle */
+.toggle{
+  display:flex; align-items:center; gap:8px;
+  border:1px solid var(--ghost-border); padding:7px 10px; border-radius:12px; background:var(--panel);
+}
+.toggle input{
+  appearance:none; width:28px; height:16px; border-radius:999px; background:#94a3b8; position:relative; outline:0;
+}
+.theme-dark .toggle input{ background:#4b5563; }
+.toggle input:checked{ background:#22c55e; }
+.toggle input::after{
+  content:''; position:absolute; top:2px; left:2px; width:12px; height:12px;
+  border-radius:50%; background:#fff; transition:left .15s;
+}
+.toggle input:checked::after{ left:14px; }
+
+/* ---------- Grid-Tabelle (links) ---------- */
+table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
+.tbl th,.tbl td{ border:1px solid var(--inbr); padding:7px; }
+.tbl th{
+  background:var(--headRowBg); color:var(--headRowFg);
+  position:sticky; top:64px; z-index:1;
+}
+.tbl td{ background:var(--grid-cell-bg); color:var(--fg); }
+.tbl .time{ min-width:8ch; text-align:center; font-weight:700; }
+
+/* Button in der Zelle = „Eingabe“ */
+.cellbtn{
+  width:100%; text-align:left;
+  background:var(--grid-entry-bg);
+  border:1px dashed color-mix(in oklab, var(--input-border) 75%, transparent);
+  color:var(--fg); padding:8px; border-radius:12px;
+}
+.cellbtn.filled{
+  border-style:solid;
+  background: color-mix(in oklab, var(--grid-entry-bg) 85%, transparent);
+  border-color: color-mix(in oklab, var(--input-border) 85%, transparent);
+}
+
+/* ---------- Key/Value-Linien ---------- */
+.kv{
+  display:grid; grid-template-columns:220px minmax(0,1fr);
+  gap:10px; align-items:center;
+}
+.content .kv{ margin-bottom:8px; }
+
+/* „Dauer (einheitlich)“: Inputs exakt untereinander (2-zeiliges Grid in Spalte 2) */
+#rowDwellAll > .row{
+  display:grid;
+  grid-template-columns:auto max-content;
+  grid-auto-rows:auto;
+  column-gap:8px; row-gap:6px;
+  align-items:center;
+  width: calc(100% - var(--edge-gap));   /* kleiner Innenabstand rechts */
+  margin-right: var(--edge-gap);
+}
+/* Reihenfolge passt: span,input,span,input  → 2x2 Raster automatisch */
+#rowDwellAll .mut{ white-space:nowrap; }
+#rowDwellAll .input.num3{ justify-self:start; }
+
+/* ---------- Slides-Listen (rechte Sidebar) ---------- */
+.groupHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.groupHead .legend, #extraTitle{ font-weight:800; }
+
+/* Spaltenköpfe + Zeilen – exakt gleiche Grid-Spalten */
+.sl-head, .saunarow, .imgrow{
+  width:100%; display:grid; gap:var(--gap); align-items:center; grid-auto-rows:minmax(42px,auto);
+}
+.sl-head{ margin: 2px 0 6px; }
+.sl-head span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.sl-head.sl-saunas, .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+.sl-head.sl-images, .imgrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+
+/* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
+body.mode-uniform #headSaunaDur, body.mode-uniform #headImgDur{ display:none; }
+body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+body.mode-uniform .sl-head.sl-images, body.mode-uniform .imgrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+body.mode-uniform .intSec{ display:none !important; }
+body.mode-uniform #ovSec{ display:none !important; }
+
+/* Übersicht-Row: Canvas/IMG wie Previews dimensionieren */
+#overviewRow .prev, #overviewRow canvas#ovPrev{ width:var(--prev-w); height:var(--prev-h); }
+
+/* Preview-Kacheln */
+.prev{
+  width:var(--prev-w); height:var(--prev-h);
+  display:grid; place-items:center; font-size:12px; opacity:.9;
+  background:var(--panel); border:1px solid var(--inbr); border-radius:10px; object-fit:cover;
+}
+
+/* Checkbox-Spalte bündig */
+.saunarow input[type="checkbox"], .imgrow input[type="checkbox"]{ justify-self:center; }
+
+/* Upload/Default Buttons kompakt */
+.btn.icon{ width:28px; height:28px; }
+
+/* Kein Überlaufen der Grids in der Sidebar */
+.saunarow > *, .imgrow > *{ min-width:0; }
+
+/* --- Wunschanpassungen: Breiten innerhalb der Spalten ----------------------- */
+/* Sauna-Namen 20% schmaler (lässt innen Luft im Spaltenbereich) */
+.saunarow .input.name{ width:80%; }
+
+/* Bild-Slides: Name 30% schmaler */
+.imgrow .input.name{ width:50%; }
+
+/* Bild-Slides: „Nach Slide“-Select 20% schmaler */
+.imgrow .sel-after{ width:70%; justify-self:start; min-width:120px; max-width:100%; }
+
+/* „Kein Aufguss“-Pillen – kleiner, mehr Abstand */
+.pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pill{
+  font-size:10.5px; line-height:1; padding:2px 6px;
+  border:1px solid var(--inbr); border-radius:999px; background:var(--pill-bg);
+  opacity:.96;
+}
+.saunarow .namewrap{ display:flex; flex-direction:column; gap:6px; }
+.saunarow .tag{ display:inline-block; margin-left:6px; padding:2px 6px; border:1px solid var(--inbr); border-radius:8px; font-size:11px; opacity:.8; }
+
+/* DnD Feedback */
+.sauna-bucket{ border:1px dashed var(--inbr); border-radius:12px; padding:8px; margin-top:6px; }
+.sauna-bucket.drag-over{ outline:2px solid var(--btn-accent); }
+.saunarow[draggable="true"]{ cursor:grab; }
+.saunarow[draggable="true"]:active{ cursor:grabbing; }
+
+/* Wochentags-Pills */
+.day-pills .day-btn{
+  border:1px solid var(--ghost-border); border-radius:999px; padding:6px 10px;
+  background:transparent; cursor:pointer; color:var(--ghost-fg);
+}
+.day-btn.active{
+  background:var(--btn-accent); color:var(--btn-accent-fg); border-color:var(--btn-accent); font-weight:700;
+}
+
+/* ---------- Farben-Editor ---------- */
+.color-cols{ display:grid; grid-template-columns:1fr; gap:12px; }
+.fieldset{ border:1px dashed var(--inbr); border-radius:12px; padding:10px 12px; }
+.fieldset > .legend{ opacity:.85; font-weight:700; margin-bottom:8px; }
+.color-item{ display:flex; align-items:center; gap:8px; }
+.swatch{ width:24px; height:24px; border-radius:6px; border:1px solid var(--inbr); }
+
+/* ---------- Footer ---------- */
+footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border); color:var(--muted); }
+
+/* ---------- Modal ---------- */
+.modal{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; place-items:center; z-index:100; }
+.box{ background:var(--panel); color:var(--fg); border:1px solid var(--inbr); border-radius:16px;
+  min-width:min(340px,95vw); max-width:95vw; max-height:90svh; overflow:auto; padding:16px; }
+.grid2{ display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; align-items:center; width:min(560px,calc(95vw - 36px)); margin:0 auto 12px; }
+.iframeWrap{ width:min(92vw,1600px); height:min(85svh,900px); border:1px solid var(--inbr); border-radius:14px; overflow:hidden; background:#000; }
+.iframeWrap iframe{ width:100%; height:100%; display:block; border:0; }
+CSS
+
+cat > /var/www/signage/admin/css/admin.mobile.css <<'CSS'
+/* file: /var/www/signage/admin/admin.mobile.css */
+
+/* Portrait oder sehr schmale Displays: Boxen unter der Tabelle (einspaltig) */
+@media (orientation: portrait), (max-width: 900px) {
+  main.layout {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .rightbar {
+    position: static !important; /* Sticky aus */
+    max-height: unset !important;
+    padding-right: 0 !important;
+  }
+  header { position: sticky; top: 0; }
+  /* Überschriften etwas kleiner */
+  .sl-head { font-size: 11px; }
+  /* Spalten können bei sehr schmaler Breite umbrechen */
+  .sl-head span { white-space: normal; }
+}
+
+/* Landscape (z.B. Tablets quer): 2/3 Tabelle, 1/3 Einstellungsboxen */
+@media (orientation: landscape) {
+  /* festes 2/3 : 1/3 Verhältnis – Desktop-Clamp bleibt außerhalb aktiv */
+  main.layout {
+    grid-template-columns: 2fr 1fr !important;
+    gap: 14px !important;
+  }
+  .rightbar {
+    position: sticky;
+    top: 64px;
+    max-height: calc(100svh - 64px);
+    width: auto; /* Verhältnis bestimmt die Breite */
+  }
+}
+
+/* Optionale Mikro-Optimierungen für Touch */
+@media (hover: none) and (pointer: coarse) {
+  .btn { padding: 10px 14px; }
+  .btn.sm { padding: 8px 12px; }
+  .input, select, textarea { min-height: 42px; }
+}
+CSS
+
+
 cat >/var/www/signage/admin/index.html <<'HTML'
    <!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
 <link rel="stylesheet" href="/admin/css/admin.mobile.css">
-  <style>
-/* ==== Dark Theme – inspiriert von Linear ==== */
-:root{
-  --bg:#0b0f19;
-  --fg:#e7ebf5;
-  --mut:#9aa3b2;
-  --acc:#8ea2ff;           /* Primär-Akzent (kühles Blau) */
-  --acc2:#b9c5ff;          /* helleres Blau für Hover/Fokus */
-  --br:#1a2236;            /* Rahmen */
-  --card:#0f1525;          /* Oberflächen */
-  --card2:#0c1220;
-  --input:#0e1628;         /* Eingaben */
-  --inbr:#1f2a44;
-  --ok:#22c55e;
-  --err:#f43f5e;
-  --shadow:0 12px 32px rgba(0,0,0,.35);
-}
+<link rel="stylesheet" href="/admin/css/admin.css">
 
-/* Background + Header-Glas */
-html,body{
-  background:radial-gradient(1200px 600px at 20% -5%, #0f1526, #0b0f19);
-  color:var(--fg);
-}
-header{
-  background:rgba(11,15,25,.75);
-  backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--br);
-}
-
-/* Cards / Details */
-.card, details.ac{
-  background:linear-gradient(180deg, var(--card), var(--card2));
-  border:1px solid var(--br);
-  box-shadow:var(--shadow);
-}
-
-/* Inputs & Selects */
-.input, select, textarea{
-  background:var(--input);
-  border-color:var(--inbr);
-  color:var(--fg);
-  transition:border-color .15s, box-shadow .15s, background .15s;
-}
-.input:focus, select:focus, textarea:focus{
-  outline:0;
-  border-color:var(--acc);
-  box-shadow:0 0 0 3px color-mix(in oklab, var(--acc) 25%, transparent);
-}
-
-/* Buttons */
-.btn{
-  border:1px solid var(--inbr);
-  background:linear-gradient(180deg, #121a2d, #0e1426);
-  color:var(--fg);
-}
-.btn:hover{ filter:brightness(1.06); }
-.btn.primary{
-  background:linear-gradient(180deg, var(--acc), var(--acc2));
-  color:#0b0d12;
-  border-color:var(--acc);
-  font-weight:700;
-}
-.btn.ghost{
-  background:transparent;
-  color:var(--fg);
-  border-color:var(--inbr);
-}
-.btn.ghost:hover{ border-color:var(--acc); color:var(--acc2); }
-
-/* Toggle */
-.toggle{ background:linear-gradient(180deg,#121a2d,#0e1426); border-color:var(--inbr); }
-.toggle input{ background:#3a475f; }
-.toggle input:checked{ background:var(--ok); }
-
-/* Tabelle kompakter & klarer */
-.tbl th, .tbl td{
-  background:#0f1529;
-  border-color:#1b2a46;
-}
-.tbl th{ background:#101a33; }
-
-/* Zell-Button (Plan) */
-.cellbtn{
-  background:#0f1529;
-  border:1px dashed #39507a;
-  color:#dce4ff;
-}
-.cellbtn.filled{
-  background:#0c162d;
-  border-color:#2a4774;
-}
-
-/* Hilfe-/Muted-Texte */
-.help, .mut{ color:var(--mut); }
-
-    /* Light theme overrides (apply via <body class="theme-light">) */
-    .theme-light{
-      --bg:#f6f8ff; --fg:#0b1220; --mut:#5b6478; --acc:#C38700; --acc2:#E7B416;
-      --br:#d6deee; --card:#ffffff; --card2:#f6f8ff; --input:#ffffff; --inbr:#c9d4ea; --shadow:0 8px 20px rgba(0,0,0,.08);
-    }
-    /* Light mode: schwarze Schrift in Inputs & helle Tabelle */
-    .theme-light .input,
-    .theme-light select,
-    .theme-light textarea{ color:#0b1220 !important; background:#ffffff !important; border-color:#c9d4ea !important; }
-
-    .theme-light .tbl th,
-    .theme-light .tbl td{ background:#eef2f7 !important; color:#0b1220 !important; border-color:#c9d4ea !important; }
-    .theme-light .tbl th{ background:#e9eef7 !important; }
-
-    .theme-light .cellbtn{ color:#0b1220 !important; background:#ffffff !important; border-color:#c9d4ea !important; }
-    .theme-light .cellbtn.filled{ background:#f7f9ff !important; border-color:#c9d4ea !important; }
-
-    .theme-light .help{ color:#5b6478 !important; }
-
-    *{box-sizing:border-box}
-html,body{
-  height:100%;
-  margin:0;
-  color:var(--fg);
-  font:14px/1.45 system-ui,Segoe UI,Roboto,Arial,sans-serif;
-}
-    body.theme-light{ background:radial-gradient(1200px 600px at 20% -5%, #ffffff, #e9edf7); color:var(--fg); }
-    a{color:#98c7ff}
-    header{position:sticky;top:0;z-index:60;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--br);background:rgba(7,10,18,.85);backdrop-filter:blur(8px)}
-    .theme-light header h1{ color:#ffffff !important; }  
-h1{margin:0;font-size:16px;letter-spacing:.3px}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .btn{border:1px solid var(--inbr);background:linear-gradient(180deg,#131a2d,#0e1426);color:#eaf0ff;padding:9px 12px;border-radius:12px;cursor:pointer;transition:transform .06s ease,filter .2s}
-    .btn:hover{filter:brightness(1.06)} .btn:active{transform:translateY(1px)} .btn.primary{background:var(--acc);color:#0b0d12;border-color:var(--acc);font-weight:700} .btn.ghost{background:transparent} .btn.sm{padding:6px 10px;border-radius:10px}
-    /* theme toggle */
-    .theme-light .btn.ghost,
-    .theme-light label.btn.ghost{ color:#0b1220 !important; }
-    .theme-light #btnCleanup,
-    .theme-light #resetColors,
-    .theme-light #resetSlides{ color:#0b1220 !important; }
-.theme-light .toggle{background:#fff}
-    .toggle{display:flex;align-items:center;gap:8px;border:1px solid var(--inbr);padding:7px 10px;border-radius:12px;background:linear-gradient(180deg,#131a2d,#0e1426);cursor:pointer}
-    .toggle input{appearance:none;width:28px;height:16px;border-radius:999px;background:#4b5563;position:relative;outline:0}
-    .toggle input:checked{background:#22c55e}
-    .toggle input::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .15s}
-    .toggle input:checked::after{left:14px}
-
-
-main.layout{width:100%;display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,34vw,600px);gap:14px;padding:16px 12px 18px 16px;align-items:start}
-    .leftcol{display:flex;flex-direction:column;gap:16px;min-width:0}
-.rightbar{position:sticky;top:64px;max-height:calc(100svh - 64px);overflow:auto;padding-right:6px;justify-self:end;width:clamp(380px,34vw,600px)}
-
-    .card, details.ac{border:1px solid var(--br);border-radius:16px;background:linear-gradient(180deg,var(--card),var(--card2));box-shadow:var(--shadow)}
-    .card .content{padding:14px}
-    details.ac{overflow:hidden}
-    summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid transparent}
-    details[open] > summary{border-bottom-color:var(--br)}
-    summary .ttl{display:flex;align-items:center;gap:10px;font-weight:700}
-    summary .actions{display:flex;gap:8px}
-    summary .chev{transition:transform .2s ease} details[open] .chev{transform:rotate(90deg)}
-    .content{padding:14px 16px}
-
-    table.tbl{width:100%;border-collapse:separate;border-spacing:0}
-    .tbl th,.tbl td{border:1px solid var(--inbr);padding:8px;background:#0f1529}
-    .tbl th{position:sticky;top:64px;background:#10172b;z-index:1}
-    .tbl .time{min-width:8ch;text-align:center;font-weight:700}
-    .cellbtn{width:100%;text-align:left;background:#0f1529;border:1px dashed #39486c;color:#d9e1ff;padding:9px;border-radius:12px}
-    .cellbtn.filled{border-style:solid;background:#0b1224;border-color:#2a3450}
-
-    .kv{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
-    .input, select, textarea{background:var(--input);border:1px solid var(--inbr);color:#fff;border-radius:12px;padding:9px;width:100%}
-
-.saunarow{
-  display:grid;
-  gap:6px; align-items:center; margin-bottom:8px;
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
-}
-/* Feste Breite für Sauna-Name */
-.saunarow .input.name{ width:160px; }
-
-/* Saunen, die nicht in der aktuellen Tabelle stehen (nur in Presets) */
-.saunarow .namewrap .input.name{ width:160px; }
-.saunarow.sauna-ghost{ opacity:.9; }
-.saunarow .tag{
-  display:inline-block; margin-left:6px; padding:2px 6px;
-  border:1px solid var(--inbr); border-radius:8px; font-size:11px; opacity:.8;
-}
-/* Visuelle Absetzung & Tages-Pillen */
-.saunarow.ghost{ opacity:.9; outline:1px dashed var(--inbr); }
-.saunarow .namewrap{ display:flex; flex-direction:column; gap:4px; }
-
-/* Übersicht-Zeile: Checkbox auch in 'einheitlich' sauber im letzten Grid */
-.saunarow input[type="checkbox"]{ justify-self:center; }
-
-/* Wenn 'einheitlich' aktiv ist: das Dauer-Feld der Übersicht komplett ausblenden */
-body.mode-uniform #ovSec{ display:none; }
-
-/* Drag & Drop Styling */
-.sauna-bucket{ border:1px dashed var(--inbr); border-radius:12px; padding:8px; margin-top:6px; }
-.sauna-bucket.drag-over{ outline:2px solid var(--acc); }
-.saunarow[draggable="true"]{ cursor:grab; }
-.saunarow[draggable="true"]:active{ cursor:grabbing; }
-
-.groupHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.day-pills .day-btn{ /* nutzt deine vorhandenen .day-btn-Styles */ }
-
-.pills{ display:flex; flex-wrap:wrap; gap:6px; }
-.pill{ font-size:11px; line-height:1; padding:3px 7px; border:1px solid var(--inbr); border-radius:999px; opacity:.9; }
-/* Wochentags-Pills (Buttons) */
-.day-btn{ border:1px solid var(--inbr); border-radius:999px; padding:6px 10px; background:transparent; cursor:pointer; }
-.day-btn.active{ background:var(--acc); color:#0b0d12; border-color:var(--acc); font-weight:700; }
-
-.saunarow .ghosttag{ background:#1b243b; }
-.theme-light .saunarow .ghosttag{ background:#e9eef7; }
-
-/* Nur für Bild-Slides-Zeilen */
-.imgrow{
-  display:grid;
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
-  gap:6px; align-items:center; margin-bottom:8px;
-}
-.sel-after{ min-width:140px; max-width:220px; } /* kompakt */
-.imgrow select.sel-after{ min-width:140px; width:100%; }
-.imgrow .dur{ width:6ch; text-align:center; }   /* 3-stellige Zahl */
-.imgrow input[type="checkbox"]{ justify-self:center; }
-.prev[title]{ cursor:help; } /* Zeigt Auflösung als Tooltip an */
-/* Verhindert, dass Grid-Inhalte die Sidebar in der Breite sprengen */
-.saunarow > *, .imgrow > * { min-width: 0; }
-
-/* ===== Dichte (XS/SM/LG) & kompakte Controls ===== */
-:root{
-  /* Defaults (SM) */
-  --dens-gap: 6px;
-  --dens-head: 11px;
-  --dens-btn: 30px;
-  --dens-input-h: 36px;
-  --prev-w: 64px;
-  --prev-h: 46px;
-
-  /* Spaltenbreiten (Saunen & Bilder) */
-  --col-name: 0.9fr;
-  --col-prev: 70px;
-  --col-dur: 74px;
-  --col-btn: 30px;
-  --col-del: 30px;
-  --col-vis: 22px;
-  --col-after: minmax(170px,1fr);
-}
-
-/* Dichteprofile */
-body.dens-lg{ --dens-gap:8px; --dens-head:12px; --dens-btn:34px; --dens-input-h:40px; --prev-w:72px; --prev-h:52px; }
-body.dens-sm{ /* already default */ }
-body.dens-xs{ --dens-gap:4px; --dens-head:10px; --dens-btn:28px; --dens-input-h:32px; --prev-w:56px; --prev-h:40px; }
-
-/* Einheitliche Zeilenhöhen & Abstände */
-.sl-head, .saunarow, .imgrow{ grid-auto-rows:minmax(46px,auto); }
-.saunarow, .imgrow{ gap:var(--dens-gap); }
-
-/* Header kleiner & ohne Überlappung */
-.sl-head{
-  display:grid; align-items:center; gap:var(--dens-gap);
-  font-weight:700; opacity:.85; font-size:var(--dens-head); line-height:1.2;
-  margin:0 0 6px;
-}
-.sl-head span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-
-/* Spaltenzuordnung */
-.sl-saunas, .saunarow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
-}
-.sl-images, .imgrow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
-}
-
-/* Controls skalieren */
-.prev{ width:var(--prev-w); height:var(--prev-h); border-radius:10px; border:1px solid var(--inbr); object-fit:cover; background:#0d1426 }
-.btn.icon{ width:var(--dens-btn); height:var(--dens-btn); padding:0; display:grid; place-items:center }
-.input, select, textarea{ min-height:var(--dens-input-h); }
-.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
-.input.name{ width:auto }
-
-/* Dauer-Spalte bei „einheitlich“ ausblenden/kollabieren */
-body.mode-uniform #headSaunaDur,
-body.mode-uniform #headImgDur{ display:none; }
-/* Einheitlich: Spalte "Dauer" vollständig aus dem Grid entfernen */
-body.mode-uniform .sl-saunas,
-body.mode-uniform .saunarow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
-}
-body.mode-uniform .sl-images,
-body.mode-uniform .imgrow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
-}
-
-/* Header-Zelle "Dauer" ausblenden */
-body.mode-uniform #headSaunaDur,
-body.mode-uniform #headImgDur{ display:none; }
-
-/* Alle Dauer-Inputs in den Zeilen ausblenden */
-body.mode-uniform .intSec{ display:none !important; }
-
-/* Previews bündig links ausrichten (kein „driften“ nach rechts) */
-.saunarow .prev, .imgrow .prev{ justify-self:start; }
-
-.btn.icon{ width:30px;height:30px;padding:0;display:grid;place-items:center }
-.input.num3{ width:6ch !important;text-align:center;padding-left:0;padding-right:0 }
-.input.name{ width:auto }
-.res{ display:none } /* Saunen: Res-Spalte entfällt */
-
-.btn.icon{ width:30px; min-width:30px; padding:6px 0; text-align:center }
-.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0 }
-.res{ font-size:12px; opacity:.7; white-space:nowrap }
-/* kompakte Zeile für Bild-Slides */
- 
-
-   .prev{width:64px;height:46px;border-radius:10px;border:1px solid var(--inbr);object-fit:cover;background:#0d1426}
-
-    .color-cols{display:grid;grid-template-columns:1fr;gap:12px}
-    .fieldset{border:1px dashed var(--inbr);border-radius:12px;padding:10px}
-    .fieldset > .legend{opacity:.8;font-weight:700;margin-bottom:8px}
-    .color-item{display:flex;align-items:center;gap:8px}
-    .swatch{width:24px;height:24px;border-radius:6px;border:1px solid #2f3f60}
-
-    .subh{margin:12px 0 6px;font-weight:800;opacity:.95}
-    .mut{opacity:.7}
-    .help{opacity:.7;font-size:12px}
-
-    footer{display:flex;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--br);color:var(--mut)}
-
-    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:100}
-    .modal .input, .modal select, .modal textarea{ min-width:0 }
-    .modal .row{ flex-wrap:wrap; }
-    .theme-light .modal .box{ background:#eef2f7 !important; color:#0b1220 !important; border-color:#c9d4ea !important; }
-    .box{background:#0e1426;border:1px solid var(--inbr);border-radius:16px;min-width:min(340px,95vw);max-width:95vw;max-height:90svh;overflow:auto;padding:16px}
-    .grid2{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px;align-items:center; width:min(560px,calc(95vw - 36px)); margin:0 auto 12px}
-    .iframeWrap{width:min(92vw,1600px);height:min(85svh,900px);border:1px solid var(--inbr);border-radius:14px;overflow:hidden;background:#000}
-    .iframeWrap iframe{width:100%;height:100%;display:block;border:0}
-  </style>
 </head>
-<body>
+<body class="theme-light">
   <header>
     <h1>Aufguss – Admin</h1>
     <div class="row">
@@ -1368,7 +1450,8 @@ body.mode-uniform .intSec{ display:none !important; }
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
-  <div class="row" style="gap:8px;flex-wrap:wrap">
+  <div id="gridActionsLeft"></div>
+<div class="row" style="gap:8px;flex-wrap:wrap">
     <div id="weekdayPills" class="row" style="gap:6px"></div>
     <button class="btn sm" id="btnSavePreset" title="Wochentag speichern">💾 Wochentag speichern</button>
     <span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span>
@@ -1406,8 +1489,14 @@ body.mode-uniform .intSec{ display:none !important; }
 </div>
 
 <div class="kv" id="rowDwellAll">
-  <label>Dauer (alle außer Übersicht)</label>
-  <input id="dwellAll" class="input" type="number" min="1" value="6">
+  <label>Dauer (einheitlich)</label>
+  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
+    <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
+
+    <span class="mut" style="min-width:10ch;">Übersicht</span>
+    <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
+  </div>
 </div>
 
 <!-- Transition -->
@@ -1687,138 +1776,436 @@ body.mode-uniform .intSec{ display:none !important; }
       <small class="mut" style="display:block;margin-top:8px">Die Vorschau verwendet die aktuellen (nicht gespeicherten) Einstellungen.</small>
     </div>
   </div>
+<script type="module" src="/admin/js/app.js"></script> 
+</body>
+</html>
+HTML
 
-  <script>
-    const DEFAULTS = {
-      slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinPx:480, tileMaxPx:1100 },
-      display:{ fit:'cover', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
-      theme:{
-        bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
-        gridBorder:'#5C3101',
-        gridTable:'#5C3101', gridTableW:2,
-        cellBg:'#5C3101', boxFg:'#FFFFFF',
-        headRowBg:'#E8DEBD', headRowFg:'#5C3101',
-        timeColBg:'#E8DEBD', timeZebra1:'#EAD9A0', timeZebra2:'#E2CE91',
-        zebra1:'#EDDFAF', zebra2:'#E6D6A1',
-        cornerBg:'#E8DEBD', cornerFg:'#5C3101',
-        tileBorder:'#5C3101',
-        chipBorder:'#5C3101', chipBorderW:2,
-        flame:'#FFD166',
-        saunaColor:'#5C3101'
-      },
-      highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
-      fonts:{ family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", scale:1, h1Scale:1, h2Scale:1, overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8, tileTextScale:0.8, tileWeight:600, chipHeight:44, chipOverflowMode:'scale',flamePct:55,flameGapPx:6 },
-      h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
- assets:{ flameImage:'/assets/img/flame_test.svg' },
-      footnotes:[ {id:'star', label:'*', text:'Nur am Fr und Sa'} ]
-    };
+# ---------------------------
+# Admin JS
+# ---------------------------
 
-    let schedule=null, settings=null, curRow=0, curCol=0;
-    const $=(s,r=document)=>r.querySelector(s);
-    const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
-    const preloadImg=(u)=> new Promise(res=>{ if(!u) return res({ok:false}); const i=new Image(); i.onload=()=>res({ok:true,w:i.naturalWidth,h:i.naturalHeight}); i.onerror=()=>res({ok:false}); i.src=u; });
-    const parseTime = (s) => { const m=/^([01]\d|2[0-3]):([0-5]\d)$/.exec((s||'').trim()); return m ? (m[1]+':'+m[2]) : null; };
-    const genId = () => 'fn_' + Math.random().toString(36).slice(2,9);
 
-    async function loadAll(){
-      const [s,cfg]=await Promise.all([
-        fetch('/admin/api/load.php').then(r=>r.json()),
-        fetch('/admin/api/load_settings.php').then(r=>r.json())
-      ]);
-      schedule=s; settings=cfg;
-      settings.slides = { ...DEFAULTS.slides, ...(settings.slides||{}) };
-      settings.display= { ...DEFAULTS.display, ...(settings.display||{}) };
-      settings.theme  = { ...DEFAULTS.theme,   ...(settings.theme||{}) };
-      settings.fonts  = { ...DEFAULTS.fonts,   ...(settings.fonts||{}) };
-      settings.assets = { ...DEFAULTS.assets,  ...(settings.assets||{}) };
-      settings.footnotes = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes||[]);
+# ---- Admin JS: core ----
+cat > /var/www/signage/admin/js/core/defaults.js <<'JS'
+// /admin/js/core/defaults.js
+// DEFAULTS + Wochentags-Helfer als Single Source of Truth
 
-      renderGrid();
-      renderSlides();
-      renderHighlightBox();
-      renderSlidesMasterBox(); // neue große Box (inkl. Bild-Slides) befüllen
-      settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
-renderInterstitialsPanel();
-renderColors();
-renderFootnotes();
-initWeekdayUI();
-    }
+export const DEFAULTS = {
+  slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinPx:480, tileMaxPx:1100 },
+  display:{ fit:'cover', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
+  theme:{
+    bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
+    gridBorder:'#5C3101',
+    gridTable:'#5C3101', gridTableW:2,
+    cellBg:'#5C3101', boxFg:'#FFFFFF',
+    headRowBg:'#E8DEBD', headRowFg:'#5C3101',
+    timeColBg:'#E8DEBD', timeZebra1:'#EAD9A0', timeZebra2:'#E2CE91',
+    zebra1:'#EDDFAF', zebra2:'#E6D6A1',
+    cornerBg:'#E8DEBD', cornerFg:'#5C3101',
+    tileBorder:'#5C3101',
+    chipBorder:'#5C3101', chipBorderW:2,
+    flame:'#FFD166',
+    saunaColor:'#5C3101'
+  },
+  highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
+  fonts:{
+    family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
+    scale:1, h1Scale:1, h2Scale:1,
+    overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8,
+    tileTextScale:0.8, tileWeight:600, chipHeight:44,
+    chipOverflowMode:'scale', flamePct:55, flameGapPx:6
+  },
+  h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
+  assets:{ flameImage:'/assets/img/flame_test.svg' },
+  footnotes:[ { id:'star', label:'*', text:'Nur am Fr und Sa' } ]
+};
 
-    // ------- Grid -------
-    function renderGrid(){
-      const head=['Zeit',...(schedule.saunas||[])];
-      let html='<thead><tr>' + head.map((h,i)=>`<th class="${i===0?'timecol corner':''}">${h}</th>`).join('') + '</tr></thead><tbody>';
-      (schedule.rows||[]).forEach((row,ri)=>{
-        html+='<tr>';
-        html+=`<td class="time timecol" data-ri="${ri}"><input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center"></td>`;
-        (row.entries||[]).forEach((cell,ci)=>{
-          const filled = (cell && cell.title) ? 'filled' : '';
-          const label = (cell && cell.title) ? (cell.title + (cell.flames ? (' · '+cell.flames) : '')) : '—';
-          html+=`<td><button class="cellbtn ${filled}" data-ri="${ri}" data-ci="${ci}">${label}</button></td>`;
-        });
-        html+='</tr>';
-      });
-      html+='</tbody>';
-      $('#grid').innerHTML=html;
-
-      $$('#grid .time input').forEach(inp=>{
-        inp.onchange=()=>{
-          const ri=+inp.parentElement.dataset.ri;
-          const t=parseTime(inp.value);
-          if(!t){ alert('Bitte HH:MM'); inp.value=schedule.rows[ri].time; return;}
-          schedule.rows[ri].time=t;
-          schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
-          renderGrid();
-        };
-        inp.onclick=()=>{ curRow=+inp.parentElement.dataset.ri; updateSelTime(); };
-      });
-      $$('#grid .cellbtn').forEach(btn=>{
-        btn.onclick=()=>{
-          curRow=+btn.dataset.ri; curCol=+btn.dataset.ci; updateSelTime();
-          const cell=schedule.rows[curRow].entries[curCol]||{};
-          $('#m_time').value=schedule.rows[curRow].time;
-          $('#m_title').value=cell.title||'';
-          $('#m_flames').value=cell.flames||'';
-          populateNoteSelect();
-          const has = !!cell.noteId;
-          $('#m_hasNote').checked = has;
-          $('#m_noteRow').style.display = has ? 'flex' : 'none';
-          if (has) $('#m_note').value = cell.noteId;
-          $('#modal').style.display='grid';
-          $('#m_title').focus();
-        };
-      });
-    }
-    function updateSelTime(){ $('#selTime').textContent=schedule.rows[curRow]?.time||'—'; }
-
-// ---- Wochentage inkl. "Opt" (manuell spielbar) ----
-const DAYS = [
+// Wochentage + Labels (+ „Opt“ als manueller Tag)
+export const DAYS = [
   ['Mon','Mo'],['Tue','Di'],['Wed','Mi'],['Thu','Do'],['Fri','Fr'],['Sat','Sa'],['Sun','So'],
   ['Opt','Opt']
 ];
-const DAY_LABELS = Object.fromEntries(DAYS);
-function dayKeyToday(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
+export const DAY_LABELS = Object.fromEntries(DAYS);
+
+export function dayKeyToday(){
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+}
+JS
+
+cat > /var/www/signage/admin/js/core/utils.js <<'JS'
+// /admin/js/core/utils.js
+// Zentrale Helfer: DOM, Zeit, IDs, String-Escape, Preload, Clone
+
+export const $  = (sel, root=document) => root.querySelector(sel);
+export const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+// Bilder vorladen → {ok,w,h}
+export const preloadImg = (url) => new Promise((resolve) => {
+  if (!url) return resolve({ ok:false });
+  const img = new Image();
+  img.onload  = () => resolve({ ok:true, w:img.naturalWidth, h:img.naturalHeight });
+  img.onerror = () => resolve({ ok:false });
+  img.src = url;
+});
+
+// "HH:MM" → validierter String oder null
+export const parseTime = (s) => {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec((s||'').trim());
+  return m ? (m[1] + ':' + m[2]) : null;
+};
+
+// kurze IDs für Fußnoten etc.
+export const genId = () => 'fn_' + Math.random().toString(36).slice(2, 9);
+
+// HTML escapen für Option-Labels etc.
+export function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (m) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'
+  }[m]));
+}
+
+// simple Deep-Clone (JSON-basiert, reicht für unsere Datenstrukturen)
+export const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+JS
+
+cat > /var/www/signage/admin/js/core/upload.js <<'JS'
+// /admin/js/core/upload.js
+// Minimaler, wiederverwendbarer Uploader (wie dein bisheriger uploadGeneric)
+
+export function uploadGeneric(fileInput, onDone){
+  if(!fileInput.files || !fileInput.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST','/admin/api/upload.php');
+  xhr.onload = () => {
+    try{
+      const j = JSON.parse(xhr.responseText||'{}');
+      if (j.ok) onDone(j.path);
+      else alert('Upload-Fehler: '+(j.error||''));
+    }catch{
+      alert('Upload fehlgeschlagen');
+    }
+  };
+  xhr.onerror = () => alert('Netzwerkfehler beim Upload');
+  xhr.send(fd);
+}
+JS
+
+# ---- Admin JS: ui ----
+cat > /var/www/signage/admin/js/ui/grid.js <<'JS'
+// /admin/js/ui/grid.js
+// Rendert die Übersichtstabelle (#grid), bedient den Zellen-Dialog und die Row-Buttons.
+// Abhängigkeiten: utils ($,$$,parseTime) + Zugriff auf schedule/settings via init(ctx).
+
+import { $, $$, parseTime } from '../core/utils.js';
+
+let ctx = null;           // { getSchedule, getSettings }
+let curRow = 0, curCol = 0;
+let inited = false;
+
+function updateSelTime(){
+  const sc = ctx.getSchedule();
+  $('#selTime').textContent = sc.rows?.[curRow]?.time || '—';
+}
+
+function populateNoteSelect(){
+  const sel = $('#m_note'); if (!sel) return;
+  sel.innerHTML = '';
+  const list = ctx.getSettings().footnotes || [];
+  list.forEach(fn => {
+    const o = document.createElement('option');
+    o.value = fn.id;
+    o.textContent = `${fn.label || '*'} — ${fn.text || ''}`;
+    sel.appendChild(o);
+  });
+}
+
+// --- Render Grid table ---
+export function renderGrid(){
+  const sc = ctx.getSchedule();
+
+  const head = ['Zeit', ...(sc.saunas || [])];
+  let html = '<thead><tr>' +
+    head.map((h,i)=>`<th class="${i===0?'timecol corner':''}">${h}</th>`).join('') +
+    '</tr></thead><tbody>';
+
+  (sc.rows || []).forEach((row, ri) => {
+    html += '<tr>';
+    html += `<td class="time timecol" data-ri="${ri}">
+               <input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center">
+             </td>`;
+    (row.entries || []).forEach((cell, ci) => {
+      const filled = (cell && cell.title) ? 'filled' : '';
+      const label  = (cell && cell.title)
+        ? (cell.title + (cell.flames ? (' · ' + cell.flames) : ''))
+        : '—';
+      html += `<td><button class="cellbtn ${filled}" data-ri="${ri}" data-ci="${ci}">${label}</button></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+
+  $('#grid').innerHTML = html;
+
+  // Zeit-Spalte
+  $$('#grid .time input').forEach(inp => {
+    inp.onchange = () => {
+      const ri = +inp.parentElement.dataset.ri;
+      const t  = parseTime(inp.value);
+      const sc2 = ctx.getSchedule();
+      if (!t) {
+        alert('Bitte HH:MM');
+        inp.value = sc2.rows[ri].time;
+        return;
+      }
+      sc2.rows[ri].time = t;
+      sc2.rows.sort((a,b)=>a.time.localeCompare(b.time));
+      renderGrid();
+    };
+    inp.onclick = () => { curRow = +inp.parentElement.dataset.ri; updateSelTime(); };
+  });
+
+  // Zellen-Buttons
+  $$('#grid .cellbtn').forEach(btn => {
+    btn.onclick = () => {
+      const sc2 = ctx.getSchedule();
+      curRow = +btn.dataset.ri;
+      curCol = +btn.dataset.ci;
+      updateSelTime();
+
+      const cell = sc2.rows[curRow].entries[curCol] || {};
+      $('#m_time').value  = sc2.rows[curRow].time;
+      $('#m_title').value = cell.title || '';
+      $('#m_flames').value= cell.flames || '';
+
+      populateNoteSelect();
+      const has = !!cell.noteId;
+      $('#m_hasNote').checked = has;
+      $('#m_noteRow').style.display = has ? 'flex' : 'none';
+      if (has) $('#m_note').value = cell.noteId;
+
+      $('#modal').style.display = 'grid';
+      $('#m_title').focus();
+    };
+  });
+}
+
+// --- einmalige Dialog/Buttons-Wiring ---
+function initOnce(){
+  if (inited) return;
+  inited = true;
+
+  // Dialog
+  $('#m_cancel').onclick = () => $('#modal').style.display = 'none';
+  $('#m_hasNote').onchange = () => {
+    $('#m_noteRow').style.display = $('#m_hasNote').checked ? 'flex' : 'none';
+  };
+  $('#m_ok').onclick = () => {
+    const sc = ctx.getSchedule();
+
+    const title   = $('#m_title').value.trim();
+    const flames  = $('#m_flames').value;
+    const newTime = parseTime($('#m_time').value);
+    const hasNote = $('#m_hasNote').checked;
+    const noteId  = hasNote ? $('#m_note').value : null;
+
+    if (!newTime && title) { alert('Bitte Zeit HH:MM'); return; }
+
+    const newCell = title ? { title, flames } : null;
+    if (newCell && hasNote) newCell.noteId = noteId;
+
+    if (newTime && newTime !== sc.rows[curRow].time && newCell){
+      // ggf. neue Zeile anlegen/verschieben
+      let targetIdx = sc.rows.findIndex(r => r.time === newTime);
+      if (targetIdx === -1){
+        const cols = sc.saunas.length;
+        sc.rows.push({ time:newTime, entries: Array.from({length:cols}).map(()=>null) });
+        sc.rows.sort((a,b)=>a.time.localeCompare(b.time));
+        targetIdx = sc.rows.findIndex(r => r.time === newTime);
+      }
+      sc.rows[targetIdx].entries[curCol] = newCell;
+      sc.rows[curRow].entries[curCol]    = null;
+    } else {
+      sc.rows[curRow].entries[curCol] = newCell;
+      if (newTime) sc.rows[curRow].time = newTime;
+    }
+    sc.rows.sort((a,b)=>a.time.localeCompare(b.time));
+
+    $('#modal').style.display = 'none';
+    renderGrid();
+  };
+
+  // Row-Operationen
+  $('#btnAddAbove').onclick = () => {
+    const sc = ctx.getSchedule();
+    const cols = sc.saunas.length;
+    sc.rows.splice(curRow, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    renderGrid();
+  };
+  $('#btnAddBelow').onclick = () => {
+    const sc = ctx.getSchedule();
+    const cols = sc.saunas.length;
+    sc.rows.splice(curRow+1, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    renderGrid();
+  };
+  $('#btnDeleteRow').onclick = () => {
+    const sc = ctx.getSchedule();
+    if (sc.rows.length > 1){
+      sc.rows.splice(curRow, 1);
+      curRow = Math.max(0, curRow - 1);
+      renderGrid();
+      updateSelTime();
+    }
+  };
+}
+
+// --- Public API ---
+export function initGridUI(context){
+  // context: { getSchedule:()=>schedule, getSettings:()=>settings }
+  ctx = context;
+  initOnce();
+  updateSelTime();
+  renderGrid();
+}
+
+export function getSelection(){ return { row:curRow, col:curCol }; }
+export function setSelection(row, col){ curRow=row|0; curCol=col|0; updateSelTime(); }
+JS
+
+cat > /var/www/signage/admin/js/ui/grid_day_loader.js <<'JS'
+// /admin/js/ui/grid_day_loader.js
+// Zweck: "Aus Tag laden" im Grid-Header – lädt einen Preset-Wochentag in das aktuelle Grid,
+// ohne den aktiven Tag (Pillen) umzuschalten.
+//
+// Abhängigkeiten:
+//  - ../core/utils.js  : $, deepClone
+//  - ../core/defaults.js : DAYS, DAY_LABELS
+//  - ./grid.js         : renderGrid (nach Laden neu zeichnen)
+//  - ./slides_master.js: renderSlidesMaster (Saunenliste etc. synchron halten)
+
+// /admin/js/ui/grid_day_loader.js
+// "Aus Tag laden" im Grid-Header (links oben neben „Aufgussplan“)
+
+import { $, deepClone } from '../core/utils.js';
+import { DAY_LABELS } from '../core/defaults.js';
+import { renderGrid as renderGridUI } from './grid.js';
+import { renderSlidesMaster } from './slides_master.js';
+
+let ctx = null; // { getSchedule, getSettings, setSchedule }
+
+function ensureUI() {
+  // Ziel-Container links oben neben "Aufgussplan"
+  const host = document.getElementById('gridActionsLeft');
+  if (!host) return; // host noch nicht da? später nochmal versuchen
+
+  // idempotent
+  let wrap = document.getElementById('gridDayLoader');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'gridDayLoader';
+    wrap.className = 'row';
+    wrap.style.gap = '8px';
+    host.appendChild(wrap);
+  }
+
+  const saved = localStorage.getItem('gridLoadDay') || 'Mon';
+
+  wrap.innerHTML = `
+    <span class="mut">Aus Tag laden:</span>
+    <select id="gridLoadDay" class="input sm" style="width:auto"></select>
+    <button id="btnGridLoadDay" class="btn sm">Laden</button>
+  `;
+
+  // Optionen füllen (Mo–So)
+  const sel = wrap.querySelector('#gridLoadDay');
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(key => {
+    const lab = (DAY_LABELS && DAY_LABELS[key]) || key;
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = lab;
+    sel.appendChild(o);
+  });
+  sel.value = saved;
+  sel.onchange = () => localStorage.setItem('gridLoadDay', sel.value);
+
+  // Laden-Button
+  const btn = wrap.querySelector('#btnGridLoadDay');
+  btn.onclick = () => {
+    const settings = ctx.getSettings();
+    const key = sel.value;
+    const preset = settings?.presets?.[key];
+    if (!preset) {
+      alert(`Kein Preset für "${(DAY_LABELS && DAY_LABELS[key]) || key}" vorhanden.\nMit „Wochentag speichern“ kannst du eins anlegen.`);
+      return;
+    }
+    // Preset ins aktuelle Schedule übernehmen (deep clone)
+    ctx.setSchedule(deepClone(preset));
+    renderGridUI();
+    renderSlidesMaster();
+  };
+}
+
+// ---- öffentlicher Einstieg ----
+export function initGridDayLoader(context) {
+  ctx = context;
+  // einmal jetzt versuchen …
+  ensureUI();
+  // … und vorsichtshalber noch einmal nach einem Tick (falls DOM-Teil später gerendert wird)
+  setTimeout(ensureUI, 0);
+}
+JS
+
+cat > /var/www/signage/admin/js/ui/slides_master.js <<'JS'
+// /admin/js/ui/slides_master.js
+// ============================================================================
+// Master-Panel: Saunen (inkl. „Kein Aufguss“), Übersicht-Row, Bild-Slides,
+// Dauer-Modus (einheitlich/individuell), Presets & Wochentage.
+// ----------------------------------------------------------------------------
+// Abhängigkeiten:
+//  - ../core/utils.js   : $, $$, preloadImg, escapeHtml
+//  - ../core/upload.js  : uploadGeneric
+//  - ../core/defaults.js: DAYS, DAY_LABELS, dayKeyToday
+//  - ./grid.js          : renderGrid (nach Schedule-Änderungen neu zeichnen)
+// ============================================================================
+
+'use strict';
+
+import { $, $$, preloadImg, escapeHtml } from '../core/utils.js';
+import { uploadGeneric } from '../core/upload.js';
+import { renderGrid as renderGridUI } from './grid.js';
+import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
+import { DEFAULTS } from '../core/defaults.js';
+
+// App-Context (Getter/Setter aus app.js)
+let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
+let wiredStatic = false;
+
+// ============================================================================
+// 1) Wochentage / Presets
+// ============================================================================
 let activeDayKey = 'Mon';
 
-function setActiveDay(key,{loadPreset=true}={}){
+function setActiveDay(key, { loadPreset = true } = {}){
   activeDayKey = key;
   localStorage.setItem('adminActiveDay', key);
 
-  // Label in der Plan-Überschrift
-  const lbl = document.getElementById('activeDayLabel');
+  // Label + Pills-Active
+  const lbl = $('#activeDayLabel');
   if (lbl) lbl.textContent = DAY_LABELS[key] || key;
+  $$('.day-pills .day-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.key === key)
+  );
 
-  // Alle Pillen-Sets synchronisieren
-  document.querySelectorAll('.day-pills .day-btn').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.key === key);
-  });
-
-  // Beim Wechsel optional Preset laden (nicht für "Opt", das ist manuell)
-  const P = settings?.presets || {};
-  if (loadPreset && key !== 'Opt' && P[key]) {
-    schedule = JSON.parse(JSON.stringify(P[key]));
-    renderGrid();
-    renderSlidesMasterBox();
+  // Optional: Preset in den aktuellen Schedule laden
+  const settings = ctx.getSettings();
+  if (loadPreset && key !== 'Opt' && settings?.presets?.[key]) {
+    const cloned = JSON.parse(JSON.stringify(settings.presets[key]));
+    ctx.setSchedule(cloned);
+    renderGridUI();
+    renderSlidesMaster();
   }
 }
 
@@ -1827,101 +2214,954 @@ function buildDayPills(hostId){
   if (!host) return;
   host.classList.add('day-pills');
   host.innerHTML = '';
-  DAYS.forEach(([key,lab])=>{
+  DAYS.forEach(([key, lab]) => {
     const b = document.createElement('button');
-    b.type='button';
-    b.className='day-btn';
+    b.type = 'button';
+    b.className = 'day-btn';
     b.dataset.key = key;
     b.textContent = lab;
-    b.onclick = ()=> setActiveDay(key,{loadPreset:true});
+    b.onclick = () => setActiveDay(key, { loadPreset: true });
     host.appendChild(b);
   });
 }
 
 function initWeekdayUI(){
-  // beide Sets rendern (Tabelle + Saunen-Box)
   buildDayPills('weekdayPills');
   buildDayPills('weekdayPills2');
 
-  // Start: Auto -> heutiger Wochentag, sonst letzter/Mon (Opt nie auto)
+  const settings = ctx.getSettings();
   const saved = localStorage.getItem('adminActiveDay');
   const initKey = (settings.presetAuto ? dayKeyToday() : (saved || 'Mon'));
-  setActiveDay(initKey,{loadPreset: !!settings.presetAuto});
+  setActiveDay(initKey, { loadPreset: !!settings.presetAuto });
 
-  // Speichern-Button: aktiven Tag (inkl. "Opt") sichern
-  const saveBtn = document.getElementById('btnSavePreset');
-  if (saveBtn) saveBtn.onclick = ()=>{
-    settings.presets = settings.presets || {};
-    settings.presets[activeDayKey] = JSON.parse(JSON.stringify(schedule));
+  const saveBtn = $('#btnSavePreset');
+  if (saveBtn) saveBtn.onclick = () => {
+    const s = ctx.getSettings();
+    s.presets ||= {};
+    s.presets[activeDayKey] = JSON.parse(JSON.stringify(ctx.getSchedule()));
     alert('Wochentag gespeichert: ' + (DAY_LABELS[activeDayKey] || activeDayKey));
   };
 }
 
-// Dialog (Zelle)
-$('#m_cancel').onclick=()=> $('#modal').style.display='none';
-$('#m_hasNote').onchange=()=>{ $('#m_noteRow').style.display = $('#m_hasNote').checked ? 'flex' : 'none'; };
-function populateNoteSelect(){
-  const sel = $('#m_note'); sel.innerHTML='';
-  (settings.footnotes||[]).forEach(fn=>{
-    const o=document.createElement('option'); o.value=fn.id; o.textContent=`${fn.label} — ${fn.text}`; sel.appendChild(o);
+// ============================================================================
+// 2) Helpers: Saunen / Inventar / Entfernen
+// ============================================================================
+function getAllSaunas(){
+  const settings = ctx.getSettings();
+  const schedule = ctx.getSchedule();
+
+  // Namen aus Presets einsammeln
+  const fromPresets = new Set();
+  const P = settings?.presets || {};
+  Object.values(P).forEach(ps => (ps?.saunas || []).forEach(n => fromPresets.add(n)));
+
+  // Merge: Einstellungen, aktueller Tag, Presets
+  const all = new Set(settings.allSaunas || []);
+  (schedule.saunas || []).forEach(n => all.add(n));
+  fromPresets.forEach(n => all.add(n));
+
+  settings.allSaunas = Array.from(all).sort((a,b)=> a.localeCompare(b,'de'));
+  return settings.allSaunas;
+}
+
+function removeSaunaColumnFromSchedule(sc, name){
+  if (!sc || !Array.isArray(sc.saunas)) return;
+  const idx = sc.saunas.indexOf(name);
+  if (idx === -1) return;
+  sc.saunas.splice(idx, 1);
+  (sc.rows || []).forEach(r => {
+    if (Array.isArray(r.entries)) r.entries.splice(idx, 1);
   });
 }
-$('#m_ok').onclick=()=>{
-  const title=$('#m_title').value.trim();
-  const flames=$('#m_flames').value;
-  const newTime=parseTime($('#m_time').value);
-  const hasNote=$('#m_hasNote').checked;
-  const noteId= hasNote ? $('#m_note').value : null;
-  if (!newTime && title){ alert('Bitte Zeit HH:MM'); return; }
-  const newCell= title? {title,flames} : null;
-  if (newCell && hasNote) newCell.noteId = noteId;
 
-  if (newTime && newTime!==schedule.rows[curRow].time && newCell){
-    let targetIdx=schedule.rows.findIndex(r => r.time===newTime);
-    if(targetIdx===-1){
-      const cols=schedule.saunas.length;
-      schedule.rows.push({time:newTime, entries:Array.from({length:cols}).map(()=>null)});
-      schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
-      targetIdx=schedule.rows.findIndex(r => r.time===newTime);
+function deleteSaunaEverywhere(name){
+  const settings = ctx.getSettings();
+  const schedule = ctx.getSchedule();
+
+  // 1) Inventar
+  settings.allSaunas = (settings.allSaunas || []).filter(n => n !== name);
+
+  // 2) Aktueller Tag
+  removeSaunaColumnFromSchedule(schedule, name);
+
+  // 3) Presets
+  const P = settings.presets || {};
+  Object.keys(P).forEach(k => removeSaunaColumnFromSchedule(P[k] || {}, name));
+
+  // 4) Assets (Bild rechts)
+  if (settings.assets?.rightImages && settings.assets.rightImages[name]){
+    delete settings.assets.rightImages[name];
+  }
+
+  // 5) Per-Sauna-Dauern
+  if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name] != null){
+    delete settings.slides.saunaDurations[name];
+  }
+
+  // 6) Sichtbarkeit
+  if (settings.slides?.hiddenSaunas){
+    settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
+  }
+
+  // 7) Verweise in Bild-Slides („Nach Slide“)
+  (settings.interstitials || []).forEach(it => {
+    const v = it.afterRef || '';
+    if (v && v.startsWith('sauna:')){
+      const n = decodeURIComponent(v.slice(6));
+      if (n === name){ it.afterRef = 'overview'; it.after = 'overview'; }
+    } else if (it.after === name){
+      it.after = 'overview';
+      it.afterRef = 'overview';
     }
-    schedule.rows[targetIdx].entries[curCol]=newCell; schedule.rows[curRow].entries[curCol]=null;
-  } else {
-    schedule.rows[curRow].entries[curCol]=newCell; if (newTime) schedule.rows[curRow].time=newTime;
+  });
+
+  renderSlidesMaster();
+  renderGridUI();
+}
+
+function renameSaunaEverywhere(oldName, newName){
+  const settings = ctx.getSettings();
+
+  // Inventar
+  const inv = new Set(settings.allSaunas || []);
+  if (inv.has(oldName)) inv.delete(oldName);
+  inv.add(newName);
+  settings.allSaunas = Array.from(inv).sort((a,b)=> a.localeCompare(b,'de'));
+
+  // Presets: saunas[] direkt ersetzen (Spaltenindex bleibt erhalten)
+  const P = settings.presets || {};
+  Object.values(P).forEach(ps=>{
+    if (!ps || !Array.isArray(ps.saunas)) return;
+    const idx = ps.saunas.indexOf(oldName);
+    if (idx !== -1){
+      ps.saunas[idx] = newName;
+      // rows/entries unverändert (Spalte bleibt dieselbe)
+    }
+  });
+
+  // Assets (rechtes Bild)
+  if (settings.assets?.rightImages && (oldName in settings.assets.rightImages)){
+    const val = settings.assets.rightImages[oldName];
+    delete settings.assets.rightImages[oldName];
+    settings.assets.rightImages[newName] = val;
   }
-  schedule.rows.sort((a,b)=>a.time.localeCompare(b.time));
-  $('#modal').style.display='none';
-  renderGrid();
+
+  // Per-Sauna-Dauern
+  if (settings.slides?.saunaDurations && (oldName in settings.slides.saunaDurations)){
+    settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[oldName];
+    delete settings.slides.saunaDurations[oldName];
+  }
+
+  // Sichtbarkeit
+  if (settings.slides?.hiddenSaunas){
+    settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.map(n => n===oldName ? newName : n);
+  }
+
+  // Interstitial-Referenzen
+  (settings.interstitials||[]).forEach(it=>{
+    if (!it) return;
+    if (it.after === oldName) it.after = newName;
+    const encOld = 'sauna:' + encodeURIComponent(oldName);
+    const encNew = 'sauna:' + encodeURIComponent(newName);
+    if (it.afterRef === encOld) it.afterRef = encNew;
+  });
+}
+
+function addSaunaToActive(name){
+  const schedule = ctx.getSchedule();
+  if (!name) return;
+  if ((schedule.saunas || []).includes(name)) return;
+  schedule.saunas.push(name);
+  schedule.rows.forEach(r => r.entries.push(null));
+  renderSlidesMaster();
+  renderGridUI();
+}
+
+function removeSaunaFromActive(name){
+  const schedule = ctx.getSchedule();
+  const idx = (schedule.saunas || []).indexOf(name);
+  if (idx === -1) return;
+  if (!confirm(`Sauna "${name}" für ${DAY_LABELS[activeDayKey] || activeDayKey} auf „Kein Aufguss“ verschieben?\nDie Spalte wird gelöscht.`)) return;
+  schedule.saunas.splice(idx,1);
+  schedule.rows.forEach(r => r.entries.splice(idx,1));
+  renderSlidesMaster();
+  renderGridUI();
+}
+
+// Für Markierungen der „Kein Aufguss“-Liste
+function computePresetSaunaDays(){
+  const settings = ctx.getSettings();
+  const map = new Map();
+  const P = settings?.presets || {};
+  const days = DAYS.filter(d => d[0] !== 'Opt'); // nur echte Wochentage
+  for (const [key, label] of days) {
+    const sc = P[key];
+    const list = Array.isArray(sc?.saunas) ? sc.saunas : [];
+    for (const name of list) {
+      const arr = map.get(name) || [];
+      if (!arr.includes(label)) arr.push(label);
+      map.set(name, arr);
+    }
+  }
+  return map;
+}
+
+// ============================================================================
+// 3) UI-Bausteine: Übersicht-Row & Sauna-Row
+// ============================================================================
+function overviewRowRender(){
+  const settings = ctx.getSettings();
+  const perMode  = (settings.slides?.durationMode === 'per');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow overview';
+wrap.innerHTML = `
+  <div style="font-weight:600">Übersicht</div>
+  <canvas id="ovPrev" class="prev"></canvas>
+  ${perMode ? '<input id="ovSec" class="input num3 intSec" type="number" min="1" max="120" step="1" />' : ''}
+  <span></span><span></span><span></span>
+  <input id="ovShow" type="checkbox" />
+`;
+
+  const ovSecEl  = wrap.querySelector('#ovSec');
+  const ovShowEl = wrap.querySelector('#ovShow');
+
+  if (ovSecEl){
+    ovSecEl.value = settings.slides?.overviewDurationSec ?? 10;
+    ovSecEl.onchange = ()=>{
+      (settings.slides ||= {});
+      settings.slides.overviewDurationSec = Math.max(1, Math.min(120, +ovSecEl.value||10));
+    };
+  }
+  if (ovShowEl){
+    ovShowEl.checked = (settings.slides?.showOverview !== false);
+    ovShowEl.onchange = ()=>{
+      (settings.slides ||= {});
+      settings.slides.showOverview = !!ovShowEl.checked;
+    };
+  }
+
+  // NEU: Canvas zeichnen
+  const canvas = wrap.querySelector('#ovPrev');
+  if (canvas) drawOverviewPreview(canvas);
+
+  return wrap;
+}
+
+function drawOverviewPreview(canvas){
+  // Größe dynamisch an die Sauna-Previews angleichen
+  const ref = document.querySelector('#saunaList .saunarow .prev');
+  const refStyle = ref ? getComputedStyle(ref) : null;
+  const cssW = ref ? Math.max(80, parseInt(refStyle.width)  || ref.clientWidth  || 160) : 160;
+  const cssH = ref ? Math.max(50, parseInt(refStyle.height) || ref.clientHeight || 90)  : 90;
+
+  const DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+  canvas.width  = cssW * DPR;
+  canvas.height = cssH * DPR;
+  canvas.style.width  = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+
+  const g = canvas.getContext('2d');
+  g.setTransform(DPR,0,0,DPR,0,0);
+
+  const settings = ctx.getSettings();
+  const schedule = ctx.getSchedule() || {};
+  const saunas = Array.isArray(schedule.saunas) ? schedule.saunas : [];
+  const rows   = Array.isArray(schedule.rows) ? schedule.rows : [];
+
+  const T = settings.theme || {};
+  const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  const val = (k, v, d) => (T[k] || css(v) || d);
+
+  const colGrid  = val('gridTable',  '--gridTable',  '#374151');
+  const wGrid    = Number.isFinite(+T.gridTableW) ? +T.gridTableW : 2;
+  const headBg   = val('headRowBg',  '--headRowBg',  '#111827');
+  const headFg   = val('headRowFg',  '--headRowFg',  '#e5e7eb');
+  const z1       = val('zebra1',     '--zebra1',     '#0f1629');
+  const z2       = val('zebra2',     '--zebra2',     '#0d1426');
+  const tz1      = val('timeZebra1', '--timeZebra1', '#0e162b');
+  const tz2      = val('timeZebra2', '--timeZebra2', '#0c1324');
+  const cornerBg = val('cornerBg',   '--cornerBg',   '#0d1426');
+  const cornerFg = val('cornerFg',   '--cornerFg',   '#9ca3af');
+
+  const cols = Math.max(2, 1 + saunas.length);
+  const rws  = Math.max(2, 1 + rows.length);
+  const cellW = Math.floor(cssW / cols);
+  const cellH = Math.floor(cssH / rws);
+
+  g.clearRect(0,0,cssW,cssH);
+
+  // Kopf
+  g.fillStyle = cornerBg; g.fillRect(0,0,cellW,cellH);
+  g.fillStyle = headBg;   g.fillRect(cellW,0, cssW-cellW, cellH);
+  g.fillStyle = cornerFg; g.font = '600 10px system-ui, sans-serif';
+  g.textBaseline = 'middle'; g.textAlign = 'start';
+  g.fillText('Zeit', 6, cellH/2);
+
+  g.fillStyle = headFg; g.font = '600 9px system-ui, sans-serif';
+  saunas.slice(0, 20).forEach((name, i)=>{
+    const x = cellW + i*cellW + 6;
+    g.fillText(String(name).slice(0,10), x, cellH/2);
+  });
+
+  // Inhalt
+  for (let r=1; r<rws; r++){
+    const y = r*cellH;
+    g.fillStyle = (r%2 ? tz1 : tz2); g.fillRect(0,y, cellW, cellH);
+    g.fillStyle = (r%2 ? z1  : z2 ); g.fillRect(cellW,y, cssW-cellW, cellH);
+  }
+
+  // Raster
+  g.strokeStyle = colGrid;
+  g.lineWidth = Math.max(1, Math.min(3, wGrid));
+  g.beginPath();
+  for (let c=0; c<=cols; c++){ const x = Math.min(cssW-0.5, c*cellW); g.moveTo(x, 0); g.lineTo(x, rws*cellH); }
+  for (let r=0; r<=rws; r++){ const y = Math.min(cssH-0.5, r*cellH); g.moveTo(0, y); g.lineTo(cols*cellW, y); }
+  g.stroke();
+
+  if (saunas.length === 0 || rows.length === 0){
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.font = '700 18px system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('Plan', cssW/2, cssH/2);
+  }
+}
+
+function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
+  const settings = ctx.getSettings();
+  const id = 'sx_' + Math.random().toString(36).slice(2,8);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'saunarow' + (mode !== 'normal' ? ' sauna-ghost' : '');
+
+  // Name-Bereich (mit Escaping!)
+  const safeName = escapeHtml(name || '');
+  const namePart = (() => {
+    if (mode === 'normal') {
+      return `<input id="n_${id}" class="input name" type="text" value="${safeName}" />`;
+    }
+    const tag = (mode === 'ghost') ? '<span class="tag ghosttag">Preset</span>' : '';
+    const pills = (Array.isArray(dayLabels) && dayLabels.length && mode === 'extra')
+      ? `<div class="pills">${dayLabels.map(d => `<span class="pill">${escapeHtml(d)}</span>`).join('')}</div>` : '';
+    return `<div class="namewrap">
+      <input id="n_${id}" class="input name" type="text" value="${safeName}" disabled />
+      ${tag}${pills}
+    </div>`;
+  })();
+
+  wrap.innerHTML = `
+    ${namePart}
+    <img id="p_${id}" class="prev" alt="" title=""/>
+    <input id="sec_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
+    ${
+      mode === 'normal'
+        ? `<button class="btn sm ghost icon" id="x_${id}" title="Kein Aufguss (Spalte für diesen Tag entfernen)">✕</button>`
+        : `<div class="row" style="gap:6px">
+             <button class="btn sm ghost icon" id="mv_${id}" title="Zu Aufguss hinzufügen">➕</button>
+             <button class="btn sm ghost icon" id="delinv_${id}" title="Dauerhaft löschen">🗑</button>
+           </div>`
+    }
+    ${ mode === 'normal' ? `<input id="en_${id}" type="checkbox" checked />` : `<span></span>` }
+  `;
+
+  // DOM-Refs
+  const $name   = wrap.querySelector('#n_'+id);
+  const $img    = wrap.querySelector('#p_'+id);
+  const $sec    = wrap.querySelector('#sec_'+id);
+  const $up     = wrap.querySelector('#f_'+id);
+  const $def    = wrap.querySelector('#d_'+id);
+  const $del    = wrap.querySelector('#x_'+id);
+  const $mv     = wrap.querySelector('#mv_'+id);
+  const $delinv = wrap.querySelector('#delinv_'+id);
+  const $en     = wrap.querySelector('#en_'+id);
+
+  // Bild-Preview
+  const url = (settings.assets?.rightImages?.[name]) || '';
+  if (url){
+    preloadImg(url).then(r => { if (r.ok){ $img.src = url; $img.title = `${r.w}×${r.h}`; } });
+  }
+
+  // Dauer pro Sauna
+  const per = (settings.slides?.durationMode === 'per');
+  const perMap = settings.slides?.saunaDurations || {};
+  if ($sec){
+    $sec.disabled = !per;
+    $sec.style.display = per ? '' : 'none';
+    $sec.value = Number.isFinite(+perMap[name]) ? perMap[name]
+               : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
+    $sec.onchange = () => {
+      settings.slides ||= {}; settings.slides.saunaDurations ||= {};
+      settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
+    };
+  }
+
+  // Sichtbarkeit
+  if ($en){
+    const hidden = new Set(settings.slides?.hiddenSaunas || []);
+    $en.checked = !hidden.has(name);
+    $en.onchange = () => {
+      const set = new Set(settings.slides?.hiddenSaunas || []);
+      if ($en.checked) set.delete(name); else set.add(name);
+      settings.slides ||= {}; settings.slides.hiddenSaunas = Array.from(set);
+    };
+  }
+
+  // Upload
+  if ($up){
+    $up.onclick = () => {
+      const fi = document.createElement('input'); fi.type='file'; fi.accept='image/*';
+      fi.onchange = () => uploadGeneric(fi, (p) => {
+        settings.assets ||= {}; settings.assets.rightImages ||= {};
+        settings.assets.rightImages[name] = p;
+        preloadImg(p).then(r => {
+          if (r.ok) { $img.src = p; $img.title = `${r.w}×${r.h}`; }
+          else { $img.removeAttribute('src'); $img.removeAttribute('title'); }
+        });
+      });
+      fi.click();
+    };
+  }
+
+  // Default-Bild
+  if ($def){
+$def.onclick = () => {
+  if (!confirm('Zuordnung entfernen und Standardbild verwenden?\n\nDas individuelle Bild wird gelöscht.')) return;
+
+  (settings.assets ||= {}); (settings.assets.rightImages ||= {});
+  // Eintrag wirklich entfernen:
+  delete settings.assets.rightImages[name];
+
+  // Preview auf Default (optional) – oder ganz leeren:
+  $img.src = '/assets/img/right_default.svg';
+  $img.title = '';
+};
+  }
+
+  // Entfernen/Bewegen/Löschen
+  if ($del)    $del.onclick    = () => removeSaunaFromActive(name);
+  if ($mv)     $mv.onclick     = () => addSaunaToActive(name);
+  if ($delinv) $delinv.onclick = () => {
+    const txt = prompt(
+      `Sauna „${name}“ dauerhaft löschen?\n\n`+
+      `Dies entfernt sie aus dem Inventar, aus dem aktuellen Tag, aus allen Presets,\n`+
+      `löscht Bildzuweisungen, Dauer-Einträge und Verweise.\n\n`+
+      `Zum Bestätigen bitte genau "Ja" eingeben:`,
+      ''
+    );
+    if ((txt || '').trim() !== 'Ja') return;
+    deleteSaunaEverywhere(name);
+  };
+
+  // Umbenennen (normal mode)
+if ($name && mode === 'normal') {
+  $name.addEventListener('change', ()=>{
+    const schedule = ctx.getSchedule();
+    const old = name;
+    const newName = ($name.value || '').trim();
+
+    // validieren
+    if (!newName){ $name.value = old; return; }
+    if (newName === old) return;
+
+    // Duplikate im aktuellen Tag verhindern
+    const existsIdx = (schedule.saunas||[]).findIndex((n,i)=> n===newName && i!==index);
+    if (existsIdx !== -1){
+      alert('Es existiert bereits eine Sauna mit diesem Namen am aktuellen Tag.');
+      $name.value = old;
+      return;
+    }
+
+    // tatsächliches Umbenennen
+    schedule.saunas[index] = newName;
+    renameSaunaEverywhere(old, newName);
+
+    // UI aktualisieren
+    renderSlidesMaster();
+    renderGridUI();
+  });
+}
+
+  return wrap;
+}
+
+const saunaExtraRow = (name, dayLabels) =>
+  saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
+
+// ============================================================================
+// 4) Drag & Drop
+// ============================================================================
+function makeRowDraggable(el, name, src){
+  if (!el) return;
+  el.setAttribute('draggable','true');
+  el.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/sauna', name);
+    e.dataTransfer.setData('text/src', src); // 'on' oder 'off'
+  });
+}
+function applyDnD(){
+  const onHost  = $('#saunaList');
+  const offHost = $('#extraSaunaList');
+  [onHost, offHost].forEach(h => {
+    if (!h) return;
+    h.addEventListener('dragover', e => { e.preventDefault(); h.classList.add('drag-over'); });
+    h.addEventListener('dragleave', () => h.classList.remove('drag-over'));
+    h.addEventListener('drop', e => {
+      e.preventDefault(); h.classList.remove('drag-over');
+      const name = e.dataTransfer.getData('text/sauna');
+      const src  = e.dataTransfer.getData('text/src');
+      if (!name) return;
+      if (h === onHost  && src !== 'on')  addSaunaToActive(name);
+      if (h === offHost && src !== 'off') removeSaunaFromActive(name);
+    });
+  });
+}
+
+// ============================================================================
+// 5) „Kein Aufguss“ / Inventar
+// ============================================================================
+function renderSaunaOffList(){
+  const schedule = ctx.getSchedule();
+  const all = getAllSaunas();
+  const activeSet = new Set(schedule.saunas || []);
+  const off = all.filter(n => !activeSet.has(n));
+
+  const extraTitle = $('#extraTitle');
+  const host = $('#extraSaunaList');
+  if (!host) return;
+  host.innerHTML = '';
+
+  const presentMap = computePresetSaunaDays(); // Map name -> ['Mo','Di',...]
+
+  off.forEach(name => {
+    const pills = presentMap.get(name) || [];
+    const row = saunaExtraRow(name, pills);
+    row.title = 'Ziehen, um zu „Aufguss“ hinzuzufügen';
+    makeRowDraggable(row, name, 'off');
+    host.appendChild(row);
+  });
+
+  if (extraTitle) extraTitle.style.display = off.length ? '' : 'none';
+}
+
+// ============================================================================
+// 6) Interstitial Images (Bild-Slides)
+// ============================================================================
+function usedAfterImageIds(exceptId){
+  const settings = ctx.getSettings();
+  const list = settings.interstitials || [];
+  const set = new Set();
+  list.forEach(im => {
+    if (!im || im.id === exceptId) return;
+    const v = im.afterRef || '';
+    if (v.startsWith('img:')) { set.add(v.slice(4)); return; }
+    // Legacy by name
+    if (im.after && im.after !== 'overview' && !(ctx.getSchedule().saunas || []).includes(im.after)){
+      const hit = list.find(x => x && x.id !== im.id && (x.name || '') === im.after);
+      if (hit && hit.id) set.add(hit.id);
+    }
+  });
+  return set;
+}
+
+function interAfterOptionsHTML(currentId){
+  const schedule = ctx.getSchedule();
+  const settings = ctx.getSettings();
+
+  const used = usedAfterImageIds(currentId);
+
+  const saunaOpts = (schedule.saunas || [])
+    .map(v => `<option value="sauna:${encodeURIComponent(v)}">${escapeHtml(v)}</option>`);
+
+  const imgOpts = (settings.interstitials || [])
+    .filter(x => x && x.id && x.id !== currentId)
+    .map(x => {
+      const val = 'img:' + x.id;
+      const taken = used.has(x.id);
+      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
+      return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+    });
+
+  return [`<option value="overview">Übersicht</option>`, ...saunaOpts, ...imgOpts].join('');
+}
+
+function getAfterSelectValue(it, currentId){
+  const schedule = ctx.getSchedule();
+  if (it.afterRef) return it.afterRef;
+  const a = it.after;
+  if (a === 'overview' || !a) return 'overview';
+  if ((schedule.saunas || []).includes(a)) return 'sauna:' + encodeURIComponent(a);
+  const hit = (ctx.getSettings().interstitials || []).find(im => im && im.id !== currentId && (im.name || '') === a);
+  if (hit) return 'img:' + hit.id;
+  return 'overview';
+}
+
+function applyAfterSelect(it, value){
+  const settings = ctx.getSettings();
+  it.afterRef = value;
+  if (value === 'overview'){
+    it.after = 'overview';
+  } else if (value.startsWith('sauna:')){
+    const name = decodeURIComponent(value.slice(6));
+    it.after = name;
+  } else if (value.startsWith('img:')){
+    const id = value.slice(4);
+    const img = (settings.interstitials || []).find(im => im && im.id === id);
+    it.after = img ? (img.name || '') : '';
+  }
+}
+
+function interRow(i){
+  const settings = ctx.getSettings();
+  const it = settings.interstitials[i];
+  const id = 'inter_' + i;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'imgrow';
+  wrap.innerHTML = `
+    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
+    <img id="p_${id}" class="prev" alt="" title=""/>
+    <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
+    <input id="en_${id}" type="checkbox" />
+  `;
+
+  const $name  = wrap.querySelector('#n_'+id);
+  const $prev  = wrap.querySelector('#p_'+id);
+  const $sec   = wrap.querySelector('#sec_'+id);
+  const $up    = wrap.querySelector('#f_'+id);
+  const $del   = wrap.querySelector('#x_'+id);
+  const $after = wrap.querySelector('#a_'+id);
+  const $en    = wrap.querySelector('#en_'+id);
+
+  // Werte
+  if ($en) $en.checked = !!it.enabled;
+  if ($sec){
+    $sec.value = Number.isFinite(+it.dwellSec)
+      ? +it.dwellSec
+      : (ctx.getSettings().slides?.imageDurationSec ?? ctx.getSettings().slides?.saunaDurationSec ?? 6);
+  }
+  if ($after) $after.value = getAfterSelectValue(it, it.id);
+
+  if (it.url){
+    preloadImg(it.url).then(r => { if (r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
+  }
+
+  // Uniform-Mode blendet Dauer-Feld aus
+  const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
+  if ($sec) $sec.style.display = uniform ? 'none' : '';
+
+  // Events
+  if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
+  if ($after) $after.onchange = () => {
+    const v = $after.value;
+    if (v === 'img:' + it.id){
+      alert('Ein Bild kann nicht nach sich selbst kommen.');
+      $after.value = 'overview';
+      applyAfterSelect(it, 'overview');
+      return;
+    }
+    if (v.startsWith('img:')){
+      const used = usedAfterImageIds(it.id);
+      const targetId = v.slice(4);
+      if (used.has(targetId)){
+        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
+        $after.value = 'overview';
+        applyAfterSelect(it, 'overview');
+        return;
+      }
+    }
+    applyAfterSelect(it, v);
+    renderSlidesMaster();
+  };
+
+  if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
+  if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
+
+  if ($up){
+    $up.onclick = () => {
+      const fi = document.createElement('input');
+      fi.type='file'; fi.accept='image/*';
+      fi.onchange = () => uploadGeneric(fi, (p) => {
+        it.url = p;
+        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
+      });
+      fi.click();
+    };
+  }
+
+  if ($del) $del.onclick = () => { ctx.getSettings().interstitials.splice(i,1); renderSlidesMaster(); };
+
+  return wrap;
+}
+
+function renderInterstitialsPanel(hostId='interList2'){
+  const settings = ctx.getSettings();
+  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const host = document.getElementById(hostId);
+  if (!host) return;
+
+  host.innerHTML = '';
+  settings.interstitials.forEach((_, i) => host.appendChild(interRow(i)));
+
+  const add = document.getElementById('btnInterAdd2');
+  if (add) add.onclick = () => {
+    (settings.interstitials ||= []).push({
+      id:'im_'+Math.random().toString(36).slice(2,9),
+      name:'',
+      enabled:true,
+      url:'',
+      after:'overview',
+      dwellSec:6
+    });
+    renderSlidesMaster();
+  };
+}
+
+// ============================================================================
+// 7) Haupt-Renderer
+// ============================================================================
+export function renderSlidesMaster(){
+  const settings = ctx.getSettings();
+  const schedule = ctx.getSchedule();
+
+  // Transition
+  const transEl = $('#transMs2');
+  if (transEl){
+    const val = Number.isFinite(+settings.slides?.transitionMs) ? +settings.slides.transitionMs : 500;
+    transEl.value = val;
+    transEl.onchange = () => { settings.slides ||= {}; settings.slides.transitionMs = Math.max(0, +transEl.value || 0); };
+  }
+
+  // Auto je Wochentag
+  const autoEl = $('#presetAuto');
+  if (autoEl){
+    autoEl.checked = !!settings.presetAuto;
+    autoEl.onchange = () => { settings.presetAuto = !!autoEl.checked; };
+  }
+
+// === Dauer-Modus (Uniform vs. Individuell) ===
+const perMode = (settings.slides?.durationMode === 'per');
+
+// Body-Klassen (falls CSS das nutzt)
+document.body.classList.toggle('mode-uniform', !perMode);
+document.body.classList.toggle('mode-per', perMode);
+
+// --- Übersicht-Row (neu zeichnen + Canvas-Preview) ---
+const ovHost = $('#overviewRow');
+if (ovHost){
+  ovHost.innerHTML = '';
+  ovHost.appendChild(overviewRowRender());
+  const cv = ovHost.querySelector('#ovPrev');
+  if (cv) drawOverviewPreview(cv);
+}
+
+// --- Saunen-Liste (Aufguss) ---
+const sHost = $('#saunaList');
+if (sHost){
+  sHost.innerHTML = '';
+  (schedule.saunas || []).forEach((name, i) => {
+    const el = saunaRow({ name, index: i, mode:'normal' });
+    makeRowDraggable(el, name, 'on');
+    sHost.appendChild(el);
+  });
+}
+
+// --- „Kein Aufguss“ + Drag&Drop ---
+renderSaunaOffList();
+applyDnD();
+
+// --- Sichtbarkeit der Dauer-Inputs gezielt steuern ---
+// Per-Sauna-Dauer (nur im PER-Modus)
+$$('.saunarow .intSec').forEach(inp => { if (inp) inp.style.display = perMode ? '' : 'none'; });
+// Übersichtsdauer-Eingabe in der Übersicht-Reihe (#ovSec existiert nur im PER-Modus)
+{
+  const ovRowInput = document.querySelector('#overviewRow .intSec, #overviewRow #ovSec');
+  if (ovRowInput) ovRowInput.style.display = perMode ? '' : 'none';
+}
+
+// --- Modus-Schalter + Globaldauer (nur UNIFORM sichtbar) ---
+const durUniform = $('#durUniform');
+const durPer     = $('#durPer');
+const rowDwell   = $('#rowDwellAll');   // Container für „Dauer (alle außer Übersicht)“ + „Dauer Übersicht“
+const dwellAll   = $('#dwellAll');      // Input global (uniform)
+const ovGlobal   = $('#ovSecGlobal');   // Input Übersicht global (uniform)
+
+// Radio-Buttons setzen
+if (durUniform) durUniform.checked = !perMode;
+if (durPer)     durPer.checked     =  perMode;
+
+// Zeile mit globalen Feldern nur im Uniform-Modus zeigen
+if (rowDwell) rowDwell.style.display = perMode ? 'none' : 'grid';
+
+// Globale Dauer „alle außer Übersicht“ (nur uniform)
+if (dwellAll) {
+  dwellAll.style.display = perMode ? 'none' : '';
+  dwellAll.value = settings.slides?.globalDwellSec ?? 6;
+  dwellAll.onchange = () => {
+    (settings.slides ||= {}).globalDwellSec = Math.max(1, Math.min(120, +dwellAll.value || 6));
+  };
+}
+
+// Globale Übersichtsdauer (nur uniform)
+if (ovGlobal) {
+  ovGlobal.style.display = perMode ? 'none' : '';
+  ovGlobal.value = settings.slides?.overviewDurationSec ?? 10;
+  ovGlobal.onchange = () => {
+    (settings.slides ||= {}).overviewDurationSec = Math.max(1, Math.min(120, +ovGlobal.value || 10));
+  };
+}
+
+// Modus-Umschalter
+if (durUniform) durUniform.onchange = () => {
+  if (durUniform.checked){
+    (settings.slides ||= {}).durationMode = 'uniform';
+    renderSlidesMaster();
+  }
+};
+if (durPer) durPer.onchange = () => {
+  if (durPer.checked){
+    (settings.slides ||= {}).durationMode = 'per';
+    renderSlidesMaster();
+  }
 };
 
-// Row-Operationen
-$('#btnAddAbove').onclick=()=>{
-  const cols=schedule.saunas.length;
-  schedule.rows.splice(curRow,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)});
-  renderGrid();
-};
-$('#btnAddBelow').onclick=()=>{
-  const cols=schedule.saunas.length;
-  schedule.rows.splice(curRow+1,0,{time:'00:00', entries:Array.from({length:cols}).map(()=>null)});
-  renderGrid();
-};
-$('#btnDeleteRow').onclick=()=>{
-  if(schedule.rows.length>1){
-    schedule.rows.splice(curRow,1);
-    curRow=Math.max(0,curRow-1);
-    renderGrid();
-    updateSelTime();
-  }
-};
+  // Bild-Slides
+  renderInterstitialsPanel('interList2');
 
-// ------- Slides & Settings -------
-function renderSlides(){
+  // Reset & Add Sauna
+  const rs = $('#resetTiming');
+  if (rs) rs.onclick = () => {
+    settings.slides ||= {};
+    settings.slides.showOverview = true;
+    settings.slides.overviewDurationSec = 10;
+    settings.slides.transitionMs = 500;
+    settings.slides.durationMode = 'uniform';
+    settings.slides.globalDwellSec = 6;
+    settings.slides.hiddenSaunas = [];
+    settings.slides.saunaDurations = {};
+    renderSlidesMaster();
+  };
+
+  const addBtn = $('#btnAddSauna');
+  if (addBtn) addBtn.onclick = () => {
+    const name = (prompt('Neue Sauna anlegen (Inventar):', 'Neue Sauna') || '').trim();
+    if (!name) return;
+    const all = getAllSaunas();
+    if (all.includes(name)){
+      alert('Diesen Namen gibt es bereits im Inventar.');
+      return;
+    }
+    const s = ctx.getSettings();
+    s.allSaunas = all.concat(name).sort((a,b)=> a.localeCompare(b,'de'));
+    renderSlidesMaster(); // erscheint unter „Kein Aufguss“
+  };
+}
+
+// ============================================================================
+// 8) Public API
+// ============================================================================
+export function initSlidesMasterUI(context){
+  ctx = context;
+  if (!wiredStatic){
+    initWeekdayUI();
+    wiredStatic = true;
+  }
+  renderSlidesMaster();
+}
+JS
+
+# ---- Admin JS: app (Entry) ----
+cat > /var/www/signage/admin/js/app.js <<'JS'
+// /admin/js/app.js
+// ============================================================================
+// Admin-App Bootstrap & Seitenweite Einstellungen
+// - Lädt Schedule + Settings
+// - Initialisiert Grid-UI, Slides-Master-UI und Grid-Day-Loader
+// - Stellt Seitenboxen bereit (Schrift/Slides, Farben, Fußnoten, Highlight/Flame)
+// - Speichern, Preview, Export/Import, Theme-Toggle, Cleanup
+// ============================================================================
+
+'use strict';
+
+// === Modular imports =========================================================
+import { $, $$, preloadImg, genId } from './core/utils.js';
+import { DEFAULTS } from './core/defaults.js';
+import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
+import { initSlidesMasterUI, renderSlidesMaster } from './ui/slides_master.js';
+import { initGridDayLoader } from './ui/grid_day_loader.js';
+import { uploadGeneric } from './core/upload.js';
+
+// === Global State ============================================================
+let schedule = null;
+let settings = null;
+
+// ============================================================================
+// 1) Bootstrap: Laden + Initialisieren
+// ============================================================================
+async function loadAll(){
+  const [s, cfg] = await Promise.all([
+    fetch('/admin/api/load.php').then(r=>r.json()),
+    fetch('/admin/api/load_settings.php').then(r=>r.json())
+  ]);
+
+  schedule = s || {};
+  settings = cfg || {};
+
+  // Defaults mergen (defensiv)
+  settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
+  settings.display       = { ...DEFAULTS.display,  ...(settings.display||{}) };
+  settings.theme         = { ...DEFAULTS.theme,    ...(settings.theme||{}) };
+  settings.fonts         = { ...DEFAULTS.fonts,    ...(settings.fonts||{}) };
+  settings.assets        = { ...DEFAULTS.assets,   ...(settings.assets||{}) };
+  settings.footnotes     = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes || []);
+  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  settings.presets       = settings.presets || {};
+
+  // --- UI-Module initialisieren ---------------------------------------------
+  initGridUI({
+    getSchedule : () => schedule,
+    getSettings : () => settings,
+    setSchedule : (s) => { schedule = s; }   // wichtig für Grid-Operationen
+  });
+
+  initSlidesMasterUI({
+    getSchedule : () => schedule,
+    getSettings : () => settings,
+    setSchedule : (s)  => { schedule = s; },
+    setSettings : (cs) => { settings = cs; }
+  });
+
+  initGridDayLoader({
+    getSchedule : () => schedule,
+    getSettings : () => settings,
+    setSchedule : (s) => { schedule = s; }
+  });
+
+  // --- Seitenboxen rendern ---------------------------------------------------
+  renderSlidesBox();
+  renderHighlightBox();
+  renderColors();
+  renderFootnotes();
+
+  // --- globale UI-Schalter (Theme/Backup/Cleanup) ---------------------------
+  initThemeToggle();
+  initBackupButtons();
+  initCleanupInSystem();
+}
+
+// ============================================================================
+// 2) Slides & Text (linke Seitenbox „Slideshow & Text“)
+// ============================================================================
+function renderSlidesBox(){
   const f = settings.fonts || {};
-
-  // kleine Helfer, damit fehlende Felder keinen Fehler werfen
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
 
-  // Anzeige/Scaling (vorhanden)
+  // Anzeige / Scaling
   setV('#fitMode', settings.display?.fit || 'cover');
 
   // Schrift
@@ -1929,9 +3169,9 @@ function renderSlides(){
   setV('#fontScale',  f.scale  ?? 1);
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
-setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
-setV('#flamePct',         f.flamePct         ?? 55);
-setV('#flameGap',         f.flameGapPx       ?? 6);
+  setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
+  setV('#flamePct',         f.flamePct         ?? 55);
+  setV('#flameGap',         f.flameGapPx       ?? 6);
 
   // H2
   setV('#h2Mode', settings.h2?.mode ?? DEFAULTS.h2.mode);
@@ -1956,9 +3196,10 @@ setV('#flameGap',         f.flameGapPx       ?? 6);
   setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
   setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
 
-  // "Standardwerte" in dieser Box: nur noch Felder, die hier real existieren.
+  // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');
-  if (reset) reset.onclick = ()=>{
+  if (!reset) return;
+  reset.onclick = ()=>{
     setV('#fitMode', 'cover');
 
     setV('#fontFamily', DEFAULTS.fonts.family);
@@ -1974,9 +3215,9 @@ setV('#flameGap',         f.flameGapPx       ?? 6);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
     setV('#chipH',        DEFAULTS.fonts.chipHeight);
-setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
-setV('#flamePct',         DEFAULTS.fonts.flamePct);
-setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
+    setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
+    setV('#flamePct',         DEFAULTS.fonts.flamePct);
+    setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
 
     setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
     setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
@@ -1990,874 +3231,306 @@ setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
   };
 }
 
-    // ------- Highlights & Flames -------
-    function renderHighlightBox(){
-      const hl=settings.highlightNext||DEFAULTS.highlightNext;
-      $('#hlEnabled').checked = !!hl.enabled;
-      $('#hlColor').value = hl.color || DEFAULTS.highlightNext.color;
-      $('#hlBefore').value = Number.isFinite(+hl.minutesBeforeNext)?hl.minutesBeforeNext:DEFAULTS.highlightNext.minutesBeforeNext;
-      $('#hlAfter').value  = Number.isFinite(+hl.minutesAfterStart)?hl.minutesAfterStart:DEFAULTS.highlightNext.minutesAfterStart;
-      const setSw=()=> $('#hlSw').style.background = $('#hlColor').value; setSw();
-      $('#hlColor').addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)) setSw(); });
+// ============================================================================
+// 3) Highlights & Flames (rechte Box „Slideshow & Text“ – unterer Teil)
+// ============================================================================
+function renderHighlightBox(){
+  const hl = settings.highlightNext || DEFAULTS.highlightNext;
 
-      $('#flameImg').value    = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
-      updateFlamePreview($('#flameImg').value);
-      $('#flameFile').onchange= ()=> uploadGeneric($('#flameFile'), (p)=>{ settings.assets=settings.assets||{}; settings.assets.flameImage=p; $('#flameImg').value=p; updateFlamePreview(p); });
-      $('#resetFlame').onclick= ()=>{ const def=DEFAULTS.assets.flameImage; settings.assets=settings.assets||{}; settings.assets.flameImage=def; $('#flameImg').value=def; updateFlamePreview(def); };
-    }
-    function updateFlamePreview(u){ const img=$('#flamePrev'); preloadImg(u).then(r=>{ if(r.ok){ img.src=u; img.title=r.w+'×'+r.h; } else { img.removeAttribute('src'); img.title=''; } }); }
+  $('#hlEnabled').checked = !!hl.enabled;
+  $('#hlColor').value     = hl.color || DEFAULTS.highlightNext.color;
+  $('#hlBefore').value    = Number.isFinite(+hl.minutesBeforeNext) ? hl.minutesBeforeNext : DEFAULTS.highlightNext.minutesBeforeNext;
+  $('#hlAfter').value     = Number.isFinite(+hl.minutesAfterStart) ? hl.minutesAfterStart  : DEFAULTS.highlightNext.minutesAfterStart;
 
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
-}
-
-// Erzeugt den Wert für das Select aus vorhandenen Daten (Kompatibilität mit alten 'after'-Werten)
-function getAfterSelectValue(it, currentId){
-  if (it.afterRef) return it.afterRef; // neue, robuste Schreibweise schon vorhanden
-
-  const a = it.after;
-  if (a === 'overview' || !a) return 'overview';
-
-  // passt auf Sauna-Namen?
-  if ((schedule.saunas || []).includes(a)) return 'sauna:' + encodeURIComponent(a);
-
-  // passt auf ein anderes Bild (per Name)?
-  const hit = (settings.interstitials || []).find(im => im && im.id !== currentId && (im.name || '') === a);
-  if (hit) return 'img:' + hit.id;
-
-  return 'overview';
-}
-
-// setzt after/afterRef basierend auf der Select-Auswahl
-function applyAfterSelect(it, value){
-  it.afterRef = value;
-  if (value === 'overview'){
-    it.after = 'overview';
-  } else if (value.startsWith('sauna:')){
-    const name = decodeURIComponent(value.slice(6));
-    it.after = name;
-  } else if (value.startsWith('img:')){
-    const id = value.slice(4);
-    const img = (settings.interstitials || []).find(im => im && im.id === id);
-    it.after = img ? (img.name || '') : '';
-  }
-}
-
-function usedAfterImageIds(exceptId){
-  const set = new Set();
-  const list = settings.interstitials || [];
-  list.forEach(im=>{
-    if (!im || im.id === exceptId) return;
-    const v = im.afterRef || '';
-    if (v.startsWith('img:')) { set.add(v.slice(4)); return; }
-    // Legacy: nach Name
-    if (im.after && im.after !== 'overview' && !(schedule.saunas||[]).includes(im.after)){
-      const hit = list.find(x=>x && x.id !== im.id && (x.name||'') === im.after);
-      if (hit && hit.id) set.add(hit.id);
-    }
+  const setSw = ()=> $('#hlSw').style.background = $('#hlColor').value;
+  setSw();
+  $('#hlColor').addEventListener('input',()=>{
+    if(/^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)) setSw();
   });
-  return set;
-}
 
-function interAfterOptionsHTML(currentId){
-  const used = usedAfterImageIds(currentId);
+  // Flammenbild
+  $('#flameImg').value = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
+  updateFlamePreview($('#flameImg').value);
 
-const saunaOpts = (schedule.saunas || [])
-  .map(v => `<option value="sauna:${encodeURIComponent(v)}">${escapeHtml(v)}</option>`);
+  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p)=>{
+    settings.assets = settings.assets || {};
+    settings.assets.flameImage = p;
+    $('#flameImg').value = p;
+    updateFlamePreview(p);
+  });
 
-  const imgOpts = (settings.interstitials || [])
-    .filter(x => x && x.id && x.id !== currentId)
-    .map(x => {
-      const val = 'img:' + x.id;
-      const taken = used.has(x.id);
-      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
-      return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
-    });
-
-  return [`<option value="overview">Übersicht</option>`, ...saunaOpts, ...imgOpts].join('');
-}
-
-function interRow(i){
-  const it = settings.interstitials[i];
-  const id = 'inter_' + i;
-
-  const wrap = document.createElement('div');
-  wrap.className = 'imgrow';
-  wrap.innerHTML = `
-    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name||'')}" />
-    <img id="p_${id}" class="prev" alt="" title=""/>
-    <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
-    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
-    <input id="en_${id}" type="checkbox" />
-  `;
-
-  const $name  = wrap.querySelector('#n_'+id);
-  const $prev  = wrap.querySelector('#p_'+id);
-  const $sec   = wrap.querySelector('#sec_'+id);
-  const $up    = wrap.querySelector('#f_'+id);
-  const $del   = wrap.querySelector('#x_'+id);
-  const $after = wrap.querySelector('#a_'+id);
-  const $en    = wrap.querySelector('#en_'+id);
-
-  $en.checked = !!it.enabled;
-  $sec.value  = Number.isFinite(+it.dwellSec)
-    ? +it.dwellSec
-    : (settings.slides?.imageDurationSec ?? settings.slides?.saunaDurationSec ?? 6);
-  $after.value = getAfterSelectValue(it, it.id);
-
-  if (it.url){
-    preloadImg(it.url).then(r=>{ if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
-  }
-
-  const uniform = (settings.slides?.durationMode !== 'per');
-  $sec.style.display = uniform ? 'none' : '';
-
-  $name.onchange = ()=>{ it.name = ($name.value||'').trim(); renderSlidesMasterBox(); };
-
-  $after.onchange = ()=>{
-    const v = $after.value;
-    if (v === 'img:'+it.id){
-      alert('Ein Bild kann nicht nach sich selbst kommen.');
-      $after.value = 'overview';
-      applyAfterSelect(it, 'overview');
-      return;
-    }
-    if (v.startsWith('img:')){
-      const used = usedAfterImageIds(it.id);
-      const targetId = v.slice(4);
-      if (used.has(targetId)){
-        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
-        $after.value = 'overview';
-        applyAfterSelect(it, 'overview');
-        return;
-      }
-    }
-    applyAfterSelect(it, v);
-    renderSlidesMasterBox();
-  };
-
-  $en.onchange  = ()=>{ it.enabled = !!$en.checked; };
-  $sec.onchange = ()=>{ it.dwellSec = Math.max(1, Math.min(60, +$sec.value||6)); };
-
-  $up.onclick = ()=>{
-    const fi = document.createElement('input');
-    fi.type='file'; fi.accept='image/*';
-    fi.onchange = ()=> uploadGeneric(fi, (p)=>{
-      it.url = p;
-      preloadImg(p).then(r=>{ if(r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
-    });
-    fi.click();
-  };
-
-  $del.onclick = ()=>{ settings.interstitials.splice(i,1); renderSlidesMasterBox(); };
-
-  return wrap;
-}
-
-function renderInterstitialsPanel(hostId='interList2'){
-  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
-  const host = document.getElementById(hostId);
-  if (!host) return;
-
-  host.innerHTML = '';
-  settings.interstitials.forEach((_,i)=> host.appendChild(interRow(i)));
-
-  const add = document.getElementById('btnInterAdd2');
-  if (add) add.onclick = ()=>{
-    (settings.interstitials ||= []).push({
-      id:'im_'+Math.random().toString(36).slice(2,9),
-      name:'',
-      enabled:true,
-      url:'',
-      after:'overview',
-      dwellSec:6
-    });
-    renderSlidesMasterBox();
+  $('#resetFlame').onclick = ()=>{
+    const def = DEFAULTS.assets.flameImage;
+    settings.assets = settings.assets || {};
+    settings.assets.flameImage = def;
+    $('#flameImg').value = def;
+    updateFlamePreview(def);
   };
 }
 
-// ---- Inventar & Off-Liste (Kein Aufguss) ----
-function getAllSaunas(){
-  // vereinheitlichen: Inventar + aktuelle + Presets
-  const fromPresets = new Set();
-  const P = settings?.presets || {};
-  Object.values(P).forEach(ps => (ps?.saunas||[]).forEach(n => fromPresets.add(n)));
-
-  const all = new Set(settings.allSaunas || []);
-  (schedule.saunas||[]).forEach(n=> all.add(n));
-  fromPresets.forEach(n=> all.add(n));
-
-  settings.allSaunas = Array.from(all).sort((a,b)=> a.localeCompare(b,'de'));
-  return settings.allSaunas;
-}
-
-function addSaunaToActive(name){
-  if (!name) return;
-  if ((schedule.saunas||[]).includes(name)) return;
-  schedule.saunas.push(name);
-  schedule.rows.forEach(r=> r.entries.push(null));
-  renderSlidesMasterBox();
-  renderGrid();
-}
-
-function removeSaunaFromActive(name){
-  const idx = (schedule.saunas||[]).indexOf(name);
-  if (idx === -1) return;
-  if (!confirm(`Sauna "${name}" für ${DAY_LABELS[activeDayKey]||activeDayKey} auf „Kein Aufguss“ verschieben?\nDie Spalte wird gelöscht.`)) return;
-  schedule.saunas.splice(idx,1);
-  schedule.rows.forEach(r=> r.entries.splice(idx,1));
-  renderSlidesMasterBox();
-  renderGrid();
-}
-
-// Drag&Drop: Zeile draggable machen
-function makeRowDraggable(el, name, src){
-  if (!el) return;
-  el.setAttribute('draggable','true');
-  el.addEventListener('dragstart', e=>{
-    e.dataTransfer.setData('text/sauna', name);
-    e.dataTransfer.setData('text/src', src); // 'on' oder 'off'
+function updateFlamePreview(u){
+  const img = $('#flamePrev');
+  preloadImg(u).then(r=>{
+    if(r.ok){ img.src = u; img.title = r.w+'×'+r.h; }
+    else { img.removeAttribute('src'); img.title = ''; }
   });
 }
 
-// DnD Drop-Zonen aktivieren
-function applyDnD(){
-  const onHost  = document.getElementById('saunaList');      // Aufguss
-  const offHost = document.getElementById('extraSaunaList'); // Kein Aufguss
-  [onHost, offHost].forEach(h=>{
-    if (!h) return;
-    h.addEventListener('dragover', e=>{ e.preventDefault(); h.classList.add('drag-over'); });
-    h.addEventListener('dragleave', ()=> h.classList.remove('drag-over'));
-    h.addEventListener('drop', e=>{
-      e.preventDefault(); h.classList.remove('drag-over');
-      const name = e.dataTransfer.getData('text/sauna');
-      const src  = e.dataTransfer.getData('text/src');
-      if (!name) return;
-      if (h===onHost  && src!=='on')  addSaunaToActive(name);
-      if (h===offHost && src!=='off') removeSaunaFromActive(name);
-    });
-  });
-}
-
-function renderSaunaOffList(){
-  const all = getAllSaunas();
-  const activeSet = new Set(schedule.saunas||[]);
-  const off = all.filter(n=> !activeSet.has(n));
-  const extraTitle = document.getElementById('extraTitle');
-  const host = document.getElementById('extraSaunaList');
-  if (!host) return;
-  host.innerHTML = '';
-
-  // Pills unter "Kein Aufguss": zeigen, aus welchen Preset-Tagen die Sauna stammt (nice to have)
-  const presentMap = computePresetSaunaDays(); // Map name -> ['Mo','Di',...]
-
-  off.forEach(name=>{
-    const pills = presentMap.get(name) || [];
-    const row = saunaExtraRow(name, pills); // disabled/kompakte Row
-    row.title = 'Ziehen, um zu „Aufguss“ hinzuzufügen';
-    makeRowDraggable(row, name, 'off');
-    host.appendChild(row);
-  });
-
-  if (extraTitle) extraTitle.style.display = off.length ? '' : 'none';
-}
-
-
-function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
-
-function computePresetSaunaDays(){
-  const map = new Map();
-  const P = settings?.presets || {};
-  const days = [
-    ['Mon','Mo'], ['Tue','Di'], ['Wed','Mi'],
-    ['Thu','Do'], ['Fri','Fr'], ['Sat','Sa'], ['Sun','So']
-  ];
-  for (const [key, label] of days) {
-    const sc = P[key];
-    const list = Array.isArray(sc?.saunas) ? sc.saunas : [];
-    for (const name of list) {
-      const arr = map.get(name) || [];
-      if (!arr.includes(label)) arr.push(label);
-      map.set(name, arr);
-    }
-  }
-  return map; // Map: saunaName -> ['Mo','Di',...]
-}
-
-function saunaExtraRow(name, dayLabels){
-  return saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
-}
-
-
-// Alle Saunen aus Presets, die NICHT in der aktuellen Tabelle sind
-function getPresetOnlySaunas(){
-  const inTable = new Set((schedule?.saunas)||[]);
-  const extras = new Set();
-  const P = settings?.presets || {};
-  Object.values(P).forEach(ps=>{
-    (ps?.saunas || []).forEach(n=>{
-      if (n && !inTable.has(n)) extras.add(n);
-    });
-  });
-  return Array.from(extras).sort((a,b)=> a.localeCompare(b,'de'));
-}
-
-// "Geister"-Sauna-Row: wie die normalen, aber Name nicht editierbar, kein Entfernen
-function saunaGhostRow(name){
-  return saunaRow({ name, mode:'ghost' });
-}
-
-// Übersicht als Row im Saunen-Stil
-function overviewRowRender(){
-  const perMode = (settings.slides?.durationMode === 'per');
-  const wrap = document.createElement('div');
-  wrap.className = 'saunarow overview';
-
-  if (perMode){
-    // 7 Spalten: name, prev, dur, up, def, del, vis
-    wrap.innerHTML = `
-      <div style="font-weight:600">Übersicht</div>
-      <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
-      <input id="ovSec" class="input num3 intSec" type="number" min="1" max="120" step="1" />
-      <span></span><span></span><span></span>
-      <input id="ovShow" type="checkbox" />
-    `;
-  } else {
-    // 6 Spalten: name, prev, up, def, del, vis  (keine "Dauer"-Spalte)
-    wrap.innerHTML = `
-      <div style="font-weight:600">Übersicht</div>
-      <div class="prev" style="display:grid;place-items:center;font-size:12px;opacity:.8;background:#0d1426;border:1px solid var(--inbr);border-radius:10px">Plan</div>
-      <span></span><span></span><span></span>
-      <input id="ovShow" type="checkbox" />
-    `;
-  }
-
-  const ovSecEl  = wrap.querySelector('#ovSec');
-  const ovShowEl = wrap.querySelector('#ovShow');
-
-  if (ovSecEl){
-    ovSecEl.value = settings.slides?.overviewDurationSec ?? 10;
-    ovSecEl.onchange = ()=>{
-      settings.slides = settings.slides || {};
-      settings.slides.overviewDurationSec = Math.max(1, Math.min(120, +ovSecEl.value||10));
-    };
-  }
-  if (ovShowEl){
-    ovShowEl.checked = (settings.slides?.showOverview !== false);
-    ovShowEl.onchange = ()=>{
-      settings.slides = settings.slides || {};
-      settings.slides.showOverview = !!ovShowEl.checked;
-    };
-  }
-  return wrap;
-}
-
-
-function saunaRow(cfg){
-  const name = cfg.name;
-  const id = 'sx_' + Math.random().toString(36).slice(2,8);
-  const mode = cfg.mode || 'normal'; // 'normal' (Aufguss) | 'ghost' | 'extra' (Kein Aufguss/Inventar)
-  const i = (cfg.index ?? null);
-
-  const wrap = document.createElement('div');
-  wrap.className = 'saunarow' + (mode !== 'normal' ? ' sauna-ghost' : '');
-
-  const namePart = (() => {
-    if (mode === 'normal') {
-      return `<input id="n_${id}" class="input name" type="text" value="${name}" />`;
-    }
-    const tag = (mode === 'ghost') ? '<span class="tag ghosttag">Preset</span>' : '';
-    const pills = (Array.isArray(cfg.dayLabels) && cfg.dayLabels.length && mode === 'extra')
-      ? `<div class="pills">${cfg.dayLabels.map(d=>`<span class="pill">${d}</span>`).join('')}</div>` : '';
-    return `<div class="namewrap">
-      <input id="n_${id}" class="input name" type="text" value="${name}" disabled />
-      ${tag}${pills}
+// ============================================================================
+// 4) Farben-Panel
+// ============================================================================
+function colorField(key,label,init){
+  const row=document.createElement('div');
+  row.className='kv';
+  row.innerHTML = `
+    <label>${label}</label>
+    <div class="color-item">
+      <div class="swatch" id="sw_${key}"></div>
+      <input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB">
     </div>`;
-  })();
+  return row;
+}
 
-  // Grundmarkup: Spaltenstruktur wie Head
-  wrap.innerHTML = `
-    ${namePart}
-    <img id="p_${id}" class="prev" alt="" title=""/>
-    <input id="sec_${id}" class="input num3 intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
-    <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
-    ${
-      mode === 'normal'
-        ? `<button class="btn sm ghost icon" id="x_${id}" title="Kein Aufguss (Spalte für diesen Tag entfernen)">✕</button>`
-	: `<div class="row" style="gap:6px">
-      	<button class="btn sm ghost icon" id="mv_${id}" title="Zu Aufguss hinzufügen">➕</button>
-      	<button class="btn sm ghost icon" id="delinv_${id}" title="Dauerhaft löschen">🗑</button>
-    	</div>`   
- }
-    ${
-      mode === 'normal'
-        ? `<input id="en_${id}" type="checkbox" checked />`
-        : `<span></span>`
-    }
-  `;
+function renderColors(){
+  const host = $('#colorList'); if (!host) return;
+  host.innerHTML = '';
 
-  const $name = wrap.querySelector('#n_'+id);
-  const $img  = wrap.querySelector('#p_'+id);
-  const $sec  = wrap.querySelector('#sec_'+id);
-  const $up   = wrap.querySelector('#f_'+id);
-  const $def  = wrap.querySelector('#d_'+id);
-  const $del  = wrap.querySelector('#x_'+id);
-  const $mv   = wrap.querySelector('#mv_'+id);
-  const $delinv = wrap.querySelector('#delinv_'+id); 
-  const $en   = wrap.querySelector('#en_'+id);
+  const theme = settings.theme || {};
 
-  // Preview + Tooltip (Auflösung)
-  const url = (settings.assets?.rightImages?.[name]) || '';
-  if (url){
-    preloadImg(url).then(r=>{ if(r.ok){ $img.src=url; $img.title=`${r.w}×${r.h}`; } });
-  }
+  // Grundfarben
+  const A=document.createElement('div'); A.className='fieldset'; A.innerHTML='<div class="legend">Grundfarben</div>';
+  A.appendChild(colorField('bg','Hintergrund', theme.bg||DEFAULTS.theme.bg));
+  A.appendChild(colorField('fg','Vordergrund/Schrift', theme.fg||DEFAULTS.theme.fg));
+  A.appendChild(colorField('accent','Akzent', theme.accent||DEFAULTS.theme.accent));
 
-  // Dauer-Feld (nur sinnvoll, wenn individueller Modus)
-  const per = (settings.slides?.durationMode === 'per');
-  const perMap = settings.slides?.saunaDurations || {};
-  $sec.disabled = !per;
-  $sec.style.display = per ? '' : 'none';
-  $sec.value = Number.isFinite(+perMap[name]) ? perMap[name] : (settings.slides?.globalDwellSec ?? settings.slides?.saunaDurationSec ?? 6);
-  $sec.onchange = () => {
-    (settings.slides ||= {}); (settings.slides.saunaDurations ||= {});
-    settings.slides.saunaDurations[name] = Math.max(1, Math.min(60, +$sec.value || 6));
-  };
+  // Übersichtstabelle
+  const B=document.createElement('div'); B.className='fieldset'; B.innerHTML='<div class="legend">Übersichtstabelle</div>';
+  B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gridTable||theme.gridBorder||DEFAULTS.theme.gridTable||DEFAULTS.theme.gridBorder));
+  const bw=document.createElement('div'); bw.className='kv';
+  bw.innerHTML='<label>Tabellenrahmen Breite (px)</label><input id="bw_gridTableW" class="input" type="number" min="0" max="10" step="1" value="'+(Number.isFinite(+theme.gridTableW)?theme.gridTableW:DEFAULTS.theme.gridTableW)+'">';
+  B.appendChild(bw);
+  B.appendChild(colorField('headRowBg','Kopfzeile Hintergrund', theme.headRowBg||DEFAULTS.theme.headRowBg));
+  B.appendChild(colorField('headRowFg','Kopfzeile Schrift', theme.headRowFg||DEFAULTS.theme.headRowFg));
+  B.appendChild(colorField('zebra1','Zebra (Inhalt) 1', theme.zebra1||DEFAULTS.theme.zebra1));
+  B.appendChild(colorField('zebra2','Zebra (Inhalt) 2', theme.zebra2||DEFAULTS.theme.zebra2));
+  B.appendChild(colorField('timeZebra1','Zeitspalte Zebra 1', theme.timeZebra1||DEFAULTS.theme.timeZebra1));
+  B.appendChild(colorField('timeZebra2','Zeitspalte Zebra 2', theme.timeZebra2||DEFAULTS.theme.timeZebra2));
+  B.appendChild(colorField('cornerBg','Ecke (oben-links) BG', theme.cornerBg||DEFAULTS.theme.cornerBg));
+  B.appendChild(colorField('cornerFg','Ecke (oben-links) FG', theme.cornerFg||DEFAULTS.theme.cornerFg));
 
-  // Anzeigen (nur "Aufguss" sinnvoll)
-  if ($en){
-    const hidden = new Set(settings.slides?.hiddenSaunas || []);
-    $en.checked = !hidden.has(name);
-    $en.onchange = () => {
-      const set = new Set(settings.slides?.hiddenSaunas || []);
-      if ($en.checked) set.delete(name); else set.add(name);
-      (settings.slides ||= {}); settings.slides.hiddenSaunas = Array.from(set);
-    };
-  }
+  // Saunafolien & Flammen
+  const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna-Folien & Flammen</div>';
+  C.appendChild(colorField('cellBg','Kachel-Hintergrund', theme.cellBg||DEFAULTS.theme.cellBg));
+  C.appendChild(colorField('boxFg','Kachel-Schrift', theme.boxFg||DEFAULTS.theme.boxFg));
+  C.appendChild(colorField('saunaColor','Sauna-Überschrift', theme.saunaColor||DEFAULTS.theme.saunaColor));
+  C.appendChild(colorField('tileBorder','Kachel-Rahmen (nur Kacheln)', theme.tileBorder||theme.gridBorder||DEFAULTS.theme.tileBorder||DEFAULTS.theme.gridBorder));
+  C.appendChild(colorField('flame','Flammen', theme.flame||DEFAULTS.theme.flame));
 
-  // Upload
-  $up.onclick = () => {
-    const fi = document.createElement('input'); fi.type='file'; fi.accept='image/*';
-    fi.onchange = () => uploadGeneric(fi, (p) => {
-      (settings.assets ||= {}); (settings.assets.rightImages ||= {});
-      settings.assets.rightImages[name] = p;
-      preloadImg(p).then(r => {
-        if (r.ok) { $img.src = p; $img.title = `${r.w}×${r.h}`; }
-        else { $img.removeAttribute('src'); $img.removeAttribute('title'); }
-      });
+  host.appendChild(A); host.appendChild(B); host.appendChild(C);
+
+  // Swatch-Vorschau & Reset
+  $$('#colorList input[type="text"]').forEach(inp=>{
+    const sw=$('#sw_'+inp.id.replace(/^cl_/,''));
+    const setPrev=v=> sw.style.background=v;
+    setPrev(inp.value);
+    inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); });
+  });
+  $('#resetColors').onclick = ()=>{ 
+    $$('#colorList input[type="text"]').forEach(inp=>{
+      const k=inp.id.replace(/^cl_/,'');
+      inp.value=(DEFAULTS.theme[k]||'#FFFFFF');
+      const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value;
     });
-    fi.click();
-  };
-
-  // Default
-  $def.onclick = () => {
-    (settings.assets ||= {}); (settings.assets.rightImages ||= {});
-    settings.assets.rightImages[name] = '/assets/img/right_default.svg';
-    $img.src = '/assets/img/right_default.svg';
-    $img.title = '';
-  };
-
-  // Entfernen = zurück zu "Kein Aufguss" (Spalte löschen) – nur normal
-  if ($del){
-    $del.onclick = () => {
-      if(!confirm(`Sauna "${name}" wirklich für ${DAY_LABELS[activeDayKey]||activeDayKey} auf „Kein Aufguss” setzen?\nDie Spalte in der Tabelle wird gelöscht.`)) return;
-      const idx = (schedule.saunas||[]).indexOf(name);
-      if (idx > -1){
-        schedule.saunas.splice(idx,1);
-        schedule.rows.forEach(r=> r.entries.splice(idx,1));
-        renderSlidesMasterBox();
-        renderGrid();
-      }
-    };
-  }
-
-  // ➕ von Inventar/Kein Aufguss nach Aufguss – nur extra
-  if ($mv){
-    $mv.onclick = () => {
-      addSaunaToActive(name); // legt Spalte an
-    };
-  }
-
-if ($delinv){
-  $delinv.onclick = ()=>{
-    const txt = prompt(
-      `Sauna „${name}“ dauerhaft löschen?\n\n`+
-      `Dies entfernt sie aus dem Inventar, aus dem aktuellen Tag, aus allen Presets,\n`+
-      `löscht Bildzuweisungen, Dauer-Einträge und Verweise.\n\n`+
-      `Zum Bestätigen bitte genau "Ja" eingeben:`,
-      ''
-    );
-    if ((txt||'').trim() !== 'Ja') return;
-    deleteSaunaEverywhere(name);
+    const bws=document.getElementById('bw_gridTableW');
+    if(bws) bws.value = DEFAULTS.theme.gridTableW ?? 2;
   };
 }
 
-  // Umbenennen (nur normal)
-  if ($name && mode === 'normal') {
-    $name.onchange = () => {
-      const newName = ($name.value || '').trim() || name;
-      if (newName === name) return;
-      const old = name;
-      schedule.saunas[i] = newName;
-      if (settings.assets?.rightImages) {
-        const val = settings.assets.rightImages[old];
-        delete settings.assets.rightImages[old];
-        settings.assets.rightImages[newName] = val;
-      }
-      if (settings.slides?.saunaDurations && settings.slides.saunaDurations[old] != null) {
-        settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[old];
-        delete settings.slides.saunaDurations[old];
-      }
-      renderSlidesMasterBox(); renderGrid();
-    };
-  }
+// ============================================================================
+// 5) Fußnoten
+// ============================================================================
+function renderFootnotes(){
+  const host=$('#fnList'); if (!host) return;
+  host.innerHTML='';
+  const layoutSel = document.getElementById('footnoteLayout');
+  if (layoutSel){ layoutSel.value = settings.footnoteLayout || 'one-line'; layoutSel.onchange = ()=>{ settings.footnoteLayout = layoutSel.value; }; }
+  const list = settings.footnotes || [];
+  list.forEach((fn,i)=> host.appendChild(fnRow(fn,i)));
+  $('#fnAdd').onclick=()=>{ (settings.footnotes ||= []).push({id:genId(), label:'*', text:''}); renderFootnotes(); };
+}
 
+function fnRow(fn,i){
+  const wrap=document.createElement('div'); wrap.className='kv';
+  wrap.innerHTML = `
+    <label>Label/Text</label>
+    <div class="row" style="gap:8px;flex-wrap:nowrap">
+      <input class="input" id="fn_l_${i}" value="${fn.label||'*'}" style="width:6ch"/>
+      <input class="input" id="fn_t_${i}" value="${fn.text||''}" style="min-width:0"/>
+      <button class="btn sm" id="fn_x_${i}">✕</button>
+    </div>`;
+  wrap.querySelector(`#fn_l_${i}`).onchange=(e)=>{ fn.label = (e.target.value||'*').slice(0,2); };
+  wrap.querySelector(`#fn_t_${i}`).onchange=(e)=>{ fn.text = e.target.value||''; };
+  wrap.querySelector(`#fn_x_${i}`).onclick=()=>{ settings.footnotes.splice(i,1); renderFootnotes(); };
   return wrap;
 }
 
-// Sauna-Zeile (kompakt mit Icon-Buttons, Sichtbarkeit & optionaler Dauer)
-function saunaMasterRow(i){
-  const name = schedule.saunas[i];
-  return saunaRow({ name, index:i, mode:'normal' });
-}
-
-function removeSaunaColumnFromSchedule(sc, name){
-  if (!sc || !Array.isArray(sc.saunas)) return;
-  const idx = sc.saunas.indexOf(name);
-  if (idx === -1) return;
-  sc.saunas.splice(idx,1);
-  (sc.rows||[]).forEach(r=>{
-    if (Array.isArray(r.entries)) r.entries.splice(idx,1);
+// ============================================================================
+// 6) Speichern / Preview / Export / Import
+// ============================================================================
+function collectColors(){ 
+  const theme={...(settings.theme||{})}; 
+  $$('#colorList input[type="text"]').forEach(inp=>{
+    const v=String(inp.value).toUpperCase();
+    if(/^#([0-9A-Fa-f]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v;
   });
+  const bw=document.getElementById('bw_gridTableW');
+  if(bw) theme.gridTableW = Math.max(0, Math.min(10, +bw.value||0));
+  return theme; 
 }
 
-function deleteSaunaEverywhere(name){
-  // 1) Inventar
-  settings.allSaunas = (settings.allSaunas||[]).filter(n => n !== name);
-
-  // 2) Aktueller Tag (Schedule)
-  removeSaunaColumnFromSchedule(schedule, name);
-
-  // 3) Presets
-  const P = settings.presets || {};
-  Object.keys(P).forEach(k => removeSaunaColumnFromSchedule(P[k]||{}, name));
-
-  // 4) Assets (Bild rechts)
-  if (settings.assets?.rightImages && settings.assets.rightImages[name]){
-    delete settings.assets.rightImages[name];
-  }
-
-  // 5) Per-Sauna-Dauern
-  if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name]!=null){
-    delete settings.slides.saunaDurations[name];
-  }
-
-  // 6) Sichtbarkeitsliste bereinigen
-  if (settings.slides?.hiddenSaunas){
-    settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
-  }
-
-  // 7) Verweise in Bild-Slides ("Nach Slide") auf Übersicht zurücksetzen
-  (settings.interstitials||[]).forEach(it=>{
-    const v = it.afterRef || '';
-    if (v && v.startsWith('sauna:')){
-      const n = decodeURIComponent(v.slice(6));
-      if (n === name){ it.afterRef = 'overview'; it.after = 'overview'; }
-    } else if (it.after === name){
-      it.after = 'overview';
-      it.afterRef = 'overview';
-    }
-  });
-
-  // UI neu zeichnen
-  renderSlidesMasterBox();
-  renderGrid();
-}
-
-
-// Masterbox-Renderer (2 Unterboxen)
-function renderSlidesMasterBox(){
-  settings.slides = { ...(settings.slides||{}) };
-
-  // Transition (optional vorhanden)
-  const transEl = document.getElementById('transMs2');
-  if (transEl){
-    const val = Number.isFinite(+settings.slides.transitionMs) ? +settings.slides.transitionMs : 500;
-    transEl.value = val;
-    transEl.onchange = ()=>{ settings.slides.transitionMs = Math.max(0, +transEl.value||0); };
-  }
-
-  // Auto je Wochentag
-  const autoEl = document.getElementById('presetAuto');
-  if (autoEl){
-    autoEl.checked = !!settings.presetAuto;
-    autoEl.onchange = ()=>{ settings.presetAuto = !!autoEl.checked; };
-  }
-
-  // Dauer-Modus visualisieren
-  const perMode = (settings.slides.durationMode === 'per');
-  $$('.intSec').forEach(inp => { if (inp) inp.style.display = perMode ? '' : 'none'; });
-  document.body.classList.toggle('mode-uniform', !perMode);
-  document.body.classList.toggle('mode-per', perMode);
-
-  // Übersicht-Row
-  const ovHost = document.getElementById('overviewRow');
-  if (ovHost){ ovHost.innerHTML=''; ovHost.appendChild(overviewRowRender()); }
-
-  // Saunen-Liste
-// Saunen-Liste (aktuelle Tabelle)
-const sHost = document.getElementById('saunaList');
-if (sHost){
-  sHost.innerHTML = '';
-  (schedule.saunas||[]).forEach((_,i)=> {
-    const el = saunaMasterRow(i);
-    makeRowDraggable(el, schedule.saunas[i], 'on');
-    sHost.appendChild(el);
-  });
-}
-// "Kein Aufguss" (Inventar - aktuell aktive)
-renderSaunaOffList();
-
-// Drag & Drop bereit machen
-applyDnD();
-
-  // Modus-Schalter + Globaldauer
-  const durUniform = document.getElementById('durUniform');
-  const durPer     = document.getElementById('durPer');
-  const dwellAll   = document.getElementById('dwellAll');
-  const rowDwell   = document.getElementById('rowDwellAll');
-
-  if (durUniform) durUniform.checked = !perMode;
-  if (durPer)     durPer.checked     = perMode;
-  if (dwellAll)   dwellAll.value     = settings.slides.globalDwellSec ?? (settings.slides.saunaDurationSec ?? 6);
-  if (rowDwell)   rowDwell.style.display = perMode ? 'none' : 'grid';
-
-  if (durUniform) durUniform.onchange = ()=>{
-    if (durUniform.checked){
-      settings.slides.durationMode = 'uniform';
-      if (rowDwell) rowDwell.style.display = 'grid';
-      renderSlidesMasterBox();
+function collectSettings(){
+  return {
+    schedule: { ...schedule },
+    settings: {
+      ...settings,
+      footnoteLayout: document.getElementById('footnoteLayout')?.value || settings.footnoteLayout || 'one-line',
+      fonts:{
+        family: $('#fontFamily').value,
+        scale: +($('#fontScale')?.value||1),
+        h1Scale:+($('#h1Scale').value||1),
+        h2Scale:+($('#h2Scale').value||1),
+        overviewTitleScale:+($('#ovTitleScale').value||1),
+        overviewHeadScale:+($('#ovHeadScale').value||0.9),
+        overviewCellScale:+($('#ovCellScale').value||0.8),
+        chipHeight:+($('#chipH').value||44),
+        chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
+        flamePct:   +($('#flamePct')?.value || 55),
+        flameGapPx: +($('#flameGap')?.value || 6),
+        tileTextScale:+($('#tileTextScale').value||0.8),
+        tileWeight:+($('#tileWeight').value||600)
+      },
+      h2:{
+        mode: $('#h2Mode').value || 'text',
+        text: ($('#h2Text').value ?? '').trim(),
+        showOnOverview: !!$('#h2ShowOverview').checked
+      },
+      slides:{
+        ...(settings.slides||{}),
+        showOverview: !!document.getElementById('ovShow')?.checked,
+	overviewDurationSec: (() => {
+  	const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
+  	const fallback = settings?.slides?.overviewDurationSec ?? (DEFAULTS?.slides?.overviewDurationSec ?? 10);
+  	const v = el?.value;
+  	const n = Number(v);
+  	return Number.isFinite(n) ? Math.max(1, Math.min(120, n)) : fallback;
+	})(),
+        transitionMs: +(document.getElementById('transMs2')?.value || 500),
+        durationMode: (document.querySelector('input[name=durMode]:checked')?.value || 'uniform'),
+        globalDwellSec: +(document.getElementById('dwellAll')?.value || 6)
+      },
+      theme: collectColors(),
+      highlightNext:{
+        enabled: $('#hlEnabled').checked,
+        color: /^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)? $('#hlColor').value.toUpperCase() : (settings.highlightNext?.color || DEFAULTS.highlightNext.color),
+        minutesBeforeNext: +( $('#hlBefore').value || DEFAULTS.highlightNext.minutesBeforeNext ),
+        minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
+      },
+      assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
+      display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080,
+        rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
+      footnotes: settings.footnotes,
+      interstitials: settings.interstitials || [],
+      presets: settings.presets || {},
+      presetAuto: !!document.getElementById('presetAuto')?.checked
     }
   };
-  if (durPer) durPer.onchange = ()=>{
-    if (durPer.checked){
-      settings.slides.durationMode = 'per';
-      if (rowDwell) rowDwell.style.display = 'none';
-      renderSlidesMasterBox();
-    }
-  };
-  if (dwellAll) dwellAll.onchange = ()=>{
-    settings.slides.globalDwellSec = Math.max(1, Math.min(120, +dwellAll.value||6));
-  };
+}
 
-  // Bild-Slides
-  renderInterstitialsPanel('interList2');
+// Buttons: Open / Preview / Save
+$('#btnOpen')?.addEventListener('click', ()=> window.open('/', '_blank'));
+$('#btnPreview')?.addEventListener('click', ()=>{ $('#prevModal').style.display='grid'; sendPreview(); });
+$('#prevReload')?.addEventListener('click', ()=> sendPreview(true));
+$('#prevClose')?.addEventListener('click', ()=>{ $('#prevModal').style.display='none'; });
 
-  // Reset & Add Sauna
-  const rs = document.getElementById('resetTiming');
-  if (rs) rs.onclick = ()=>{
-    settings.slides.showOverview = true;
-    settings.slides.overviewDurationSec = 10;
-    settings.slides.transitionMs = 500;
-    settings.slides.durationMode = 'uniform';
-    settings.slides.globalDwellSec = 6;
-    settings.slides.hiddenSaunas = [];
-    settings.slides.saunaDurations = {};
-    renderSlidesMasterBox();
-  };
-
-const addBtn = document.getElementById('btnAddSauna');
-if (addBtn) addBtn.onclick = ()=>{
-  const name = (prompt('Neue Sauna anlegen (Inventar):', 'Neue Sauna')||'').trim();
-  if(!name) return;
-  settings.allSaunas = getAllSaunas();
-  if (settings.allSaunas.includes(name)){
-    alert('Diesen Namen gibt es bereits im Inventar.');
+function sendPreview(reload){
+  const f=$('#prevFrame'); if(!f) return;
+  if (reload){
+    f.contentWindow.location.reload();
+    setTimeout(()=>sendPreview(),400);
     return;
   }
-  settings.allSaunas.push(name);
-  settings.allSaunas.sort((a,b)=> a.localeCompare(b,'de'));
-  renderSlidesMasterBox(); // erscheint unter "Kein Aufguss"
-};
+  const payload=collectSettings();
+  setTimeout(()=>{ f.contentWindow.postMessage({type:'preview', payload}, '*'); }, 350);
 }
 
+$('#btnSave')?.addEventListener('click', async ()=>{
+  const body=collectSettings();
+  body.schedule.version = (Date.now()/1000|0);
+  body.settings.version = (Date.now()/1000|0);
+  const r=await fetch('/admin/api/save.php',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  const j=await r.json().catch(()=>({ok:false}));
+  alert(j.ok ? 'Gespeichert.' : ('Fehler: '+(j.error||'unbekannt')));
+});
 
-// ------- Farben -------
-    function colorField(key,label,init){ const row=document.createElement('div'); row.className='kv'; row.innerHTML=`<label>${label}</label><div class="color-item"><div class="swatch" id="sw_${key}"></div><input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB"></div>`; return row; }
-    function renderColors(){
-      const host=$('#colorList'); host.innerHTML='';
-      const theme=settings.theme||{};
-      const A=document.createElement('div'); A.className='fieldset'; A.innerHTML='<div class="legend">Grundfarben</div>';
-      A.appendChild(colorField('bg','Hintergrund', theme.bg||DEFAULTS.theme.bg));
-      A.appendChild(colorField('fg','Vordergrund/Schrift', theme.fg||DEFAULTS.theme.fg));
-      A.appendChild(colorField('accent','Akzent', theme.accent||DEFAULTS.theme.accent));
+// Export/Import + Optionen
+function initBackupButtons(){
+  const expBtn   = document.getElementById('btnExport');
+  const impFile  = document.getElementById('importFile');
+  const impWrite = document.getElementById('impWriteImg');
 
-const B=document.createElement('div'); B.className='fieldset'; B.innerHTML='<div class="legend">Übersichtstabelle</div>';
-B.appendChild(colorField('gridTable','Tabellenrahmen (nur Übersicht)', theme.gridTable||theme.gridBorder||DEFAULTS.theme.gridTable||DEFAULTS.theme.gridBorder));
-// Breite (Spinner)
-      const bw=document.createElement('div'); bw.className='kv'; bw.innerHTML='<label>Tabellenrahmen Breite (px)</label><input id="bw_gridTableW" class="input" type="number" min="0" max="10" step="1" value="'+(Number.isFinite(+theme.gridTableW)?theme.gridTableW:DEFAULTS.theme.gridTableW)+'">';
-      B.appendChild(bw);
-      B.appendChild(colorField('headRowBg','Kopfzeile Hintergrund', theme.headRowBg||DEFAULTS.theme.headRowBg));
-      B.appendChild(colorField('headRowFg','Kopfzeile Schrift', theme.headRowFg||DEFAULTS.theme.headRowFg));
-      B.appendChild(colorField('zebra1','Zebra (Inhalt) 1', theme.zebra1||DEFAULTS.theme.zebra1));
-      B.appendChild(colorField('zebra2','Zebra (Inhalt) 2', theme.zebra2||DEFAULTS.theme.zebra2));
-      B.appendChild(colorField('timeZebra1','Zeitspalte Zebra 1', theme.timeZebra1||DEFAULTS.theme.timeZebra1));
-      B.appendChild(colorField('timeZebra2','Zeitspalte Zebra 2', theme.timeZebra2||DEFAULTS.theme.timeZebra2));
-      B.appendChild(colorField('cornerBg','Ecke (oben‑links) BG', theme.cornerBg||DEFAULTS.theme.cornerBg));
-      B.appendChild(colorField('cornerFg','Ecke (oben‑links) FG', theme.cornerFg||DEFAULTS.theme.cornerFg));
+  if (expBtn) expBtn.onclick = async ()=>{
+    const incImg = document.getElementById('expWithImg')?.checked ? 1 : 0;
+    const incSet = document.getElementById('expWithSettings')?.checked ? 1 : 0;
+    const incSch = document.getElementById('expWithSchedule')?.checked ? 1 : 0;
+    const stamp  = new Date().toISOString().slice(0,10);
+    const url = `/admin/api/export.php?include=${incImg}&settings=${incSet}&schedule=${incSch}&name=${encodeURIComponent('signage_export_'+stamp)}`;
+    window.location.assign(url);
+  };
 
- const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna-Folien & Flammen</div>';
- C.appendChild(colorField('cellBg','Kachel-Hintergrund', theme.cellBg||DEFAULTS.theme.cellBg));
- C.appendChild(colorField('boxFg','Kachel-Schrift', theme.boxFg||DEFAULTS.theme.boxFg));
- C.appendChild(colorField('saunaColor','Sauna-Überschrift', theme.saunaColor||DEFAULTS.theme.saunaColor));
- C.appendChild(colorField('tileBorder','Kachel-Rahmen (nur Kacheln)', theme.tileBorder||theme.gridBorder||DEFAULTS.theme.tileBorder||DEFAULTS.theme.gridBorder));
- C.appendChild(colorField('flame','Flammen', theme.flame||DEFAULTS.theme.flame));
+  if (impFile) impFile.onchange = async ()=>{
+    if(!impFile.files || !impFile.files[0]) return;
+    const fd = new FormData();
+    fd.append('file', impFile.files[0]);
+    fd.append('writeAssets', (impWrite?.checked ? '1' : '0'));
+    fd.append('writeSettings', document.getElementById('impWriteSettings')?.checked ? '1' : '0');
+    fd.append('writeSchedule', document.getElementById('impWriteSchedule')?.checked ? '1' : '0');
+    const res = await fetch('/admin/api/import.php',{ method:'POST', body: fd });
+    let j=null; try{ j=await res.json(); }catch{}
+    alert(j?.ok ? 'Import erfolgreich.' : ('Fehler: '+(j?.error||'unbekannt')));
+    if(j?.ok) location.reload();
+  };
+}
 
-      host.appendChild(A); host.appendChild(B); host.appendChild(C);
-      $$('#colorList input[type="text"]').forEach(inp=>{ const sw=$('#sw_'+inp.id.replace(/^cl_/,'')); const setPrev=v=>sw.style.background=v; setPrev(inp.value); inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); }); });
-      $('#resetColors').onclick=()=>{ 
-        $$('#colorList input[type="text"]').forEach(inp=>{ const k=inp.id.replace(/^cl_/,''); inp.value=(DEFAULTS.theme[k]||'#FFFFFF'); const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value; }); 
-        const bw=document.getElementById('bw_gridTableW'); if(bw) bw.value = DEFAULTS.theme.gridTableW ?? 2;
-      };
-    }
-    
-// ------- Fußnoten -------
-    function renderFootnotes(){
-      const host=$('#fnList'); host.innerHTML='';
-      const layoutSel = document.getElementById('footnoteLayout');
-      if (layoutSel){ layoutSel.value = settings.footnoteLayout || 'one-line'; layoutSel.onchange = ()=>{ settings.footnoteLayout = layoutSel.value; }; }
-      const list = settings.footnotes || [];
-      list.forEach((fn,i)=> host.appendChild(fnRow(fn,i)));
-      $('#fnAdd').onclick=()=>{ (settings.footnotes ||= []).push({id:genId(), label:'*', text:''}); renderFootnotes(); };
-    }
-    function fnRow(fn,i){
-      const wrap=document.createElement('div'); wrap.className='kv';
-      wrap.innerHTML = `<label>Label/Text</label><div class="row" style="gap:8px;flex-wrap:nowrap"><input class="input" id="fn_l_${i}" value="${fn.label||'*'}" style="width:6ch"/><input class="input" id="fn_t_${i}" value="${fn.text||''}" style="min-width:0"/><button class="btn sm" id="fn_x_${i}">✕</button></div>`;
-      wrap.querySelector(`#fn_l_${i}`).onchange=(e)=>{ fn.label = (e.target.value||'*').slice(0,2); };
-      wrap.querySelector(`#fn_t_${i}`).onchange=(e)=>{ fn.text = e.target.value||''; };
-      wrap.querySelector(`#fn_x_${i}`).onclick=()=>{ settings.footnotes.splice(i,1); renderFootnotes(); };
-      return wrap;
-    }
+// ============================================================================
+// 7) Theme-Toggle
+// ============================================================================
+function initThemeToggle(){
+  const cb = document.getElementById('themeMode');
+  const label = document.getElementById('themeLabel');
 
-    // ------- Upload helper & cleanup -------
-    function uploadGeneric(fileInput, onDone){ if(!fileInput.files || !fileInput.files[0]) return; const fd=new FormData(); fd.append('file', fileInput.files[0]); const xhr=new XMLHttpRequest(); xhr.open('POST','/admin/api/upload.php'); xhr.onload=()=>{ try{ const j=JSON.parse(xhr.responseText||'{}'); if(j.ok){ onDone(j.path); } else { alert('Upload-Fehler: '+(j.error||'')); } }catch{ alert('Upload fehlgeschlagen'); } }; xhr.onerror=()=> alert('Netzwerkfehler beim Upload'); xhr.send(fd); }
-    async function cleanupAssets(){ if(!confirm('Überflüssige Bilder in /assets/img/ löschen (Defaults & aktuell verwendete bleiben erhalten)?')) return; const r=await fetch('/admin/api/cleanup_assets.php'); const j=await r.json().catch(()=>({ok:false})); alert(j.ok? (`Bereinigt: ${j.removed} Dateien entfernt.`):('Fehler: '+(j.error||''))); }
+  const apply = (mode) => {
+    document.body.classList.toggle('theme-light', mode === 'light');
+    document.body.classList.toggle('theme-dark',  mode === 'dark');
+    label.textContent = (mode === 'light') ? 'Hell' : 'Dunkel';
+    localStorage.setItem('adminTheme', mode);
+  };
 
-    // ------- Save / Preview -------
-    function collectColors(){ 
-      const theme={...(settings.theme||{})}; 
-      $$('#colorList input[type="text"]').forEach(inp=>{ const v=inp.value.toUpperCase(); if(/^#([0-9A-Fa-f]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v; }); 
-      const bw=document.getElementById('bw_gridTableW'); if(bw) theme.gridTableW = Math.max(0, Math.min(10, +bw.value||0));
-      return theme; 
-    }
-    function collectSettings(){
-      return {
-        schedule:{...schedule},
-        settings:{
-          ...settings,
-          footnoteLayout: document.getElementById('footnoteLayout')?.value || settings.footnoteLayout || 'one-line',
-  fonts:{
-            family: $('#fontFamily').value,
-            scale: +($('#fontScale')?.value||1),
-            h1Scale:+($('#h1Scale').value||1),
-            h2Scale:+($('#h2Scale').value||1),
-            overviewTitleScale:+($('#ovTitleScale').value||1),
-            overviewHeadScale:+($('#ovHeadScale').value||0.9),
-            overviewCellScale:+($('#ovCellScale').value||0.8),
-            chipHeight:+($('#chipH').value||44),
-chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
-flamePct:         +($('#flamePct')?.value || 55),
-flameGapPx:       +($('#flameGap')?.value || 6),
-tileTextScale:+($('#tileTextScale').value||0.8), tileWeight:+($('#tileWeight').value||600) },
-            h2:{
-              mode: $('#h2Mode').value || 'text',
-              text: ($('#h2Text').value ?? '').trim(),
-              showOnOverview: !!$('#h2ShowOverview').checked
-            },
-            slides:{
-              ...(settings.slides||{}),
-              // aus neuer großer Box
-              showOverview: !!document.getElementById('ovShow')?.checked,
-              overviewDurationSec: +(document.getElementById('ovSec')?.value || 10),
-              transitionMs: +(document.getElementById('transMs2')?.value || 500),
-              durationMode: (document.querySelector('input[name=durMode]:checked')?.value || 'uniform'),
-              globalDwellSec: +(document.getElementById('dwellAll')?.value || 6)
-            },
-          theme: collectColors(),
-          highlightNext:{
-            enabled: $('#hlEnabled').checked,
-            color: /^#([0-9A-Fa-f]{6})$/.test($('#hlColor').value)? $('#hlColor').value.toUpperCase() : (settings.highlightNext?.color || DEFAULTS.highlightNext.color),
-            minutesBeforeNext: +( $('#hlBefore').value || DEFAULTS.highlightNext.minutesBeforeNext ),
-            minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
-          },
-          assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
-          display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080, rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
-          footnotes: settings.footnotes,
-          interstitials: settings.interstitials || [],
-	presets: settings.presets || {},
-          presetAuto: !!document.getElementById('presetAuto')?.checked
-        }
-      };
-    }
+  // ⬇️ Standard jetzt "light"
+  const saved = localStorage.getItem('adminTheme') || 'light';
+  cb.checked = (saved === 'light');
+  apply(saved);
 
-    $('#btnOpen').onclick=()=> window.open('/', '_blank');
-    $('#btnPreview').onclick=()=>{ $('#prevModal').style.display='grid'; sendPreview(); };
-    $('#prevReload').onclick=()=> sendPreview(true);
-    $('#prevClose').onclick=()=> $('#prevModal').style.display='none';
-    function sendPreview(reload){ const f=$('#prevFrame'); if(reload){ f.contentWindow.location.reload(); setTimeout(()=>sendPreview(),400); return; } const payload=collectSettings(); setTimeout(()=>{ f.contentWindow.postMessage({type:'preview', payload}, '*'); }, 350); }
+  cb.onchange = () => apply(cb.checked ? 'light' : 'dark');
+}
 
-    $('#btnSave').onclick=async()=>{ const body=collectSettings(); body.schedule.version = (Date.now()/1000|0); body.settings.version = (Date.now()/1000|0); const r=await fetch('/admin/api/save.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json(); alert(j.ok? 'Gespeichert.' : ('Fehler: '+(j.error||'unbekannt'))); };
-
-    function initBackupButtons(){
-      const expBtn = document.getElementById('btnExport');
-      const expWithImg = document.getElementById('expWithImg');
-      const impFile = document.getElementById('importFile');
-      const impWrite = document.getElementById('impWriteImg');
-
-      if (expBtn) expBtn.onclick = async ()=>{
-        const incImg = document.getElementById('expWithImg')?.checked ? 1 : 0;
-        const incSet = document.getElementById('expWithSettings')?.checked ? 1 : 0;
-        const incSch = document.getElementById('expWithSchedule')?.checked ? 1 : 0;
-        const stamp = new Date().toISOString().slice(0,10);
-        const url = `/admin/api/export.php?include=${incImg}&settings=${incSet}&schedule=${incSch}&name=${encodeURIComponent('signage_export_'+stamp)}`;
-        window.location.assign(url);
-      };
-
-      if (impFile) impFile.onchange = async ()=>{
-        if(!impFile.files || !impFile.files[0]) return;
-        const fd = new FormData();
-        fd.append('file', impFile.files[0]);
-        fd.append('writeAssets', (impWrite?.checked ? '1' : '0'));
-        fd.append('writeSettings', document.getElementById('impWriteSettings')?.checked ? '1' : '0');
-        fd.append('writeSchedule', document.getElementById('impWriteSchedule')?.checked ? '1' : '0');
- const res = await fetch('/admin/api/import.php',{ method:'POST', body: fd });
-        let j=null; try{ j=await res.json(); }catch{}
-        alert(j?.ok ? 'Import erfolgreich.' : ('Fehler: '+(j?.error||'unbekannt')));
-        if(j?.ok) location.reload();
-      };
-    }
-
-
-    function initThemeToggle(){
-      const cb = document.getElementById('themeMode');
-      const label = document.getElementById('themeLabel');
-      const apply = (mode) => {
-        document.body.classList.toggle('theme-light', mode==='light');
-        label.textContent = (mode==='light') ? 'Hell' : 'Dunkel';
-        localStorage.setItem('adminTheme', mode);
-      };
-      const saved = localStorage.getItem('adminTheme') || 'dark';
-      cb.checked = (saved==='light');
-      apply(saved);
-      cb.onchange = () => apply(cb.checked ? 'light' : 'dark');
-    }
-
-initThemeToggle();
-initBackupButtons();
-
-(function initCleanupInSystem(){
+// ============================================================================
+// 8) System: Cleanup-Buttons (Assets aufräumen mit Auswahl)
+// ============================================================================
+function initCleanupInSystem(){
   const btn = document.getElementById('btnCleanupSys');
   if(!btn) return;
   btn.onclick = async ()=>{
@@ -2874,13 +3547,13 @@ initBackupButtons();
     const j = await r.json().catch(()=>({ok:false}));
     alert(j.ok ? (`Bereinigt: ${j.removed||'?'} Dateien entfernt.`) : ('Fehler: '+(j.error||'')));
   };
-})();
+}
 
- loadAll();
-  </script>
-</body>
-</html>
-HTML
+// ============================================================================
+// 9) Start
+// ============================================================================
+loadAll();
+JS
 
 # ---------------------------
 # Admin API (PHP)
@@ -2901,26 +3574,38 @@ header('Content-Type: application/json; charset=UTF-8');
 $fn = '/var/www/signage/data/settings.json';
 if(!is_file($fn)){
 echo json_encode([
-'version'=>1,
-'theme'=>[
-'bg'=>'#E8DEBD','fg'=>'#5C3101','accent'=>'#5C3101','gridBorder'=>'#5C3101','cellBg'=>'#5C3101','boxFg'=>'#FFFFFF',
-'saunaColor'=>'#5C3101','timeColBg'=>'#E8DEBD','flame'=>'#FFD166','zebra1'=>'#EDDFAF','zebra2'=>'#E6D6A1'
-],
-'fonts'=>['family'=>"-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif", 'scale'=>1],
-'h2'=>['mode'=>'text','text'=>'Aufgusszeiten','showOnOverview'=>true],
-'display'=>['fit'=>'width','rightWidthPercent'=>38,'cutTopPercent'=>28,'cutBottomPercent'=>12],
-'slides'=>[
-'overviewDurationSec'=>10,
-'saunaDurationSec'=>6,
-'transitionMs'=>500,
-'tileWidthPercent'=>45,
-'tileMinPx'=>480,
-'tileMaxPx'=>1100,
-'loop'=>true,
-'order'=>['overview','Aufgusssauna','Finnische Sauna','Kelosauna','Dampfbad','Fenster zur Welt']
-],
-'assets'=>['rightImages'=>[], 'flameImage'=>'/assets/img/flame_test.svg'],
-'footnote'=>''
+  'version'=>1,
+  'theme'=>[
+    'bg'=>'#E8DEBD','fg'=>'#5C3101','accent'=>'#5C3101',
+    'gridBorder'=>'#5C3101','gridTable'=>'#5C3101','gridTableW'=>2,
+    'cellBg'=>'#5C3101','boxFg'=>'#FFFFFF',
+    'headRowBg'=>'#E8DEBD','headRowFg'=>'#5C3101',
+    'timeColBg'=>'#E8DEBD','timeZebra1'=>'#EAD9A0','timeZebra2'=>'#E2CE91',
+    'zebra1'=>'#EDDFAF','zebra2'=>'#E6D6A1',
+    'cornerBg'=>'#E8DEBD','cornerFg'=>'#5C3101',
+    'tileBorder'=>'#5C3101','chipBorder'=>'#5C3101','chipBorderW'=>2,
+    'flame'=>'#FFD166','saunaColor'=>'#5C3101'
+  ],
+  'fonts'=>[
+    'family'=>"-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
+    'scale'=>1, 'h1Scale'=>1, 'h2Scale'=>1,
+    'overviewTitleScale'=>1, 'overviewHeadScale'=>0.9, 'overviewCellScale'=>0.8,
+    'tileTextScale'=>0.8, 'tileWeight'=>600, 'chipHeight'=>44,
+    'chipOverflowMode'=>'scale','flamePct'=>55,'flameGapPx'=>6
+  ],
+  'h2'=>['mode'=>'text','text'=>'Aufgusszeiten','showOnOverview'=>true],
+  'display'=>['fit'=>'cover','rightWidthPercent'=>38,'cutTopPercent'=>28,'cutBottomPercent'=>12],
+  'slides'=>[
+    'overviewDurationSec'=>10,'saunaDurationSec'=>6,'transitionMs'=>500,
+    'tileWidthPercent'=>45,'tileMinPx'=>480,'tileMaxPx'=>1100,
+    'durationMode'=>'uniform','globalDwellSec'=>6,'loop'=>true,
+    'order'=>['overview']
+  ],
+  'assets'=>['rightImages'=>[], 'flameImage'=>'/assets/img/flame_test.svg'],
+  'footnotes'=>[ ['id'=>'star','label'=>'*','text'=>'Nur am Fr und Sa'] ],
+  'interstitials'=>[],
+  'presets'=>[],
+  'presetAuto'=>false
 ]);
 exit;
 }
@@ -2943,7 +3628,6 @@ echo json_encode(['ok'=>true]);
 PHP
 
 chown -R www-data:www-data /var/www/signage/admin
-chmod -R 0644 /var/www/signage/admin/api/*.php
 find /var/www/signage -type d -exec chmod 2775 {} \;
 
 # ---------------------------
@@ -3124,7 +3808,7 @@ $writeAssets   = !empty($_POST['writeAssets']) || !empty($_GET['writeAssets']);
 $writeSettings = isset($_POST['writeSettings']) ? ($_POST['writeSettings']==='1') : true;
 $writeSchedule = isset($_POST['writeSchedule']) ? ($_POST['writeSchedule']==='1') : true;
 $settings = $j['settings'] ?? null; $schedule = $j['schedule'] ?? null;
-if (!$settings || !$schedule) fail('missing-sections');
+if (!$settings && !$schedule) fail('missing-sections');
 
 $base = '/var/www/signage';
 $assetsDir = $base.'/assets/img';
@@ -3180,6 +3864,17 @@ echo json_encode(['ok'=>true, 'assetsWritten'=>count($pathMap), 'remapped'=>$pat
 PHP
 
 
+# --- Final: saubere Ownership & Rechte im Webroot ---
+chown -R www-data:www-data "$WEBROOT"
+
+# Verzeichnisse setgid + gruppenschreibbar, Dateien 0644
+find "$WEBROOT" -type d -exec chmod 2775 {} +
+find "$WEBROOT" -type f -exec chmod 0644 {} +
+
+# PHP-Skripte sicherstellen (falls Shell-Globs mal nicht trafen)
+find "$WEBROOT/admin/api" -type f -name '*.php' -exec chmod 0644 {} +
+
+
 # ---------------------------
 # Nginx vHosts
 # ---------------------------
@@ -3231,14 +3926,23 @@ server {
   location ~ ^/admin/api/.*\.php$ {
     include snippets/fastcgi-php.conf;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+    fastcgi_pass unix:__PHP_SOCK__;
   }
 }
 NGINX
 
-sed -i "s/__PUBLIC_PORT__/${SIGNAGE_PUBLIC_PORT}/g" /etc/nginx/sites-available/signage-slideshow.conf
-sed -i "s/__ADMIN_PORT__/${SIGNAGE_ADMIN_PORT}/g"     /etc/nginx/sites-available/signage-admin.conf
+# Variablen haben Defaults – zusätzlich exportieren schadet nicht
+export SIGNAGE_PUBLIC_PORT SIGNAGE_ADMIN_PORT
 
+# Platzhalter ersetzen
+sed -i "s/__PUBLIC_PORT__/${SIGNAGE_PUBLIC_PORT}/g" /etc/nginx/sites-available/signage-slideshow.conf
+sed -i "s/__ADMIN_PORT__/${SIGNAGE_ADMIN_PORT}/g"   /etc/nginx/sites-available/signage-admin.conf
+sed -i "s|__PHP_SOCK__|${PHP_SOCK}|g"               /etc/nginx/sites-available/signage-admin.conf
+
+# Safety-Check: sind noch Platzhalter in den Nginx-Configs?
+if grep -R -q "__ADMIN_PORT__\|__PUBLIC_PORT__\|__PHP_SOCK__" /etc/nginx/sites-available; then
+  err "Nginx-Konfiguration enthält noch Platzhalter. Ersetzungen prüfen."
+fi
 
 ln -sf /etc/nginx/sites-available/signage-slideshow.conf /etc/nginx/sites-enabled/signage-slideshow.conf
 ln -sf /etc/nginx/sites-available/signage-admin.conf     /etc/nginx/sites-enabled/signage-admin.conf
@@ -3246,7 +3950,6 @@ rm -f /etc/nginx/sites-enabled/default || true
 
 nginx -t
 systemctl reload nginx
-
 
 # PHP Upload/Exec-Limits für große Bilder
 cat >/etc/php/8.3/fpm/conf.d/zz-signage.ini <<'INI'
@@ -3298,6 +4001,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
