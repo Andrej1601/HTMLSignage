@@ -380,6 +380,12 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
+const Q = new URLSearchParams(location.search);
+const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
+const rawDevice = (Q.get('device') || localStorage.getItem('deviceId') || '').trim();
+const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
+if (!DEVICE_ID) localStorage.removeItem('deviceId'); // Karteileichen loswerden
+let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
 
   let schedule = null;
   let settings = null;
@@ -405,6 +411,20 @@ cat >/var/www/signage/assets/slideshow.js <<'JS'
       schedule = preset; // gleiche Struktur wie schedule.json erwartet
     }
   }
+
+// -----------DeviceLoader -------
+async function loadDeviceResolved(id){
+  const r = await fetch(`/pair/resolve?device=${encodeURIComponent(id)}&t=${Date.now()}`, {cache:'no-store'});
+  if (!r.ok) throw new Error('device_resolve http '+r.status);
+  const j = await r.json();
+  if (!j || j.ok === false || !j.settings || !j.schedule) {
+    throw new Error('device_resolve payload invalid');
+  }
+  schedule = j.schedule;
+  settings = j.settings;
+  applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+}
+
 
   // ---------- IO ----------
   async function loadJSON(u) { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u); return await r.json(); }
@@ -717,6 +737,14 @@ function fitChipText(el, mode){
     el.classList.add('ellipsis'); // letzte Sicherung
   }
 }
+//ERRORS
+window.onerror = function (msg, src, line, col) {
+  const d = document.createElement('div');
+  d.style = 'position:fixed;left:8px;bottom:8px;z-index:99999;background:rgba(0,0,0,.5);color:#fff;padding:8px 10px;border-radius:8px;font:12px/1.2 monospace';
+  d.textContent = '[JS] ' + msg + ' @ ' + (src||'') + ':' + line + ':' + col;
+  document.body.appendChild(d);
+};
+
 
 function fitChipsIn(container){
   const mode = document.body.dataset.chipOverflow || 'scale';
@@ -989,33 +1017,141 @@ lastKey = key;
   slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
 }
 
+//Showpairing
+function showPairing(){
+  STAGE.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'container fade show';
+  box.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+  box.innerHTML = `
+    <div style="background:rgba(0,0,0,.55);color:#fff;padding:28px 32px;border-radius:16px;max-width:90vw;text-align:center">
+      <div style="font-weight:800;font-size:28px;margin-bottom:10px">Gerät koppeln</div>
+      <div id="code" style="font-size:42px;font-weight:900;letter-spacing:4px;background:rgba(255,255,255,.1);padding:8px 14px;border-radius:12px;display:inline-block;min-width:12ch">…</div>
+      <div style="margin-top:10px;opacity:.9">Öffne im Admin „Geräte“ und gib den Code ein.</div>
+    </div>`;
+  STAGE.appendChild(box);
+
+  (async ()=>{
+    try {
+      // Bestehenden Code (Session) wiederverwenden – verhindert neuen Code bei Refresh
+      let st = null; try { st = JSON.parse(sessionStorage.getItem('pairState')||'null'); } catch {}
+      let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
+
+      if (!code) {
+        const r = await fetch('/pair/begin', { method:'POST', headers:{'X-Pair-Request':'1'} });
+        if (!r.ok) throw new Error('begin http '+r.status);
+        const j0 = await r.json();
+        if (!j0 || !j0.code) throw new Error('begin payload');
+        code = j0.code;
+        sessionStorage.setItem('pairState', JSON.stringify({ code, createdAt: Date.now() }));
+      }
+
+      const el = document.getElementById('code');
+      if (el) el.textContent = code;
+
+      const timer = setInterval(async ()=>{
+        try {
+          const rr = await fetch('/pair/poll?code='+encodeURIComponent(code), {cache:'no-store'});
+          if (!rr.ok) return;
+          const jj = await rr.json();
+          if (jj && jj.paired && jj.deviceId){
+            clearInterval(timer);
+            try{ sessionStorage.removeItem('pairState'); }catch{}
+            localStorage.setItem('deviceId', jj.deviceId);
+            location.replace('/?device='+encodeURIComponent(jj.deviceId));
+          }
+        } catch {}
+      }, 3000);
+    } catch (e) {
+      const el = document.getElementById('code');
+      if (el) el.textContent = 'NETZ-FEHLER';
+      console.error('[pair] begin failed', e);
+    }
+  })();
+}
+
+
   // ---------- Bootstrap & live update ----------
-  async function bootstrap() {
-    await loadAll();
-    step();
+async function bootstrap(){
+// Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
+ window.addEventListener('message', (ev) => {
+ const d = ev?.data || {};
+ if (d?.type !== 'preview') return;
+ previewMode = true;
+ try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
+ const p = d.payload || {};
+ if (p.schedule) schedule = p.schedule;
+ if (p.settings) settings = p.settings;
+ applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+ idx = 0; lastKey = null;
+ step();
+ });
+  const deviceMode = !!DEVICE_ID;
+
+  if (!previewMode) {
+    if (deviceMode) {
+try {
+ await loadDeviceResolved(DEVICE_ID);
+ // Heartbeat: sofort + alle 30s (setzt "Zuletzt gesehen" direkt)
+ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{});
+ setInterval(()=>{ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{}); }, 30000);     
+ } catch (e) {
+console.error('[bootstrap] resolve failed:', e);
+ showPairing();
+ return; // HIER abbrechen, sonst bleibt die Stage leer
+      }
+} else {
+  if (IS_PREVIEW) {
+    STAGE.innerHTML = '<div style="padding:16px;color:#fff;opacity:.75">Vorschau lädt…</div>';
+    return; // kein Pairing im Admin-Dock
+  }
+  showPairing();
+  return;
+}
+  }
+
+  // Erst hier starten wir die Slideshow
+  step();
+
+  // Live-Reload: bei Device NUR resolve pollen
+  if (!previewMode) {
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
-    setInterval(async () => {
-      try { const s = await loadJSON('/data/schedule.json'); if (s.version !== lastSchedVer) { schedule = s; lastSchedVer = s.version; buildQueue(); } } catch (e) {}
-      try {
-        const cf = await loadJSON('/data/settings.json');
-        if (cf.version !== lastSetVer) {
-          settings = cf; lastSetVer = cf.version;
-          applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
-          clearTimers(); idx = idx % nextQueue.length; step(); // sofort neu rendern (H2 inkl.)
-        }
-      } catch (e) {}
-    }, 3000);
 
-    window.addEventListener('message', (ev) => {
-      if (!ev?.data || ev.data.type !== 'preview') return;
-      const p = ev.data.payload || {};
-      if (p.schedule) schedule = p.schedule;
-      if (p.settings) settings = p.settings;
-      clearTimers();
-      applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue(); idx = 0; step();
-    });
+    setInterval(async () => {
+      try {
+        if (deviceMode) {
+          const r = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, {cache:'no-store'});
+          if (!r.ok) throw new Error('resolve http '+r.status);
+          const j = await r.json();
+          if (!j || j.ok === false) throw new Error('resolve payload');
+
+          const newSchedVer = j.schedule?.version || 0;
+          const newSetVer   = j.settings?.version || 0;
+
+          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
+            schedule = j.schedule; settings = j.settings;
+            lastSchedVer = newSchedVer; lastSetVer = newSetVer;
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
+          }
+        } else {
+          const s  = await loadJSON('/data/schedule.json');
+          const cf = await loadJSON('/data/settings.json');
+          if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
+            schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
+          }
+        }
+} catch(e) {
+ console.warn('[poll] failed:', e);
+ // robuster: nicht sofort zurück zum Pairing – erst nach 3 Fehlversuchen
+ window.__pollErrs = (window.__pollErrs||0)+1;
+ if (deviceMode && window.__pollErrs>=3) showPairing();      }
+    }, 3000);
   }
+}
 
   bootstrap();
 })();
@@ -1422,7 +1558,7 @@ CSS
 
 
 cat >/var/www/signage/admin/index.html <<'HTML'
-   <!doctype html> <html lang="de"> <head>
+ <!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
@@ -1438,15 +1574,26 @@ cat >/var/www/signage/admin/index.html <<'HTML'
         <input type="checkbox" id="themeMode">
         <span id="themeLabel">Dunkel</span>
       </label>
+<!-- Ansicht-Menü -->
+<div class="menuwrap" id="viewMenuWrap">
+  <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+    Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+  </button>
+  <div class="dropdown" id="viewMenu" role="menu" hidden>
+    <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+    <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+    <button class="dd-item" role="menuitemradio" data-view="devices" aria-checked="false">🖥 Geräte</button>
+  </div>
+</div>
+
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
-      <button class="btn" id="btnPreview">Vorschau (ohne Speichern)</button>
       <button class="btn primary" id="btnSave">Speichern</button>
     </div>
   </header>
 
   <main class="layout">
     <section class="leftcol">
-      <div class="card">
+<div class="card" id="gridPane">
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
@@ -1695,7 +1842,9 @@ cat >/var/www/signage/admin/index.html <<'HTML'
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
         </summary>
         <div class="content color-cols" id="colorList"></div>
-      </details>
+    </div>
+</details>     
+</details>
 
       <details class="ac">
         <summary>
@@ -1765,18 +1914,26 @@ cat >/var/www/signage/admin/index.html <<'HTML'
     </div>
   </div>
 
-  <!-- Vorschau-Modal -->
-  <div id="prevModal" class="modal">
-    <div class="box">
-      <div class="row" style="justify-content:space-between;margin-bottom:10px">
-        <div style="font-weight:700">Vorschau</div>
-        <div class="row"><button class="btn sm" id="prevReload">Neu laden</button><button class="btn sm" id="prevClose">Schließen</button></div>
+<!-- Geräte-Vorschau (ohne Pairing) – ACHTUNG: SIBLING, NICHT im prevModal! -->
+<div id="devPrevModal" class="modal">
+  <div class="box">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div style="font-weight:700" data-devprev-title>Geräte-Ansicht</div>
+      <div class="row">
+        <button class="btn sm" id="devPrevReload">Neu laden</button>
+        <button class="btn sm" id="devPrevClose">Schließen</button>
       </div>
-      <div class="iframeWrap"><iframe id="prevFrame" src="/"></iframe></div>
-      <small class="mut" style="display:block;margin-top:8px">Die Vorschau verwendet die aktuellen (nicht gespeicherten) Einstellungen.</small>
     </div>
+    <div class="iframeWrap">
+      <iframe id="devPrevFrame" src="about:blank" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </div>
+    <small class="mut" style="display:block;margin-top:8px">
+      Live-Ansicht des ausgewählten Geräts (nur Lesen; kein Pairing, keine Speicherung).
+    </small>
   </div>
-<script type="module" src="/admin/js/app.js"></script> 
+</div>
+
+<script type="module" src="/admin/js/app.js"></script>
 </body>
 </html>
 HTML
@@ -3088,7 +3245,7 @@ cat > /var/www/signage/admin/js/app.js <<'JS'
 'use strict';
 
 // === Modular imports =========================================================
-import { $, $$, preloadImg, genId } from './core/utils.js';
+import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster } from './ui/slides_master.js';
@@ -3098,6 +3255,94 @@ import { uploadGeneric } from './core/upload.js';
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
+let baseSettings = null;            // globale Settings (Quelle)
+let currentDeviceCtx = null;        // z.B. "dev_abc..."
+let currentDeviceName = null;
+let currentView = localStorage.getItem('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
+let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
+let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
+
+
+// --- Kontext-Badge (Header) im Modul-Scope ---
+function renderContextBadge(){
+  const h1 = document.querySelector('header h1');
+  if (!h1) return;
+  let el = document.getElementById('ctxBadge');
+  if (!currentDeviceCtx){
+    if (el) el.remove();
+    return;
+  }
+  if (!el){
+    el = document.createElement('span'); el.id='ctxBadge';
+    el.className='ctx-badge';
+    h1.after(el);
+  }
+  el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
+  el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
+}
+
+// --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
+async function enterDeviceContext(id, name){
+  // aktuelle Geräte-Daten holen, Overrides herausziehen
+  const r = await fetch('/admin/api/devices_list.php');
+  const j = await r.json();
+  const dev = (j.devices||[]).find(d=>d.id===id);
+  const ov  = dev?.overrides?.settings || {};
+
+  currentDeviceCtx = id;
+  currentDeviceName = name || id;
+
+  // globale Settings als Basis
+  settings = deepClone(baseSettings);
+
+  // Overrides mergen (flach genug für unsere Struktur)
+  (function merge(t, s){
+    for (const k of Object.keys(s)){
+      if (s[k] && typeof s[k]==='object' && !Array.isArray(s[k])){
+        t[k] = t[k] && typeof t[k]==='object' ? deepClone(t[k]) : {};
+        merge(t[k], s[k]);
+      } else {
+        t[k] = s[k];
+      }
+    }
+  })(settings, ov);
+
+  // UI neu zeichnen
+  renderSlidesBox();
+  renderHighlightBox();
+  renderColors();
+  renderFootnotes();
+  initSlidesMasterUI({
+    getSchedule:()=>schedule,
+    getSettings:()=>settings,
+    setSchedule:(s)=>{schedule=s;},
+    setSettings:(cs)=>{settings=cs;}
+  });
+  renderContextBadge();
+
+  // in den Grid-Modus springen (falls du showView hast)
+if (typeof showView==='function') showView('grid');
+}
+
+function exitDeviceContext(){
+  currentDeviceCtx = null;
+  currentDeviceName = null;
+
+  settings = deepClone(baseSettings);
+
+  renderSlidesBox();
+  renderHighlightBox();
+  renderColors();
+  renderFootnotes();
+  initSlidesMasterUI({
+    getSchedule:()=>schedule,
+    getSettings:()=>settings,
+    setSchedule:(s)=>{schedule=s;},
+    setSettings:(cs)=>{settings=cs;}
+  });
+  renderContextBadge();
+}
+
 
 // ============================================================================
 // 1) Bootstrap: Laden + Initialisieren
@@ -3110,6 +3355,7 @@ async function loadAll(){
 
   schedule = s || {};
   settings = cfg || {};
+  baseSettings = deepClone(settings);
 
   // Defaults mergen (defensiv)
   settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
@@ -3151,6 +3397,7 @@ async function loadAll(){
   initThemeToggle();
   initBackupButtons();
   initCleanupInSystem();
+  initViewMenu();
 }
 
 // ============================================================================
@@ -3292,9 +3539,10 @@ function colorField(key,label,init){
 }
 
 function renderColors(){
-  const host = $('#colorList'); if (!host) return;
+ensureColorTools();
+const host = $('#colorList');
+  if (!host) return;
   host.innerHTML = '';
-
   const theme = settings.theme || {};
 
   // Grundfarben
@@ -3345,6 +3593,107 @@ function renderColors(){
     if(bws) bws.value = DEFAULTS.theme.gridTableW ?? 2;
   };
 }
+
+function ensureColorTools(){
+  const host = document.getElementById('colorList');
+  if (!host) return;
+  if (document.getElementById('colorTools')) return; // schon da
+
+  const box = document.createElement('div');
+  box.id = 'colorTools';
+  box.className = 'fieldset';
+  box.innerHTML = `
+    <div class="legendRow">
+      <div class="legend">Farb-Werkzeuge</div>
+<button class="btn sm ghost" id="togglePickerSize" title="Iframe Höhe expandieren/zusammenklappen">⛶</button>
+<button class="btn sm ghost" id="dockPicker" title="Als schwebendes Fenster anzeigen">⇱</button>
+
+</div>
+
+        <div id="pickerWrap" class="pickerResizable">
+          <iframe
+            id="hexPickerFrame"
+            class="pickerFrame"
+            src="https://colorhunt.co/"
+            loading="lazy"
+            referrerpolicy="no-referrer"
+            title="Hex Color Picker"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <div class="kv">
+      <label>Schnell-Picker</label>
+      <div class="row" style="gap:8px;flex-wrap:nowrap">
+        <input type="color" id="quickColor" class="input">
+        <input type="text" id="quickHex" class="input" value="#FFDD66" placeholder="#RRGGBB">
+        <button class="btn sm" id="copyHex" title="Hex in Zwischenablage kopieren"># kopieren</button>
+        <span id="copyState" class="mut"></span>
+      </div>
+    </div>
+  `;
+
+  // vor die Farbliste setzen
+  host.parentElement.insertBefore(box, host);
+
+  // Controls
+  const $wrap = document.getElementById('pickerWrap');
+  const $toggle = document.getElementById('togglePickerSize');
+  const $qc = document.getElementById('quickColor');
+  const $qh = document.getElementById('quickHex');
+  const $cp = document.getElementById('copyHex');
+  const $st = document.getElementById('copyState');
+
+  // Höhe aus LocalStorage wiederherstellen (nur "Normalmodus")
+const savedH = parseInt(localStorage.getItem('colorPickerH') || '0', 10);
+const savedW = parseInt(localStorage.getItem('colorPickerW') || '0', 10);
+if (savedH >= 140) $wrap.style.height = savedH + 'px';
+if (savedW >= 260) $wrap.style.width  = savedW + 'px';
+
+  // expand/collapse
+$toggle.onclick = ()=>{
+  if (!box.classList.contains('exp')){
+    box.dataset.prevH = $wrap.clientHeight;
+    box.dataset.prevW = $wrap.clientWidth;
+    box.classList.add('exp');
+    $wrap.style.width = '100%';
+  } else {
+    box.classList.remove('exp');
+    const h = parseInt(box.dataset.prevH || '180', 10);
+    const w = parseInt(box.dataset.prevW || '0',   10);
+    $wrap.style.height = Math.max(140, h) + 'px';
+    if (w) $wrap.style.width = Math.max(260, w) + 'px';
+  }
+};
+
+// Größe speichern (nur wenn nicht expanded)
+const ro = new ResizeObserver((entries)=>{
+  if (box.classList.contains('exp')) return;
+  for (const e of entries){
+    const {height, width} = e.contentRect;
+    if (height >= 140) localStorage.setItem('colorPickerH', String(Math.round(height)));
+    if (width  >= 260) localStorage.setItem('colorPickerW', String(Math.round(width)));
+  }
+});
+ro.observe($wrap);
+
+  // Schnell-Picker Logik
+  if (/^#([0-9A-Fa-f]{6})$/.test($qh.value)) $qc.value = $qh.value;
+  $qc.addEventListener('input', ()=>{ $qh.value = ($qc.value || '').toUpperCase(); });
+  $qh.addEventListener('input', ()=>{
+    const v = ($qh.value||'').trim();
+    if (/^#([0-9A-Fa-f]{6})$/.test(v)) $qc.value = v;
+  });
+  $cp.onclick = async ()=>{
+    const v = ($qh.value||'').trim().toUpperCase();
+    if (!/^#([0-9A-F]{6})$/.test(v)) { alert('Bitte gültigen Hex-Wert: #RRGGBB'); return; }
+    try { await navigator.clipboard.writeText(v); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
+    catch { $qh.select(); document.execCommand?.('copy'); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
+  };
+const $dock = document.getElementById('dockPicker');
+$dock.onclick = ()=> box.classList.toggle('float');
+}
+
 
 // ============================================================================
 // 5) Fußnoten
@@ -3448,33 +3797,394 @@ function collectSettings(){
 
 // Buttons: Open / Preview / Save
 $('#btnOpen')?.addEventListener('click', ()=> window.open('/', '_blank'));
-$('#btnPreview')?.addEventListener('click', ()=>{ $('#prevModal').style.display='grid'; sendPreview(); });
-$('#prevReload')?.addEventListener('click', ()=> sendPreview(true));
-$('#prevClose')?.addEventListener('click', ()=>{ $('#prevModal').style.display='none'; });
-
-function sendPreview(reload){
-  const f=$('#prevFrame'); if(!f) return;
-  if (reload){
-    f.contentWindow.location.reload();
-    setTimeout(()=>sendPreview(),400);
-    return;
-  }
-  const payload=collectSettings();
-  setTimeout(()=>{ f.contentWindow.postMessage({type:'preview', payload}, '*'); }, 350);
-}
 
 $('#btnSave')?.addEventListener('click', async ()=>{
-  const body=collectSettings();
-  body.schedule.version = (Date.now()/1000|0);
-  body.settings.version = (Date.now()/1000|0);
-  const r=await fetch('/admin/api/save.php',{
+  const body = collectSettings();
+
+  if (!currentDeviceCtx){
+    // Global speichern
+    body.schedule.version = (Date.now()/1000|0);
+    body.settings.version = (Date.now()/1000|0);
+    const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+    const j=await r.json().catch(()=>({ok:false}));
+    if (j.ok){ baseSettings = deepClone(body.settings); }
+    alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
+  } else {
+    // Geräte-Override speichern
+    const payload = { device: currentDeviceCtx, settings: body.settings };
+    const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const j=await r.json().catch(()=>({ok:false}));
+    alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
+  }
+});
+
+// --- Dock ----------------------------------------------------------
+let _dockTimer = 0;
+let _dockInputListener = null;
+
+function dockPushDebounced(){
+  clearTimeout(_dockTimer);
+  _dockTimer = setTimeout(()=> dockSend(false), 250);
+}
+function dockSend(reload){
+  const frame = document.getElementById('dockPane')?.querySelector('#dockFrame');
+  if (!frame || !frame.contentWindow) return;
+  const payload = collectSettings();
+  if (reload){
+    try { frame.contentWindow.location.reload(); } catch {}
+    setTimeout(()=> { try { frame.contentWindow.postMessage({type:'preview', payload}, '*'); } catch {} }, 350);
+    return;
+  }
+  try { frame.contentWindow.postMessage({type:'preview', payload}, '*'); } catch {}
+}
+function attachDockLivePush(){
+  if (_dockInputListener) return;
+  _dockInputListener = (ev)=>{
+    if (ev?.target?.type === 'file') return;
+    dockPushDebounced();
+  };
+  document.addEventListener('input',  _dockInputListener, true);
+  document.addEventListener('change', _dockInputListener, true);
+}
+function detachDockLivePush(){
+  if (!_dockInputListener) return;
+  document.removeEventListener('input',  _dockInputListener, true);
+  document.removeEventListener('change', _dockInputListener, true);
+  _dockInputListener = null;
+  clearTimeout(_dockTimer);
+}
+
+
+// --- Devices: Claim ----------------------------------------------------------
+async function claim(codeFromUI, nameFromUI) {
+  const code = (codeFromUI || '').trim().toUpperCase();
+  const name = (nameFromUI || '').trim() || ('Display ' + code.slice(-3));
+  if (!/^[A-Z0-9]{6}$/.test(code)) {
+    alert('Bitte einen 6-stelligen Code eingeben.'); return;
+  }
+  const r = await fetch('/admin/api/devices_claim.php', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ code, name })
+  });
+  const j = await r.json().catch(()=>({ok:false}));
+  if (!j.ok) { alert('Fehler: ' + (j.error || 'unbekannt')); return; }
+
+  // kleine Quality-of-life Info:
+  if (j.deviceId) {
+    const url = location.origin + '/?device=' + j.deviceId;
+    console.log('Gepaart:', j.deviceId, url);
+  }
+  // Pane neu laden (siehe createDevicesPane -> render)
+  if (typeof window.__refreshDevicesPane === 'function') await window.__refreshDevicesPane();
+  alert('Gerät gekoppelt' + (j.already ? ' (war bereits gekoppelt)' : '') + '.');
+}
+
+async function createDevicesPane(){
+  const host = document.querySelector('.leftcol');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'devicesPane';
+  card.innerHTML = `
+    <div class="content">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-weight:800">Geräte</div>
+        <div class="row" style="gap:6px">
+          <button class="btn sm" id="devPairManual">Code eingeben…</button>
+          <button class="btn sm" id="devRefresh">Aktualisieren</button>
+          <button class="btn sm danger" id="devGc">Aufräumen</button>
+      </div>
+      </div>
+
+      <div id="devPendingWrap">
+        <div class="subh" style="font-weight:700;margin:8px 0">Ungepairt</div>
+        <div id="devPendingList" class="kv"></div>
+      </div>
+
+      <div id="devPairedWrap" style="margin-top:12px">
+        <div class="subh" style="font-weight:700;margin:8px 0">Gepaart</div>
+        <div id="devPairedList" class="kv"></div>
+      </div>
+
+      <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code.</small>
+    </div>`;
+
+  host?.insertBefore(card, host.firstChild);
+
+  // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
+  async function fetchDevicesStatus(){
+    try {
+      const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
+      if (r.ok) { const j = await r.json(); j.ok ??= true; return j; }
+    } catch(e){}
+    // Fallback: /data/devices.json -> normalisierte Struktur
+    const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
+    const j2 = await r2.json();
+    const pairings = Object.values(j2.pairings || {})
+      .filter(p => !p.deviceId)
+      .map(p => ({ code: p.code, createdAt: p.created }));
+    const devices = Object.values(j2.devices || {})
+      .map(d => ({ id: d.id, name: d.name || '', lastSeenAt: d.lastSeen || 0 }));
+    return { ok:true, pairings, devices };
+  }
+
+  async function render(){
+    const j = await fetchDevicesStatus();
+
+    // Pending
+    const P = document.getElementById('devPendingList');
+    P.innerHTML = '';
+    const pend = (j.pairings || []).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if (!pend.length) {
+      P.innerHTML = '<div class="mut">Keine offenen Pairings.</div>';
+    } else {
+      pend.forEach(d=>{
+        const row = document.createElement('div'); row.className='row'; row.style.gap='8px';
+        const ts = d.createdAt ? new Date(d.createdAt*1000).toLocaleString('de-DE') : '—';
+        row.innerHTML = `
+          <div class="pill">Code: <b>${d.code}</b></div>
+          <div class="mut">seit ${ts}</div>
+          <button class="btn sm" data-code>Pairen…</button>
+        `;
+        row.querySelector('[data-code]').onclick = async ()=>{
+          const name = prompt('Name des Geräts (z. B. „Foyer TV“):','') || '';
+          await claim(d.code, name);
+        };
+        P.appendChild(row);
+      });
+    }
+
+    // Paired
+    const L = document.getElementById('devPairedList');
+    L.innerHTML = '';
+    const paired = (j.devices || []);
+    if (!paired.length) {
+      L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
+    } else {
+      paired.forEach(d=>{
+        const row = document.createElement('div'); row.className='row'; row.style.gap='8px'; row.style.alignItems='center';
+        const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        row.innerHTML = `
+          <div class="pill"><b>${d.name || d.id}</b></div>
+          <div class="mut">ID: ${d.id}</div>
+          <div class="mut">Zuletzt: ${seen}</div>
+<button class="btn sm" data-view>Ansehen</button>
+<button class="btn sm ghost" data-url>URL kopieren</button>
+          <button class="btn sm" data-edit>Im Editor bearbeiten</button>
+          <button class="btn sm danger" data-unpair>Trennen…</button>
+          `;
+
+row.querySelector('[data-unpair]').onclick = async ()=>{
+  if (!/^dev_/.test(String(d.id))) {
+    alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
+    return;
+  }
+  const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+  if ((check||'').trim().toLowerCase() !== 'ja') return;
+
+  const r = await fetch('/admin/api/devices_unpair.php', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)
+    body: JSON.stringify({ device: d.id, purge: 1 })
   });
-  const j=await r.json().catch(()=>({ok:false}));
-  alert(j.ok ? 'Gespeichert.' : ('Fehler: '+(j.error||'unbekannt')));
+  const jj = await r.json().catch(()=>({ok:false}));
+  if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
+  alert('Gerät getrennt.');
+  render();
+};
+
+row.querySelector('[data-view]').onclick = ()=>{
+ openDevicePreview(d.id, d.name || d.id);
+ };
+ row.querySelector('[data-url]').onclick = async ()=>{
+          const url = location.origin + '/?device=' + d.id;
+          try { await navigator.clipboard.writeText(url); alert('URL kopiert:\n'+url); }
+          catch { prompt('URL kopieren:', url); }
+        };
+        row.querySelector('[data-edit]').onclick = ()=>{
+          enterDeviceContext(d.id, d.name || d.id);
+        };
+        L.appendChild(row);
+      });
+    }
+  }
+
+  // oben rechts: „Code eingeben…“
+  card.querySelector('#devPairManual').onclick = async ()=>{
+    const code = prompt('Pairing-Code (6 Zeichen):','');
+    if (!code) return;
+    const name = prompt('Gerätename (optional):','') || '';
+    await claim(code, name);
+  };
+
+  // Refresh & einmalig laden
+  card.querySelector('#devRefresh').onclick = render;
+  await render();
+
+card.querySelector('#devGc').onclick = async ()=>{
+  const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
+  if ((conf||'').trim().toLowerCase() !== 'ja') return;
+  const r = await fetch('/admin/api/devices_gc.php', { method:'POST' });
+  const j = await r.json().catch(()=>({ok:false}));
+  if (!j.ok){ alert('Fehler: '+(j.error||'unbekannt')); return; }
+  alert(`Bereinigt: ${j.deletedDevices} Geräte, ${j.deletedPairings} Pairing-Codes.`);
+  card.querySelector('#devRefresh').click();
+};
+
+
+  // globaler Hook, damit claim() nach erfolgreichem Pairen neu laden kann
+  window.__refreshDevicesPane = render;
+
+  return card;
+}
+
+// Geräte‑Vorschau (neues Modal)
+function openDevicePreview(id, name){
+  const m = document.getElementById('devPrevModal');
+  const f = document.getElementById('devPrevFrame');
+  if (!m || !f) {
+    console.error('[devPrev] Modal oder Frame nicht gefunden. Existieren #devPrevModal und #devPrevFrame als SIBLINGS von #prevModal?');
+    alert('Geräte-Vorschau nicht verfügbar (siehe Konsole).');
+    return;
+  }
+  const t = m.querySelector('[data-devprev-title]');
+  if (t) t.textContent = name ? ('Geräte-Ansicht: ' + name) : 'Geräte-Ansicht';
+  f.src = '/?device=' + encodeURIComponent(id) + '&t=' + Date.now();
+  m.style.display = 'grid';
+}
+document.getElementById('devPrevReload')?.addEventListener('click', ()=>{
+  const f = document.getElementById('devPrevFrame');
+  try { f?.contentWindow?.location?.reload(); } catch {}
 });
+document.getElementById('devPrevClose')?.addEventListener('click', ()=>{
+  const m = document.getElementById('devPrevModal');
+  const f = document.getElementById('devPrevFrame');
+  if (m) m.style.display = 'none';
+  if (f) f.src = 'about:blank';
+});
+
+function createDockPane(){
+  const gridCard = document.getElementById('gridPane');
+  if (!gridCard) return null;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+  wrap.id = 'dockPane';
+  wrap.innerHTML = `
+    <div class="content" style="padding-top:10px">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <div style="font-weight:700">Vorschau</div>
+        <div class="row" style="gap:8px">
+          <button class="btn sm" id="dockReload">Neu laden</button>
+          <span class="mut">zeigt nicht gespeicherte Änderungen</span>
+        </div>
+      </div>
+      <div class="dockWrap">
+        <iframe id="dockFrame" src="about:blank" title="Slideshow Vorschau"></iframe>
+      </div>
+    </div>
+  `;
+  gridCard.style.display = 'none';
+  gridCard.after(wrap);
+
+  const frame = wrap.querySelector('#dockFrame');
+  frame.src = '/?preview=1';
+  frame.addEventListener('load', ()=> dockSend(false), { once:true });
+  wrap.querySelector('#dockReload')?.addEventListener('click', ()=> dockSend(true));
+
+  return wrap;
+}
+
+function destroyDockPane(){
+  const pane = document.getElementById('dockPane');
+  if (pane){
+    const frame = pane.querySelector('#dockFrame');
+    if (frame) frame.src = 'about:blank';
+    pane.remove();
+  }
+}
+
+function viewLabel(v){ return v==='preview' ? 'Vorschau' : v==='devices' ? 'Geräte' : 'Grid'; }
+
+async function showView(v){
+  currentView = v;
+  localStorage.setItem('adminView', v);
+
+  const labelEl = document.getElementById('viewMenuLabel');
+  if (labelEl) labelEl.textContent = viewLabel(v);
+  document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
+    it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
+  });
+
+  const gridCard = document.getElementById('gridPane');
+  if (!gridCard) return;
+
+  // Alles schließen/aufräumen
+  detachDockLivePush();
+
+  if (v === 'grid'){
+    gridCard.style.display = '';
+    destroyDockPane();
+    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    return;
+  }
+
+  if (v === 'preview'){
+    gridCard.style.display = 'none';
+    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!document.getElementById('dockPane')) createDockPane();
+    attachDockLivePush();
+    return;
+  }
+
+  if (v === 'devices'){
+    gridCard.style.display = 'none';
+    destroyDockPane();
+    if (!devicesPane){
+      // WICHTIG: createDevicesPane ist async → Ergebnis abwarten
+      devicesPane = await createDevicesPane();
+    }
+    return;
+  }
+}
+
+function initViewMenu(){
+  const btn  = document.getElementById('viewMenuBtn');
+  const menu = document.getElementById('viewMenu');
+  if (!btn || !menu) return;
+
+  const openMenu  = ()=>{ menu.hidden=false; btn.setAttribute('aria-expanded','true'); };
+  const closeMenu = ()=>{ menu.hidden=true;  btn.setAttribute('aria-expanded','false'); };
+
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    (btn.getAttribute('aria-expanded')==='true') ? closeMenu() : openMenu();
+  });
+
+  menu.querySelectorAll('.dd-item').forEach(it=>{
+    it.addEventListener('click', async ()=>{
+      await showView(it.dataset.view);
+      closeMenu();
+    });
+  });
+
+  document.addEventListener('click', (e)=>{
+    if (!menu.hidden && !document.getElementById('viewMenuWrap').contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', async (e)=>{
+    if (e.key === 'Escape' && !menu.hidden) closeMenu();
+    const typing = /input|textarea|select/i.test(e.target?.tagName||'');
+    if (typing) return;
+    if (e.key === '1') { await showView('grid');    closeMenu(); }
+    if (e.key === '2') { await showView('preview'); closeMenu(); }
+    if (e.key === '3') { await showView('devices'); closeMenu(); }
+  });
+
+  document.getElementById('viewMenuLabel').textContent = viewLabel(currentView);
+  // Initial zeichnen
+  Promise.resolve().then(()=> showView(currentView));
+}
+
 
 // Export/Import + Optionen
 function initBackupButtons(){
@@ -3559,6 +4269,496 @@ JS
 # Admin API (PHP)
 # ---------------------------
 install -d -o www-data -g www-data -m 2775 /var/www/signage/admin/api
+
+# ---------------------------
+# Device Manager
+# ---------------------------
+
+cat >/var/www/signage/admin/api/device_resolve.php <<'PHP'
+<?php
+/**
+ * File: /var/www/signage/admin/api/device_resolve.php
+ * Zweck: Liefert aufgelöste Einstellungen (global + Geräte-Overrides) und Zeitplan.
+ * Warum wichtige Checks: Verhindert "undefined"-Geräte & sorgt für robuste Fallbacks.
+ */
+
+require_once __DIR__ . '/devices_lib.php';
+
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+// --- kleine Helfer (nur "warum"-kritische Funktionalität) -------------------
+
+/** Rekursives Merge nur für assoziative Arrays; Geräte-Overrides haben Vorrang. */
+function merge_r($a, $b) {
+  if (!is_array($a)) $a = [];
+  if (!is_array($b)) return $a;
+  foreach ($b as $k => $v) {
+    $a[$k] = (is_array($v) && array_key_exists($k, $a) && is_array($a[$k]))
+      ? merge_r($a[$k], $v)
+      : $v;
+  }
+  return $a;
+}
+
+/** JSON sicher lesen; bei defekten/fehlenden Dateien leere Defaults liefern. */
+function read_json_file($absPath) {
+  if (!is_file($absPath)) return [];
+  $raw = @file_get_contents($absPath);
+  $j = json_decode($raw, true);
+  return is_array($j) ? $j : [];
+}
+
+// --- Input ------------------------------------------------------------------
+
+$devId = isset($_GET['device']) ? trim($_GET['device']) : '';
+if ($devId === '') {
+  http_response_code(400);
+  echo json_encode(['ok'=>false, 'error'=>'missing-device'], JSON_UNESCAPED_SLASHES);
+  exit;
+}
+if (!preg_match('/^dev_[a-f0-9]{12}$/i', $devId)) {
+  // Schützt vor Karteileichen/Fehlformaten
+  http_response_code(400);
+  echo json_encode(['ok'=>false, 'error'=>'invalid-device-format'], JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
+// --- DB & Gerät -------------------------------------------------------------
+
+$db  = devices_load();
+$dev = $db['devices'][$devId] ?? null;
+if (!$dev) {
+  http_response_code(404);
+  echo json_encode(['ok'=>false, 'error'=>'device-not-found'], JSON_UNESCAPED_SLASHES);
+  exit;
+}
+
+// --- Pfade & Basiskonfiguration --------------------------------------------
+
+$docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/');
+if ($docRoot === '' || !is_dir($docRoot)) {
+  // Fallback, falls PHP-FPM nicht mit korrektem DOCUMENT_ROOT läuft
+  $docRoot = rtrim(realpath(__DIR__ . '/../../'), '/');
+}
+
+$baseSettings = read_json_file($docRoot . '/data/settings.json');
+$baseSchedule = read_json_file($docRoot . '/data/schedule.json');
+
+$overSettings = $dev['overrides']['settings'] ?? [];
+if (!is_array($overSettings)) $overSettings = [];
+
+// --- Merge & Versionen ------------------------------------------------------
+
+$mergedSettings = merge_r($baseSettings, $overSettings);
+
+// Version als einfache Cache-Bremse; nimmt höchste bekannte Version
+$mergedSettings['version'] = max(
+  intval($baseSettings['version'] ?? 0),
+  intval($overSettings['version'] ?? 0)
+);
+$baseSchedule['version'] = intval($baseSchedule['version'] ?? 0);
+
+// --- Antwort ----------------------------------------------------------------
+
+$out = [
+  'ok'       => true,
+  'device'   => [
+    'id'   => $devId,
+    'name' => $dev['name'] ?? $devId,
+  ],
+  'settings' => $mergedSettings,
+  'schedule' => $baseSchedule,
+  'now'      => time(),
+];
+
+echo json_encode($out, JSON_UNESCAPED_SLASHES);
+PHP
+
+cat >/var/www/signage/admin/api/devices_begin.php <<'PHP'
+<?php
+header('Content-Type: application/json; charset=UTF-8');
+require_once __DIR__.'/devices_store.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+  http_response_code(405);
+  echo json_encode(['ok'=>false,'error'=>'method-not-allowed']);
+  exit;
+}
+if (strtolower($_SERVER['HTTP_X_PAIR_REQUEST'] ?? '') !== '1') {
+  http_response_code(403);
+  echo json_encode(['ok'=>false,'error'=>'forbidden']);
+  exit;
+}
+
+$db = dev_db_load();
+dev_gc($db);
+
+$code = dev_gen_code($db);
+if (!$code) { http_response_code(500); echo json_encode(['ok'=>false,'error'=>'code-gen']); exit; }
+
+$db['pairings'][$code] = ['code'=>$code, 'created'=>time(), 'deviceId'=>null];
+dev_db_save($db);
+
+echo json_encode(['ok'=>true,'code'=>$code]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_claim.php <<'PHP
+<?php
+// Hängt am ADMIN-VHost (BasicAuth schützt), nicht im öffentlichen /pair/*
+header('Content-Type: application/json; charset=UTF-8');
+require_once __DIR__.'/devices_store.php';
+
+$raw = file_get_contents('php://input');
+$in  = json_decode($raw, true);
+$code = strtoupper(trim($in['code'] ?? ''));
+$name = trim($in['name'] ?? '');
+
+if ($code===''){ echo json_encode(['ok'=>false,'error'=>'no-code']); exit; }
+
+$db = dev_db_load();
+$p  = $db['pairings'][$code] ?? null;
+if (!$p){ echo json_encode(['ok'=>false,'error'=>'unknown-code']); exit; }
+if (!empty($p['deviceId'])){ echo json_encode(['ok'=>true,'deviceId'=>$p['deviceId'], 'already'=>true]); exit; }
+
+$id = dev_gen_id($db);
+$db['devices'][$id] = [
+  'id'=>$id, 'name'=>$name, 'created'=>time(), 'lastSeen'=>0
+];
+$db['pairings'][$code]['deviceId'] = $id;
+dev_db_save($db);
+
+echo json_encode(['ok'=>true,'deviceId'=>$id]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_claim.php <<'PHP
+<?php
+// /admin/api/devices_gc.php – aufräumen & reparieren (vollständig)
+require_once __DIR__ . '/devices_lib.php';
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$db = devices_load();
+if (!$db) { echo json_encode(['ok'=>false,'error'=>'load-failed']); exit; }
+
+$deletedDevices = 0;
+$deletedPairings = 0;
+
+// 1) Ungültige Geräte-IDs entfernen
+foreach (($db['devices'] ?? []) as $id => $_) {
+ if (!preg_match('/^dev_[a-f0-9]{12}$/i', (string)$id)) {
+ unset($db['devices'][$id]);
+ $deletedDevices++;
+ }
+}
+
+// 2) Abgelaufene, nicht gekoppelte Pairings entfernen (>15min)
+$now = time();
+foreach (($db['pairings'] ?? []) as $code => $row) {
+ $age = $now - (int)($row['created'] ?? $now);
+ if (empty($row['deviceId']) && $age > 900) {
+ unset($db['pairings'][$code]);
+ $deletedPairings++;
+ }
+}
+
+// 3) Beziehungen reparieren: deviceId, die auf nicht-existentes Device zeigt, lösen
+foreach (($db['pairings'] ?? []) as $code => $row) {
+ $did = $row['deviceId'] ?? null;
+ if ($did && empty($db['devices'][$did])) {
+ $db['pairings'][$code]['deviceId'] = null;
+ }
+}
+
+if (!devices_save($db)) { echo json_encode(['ok'=>false,'error'=>'save-failed']); exit; }
+echo json_encode(['ok'=>true,'deletedDevices'=>$deletedDevices,'deletedPairings'=>$deletedPairings]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_lib.php <<'PHP'
+<?php
+// admin/api/devices_lib.php
+function devices_path() {
+  return $_SERVER['DOCUMENT_ROOT'].'/data/devices.json';
+}
+function devices_load() {
+  $p = devices_path();
+  if (!file_exists($p)) return ['version'=>1,'devices'=>[],'pairings'=>[]];
+  $j = json_decode(file_get_contents($p), true);
+  return is_array($j) ? $j : ['version'=>1,'devices'=>[],'pairings'=>[]];
+}
+function devices_save($data) {
+  $p = devices_path();
+  $tmp = $p.'.tmp';
+  if (!is_dir(dirname($p))) mkdir(dirname($p), 0775, true);
+  $ok = file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)) !== false;
+  if ($ok) $ok = rename($tmp, $p);
+  return $ok;
+}
+PHP
+
+cat >/var/www/signage/admin/api/devices_list.php <<'PHP'
+<?php
+// /admin/api/devices_list.php – liefert getrennte Arrays { pairings, devices }
+// Warum: Die Admin-UI erwartet dieses Format; gemischte Ausgabe verursachte
+// "undefined"-Einträge & fehlschlagendes Löschen.
+
+require_once __DIR__ . '/devices_lib.php';
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$db = devices_load();
+$now = time();
+
+$pairings = [];
+foreach (($db['pairings'] ?? []) as $code => $row) {
+ if (!empty($row['deviceId'])) continue; // nur offene Codes anzeigen
+ $created = (int)($row['created'] ?? 0);
+ $pairings[] = [
+ 'code' => $row['code'] ?? $code,
+ 'createdAt' => $created,
+ 'expiresAt' => $created ? ($created + 900) : null
+ ];
+}
+usort($pairings, fn($a,$b)=>($b['createdAt']??0)-($a['createdAt']??0));
+
+$devices = [];
+foreach (($db['devices'] ?? []) as $id => $d) {
+ $devices[] = [
+ 'id' => $id,
+ 'name' => $d['name'] ?? $id,
+ 'lastSeenAt' => (int)($d['lastSeen'] ?? 0) ?: null,
+ 'overrides' => [ 'settings' => $d['overrides']['settings'] ?? (object)[] ]
+ ];
+}
+
+echo json_encode(['ok'=>true, 'pairings'=>$pairings, 'devices'=>$devices], JSON_UNESCAPED_SLASHES);
+PHP
+
+cat >/var/www/signage/admin/api/devices_pair.php <<'PHP'
+<?php
+header('Content-Type: application/json; charset=UTF-8');
+require __DIR__.'/devices_lib.php';
+$raw = file_get_contents('php://input'); $j = json_decode($raw,true) ?: [];
+$code = trim($j['code'] ?? '');
+$name = trim($j['name'] ?? '');
+if ($code==='' || $name===''){ echo json_encode(['ok'=>false,'error'=>'missing']); exit; }
+$db = dev_load();
+$d =& dev_find_by_code($db, $code);
+if (!$d){ echo json_encode(['ok'=>false,'error'=>'not-found']); exit; }
+if (!empty($d['paired'])){ echo json_encode(['ok'=>false,'error'=>'already']); exit; }
+$id = dev_newid('dev_');
+$d['id'] = $id;
+$d['name'] = $name;
+$d['paired'] = true;
+$d['code'] = null;
+$d['overrides'] = ['settings'=>new stdClass()]; // Platzhalter
+dev_save($db);
+echo json_encode(['ok'=>true,'deviceId'=>$id,'url'=>'/?device='.$id]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_pending.php <<'PHP'
+<?php
+require_once __DIR__ . '/devices_lib.php';
+header('Content-Type: application/json; charset=UTF-8');
+
+$state = devices_load(); // liest /var/www/signage/data/devices.json
+$pending = [];
+if (!empty($state['pending']) && is_array($state['pending'])) {
+  foreach ($state['pending'] as $code => $info) {
+    $pending[] = ['code'=>$code, 'ts'=>$info['ts'] ?? null, 'ip'=>$info['ip'] ?? null];
+  }
+}
+echo json_encode(['ok'=>true,'pending'=>$pending], JSON_UNESCAPED_SLASHES);
+PHP
+
+cat >/var/www/signage/admin/api/devices_poll.php <<'PHP'
+<?php
+header('Content-Type: application/json; charset=UTF-8');
+require_once __DIR__.'/devices_store.php';
+
+$code = isset($_GET['code']) ? strtoupper(preg_replace('/[^A-Z0-9]/','',$_GET['code'])) : '';
+if ($code===''){ echo json_encode(['ok'=>false,'error'=>'no-code']); exit; }
+
+$db = dev_db_load();
+$p = $db['pairings'][$code] ?? null;
+if (!$p){ echo json_encode(['ok'=>true,'paired'=>false,'exists'=>false]); exit; }
+
+if (!empty($p['deviceId'])){
+  echo json_encode(['ok'=>true,'paired'=>true,'deviceId'=>$p['deviceId']]); exit;
+}
+echo json_encode(['ok'=>true,'paired'=>false,'exists'=>true]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_save_override.php <<'PHP'
+<?php
+require_once __DIR__ . '/devices_lib.php';
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$raw = file_get_contents('php://input');
+$in  = json_decode($raw, true);
+if (!$in || !isset($in['device']) || !is_array($in['settings'])) {
+  echo json_encode(['ok'=>false, 'error'=>'missing']); exit;
+}
+$devId = $in['device'];
+$set   = $in['settings'];
+
+$dev = devices_load();
+if (!isset($dev['devices'][$devId])) {
+  echo json_encode(['ok'=>false, 'error'=>'unknown-device']); exit;
+}
+
+// Version hochzählen (Signal für Clients)
+$set['version'] = intval($set['version'] ?? 0) + 1;
+
+$dev['devices'][$devId]['overrides'] = $dev['devices'][$devId]['overrides'] ?? [];
+$dev['devices'][$devId]['overrides']['settings'] = $set;
+
+if (!devices_save($dev)) {
+  echo json_encode(['ok'=>false, 'error'=>'write-failed']); exit;
+}
+echo json_encode(['ok'=>true, 'version'=>$set['version']]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_status.php <<'PHP'
+<?php
+// /var/www/signage/admin/api/devices_status.php
+header('Content-Type: application/json; charset=UTF-8');
+
+$fn = __DIR__ . '/../../data/devices.json';
+$state = json_decode(@file_get_contents($fn), true);
+if (!$state) $state = ['version'=>1, 'devices'=>[], 'pairings'=>[]];
+
+$pairings = array_values($state['pairings'] ?? []);
+// neuestes NICHT beanspruchtes Pairing finden
+$open = null;
+foreach ($pairings as $p) {
+  if (empty($p['deviceId'])) {
+    if ($open === null || (int)$p['created'] > (int)$open['created']) $open = $p;
+  }
+}
+
+$devices = array_values($state['devices'] ?? []);
+echo json_encode([
+  'ok' => true,
+  'now' => time(),
+  'openPairing' => $open,   // {code, created} oder null
+  'devices' => $devices     // [{id,name,created,lastSeen}, ...]
+]);
+PHP
+
+cat >/var/www/signage/admin/api/load.php <<'PHP'
+<?php
+// /admin/api/devices_store.php – vollständige Helfer (ohne Platzhalter)
+// Warum: Wird von /pair/* Endpunkten und Admin-API geteilt; zentrale, robuste Umsetzung.
+
+const DEV_DB = '/var/www/signage/data/devices.json';
+
+function dev_db_load(){
+ if (!is_file(DEV_DB)) return ['version'=>1,'pairings'=>[],'devices'=>[]];
+ $j = json_decode(@file_get_contents(DEV_DB), true);
+ return is_array($j) ? $j : ['version'=>1,'pairings'=>[],'devices'=>[]];
+}
+
+function dev_db_save($db){
+ @mkdir(dirname(DEV_DB), 02775, true);
+ file_put_contents(DEV_DB, json_encode($db, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+ @chmod(DEV_DB, 0644);
+ @chown(DEV_DB,'www-data'); @chgrp(DEV_DB,'www-data');
+}
+
+// Koppel-Code (AAAAAA) aus A–Z (ohne I/O) generieren; keine Speicherung hier
+function dev_gen_code($db){
+ $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+ for ($i=0; $i<500; $i++) {
+ $code = '';
+ for ($j=0; $j<6; $j++) $code .= $alphabet[random_int(0, strlen($alphabet)-1)];
+ if (empty($db['pairings'][$code])) return $code;
+ }
+ return null;
+}
+
+// Geräte-ID im Format dev_ + 12 hex (Regex im Player erwartet exakt das)
+function dev_gen_id($db){
+ for ($i=0; $i<1000; $i++) {
+ $id = 'dev_'.bin2hex(random_bytes(6));
+ if (empty($db['devices'][$id])) return $id;
+ }
+ return null;
+}
+
+// Aufräumen: offene Pairings >15min löschen; verwaiste Links bereinigen
+function dev_gc(&$db){
+ $now = time();
+ foreach (($db['pairings'] ?? []) as $code => $p) {
+ $age = $now - (int)($p['created'] ?? $now);
+ if ($age > 900 && empty($p['deviceId'])) unset($db['pairings'][$code]);
+ // Referenz auf nicht-existentes Device? -> lösen
+ if (!empty($p['deviceId']) && empty($db['devices'][$p['deviceId']])) {
+ $db['pairings'][$code]['deviceId'] = null;
+ }
+ }
+}
+PHP
+
+cat >/var/www/signage/admin/api/devices_touch.php <<'PHP'
+<?php
+header('Content-Type: application/json; charset=UTF-8');
+require_once __DIR__.'/devices_store.php';
+
+$id = isset($_GET['device']) ? $_GET['device'] : '';
+if ($id===''){ echo json_encode(['ok'=>false,'error'=>'no-device']); exit; }
+
+$db = dev_db_load();
+if (!isset($db['devices'][$id])){ echo json_encode(['ok'=>false,'error'=>'unknown-device']); exit; }
+$db['devices'][$id]['lastSeen'] = time();
+dev_db_save($db);
+echo json_encode(['ok'=>true]);
+PHP
+
+cat >/var/www/signage/admin/api/devices_unpair.php <<'PHP'
+<?php
+require_once __DIR__ . '/devices_lib.php';
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$body  = json_decode(file_get_contents('php://input'), true) ?: [];
+$didIn = trim((string)($body['device'] ?? ''));
+$purge = !empty($body['purge']);
+
+$db = devices_load();
+if (!$db) { echo json_encode(['ok'=>false,'error'=>'load-failed']); exit; }
+
+$validNew = function($id){ return is_string($id) && preg_match('/^dev_[a-f0-9]{12}$/i', $id); };
+
+// exakte Übereinstimmung (neues Format) …
+$foundKey = isset($db['devices'][$didIn]) ? $didIn : null;
+
+// … oder Legacy: numerische Schlüssel als String ("0","1",…)
+if ($foundKey === null) {
+  $legacyKey = (string)intval($didIn);
+  if (isset($db['devices'][$legacyKey])) $foundKey = $legacyKey;
+}
+
+if ($foundKey === null) { echo json_encode(['ok'=>false,'error'=>'unknown-device']); exit; }
+
+// Pairings entkoppeln
+if (!empty($db['pairings'])) {
+  foreach ($db['pairings'] as $code => &$row) {
+    if (($row['deviceId'] ?? null) === $foundKey) unset($row['deviceId']);
+  }
+  unset($row);
+}
+
+// Purge: Gerätseintrag ganz weg, sonst nur Overrides löschen
+if ($purge) { unset($db['devices'][$foundKey]); }
+else {
+  if (isset($db['devices'][$foundKey]['overrides'])) unset($db['devices'][$foundKey]['overrides']);
+}
+
+if (!devices_save($db)) { echo json_encode(['ok'=>false,'error'=>'save-failed']); exit; }
+echo json_encode(['ok'=>true,'device'=>$foundKey,'removed'=>$purge?1:0]);
+PHP
 
 cat >/var/www/signage/admin/api/load.php <<'PHP'
 <?php
@@ -3880,6 +5080,48 @@ find "$WEBROOT/admin/api" -type f -name '*.php' -exec chmod 0644 {} +
 # ---------------------------
 PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n1 || echo /run/php/php8.3-fpm.sock)
 
+cat >/etc/nginx/snippets/signage-pairing.conf <<'"'"'EOF'"'"'
+# /etc/nginx/snippets/signage-pairing.conf
+# Pairing/Device-API – ohne Auth, gleicher Origin (auf :80 und :8888 nutzbar)
+
+location = /pair/begin {
+  auth_basic off;
+  add_header X-Pair "begin" always;
+  include fastcgi_params;
+  fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_begin.php;
+  fastcgi_param SCRIPT_NAME     /admin/api/devices_begin.php;
+  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+}
+
+location = /pair/poll {
+  auth_basic off;
+  add_header X-Pair "poll" always;
+  include fastcgi_params;
+  fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_poll.php;
+  fastcgi_param SCRIPT_NAME     /admin/api/devices_poll.php;
+  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+}
+
+location = /pair/touch {
+  auth_basic off;
+  add_header X-Pair "touch" always;
+  include fastcgi_params;
+  fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_touch.php;
+  fastcgi_param SCRIPT_NAME     /admin/api/devices_touch.php;
+  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+}
+
+location = /pair/resolve {
+  auth_basic off;
+  add_header X-Pair "resolve" always;
+  include fastcgi_params;
+  fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/device_resolve.php;
+  fastcgi_param SCRIPT_NAME     /admin/api/device_resolve.php;
+  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+}
+EOF
+
+
 cat >/etc/nginx/sites-available/signage-slideshow.conf <<'NGINX'
 server {
   listen __PUBLIC_PORT__ default_server;
@@ -3897,6 +5139,8 @@ server {
     add_header Cache-Control "no-store, must-revalidate" always;
     try_files $uri =404;
   }
+# Pairing/Device-API – ohne Auth, gleicher Origin (Port 80)
+include /etc/nginx/snippets/signage-pairing.conf;
 }
 NGINX
 
@@ -3928,6 +5172,12 @@ server {
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     fastcgi_pass unix:__PHP_SOCK__;
   }
+location ^~ /data/ {
+  add_header Cache-Control "no-store, must-revalidate" always;
+  auth_basic off;                       # WICHTIG: ohne Login
+  try_files $uri =404;
+}
+include /etc/nginx/snippets/signage-pairing.conf;
 }
 NGINX
 
@@ -4001,6 +5251,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
