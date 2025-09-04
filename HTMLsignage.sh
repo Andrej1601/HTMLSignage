@@ -5080,7 +5080,7 @@ find "$WEBROOT/admin/api" -type f -name '*.php' -exec chmod 0644 {} +
 # ---------------------------
 PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n1 || echo /run/php/php8.3-fpm.sock)
 
-cat >/etc/nginx/snippets/signage-pairing.conf <<'"'"'EOF'"'"'
+cat >/etc/nginx/snippets/signage-pairing.conf <<'EOF'
 # /etc/nginx/snippets/signage-pairing.conf
 # Pairing/Device-API – ohne Auth, gleicher Origin (auf :80 und :8888 nutzbar)
 
@@ -5251,6 +5251,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
