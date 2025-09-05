@@ -77,8 +77,11 @@ EOPHP
   log "Configuring basic auth"
   if [[ ! -f /etc/nginx/.signage_admin ]]; then
     printf "%s:%s\n" "$SIGNAGE_ADMIN_USER" "$(openssl passwd -apr1 "$SIGNAGE_ADMIN_PASS")" > /etc/nginx/.signage_admin
-    chmod 640 /etc/nginx/.signage_admin
+
   fi
+  chown root:www-data /etc/nginx/.signage_admin
+  chmod 640 /etc/nginx/.signage_admin
+
 
   nginx -t
   systemctl reload nginx
