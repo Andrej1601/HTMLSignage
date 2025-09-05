@@ -96,6 +96,15 @@ header{
 }
 h1{ margin:0; font-size:16px; letter-spacing:.3px; }
 
+body.device-mode header{
+  background: var(--btn-primary);
+  color: var(--btn-primary-fg);
+}
+body.device-mode #ctxBadge{
+  background: var(--btn-primary-fg);
+  color: var(--btn-primary);
+}
+
 /* ---------- Layout: Main + Rightbar ---------- */
 main.layout{
   width:100%;
@@ -163,6 +172,11 @@ details[open] .chev{ transform: rotate(90deg); }
   font-weight:700; padding:var(--btn-pad); border-radius:12px;
   border:1px solid transparent; cursor:pointer; user-select:none;
   transition: transform .06s ease, filter .15s, background .15s, border-color .15s, color .15s;
+}
+.btn:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  filter:grayscale(40%);
 }
 .btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
 .btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }

@@ -66,6 +66,7 @@ async function enterDeviceContext(id, name){
 
   currentDeviceCtx = id;
   currentDeviceName = name || id;
+  document.body.classList.add('device-mode');
 
   // globale Settings als Basis
   settings = deepClone(baseSettings);
@@ -102,6 +103,7 @@ if (typeof showView==='function') showView('grid');
 function exitDeviceContext(){
   currentDeviceCtx = null;
   currentDeviceName = null;
+  document.body.classList.remove('device-mode');
 
   settings = deepClone(baseSettings);
 
@@ -131,6 +133,11 @@ async function loadAll(){
   schedule = s || {};
   settings = cfg || {};
   baseSettings = deepClone(settings);
+
+  try {
+    const draft = localStorage.getItem('scheduleDraft');
+    if (draft) schedule = JSON.parse(draft);
+  } catch {}
 
   // Defaults mergen (defensiv)
   settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
@@ -204,7 +211,7 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
-  setV('#chipH',        f.chipHeight         ?? 44);
+  setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
 
   // Saunafolien (Kacheln)
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
@@ -236,7 +243,7 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
-    setV('#chipH',        DEFAULTS.fonts.chipHeight);
+    setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
     setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
@@ -526,7 +533,7 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
-        chipHeight:+($('#chipH').value||44),
+        chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
         flameGapPx: +($('#flameGap')?.value || 6),
@@ -582,13 +589,17 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     body.settings.version = (Date.now()/1000|0);
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
-    if (j.ok){ baseSettings = deepClone(body.settings); }
+    if (j.ok){
+      baseSettings = deepClone(body.settings);
+      localStorage.removeItem('scheduleDraft');
+    }
     alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
   } else {
     // Geräte-Override speichern
     const payload = { device: currentDeviceCtx, settings: body.settings };
     const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const j=await r.json().catch(()=>({ok:false}));
+    if (j.ok) localStorage.removeItem('scheduleDraft');
     alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
   }
 });
