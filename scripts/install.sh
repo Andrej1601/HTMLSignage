@@ -23,6 +23,23 @@ main(){
   PHP_SOCK=${PHP_SOCK:-/run/php/php8.3-fpm.sock}
   APP_DIR=/var/www/signage
 
+
+  if [[ -t 0 ]]; then
+    read -rp "Public port [${SIGNAGE_PUBLIC_PORT}]: " input
+    SIGNAGE_PUBLIC_PORT=${input:-$SIGNAGE_PUBLIC_PORT}
+
+    read -rp "Admin port [${SIGNAGE_ADMIN_PORT}]: " input
+    SIGNAGE_ADMIN_PORT=${input:-$SIGNAGE_ADMIN_PORT}
+
+    read -rp "Admin username [${SIGNAGE_ADMIN_USER}]: " input
+    SIGNAGE_ADMIN_USER=${input:-$SIGNAGE_ADMIN_USER}
+
+    read -rsp "Admin password [${SIGNAGE_ADMIN_PASS}]: " input
+    echo
+    SIGNAGE_ADMIN_PASS=${input:-$SIGNAGE_ADMIN_PASS}
+  fi
+
+
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
@@ -65,7 +82,25 @@ EOPHP
 
   nginx -t
   systemctl reload nginx
-  log "Installation complete"
+
+  IP=$(hostname -I | awk '{print $1}')
+  cat <<EOF
+
+Installation complete.
+
+Admin UI:   http://${IP}:${SIGNAGE_ADMIN_PORT}/admin/ (user: ${SIGNAGE_ADMIN_USER})
+Slideshow:  http://${IP}:${SIGNAGE_PUBLIC_PORT}/
+
+Configs:
+  /etc/nginx/sites-available/signage-admin.conf
+  /etc/nginx/sites-available/signage-slideshow.conf
+  /etc/nginx/snippets/signage-pairing.conf
+
+Change admin password:
+  htpasswd /etc/nginx/.signage_admin ${SIGNAGE_ADMIN_USER}
+  systemctl reload nginx
+
+EOF
 }
 
 main "$@"
