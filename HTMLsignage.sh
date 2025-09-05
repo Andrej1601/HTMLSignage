@@ -1514,6 +1514,111 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
 .grid2{ display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; align-items:center; width:min(560px,calc(95vw - 36px)); margin:0 auto 12px; }
 .iframeWrap{ width:min(92vw,1600px); height:min(85svh,900px); border:1px solid var(--inbr); border-radius:14px; overflow:hidden; background:#000; }
 .iframeWrap iframe{ width:100%; height:100%; display:block; border:0; }
+
+/* Card in der linken Spalte immer voll breit strecken */
+.leftcol > .card,
+.leftcol > .card .content {
+  width: 100%;
+}
+
+/* Docked Preview: volle Breite + 16:9, inkl. Fallback ohne aspect-ratio */
+.dockWrap{
+  display:block;
+  width:100%;
+  max-width:100%;
+  background:#000;
+  border:1px solid var(--inbr);
+  border-radius:14px;
+  overflow:hidden;
+  position:relative;
+  aspect-ratio: 16 / 9; /* moderne Browser */
+}
+
+/* Fallback für ältere Mobile Browser (kein aspect-ratio) */
+@supports not (aspect-ratio: 1 / 1) {
+  .dockWrap { height:auto; }
+  .dockWrap::before{
+    content:"";
+    display:block;
+    padding-top:56.25%; /* 16:9 */
+  }
+  .dockWrap > iframe{
+    position:absolute;
+    inset:0;
+  }
+}
+
+.dockWrap > iframe{
+  position:absolute;  /* bei aspect-ratio: greift auch */
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  display:block;
+}
+
+/* Falls die Dock-Box mal in einer .row (flex) sitzt: trotzdem volle Zeile belegen */
+.row > .dockWrap{
+  flex: 1 1 100%;
+}
+
+/* Farb-Tools (über der Farbliste) */
+.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
+#colorTools{margin-bottom:12px}
+.pickerFrame{width:100%;height:180px;border:1px dashed var(--inbr);border-radius:12px;background:#0000}
+#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
+#quickHex{text-transform:uppercase;width:10ch}
+#copyHex{white-space:nowrap}
+
+/* Farb-Tools */
+.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
+#colorTools{margin-bottom:12px}
+#colorTools .legendRow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#togglePickerSize{min-width:0;padding:4px 8px}
+.pickerResizable{
+  height:180px;
+  width:100%;
+  min-height:140px;
+  max-height:70vh;
+  min-width:260px;
+  max-width:calc(100vw - 48px);
+  resize:both;               
+  overflow:auto;
+  border:1px dashed var(--inbr);
+  border-radius:12px;
+  background:#0000;
+  transition:height .2s ease;
+}
+#colorTools.exp .pickerResizable{ height:420px; width:100%; }
+.pickerFrame{width:100%;height:100%;border:0}
+#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
+#quickHex{text-transform:uppercase;width:10ch}
+#copyHex{white-space:nowrap}
+#colorTools.float{
+  position:fixed; right:16px; bottom:16px; z-index:999;
+  width:min(90vw, 1200px);
+  background:var(--card); border:1px solid var(--inbr); border-radius:12px;
+  box-shadow:var(--shadow); padding:12px;
+}
+#colorTools.float .pickerResizable{
+  width:100%; height:min(60vh, 700px); max-height:80vh; resize:both;
+}
+
+/* Ansicht-Menü (Header) */
+.menuwrap{ position:relative; }
+.dropdown{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:80;
+  min-width: 220px; padding:6px;
+  background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 12px 24px rgba(0,0,0,.12);
+}
+.dd-item{
+  display:flex; align-items:center; gap:8px;
+  width:100%; padding:8px 10px; border:0; background:transparent; cursor:pointer;
+  border-radius:10px; text-align:left; font-weight:700; color:var(--fg);
+}
+.dd-item:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+.dd-item[aria-checked="true"]{ outline:2px solid color-mix(in oklab, var(--btn-accent) 60%, transparent); outline-offset:2px; }
 CSS
 
 cat > /var/www/signage/admin/css/admin.mobile.css <<'CSS'
@@ -4277,6 +4382,64 @@ install -d -o www-data -g www-data -m 2775 /var/www/signage/admin/api
 # ---------------------------
 # Device Manager
 # ---------------------------
+cat >/var/www/signage/admin/api/devices_store.php <<'PHP'
+<?php
+// /admin/api/devices_store.php – vollständige Helfer (ohne Platzhalter)
+// Warum: Wird von /pair/* Endpunkten und Admin-API geteilt; zentrale, robuste Umsetzung.
+
+const DEV_DB = '/var/www/signage/data/devices.json';
+
+function dev_db_load(){
+  if (!is_file(DEV_DB)) return ['version'=>1,'pairings'=>[],'devices'=>[]];
+  $j = json_decode(@file_get_contents(DEV_DB), true);
+  return is_array($j) ? $j : ['version'=>1,'pairings'=>[],'devices'=>[]];
+}
+
+function dev_db_save($db){
+  @mkdir(dirname(DEV_DB), 02775, true);
+  $json = json_encode($db, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT);
+  $bytes = @file_put_contents(DEV_DB, $json, LOCK_EX);
+  if ($bytes === false) {
+    throw new RuntimeException('Unable to write device database');
+  }
+  @chmod(DEV_DB, 0644);
+  @chown(DEV_DB,'www-data'); @chgrp(DEV_DB,'www-data');
+  return true;
+}
+
+// Koppel-Code (AAAAAA) aus A–Z (ohne I/O) generieren; keine Speicherung hier
+function dev_gen_code($db){
+  $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  for ($i=0; $i<500; $i++) {
+    $code = '';
+    for ($j=0; $j<6; $j++) $code .= $alphabet[random_int(0, strlen($alphabet)-1)];
+    if (empty($db['pairings'][$code])) return $code;
+  }
+  return null;
+}
+
+// Geräte-ID im Format dev_ + 12 hex (Regex im Player erwartet exakt das)
+function dev_gen_id($db){
+  for ($i=0; $i<1000; $i++) {
+    $id = 'dev_'.bin2hex(random_bytes(6));
+    if (empty($db['devices'][$id])) return $id;
+  }
+  return null;
+}
+
+// Aufräumen: offene Pairings >15min löschen; verwaiste Links bereinigen
+function dev_gc(&$db){
+  $now = time();
+  foreach (($db['pairings'] ?? []) as $code => $p) {
+    $age = $now - (int)($p['created'] ?? $now);
+    if ($age > 900 && empty($p['deviceId'])) unset($db['pairings'][$code]);
+    // Referenz auf nicht-existentes Device? -> lösen
+    if (!empty($p['deviceId']) && empty($db['devices'][$p['deviceId']])) {
+      $db['pairings'][$code]['deviceId'] = null;
+    }
+  }
+}
+PHP
 
 cat >/var/www/signage/admin/api/device_resolve.php <<'PHP'
 <?php
@@ -5256,6 +5419,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
