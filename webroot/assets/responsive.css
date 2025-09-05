@@ -1,0 +1,5 @@
+/* Responsive tweaks for slideshow layout */
+@media (max-width: 900px), (orientation: portrait) {
+  .rightPanel { display: none; }
+  .container.has-right { padding-right: 32px; }
+}
