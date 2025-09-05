@@ -160,7 +160,7 @@
     <details class="ac sub" id="boxImages">
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
-    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
+    <div class="actions"><button class="btn sm" id="btnInterAdd2">Slide hinzufügen</button></div>
   </summary>
 <small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
   <div class="content">
@@ -175,28 +175,6 @@
   </div>
     <div id="interList2"></div>
   </div>
-</details>
-
-<!-- Unterbox 4: HTML-Slides -->
-<details class="ac sub" id="boxHtml">
-  <summary>
-    <div class="ttl">▶<span class="chev">⮞</span> HTML-Slides</div>
-    <div class="actions"><button class="btn sm" id="btnHtmlAdd">HTML hinzufügen</button></div>
-  </summary>
-  <div class="content">
-    <div class="sl-head sl-html">
-      <span class="col-name">Name</span>
-      <span class="col-prev">Preview</span>
-      <span class="col-edit">Bearbeiten</span>
-      <span class="col-dur" id="headHtmlDur">Dauer (s)</span>
-      <span class="col-del">✕</span>
-      <span class="col-after">Nach Slide</span>
-      <span class="col-vis">Anzeigen</span>
-    </div>
-    <div id="htmlList"></div>
-  </div>
-</details>
-
   </div>
 </details>
 
@@ -396,6 +374,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
 <script>
 
   (function(){
