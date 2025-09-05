@@ -5090,7 +5090,7 @@ location = /pair/begin {
   include fastcgi_params;
   fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_begin.php;
   fastcgi_param SCRIPT_NAME     /admin/api/devices_begin.php;
-  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+  fastcgi_pass unix:__PHP_SOCK__;
 }
 
 location = /pair/poll {
@@ -5099,7 +5099,7 @@ location = /pair/poll {
   include fastcgi_params;
   fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_poll.php;
   fastcgi_param SCRIPT_NAME     /admin/api/devices_poll.php;
-  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+  fastcgi_pass unix:__PHP_SOCK__;
 }
 
 location = /pair/touch {
@@ -5108,7 +5108,7 @@ location = /pair/touch {
   include fastcgi_params;
   fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/devices_touch.php;
   fastcgi_param SCRIPT_NAME     /admin/api/devices_touch.php;
-  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+  fastcgi_pass unix:__PHP_SOCK__;
 }
 
 location = /pair/resolve {
@@ -5117,7 +5117,7 @@ location = /pair/resolve {
   include fastcgi_params;
   fastcgi_param SCRIPT_FILENAME /var/www/signage/admin/api/device_resolve.php;
   fastcgi_param SCRIPT_NAME     /admin/api/device_resolve.php;
-  fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+  fastcgi_pass unix:__PHP_SOCK__;
 }
 EOF
 
@@ -5188,6 +5188,7 @@ export SIGNAGE_PUBLIC_PORT SIGNAGE_ADMIN_PORT
 sed -i "s/__PUBLIC_PORT__/${SIGNAGE_PUBLIC_PORT}/g" /etc/nginx/sites-available/signage-slideshow.conf
 sed -i "s/__ADMIN_PORT__/${SIGNAGE_ADMIN_PORT}/g"   /etc/nginx/sites-available/signage-admin.conf
 sed -i "s|__PHP_SOCK__|${PHP_SOCK}|g"               /etc/nginx/sites-available/signage-admin.conf
+sed -i "s|__PHP_SOCK__|${PHP_SOCK}|g"               /etc/nginx/snippets/signage-pairing.conf
 
 # Safety-Check: sind noch Platzhalter in den Nginx-Configs?
 if grep -R -q "__ADMIN_PORT__\|__PUBLIC_PORT__\|__PHP_SOCK__" /etc/nginx/sites-available; then
