@@ -28,6 +28,8 @@ let currentDeviceName = null;
 let currentView = localStorage.getItem('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
 let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
 let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
+let devicesPinned = (localStorage.getItem('devicesPinned') === '1');
+if (devicesPinned) document.body?.classList.add('devices-pinned');
 
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
@@ -66,6 +68,7 @@ async function enterDeviceContext(id, name){
 
   currentDeviceCtx = id;
   currentDeviceName = name || id;
+  document.body.classList.add('device-mode');
 
   // globale Settings als Basis
   settings = deepClone(baseSettings);
@@ -94,6 +97,7 @@ async function enterDeviceContext(id, name){
     setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
+  window.__refreshDevicesPane?.();
 
   // in den Grid-Modus springen (falls du showView hast)
 if (typeof showView==='function') showView('grid');
@@ -102,6 +106,7 @@ if (typeof showView==='function') showView('grid');
 function exitDeviceContext(){
   currentDeviceCtx = null;
   currentDeviceName = null;
+  document.body.classList.remove('device-mode');
 
   settings = deepClone(baseSettings);
 
@@ -116,6 +121,7 @@ function exitDeviceContext(){
     setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
+  window.__refreshDevicesPane?.();
 }
 
 
@@ -131,6 +137,11 @@ async function loadAll(){
   schedule = s || {};
   settings = cfg || {};
   baseSettings = deepClone(settings);
+
+  try {
+    const draft = localStorage.getItem('scheduleDraft');
+    if (draft) schedule = JSON.parse(draft);
+  } catch {}
 
   // Defaults mergen (defensiv)
   settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
@@ -204,7 +215,7 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
-  setV('#chipH',        f.chipHeight         ?? 44);
+  setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
 
   // Saunafolien (Kacheln)
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
@@ -236,7 +247,7 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
-    setV('#chipH',        DEFAULTS.fonts.chipHeight);
+    setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
     setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
@@ -526,7 +537,7 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
-        chipHeight:+($('#chipH').value||44),
+        chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
         flameGapPx: +($('#flameGap')?.value || 6),
@@ -582,13 +593,17 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     body.settings.version = (Date.now()/1000|0);
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
-    if (j.ok){ baseSettings = deepClone(body.settings); }
+    if (j.ok){
+      baseSettings = deepClone(body.settings);
+      localStorage.removeItem('scheduleDraft');
+    }
     alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
   } else {
     // Geräte-Override speichern
     const payload = { device: currentDeviceCtx, settings: body.settings };
     const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
     const j=await r.json().catch(()=>({ok:false}));
+    if (j.ok) localStorage.removeItem('scheduleDraft');
     alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
   }
 });
@@ -667,6 +682,7 @@ async function createDevicesPane(){
         <div class="row" style="gap:6px">
           <button class="btn sm" id="devPairManual">Code eingeben…</button>
           <button class="btn sm" id="devRefresh">Aktualisieren</button>
+          <button class="btn sm" id="devPin"></button>
           <button class="btn sm danger" id="devGc">Aufräumen</button>
       </div>
       </div>
@@ -714,7 +730,7 @@ async function createDevicesPane(){
       P.innerHTML = '<div class="mut">Keine offenen Pairings.</div>';
     } else {
       pend.forEach(d=>{
-        const row = document.createElement('div'); row.className='row'; row.style.gap='8px';
+        const row = document.createElement('div'); row.className='pend-item';
         const ts = d.createdAt ? new Date(d.createdAt*1000).toLocaleString('de-DE') : '—';
         row.innerHTML = `
           <div class="pill">Code: <b>${d.code}</b></div>
@@ -736,33 +752,36 @@ async function createDevicesPane(){
     if (!paired.length) {
       L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
     } else {
-  paired.forEach(d=>{
-        const row = document.createElement('div');
-        row.className='row';
-        row.style.gap='8px';
-        row.style.alignItems='center';
+      const table = document.createElement('table');
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      L.appendChild(table);
+      paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
-        row.innerHTML = `
-          <div class="pill${currentDeviceCtx===d.id?' current':''}"><b>${d.name || d.id}</b></div>
-          <div class="mut">ID: ${d.id}</div>
-          <div class="mut">Zuletzt: ${seen}</div>
-          <label class="toggle" data-mode-wrap>
+        const tr = document.createElement('tr');
+        if (currentDeviceCtx===d.id) tr.classList.add('current');
+        if (useInd) tr.classList.add('ind');
+        tr.innerHTML = `
+          <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
+          <td><button class="btn sm" data-view>Ansehen</button></td>
+          <td><label class="toggle" data-mode-wrap>
             <input type="checkbox" ${useInd?'checked':''} data-mode>
             <span data-mode-label>${modeLbl}</span>
-          </label>
-          <button class="btn sm" data-view>Ansehen</button>
-          <button class="btn sm ghost" data-url>URL kopieren</button>
-          <button class="btn sm" data-edit>Im Editor bearbeiten</button>
-          <button class="btn sm danger" data-unpair>Trennen…</button>
-          `;
+          </label></td>
+          <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
+          <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
+          <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
+          <td class="mut">${seen}</td>
+        `;
 
-        const modeInput = row.querySelector('[data-mode]');
-        const modeLabel = row.querySelector('[data-mode-label]');
+        const modeInput = tr.querySelector('[data-mode]');
+        const modeLabel = tr.querySelector('[data-mode-label]');
         modeInput.onchange = async ()=>{
           const mode = modeInput.checked ? 'device' : 'global';
           modeLabel.textContent = modeInput.checked ? 'Individuell' : 'Global';
+          tr.classList.toggle('ind', modeInput.checked);
           const r = await fetch('/admin/api/devices_set_mode.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -772,37 +791,37 @@ async function createDevicesPane(){
           if (!jj.ok) alert('Fehler: '+(jj.error||'unbekannt'));
         };
 
-        row.querySelector('[data-unpair]').onclick = async ()=>{
+        tr.querySelector('[data-unpair]').onclick = async ()=>{
           if (!/^dev_/.test(String(d.id))) {
             alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
             return;
           }
-  const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
-  if ((check||'').trim().toLowerCase() !== 'ja') return;
+          const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+          if ((check||'').trim().toLowerCase() !== 'ja') return;
 
-  const r = await fetch('/admin/api/devices_unpair.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ device: d.id, purge: 1 })
-  });
-  const jj = await r.json().catch(()=>({ok:false}));
-  if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
-  alert('Gerät getrennt.');
-  render();
-};
+          const r = await fetch('/admin/api/devices_unpair.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ device: d.id, purge: 1 })
+          });
+          const jj = await r.json().catch(()=>({ok:false}));
+          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
+          alert('Gerät getrennt.');
+          render();
+        };
 
-row.querySelector('[data-view]').onclick = ()=>{
- openDevicePreview(d.id, d.name || d.id);
- };
- row.querySelector('[data-url]').onclick = async ()=>{
+        tr.querySelector('[data-view]').onclick = ()=>{
+          openDevicePreview(d.id, d.name || d.id);
+        };
+        tr.querySelector('[data-url]').onclick = async ()=>{
           const url = SLIDESHOW_ORIGIN + '/?device=' + d.id;
           try { await navigator.clipboard.writeText(url); alert('URL kopiert:\n'+url); }
           catch { prompt('URL kopieren:', url); }
         };
-        row.querySelector('[data-edit]').onclick = ()=>{
+        tr.querySelector('[data-edit]').onclick = ()=>{
           enterDeviceContext(d.id, d.name || d.id);
         };
-        L.appendChild(row);
+        tbody.appendChild(tr);
       });
     }
   }
@@ -818,6 +837,11 @@ row.querySelector('[data-view]').onclick = ()=>{
   // Refresh & einmalig laden
   card.querySelector('#devRefresh').onclick = render;
   await render();
+
+  const pinBtn = card.querySelector('#devPin');
+  const updatePin = ()=>{ pinBtn.textContent = devicesPinned ? 'Loslösen' : 'Anpinnen'; document.body.classList.toggle('devices-pinned', devicesPinned); };
+  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
+  updatePin();
 
 card.querySelector('#devGc').onclick = async ()=>{
   const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
@@ -920,16 +944,25 @@ async function showView(v){
   // Alles schließen/aufräumen
   detachDockLivePush();
 
+  if (devicesPinned && v !== 'devices'){
+    gridCard.style.display = (v === 'grid') ? '' : 'none';
+    if (v === 'preview'){ if (!document.getElementById('dockPane')) createDockPane(); attachDockLivePush(); }
+    else { destroyDockPane(); }
+    if (!devicesPane){ devicesPane = await createDevicesPane(); }
+    devicesPane.style.display = '';
+    return;
+  }
+
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
     return;
   }
 
   if (v === 'preview'){
     gridCard.style.display = 'none';
-    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
     if (!document.getElementById('dockPane')) createDockPane();
     attachDockLivePush();
     return;
@@ -942,6 +975,7 @@ async function showView(v){
       // WICHTIG: createDevicesPane ist async → Ergebnis abwarten
       devicesPane = await createDevicesPane();
     }
+    devicesPane.style.display = '';
     return;
   }
 }

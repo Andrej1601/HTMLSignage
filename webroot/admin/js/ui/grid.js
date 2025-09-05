@@ -7,6 +7,52 @@ import { $, $$, parseTime } from '../core/utils.js';
 let ctx = null;           // { getSchedule, getSettings }
 let curRow = 0, curCol = 0;
 let inited = false;
+let undoStack = [];
+let redoStack = [];
+
+function cloneRows(rows){
+  return rows.map(r=>({ time:r.time, entries:r.entries.map(c=> c ? { ...c } : null) }));
+}
+
+function pushHistory(){
+  const sc = ctx.getSchedule();
+  undoStack.push(cloneRows(sc.rows));
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack.length = 0;
+}
+
+function updateUndoRedoButtons(){
+  const undoBtn = $('#btnUndo');
+  const redoBtn = $('#btnRedo');
+  if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+}
+
+function saveDraft(){
+  try { localStorage.setItem('scheduleDraft', JSON.stringify(ctx.getSchedule())); } catch {}
+}
+
+function undo(){
+  if (!undoStack.length) return;
+  const sc = ctx.getSchedule();
+  redoStack.push(cloneRows(sc.rows));
+  sc.rows = undoStack.pop();
+  renderGrid();
+  updateSelTime();
+  updateUndoRedoButtons();
+  saveDraft();
+}
+
+function redo(){
+  if (!redoStack.length) return;
+  const sc = ctx.getSchedule();
+  undoStack.push(cloneRows(sc.rows));
+  sc.rows = redoStack.pop();
+  renderGrid();
+  updateSelTime();
+  updateUndoRedoButtons();
+  saveDraft();
+}
 
 function updateSelTime(){
   const sc = ctx.getSchedule();
@@ -63,6 +109,7 @@ export function renderGrid(){
         inp.value = sc2.rows[ri].time;
         return;
       }
+      pushHistory();
       sc2.rows[ri].time = t;
       sc2.rows.sort((a,b)=>a.time.localeCompare(b.time));
       renderGrid();
@@ -93,6 +140,9 @@ export function renderGrid(){
       $('#m_title').focus();
     };
   });
+
+  updateUndoRedoButtons();
+  saveDraft();
 }
 
 // --- einmalige Dialog/Buttons-Wiring ---
@@ -119,6 +169,8 @@ function initOnce(){
     const newCell = title ? { title, flames } : null;
     if (newCell && hasNote) newCell.noteId = noteId;
 
+    pushHistory();
+
     if (newTime && newTime !== sc.rows[curRow].time && newCell){
       // ggf. neue Zeile anlegen/verschieben
       let targetIdx = sc.rows.findIndex(r => r.time === newTime);
@@ -143,12 +195,14 @@ function initOnce(){
   // Row-Operationen
   $('#btnAddAbove').onclick = () => {
     const sc = ctx.getSchedule();
+    pushHistory();
     const cols = sc.saunas.length;
     sc.rows.splice(curRow, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
     renderGrid();
   };
   $('#btnAddBelow').onclick = () => {
     const sc = ctx.getSchedule();
+    pushHistory();
     const cols = sc.saunas.length;
     sc.rows.splice(curRow+1, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
     renderGrid();
@@ -156,12 +210,16 @@ function initOnce(){
   $('#btnDeleteRow').onclick = () => {
     const sc = ctx.getSchedule();
     if (sc.rows.length > 1){
+      pushHistory();
       sc.rows.splice(curRow, 1);
       curRow = Math.max(0, curRow - 1);
       renderGrid();
       updateSelTime();
     }
   };
+
+  $('#btnUndo').onclick = undo;
+  $('#btnRedo').onclick = redo;
 }
 
 // --- Public API ---
@@ -171,6 +229,7 @@ export function initGridUI(context){
   initOnce();
   updateSelTime();
   renderGrid();
+  updateUndoRedoButtons();
 }
 
 export function getSelection(){ return { row:curRow, col:curCol }; }
