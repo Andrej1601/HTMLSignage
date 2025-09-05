@@ -485,7 +485,7 @@ while (m.totalH > availH && iter < 12) {
     const rightH2 = (((settings?.h2?.showOnOverview) ?? true) && (settings?.h2?.mode||'text')!=='none')
       ? h('h2',{class:'h2'}, computeH2Text() || '')
       : null;
-    const bar = h('div',{class:'ovbar'}, [ h('h1',{class:'h1'}, 'Aufgussplan'), rightH2 ]);
+    const bar = h('div',{class:'ovbar headings'}, [ h('h1',{class:'h1'}, 'Aufgussplan'), rightH2 ]);
     const c = h('div', {class:'container overview fade show'}, [ bar, h('div', {class:'ovwrap'}, [table]) ]);
 const recalc = () => { 
   autoScaleOverview(c);
@@ -538,10 +538,13 @@ function renderHtmlSlide(html) {
   function renderSauna(name) {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
+    const headingWrap = h('div', { class: 'headings' }, [
+      h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
+      h('h2', { class: 'h2' }, computeH2Text() || '')
+    ]);
     const c = h('div', { class: 'container has-right fade show' }, [
       h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url(' + JSON.stringify(rightUrl) + ')') : 'display:none;' }),
-      h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
-      h('h2', {class:'h2'}, computeH2Text() || '')
+      headingWrap
     ]);
 
     const body = h('div', { class: 'body' });

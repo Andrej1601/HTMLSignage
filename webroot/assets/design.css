@@ -54,6 +54,8 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .container{position:relative; height:100%; padding:calc(32px*var(--vwScale)); display:flex; flex-direction:column; align-items:flex-start}
 .container.has-right{padding-right:calc(var(--rightW) + 32px)}
 .container.overview{padding-right:32px}
+.headings{width:100%;}
+.container.has-right .headings{max-width:calc(100% - var(--rightW));}
 .h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
 .overview .h1{font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
