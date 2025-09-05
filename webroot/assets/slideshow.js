@@ -17,6 +17,21 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
 
+  const imgCache = new Set();
+  function preloadImage(url){
+    return new Promise(res=>{
+      if (!url || imgCache.has(url)) return res();
+      const i = new Image();
+      i.onload = i.onerror = () => res();
+      i.src = url;
+      imgCache.add(url);
+    });
+  }
+  async function preloadRightImages(){
+    const urls = Object.values(settings?.assets?.rightImages || {});
+    await Promise.all(urls.filter(Boolean).map(preloadImage));
+  }
+
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
   const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
@@ -44,7 +59,9 @@ async function loadDeviceResolved(id){
   }
   schedule = j.schedule;
   settings = j.settings;
-  applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+  applyTheme(); applyDisplay(); maybeApplyPreset();
+  await preloadRightImages();
+  await buildQueue();
 }
 
 
@@ -59,7 +76,8 @@ async function loadDeviceResolved(id){
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
-    buildQueue();
+    await preloadRightImages();
+    await buildQueue();
   }
 
   // ---------- Theme & Display ----------
