@@ -37,7 +37,10 @@
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
-  <div id="gridActionsLeft"></div>
+  <div id="gridActionsLeft" class="row" style="gap:6px">
+    <button class="btn sm" id="btnUndo" title="Rückgängig" disabled>↶ Rückgängig</button>
+    <button class="btn sm" id="btnRedo" title="Wiederholen" disabled>↷ Wiederholen</button>
+  </div>
 <div class="row" style="gap:8px;flex-wrap:wrap">
     <div id="weekdayPills" class="row" style="gap:6px"></div>
     <button class="btn sm" id="btnSavePreset" title="Wochentag speichern">💾 Wochentag speichern</button>
