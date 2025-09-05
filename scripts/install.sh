@@ -40,6 +40,7 @@ main(){
   fi
 
 
+
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y

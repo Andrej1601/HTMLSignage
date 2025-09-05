@@ -374,8 +374,16 @@
 </div>
 
 <script>
-  window.SLIDESHOW_ORIGIN = location.protocol + "//" + location.hostname + ":__PUBLIC_PORT__";
-  if (window.SLIDESHOW_ORIGIN.includes("__PUBLIC_PORT__")) window.SLIDESHOW_ORIGIN = location.origin;
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
 </script>
 <script type="module" src="/admin/js/app.js"></script>
 </body>
