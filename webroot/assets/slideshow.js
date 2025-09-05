@@ -100,7 +100,7 @@ async function loadDeviceResolved(id){
       '--ovCellScale': settings?.fonts?.overviewCellScale || 0.8,
       '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
       '--tileWeight': settings?.fonts?.tileWeight || 600,
-      '--chipH': (settings?.fonts?.chipHeight || 44) + 'px'
+      '--chipHScale': (settings?.fonts?.chipHeight || 1)
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
 // Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings

@@ -204,7 +204,7 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
-  setV('#chipH',        f.chipHeight         ?? 44);
+  setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
 
   // Saunafolien (Kacheln)
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
@@ -236,7 +236,7 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
-    setV('#chipH',        DEFAULTS.fonts.chipHeight);
+    setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
     setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
@@ -526,7 +526,7 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
-        chipHeight:+($('#chipH').value||44),
+        chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
         flameGapPx: +($('#flameGap')?.value || 6),
