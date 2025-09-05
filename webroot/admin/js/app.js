@@ -95,6 +95,7 @@ async function enterDeviceContext(id, name){
     setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
+  window.__refreshDevicesPane?.();
 
   // in den Grid-Modus springen (falls du showView hast)
 if (typeof showView==='function') showView('grid');
@@ -118,6 +119,7 @@ function exitDeviceContext(){
     setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
+  window.__refreshDevicesPane?.();
 }
 
 
@@ -725,7 +727,7 @@ async function createDevicesPane(){
       P.innerHTML = '<div class="mut">Keine offenen Pairings.</div>';
     } else {
       pend.forEach(d=>{
-        const row = document.createElement('div'); row.className='row'; row.style.gap='8px';
+        const row = document.createElement('div'); row.className='pend-item';
         const ts = d.createdAt ? new Date(d.createdAt*1000).toLocaleString('de-DE') : '—';
         row.innerHTML = `
           <div class="pill">Code: <b>${d.code}</b></div>
@@ -747,33 +749,36 @@ async function createDevicesPane(){
     if (!paired.length) {
       L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
     } else {
-  paired.forEach(d=>{
-        const row = document.createElement('div');
-        row.className='row';
-        row.style.gap='8px';
-        row.style.alignItems='center';
+      const table = document.createElement('table');
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      L.appendChild(table);
+      paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
-        row.innerHTML = `
-          <div class="pill${currentDeviceCtx===d.id?' current':''}"><b>${d.name || d.id}</b></div>
-          <div class="mut">ID: ${d.id}</div>
-          <div class="mut">Zuletzt: ${seen}</div>
-          <label class="toggle" data-mode-wrap>
+        const tr = document.createElement('tr');
+        if (currentDeviceCtx===d.id) tr.classList.add('current');
+        if (useInd) tr.classList.add('ind');
+        tr.innerHTML = `
+          <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
+          <td><button class="btn sm" data-view>Ansehen</button></td>
+          <td><label class="toggle" data-mode-wrap>
             <input type="checkbox" ${useInd?'checked':''} data-mode>
             <span data-mode-label>${modeLbl}</span>
-          </label>
-          <button class="btn sm" data-view>Ansehen</button>
-          <button class="btn sm ghost" data-url>URL kopieren</button>
-          <button class="btn sm" data-edit>Im Editor bearbeiten</button>
-          <button class="btn sm danger" data-unpair>Trennen…</button>
-          `;
+          </label></td>
+          <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
+          <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
+          <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
+          <td class="mut">${seen}</td>
+        `;
 
-        const modeInput = row.querySelector('[data-mode]');
-        const modeLabel = row.querySelector('[data-mode-label]');
+        const modeInput = tr.querySelector('[data-mode]');
+        const modeLabel = tr.querySelector('[data-mode-label]');
         modeInput.onchange = async ()=>{
           const mode = modeInput.checked ? 'device' : 'global';
           modeLabel.textContent = modeInput.checked ? 'Individuell' : 'Global';
+          tr.classList.toggle('ind', modeInput.checked);
           const r = await fetch('/admin/api/devices_set_mode.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -783,37 +788,37 @@ async function createDevicesPane(){
           if (!jj.ok) alert('Fehler: '+(jj.error||'unbekannt'));
         };
 
-        row.querySelector('[data-unpair]').onclick = async ()=>{
+        tr.querySelector('[data-unpair]').onclick = async ()=>{
           if (!/^dev_/.test(String(d.id))) {
             alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
             return;
           }
-  const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
-  if ((check||'').trim().toLowerCase() !== 'ja') return;
+          const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+          if ((check||'').trim().toLowerCase() !== 'ja') return;
 
-  const r = await fetch('/admin/api/devices_unpair.php', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ device: d.id, purge: 1 })
-  });
-  const jj = await r.json().catch(()=>({ok:false}));
-  if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
-  alert('Gerät getrennt.');
-  render();
-};
+          const r = await fetch('/admin/api/devices_unpair.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ device: d.id, purge: 1 })
+          });
+          const jj = await r.json().catch(()=>({ok:false}));
+          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
+          alert('Gerät getrennt.');
+          render();
+        };
 
-row.querySelector('[data-view]').onclick = ()=>{
- openDevicePreview(d.id, d.name || d.id);
- };
- row.querySelector('[data-url]').onclick = async ()=>{
+        tr.querySelector('[data-view]').onclick = ()=>{
+          openDevicePreview(d.id, d.name || d.id);
+        };
+        tr.querySelector('[data-url]').onclick = async ()=>{
           const url = SLIDESHOW_ORIGIN + '/?device=' + d.id;
           try { await navigator.clipboard.writeText(url); alert('URL kopiert:\n'+url); }
           catch { prompt('URL kopieren:', url); }
         };
-        row.querySelector('[data-edit]').onclick = ()=>{
+        tr.querySelector('[data-edit]').onclick = ()=>{
           enterDeviceContext(d.id, d.name || d.id);
         };
-        L.appendChild(row);
+        tbody.appendChild(tr);
       });
     }
   }

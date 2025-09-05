@@ -519,7 +519,7 @@ function renderImage(url) {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
     const c = h('div', { class: 'container has-right fade show' }, [
-      h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url("' + rightUrl + '")') : 'display:none;' }),
+      h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url(' + JSON.stringify(rightUrl) + ')') : 'display:none;' }),
       h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
       h('h2', {class:'h2'}, computeH2Text() || '')
     ]);
