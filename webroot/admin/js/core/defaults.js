@@ -2,7 +2,7 @@
 // DEFAULTS + Wochentags-Helfer als Single Source of Truth
 
 export const DEFAULTS = {
-  slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinPx:480, tileMaxPx:1100 },
+  slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinPct:25, tileMaxPct:57 },
   display:{ fit:'cover', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
   theme:{
     bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
@@ -24,7 +24,7 @@ export const DEFAULTS = {
     scale:1, h1Scale:1, h2Scale:1,
     overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8,
     tileTextScale:0.8, tileWeight:600, chipHeight:1,
-    chipOverflowMode:'scale', flamePct:55, flameGapPx:6
+    chipOverflowMode:'scale', flamePct:55, flameGapPct:14
   },
   h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
   assets:{ flameImage:'/assets/img/flame_test.svg' },

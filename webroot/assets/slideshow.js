@@ -122,10 +122,10 @@ async function loadDeviceResolved(id){
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
 // Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
-const f = settings?.fonts || {};
-setVars({
+  const f = settings?.fonts || {};
+  setVars({
   '--chipFlamePct': Math.max(0.3, Math.min(1, (f.flamePct || 55) / 100)),
-  '--chipFlameGap': (f.flameGapPx ?? 6) + 'px'
+  '--chipFlameGapFactor': Math.max(0, (f.flameGapPct ?? 14) / 100)
 });
 // 'scale' = Text automatisch verkleinern, 'ellipsis' = auf „…“ kürzen
 document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
@@ -536,8 +536,10 @@ function renderHtmlSlide(html) {
     const avail = computeAvailContentWidth(container);
     const pct = (settings?.slides?.tileWidthPercent ?? 45) / 100;
     const target = Math.max(0, avail * pct);
-    const minPx = settings?.slides?.tileMinPx ?? 480;
-    const maxPx = settings?.slides?.tileMaxPx ?? 1100;
+    const minPct = Math.max(0, (settings?.slides?.tileMinPct ?? 25) / 100);
+    const maxPct = Math.max(minPct, (settings?.slides?.tileMaxPct ?? 57) / 100);
+    const minPx = avail * minPct;
+    const maxPx = avail * maxPct;
     container.style.setProperty('--tileTargetPx', target + 'px');
     container.style.setProperty('--tileMinPx', minPx + 'px');
     container.style.setProperty('--tileMaxPx', maxPx + 'px');

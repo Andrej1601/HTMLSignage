@@ -15,7 +15,8 @@
   },
   "fonts": {
     "family": "-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
-    "scale": 1.00
+    "scale": 1.00,
+    "flameGapPct": 14
   },
   "display": {
     "rightWidthPercent": 38,
@@ -27,8 +28,8 @@
     "saunaDurationSec": 6,
     "transitionMs": 500,
     "tileWidthPercent": 45,
-    "tileMinPx": 480,
-    "tileMaxPx": 1100,
+    "tileMinPct": 25,
+    "tileMaxPct": 57,
     "loop": true,
     "order": ["overview","Aufgusssauna","Finnische Sauna","Kelosauna","Dampfbad","Fenster zur Welt"]
   },
