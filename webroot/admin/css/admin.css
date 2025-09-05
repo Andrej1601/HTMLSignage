@@ -111,6 +111,8 @@ body.device-mode header{
 body.device-mode #ctxBadge{
   background: var(--btn-primary-fg);
   color: var(--btn-primary);
+  font-size:20px;
+  padding:12px 20px;
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -247,11 +249,11 @@ details[open] .chev{ transform: rotate(90deg); }
 .ctx-badge{
     display:inline-block;
     margin-left:8px;
-    padding:6px 12px;
-    border-radius:8px;
+    padding:10px 16px;
+    border-radius:12px;
     background:var(--btn-accent);
     color:var(--btn-accent-fg);
-    font-size:16px;
+    font-size:18px;
     font-weight:700;
 }
 .ctx-badge button{
@@ -280,6 +282,13 @@ details[open] .chev{ transform: rotate(90deg); }
 #devPairedList tr.ind button{color:inherit;}
 body.device-mode #devPairedList tr.current{background:var(--btn-primary);color:var(--btn-primary-fg);}
 body.device-mode #devPairedList tr.current button{color:inherit;}
+
+/* Hervorgehobene Gerätezeile */
+#devPairedList tr.selected{outline:2px solid var(--btn-accent);}
+body.device-mode #devPairedList tr.selected{outline-color:var(--btn-primary);}
+
+/* Hinweistext unter dem Kontext-Badge */
+#ctxBadgeTip{display:block;margin-left:8px;margin-top:4px;color:var(--muted);font-size:13px;}
 
 
 /* ---------- Grid-Tabelle (links) ---------- */

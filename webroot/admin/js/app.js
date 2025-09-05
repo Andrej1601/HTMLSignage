@@ -37,17 +37,26 @@ function renderContextBadge(){
   const h1 = document.querySelector('header h1');
   if (!h1) return;
   let el = document.getElementById('ctxBadge');
+  let tip = document.getElementById('ctxBadgeTip');
   if (!currentDeviceCtx){
     if (el) el.remove();
+    if (tip) tip.remove();
     return;
   }
   if (!el){
     el = document.createElement('span'); el.id='ctxBadge';
     el.className='ctx-badge';
+    el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
     h1.after(el);
   }
   el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
   el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
+  if (!tip){
+    tip = document.createElement('small');
+    tip.id = 'ctxBadgeTip';
+    el.after(tip);
+  }
+  tip.textContent = 'Tipp: Klick auf × um zur globalen Ansicht zurückzukehren.';
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
@@ -759,6 +768,10 @@ async function createDevicesPane(){
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
       L.appendChild(table);
+      const selectRow = (tr)=>{
+        tr.parentElement.querySelectorAll('tr').forEach(r=>r.classList.remove('selected'));
+        tr.classList.add('selected');
+      };
       paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
         const useInd = d.useOverrides;
@@ -814,6 +827,7 @@ async function createDevicesPane(){
         };
 
         tr.querySelector('[data-view]').onclick = ()=>{
+          selectRow(tr);
           openDevicePreview(d.id, d.name || d.id);
         };
         tr.querySelector('[data-url]').onclick = async ()=>{
@@ -822,6 +836,7 @@ async function createDevicesPane(){
           catch { prompt('URL kopieren:', url); }
         };
         tr.querySelector('[data-edit]').onclick = ()=>{
+          selectRow(tr);
           enterDeviceContext(d.id, d.name || d.id);
         };
         tbody.appendChild(tr);
