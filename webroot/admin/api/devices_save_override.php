@@ -21,6 +21,7 @@ $set['version'] = intval($set['version'] ?? 0) + 1;
 
 $dev['devices'][$devId]['overrides'] = $dev['devices'][$devId]['overrides'] ?? [];
 $dev['devices'][$devId]['overrides']['settings'] = $set;
+
 $dev['devices'][$devId]['useOverrides'] = true;
 
 if (!devices_save($dev)) {

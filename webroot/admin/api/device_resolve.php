@@ -69,11 +69,13 @@ $baseSettings = read_json_file($docRoot . '/data/settings.json');
 $baseSchedule = read_json_file($docRoot . '/data/schedule.json');
 
 $overSettings = $dev['overrides']['settings'] ?? [];
+
 if (empty($dev['useOverrides'])) {
   $overSettings = [];
 } elseif (!is_array($overSettings)) {
   $overSettings = [];
 }
+
 
 // --- Merge & Versionen ------------------------------------------------------
 

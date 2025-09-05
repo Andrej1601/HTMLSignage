@@ -57,6 +57,7 @@ async function enterDeviceContext(id, name){
     body: JSON.stringify({ device: id, mode: 'device' })
   }).catch(()=>{});
 
+
   // aktuelle Geräte-Daten holen, Overrides herausziehen
   const r = await fetch('/admin/api/devices_list.php');
   const j = await r.json();
