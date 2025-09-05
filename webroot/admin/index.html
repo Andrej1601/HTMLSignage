@@ -37,7 +37,10 @@
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
-  <div id="gridActionsLeft"></div>
+  <div id="gridActionsLeft" class="row" style="gap:6px">
+    <button class="btn sm" id="btnUndo" title="Rückgängig" disabled>↶ Rückgängig</button>
+    <button class="btn sm" id="btnRedo" title="Wiederholen" disabled>↷ Wiederholen</button>
+  </div>
 <div class="row" style="gap:8px;flex-wrap:wrap">
     <div id="weekdayPills" class="row" style="gap:6px"></div>
     <button class="btn sm" id="btnSavePreset" title="Wochentag speichern">💾 Wochentag speichern</button>
@@ -224,7 +227,7 @@
           <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
           <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
           <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
-          <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="20" max="120" value="44"></div>
+          <div class="kv"><label>Chip‑Höhe (%)</label><input id="chipH" class="input" type="number" min="50" max="200" value="100"></div>
           <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
 <div class="kv"><label>Textüberlänge</label>
   <select id="chipOverflowMode" class="input">

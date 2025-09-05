@@ -19,7 +19,7 @@ echo json_encode([
     'family'=>"-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
     'scale'=>1, 'h1Scale'=>1, 'h2Scale'=>1,
     'overviewTitleScale'=>1, 'overviewHeadScale'=>0.9, 'overviewCellScale'=>0.8,
-    'tileTextScale'=>0.8, 'tileWeight'=>600, 'chipHeight'=>44,
+    'tileTextScale'=>0.8, 'tileWeight'=>600, 'chipHeight'=>1,
     'chipOverflowMode'=>'scale','flamePct'=>55,'flameGapPx'=>6
   ],
   'h2'=>['mode'=>'text','text'=>'Aufgusszeiten','showOnOverview'=>true],

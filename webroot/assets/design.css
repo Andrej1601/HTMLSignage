@@ -16,9 +16,12 @@
   /* typography */
   --font:-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
   --baseScale:1; --vwScale:1; --scale:calc(var(--baseScale)*var(--vwScale)); --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80;
-  --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28; --chipH:44px;
---chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
---chipFlameGap:6px;   /* Abstand zwischen Flammen */
+  --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28;
+  --chipHBase:calc(44px*var(--scale));
+  --chipHScale:1;
+  --chipH:calc(var(--chipHBase)*var(--chipHScale));
+  --chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
+  --chipFlameGap:6px;   /* Abstand zwischen Flammen */
   --ovAuto:1; /* overview-only autoscale factor */
 
   /* right panel shape */

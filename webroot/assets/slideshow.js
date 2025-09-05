@@ -100,7 +100,7 @@ async function loadDeviceResolved(id){
       '--ovCellScale': settings?.fonts?.overviewCellScale || 0.8,
       '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
       '--tileWeight': settings?.fonts?.tileWeight || 600,
-      '--chipH': (settings?.fonts?.chipHeight || 44) + 'px'
+      '--chipHScale': (settings?.fonts?.chipHeight || 1)
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
 // Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
@@ -519,7 +519,7 @@ function renderImage(url) {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
     const c = h('div', { class: 'container has-right fade show' }, [
-      h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url("' + rightUrl + '")') : 'display:none;' }),
+      h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url(' + JSON.stringify(rightUrl) + ')') : 'display:none;' }),
       h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
       h('h2', {class:'h2'}, computeH2Text() || '')
     ]);

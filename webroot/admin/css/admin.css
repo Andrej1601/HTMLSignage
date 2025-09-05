@@ -96,6 +96,15 @@ header{
 }
 h1{ margin:0; font-size:16px; letter-spacing:.3px; }
 
+body.device-mode header{
+  background: var(--btn-primary);
+  color: var(--btn-primary-fg);
+}
+body.device-mode #ctxBadge{
+  background: var(--btn-primary-fg);
+  color: var(--btn-primary);
+}
+
 /* ---------- Layout: Main + Rightbar ---------- */
 main.layout{
   width:100%;
@@ -164,6 +173,11 @@ details[open] .chev{ transform: rotate(90deg); }
   border:1px solid transparent; cursor:pointer; user-select:none;
   transition: transform .06s ease, filter .15s, background .15s, border-color .15s, color .15s;
 }
+.btn:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  filter:grayscale(40%);
+}
 .btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
 .btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
 
@@ -203,13 +217,14 @@ details[open] .chev{ transform: rotate(90deg); }
 
 /* Badge für Geräte-Kontext */
 .ctx-badge{
-  display:inline-block;
-  margin-left:8px;
-  padding:4px 8px;
-  border-radius:8px;
-  background:var(--btn-accent);
-  color:var(--btn-accent-fg);
-  font-size:14px;
+    display:inline-block;
+    margin-left:8px;
+    padding:6px 12px;
+    border-radius:8px;
+    background:var(--btn-accent);
+    color:var(--btn-accent-fg);
+    font-size:16px;
+    font-weight:700;
 }
 .ctx-badge button{
   margin-left:6px;
@@ -221,12 +236,22 @@ details[open] .chev{ transform: rotate(90deg); }
 }
 
 /* Hervorhebung des aktiven Geräts in der Liste */
-.pill.current{
-  background:var(--btn-accent);
-  color:var(--btn-accent-fg);
-  border-color:var(--btn-accent);
-  font-weight:700;
-}
+  .pill.current{
+    background:var(--btn-accent);
+    color:var(--btn-accent-fg);
+    border-color:var(--btn-accent);
+    font-weight:700;
+  }
+
+/* Geräte-Tabellenansicht */
+#devPendingList{display:flex;flex-wrap:wrap;gap:8px;}
+#devPendingList .pend-item{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+#devPairedList table{width:100%;border-collapse:collapse;}
+#devPairedList td,#devPairedList th{padding:6px 8px;text-align:left;}
+#devPairedList tr.ind{background:var(--btn-accent);color:var(--btn-accent-fg);}
+#devPairedList tr.ind button{color:inherit;}
+body.device-mode #devPairedList tr.current{background:var(--btn-primary);color:var(--btn-primary-fg);}
+body.device-mode #devPairedList tr.current button{color:inherit;}
 
 
 /* ---------- Grid-Tabelle (links) ---------- */
