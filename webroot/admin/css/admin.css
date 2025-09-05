@@ -86,6 +86,14 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .mut,.help{ color:var(--muted); }
 
+/* Utility classes for headings and toolbars */
+.subh{ font-weight:700; margin:8px 0; }
+.card-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.card-title{ font-weight:800; }
+.device-toolbar{ display:flex; flex-wrap:wrap; gap:6px; }
+.btn.icon-label{ gap:4px; }
+.devices-section{ margin-top:12px; }
+
 /* ---------- Header ---------- */
 header{
   position:sticky; top:0; z-index:60;

@@ -680,23 +680,23 @@ async function createDevicesPane(){
   card.id = 'devicesPane';
   card.innerHTML = `
     <div class="content">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="font-weight:800">Geräte</div>
-        <div class="row" style="gap:6px">
-          <button class="btn sm" id="devPairManual">Code eingeben…</button>
-          <button class="btn sm" id="devRefresh">Aktualisieren</button>
-          <button class="btn sm" id="devPin"></button>
-          <button class="btn sm danger" id="devGc">Aufräumen</button>
-      </div>
+      <div class="card-head">
+        <div class="card-title">Geräte</div>
+        <div class="device-toolbar">
+          <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
+          <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
+          <button class="btn sm icon-label" id="devPin"></button>
+          <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
+        </div>
       </div>
 
       <div id="devPendingWrap">
-        <div class="subh" style="font-weight:700;margin:8px 0">Ungepairt</div>
+        <div class="subh">Ungepairt</div>
         <div id="devPendingList" class="kv"></div>
       </div>
 
-      <div id="devPairedWrap" style="margin-top:12px">
-        <div class="subh" style="font-weight:700;margin:8px 0">Gepaart</div>
+      <div id="devPairedWrap" class="devices-section">
+        <div class="subh">Gepaart</div>
         <div id="devPairedList" class="kv"></div>
       </div>
 
@@ -842,7 +842,10 @@ async function createDevicesPane(){
   await render();
 
   const pinBtn = card.querySelector('#devPin');
-  const updatePin = ()=>{ pinBtn.textContent = devicesPinned ? 'Loslösen' : 'Anpinnen'; document.body.classList.toggle('devices-pinned', devicesPinned); };
+  const updatePin = ()=>{
+    pinBtn.innerHTML = `<span class="icon">📌</span><span class="label">${devicesPinned ? 'Loslösen' : 'Anpinnen'}</span>`;
+    document.body.classList.toggle('devices-pinned', devicesPinned);
+  };
   pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
   updatePin();
 
