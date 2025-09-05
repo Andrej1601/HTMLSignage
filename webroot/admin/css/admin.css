@@ -198,6 +198,24 @@ details[open] .chev{ transform: rotate(90deg); }
 .btn.ghost{
   background:var(--ghost-bg); color:var(--ghost-fg); border:1px solid var(--ghost-border);
 }
+
+/* ---------- Hilfe-Overlay & Tooltips ---------- */
+.tip{ cursor:help; color:var(--muted); margin-left:4px; }
+
+#helpOverlay{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(0,0,0,.6);
+  display:flex; align-items:center; justify-content:center;
+}
+#helpOverlay[hidden]{ display:none; }
+#helpOverlay .panel{
+  background:var(--panel); color:var(--fg);
+  border:1px solid var(--border); border-radius:16px;
+  padding:24px; max-width:500px; width:90%;
+  position:relative;
+}
+#helpOverlay .panel h2{ margin-top:0; }
+#helpClose{ position:absolute; top:8px; right:8px; }
 .btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
 
 /* Toggle */
