@@ -125,7 +125,7 @@ async function loadDeviceResolved(id){
   const f = settings?.fonts || {};
   setVars({
   '--chipFlamePct': Math.max(0.3, Math.min(1, (f.flamePct || 55) / 100)),
-  '--chipFlameGapFactor': Math.max(0, (f.flameGapPct ?? 14) / 100)
+  '--chipFlameGapScale': Math.max(0, (f.flameGapScale ?? 0.14))
 });
 // 'scale' = Text automatisch verkleinern, 'ellipsis' = auf „…“ kürzen
 document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
@@ -140,6 +140,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     if (typeof d.cutBottomPercent === 'number')  document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
 
     const baseW = d.baseW || 1920;
+    document.documentElement.style.setProperty('--baseW', baseW + 'px');
     const updateVwScale = () => {
       const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
       const s = Math.max(0.25, vw / baseW); // untere Schranke gegen Ultra-Klein
@@ -536,13 +537,11 @@ function renderHtmlSlide(html) {
     const avail = computeAvailContentWidth(container);
     const pct = (settings?.slides?.tileWidthPercent ?? 45) / 100;
     const target = Math.max(0, avail * pct);
-    const minPct = Math.max(0, (settings?.slides?.tileMinPct ?? 25) / 100);
-    const maxPct = Math.max(minPct, (settings?.slides?.tileMaxPct ?? 57) / 100);
-    const minPx = avail * minPct;
-    const maxPx = avail * maxPct;
+    const minScale = Math.max(0, settings?.slides?.tileMinScale ?? 0.25);
+    const maxScale = Math.max(minScale, settings?.slides?.tileMaxScale ?? 0.57);
     container.style.setProperty('--tileTargetPx', target + 'px');
-    container.style.setProperty('--tileMinPx', minPx + 'px');
-    container.style.setProperty('--tileMaxPx', maxPx + 'px');
+    container.style.setProperty('--tileMinScale', String(minScale));
+    container.style.setProperty('--tileMaxScale', String(maxScale));
   }
 
   // ---------- Sauna slide ----------

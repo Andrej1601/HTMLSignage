@@ -21,15 +21,17 @@
   --chipHScale:1;
   --chipH:calc(var(--chipHBase)*var(--chipHScale));
   --chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
-  --chipFlameGapFactor:0.14; /* Anteil der Chip-Höhe als Abstand */
-  --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapFactor));
+  --chipFlameGapScale:0.14; /* Anteil der Chip-Höhe als Abstand */
+  --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapScale));
   --ovAuto:1; /* overview-only autoscale factor */
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
 
-  /* sauna tile clamp (JS sets --tileTargetPx and min/max via factors) */
-  --tileMinPx:480px; --tileMaxPx:1100px; --tileTargetPx:860px;
+  /* sauna tile clamp (JS sets --tileTargetPx and baseW) */
+  --baseW:1920px;
+  --tileMinScale:0.25; --tileMaxScale:0.57;
+  --tileTargetPx:860px;
   --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
   --ovTitleScale:1; /* nur H1 der Übersicht */
   --flamesColW: calc(var(--flameSizePx)*1px*var(--scale)*3 + 24px);
@@ -137,7 +139,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 
 /* sauna tiles */
 .tile{display:grid; grid-template-columns:1fr auto; align-items:center; gap:calc(16px*var(--vwScale));
-  width: clamp(calc(var(--tileMinPx)*var(--vwScale)), var(--tileTargetPx), calc(var(--tileMaxPx)*var(--vwScale)));
+  width: clamp(calc(var(--baseW)*var(--tileMinScale)*var(--vwScale)), var(--tileTargetPx), calc(var(--baseW)*var(--tileMaxScale)*var(--vwScale)));
   padding:calc(14px*var(--vwScale)) calc(18px*var(--vwScale)); background:var(--cell);   border:calc(var(--tileBorderW)*var(--vwScale)) solid var(--tileBorder); border-radius:16px; color:var(--boxfg);
 }
 .title{font-size:calc(40px*var(--scale)*var(--tileTextScale)); font-weight:var(--tileWeight)}
