@@ -37,17 +37,26 @@ function renderContextBadge(){
   const h1 = document.querySelector('header h1');
   if (!h1) return;
   let el = document.getElementById('ctxBadge');
+  let tip = document.getElementById('ctxBadgeTip');
   if (!currentDeviceCtx){
     if (el) el.remove();
+    if (tip) tip.remove();
     return;
   }
   if (!el){
     el = document.createElement('span'); el.id='ctxBadge';
     el.className='ctx-badge';
+    el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
     h1.after(el);
   }
   el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
   el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
+  if (!tip){
+    tip = document.createElement('small');
+    tip.id = 'ctxBadgeTip';
+    el.after(tip);
+  }
+  tip.textContent = 'Tipp: Klick auf × um zur globalen Ansicht zurückzukehren.';
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
@@ -204,7 +213,7 @@ function renderSlidesBox(){
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
-  setV('#flameGap',         f.flameGapPct      ?? 14);
+  setV('#flameGap',         f.flameGapScale    ?? 0.14);
 
   // H2
   setV('#h2Mode', settings.h2?.mode ?? DEFAULTS.h2.mode);
@@ -221,8 +230,8 @@ function renderSlidesBox(){
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
   setV('#tileWeight',    f.tileWeight    ?? 600);
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
-  setV('#tileMin',       settings.slides?.tileMinPct ?? 25);
-  setV('#tileMax',       settings.slides?.tileMaxPct ?? 57);
+  setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
+  setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
 
   // Bildspalte / Schrägschnitt
   setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
@@ -250,13 +259,13 @@ function renderSlidesBox(){
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
-    setV('#flameGap',         DEFAULTS.fonts.flameGapPct);
+    setV('#flameGap',         DEFAULTS.fonts.flameGapScale);
 
     setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
     setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
-    setV('#tileMin',       DEFAULTS.slides.tileMinPct);
-    setV('#tileMax',       DEFAULTS.slides.tileMaxPct);
+    setV('#tileMin',       DEFAULTS.slides.tileMinScale);
+    setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
 
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
     setV('#cutTop',   DEFAULTS.display.cutTopPercent);
@@ -540,7 +549,7 @@ function collectSettings(){
         chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
-        flameGapPct:+($('#flameGap')?.value || 14),
+        flameGapScale:+($('#flameGap')?.value || 0.14),
         tileTextScale:+($('#tileTextScale').value||0.8),
         tileWeight:+($('#tileWeight').value||600)
       },
@@ -552,8 +561,8 @@ function collectSettings(){
       slides:{
         ...(settings.slides||{}),
         tileWidthPercent:+($('#tilePct')?.value || 45),
-        tileMinPct:+($('#tileMin')?.value || 25),
-        tileMaxPct:+($('#tileMax')?.value || 57),
+        tileMinScale:+($('#tileMin')?.value || 0.25),
+        tileMaxScale:+($('#tileMax')?.value || 0.57),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
   	const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
@@ -680,23 +689,23 @@ async function createDevicesPane(){
   card.id = 'devicesPane';
   card.innerHTML = `
     <div class="content">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="font-weight:800">Geräte</div>
-        <div class="row" style="gap:6px">
-          <button class="btn sm" id="devPairManual">Code eingeben…</button>
-          <button class="btn sm" id="devRefresh">Aktualisieren</button>
-          <button class="btn sm" id="devPin"></button>
-          <button class="btn sm danger" id="devGc">Aufräumen</button>
-      </div>
+      <div class="card-head">
+        <div class="card-title">Geräte</div>
+        <div class="device-toolbar">
+          <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
+          <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
+          <button class="btn sm icon-label" id="devPin"></button>
+          <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
+        </div>
       </div>
 
       <div id="devPendingWrap">
-        <div class="subh" style="font-weight:700;margin:8px 0">Ungepairt</div>
+        <div class="subh">Ungepairt</div>
         <div id="devPendingList" class="kv"></div>
       </div>
 
-      <div id="devPairedWrap" style="margin-top:12px">
-        <div class="subh" style="font-weight:700;margin:8px 0">Gepaart</div>
+      <div id="devPairedWrap" class="devices-section">
+        <div class="subh">Gepaart</div>
         <div id="devPairedList" class="kv"></div>
       </div>
 
@@ -759,6 +768,10 @@ async function createDevicesPane(){
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
       L.appendChild(table);
+      const selectRow = (tr)=>{
+        tr.parentElement.querySelectorAll('tr').forEach(r=>r.classList.remove('selected'));
+        tr.classList.add('selected');
+      };
       paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
         const useInd = d.useOverrides;
@@ -814,6 +827,7 @@ async function createDevicesPane(){
         };
 
         tr.querySelector('[data-view]').onclick = ()=>{
+          selectRow(tr);
           openDevicePreview(d.id, d.name || d.id);
         };
         tr.querySelector('[data-url]').onclick = async ()=>{
@@ -822,6 +836,7 @@ async function createDevicesPane(){
           catch { prompt('URL kopieren:', url); }
         };
         tr.querySelector('[data-edit]').onclick = ()=>{
+          selectRow(tr);
           enterDeviceContext(d.id, d.name || d.id);
         };
         tbody.appendChild(tr);
@@ -842,7 +857,10 @@ async function createDevicesPane(){
   await render();
 
   const pinBtn = card.querySelector('#devPin');
-  const updatePin = ()=>{ pinBtn.textContent = devicesPinned ? 'Loslösen' : 'Anpinnen'; document.body.classList.toggle('devices-pinned', devicesPinned); };
+  const updatePin = ()=>{
+    pinBtn.innerHTML = `<span class="icon">📌</span><span class="label">${devicesPinned ? 'Loslösen' : 'Anpinnen'}</span>`;
+    document.body.classList.toggle('devices-pinned', devicesPinned);
+  };
   pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
   updatePin();
 

@@ -25,7 +25,7 @@
     <button class="dd-item" role="menuitemradio" data-view="devices" aria-checked="false">🖥 Geräte</button>
   </div>
 </div>
-
+      <button class="btn" id="btnHelp">Hilfe</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
     </div>
@@ -71,7 +71,7 @@
 
 <!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
 <div class="kv" id="rowDurMode">
-  <label>Dauer-Modus</label>
+  <label>Dauer-Modus <span class="tip" title="Bestimmt, ob alle Slides dieselbe Dauer haben oder individuell gesteuert werden.">❔</span></label>
   <div class="row">
     <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
     <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
@@ -94,7 +94,7 @@
   <input id="transMs2" class="input" type="number" min="0" value="500">
 </div>
 
-<div class="kv"><label>Auto je Wochentag</label><input id="presetAuto" type="checkbox"></div>
+<div class="kv"><label>Auto je Wochentag <span class="tip" title="Lädt beim Start automatisch das Preset des aktuellen Wochentags.">❔</span></label><input id="presetAuto" type="checkbox"></div>
 <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
 
     <!-- Unterbox 1: Saunen & Übersicht -->
@@ -146,7 +146,7 @@
     <div id="fnList"></div>
     <div class="subh">Darstellung</div>
     <div class="kv">
-      <label>Fußnoten-Layout</label>
+      <label>Fußnoten-Layout <span class="tip" title="Legt fest, wie mehrere Fußnoten dargestellt werden.">❔</span></label>
       <select id="footnoteLayout" class="input">
         <option value="one-line" selected>Möglichst einzeilig</option>
         <option value="multi">Mehrzeilig</option>
@@ -258,8 +258,8 @@
 <div class="kv"><label>Flammen-Größe (% der Chip-Höhe)</label>
   <input id="flamePct" class="input" type="number" min="30" max="100" value="55">
 </div>
-<div class="kv"><label>Flammen-Abstand (%)</label>
-  <input id="flameGap" class="input" type="number" min="0" max="100" value="14">
+<div class="kv"><label>Flammen-Abstand (Faktor)</label>
+  <input id="flameGap" class="input" type="number" min="0" max="1" step="0.01" value="0.14">
 </div>
 
           <div class="subh">Saunafolien (Kacheln)</div>
@@ -274,8 +274,8 @@
             </select>
           </div>
           <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
-          <div class="kv"><label>Kachel‑Breite min (%)</label><input id="tileMin" class="input" type="number" min="0" max="100" value="25"></div>
-          <div class="kv"><label>Kachel‑Breite max (%)</label><input id="tileMax" class="input" type="number" min="0" max="100" value="57"></div>
+          <div class="kv"><label>Kachel‑Breite min (Faktor)</label><input id="tileMin" class="input" type="number" min="0" max="1" step="0.01" value="0.25"></div>
+          <div class="kv"><label>Kachel‑Breite max (Faktor)</label><input id="tileMax" class="input" type="number" min="0" max="1" step="0.01" value="0.57"></div>
 
           <div class="subh">Bildspalte / Schrägschnitt</div>
           <div class="kv"><label>Breite rechts (%)</label><input id="rightW" class="input" type="number" min="0" max="70" value="38"></div>
@@ -297,7 +297,68 @@
             </div>
           </div>
         </div>
-      </details>
+</details>
+
+<!-- Fußnoten -->
+<details class="ac" id="boxFootnotes">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten</div>
+    <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div id="fnList"></div>
+    <div class="subh">Darstellung</div>
+    <div class="kv">
+      <label>Fußnoten-Layout</label>
+      <select id="footnoteLayout" class="input">
+        <option value="one-line" selected>Möglichst einzeilig</option>
+        <option value="multi">Mehrzeilig</option>
+        <option value="stacked">Untereinander (jede Zeile)</option>
+      </select>
+    </div>
+  </div>
+</details>
+
+<!-- Bild-Slides -->
+<details class="ac" id="boxImages">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
+  </summary>
+  <small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
+  <div class="content">
+    <div class="sl-head sl-images">
+      <span class="col-name">Name</span>
+      <span class="col-prev">Preview</span>
+      <span class="col-dur" id="headImgDur">Dauer (s)</span>
+      <span class="col-up">Upload</span>
+      <span class="col-del">✕</span>
+      <span class="col-after">Nach Slide</span>
+      <span class="col-vis">Anzeigen</span>
+    </div>
+    <div id="interList2"></div>
+  </div>
+</details>
+
+<!-- HTML-Slides -->
+<details class="ac" id="boxHtml">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> HTML-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnHtmlAdd">HTML hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div class="sl-head sl-html">
+      <span class="col-name">Name</span>
+      <span class="col-prev">Preview</span>
+      <span class="col-edit">Bearbeiten</span>
+      <span class="col-dur" id="headHtmlDur">Dauer (s)</span>
+      <span class="col-del">✕</span>
+      <span class="col-after">Nach Slide</span>
+      <span class="col-vis">Anzeigen</span>
+    </div>
+    <div id="htmlList"></div>
+  </div>
+</details>
 
       <details class="ac">
         <summary>
@@ -305,9 +366,7 @@
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
         </summary>
         <div class="content color-cols" id="colorList"></div>
-    </div>
-</details>     
-</details>
+      </details>
 
       <details class="ac">
         <summary>
@@ -396,6 +455,18 @@
   </div>
 </div>
 
+<div id="helpOverlay" hidden>
+  <div class="panel">
+    <button id="helpClose" class="btn icon" aria-label="Schließen">✕</button>
+    <h2>Schnellstart</h2>
+    <ul>
+      <li>Nutze „Sauna hinzufügen“, um neue Slides zu erstellen.</li>
+      <li>Wechsle zur Ansicht „Geräte“, um Displays zu bearbeiten.</li>
+    </ul>
+    <p>Mehr Hilfe in der <a href="/admin/help.md" target="_blank">Dokumentation</a>.</p>
+  </div>
+</div>
+
 <script>
 
   (function(){
@@ -408,6 +479,7 @@
   })();
 
 </script>
+<script type="module" src="/admin/js/help.js"></script>
 <script type="module" src="/admin/js/app.js"></script>
 </body>
 </html>
