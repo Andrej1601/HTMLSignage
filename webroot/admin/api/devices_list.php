@@ -24,12 +24,15 @@ usort($pairings, fn($a,$b)=>($b['createdAt']??0)-($a['createdAt']??0));
 
 $devices = [];
 foreach (($db['devices'] ?? []) as $id => $d) {
- $devices[] = [
- 'id' => $id,
- 'name' => $d['name'] ?? $id,
- 'lastSeenAt' => (int)($d['lastSeen'] ?? 0) ?: null,
- 'overrides' => [ 'settings' => $d['overrides']['settings'] ?? (object)[] ]
- ];
+
+  $devices[] = [
+    'id' => $id,
+    'name' => $d['name'] ?? $id,
+    'lastSeenAt' => (int)($d['lastSeen'] ?? 0) ?: null,
+    'useOverrides' => !empty($d['useOverrides']),
+    'overrides' => [ 'settings' => $d['overrides']['settings'] ?? (object)[] ]
+  ];
+
 }
 
 echo json_encode(['ok'=>true, 'pairings'=>$pairings, 'devices'=>$devices], JSON_UNESCAPED_SLASHES);

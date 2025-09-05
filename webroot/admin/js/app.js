@@ -1,4 +1,3 @@
-
 // /admin/js/app.js
 // ============================================================================
 // Admin-App Bootstrap & Seitenweite Einstellungen
@@ -51,6 +50,14 @@ function renderContextBadge(){
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
 async function enterDeviceContext(id, name){
+  // Modus auf individuelle Einstellungen setzen
+  fetch('/admin/api/devices_set_mode.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device: id, mode: 'device' })
+  }).catch(()=>{});
+
+
   // aktuelle Geräte-Daten holen, Overrides herausziehen
   const r = await fetch('/admin/api/devices_list.php');
   const j = await r.json();
@@ -729,24 +736,47 @@ async function createDevicesPane(){
     if (!paired.length) {
       L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
     } else {
-      paired.forEach(d=>{
-        const row = document.createElement('div'); row.className='row'; row.style.gap='8px'; row.style.alignItems='center';
+  paired.forEach(d=>{
+        const row = document.createElement('div');
+        row.className='row';
+        row.style.gap='8px';
+        row.style.alignItems='center';
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        const useInd = d.useOverrides;
+        const modeLbl = useInd ? 'Individuell' : 'Global';
         row.innerHTML = `
-          <div class="pill"><b>${d.name || d.id}</b></div>
+          <div class="pill${currentDeviceCtx===d.id?' current':''}"><b>${d.name || d.id}</b></div>
           <div class="mut">ID: ${d.id}</div>
           <div class="mut">Zuletzt: ${seen}</div>
-<button class="btn sm" data-view>Ansehen</button>
-<button class="btn sm ghost" data-url>URL kopieren</button>
+          <label class="toggle" data-mode-wrap>
+            <input type="checkbox" ${useInd?'checked':''} data-mode>
+            <span data-mode-label>${modeLbl}</span>
+          </label>
+          <button class="btn sm" data-view>Ansehen</button>
+          <button class="btn sm ghost" data-url>URL kopieren</button>
           <button class="btn sm" data-edit>Im Editor bearbeiten</button>
           <button class="btn sm danger" data-unpair>Trennen…</button>
           `;
 
-row.querySelector('[data-unpair]').onclick = async ()=>{
-  if (!/^dev_/.test(String(d.id))) {
-    alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
-    return;
-  }
+        const modeInput = row.querySelector('[data-mode]');
+        const modeLabel = row.querySelector('[data-mode-label]');
+        modeInput.onchange = async ()=>{
+          const mode = modeInput.checked ? 'device' : 'global';
+          modeLabel.textContent = modeInput.checked ? 'Individuell' : 'Global';
+          const r = await fetch('/admin/api/devices_set_mode.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device: d.id, mode })
+          });
+          const jj = await r.json().catch(()=>({ok:false}));
+          if (!jj.ok) alert('Fehler: '+(jj.error||'unbekannt'));
+        };
+
+        row.querySelector('[data-unpair]').onclick = async ()=>{
+          if (!/^dev_/.test(String(d.id))) {
+            alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
+            return;
+          }
   const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
   if ((check||'').trim().toLowerCase() !== 'ja') return;
 
@@ -1030,5 +1060,4 @@ function initCleanupInSystem(){
 // ============================================================================
 // 9) Start
 // ============================================================================
-
 loadAll();

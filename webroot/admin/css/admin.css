@@ -198,7 +198,36 @@ details[open] .chev{ transform: rotate(90deg); }
   content:''; position:absolute; top:2px; left:2px; width:12px; height:12px;
   border-radius:50%; background:#fff; transition:left .15s;
 }
+
 .toggle input:checked::after{ left:14px; }
+
+/* Badge für Geräte-Kontext */
+.ctx-badge{
+  display:inline-block;
+  margin-left:8px;
+  padding:4px 8px;
+  border-radius:8px;
+  background:var(--btn-accent);
+  color:var(--btn-accent-fg);
+  font-size:14px;
+}
+.ctx-badge button{
+  margin-left:6px;
+  border:none;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+  font-weight:700;
+}
+
+/* Hervorhebung des aktiven Geräts in der Liste */
+.pill.current{
+  background:var(--btn-accent);
+  color:var(--btn-accent-fg);
+  border-color:var(--btn-accent);
+  font-weight:700;
+}
+
 
 /* ---------- Grid-Tabelle (links) ---------- */
 table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
