@@ -374,6 +374,7 @@
 </div>
 
 <script>
+
   (function(){
     const p = '__PUBLIC_PORT__';
     const proto = location.protocol;
@@ -382,6 +383,7 @@
     const suffix = port === def ? '' : ':' + port;
     window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
   })();
+
 </script>
 <script type="module" src="/admin/js/app.js"></script>
 </body>
