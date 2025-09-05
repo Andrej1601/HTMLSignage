@@ -87,6 +87,14 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .row{ display:flex; gap:0.625rem; align-items:center; flex-wrap:wrap; }
 .mut,.help{ color:var(--muted); }
 
+/* Utility classes for headings and toolbars */
+.subh{ font-weight:700; margin:calc(var(--base-size) * 0.5) 0; }
+.card-head{ display:flex; justify-content:space-between; align-items:center; gap:calc(var(--base-size) * 0.5); margin-bottom:calc(var(--base-size) * 0.5); }
+.card-title{ font-weight:800; }
+.device-toolbar{ display:flex; flex-wrap:wrap; gap:calc(var(--base-size) * 0.375); }
+.btn.icon-label{ gap:calc(var(--base-size) * 0.25); }
+.devices-section{ margin-top:calc(var(--base-size) * 0.75); }
+
 /* ---------- Header ---------- */
 header{
   position:sticky; top:0; z-index:60;
@@ -104,6 +112,8 @@ body.device-mode header{
 body.device-mode #ctxBadge{
   background: var(--btn-primary-fg);
   color: var(--btn-primary);
+  font-size:calc(var(--base-size) * 1.25);
+  padding:calc(var(--base-size) * 0.75) calc(var(--base-size) * 1.25);
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -199,6 +209,24 @@ details[open] .chev{ transform: rotate(90deg); }
 .btn.ghost{
   background:var(--ghost-bg); color:var(--ghost-fg); border:0.0625rem solid var(--ghost-border);
 }
+
+/* ---------- Hilfe-Overlay & Tooltips ---------- */
+.tip{ cursor:help; color:var(--muted); margin-left:calc(var(--base-size) * 0.25); }
+
+#helpOverlay{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(0,0,0,.6);
+  display:flex; align-items:center; justify-content:center;
+}
+#helpOverlay[hidden]{ display:none; }
+#helpOverlay .panel{
+  background:var(--panel); color:var(--fg);
+  border:0.0625rem solid var(--border); border-radius:calc(var(--base-size) * 1);
+  padding:calc(var(--base-size) * 1.5); max-width:calc(var(--base-size) * 31.25); width:90%;
+  position:relative;
+}
+#helpOverlay .panel h2{ margin-top:0; }
+#helpClose{ position:absolute; top:calc(var(--base-size) * 0.5); right:calc(var(--base-size) * 0.5); }
 .btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
 
 /* Toggle */
@@ -255,6 +283,13 @@ details[open] .chev{ transform: rotate(90deg); }
 #devPairedList tr.ind button{color:inherit;}
 body.device-mode #devPairedList tr.current{background:var(--btn-primary);color:var(--btn-primary-fg);}
 body.device-mode #devPairedList tr.current button{color:inherit;}
+
+/* Hervorgehobene Gerätezeile */
+#devPairedList tr.selected{outline:0.125rem solid var(--btn-accent);}
+body.device-mode #devPairedList tr.selected{outline-color:var(--btn-primary);}
+
+/* Hinweistext unter dem Kontext-Badge */
+#ctxBadgeTip{display:block;margin-left:calc(var(--base-size) * 0.5);margin-top:calc(var(--base-size) * 0.25);color:var(--muted);font-size:calc(var(--base-size) * 0.8125);}
 
 
 /* ---------- Grid-Tabelle (links) ---------- */
