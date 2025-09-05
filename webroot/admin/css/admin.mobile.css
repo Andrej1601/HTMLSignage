@@ -1,10 +1,10 @@
 /* file: /var/www/signage/admin/admin.mobile.css */
 
 /* Portrait oder sehr schmale Displays: Boxen unter der Tabelle (einspaltig) */
-@media (orientation: portrait), (max-width: 900px) {
+@media (orientation: portrait), (max-width: 56.25rem) {
   main.layout {
     grid-template-columns: 1fr !important;
-    gap: 12px !important;
+    gap: calc(var(--gap) * 2) !important;
   }
   .rightbar {
     position: static !important; /* Sticky aus */
@@ -13,7 +13,7 @@
   }
   header { position: sticky; top: 0; }
   /* Überschriften etwas kleiner */
-  .sl-head { font-size: 11px; }
+  .sl-head { font-size: calc(var(--fs) * 0.785); }
   /* Spalten können bei sehr schmaler Breite umbrechen */
   .sl-head span { white-space: normal; }
 }
@@ -23,19 +23,19 @@
   /* festes 2/3 : 1/3 Verhältnis – Desktop-Clamp bleibt außerhalb aktiv */
   main.layout {
     grid-template-columns: 2fr 1fr !important;
-    gap: 14px !important;
+    gap: calc(var(--gap) * 2.3333) !important;
   }
   .rightbar {
     position: sticky;
-    top: 64px;
-    max-height: calc(100svh - 64px);
+    top: calc(var(--base-size) * 4);
+    max-height: calc(100svh - var(--base-size) * 4);
     width: auto; /* Verhältnis bestimmt die Breite */
   }
 }
 
 /* Optionale Mikro-Optimierungen für Touch */
 @media (hover: none) and (pointer: coarse) {
-  .btn { padding: 10px 14px; }
-  .btn.sm { padding: 8px 12px; }
-  .input, select, textarea { min-height: 42px; }
+  .btn { padding: calc(var(--base-size) * 0.625) calc(var(--base-size) * 0.875); }
+  .btn.sm { padding: calc(var(--base-size) * 0.5) calc(var(--base-size) * 0.75); }
+  .input, select, textarea { min-height: calc(var(--input-min-h) * 1.4); }
 }
