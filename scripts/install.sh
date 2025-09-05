@@ -23,6 +23,7 @@ main(){
   PHP_SOCK=${PHP_SOCK:-/run/php/php8.3-fpm.sock}
   APP_DIR=/var/www/signage
 
+
   if [[ -t 0 ]]; then
     read -rp "Public port [${SIGNAGE_PUBLIC_PORT}]: " input
     SIGNAGE_PUBLIC_PORT=${input:-$SIGNAGE_PUBLIC_PORT}
@@ -37,6 +38,7 @@ main(){
     echo
     SIGNAGE_ADMIN_PASS=${input:-$SIGNAGE_ADMIN_PASS}
   fi
+
 
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
@@ -75,9 +77,11 @@ EOPHP
   log "Configuring basic auth"
   if [[ ! -f /etc/nginx/.signage_admin ]]; then
     printf "%s:%s\n" "$SIGNAGE_ADMIN_USER" "$(openssl passwd -apr1 "$SIGNAGE_ADMIN_PASS")" > /etc/nginx/.signage_admin
+
   fi
   chown root:www-data /etc/nginx/.signage_admin
   chmod 640 /etc/nginx/.signage_admin
+
 
   nginx -t
   systemctl reload nginx
