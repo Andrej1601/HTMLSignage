@@ -28,6 +28,8 @@ let currentDeviceName = null;
 let currentView = localStorage.getItem('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
 let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
 let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
+let devicesPinned = (localStorage.getItem('devicesPinned') === '1');
+if (devicesPinned) document.body?.classList.add('devices-pinned');
 
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
@@ -680,6 +682,7 @@ async function createDevicesPane(){
         <div class="row" style="gap:6px">
           <button class="btn sm" id="devPairManual">Code eingeben…</button>
           <button class="btn sm" id="devRefresh">Aktualisieren</button>
+          <button class="btn sm" id="devPin"></button>
           <button class="btn sm danger" id="devGc">Aufräumen</button>
       </div>
       </div>
@@ -835,6 +838,11 @@ async function createDevicesPane(){
   card.querySelector('#devRefresh').onclick = render;
   await render();
 
+  const pinBtn = card.querySelector('#devPin');
+  const updatePin = ()=>{ pinBtn.textContent = devicesPinned ? 'Loslösen' : 'Anpinnen'; document.body.classList.toggle('devices-pinned', devicesPinned); };
+  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
+  updatePin();
+
 card.querySelector('#devGc').onclick = async ()=>{
   const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
   if ((conf||'').trim().toLowerCase() !== 'ja') return;
@@ -936,16 +944,25 @@ async function showView(v){
   // Alles schließen/aufräumen
   detachDockLivePush();
 
+  if (devicesPinned && v !== 'devices'){
+    gridCard.style.display = (v === 'grid') ? '' : 'none';
+    if (v === 'preview'){ if (!document.getElementById('dockPane')) createDockPane(); attachDockLivePush(); }
+    else { destroyDockPane(); }
+    if (!devicesPane){ devicesPane = await createDevicesPane(); }
+    devicesPane.style.display = '';
+    return;
+  }
+
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
     return;
   }
 
   if (v === 'preview'){
     gridCard.style.display = 'none';
-    if (devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
     if (!document.getElementById('dockPane')) createDockPane();
     attachDockLivePush();
     return;
@@ -958,6 +975,7 @@ async function showView(v){
       // WICHTIG: createDevicesPane ist async → Ergebnis abwarten
       devicesPane = await createDevicesPane();
     }
+    devicesPane.style.display = '';
     return;
   }
 }

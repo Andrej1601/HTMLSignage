@@ -136,7 +136,27 @@
       </div>
     </details>
 
-    <!-- Unterbox 2: Bild-Slides -->
+    <!-- Unterbox 2: Fußnoten -->
+<details class="ac sub" id="boxFootnotes">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten</div>
+    <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div id="fnList"></div>
+    <div class="subh">Darstellung</div>
+    <div class="kv">
+      <label>Fußnoten-Layout</label>
+      <select id="footnoteLayout" class="input">
+        <option value="one-line" selected>Möglichst einzeilig</option>
+        <option value="multi">Mehrzeilig</option>
+        <option value="stacked">Untereinander (jede Zeile)</option>
+      </select>
+    </div>
+  </div>
+</details>
+
+    <!-- Unterbox 3: Bild-Slides -->
     <details class="ac sub" id="boxImages">
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
@@ -157,23 +177,23 @@
   </div>
 </details>
 
-<!-- Unterbox 3: Fußnoten -->
-<details class="ac sub" id="boxFootnotes">
+<!-- Unterbox 4: HTML-Slides -->
+<details class="ac sub" id="boxHtml">
   <summary>
-    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten</div>
-    <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+    <div class="ttl">▶<span class="chev">⮞</span> HTML-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnHtmlAdd">HTML hinzufügen</button></div>
   </summary>
   <div class="content">
-    <div id="fnList"></div>
-    <div class="subh">Darstellung</div>
-    <div class="kv">
-      <label>Fußnoten-Layout</label>
-      <select id="footnoteLayout" class="input">
-        <option value="one-line" selected>Möglichst einzeilig</option>
-        <option value="multi">Mehrzeilig</option>
-        <option value="stacked">Untereinander (jede Zeile)</option>
-      </select>
+    <div class="sl-head sl-html">
+      <span class="col-name">Name</span>
+      <span class="col-prev">Preview</span>
+      <span class="col-edit">Bearbeiten</span>
+      <span class="col-dur" id="headHtmlDur">Dauer (s)</span>
+      <span class="col-del">✕</span>
+      <span class="col-after">Nach Slide</span>
+      <span class="col-vis">Anzeigen</span>
     </div>
+    <div id="htmlList"></div>
   </div>
 </details>
 

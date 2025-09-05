@@ -121,6 +121,8 @@ main.layout{
   width: clamp(360px, 32vw, 540px);
 }
 
+body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
+
 /* ---------- Cards / Details ---------- */
 .card, details.ac{
   background:var(--panel); border:1px solid var(--border);
@@ -315,6 +317,9 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
 .sl-head.sl-images, .imgrow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
+.sl-head.sl-html, .htmlrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-dur) var(--col-del) var(--col-after) var(--col-vis);
+}
 
 /* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
 body.mode-uniform #headSaunaDur, body.mode-uniform #headImgDur{ display:none; }
@@ -322,6 +327,9 @@ body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .sl-head.sl-images, body.mode-uniform .imgrow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+body.mode-uniform .sl-head.sl-html, body.mode-uniform .htmlrow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
