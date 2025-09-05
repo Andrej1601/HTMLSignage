@@ -1,0 +1,382 @@
+ <!doctype html> <html lang="de"> <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Aufguss – Admin</title>
+<link rel="stylesheet" href="/admin/css/admin.mobile.css">
+<link rel="stylesheet" href="/admin/css/admin.css">
+
+</head>
+<body class="theme-light">
+  <header>
+    <h1>Aufguss – Admin</h1>
+    <div class="row">
+      <label class="toggle" title="Hell/Dunkel">
+        <input type="checkbox" id="themeMode">
+        <span id="themeLabel">Dunkel</span>
+      </label>
+<!-- Ansicht-Menü -->
+<div class="menuwrap" id="viewMenuWrap">
+  <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+    Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+  </button>
+  <div class="dropdown" id="viewMenu" role="menu" hidden>
+    <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+    <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+    <button class="dd-item" role="menuitemradio" data-view="devices" aria-checked="false">🖥 Geräte</button>
+  </div>
+</div>
+
+      <button class="btn" id="btnOpen">Slideshow öffnen</button>
+      <button class="btn primary" id="btnSave">Speichern</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="leftcol">
+<div class="card" id="gridPane">
+        <div class="content" style="padding-bottom:0">
+<div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+  <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
+  <div id="gridActionsLeft"></div>
+<div class="row" style="gap:8px;flex-wrap:wrap">
+    <div id="weekdayPills" class="row" style="gap:6px"></div>
+    <button class="btn sm" id="btnSavePreset" title="Wochentag speichern">💾 Wochentag speichern</button>
+    <span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span>
+  </div>
+</div>
+          <table id="grid" class="tbl"></table>
+          <div class="row" style="margin:12px 0 4px">
+            <button class="btn sm" id="btnAddAbove">Zeile darüber +</button>
+            <button class="btn sm" id="btnAddBelow">Zeile darunter +</button>
+            <button class="btn sm" id="btnDeleteRow">Ausgewählte Zeile löschen</button>
+            <span class="mut">Zeit anklicken = Zeile markieren · Zeitänderungen im Dialog verschieben Aufguss korrekt.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="rightbar">
+<!-- Slides – Masterbox -->
+<details class="ac" open id="slidesMaster">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
+    <div class="actions">
+      <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
+    </div>
+  </summary>
+  <div class="content">
+
+<!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
+<div class="kv" id="rowDurMode">
+  <label>Dauer-Modus</label>
+  <div class="row">
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
+    <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
+  </div>
+</div>
+
+<div class="kv" id="rowDwellAll">
+  <label>Dauer (einheitlich)</label>
+  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
+    <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
+
+    <span class="mut" style="min-width:10ch;">Übersicht</span>
+    <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
+  </div>
+</div>
+
+<!-- Transition -->
+<div class="kv"><label>Transition (ms)</label>
+  <input id="transMs2" class="input" type="number" min="0" value="500">
+</div>
+
+<div class="kv"><label>Auto je Wochentag</label><input id="presetAuto" type="checkbox"></div>
+<div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+
+    <!-- Unterbox 1: Saunen & Übersicht -->
+    <details class="ac sub" open id="boxSaunas">
+      <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
+ <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
+</summary>      
+<div class="content">
+
+        <!-- Übersicht im Saunen-Stil -->
+        <div class="fieldset" style="margin-bottom:10px">
+          <div class="legend">Übersicht (Aufgussplan)</div>
+          <div id="overviewRow"></div>
+        </div>
+
+        <!-- Saunenliste -->
+		<!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
+<div class="groupHead">
+  <div class="legend">Aufguss</div>
+  <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
+</div>
+ 	<!-- Aufguss -->
+<div class="sl-head sl-saunas">
+  <span class="col-name">Name</span>
+  <span class="col-prev">Preview</span>
+  <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
+  <span class="col-up">Upload</span>
+  <span class="col-def">Default</span>
+  <span class="col-del">✕</span>
+  <span class="col-vis">Anzeigen</span>
+</div>
+        
+	<!-- kein Aufguss -->
+	<div id="saunaList"></div>
+	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
+	<div id="extraSaunaList"></div>
+
+        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+      </div>
+    </details>
+
+    <!-- Unterbox 2: Bild-Slides -->
+    <details class="ac sub" id="boxImages">
+<summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Bild-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnInterAdd2">Bild hinzufügen</button></div>
+  </summary>
+<small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
+  <div class="content">
+<div class="sl-head sl-images">
+    <span class="col-name">Name</span>
+    <span class="col-prev">Preview</span>
+    <span class="col-dur" id="headImgDur">Dauer (s)</span>
+    <span class="col-up">Upload</span>
+    <span class="col-del">✕</span>
+    <span class="col-after">Nach Slide</span>
+    <span class="col-vis">Anzeigen</span>
+  </div>
+    <div id="interList2"></div>
+  </div>
+</details>
+
+<!-- Unterbox 3: Fußnoten -->
+<details class="ac sub" id="boxFootnotes">
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten</div>
+    <div class="actions"><button class="btn sm" id="fnAdd">Hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div id="fnList"></div>
+    <div class="subh">Darstellung</div>
+    <div class="kv">
+      <label>Fußnoten-Layout</label>
+      <select id="footnoteLayout" class="input">
+        <option value="one-line" selected>Möglichst einzeilig</option>
+        <option value="multi">Mehrzeilig</option>
+        <option value="stacked">Untereinander (jede Zeile)</option>
+      </select>
+    </div>
+  </div>
+</details>
+
+  </div>
+</details>
+
+ <details class="ac" id="boxSlidesText">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
+          <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
+        </summary>
+        <div class="content">
+          <div class="subh">Skalierung & 16:9</div>
+          <div class="kv"><label>Fit‑Modus</label>
+            <select id="fitMode" class="input">
+              <option value="cover">Cover (bildschirmfüllend, kann beschneiden)</option>
+              <option value="contain">Contain (einpassen, keine Beschneidung)</option>
+              <option value="width">Nur Breite anpassen</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
+          <div class="help">„Cover“ füllt 1080p/1440p **ohne Rand**. Andere Verhältnisse werden ggf. beschnitten. „Contain“ zeigt immer alles (Rand möglich).</div>
+
+          <div class="subh">Schrift</div>
+          <div class="kv"><label>Schriftfamilie</label>
+            <select id="fontFamily" class="input">
+              <option value="system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif">System (Default)</option>
+              <option value="Montserrat, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif">Montserrat</option>
+              <option value="Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Roboto</option>
+              <option value="'Open Sans', system-ui, -apple-system, Segoe UI, Arial, sans-serif">Open Sans</option>
+              <option value="Lato, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Lato</option>
+            </select>
+          </div>
+          <div class="kv"><label>Globaler Scale</label><input id="fontScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
+          <div class="kv"><label>H1 Scale</label><input id="h1Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
+          <div class="kv"><label>H2 Scale</label><input id="h2Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
+          <div class="kv"><label>H2 Modus</label>
+            <select id="h2Mode" class="input">
+              <option value="none">— nichts —</option>
+              <option value="text" selected>Nur Text</option>
+              <option value="weekday">Wochentag</option>
+              <option value="date">Datum</option>
+              <option value="text+weekday">Text + Wochentag</option>
+              <option value="text+date">Text + Datum</option>
+            </select>
+          </div>
+          <div class="kv"><label>H2 Text</label><input id="h2Text" class="input" type="text" placeholder="Aufgusszeiten"></div>
+          <div class="kv"><label>H2 in Übersicht anzeigen</label><input id="h2ShowOverview" type="checkbox" checked></div>
+
+          <div class="subh">Übersicht (Tabelle)</div>
+          <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
+          <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
+          <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+          <div class="kv"><label>Chip‑Höhe (px)</label><input id="chipH" class="input" type="number" min="20" max="120" value="44"></div>
+          <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
+<div class="kv"><label>Textüberlänge</label>
+  <select id="chipOverflowMode" class="input">
+    <option value="scale" selected>Automatisch skalieren</option>
+    <option value="ellipsis">Mit „…“ kürzen</option>
+  </select>
+</div>
+<div class="kv"><label>Flammen-Größe (% der Chip-Höhe)</label>
+  <input id="flamePct" class="input" type="number" min="30" max="100" value="55">
+</div>
+<div class="kv"><label>Flammen-Abstand (px)</label>
+  <input id="flameGap" class="input" type="number" min="0" max="24" value="6">
+</div>
+
+          <div class="subh">Saunafolien (Kacheln)</div>
+          <div class="kv"><label>Text‑Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+          <div class="kv"><label>Font‑Weight</label>
+            <select id="tileWeight" class="input">
+              <option value="400">Normal (400)</option>
+              <option value="500">Medium (500)</option>
+              <option value="600" selected>Semibold (600)</option>
+              <option value="700">Bold (700)</option>
+              <option value="800">Extra Bold (800)</option>
+            </select>
+          </div>
+          <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
+          <div class="kv"><label>Kachel‑Breite min (px)</label><input id="tileMin" class="input" type="number" min="100" max="2000" value="480"></div>
+          <div class="kv"><label>Kachel‑Breite max (px)</label><input id="tileMax" class="input" type="number" min="200" max="3000" value="1100"></div>
+
+          <div class="subh">Bildspalte / Schrägschnitt</div>
+          <div class="kv"><label>Breite rechts (%)</label><input id="rightW" class="input" type="number" min="0" max="70" value="38"></div>
+          <div class="kv"><label>Schnitt oben (%)</label><input id="cutTop" class="input" type="number" min="0" max="100" value="28"></div>
+          <div class="kv"><label>Schnitt unten (%)</label><input id="cutBottom" class="input" type="number" min="0" max="100" value="12"></div>
+          <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
+
+          <div class="subh">Flammen / Hervorhebungen</div>
+          <div class="kv"><label>Highlight aktiv</label><input id="hlEnabled" type="checkbox"></div>
+          <div class="kv"><label>Highlight‑Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
+          <div class="kv"><label>Min. vor Start</label><input id="hlBefore" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Min. nach Start</label><input id="hlAfter" class="input" type="number" min="0" max="120" value="15"></div>
+          <div class="kv"><label>Flammen‑Bild</label>
+            <div class="row" style="gap:8px">
+              <img id="flamePrev" class="prev" alt="">
+              <input id="flameImg" type="hidden" />
+              <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="flameFile" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
+              <button class="btn sm" id="resetFlame">Default</button>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="ac">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
+          <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
+        </summary>
+        <div class="content color-cols" id="colorList"></div>
+    </div>
+</details>     
+</details>
+
+      <details class="ac">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> System</div>
+        </summary>
+        <div class="content">
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn" id="btnExport">Export</button>
+
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="expWithSettings" checked>Einstellungen einschließen
+            </label>
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="expWithSchedule" checked>Aufgusszeiten einschließen
+            </label>
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="expWithImg">Bilder einschließen
+            </label>
+
+            <label class="btn" style="position:relative;overflow:hidden">
+              Import<input id="importFile" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0">
+            </label>
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="impWriteSettings" checked>Einstellungen anwenden
+            </label>
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="impWriteSchedule" checked>Aufgusszeiten anwenden
+            </label>
+            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
+              <input type="checkbox" id="impWriteImg" checked>Bilder einspielen
+            </label>
+         <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
+ </div>
+          <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
+        </div>
+      </details>
+
+    </aside>
+  </main>
+
+  <footer>© Andrej Soennecken</footer>
+
+  <!-- Dialog Zelle -->
+  <div id="modal" class="modal">
+    <div class="box">
+      <div class="grid2">
+        <label>Uhrzeit</label><input id="m_time" class="input" type="text" placeholder="HH:MM">
+        <label>Titel</label><input id="m_title" class="input" type="text" placeholder="z.B. Vulkan">
+        <label>Flammen</label>
+        <select id="m_flames" class="input">
+          <option value="">—</option>
+          <option>1</option><option>2</option><option>3</option>
+          <option>1-2</option><option>2-3</option><option>1-3</option>
+        </select>
+        <label>Fußnote</label>
+        <div>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="m_hasNote"> hinzufügen</label>
+          <div class="row" id="m_noteRow" style="margin-top:8px;display:none">
+            <select id="m_note" class="input"></select>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px">
+        <button class="btn" id="m_cancel">Abbrechen</button>
+        <button class="btn primary" id="m_ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+<!-- Geräte-Vorschau (ohne Pairing) – ACHTUNG: SIBLING, NICHT im prevModal! -->
+<div id="devPrevModal" class="modal">
+  <div class="box">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <div style="font-weight:700" data-devprev-title>Geräte-Ansicht</div>
+      <div class="row">
+        <button class="btn sm" id="devPrevReload">Neu laden</button>
+        <button class="btn sm" id="devPrevClose">Schließen</button>
+      </div>
+    </div>
+    <div class="iframeWrap">
+      <iframe id="devPrevFrame" src="about:blank" loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </div>
+    <small class="mut" style="display:block;margin-top:8px">
+      Live-Ansicht des ausgewählten Geräts (nur Lesen; kein Pairing, keine Speicherung).
+    </small>
+  </div>
+</div>
+
+<script>
+  window.SLIDESHOW_ORIGIN = location.protocol + "//" + location.hostname + ":__PUBLIC_PORT__";
+  if (window.SLIDESHOW_ORIGIN.includes("__PUBLIC_PORT__")) window.SLIDESHOW_ORIGIN = location.origin;
+</script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html>
