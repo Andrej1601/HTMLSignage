@@ -24,3 +24,4 @@ and prints the URLs and configuration paths when finished.
 Environment variables such as `SIGNAGE_PUBLIC_PORT`, `SIGNAGE_ADMIN_PORT`,
 `SIGNAGE_ADMIN_USER` and `SIGNAGE_ADMIN_PASS` can still be set to override
 the defaults.
+

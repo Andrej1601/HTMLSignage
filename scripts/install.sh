@@ -23,6 +23,7 @@ main(){
   PHP_SOCK=${PHP_SOCK:-/run/php/php8.3-fpm.sock}
   APP_DIR=/var/www/signage
 
+
   if [[ -t 0 ]]; then
     read -rp "Public port [${SIGNAGE_PUBLIC_PORT}]: " input
     SIGNAGE_PUBLIC_PORT=${input:-$SIGNAGE_PUBLIC_PORT}
@@ -37,6 +38,7 @@ main(){
     echo
     SIGNAGE_ADMIN_PASS=${input:-$SIGNAGE_ADMIN_PASS}
   fi
+
 
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
