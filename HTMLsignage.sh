@@ -4431,7 +4431,7 @@ dev_db_save($db);
 echo json_encode(['ok'=>true,'deviceId'=>$id]);
 PHP
 
-cat >/var/www/signage/admin/api/devices_claim.php <<'PHP'
+cat >/var/www/signage/admin/api/devices_gc.php <<'PHP'
 <?php
 // /admin/api/devices_gc.php – aufräumen & reparieren (vollständig)
 require_once __DIR__ . '/devices_lib.php';
@@ -5251,6 +5251,7 @@ echo "Dateien:"
 echo "  /var/www/signage/data/schedule.json   — Zeiten & Inhalte"
 echo "  /var/www/signage/data/settings.json   — Theme, Display, Slides (inkl. tileWidth%, tileMin/Max, rightWidth%, cutTop/Bottom)"
 echo "  /var/www/signage/assets/design.css    — Layout (16:9), Zebra, Farben"
+
 
 
 
