@@ -20,13 +20,13 @@ echo json_encode([
     'scale'=>1, 'h1Scale'=>1, 'h2Scale'=>1,
     'overviewTitleScale'=>1, 'overviewHeadScale'=>0.9, 'overviewCellScale'=>0.8,
     'tileTextScale'=>0.8, 'tileWeight'=>600, 'chipHeight'=>1,
-    'chipOverflowMode'=>'scale','flamePct'=>55,'flameGapPx'=>6
+    'chipOverflowMode'=>'scale','flamePct'=>55,'flameGapPct'=>14
   ],
   'h2'=>['mode'=>'text','text'=>'Aufgusszeiten','showOnOverview'=>true],
   'display'=>['fit'=>'cover','rightWidthPercent'=>38,'cutTopPercent'=>28,'cutBottomPercent'=>12],
   'slides'=>[
     'overviewDurationSec'=>10,'saunaDurationSec'=>6,'transitionMs'=>500,
-    'tileWidthPercent'=>45,'tileMinPx'=>480,'tileMaxPx'=>1100,
+    'tileWidthPercent'=>45,'tileMinPct'=>25,'tileMaxPct'=>57,
     'durationMode'=>'uniform','globalDwellSec'=>6,'loop'=>true,
     'order'=>['overview']
   ],

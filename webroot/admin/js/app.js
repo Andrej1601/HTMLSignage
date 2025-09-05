@@ -204,7 +204,7 @@ function renderSlidesBox(){
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
-  setV('#flameGap',         f.flameGapPx       ?? 6);
+  setV('#flameGap',         f.flameGapPct      ?? 14);
 
   // H2
   setV('#h2Mode', settings.h2?.mode ?? DEFAULTS.h2.mode);
@@ -221,8 +221,8 @@ function renderSlidesBox(){
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
   setV('#tileWeight',    f.tileWeight    ?? 600);
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
-  setV('#tileMin',       settings.slides?.tileMinPx ?? 480);
-  setV('#tileMax',       settings.slides?.tileMaxPx ?? 1100);
+  setV('#tileMin',       settings.slides?.tileMinPct ?? 25);
+  setV('#tileMax',       settings.slides?.tileMaxPct ?? 57);
 
   // Bildspalte / Schrägschnitt
   setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
@@ -250,13 +250,13 @@ function renderSlidesBox(){
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
-    setV('#flameGap',         DEFAULTS.fonts.flameGapPx);
+    setV('#flameGap',         DEFAULTS.fonts.flameGapPct);
 
     setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
     setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
-    setV('#tileMin',       DEFAULTS.slides.tileMinPx);
-    setV('#tileMax',       DEFAULTS.slides.tileMaxPx);
+    setV('#tileMin',       DEFAULTS.slides.tileMinPct);
+    setV('#tileMax',       DEFAULTS.slides.tileMaxPct);
 
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
     setV('#cutTop',   DEFAULTS.display.cutTopPercent);
@@ -540,7 +540,7 @@ function collectSettings(){
         chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
-        flameGapPx: +($('#flameGap')?.value || 6),
+        flameGapPct:+($('#flameGap')?.value || 14),
         tileTextScale:+($('#tileTextScale').value||0.8),
         tileWeight:+($('#tileWeight').value||600)
       },
@@ -551,8 +551,11 @@ function collectSettings(){
       },
       slides:{
         ...(settings.slides||{}),
+        tileWidthPercent:+($('#tilePct')?.value || 45),
+        tileMinPct:+($('#tileMin')?.value || 25),
+        tileMaxPct:+($('#tileMax')?.value || 57),
         showOverview: !!document.getElementById('ovShow')?.checked,
-	overviewDurationSec: (() => {
+        overviewDurationSec: (() => {
   	const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
   	const fallback = settings?.slides?.overviewDurationSec ?? (DEFAULTS?.slides?.overviewDurationSec ?? 10);
   	const v = el?.value;

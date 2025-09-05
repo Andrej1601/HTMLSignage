@@ -21,13 +21,14 @@
   --chipHScale:1;
   --chipH:calc(var(--chipHBase)*var(--chipHScale));
   --chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
-  --chipFlameGap:6px;   /* Abstand zwischen Flammen */
+  --chipFlameGapFactor:0.14; /* Anteil der Chip-Höhe als Abstand */
+  --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapFactor));
   --ovAuto:1; /* overview-only autoscale factor */
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
 
-  /* sauna tile clamp (JS sets --tileTargetPx) */
+  /* sauna tile clamp (JS sets --tileTargetPx and min/max via factors) */
   --tileMinPx:480px; --tileMaxPx:1100px; --tileTargetPx:860px;
   --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
   --ovTitleScale:1; /* nur H1 der Übersicht */
