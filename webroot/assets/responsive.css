@@ -1,12 +1,17 @@
 /* Responsive tweaks for slideshow layout */
+
 @media (max-width: 900px), (orientation: portrait) {
-  .rightPanel {
-    display:block;
-    position:relative;
-    width:100%;
-    height:40vh;
-    -webkit-clip-path:none;
-            clip-path:none;
+  :root {
+    --rightW:30%;
+    --cutTop:40%;
+    --cutBottom:20%;
   }
-  .container.has-right { padding-right:0; }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --rightW:24%;
+    --cutTop:45%;
+    --cutBottom:25%;
+  }
 }
