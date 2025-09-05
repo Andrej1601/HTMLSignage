@@ -1039,7 +1039,11 @@ function showPairing(){
 
       if (!code) {
         const r = await fetch('/pair/begin', { method:'POST', headers:{'X-Pair-Request':'1'} });
-        if (!r.ok) throw new Error('begin http '+r.status);
+        if (!r.ok){
+          const err = new Error('begin http '+r.status);
+          err.status = r.status;
+          throw err;
+        }
         const j0 = await r.json();
         if (!j0 || !j0.code) throw new Error('begin payload');
         code = j0.code;
@@ -1064,7 +1068,7 @@ function showPairing(){
       }, 3000);
     } catch (e) {
       const el = document.getElementById('code');
-      if (el) el.textContent = 'NETZ-FEHLER';
+      if (el) el.textContent = (e && e.status) ? String(e.status) : 'NETZ-FEHLER';
       console.error('[pair] begin failed', e);
     }
   })();
