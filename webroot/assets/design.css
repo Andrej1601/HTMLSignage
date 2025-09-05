@@ -140,7 +140,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
   padding:calc(14px*var(--vwScale)) calc(18px*var(--vwScale)); background:var(--cell);   border:calc(var(--tileBorderW)*var(--vwScale)) solid var(--tileBorder); border-radius:16px; color:var(--boxfg);
 }
 .title{font-size:calc(40px*var(--scale)*var(--tileTextScale)); font-weight:var(--tileWeight)}
-.flames{display:flex;gap:10px;align-items:center; justify-self:end}
+.flames{display:flex;gap:10px;align-items:center; justify-self:end; align-self:center}
 .flame{width:calc(var(--flameSizePx)*1px*var(--scale)); height:calc(var(--flameSizePx)*1px*var(--scale))}
 .flame img,.flame svg{width:100%;height:100%;object-fit:contain}
 .flame svg path{fill:var(--flame)}
