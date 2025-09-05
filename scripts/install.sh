@@ -51,6 +51,10 @@ main(){
   find "$APP_DIR" -type d -exec chmod 2755 {} +
   find "$APP_DIR" -type f -exec chmod 0644 {} +
 
+
+  sed -i "s/__PUBLIC_PORT__/${SIGNAGE_PUBLIC_PORT}/" "$APP_DIR/admin/index.html"
+
+
   log "Deploying nginx configuration"
   install -d /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/snippets
   cp config/nginx/signage-slideshow.conf /etc/nginx/sites-available/

@@ -1,3 +1,4 @@
+
 // /admin/js/app.js
 // ============================================================================
 // Admin-App Bootstrap & Seitenweite Einstellungen
@@ -16,6 +17,8 @@ import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
+
+const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 
 // === Global State ============================================================
 let schedule = null;
@@ -561,7 +564,7 @@ function collectSettings(){
 }
 
 // Buttons: Open / Preview / Save
-$('#btnOpen')?.addEventListener('click', ()=> window.open('/', '_blank'));
+$('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/', '_blank'));
 
 $('#btnSave')?.addEventListener('click', async ()=>{
   const body = collectSettings();
@@ -597,10 +600,10 @@ function dockSend(reload){
   const payload = collectSettings();
   if (reload){
     try { frame.contentWindow.location.reload(); } catch {}
-    setTimeout(()=> { try { frame.contentWindow.postMessage({type:'preview', payload}, '*'); } catch {} }, 350);
+    setTimeout(()=> { try { frame.contentWindow.postMessage({type:'preview', payload}, SLIDESHOW_ORIGIN); } catch {} }, 350);
     return;
   }
-  try { frame.contentWindow.postMessage({type:'preview', payload}, '*'); } catch {}
+  try { frame.contentWindow.postMessage({type:'preview', payload}, SLIDESHOW_ORIGIN); } catch {}
 }
 function attachDockLivePush(){
   if (_dockInputListener) return;
@@ -637,7 +640,7 @@ async function claim(codeFromUI, nameFromUI) {
 
   // kleine Quality-of-life Info:
   if (j.deviceId) {
-    const url = location.origin + '/?device=' + j.deviceId;
+    const url = SLIDESHOW_ORIGIN + '/?device=' + j.deviceId;
     console.log('Gepaart:', j.deviceId, url);
   }
   // Pane neu laden (siehe createDevicesPane -> render)
@@ -762,7 +765,7 @@ row.querySelector('[data-view]').onclick = ()=>{
  openDevicePreview(d.id, d.name || d.id);
  };
  row.querySelector('[data-url]').onclick = async ()=>{
-          const url = location.origin + '/?device=' + d.id;
+          const url = SLIDESHOW_ORIGIN + '/?device=' + d.id;
           try { await navigator.clipboard.writeText(url); alert('URL kopiert:\n'+url); }
           catch { prompt('URL kopieren:', url); }
         };
@@ -814,7 +817,7 @@ function openDevicePreview(id, name){
   }
   const t = m.querySelector('[data-devprev-title]');
   if (t) t.textContent = name ? ('Geräte-Ansicht: ' + name) : 'Geräte-Ansicht';
-  f.src = '/?device=' + encodeURIComponent(id) + '&t=' + Date.now();
+  f.src = SLIDESHOW_ORIGIN + '/?device=' + encodeURIComponent(id) + '&t=' + Date.now();
   m.style.display = 'grid';
 }
 document.getElementById('devPrevReload')?.addEventListener('click', ()=>{
@@ -853,7 +856,7 @@ function createDockPane(){
   gridCard.after(wrap);
 
   const frame = wrap.querySelector('#dockFrame');
-  frame.src = '/?preview=1';
+  frame.src = SLIDESHOW_ORIGIN + '/?preview=1';
   frame.addEventListener('load', ()=> dockSend(false), { once:true });
   wrap.querySelector('#dockReload')?.addEventListener('click', ()=> dockSend(true));
 

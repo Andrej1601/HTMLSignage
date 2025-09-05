@@ -373,6 +373,10 @@
   </div>
 </div>
 
+<script>
+  window.SLIDESHOW_ORIGIN = location.protocol + "//" + location.hostname + ":__PUBLIC_PORT__";
+  if (window.SLIDESHOW_ORIGIN.includes("__PUBLIC_PORT__")) window.SLIDESHOW_ORIGIN = location.origin;
+</script>
 <script type="module" src="/admin/js/app.js"></script>
 </body>
 </html>
