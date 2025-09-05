@@ -1,0 +1,179 @@
+:root{
+  /* theme */
+  --bg:#E8DEBD; --fg:#5C3101; --accent:#5C3101;
+  --grid:#5C3101; --cell:#5C3101; --boxfg:#FFFFFF; --timecol:#E8DEBD;
+  --flame:#FFD166; --zebra1:#EDDFAF; --zebra2:#E6D6A1; --hlColor:#FFDD66;
+  /* separate borders */
+  --gridTable: var(--grid);
+  --gridTableW: 2px;
+  --tileBorder: var(--grid);
+  --tileBorderW: 3px;
+  --chipBorder: var(--grid);
+  --chipBorderW: 2px;
+  --timeZebra1:#EAD9A0; --timeZebra2:#E2CE91; /* Zeitspalte Zebra */
+  --headBg:#E8DEBD; --headFg:#5C3101;       /* Kopfzeile */
+  --cornerBg:#E8DEBD; --cornerFg:#5C3101;   /* Ecke (oben-links) */
+  /* typography */
+  --font:-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  --baseScale:1; --vwScale:1; --scale:calc(var(--baseScale)*var(--vwScale)); --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80;
+  --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28; --chipH:44px;
+--chipFlamePct:.55;   /* Anteil der Chip-Höhe für Flammen */
+--chipFlameGap:6px;   /* Abstand zwischen Flammen */
+  --ovAuto:1; /* overview-only autoscale factor */
+
+  /* right panel shape */
+  --rightW:38%; --cutTop:28%; --cutBottom:12%;
+
+  /* sauna tile clamp (JS sets --tileTargetPx) */
+  --tileMinPx:480px; --tileMaxPx:1100px; --tileTargetPx:860px;
+  --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
+  --ovTitleScale:1; /* nur H1 der Übersicht */
+  --flamesColW: calc(var(--flameSizePx)*1px*var(--scale)*3 + 24px);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:var(--font)}
+.slideshow{overflow:hidden}
+
+/* Full-viewport – no transform */
+.fitbox{position:fixed; inset:0;}
+.canvas{position:relative; width:100vw; height:100vh;}
+.stage{position:relative; width:100%; height:100%; overflow:hidden}
+
+.fade{opacity:0;transition:opacity .5s}
+.fade.show{opacity:1}
+
+/* interstitial image */
+.container.imgslide{padding:0}
+.imgFill{position:absolute; inset:0; background-size:cover; background-position:center; background-repeat:no-repeat}
+
+/* layout */
+.container{position:relative; height:100%; padding:calc(32px*var(--vwScale)); display:flex; flex-direction:column; align-items:flex-start}
+.container.has-right{padding-right:calc(var(--rightW) + 32px)}
+.container.overview{padding-right:32px}
+.h1{font-weight:800;letter-spacing:.02em;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
+.h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
+.overview .h1{font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
+.overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
+/* overview-only multiply with --ovAuto */
+.ovbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%;margin:0 0 10px}
+.overview .h1{font-size:calc(56px*var(--scale)*var(--ovTitleScale)*var(--ovAuto))}
+.overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
+.caption{opacity:.85;font-size:calc(20px*var(--scale))}
+
+/* content area under headings is vertically centered */
+.body{flex:1; display:flex}
+.list{display:flex;flex-direction:column;gap:calc(18px*var(--vwScale));width:100%;align-items:flex-start;justify-content:center}
+
+/* right image panel */
+.rightPanel{
+  position:absolute; top:0; right:0; height:100%; width:var(--rightW);
+  background-size:cover; background-position:center; background-repeat:no-repeat;
+  -webkit-clip-path: polygon(var(--cutTop) 0, 100% 0, 100% 100%, var(--cutBottom) 100%);
+          clip-path: polygon(var(--cutTop) 0, 100% 0, 100% 100%, var(--cutBottom) 100%);
+  box-shadow: -6px 0 20px rgba(0,0,0,.15) inset;
+}
+
+/* overview table */
+.grid{width:100%;max-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.grid th,.grid td{border:var(--gridTableW) solid var(--gridTable);white-space:nowrap}
+.grid col.c_time{width:10ch}
+.grid col.c_auto{width:auto}
+.grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
+.overview .grid thead th{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
+.grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
+
+/* zebra: rows for content cells, separate zebra for time column */
+.grid tbody tr:nth-child(odd) td:not(.timecol){background:var(--zebra1)}
+.grid tbody tr:nth-child(even) td:not(.timecol){background:var(--zebra2)}
+.grid tbody tr:nth-child(odd) td.timecol{background:var(--timeZebra1)!important}
+.grid tbody tr:nth-child(even) td.timecol{background:var(--timeZebra2)!important}
+
+.grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale))}
+.overview .grid td{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
+.grid th.timecol, .grid td.timecol{width:10ch}
+.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
+
+/* equal chips */
+.cellwrap{display:block;width:100%;min-width:0}
+
+.chip{
+  display:flex; align-items:center; width:100%;
+  height:var(--chipH);
+  padding:0 .8em;
+  border-radius:10px;
+  background:var(--cell); color:var(--boxfg);
+  border:var(--chipBorderW) solid var(--chipBorder);
+  font-weight:700; letter-spacing:.2px;
+  overflow:hidden;
+}
+.overview .chip{height:calc(var(--chipH)*var(--ovAuto))}
+
+/* Text links, kann ellipsisieren oder (per JS) skaliert werden */
+.chip-text{
+  flex:1 1 auto; min-width:0;
+  white-space:nowrap;
+}
+.chip-text.ellipsis{
+  overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Flammen rechts, kompakt und nie über dem Text */
+.chip-flames{
+  flex:0 0 auto; display:inline-flex; margin-left:.6em;
+}
+.chip-flames .flames{ display:inline-flex; gap:var(--chipFlameGap); }
+.chip-flames .flame{
+  height:calc(var(--chipH) * var(--chipFlamePct));
+  width:auto;
+}
+
+/* overview wrapper */
+.ovwrap{transform-origin:top left; width:100%; will-change:contents}
+
+/* sauna tiles */
+.tile{display:grid; grid-template-columns:1fr auto; align-items:center; gap:calc(16px*var(--vwScale));
+  width: clamp(calc(var(--tileMinPx)*var(--vwScale)), var(--tileTargetPx), calc(var(--tileMaxPx)*var(--vwScale)));
+  padding:calc(14px*var(--vwScale)) calc(18px*var(--vwScale)); background:var(--cell);   border:calc(var(--tileBorderW)*var(--vwScale)) solid var(--tileBorder); border-radius:16px; color:var(--boxfg);
+}
+.title{font-size:calc(40px*var(--scale)*var(--tileTextScale)); font-weight:var(--tileWeight)}
+.flames{display:flex;gap:10px;align-items:center; justify-self:end}
+.flame{width:calc(var(--flameSizePx)*1px*var(--scale)); height:calc(var(--flameSizePx)*1px*var(--scale))}
+.flame img,.flame svg{width:100%;height:100%;object-fit:contain}
+.flame svg path{fill:var(--flame)}
+
+/* note markers subtle */
+.notewrap sup.note{font-weight:400; opacity:.75; font-size:.8em}
+
+/* highlight */
+.tile.highlight{border-color:var(--hlColor); box-shadow:0 0 0 4px var(--hlColor)}
+.chip.highlight{outline:3px solid var(--hlColor); outline-offset:2px}
+
+/* footnotes inline */
+.footer-note{margin-top:12px;font-size:calc(16px*var(--scale)*var(--ovAuto));opacity:.9}
+/* Fußnoten-Layout: oneline bevorzugt, wrap nur zwischen Items */
+.footer-note .fnitem{display:flex;align-items:baseline;gap:.35em;min-width:0}
+.footer-note .fnitem sup.note{font-weight:400;opacity:.8}
+
+/* Einzeilig: keine Zeilenumbrüche, ggf. abgeschnitten */
+.footer-note.fn-one{display:flex;flex-wrap:nowrap;align-items:baseline;gap:calc(10px*var(--ovAuto));overflow:hidden;white-space:nowrap}
+.footer-note.fn-one .fnitem{white-space:inherit}
+
+/* Mehrzeilig: Container darf umbrechen; Items dürfen intern umbrechen */
+.footer-note.fn-multi{display:flex;flex-wrap:wrap;align-items:baseline;gap:calc(10px*var(--ovAuto));white-space:normal}
+.footer-note.fn-multi .fnitem{flex:1 1 260px;min-width:200px;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+
+/* Gestapelt: jede Fußnote in eigener Zeile */
+.footer-note.fn-stack{
+  display:flex;
+  flex-direction:column;
+  gap:calc(6px*var(--ovAuto));
+}
+.footer-note.fn-stack .fnitem{
+  display:block;
+  white-space:normal;
+}
+.footer-note.fn-stack .fnsep{ display:none }
+
+/* Trenner-Punkt zwischen Items (nur optisch) */
+.footer-note .fnsep{ margin:0 calc(8px*var(--ovAuto)); opacity:.7 }
+.brand{position:absolute;right:20px;bottom:16px;opacity:.6;font-size:14px;color:var(--fg)}
