@@ -16,13 +16,6 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
   let idx = 0;
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
-  const urlCache = new Map();
-  function preloadUrl(url){
-    if (!url || urlCache.has(url)) return Promise.resolve();
-    return fetch(url).then(r=>r.text()).then(txt=>{
-      urlCache.set(url, DOMPurify.sanitize(txt));
-    }).catch(()=>{ urlCache.set(url, ''); });
-  }
 
   const imgCache = new Set();
   function preloadImage(url){
@@ -157,7 +150,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
 // ---------- Slide queue ----------
-async function buildQueue() {
+function buildQueue() {
   // Tages-Preset ggf. anwenden
   maybeApplyPreset();
 
@@ -184,13 +177,12 @@ async function buildQueue() {
   if (showOverview) queue.push({ type: 'overview' });
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
-    // Interstitial-Slides vorbereiten
-    const allInter = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
-    const imgs = allInter.filter(it => it && it.enabled && (it.type === 'image' || !it.type) && it.url).map(it=>({...it, __kind:'image'}));
-    const htmls = allInter.filter(it => it && it.enabled && it.type === 'rich' && it.html).map(it=>({...it, __kind:'html'}));
-    const urls = allInter.filter(it => it && it.enabled && it.type === 'url' && it.url).map(it=>({...it, __kind:'url'}));
-    await Promise.all(urls.map(it=>preloadUrl(it.url)));
-    const media = imgs.concat(htmls, urls);
+  // Bilder & HTML-Slides vorbereiten
+  const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+  const htmlAll = Array.isArray(settings?.htmlSlides) ? settings.htmlSlides : [];
+  const imgs = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
+  const htmls = htmlAll.filter(it => it && it.enabled && it.html).map(it=>({...it, __kind:'html'}));
+  const media = imgs.concat(htmls);
 
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
@@ -252,7 +244,6 @@ async function buildQueue() {
 
       let node;
       if (it.__kind === 'html') node = { type:'html', html: it.html, dwell, __id: it.id || null };
-      else if (it.__kind === 'url') node = { type:'url', url: it.url, dwell, __id: it.id || null };
       else node = { type:'image', url: it.url, dwell, __id: it.id || null };
       queue.splice(insPos, 0, node);
     }
@@ -525,7 +516,7 @@ function renderImage(url) {
 
 function renderHtmlSlide(html) {
   const c = h('div', { class: 'container htmlslide fade show' });
-  c.innerHTML = DOMPurify.sanitize(html || '');
+  c.innerHTML = html || '';
   return c;
 }
 
@@ -640,7 +631,7 @@ function dwellMsForItem(item) {
     }
   }
 
-    if (item.type === 'image' || item.type === 'html' || item.type === 'url') {
+  if (item.type === 'image' || item.type === 'html') {
     if (mode !== 'per') {
       const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
       return sec(g) * 1000;
@@ -669,7 +660,6 @@ if (key === lastKey && nextQueue.length > 1) {
   const el =
     (item.type === 'overview') ? renderOverview() :
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
-    (item.type === 'url')      ? renderHtmlSlide(urlCache.get(item.url) || '') :
     (item.type === 'html')     ? renderHtmlSlide(item.html) :
                                  renderImage(item.url);
 
@@ -740,7 +730,7 @@ function showPairing(){
   // ---------- Bootstrap & live update ----------
 async function bootstrap(){
 // Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
- window.addEventListener('message', async (ev) => {
+ window.addEventListener('message', (ev) => {
  const d = ev?.data || {};
  if (d?.type !== 'preview') return;
  previewMode = true;
@@ -748,7 +738,7 @@ async function bootstrap(){
  const p = d.payload || {};
  if (p.schedule) schedule = p.schedule;
  if (p.settings) settings = p.settings;
- applyTheme(); applyDisplay(); maybeApplyPreset(); await buildQueue();
+ applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
  idx = 0; lastKey = null;
  step();
  });
@@ -798,7 +788,7 @@ console.error('[bootstrap] resolve failed:', e);
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); await buildQueue();
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
             clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
           }
         } else {
@@ -806,7 +796,7 @@ console.error('[bootstrap] resolve failed:', e);
           const cf = await loadJSON('/data/settings.json');
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); await buildQueue();
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
             clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
           }
         }

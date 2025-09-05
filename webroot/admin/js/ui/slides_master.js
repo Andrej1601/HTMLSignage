@@ -685,33 +685,24 @@ function interRow(i){
   const wrap = document.createElement('div');
   wrap.className = 'imgrow';
   wrap.innerHTML = `
-    <div class="namewrap">
-      <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
-      <select id="t_${id}" class="input type">
-        <option value="image">Bild</option>
-        <option value="rich">Text</option>
-        <option value="url">URL</option>
-      </select>
-    </div>
-    <div id="p_${id}" class="prev"></div>
+    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
+    <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload/Bearbeiten">⤴︎</button>
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
     <input id="en_${id}" type="checkbox" />
   `;
 
   const $name  = wrap.querySelector('#n_'+id);
-  const $type  = wrap.querySelector('#t_'+id);
   const $prev  = wrap.querySelector('#p_'+id);
   const $sec   = wrap.querySelector('#sec_'+id);
-  const $btn   = wrap.querySelector('#f_'+id);
+  const $up    = wrap.querySelector('#f_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $after = wrap.querySelector('#a_'+id);
   const $en    = wrap.querySelector('#en_'+id);
 
-  it.type = it.type || 'image';
-  if ($type) $type.value = it.type;
+  // Werte
   if ($en) $en.checked = !!it.enabled;
   if ($sec){
     $sec.value = Number.isFinite(+it.dwellSec)
@@ -720,25 +711,16 @@ function interRow(i){
   }
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
-  function updatePreview(){
-    if (!$prev) return;
-    if (it.type === 'image' && it.url){
-      preloadImg(it.url).then(r => { if (r.ok){ $prev.innerHTML = `<img src="${it.url}" alt="" title="${r.w}×${r.h}">`; } });
-    } else if (it.type === 'rich'){
-      $prev.textContent = it.html ? 'Text' : '';
-    } else if (it.type === 'url'){
-      $prev.textContent = it.url || '';
-    } else {
-      $prev.innerHTML = '';
-    }
+  if (it.url){
+    preloadImg(it.url).then(r => { if (r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
   }
-  updatePreview();
 
+  // Uniform-Mode blendet Dauer-Feld aus
   const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
   if ($sec) $sec.style.display = uniform ? 'none' : '';
 
-  if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); };
-  if ($type)  $type.onchange  = () => { it.type = $type.value; updatePreview(); };
+  // Events
+  if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
   if ($after) $after.onchange = () => {
     const v = $after.value;
     if (v === 'img:' + it.id){
@@ -760,51 +742,67 @@ function interRow(i){
     applyAfterSelect(it, v);
     renderSlidesMaster();
   };
+
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
 
-  function editRich(){
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;';
-    overlay.innerHTML = `
-      <div style="background:#fff;padding:10px;max-width:80%;max-height:80%;display:flex;flex-direction:column;gap:8px;">
-        <div id="ed_${id}" contenteditable="true" style="flex:1;min-width:300px;min-height:200px;border:1px solid #ccc;padding:4px;overflow:auto;"></div>
-        <div class="row" style="gap:8px;justify-content:flex-end;">
-          <button class="btn sm" id="save_${id}">Speichern</button>
-          <button class="btn sm" id="cancel_${id}">Abbrechen</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const ed = overlay.querySelector('#ed_'+id);
-    ed.innerHTML = it.html || '';
-    overlay.querySelector('#save_'+id).onclick = () => {
-      it.html = DOMPurify.sanitize(ed.innerHTML);
-      updatePreview();
-      document.body.removeChild(overlay);
-    };
-    overlay.querySelector('#cancel_'+id).onclick = () => document.body.removeChild(overlay);
-  }
-
-  if ($btn){
-    $btn.onclick = () => {
-      if (it.type === 'image'){
-        const fi = document.createElement('input');
-        fi.type='file'; fi.accept='image/*';
-        fi.onchange = () => uploadGeneric(fi, (p) => {
-          it.url = p;
-          updatePreview();
-        });
-        fi.click();
-      } else if (it.type === 'rich'){
-        editRich();
-      } else if (it.type === 'url'){
-        const u = prompt('Externe URL:', it.url || '');
-        if (u !== null){ it.url = u.trim(); updatePreview(); }
-      }
+  if ($up){
+    $up.onclick = () => {
+      const fi = document.createElement('input');
+      fi.type='file'; fi.accept='image/*';
+      fi.onchange = () => uploadGeneric(fi, (p) => {
+        it.url = p;
+        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
+      });
+      fi.click();
     };
   }
 
   if ($del) $del.onclick = () => { ctx.getSettings().interstitials.splice(i,1); renderSlidesMaster(); };
+
+  return wrap;
+}
+
+function htmlRow(i){
+  const settings = ctx.getSettings();
+  const it = settings.htmlSlides[i];
+  const id = 'html_' + i;
+  const wrap = document.createElement('div');
+  wrap.className = 'htmlrow';
+  wrap.innerHTML = `
+    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name||'')}" />
+    <div id="p_${id}" class="prev">${it.html ? 'HTML' : ''}</div>
+    <button class="btn sm ghost icon" id="e_${id}" title="Bearbeiten">✎</button>
+    <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
+    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
+    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
+    <input id="en_${id}" type="checkbox" />
+  `;
+
+  const $name  = wrap.querySelector('#n_'+id);
+  const $sec   = wrap.querySelector('#sec_'+id);
+  const $del   = wrap.querySelector('#x_'+id);
+  const $after = wrap.querySelector('#a_'+id);
+  const $en    = wrap.querySelector('#en_'+id);
+  const $edit  = wrap.querySelector('#e_'+id);
+
+  if ($en) $en.checked = !!it.enabled;
+  if ($sec){
+    $sec.value = Number.isFinite(+it.dwellSec)
+      ? +it.dwellSec
+      : (ctx.getSettings().slides?.imageDurationSec ?? ctx.getSettings().slides?.saunaDurationSec ?? 6);
+  }
+  if ($after) $after.value = getAfterSelectValue(it, it.id);
+
+  const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
+  if ($sec) $sec.style.display = uniform ? 'none' : '';
+
+  if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); };
+  if ($after) $after.onchange = () => { applyAfterSelect(it, $after.value); renderSlidesMaster(); };
+  if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
+  if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
+  if ($edit) $edit.onclick = () => { window.open(`/admin/html-editor.html?id=${encodeURIComponent(it.id)}`, '_blank'); };
+  if ($del) $del.onclick = () => { ctx.getSettings().htmlSlides.splice(i,1); renderSlidesMaster(); };
 
   return wrap;
 }
@@ -822,14 +820,26 @@ function renderInterstitialsPanel(hostId='interList2'){
   if (add) add.onclick = () => {
     (settings.interstitials ||= []).push({
       id:'im_'+Math.random().toString(36).slice(2,9),
-      type:'image',
       name:'',
       enabled:true,
       url:'',
-      html:'',
       after:'overview',
       dwellSec:6
     });
+    renderSlidesMaster();
+  };
+}
+
+function renderHtmlSlidesPanel(hostId='htmlList'){
+  const settings = ctx.getSettings();
+  settings.htmlSlides = Array.isArray(settings.htmlSlides) ? settings.htmlSlides : [];
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = '';
+  settings.htmlSlides.forEach((_,i)=> host.appendChild(htmlRow(i)));
+  const add = document.getElementById('btnHtmlAdd');
+  if (add) add.onclick = ()=>{
+    (settings.htmlSlides ||= []).push({id:'html_'+Math.random().toString(36).slice(2,9), name:'', enabled:true, html:'', after:'overview', dwellSec:6});
     renderSlidesMaster();
   };
 }
@@ -943,8 +953,11 @@ if (durPer) durPer.onchange = () => {
   }
 };
 
-    // Bild- und Text-Slides
-    renderInterstitialsPanel('interList2');
+  // Bild-Slides
+  renderInterstitialsPanel('interList2');
+
+  // HTML-Slides
+  renderHtmlSlidesPanel('htmlList');
 
   // Reset & Add Sauna
   const rs = $('#resetTiming');
@@ -987,3 +1000,18 @@ export function initSlidesMasterUI(context){
   renderSlidesMaster();
 }
 
+window.addEventListener('message', e=>{
+  if (!e.data) return;
+  if (e.data.type === 'htmlSave'){
+    const settings = ctx.getSettings();
+    const sl = (settings.htmlSlides||[]).find(s=>s.id===e.data.id);
+    if (sl){ sl.html = e.data.html; }
+    renderHtmlSlidesPanel('htmlList');
+  }
+  if (e.data.type === 'htmlRequest'){
+    const settings = ctx.getSettings();
+    const sl = (settings.htmlSlides||[]).find(s=>s.id===e.data.id);
+    const html = sl ? sl.html : '';
+    e.source?.postMessage({type:'htmlInit', id:e.data.id, html}, '*');
+  }
+});
