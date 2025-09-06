@@ -763,50 +763,6 @@ function interRow(i){
   return wrap;
 }
 
-function htmlRow(i){
-  const settings = ctx.getSettings();
-  const it = settings.htmlSlides[i];
-  const id = 'html_' + i;
-  const wrap = document.createElement('div');
-  wrap.className = 'htmlrow';
-  wrap.innerHTML = `
-    <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name||'')}" />
-    <div id="p_${id}" class="prev">${it.html ? 'HTML' : ''}</div>
-    <button class="btn sm ghost icon" id="e_${id}" title="Bearbeiten">✎</button>
-    <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
-    <input id="en_${id}" type="checkbox" />
-  `;
-
-  const $name  = wrap.querySelector('#n_'+id);
-  const $sec   = wrap.querySelector('#sec_'+id);
-  const $del   = wrap.querySelector('#x_'+id);
-  const $after = wrap.querySelector('#a_'+id);
-  const $en    = wrap.querySelector('#en_'+id);
-  const $edit  = wrap.querySelector('#e_'+id);
-
-  if ($en) $en.checked = !!it.enabled;
-  if ($sec){
-    $sec.value = Number.isFinite(+it.dwellSec)
-      ? +it.dwellSec
-      : (ctx.getSettings().slides?.imageDurationSec ?? ctx.getSettings().slides?.saunaDurationSec ?? 6);
-  }
-  if ($after) $after.value = getAfterSelectValue(it, it.id);
-
-  const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
-  if ($sec) $sec.style.display = uniform ? 'none' : '';
-
-  if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); };
-  if ($after) $after.onchange = () => { applyAfterSelect(it, $after.value); renderSlidesMaster(); };
-  if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
-  if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
-  if ($edit) $edit.onclick = () => { window.open(`/admin/html-editor.html?id=${encodeURIComponent(it.id)}`, '_blank'); };
-  if ($del) $del.onclick = () => { ctx.getSettings().htmlSlides.splice(i,1); renderSlidesMaster(); };
-
-  return wrap;
-}
-
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
   settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
@@ -826,20 +782,6 @@ function renderInterstitialsPanel(hostId='interList2'){
       after:'overview',
       dwellSec:6
     });
-    renderSlidesMaster();
-  };
-}
-
-function renderHtmlSlidesPanel(hostId='htmlList'){
-  const settings = ctx.getSettings();
-  settings.htmlSlides = Array.isArray(settings.htmlSlides) ? settings.htmlSlides : [];
-  const host = document.getElementById(hostId);
-  if (!host) return;
-  host.innerHTML = '';
-  settings.htmlSlides.forEach((_,i)=> host.appendChild(htmlRow(i)));
-  const add = document.getElementById('btnHtmlAdd');
-  if (add) add.onclick = ()=>{
-    (settings.htmlSlides ||= []).push({id:'html_'+Math.random().toString(36).slice(2,9), name:'', enabled:true, html:'', after:'overview', dwellSec:6});
     renderSlidesMaster();
   };
 }
@@ -956,9 +898,6 @@ if (durPer) durPer.onchange = () => {
   // Bild-Slides
   renderInterstitialsPanel('interList2');
 
-  // HTML-Slides
-  renderHtmlSlidesPanel('htmlList');
-
   // Reset & Add Sauna
   const rs = $('#resetTiming');
   if (rs) rs.onclick = () => {
@@ -999,19 +938,3 @@ export function initSlidesMasterUI(context){
   }
   renderSlidesMaster();
 }
-
-window.addEventListener('message', e=>{
-  if (!e.data) return;
-  if (e.data.type === 'htmlSave'){
-    const settings = ctx.getSettings();
-    const sl = (settings.htmlSlides||[]).find(s=>s.id===e.data.id);
-    if (sl){ sl.html = e.data.html; }
-    renderHtmlSlidesPanel('htmlList');
-  }
-  if (e.data.type === 'htmlRequest'){
-    const settings = ctx.getSettings();
-    const sl = (settings.htmlSlides||[]).find(s=>s.id===e.data.id);
-    const html = sl ? sl.html : '';
-    e.source?.postMessage({type:'htmlInit', id:e.data.id, html}, '*');
-  }
-});
