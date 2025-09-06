@@ -179,6 +179,7 @@ function buildQueue() {
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
 
+
   // Bilder vorbereiten
   const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
   const media = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
@@ -543,7 +544,6 @@ function renderUrl(url) {
   return c;
 }
 
-
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -658,6 +658,7 @@ function dwellMsForItem(item) {
     }
   }
 
+
     if (item.type === 'image' || item.type === 'html' || item.type === 'pdf' || item.type === 'url') {
 
     if (mode !== 'per') {
@@ -667,7 +668,6 @@ function dwellMsForItem(item) {
       const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
       return sec(v) * 1000;
     }
-  }
 
   return 6000; // Fallback
 }
@@ -676,6 +676,7 @@ function dwellMsForItem(item) {
 function step() {
   if (!nextQueue.length) return;
   clearTimers();
+
 
 let item = nextQueue[idx % nextQueue.length];
 let key  = item.type + '|' + (item.sauna || item.url || '');
@@ -693,6 +694,7 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'url')      ? renderUrl(item.url) :
 
                                  renderImage(item.url);
+
 
   show(el);
 lastKey = key;

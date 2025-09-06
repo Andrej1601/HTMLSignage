@@ -780,6 +780,7 @@ function interRow(i){
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
 
+
   if ($url){
     $url.onchange = () => {
       const v = ($url.value || '').trim();
@@ -817,6 +818,7 @@ function interRow(i){
 
   return wrap;
 }
+
 
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
