@@ -27,6 +27,11 @@ let wiredStatic = false;
 // ============================================================================
 let activeDayKey = 'Mon';
 
+// Exported getter to expose the currently active day
+export function getActiveDayKey(){
+  return activeDayKey;
+}
+
 function setActiveDay(key, { loadPreset = true } = {}){
   activeDayKey = key;
   localStorage.setItem('adminActiveDay', key);

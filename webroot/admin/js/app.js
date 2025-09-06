@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
@@ -545,6 +545,8 @@ function collectColors(){
 }
 
 function collectSettings(){
+  settings.presets ||= {};
+  settings.presets[getActiveDayKey()] = deepClone(schedule);
   return {
     schedule: { ...schedule },
     settings: {
