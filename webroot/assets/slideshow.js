@@ -178,12 +178,9 @@ function buildQueue() {
   if (showOverview) queue.push({ type: 'overview' });
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
-  // Bilder & HTML-Slides vorbereiten
+  // Bilder vorbereiten
   const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
-  const htmlAll = Array.isArray(settings?.htmlSlides) ? settings.htmlSlides : [];
-  const imgs = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
-  const htmls = htmlAll.filter(it => it && it.enabled && it.html).map(it=>({...it, __kind:'html'}));
-  const media = imgs.concat(htmls);
+  const media = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
 
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
@@ -243,9 +240,7 @@ function buildQueue() {
         ? +it.dwellSec
         : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
 
-      let node;
-      if (it.__kind === 'html') node = { type:'html', html: it.html, dwell, __id: it.id || null };
-      else node = { type:'image', url: it.url, dwell, __id: it.id || null };
+      const node = { type:'image', url: it.url, dwell, __id: it.id || null };
       queue.splice(insPos, 0, node);
     }
     remaining = postponed;
@@ -515,12 +510,6 @@ function renderImage(url) {
   return c;
 }
 
-function renderHtmlSlide(html) {
-  const c = h('div', { class: 'container htmlslide fade show' });
-  c.innerHTML = html || '';
-  return c;
-}
-
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -635,7 +624,7 @@ function dwellMsForItem(item) {
     }
   }
 
-  if (item.type === 'image' || item.type === 'html') {
+  if (item.type === 'image') {
     if (mode !== 'per') {
       const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
       return sec(g) * 1000;
@@ -654,17 +643,16 @@ function step() {
   clearTimers();
 
 let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+let key  = item.type + '|' + (item.sauna || item.url || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
     idx++;
     item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+    key  = item.type + '|' + (item.sauna || item.url || '');
 }
   const el =
     (item.type === 'overview') ? renderOverview() :
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
-    (item.type === 'html')     ? renderHtmlSlide(item.html) :
                                  renderImage(item.url);
 
   show(el);
