@@ -555,17 +555,23 @@ function renderUrl(url) {
   const iframe = h('iframe', { class: 'urlFrame', src: url });
   const msg = h('div', { class: 'urlMsg' }, 'Lade…');
   const c = h('div', { class: 'container urlslide fade show' }, [iframe, msg]);
-  let loaded = false;
-  const done = () => { loaded = true; msg.remove(); };
-  const err = () => { msg.textContent = 'Fehler beim Laden'; };
-  iframe.addEventListener('load', () => {
-    try {
-      const doc = iframe.contentDocument;
-      if (doc && doc.body && doc.body.childElementCount) done(); else err();
-    } catch { done(); }
-  }, { once:true });
-  iframe.addEventListener('error', err, { once:true });
-  setTimeout(() => { if (!loaded) err(); }, 10000);
+  let finished = false;
+  let timer;
+  const done = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    msg.remove();
+  };
+  const err = (t = 'Fehler beim Laden') => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    msg.textContent = t;
+  };
+  iframe.addEventListener('load', done, { once:true });
+  iframe.addEventListener('error', () => err('Seite blockiert (X-Frame-Options/CSP)'), { once:true });
+  timer = setTimeout(() => err(), 10000);
   return c;
 }
 
