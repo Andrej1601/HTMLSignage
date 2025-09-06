@@ -88,6 +88,7 @@ function initWeekdayUI(){
     const s = ctx.getSettings();
     s.presets ||= {};
     s.presets[activeDayKey] = JSON.parse(JSON.stringify(ctx.getSchedule()));
+    localStorage.setItem('settingsDraft', JSON.stringify(ctx.getSettings()));
     alert('Wochentag gespeichert: ' + (DAY_LABELS[activeDayKey] || activeDayKey));
   };
 }
