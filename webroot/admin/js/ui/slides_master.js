@@ -50,6 +50,11 @@ function setActiveDay(key, { loadPreset = true } = {}){
     ctx.setSchedule(cloned);
     renderGridUI();
     renderSlidesMaster();
+  } else {
+    const empty = { saunas: ctx.getSchedule().saunas.slice(), rows: [] };
+    ctx.setSchedule(empty);
+    renderGridUI();
+    renderSlidesMaster();
   }
 }
 
