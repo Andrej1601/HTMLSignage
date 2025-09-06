@@ -611,7 +611,7 @@ function renderSaunaOffList(){
 }
 
 // ============================================================================
-// 6) Interstitial Images (Bild-Slides)
+// 6) Interstitial Slides (Bild/PDF/URL)
 // ============================================================================
 function usedAfterImageIds(exceptId){
   const settings = ctx.getSettings();
@@ -644,7 +644,7 @@ function interAfterOptionsHTML(currentId){
     .map(x => {
       const val = 'img:' + x.id;
       const taken = used.has(x.id);
-      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
+      const label = 'Slide: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
       return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
     });
 
@@ -688,7 +688,13 @@ function interRow(i){
     <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <select id="t_${id}" class="input srcSel">
+      <option value="image">Bild</option>
+      <option value="pdf">PDF</option>
+      <option value="url">URL</option>
+    </select>
+    <button class="btn sm ghost icon" id="f_${id}" title="Datei wählen">⤴︎</button>
+    <input id="u_${id}" class="input urlInput" type="text" placeholder="https://..." style="display:none" />
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
     <input id="en_${id}" type="checkbox" />
@@ -697,7 +703,9 @@ function interRow(i){
   const $name  = wrap.querySelector('#n_'+id);
   const $prev  = wrap.querySelector('#p_'+id);
   const $sec   = wrap.querySelector('#sec_'+id);
+  const $type  = wrap.querySelector('#t_'+id);
   const $up    = wrap.querySelector('#f_'+id);
+  const $url   = wrap.querySelector('#u_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $after = wrap.querySelector('#a_'+id);
   const $en    = wrap.querySelector('#en_'+id);
@@ -711,8 +719,34 @@ function interRow(i){
   }
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
-  if (it.url){
-    preloadImg(it.url).then(r => { if (r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
+  if ($type) $type.value = it.type || 'image';
+  if ($type && $url && $up && $prev){
+    const applyType = () => {
+      const t = $type.value;
+      it.type = t;
+      if (t === 'url') {
+        $url.style.display = '';
+        $up.style.display = 'none';
+        $prev.style.display = 'none';
+        $url.value = it.url || '';
+      } else {
+        $url.style.display = 'none';
+        $up.style.display = '';
+        if (t === 'image' && it.url){
+          $prev.style.display = '';
+          preloadImg(it.url).then(r=>{ if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
+        } else {
+          $prev.style.display = 'none';
+        }
+      }
+    };
+    applyType();
+    $type.onchange = () => {
+      it.type = $type.value;
+      if (it.type !== 'url') it.url = '';
+      if (it.type !== 'pdf') it.pdf = '';
+      applyType();
+    };
   }
 
   // Uniform-Mode blendet Dauer-Feld aus
@@ -724,7 +758,7 @@ function interRow(i){
   if ($after) $after.onchange = () => {
     const v = $after.value;
     if (v === 'img:' + it.id){
-      alert('Ein Bild kann nicht nach sich selbst kommen.');
+      alert('Ein Slide kann nicht nach sich selbst kommen.');
       $after.value = 'overview';
       applyAfterSelect(it, 'overview');
       return;
@@ -733,7 +767,7 @@ function interRow(i){
       const used = usedAfterImageIds(it.id);
       const targetId = v.slice(4);
       if (used.has(targetId)){
-        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
+        alert('Dieses Slide ist bereits als „Nach Slide“ gewählt.');
         $after.value = 'overview';
         applyAfterSelect(it, 'overview');
         return;
@@ -746,14 +780,35 @@ function interRow(i){
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
 
+  if ($url){
+    $url.onchange = () => {
+      const v = ($url.value || '').trim();
+      try{
+        const u = new URL(v);
+        it.url = u.href;
+      } catch {
+        alert('Ungültige URL');
+        $url.focus();
+      }
+    };
+  }
+
   if ($up){
     $up.onclick = () => {
       const fi = document.createElement('input');
-      fi.type='file'; fi.accept='image/*';
-      fi.onchange = () => uploadGeneric(fi, (p) => {
-        it.url = p;
-        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
-      });
+      fi.type = 'file';
+      fi.accept = ($type && $type.value === 'pdf') ? 'application/pdf' : 'image/*';
+      fi.onchange = () => {
+        const f = fi.files && fi.files[0];
+        if (f){
+          if ($type.value === 'pdf' && f.type !== 'application/pdf'){ alert('Nur PDF-Dateien unterstützt.'); return; }
+          if ($type.value === 'image' && !/^image\//.test(f.type)){ alert('Nur Bilddateien unterstützt.'); return; }
+        }
+        uploadGeneric(fi, (p) => {
+          if ($type.value === 'pdf'){ it.pdf = p; $prev.style.display = 'none'; }
+          else { it.url = p; preloadImg(p).then(r=>{ if(r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } }); }
+        });
+      };
       fi.click();
     };
   }
@@ -822,7 +877,9 @@ function renderInterstitialsPanel(hostId='interList2'){
       id:'im_'+Math.random().toString(36).slice(2,9),
       name:'',
       enabled:true,
+      type:'image',
       url:'',
+      pdf:'',
       after:'overview',
       dwellSec:6
     });
