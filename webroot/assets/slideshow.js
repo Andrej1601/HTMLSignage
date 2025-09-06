@@ -178,9 +178,12 @@ function buildQueue() {
   if (showOverview) queue.push({ type: 'overview' });
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
+
+
   // Bilder vorbereiten
   const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
   const media = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
+
 
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
@@ -198,9 +201,9 @@ function buildQueue() {
         const io = idxOverview();
         insPos = (io >= 0) ? io + 1 : 0;
       } else if (String(ref).startsWith('img:')) {
-        // nach Bild: nur einfügen, wenn das Bild bereits platziert ist
+        // nach Slide: nur einfügen, wenn das Slide bereits platziert ist
         const prevId = String(ref).slice(4);
-        const prevIndex = queue.findIndex(x => x.type === 'image' && x.__id === prevId);
+        const prevIndex = queue.findIndex(x => ['image','pdf','url'].includes(x.type) && x.__id === prevId);
         if (prevIndex === -1) { postponed.push(it); continue; }
         insPos = prevIndex + 1;
       } else {
@@ -242,7 +245,10 @@ function buildQueue() {
 
       let node;
       if (it.__kind === 'html') node = { type:'html', html: it.html, dwell, __id: it.id || null };
+      else if (it.__kind === 'pdf') node = { type:'pdf', url: it.pdf, dwell, __id: it.id || null };
+      else if (it.__kind === 'url') node = { type:'url', url: it.url, dwell, __id: it.id || null };
       else node = { type:'image', url: it.url, dwell, __id: it.id || null };
+
       queue.splice(insPos, 0, node);
     }
     remaining = postponed;
@@ -512,6 +518,32 @@ function renderImage(url) {
   return c;
 }
 
+
+function renderHtmlSlide(html) {
+  const c = h('div', { class: 'container htmlslide fade show' });
+  c.innerHTML = html || '';
+  return c;
+}
+
+function renderPdf(url) {
+  const iframe = h('iframe', { class: 'pdfFrame', src: url });
+  const c = h('div', { class: 'container pdfslide fade show' }, [iframe]);
+  return c;
+}
+
+function renderUrl(url) {
+  const iframe = h('iframe', { class: 'urlFrame', src: url });
+  const msg = h('div', { class: 'urlMsg' }, 'Lade…');
+  const c = h('div', { class: 'container urlslide fade show' }, [iframe, msg]);
+  let loaded = false;
+  const done = () => { loaded = true; msg.remove(); };
+  const err = () => { msg.textContent = 'Fehler beim Laden'; };
+  iframe.addEventListener('load', done, { once:true });
+  iframe.addEventListener('error', err, { once:true });
+  setTimeout(() => { if (!loaded) err(); }, 10000);
+  return c;
+}
+
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -626,14 +658,15 @@ function dwellMsForItem(item) {
     }
   }
 
-    if (item.type === 'image') {
-      if (mode !== 'per') {
-        const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
-        return sec(g) * 1000;
-      } else {
-        const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
-        return sec(v) * 1000;
-      }
+
+    if (item.type === 'image' || item.type === 'html' || item.type === 'pdf' || item.type === 'url') {
+
+    if (mode !== 'per') {
+      const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
+      return sec(g) * 1000;
+    } else {
+      const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
+      return sec(v) * 1000;
     }
 
   return 6000; // Fallback
@@ -644,18 +677,24 @@ function step() {
   if (!nextQueue.length) return;
   clearTimers();
 
-  let item = nextQueue[idx % nextQueue.length];
-  let key  = item.type + '|' + (item.sauna || item.url || '');
+
+let item = nextQueue[idx % nextQueue.length];
+let key  = item.type + '|' + (item.sauna || item.url || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
-      idx++;
-      item = nextQueue[idx % nextQueue.length];
-      key  = item.type + '|' + (item.sauna || item.url || '');
+    idx++;
+    item = nextQueue[idx % nextQueue.length];
+    key  = item.type + '|' + (item.sauna || item.url || '');
 }
-    const el =
-      (item.type === 'overview') ? renderOverview() :
-      (item.type === 'sauna')    ? renderSauna(item.sauna) :
-                                   renderImage(item.url);
+  const el =
+    (item.type === 'overview') ? renderOverview() :
+    (item.type === 'sauna')    ? renderSauna(item.sauna) :
+    (item.type === 'html')     ? renderHtmlSlide(item.html) :
+    (item.type === 'pdf')      ? renderPdf(item.url) :
+    (item.type === 'url')      ? renderUrl(item.url) :
+
+                                 renderImage(item.url);
+
 
   show(el);
 lastKey = key;

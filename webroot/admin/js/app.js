@@ -44,12 +44,17 @@ function renderContextBadge(){
     return;
   }
   if (!el){
-    el = document.createElement('span'); el.id='ctxBadge';
+    el = document.createElement('span');
+    el.id='ctxBadge';
     el.className='ctx-badge';
-    el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
+    el.setAttribute('role','status');
+    el.setAttribute('aria-label','Individueller Modus aktiv');
+    el.title = 'Individueller Modus';
     h1.after(el);
   }
-  el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
+  el.innerHTML = `<span class="ctx-icon" aria-hidden="true">⚙️</span>`+
+    `<span class="ctx-text">Individueller Modus aktiv: ${currentDeviceName || currentDeviceCtx}</span>`+
+    ` <button id="ctxReset" class="ctx-reset" title="Zurück zur globalen Ansicht" aria-label="Zurück zur globalen Ansicht">×</button>`;
   el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
   if (!tip){
     tip = document.createElement('small');
