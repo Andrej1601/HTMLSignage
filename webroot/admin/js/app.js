@@ -667,6 +667,7 @@ function dockPushDebounced(){
   clearTimeout(_dockTimer);
   _dockTimer = setTimeout(()=> dockSend(false), 250);
 }
+window.dockPushDebounced = dockPushDebounced;
 function dockSend(reload){
   const frame = document.getElementById('dockPane')?.querySelector('#dockFrame');
   if (!frame || !frame.contentWindow) return;
