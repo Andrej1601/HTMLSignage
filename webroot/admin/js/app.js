@@ -167,7 +167,6 @@ async function loadAll(){
         type: it.type || 'image',
         url: it.url || '',
         thumb: it.thumb || it.url || '',
-        html: it.html || '',
         after: it.after || 'overview',
         dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6,
         afterRef: it.afterRef || undefined

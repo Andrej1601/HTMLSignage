@@ -50,7 +50,6 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 
 /* interstitial image */
 .container.imgslide{padding:0}
-.container.htmlslide{padding:0}
 .imgFill{position:absolute; inset:0; background-size:cover; background-position:center; background-repeat:no-repeat}
 
 /* layout */

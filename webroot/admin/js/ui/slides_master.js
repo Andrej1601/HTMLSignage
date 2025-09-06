@@ -22,32 +22,6 @@ import { DEFAULTS } from '../core/defaults.js';
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
 
-// HTML-Editor Message Handling
-window.addEventListener('message', (e) => {
-  const d = e.data;
-  if (!d || !d.type) return;
-  if (d.type === 'htmlRequest'){
-    const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
-    e.source?.postMessage({ type:'htmlInit', id:d.id, html: it?.html || '' }, '*');
-  } else if (d.type === 'htmlSave'){
-    const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
-    if (it){
-      it.html = d.html || '';
-      renderSlidesMaster();
-      fetch('/admin/api/preview.php', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ type:'html', html: it.html })
-      }).then(r=>r.json()).then(j=>{
-        if(j.ok && j.thumb){
-          it.thumb = j.thumb;
-          renderSlidesMaster();
-        }
-      });
-    }
-  }
-});
-
 // ============================================================================
 // 1) Wochentage / Presets
 // ============================================================================
@@ -716,8 +690,6 @@ function interRow(i){
       <option value="image">Bild</option>
       <option value="video">Video</option>
       <option value="url">URL</option>
-      <option value="mpd">MPD</option>
-      <option value="html">HTML</option>
     </select>
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
@@ -781,7 +753,7 @@ function interRow(i){
         fi.click();
       };
       $media.appendChild(mb);
-    } else if (t === 'url' || t === 'mpd'){
+    } else if (t === 'url'){
       const mb = document.createElement('button');
       mb.className = 'btn sm ghost';
       mb.textContent = 'URL';
@@ -789,15 +761,8 @@ function interRow(i){
         const val = prompt('URL:', it.url || '');
         if (val) {
           it.url = val.trim();
-          if (it.url) {
-            fetch('/admin/api/preview.php', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ type:'url', url: it.url })
-            }).then(r=>r.json()).then(j=>{
-              if (j.ok && j.thumb){ it.thumb = j.thumb; updatePrev(j.thumb); }
-            });
-          }
+          it.thumb = '';
+          updatePrev('');
         }
       };
       $media.appendChild(mb);
@@ -807,12 +772,6 @@ function interRow(i){
   renderMediaField();
 
   // Events
-  if ($prev) $prev.onclick = () => {
-    const t = $type?.value || 'image';
-    if (t === 'html'){
-      window.open('/admin/html-editor.html?id=' + it.id, '_blank', 'width=800,height=600');
-    }
-  };
   if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
   if ($type)  $type.onchange  = () => { it.type = $type.value; renderMediaField(); };
   if ($after) $after.onchange = () => {
@@ -848,7 +807,7 @@ function interRow(i){
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
   const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
-  settings.interstitials = list.map(it => ({ type:'image', thumb:'', html:'', ...it }));
+  settings.interstitials = list.map(it => ({ type:'image', thumb:'', ...it }));
 
   const host = document.getElementById(hostId);
   if (!host) return;
@@ -865,7 +824,6 @@ function renderInterstitialsPanel(hostId='interList2'){
       type:'image',
       url:'',
       thumb:'',
-      html:'',
       after:'overview',
       dwellSec:6
     });
