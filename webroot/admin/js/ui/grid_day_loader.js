@@ -60,7 +60,7 @@ function ensureUI() {
     const key = sel.value;
     const preset = settings?.presets?.[key];
     if (!preset) {
-      alert(`Kein Preset für "${(DAY_LABELS && DAY_LABELS[key]) || key}" vorhanden.\nMit „Wochentag speichern“ kannst du eins anlegen.`);
+      alert(`Kein Preset für "${(DAY_LABELS && DAY_LABELS[key]) || key}" vorhanden.`);
       return;
     }
     // Preset ins aktuelle Schedule übernehmen (deep clone)
