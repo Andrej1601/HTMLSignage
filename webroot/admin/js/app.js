@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, validateUniqueAfterRefs } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
@@ -628,6 +628,10 @@ function collectSettings(){
 $('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/', '_blank'));
 
 $('#btnSave')?.addEventListener('click', async ()=>{
+  if (!validateUniqueAfterRefs()){
+    alert('Fehler: Mehrfachzuweisung bei "Nach Slide".');
+    return;
+  }
   const body = collectSettings();
 
   if (!currentDeviceCtx){
