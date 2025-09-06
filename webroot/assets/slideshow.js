@@ -196,7 +196,7 @@ function buildQueue() {
         if (it.url) media.push({ ...base, type: 'dash', src: it.url });
         break;
       case 'html':
-        if (it.html) media.push({ ...base, type: 'html', html: it.html });
+        media.push({ ...base, type: 'html', html: it.html });
         break;
       default:
         if (it.url) media.push({ ...base, type: 'image', src: it.url });
@@ -263,7 +263,7 @@ function buildQueue() {
 
       const node = { type: it.type, dwell, __id: it.id || null };
       if (it.src) node.src = it.src;
-      if (it.html) node.html = it.html;
+      if (it.type === 'html') node.html = it.html || '';
       if (it.url && it.type === 'url') node.url = it.url;
       queue.splice(insPos, 0, node);
     }
@@ -557,7 +557,7 @@ function renderVideo(src) {
 
 // ---------- Interstitial HTML slide ----------
 function renderHtml(html) {
-  const c = h('div', { class: 'container htmlslide fade show' });
+  const c = h('div', { class: 'container htmlslide fade show', style: 'display:block' });
   c.innerHTML = html || '';
   return c;
 }
