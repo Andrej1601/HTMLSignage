@@ -733,8 +733,17 @@ function interRow(i){
   }
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
+  const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
   if (it.thumb){
-    preloadImg(it.thumb).then(r => { if (r.ok){ $prev.src = it.thumb; $prev.title = `${r.w}×${r.h}`; } });
+    preloadImg(it.thumb).then(r => {
+      if (r.ok){
+        $prev.src = it.thumb; $prev.title = `${r.w}×${r.h}`;
+      } else {
+        $prev.src = FALLBACK_THUMB; $prev.title = '';
+      }
+    });
+  } else {
+    $prev.src = FALLBACK_THUMB;
   }
 
   // Uniform-Mode blendet Dauer-Feld aus
@@ -755,7 +764,10 @@ function interRow(i){
       fi.type = 'file'; fi.accept = 'image/*';
       fi.onchange = () => uploadGeneric(fi, (p) => {
         it.thumb = p;
-        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
+        preloadImg(p).then(r => {
+          if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
+          else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
+        });
       });
       fi.click();
     };
@@ -771,7 +783,29 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p) => { it.url = p; });
+        if (t === 'video'){
+          const ti = document.createElement('input');
+          ti.type = 'file'; ti.accept = 'image/*';
+          ti.onchange = () => uploadGeneric(fi, (p, tp) => {
+            it.url = p;
+            if (tp){
+              it.thumb = tp;
+              preloadImg(tp).then(r => {
+                if (r.ok){ $prev.src = tp; $prev.title = `${r.w}×${r.h}`; }
+                else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
+              });
+            }
+          }, ti);
+          fi.onchange = () => { if (fi.files[0]) ti.click(); };
+        } else {
+          fi.onchange = () => uploadGeneric(fi, (p) => {
+            it.url = p; it.thumb = p;
+            preloadImg(p).then(r => {
+              if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
+              else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
+            });
+          });
+        }
         fi.click();
       };
       $media.appendChild(mb);

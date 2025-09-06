@@ -50,4 +50,31 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 @chmod($dest, 0644); @chown($dest,'www-data'); @chgrp($dest,'www-data');
 
 $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
-echo json_encode(['ok'=>true,'path'=>$publicPath]);
+// optional preview image (thumb) for non-image media
+$thumbPath = null;
+if (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
+  $tu = $_FILES['thumb'];
+  if (!empty($tu['error'])) fail('thumb-upload-error-'.$tu['error']);
+  $tmime = $finfo->file($tu['tmp_name']) ?: 'application/octet-stream';
+  $allowedThumb = [
+    'image/png'     => 'png',
+    'image/jpeg'    => 'jpg',
+    'image/webp'    => 'webp',
+    'image/svg+xml' => 'svg',
+  ];
+  if (!isset($allowedThumb[$tmime])) fail('thumb-unsupported-type: '.$tmime);
+  $text = $allowedThumb[$tmime];
+  $torig = preg_replace('/[^A-Za-z0-9._-]/','_', $tu['name']);
+  if (!$torig) $torig = 'thumb.'.$text;
+  if (!preg_match('/\\.' . preg_quote($text,'/') . '$/i', $torig)) $torig .= '.' . $text;
+  $tbase = '/var/www/signage/assets/media/img/';
+  if (!is_dir($tbase)) { @mkdir($tbase, 02775, true); @chown($tbase,'www-data'); @chgrp($tbase,'www-data'); }
+  $tdest = $tbase . $torig;
+  $tpi = pathinfo($tdest);
+  $tfname = $tpi['filename']; $ti=0;
+  while (file_exists($tdest)) { $ti++; $tdest = $tpi['dirname'].'/'.$tfname.'_'.$ti.'.'.$text; }
+  if (!@move_uploaded_file($tu['tmp_name'], $tdest)) fail('thumb-move-failed', 500);
+  @chmod($tdest, 0644); @chown($tdest,'www-data'); @chgrp($tdest,'www-data');
+  $thumbPath = '/assets/media/img/' . basename($tdest);
+}
+echo json_encode(['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath]);
