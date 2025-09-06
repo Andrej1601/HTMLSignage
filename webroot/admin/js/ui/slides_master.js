@@ -731,8 +731,9 @@ function interRow(i){
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
   const updatePrev = (src) => {
     if (!src){ $prev.src = FALLBACK_THUMB; $prev.title = ''; return; }
-    preloadImg(src).then(r => {
-      if (r.ok){ $prev.src = src; $prev.title = `${r.w}×${r.h}`; }
+    const url = src + '?v=' + Date.now();
+    preloadImg(url).then(r => {
+      if (r.ok){ $prev.src = url; $prev.title = `${r.w}×${r.h}`; }
       else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
     });
   };
