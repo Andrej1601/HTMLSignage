@@ -178,12 +178,9 @@ function buildQueue() {
   if (showOverview) queue.push({ type: 'overview' });
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
-  // Bilder & HTML-Slides vorbereiten
+  // Bilder vorbereiten
   const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
-  const htmlAll = Array.isArray(settings?.htmlSlides) ? settings.htmlSlides : [];
-  const imgs = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
-  const htmls = htmlAll.filter(it => it && it.enabled && it.html).map(it=>({...it, __kind:'html'}));
-  const media = imgs.concat(htmls);
+  const media = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
 
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
@@ -515,12 +512,6 @@ function renderImage(url) {
   return c;
 }
 
-function renderHtmlSlide(html) {
-  const c = h('div', { class: 'container htmlslide fade show' });
-  c.innerHTML = html || '';
-  return c;
-}
-
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -635,15 +626,15 @@ function dwellMsForItem(item) {
     }
   }
 
-  if (item.type === 'image' || item.type === 'html') {
-    if (mode !== 'per') {
-      const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
-      return sec(g) * 1000;
-    } else {
-      const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
-      return sec(v) * 1000;
+    if (item.type === 'image') {
+      if (mode !== 'per') {
+        const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
+        return sec(g) * 1000;
+      } else {
+        const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
+        return sec(v) * 1000;
+      }
     }
-  }
 
   return 6000; // Fallback
 }
@@ -653,19 +644,18 @@ function step() {
   if (!nextQueue.length) return;
   clearTimers();
 
-let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+  let item = nextQueue[idx % nextQueue.length];
+  let key  = item.type + '|' + (item.sauna || item.url || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
-    idx++;
-    item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+      idx++;
+      item = nextQueue[idx % nextQueue.length];
+      key  = item.type + '|' + (item.sauna || item.url || '');
 }
-  const el =
-    (item.type === 'overview') ? renderOverview() :
-    (item.type === 'sauna')    ? renderSauna(item.sauna) :
-    (item.type === 'html')     ? renderHtmlSlide(item.html) :
-                                 renderImage(item.url);
+    const el =
+      (item.type === 'overview') ? renderOverview() :
+      (item.type === 'sauna')    ? renderSauna(item.sauna) :
+                                   renderImage(item.url);
 
   show(el);
 lastKey = key;
