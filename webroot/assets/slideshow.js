@@ -192,12 +192,6 @@ function buildQueue() {
       case 'url':
         if (it.url) media.push({ ...base, type: 'url', url: it.url });
         break;
-      case 'mpd':
-        if (it.url) media.push({ ...base, type: 'dash', src: it.url });
-        break;
-      case 'html':
-        media.push({ ...base, type: 'html', html: it.html });
-        break;
       default:
         if (it.url) media.push({ ...base, type: 'image', src: it.url });
     }
@@ -263,7 +257,6 @@ function buildQueue() {
 
       const node = { type: it.type, dwell, __id: it.id || null };
       if (it.src) node.src = it.src;
-      if (it.type === 'html') node.html = it.html || '';
       if (it.url && it.type === 'url') node.url = it.url;
       queue.splice(insPos, 0, node);
     }
@@ -555,13 +548,6 @@ function renderVideo(src) {
   return c;
 }
 
-// ---------- Interstitial HTML slide ----------
-function renderHtml(html) {
-  const c = h('div', { class: 'container htmlslide fade show', style: 'display:block' });
-  c.innerHTML = html || '';
-  return c;
-}
-
 // ---------- Interstitial external URL slide ----------
 function renderUrl(src) {
   const f = h('iframe', {
@@ -570,39 +556,6 @@ function renderUrl(src) {
     style: 'width:100%;height:100%;border:0'
   });
   const c = h('div', { class: 'container urlslide fade show' }, [f]);
-  return c;
-}
-
-// ---------- Interstitial DASH video slide ----------
-function renderDash(src) {
-  const v = h('video', {
-    autoplay: '',
-    loop: '',
-    muted: '',
-    playsinline: '',
-    style: 'width:100%;height:100%;object-fit:contain'
-  });
-
-  const initDash = () => {
-    if (!window.dashjs) return;
-    try {
-      const player = dashjs.MediaPlayer().create();
-      player.initialize(v, src, true);
-      player.on('ended', () => { try { v.play(); } catch {} });
-    } catch {}
-  };
-
-  if (window.dashjs) {
-    initDash();
-  } else {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js';
-    s.onload = initDash;
-    document.head.appendChild(s);
-    v.src = src; // Fallback
-  }
-
-  const c = h('div', { class: 'container videoslide fade show' }, [v]);
   return c;
 }
 
@@ -720,7 +673,7 @@ function dwellMsForItem(item) {
     }
   }
 
-  if (['image', 'video', 'url', 'html', 'dash'].includes(item.type)) {
+  if (['image', 'video', 'url'].includes(item.type)) {
     if (mode !== 'per') {
       const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
       return sec(g) * 1000;
@@ -739,21 +692,19 @@ function step() {
   clearTimers();
 
 let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.src || item.url || item.html || '');
+let key  = item.type + '|' + (item.sauna || item.src || item.url || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
     idx++;
     item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.src || item.url || item.html || '');
+    key  = item.type + '|' + (item.sauna || item.src || item.url || '');
 }
   const el =
     (item.type === 'overview') ? renderOverview() :
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
     (item.type === 'image')    ? renderImage(item.src) :
     (item.type === 'video')    ? renderVideo(item.src) :
-    (item.type === 'html')     ? renderHtml(item.html) :
     (item.type === 'url')      ? renderUrl(item.url) :
-    (item.type === 'dash')     ? renderDash(item.src) :
                                  renderImage(item.src || item.url);
 
   show(el);

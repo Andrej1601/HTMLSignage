@@ -1,6 +1,6 @@
 <?php
 // file: /var/www/signage/admin/api/upload.php
-// Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos, MPD, HTML)
+// Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos)
 // Hinweise: Nginx client_max_body_size & PHP upload_max_filesize/post_max_size müssen groß genug sein.
 
 header('Content-Type: application/json; charset=UTF-8');
@@ -25,9 +25,7 @@ $allowed = [
   'image/jpeg'       => ['ext'=>'jpg',  'dir'=>'img'],
   'image/webp'       => ['ext'=>'webp', 'dir'=>'img'],
   'image/svg+xml'    => ['ext'=>'svg',  'dir'=>'img'],
-  'video/mp4'        => ['ext'=>'mp4',  'dir'=>'video'],
-  'application/dash+xml' => ['ext'=>'mpd', 'dir'=>'mpd'],
-  'text/html'        => ['ext'=>'html', 'dir'=>'html']
+  'video/mp4'        => ['ext'=>'mp4',  'dir'=>'video']
 ];
 if (!isset($allowed[$mime])) fail('unsupported-type: '.$mime);
 
