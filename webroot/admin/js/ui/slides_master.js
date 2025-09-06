@@ -31,7 +31,7 @@ window.addEventListener('message', (e) => {
     e.source?.postMessage({ type:'htmlInit', id:d.id, html: it?.html || '' }, '*');
   } else if (d.type === 'htmlSave'){
     const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
-    if (it) it.html = d.html || '';
+    if (it) { it.html = d.html || ''; renderSlidesMaster(); }
   }
 });
 
