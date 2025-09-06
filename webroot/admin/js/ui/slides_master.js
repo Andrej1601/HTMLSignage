@@ -791,9 +791,12 @@ function interRow(i){
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
         fi.onchange = () => uploadGeneric(fi, (p, tp) => {
-          it.url = p;
-          it.thumb = tp || (t === 'image' ? p : '');
+          const suffix = '?v=' + Date.now();
+          it.url = p + suffix;
+          const tv = tp || (t === 'image' ? p : '');
+          it.thumb = tv ? tv + suffix : '';
           updatePrev(it.thumb);
+          renderSlidesMaster();
         });
         fi.click();
       };
