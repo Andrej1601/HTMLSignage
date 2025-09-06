@@ -22,22 +22,35 @@ body{padding:16px;}
 <button class="btn" onclick="window.close()">Schließen</button>
 </div>
 <script>
+'use strict';
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 const editor = document.getElementById('editor');
-window.addEventListener('DOMContentLoaded',()=>{
-  window.opener && window.opener.postMessage({type:'htmlRequest', id}, '*');
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.opener) {
+    window.opener.postMessage({ type: 'htmlRequest', id }, '*');
+  }
 });
-window.addEventListener('message',e=>{
-  if(e.data && e.data.type==='htmlInit' && e.data.id===id){ editor.innerHTML = e.data.html || ''; }
+
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (d && d.type === 'htmlInit' && d.id === id) {
+    editor.innerHTML = d.html || '';
+  }
 });
-const boldBtn = document.getElementById('boldBtn');
-boldBtn.onclick = ()=> document.execCommand('bold');
-const imgBtn = document.getElementById('imgBtn');
-imgBtn.onclick = ()=>{ const url = prompt('Bild-URL:'); if(url) document.execCommand('insertImage',false,url); };
-const saveBtn = document.getElementById('saveBtn');
-saveBtn.onclick = ()=>{
-  window.opener && window.opener.postMessage({type:'htmlSave', id, html: editor.innerHTML}, '*');
+
+document.getElementById('boldBtn').onclick = () => document.execCommand('bold');
+
+document.getElementById('imgBtn').onclick = () => {
+  const url = prompt('Bild-URL:');
+  if (url) document.execCommand('insertImage', false, url);
+};
+
+document.getElementById('saveBtn').onclick = () => {
+  if (window.opener) {
+    window.opener.postMessage({ type: 'htmlSave', id, html: editor.innerHTML }, '*');
+  }
   window.close();
 };
 </script>
