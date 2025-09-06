@@ -30,8 +30,7 @@ $allowed = [
 'image/png' => 'png',
 'image/jpeg'=> 'jpg',
 'image/webp'=> 'webp',
-'image/svg+xml' => 'svg',
-'application/pdf' => 'pdf'
+'image/svg+xml' => 'svg'
 ];
 if (!isset($allowed[$mime])) fail('unsupported-type: '.$mime);
 
@@ -42,7 +41,7 @@ if (!$orig) $orig = 'upload.' . $ext;
 if (!preg_match('/\.' . preg_quote($ext,'/') . '$/i', $orig)) $orig .= '.' . $ext;
 
 
-$baseDir = ($ext === 'pdf') ? '/var/www/signage/assets/pdf/' : '/var/www/signage/assets/img/';
+$baseDir = '/var/www/signage/assets/img/';
 if (!is_dir($baseDir)) { @mkdir($baseDir, 02775, true); @chown($baseDir,'www-data'); @chgrp($baseDir,'www-data'); }
 
 
@@ -56,5 +55,5 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 @chmod($dest, 0644); @chown($dest,'www-data'); @chgrp($dest,'www-data');
 
 
-$publicPath = ($ext === 'pdf' ? '/assets/pdf/' : '/assets/img/') . basename($dest);
+$publicPath = '/assets/img/' . basename($dest);
 echo json_encode(['ok'=>true,'path'=>$publicPath]);

@@ -611,7 +611,7 @@ function renderSaunaOffList(){
 }
 
 // ============================================================================
-// 6) Interstitial Slides (Bild/PDF/URL)
+// 6) Interstitial Images (Bild-Slides)
 // ============================================================================
 function usedAfterImageIds(exceptId){
   const settings = ctx.getSettings();
@@ -644,7 +644,7 @@ function interAfterOptionsHTML(currentId){
     .map(x => {
       const val = 'img:' + x.id;
       const taken = used.has(x.id);
-      const label = 'Slide: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
+      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
       return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
     });
 
@@ -680,8 +680,6 @@ function applyAfterSelect(it, value){
 function interRow(i){
   const settings = ctx.getSettings();
   const it = settings.interstitials[i];
-  // Legacy migration: earlier versions stored external URLs in `url`
-  if (it.type === 'url' && it.link == null && it.url){ it.link = it.url; it.url = ''; }
   const id = 'inter_' + i;
 
   const wrap = document.createElement('div');
@@ -690,13 +688,7 @@ function interRow(i){
     <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <select id="t_${id}" class="input srcSel">
-      <option value="image">Bild</option>
-      <option value="pdf">PDF</option>
-      <option value="url">URL</option>
-    </select>
-    <button class="btn sm ghost icon" id="f_${id}" title="Datei wählen">⤴︎</button>
-    <input id="u_${id}" class="input urlInput" type="text" placeholder="https://..." readonly style="display:none" />
+    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
     <input id="en_${id}" type="checkbox" />
@@ -705,9 +697,7 @@ function interRow(i){
   const $name  = wrap.querySelector('#n_'+id);
   const $prev  = wrap.querySelector('#p_'+id);
   const $sec   = wrap.querySelector('#sec_'+id);
-  const $type  = wrap.querySelector('#t_'+id);
   const $up    = wrap.querySelector('#f_'+id);
-  const $url   = wrap.querySelector('#u_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $after = wrap.querySelector('#a_'+id);
   const $en    = wrap.querySelector('#en_'+id);
@@ -721,41 +711,8 @@ function interRow(i){
   }
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
-  if ($type) $type.value = it.type || 'image';
-  const faviconFor = u => {
-    try { const uu = new URL(u); return 'https://www.google.com/s2/favicons?sz=64&domain_url=' + encodeURIComponent(uu.origin); }
-    catch { return '/assets/img/url_placeholder.svg'; }
-  };
-  if ($type && $url && $up && $prev){
-    const applyType = () => {
-      const t = $type.value;
-      it.type = t;
-      if (t === 'url') {
-        $url.style.display = '';
-        $up.style.display = 'none';
-        $url.value = it.link || '';
-        $prev.style.display = '';
-        $prev.src = it.link ? faviconFor(it.link) : '/assets/img/url_placeholder.svg';
-        $prev.title = it.link || '';
-      } else if (t === 'pdf') {
-        $url.style.display = 'none';
-        $up.style.display = '';
-        $prev.style.display = '';
-        $prev.src = '/assets/img/pdf_placeholder.svg';
-        $prev.title = it.pdf ? it.pdf.split('/').pop() : '';
-      } else {
-        $url.style.display = 'none';
-        $up.style.display = '';
-        if (it.url){
-          $prev.style.display = '';
-          preloadImg(it.url).then(r=>{ if(r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } else { $prev.src = it.url; } });
-        } else {
-          $prev.style.display = 'none';
-        }
-      }
-    };
-    applyType();
-    $type.onchange = () => { it.type = $type.value; applyType(); };
+  if (it.url){
+    preloadImg(it.url).then(r => { if (r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
   }
 
   // Uniform-Mode blendet Dauer-Feld aus
@@ -767,7 +724,7 @@ function interRow(i){
   if ($after) $after.onchange = () => {
     const v = $after.value;
     if (v === 'img:' + it.id){
-      alert('Ein Slide kann nicht nach sich selbst kommen.');
+      alert('Ein Bild kann nicht nach sich selbst kommen.');
       $after.value = 'overview';
       applyAfterSelect(it, 'overview');
       return;
@@ -776,7 +733,7 @@ function interRow(i){
       const used = usedAfterImageIds(it.id);
       const targetId = v.slice(4);
       if (used.has(targetId)){
-        alert('Dieses Slide ist bereits als „Nach Slide“ gewählt.');
+        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
         $after.value = 'overview';
         applyAfterSelect(it, 'overview');
         return;
@@ -789,32 +746,14 @@ function interRow(i){
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
 
-  if ($url){
-    $url.onclick = () => {
-      const v = prompt('URL eingeben', it.link || 'https://');
-      if (v !== null){
-        try{ const u = new URL(v); it.link = u.href; $url.value = it.link; $prev.src = faviconFor(it.link); $prev.style.display = ''; $prev.title = it.link; }
-        catch { alert('Ungültige URL'); }
-      }
-    };
-  }
-
   if ($up){
     $up.onclick = () => {
       const fi = document.createElement('input');
-      fi.type = 'file';
-      fi.accept = ($type && $type.value === 'pdf') ? 'application/pdf' : 'image/*';
-      fi.onchange = () => {
-        const f = fi.files && fi.files[0];
-        if (f){
-          if ($type.value === 'pdf' && f.type !== 'application/pdf'){ alert('Nur PDF-Dateien unterstützt.'); return; }
-          if ($type.value === 'image' && !/^image\//.test(f.type)){ alert('Nur Bilddateien unterstützt.'); return; }
-        }
-        uploadGeneric(fi, (p) => {
-          if ($type.value === 'pdf'){ it.pdf = p; $prev.style.display = ''; $prev.src = '/assets/img/pdf_placeholder.svg'; $prev.title = p.split('/').pop(); }
-          else { it.url = p; preloadImg(p).then(r=>{ if(r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } }); }
-        });
-      };
+      fi.type='file'; fi.accept='image/*';
+      fi.onchange = () => uploadGeneric(fi, (p) => {
+        it.url = p;
+        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
+      });
       fi.click();
     };
   }
@@ -839,10 +778,7 @@ function renderInterstitialsPanel(hostId='interList2'){
       id:'im_'+Math.random().toString(36).slice(2,9),
       name:'',
       enabled:true,
-      type:'image',
       url:'',
-      pdf:'',
-      link:'',
       after:'overview',
       dwellSec:6
     });
