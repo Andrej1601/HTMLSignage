@@ -50,9 +50,11 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 @chmod($dest, 0644); @chown($dest,'www-data'); @chgrp($dest,'www-data');
 
 $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
-// optional preview image (thumb) for non-image media
+// optional or auto-generated preview image (thumb)
 $thumbPath = null;
-if (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
+if ($subDir === 'img'){
+  $thumbPath = $publicPath;
+} elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
   $tu = $_FILES['thumb'];
   if (!empty($tu['error'])) fail('thumb-upload-error-'.$tu['error']);
   $tmime = $finfo->file($tu['tmp_name']) ?: 'application/octet-stream';
@@ -77,4 +79,20 @@ if (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
   @chmod($tdest, 0644); @chown($tdest,'www-data'); @chgrp($tdest,'www-data');
   $thumbPath = '/assets/media/img/' . basename($tdest);
 }
+
+// auto-generate thumb for videos if not provided
+if ($subDir === 'video' && !$thumbPath){
+  $tbase = '/var/www/signage/assets/media/img/';
+  if (!is_dir($tbase)) { @mkdir($tbase, 02775, true); @chown($tbase,'www-data'); @chgrp($tbase,'www-data'); }
+  $thumbDest = $tbase . $fname . '.jpg';
+  $tpi = pathinfo($thumbDest); $tfname = $tpi['filename']; $ti=0;
+  while (file_exists($thumbDest)) { $ti++; $thumbDest = $tpi['dirname'].'/'.$tfname.'_'.$ti.'.jpg'; }
+  $cmd = 'ffmpeg -hide_banner -loglevel error -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
+  @exec($cmd, $o, $ret);
+  if (file_exists($thumbDest)){
+    @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
+    $thumbPath = '/assets/media/img/' . basename($thumbDest);
+  }
+}
+
 echo json_encode(['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath]);
