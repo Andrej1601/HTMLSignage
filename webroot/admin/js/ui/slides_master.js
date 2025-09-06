@@ -626,36 +626,23 @@ function renderSaunaOffList(){
 // ============================================================================
 // 6) Interstitial Media (Medien-Slides)
 // ============================================================================
-function usedAfterImageIds(exceptId){
+function usedAfterRefs(exceptId){
   const settings = ctx.getSettings();
   const list = settings.interstitials || [];
   const set = new Set();
   list.forEach(im => {
     if (!im || im.id === exceptId) return;
-    const v = im.afterRef || '';
-    if (v.startsWith('img:')) {
-      const id = v.slice(4);
-      if (set.has(id)){
-        // Duplicate usage -> reset to overview
-        im.afterRef = 'overview';
-        im.after = 'overview';
-        return;
-      }
-      set.add(id);
+    let v = im.afterRef;
+    if (!v) v = getAfterSelectValue(im, im.id);
+    if (!v) v = 'overview';
+    if (set.has(v)){
+      // Duplicate usage -> reset to overview
+      im.afterRef = 'overview';
+      im.after = 'overview';
+      set.add('overview');
       return;
     }
-    // Legacy by name
-    if (im.after && im.after !== 'overview' && !(ctx.getSchedule().saunas || []).includes(im.after)){
-      const hit = list.find(x => x && x.id !== im.id && (x.name || '') === im.after);
-      if (hit && hit.id){
-        if (set.has(hit.id)){
-          im.afterRef = 'overview';
-          im.after = 'overview';
-        } else {
-          set.add(hit.id);
-        }
-      }
-    }
+    set.add(v);
   });
   return set;
 }
@@ -664,17 +651,21 @@ function interAfterOptionsHTML(currentId){
   const schedule = ctx.getSchedule();
   const settings = ctx.getSettings();
 
-  const used = usedAfterImageIds(currentId);
+  const used = usedAfterRefs(currentId);
+
+  const opts = [];
+  if (!used.has('overview')) opts.push('<option value="overview">Übersicht</option>');
 
   const saunaOpts = (schedule.saunas || [])
+    .filter(v => !used.has('sauna:' + encodeURIComponent(v)))
     .map(v => `<option value="sauna:${encodeURIComponent(v)}">${escapeHtml(v)}</option>`);
 
   const imgOpts = (settings.interstitials || [])
     .filter(x => x && x.id && x.id !== currentId)
-    .filter(x => !used.has(x.id))
+    .filter(x => !used.has('img:' + x.id))
     .map(x => `<option value="img:${x.id}">${escapeHtml('Bild: ' + (x.name || x.id))}</option>`);
 
-  return [`<option value="overview">Übersicht</option>`, ...saunaOpts, ...imgOpts].join('');
+  return [...opts, ...saunaOpts, ...imgOpts].join('');
 }
 
 function getAfterSelectValue(it, currentId){
@@ -691,7 +682,7 @@ function getAfterSelectValue(it, currentId){
 function applyAfterSelect(it, value){
   const settings = ctx.getSettings();
   // Ensure uniqueness of afterRef across all interstitials
-  if (value && value !== 'overview'){
+  if (value){
     (settings.interstitials || []).forEach(other => {
       if (other && other !== it && other.afterRef === value){
         other.afterRef = 'overview';
@@ -858,15 +849,12 @@ function interRow(i){
       applyAfterSelect(it, 'overview');
       return;
     }
-    if (v.startsWith('img:')){
-      const used = usedAfterImageIds(it.id);
-      const targetId = v.slice(4);
-      if (used.has(targetId)){
-        alert('Dieses Bild ist bereits als „Nach Bild“ gewählt.');
-        $after.value = 'overview';
-        applyAfterSelect(it, 'overview');
-        return;
-      }
+    const used = usedAfterRefs(it.id);
+    if (used.has(v)){
+      alert('Dieses Ziel ist bereits als „Nach Slide“ gewählt.');
+      $after.value = 'overview';
+      applyAfterSelect(it, 'overview');
+      return;
     }
     applyAfterSelect(it, v);
   };
