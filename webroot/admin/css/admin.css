@@ -105,35 +105,14 @@ header{
 h1{ margin:0; font-size:16px; letter-spacing:.3px; }
 
 body.device-mode header{
-  /* Neutraler Header, keine Vollflächige Farbänderung */
-  background: color-mix(in oklab, var(--panel) 85%, transparent);
-  color: var(--fg);
-}
-
-/* Seitenleiste zur Kennzeichnung des individuellen Modus */
-body.device-mode::before{
-  content: "";
-  position:fixed;
-  top:0; left:0; bottom:0;
-  width:6px;
-  background:var(--btn-primary);
-  animation:modePulse 2s ease-in-out infinite;
-  z-index:70;
-}
-
-@keyframes modePulse{
-  0%,100%{opacity:1;}
-  50%{opacity:.5;}
-}
-
-body.device-mode #ctxBadge{
   background: var(--btn-primary);
   color: var(--btn-primary-fg);
-  font-size:16px;
-  padding:10px 16px;
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
+}
+body.device-mode #ctxBadge{
+  background: var(--btn-primary-fg);
+  color: var(--btn-primary);
+  font-size:20px;
+  padding:12px 20px;
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -268,8 +247,7 @@ details[open] .chev{ transform: rotate(90deg); }
 
 /* Badge für Geräte-Kontext */
 .ctx-badge{
-    display:inline-flex;
-    align-items:center;
+    display:inline-block;
     margin-left:8px;
     padding:10px 16px;
     border-radius:12px;
@@ -277,9 +255,7 @@ details[open] .chev{ transform: rotate(90deg); }
     color:var(--btn-accent-fg);
     font-size:18px;
     font-weight:700;
-    gap:6px;
 }
-.ctx-badge .ctx-icon{ font-size:20px; }
 .ctx-badge button{
   margin-left:6px;
   border:none;
