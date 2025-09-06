@@ -191,6 +191,7 @@ function buildQueue() {
   const htmls = htmlAll.filter(it => it && it.enabled && it.html).map(it=>({...it, __kind:'html'}));
   const media = inters.concat(htmls);
 
+
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
 
@@ -249,11 +250,13 @@ function buildQueue() {
         ? +it.dwellSec
         : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
 
+
       let node;
       if (it.__kind === 'html') node = { type:'html', html: it.html, dwell, __id: it.id || null };
       else if (it.__kind === 'pdf') node = { type:'pdf', url: it.url, dwell, __id: it.id || null };
       else if (it.__kind === 'url') node = { type:'url', url: it.url, dwell, __id: it.id || null };
       else node = { type:'image', url: it.url, dwell, __id: it.id || null };
+
       queue.splice(insPos, 0, node);
     }
     remaining = postponed;
@@ -523,6 +526,7 @@ function renderImage(url) {
   return c;
 }
 
+
 function renderHtmlSlide(html) {
   const c = h('div', { class: 'container htmlslide fade show' });
   c.innerHTML = html || '';
@@ -680,6 +684,7 @@ function dwellMsForItem(item) {
   }
 
     if (item.type === 'image' || item.type === 'html' || item.type === 'pdf' || item.type === 'url') {
+
     if (mode !== 'per') {
       const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
       return sec(g) * 1000;
@@ -698,12 +703,12 @@ function step() {
   clearTimers();
 
 let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+let key  = item.type + '|' + (item.sauna || item.url || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
     idx++;
     item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.url || item.html || '');
+    key  = item.type + '|' + (item.sauna || item.url || '');
 }
   const el =
     (item.type === 'overview') ? renderOverview() :
@@ -711,6 +716,7 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'html')     ? renderHtmlSlide(item.html) :
     (item.type === 'pdf')      ? renderPdf(item.url) :
     (item.type === 'url')      ? renderUrl(item.url) :
+
                                  renderImage(item.url);
 
   show(el);
