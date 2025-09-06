@@ -51,7 +51,12 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 /* interstitial image */
 .container.imgslide{padding:0}
 .container.htmlslide{padding:0}
+.container.pdfslide{padding:0}
+.container.urlslide{padding:0}
 .imgFill{position:absolute; inset:0; background-size:cover; background-position:center; background-repeat:no-repeat}
+
+.pdfFrame,.urlFrame{position:absolute; inset:0; width:100%; height:100%; border:0}
+.pdfMsg,.urlMsg{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:#fff; color:#000;}
 
 /* layout */
 .container{position:relative; height:100%; padding:calc(32px*var(--vwScale)); display:flex; flex-direction:column; align-items:flex-start}
