@@ -45,6 +45,11 @@ function setActiveDay(key, { loadPreset = true } = {}){
     ctx.setSchedule(cloned);
     renderGridUI();
     renderSlidesMaster();
+  } else if (loadPreset && key !== 'Opt') {
+    const emptySchedule = { saunas: ctx.getSchedule().saunas, rows: [] };
+    ctx.setSchedule(emptySchedule);
+    renderGridUI();
+    renderSlidesMaster();
   }
 }
 
