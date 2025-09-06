@@ -782,23 +782,25 @@ function interRow(i){
       };
       $media.appendChild(mb);
     } else if (t === 'url' || t === 'mpd'){
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.className = 'input';
-      inp.value = it.url || '';
-      inp.onchange = () => {
-        it.url = inp.value.trim();
-        if (t === 'url' && it.url){
-          fetch('/admin/api/preview.php', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ type:'url', url: it.url })
-          }).then(r=>r.json()).then(j=>{
-            if(j.ok && j.thumb){ it.thumb = j.thumb; updatePrev(j.thumb); }
-          });
+      const mb = document.createElement('button');
+      mb.className = 'btn sm ghost';
+      mb.textContent = 'URL';
+      mb.onclick = () => {
+        const val = prompt('URL:', it.url || '');
+        if (val) {
+          it.url = val.trim();
+          if (it.url) {
+            fetch('/admin/api/preview.php', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ type:'url', url: it.url })
+            }).then(r=>r.json()).then(j=>{
+              if (j.ok && j.thumb){ it.thumb = j.thumb; updatePrev(j.thumb); }
+            });
+          }
         }
       };
-      $media.appendChild(inp);
+      $media.appendChild(mb);
     }
   };
 
