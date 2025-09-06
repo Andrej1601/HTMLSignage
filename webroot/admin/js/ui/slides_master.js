@@ -816,12 +816,20 @@ function interRow(i){
             headers:{'Content-Type':'application/json'},
             body: JSON.stringify({url: it.url})
           }).then(r=>r.json()).then(j=>{
-            const t = (j && j.ok && j.thumb) ? j.thumb : FALLBACK_THUMB;
-            it.thumb = t;
-            updatePrev(t);
+            if (j && j.ok && j.thumb){
+              const t = j.thumb + '?v=' + Date.now();
+              it.thumb = t;
+              updatePrev(t);
+              renderSlidesMaster();
+            } else {
+              it.thumb = FALLBACK_THUMB;
+              updatePrev(FALLBACK_THUMB);
+              renderSlidesMaster();
+            }
           }).catch(()=>{
             it.thumb = FALLBACK_THUMB;
             updatePrev(FALLBACK_THUMB);
+            renderSlidesMaster();
           });
         }
       };
