@@ -45,6 +45,7 @@
 
   /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
   --col-name:minmax(140px,0.9fr);
+  --col-type:8ch;
   --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px; --col-after:minmax(150px,1fr);
 
   /* Preview-Größe */
@@ -119,7 +120,7 @@ body.device-mode #ctxBadge{
 main.layout{
   width:100%;
   display:grid;
-  grid-template-columns:minmax(0,1fr) clamp(360px, 32vw, 540px);
+  grid-template-columns:minmax(0,1fr) clamp(420px, 36vw, 640px);
   gap:14px; padding:16px 12px 18px 16px; align-items:start;
 }
 .leftcol{ display:flex; flex-direction:column; gap:16px; min-width:0; }
@@ -128,7 +129,7 @@ main.layout{
   max-height:calc(100svh - 64px);
   overflow:auto; padding-right:6px;
   justify-self:end;
-  width: clamp(360px, 32vw, 540px);
+  width: clamp(420px, 36vw, 640px);
 }
 
 body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
@@ -350,7 +351,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 .sl-head.sl-images, .mediarow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
 
 /* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
@@ -359,7 +360,7 @@ body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
-  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
 body.mode-uniform #ovSec{ display:none !important; }
