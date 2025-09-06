@@ -340,7 +340,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
 .groupHead .legend, #extraTitle{ font-weight:800; }
 
 /* Spaltenköpfe + Zeilen – exakt gleiche Grid-Spalten */
-.sl-head, .saunarow, .imgrow{
+.sl-head, .saunarow, .mediarow{
   width:100%; display:grid; gap:var(--gap); align-items:center; grid-auto-rows:minmax(42px,auto);
 }
 .sl-head{ margin: 2px 0 6px; }
@@ -349,7 +349,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
 .sl-head.sl-saunas, .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
-.sl-head.sl-images, .imgrow{
+.sl-head.sl-images, .mediarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
 
@@ -358,7 +358,7 @@ body.mode-uniform #headSaunaDur, body.mode-uniform #headImgDur{ display:none; }
 body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
-body.mode-uniform .sl-head.sl-images, body.mode-uniform .imgrow{
+body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
@@ -375,23 +375,23 @@ body.mode-uniform #ovSec{ display:none !important; }
 }
 
 /* Checkbox-Spalte bündig */
-.saunarow input[type="checkbox"], .imgrow input[type="checkbox"]{ justify-self:center; }
+.saunarow input[type="checkbox"], .mediarow input[type="checkbox"]{ justify-self:center; }
 
 /* Upload/Default Buttons kompakt */
 .btn.icon{ width:28px; height:28px; }
 
 /* Kein Überlaufen der Grids in der Sidebar */
-.saunarow > *, .imgrow > *{ min-width:0; }
+.saunarow > *, .mediarow > *{ min-width:0; }
 
 /* --- Wunschanpassungen: Breiten innerhalb der Spalten ----------------------- */
 /* Sauna-Namen 20% schmaler (lässt innen Luft im Spaltenbereich) */
 .saunarow .input.name{ width:80%; }
 
-/* Bild-Slides: Name 30% schmaler */
-.imgrow .input.name{ width:50%; }
+/* Medien-Slides: Name 30% schmaler */
+.mediarow .input.name{ width:50%; }
 
-/* Bild-Slides: „Nach Slide“-Select 20% schmaler */
-.imgrow .sel-after{ width:70%; justify-self:start; min-width:120px; max-width:100%; }
+/* Medien-Slides: „Nach Slide“-Select 20% schmaler */
+.mediarow .sel-after{ width:70%; justify-self:start; min-width:120px; max-width:100%; }
 
 /* „Kein Aufguss“-Pillen – kleiner, mehr Abstand */
 .pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }

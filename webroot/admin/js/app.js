@@ -1098,7 +1098,7 @@ function initCleanupInSystem(){
   if(!btn) return;
   btn.onclick = async ()=>{
     const delSauna = confirm('Sauna-Bilder löschen? OK = Ja, Abbrechen = Nein');
-    const delInter = confirm('Bild-Slides löschen? OK = Ja, Abbrechen = Nein');
+    const delInter = confirm('Medien-Slides löschen? OK = Ja, Abbrechen = Nein');
     const delFlame = confirm('Flammen-Bild löschen? OK = Ja, Abbrechen = Nein');
 
     const qs = new URLSearchParams({

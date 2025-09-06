@@ -1,6 +1,6 @@
 // /admin/js/ui/slides_master.js
 // ============================================================================
-// Master-Panel: Saunen (inkl. „Kein Aufguss“), Übersicht-Row, Bild-Slides,
+// Master-Panel: Saunen (inkl. „Kein Aufguss“), Übersicht-Row, Medien-Slides,
 // Dauer-Modus (einheitlich/individuell), Presets & Wochentage.
 // ----------------------------------------------------------------------------
 // Abhängigkeiten:
@@ -142,7 +142,7 @@ function deleteSaunaEverywhere(name){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
   }
 
-  // 7) Verweise in Bild-Slides („Nach Slide“)
+  // 7) Verweise in Medien-Slides („Nach Slide“)
   (settings.interstitials || []).forEach(it => {
     const v = it.afterRef || '';
     if (v && v.startsWith('sauna:')){
@@ -611,7 +611,7 @@ function renderSaunaOffList(){
 }
 
 // ============================================================================
-// 6) Interstitial Images (Bild-Slides)
+// 6) Interstitial Media (Medien-Slides)
 // ============================================================================
 function usedAfterImageIds(exceptId){
   const settings = ctx.getSettings();
@@ -683,7 +683,7 @@ function interRow(i){
   const id = 'inter_' + i;
 
   const wrap = document.createElement('div');
-  wrap.className = 'imgrow';
+  wrap.className = 'mediarow';
   wrap.innerHTML = `
     <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
     <img id="p_${id}" class="prev" alt="" title=""/>
@@ -772,7 +772,7 @@ function renderInterstitialsPanel(hostId='interList2'){
   host.innerHTML = '';
   settings.interstitials.forEach((_, i) => host.appendChild(interRow(i)));
 
-  const add = document.getElementById('btnInterAdd2');
+  const add = document.getElementById('btnMediaAdd');
   if (add) add.onclick = () => {
     (settings.interstitials ||= []).push({
       id:'im_'+Math.random().toString(36).slice(2,9),
@@ -895,7 +895,7 @@ if (durPer) durPer.onchange = () => {
   }
 };
 
-  // Bild-Slides
+  // Medien-Slides
   renderInterstitialsPanel('interList2');
 
   // Reset & Add Sauna
