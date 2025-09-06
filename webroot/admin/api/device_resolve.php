@@ -32,6 +32,11 @@ function read_json_file($absPath) {
   return is_array($j) ? $j : [];
 }
 
+/** Aktueller Tag als Kurzschlüssel (Sun,Mon,...). */
+function day_key() {
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][intval(date('w'))] ?? 'Sun';
+}
+
 // --- Input ------------------------------------------------------------------
 
 $devId = isset($_GET['device']) ? trim($_GET['device']) : '';
@@ -67,6 +72,7 @@ if ($docRoot === '' || !is_dir($docRoot)) {
 
 $baseSettings = read_json_file($docRoot . '/data/settings.json');
 $baseSchedule = read_json_file($docRoot . '/data/schedule.json');
+$baseScheduleVersion = intval($baseSchedule['version'] ?? 0);
 
 $overSettings = $dev['overrides']['settings'] ?? [];
 
@@ -81,12 +87,34 @@ if (empty($dev['useOverrides'])) {
 
 $mergedSettings = merge_r($baseSettings, $overSettings);
 
+// Preset-Felder aus Basiskonfig übernehmen, falls Overrides sie weglassen
+if (!array_key_exists('presetAuto', $overSettings) || $overSettings['presetAuto'] === null || $overSettings['presetAuto'] === '') {
+  if (array_key_exists('presetAuto', $baseSettings)) {
+    $mergedSettings['presetAuto'] = $baseSettings['presetAuto'];
+  }
+}
+if (!array_key_exists('presets', $overSettings) || !is_array($overSettings['presets']) || count($overSettings['presets']) === 0) {
+  if (array_key_exists('presets', $baseSettings) && is_array($baseSettings['presets'])) {
+    $mergedSettings['presets'] = $baseSettings['presets'];
+  }
+}
+
+// Zeitplan ggf. anhand Preset automatisch ersetzen
+$schedule = $baseSchedule;
+if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) && is_array($mergedSettings['presets'])) {
+  $presets = $mergedSettings['presets'];
+  $preset = $presets[day_key()] ?? ($presets['Default'] ?? null);
+  if (is_array($preset) && isset($preset['saunas']) && isset($preset['rows']) && is_array($preset['rows'])) {
+    $schedule = $preset;
+  }
+}
+$schedule['version'] = $baseScheduleVersion;
+
 // Version als einfache Cache-Bremse; nimmt höchste bekannte Version
 $mergedSettings['version'] = max(
   intval($baseSettings['version'] ?? 0),
   intval($overSettings['version'] ?? 0)
 );
-$baseSchedule['version'] = intval($baseSchedule['version'] ?? 0);
 
 // --- Antwort ----------------------------------------------------------------
 
@@ -97,7 +125,7 @@ $out = [
     'name' => $dev['name'] ?? $devId,
   ],
   'settings' => $mergedSettings,
-  'schedule' => $baseSchedule,
+  'schedule' => $schedule,
   'now'      => time(),
 ];
 
