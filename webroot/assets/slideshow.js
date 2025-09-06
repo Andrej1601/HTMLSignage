@@ -649,7 +649,11 @@ if (footNodes.length){
   function hide(cb) {
     const cur = STAGE.firstChild; if (cur) cur.classList.remove('show');
     const t = (settings?.slides?.transitionMs ?? 500);
-    transTimer = setTimeout(cb, t);
+    if (t > 0) {
+      transTimer = setTimeout(cb, t);
+    } else {
+      cb();
+    }
   }
 
 function dwellMsForItem(item) {
@@ -708,7 +712,8 @@ if (key === lastKey && nextQueue.length > 1) {
                                  renderImage(item.src || item.url);
 
   show(el);
-lastKey = key;
+  lastKey = key;
+  if (nextQueue.length <= 1) return;
   const dwell = dwellMsForItem(item);
   slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
 }
