@@ -710,6 +710,15 @@ function applyAfterSelect(it, value){
     const img = (settings.interstitials || []).find(im => im && im.id === id);
     it.after = img ? (img.name || '') : '';
   }
+
+  // Refresh all "Nach Slide" selects so that used slides are hidden
+  $$('.sel-after').forEach(sel => {
+    const idx = +sel.id.replace('a_inter_', '');
+    const current = (settings.interstitials || [])[idx];
+    if (!current) return;
+    sel.innerHTML = interAfterOptionsHTML(current.id);
+    sel.value = getAfterSelectValue(current, current.id);
+  });
 }
 
 function interRow(i){
@@ -848,7 +857,6 @@ function interRow(i){
       }
     }
     applyAfterSelect(it, v);
-    renderSlidesMaster();
   };
 
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
