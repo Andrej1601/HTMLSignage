@@ -536,15 +536,22 @@ function renderImage(url) {
 
 // ---------- Interstitial video slide ----------
 function renderVideo(src) {
-  const v = h('video', {
-    src,
-    autoplay: '',
-    loop: '',
-    muted: '',
-    playsinline: '',
-    style: 'width:100%;height:100%;object-fit:contain'
+  const v = document.createElement('video');
+  v.preload = 'auto';
+  v.autoplay = true;
+  v.loop = true;
+  v.muted = true;
+  v.playsInline = true;
+  v.setAttribute('style', 'width:100%;height:100%;object-fit:contain');
+  v.src = src;
+  v.addEventListener('canplay', () => v.play());
+  v.addEventListener('error', (e) => {
+    console.error('[video] error', e);
+    const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
+    if (v.parentNode) v.parentNode.replaceChild(fallback, v);
   });
-  const c = h('div', { class: 'container videoslide fade show' }, [v]);
+  const c = h('div', { class: 'container videoslide fade show' });
+  c.appendChild(v);
   return c;
 }
 
