@@ -795,7 +795,14 @@ function interRow(i){
 
   // Events
   if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
-  if ($type)  $type.onchange  = () => { it.type = $type.value; renderMediaField(); };
+  if ($type)  $type.onchange  = () => {
+    it.type = $type.value;
+    it.url = '';
+    it.thumb = '';
+    updatePrev('');
+    renderMediaField();
+    renderSlidesMaster();
+  };
   if ($after) $after.onchange = () => {
     const v = $after.value;
     if (v === 'img:' + it.id){
