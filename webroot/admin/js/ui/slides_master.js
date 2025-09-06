@@ -663,7 +663,11 @@ function interAfterOptionsHTML(currentId){
   const imgOpts = (settings.interstitials || [])
     .filter(x => x && x.id && x.id !== currentId)
     .filter(x => !used.has('img:' + x.id))
-    .map(x => `<option value="img:${x.id}">${escapeHtml('Bild: ' + (x.name || x.id))}</option>`);
+    .map(x => {
+      const prefixMap = { image: 'Bild', video: 'Video', url: 'URL' };
+      const prefix = (prefixMap[x.type] || 'Bild') + ': ';
+      return `<option value="img:${x.id}">${escapeHtml(prefix + (x.name || x.id))}</option>`;
+    });
 
   return [...opts, ...saunaOpts, ...imgOpts].join('');
 }
