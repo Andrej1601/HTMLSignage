@@ -528,12 +528,12 @@ function renderImage(url) {
 }
 
 // ---------- Interstitial video slide ----------
-function renderVideo(src) {
+function renderVideo(src, opts = {}) {
   const v = document.createElement('video');
   v.preload = 'auto';
   v.autoplay = true;
-  v.loop = true;
-  v.muted = true;
+  if (opts.muted !== undefined) v.muted = !!opts.muted;
+  else v.muted = true;
   v.playsInline = true;
   v.setAttribute('style', 'object-fit:cover');
   v.src = src;
@@ -543,6 +543,9 @@ function renderVideo(src) {
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     if (v.parentNode) v.parentNode.replaceChild(fallback, v);
   });
+  if (settings?.slides?.waitForVideo) {
+    v.addEventListener('ended', () => { idx++; step(); });
+  }
   const c = h('div', { class: 'container videoslide fade show' });
   c.appendChild(v);
   return c;
@@ -707,15 +710,18 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'overview') ? renderOverview() :
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
     (item.type === 'image')    ? renderImage(item.src) :
-    (item.type === 'video')    ? renderVideo(item.src) :
+    (item.type === 'video')    ? renderVideo(item.src, item) :
     (item.type === 'url')      ? renderUrl(item.url) :
                                  renderImage(item.src || item.url);
 
   show(el);
   lastKey = key;
-  if (nextQueue.length <= 1) return;
-  const dwell = dwellMsForItem(item);
-  slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
+
+  if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
+    const dwell = dwellMsForItem(item);
+    slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
+  }
+
 }
 
 //Showpairing

@@ -865,6 +865,12 @@ export function renderSlidesMaster(){
     autoEl.onchange = () => { settings.presetAuto = !!autoEl.checked; };
   }
 
+  const waitEl = $('#waitForVideo');
+  if (waitEl){
+    waitEl.checked = !!settings.slides?.waitForVideo;
+    waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
+  }
+
 // === Dauer-Modus (Uniform vs. Individuell) ===
 const perMode = (settings.slides?.durationMode === 'per');
 
@@ -964,6 +970,7 @@ if (durPer) durPer.onchange = () => {
     settings.slides.transitionMs = 500;
     settings.slides.durationMode = 'uniform';
     settings.slides.globalDwellSec = 6;
+    settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaDurations = {};
     renderSlidesMaster();
