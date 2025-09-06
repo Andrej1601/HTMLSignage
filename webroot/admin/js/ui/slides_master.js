@@ -763,6 +763,18 @@ function interRow(i){
           it.url = val.trim();
           it.thumb = '';
           updatePrev('');
+          fetch('/admin/api/url_thumb.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({url: it.url})
+          }).then(r=>r.json()).then(j=>{
+            const t = (j && j.ok && j.thumb) ? j.thumb : FALLBACK_THUMB;
+            it.thumb = t;
+            updatePrev(t);
+          }).catch(()=>{
+            it.thumb = FALLBACK_THUMB;
+            updatePrev(FALLBACK_THUMB);
+          });
         }
       };
       $media.appendChild(mb);
