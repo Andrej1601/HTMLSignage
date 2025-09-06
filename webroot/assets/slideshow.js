@@ -178,9 +178,30 @@ function buildQueue() {
   if (showOverview) queue.push({ type: 'overview' });
   for (const s of visibleSaunas) queue.push({ type: 'sauna', sauna: s });
 
-  // Bilder vorbereiten
-  const imgsAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
-  const media = imgsAll.filter(it => it && it.enabled && it.url).map(it=>({...it, __kind:'image'}));
+  // Bilder/Medien vorbereiten
+  const mediaAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+  const media = [];
+  for (const it of mediaAll) {
+    if (!it || !it.enabled) continue;
+    const base = { ...it };
+    switch (it.type) {
+      case 'video':
+      case 'image':
+        if (it.url) media.push({ ...base, type: it.type, src: it.url });
+        break;
+      case 'url':
+        if (it.url) media.push({ ...base, type: 'url', url: it.url });
+        break;
+      case 'mpd':
+        if (it.url) media.push({ ...base, type: 'dash', src: it.url });
+        break;
+      case 'html':
+        if (it.html) media.push({ ...base, type: 'html', html: it.html });
+        break;
+      default:
+        if (it.url) media.push({ ...base, type: 'image', src: it.url });
+    }
+  }
 
   // Hilfen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
@@ -198,9 +219,9 @@ function buildQueue() {
         const io = idxOverview();
         insPos = (io >= 0) ? io + 1 : 0;
       } else if (String(ref).startsWith('img:')) {
-        // nach Bild: nur einfügen, wenn das Bild bereits platziert ist
+        // nach Bild/Medien-Item: nur einfügen, wenn das Ziel bereits platziert ist
         const prevId = String(ref).slice(4);
-        const prevIndex = queue.findIndex(x => x.type === 'image' && x.__id === prevId);
+        const prevIndex = queue.findIndex(x => x.__id === prevId);
         if (prevIndex === -1) { postponed.push(it); continue; }
         insPos = prevIndex + 1;
       } else {
@@ -235,12 +256,15 @@ function buildQueue() {
         }
       }
 
-      // Bild-Node einfügen
+      // Medien-Node einfügen
       const dwell = Number.isFinite(+it.dwellSec)
         ? +it.dwellSec
         : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
 
-      const node = { type:'image', url: it.url, dwell, __id: it.id || null };
+      const node = { type: it.type, dwell, __id: it.id || null };
+      if (it.src) node.src = it.src;
+      if (it.html) node.html = it.html;
+      if (it.url && it.type === 'url') node.url = it.url;
       queue.splice(insPos, 0, node);
     }
     remaining = postponed;
@@ -510,6 +534,71 @@ function renderImage(url) {
   return c;
 }
 
+// ---------- Interstitial video slide ----------
+function renderVideo(src) {
+  const v = h('video', {
+    src,
+    autoplay: '',
+    loop: '',
+    muted: '',
+    playsinline: '',
+    style: 'width:100%;height:100%;object-fit:contain'
+  });
+  const c = h('div', { class: 'container videoslide fade show' }, [v]);
+  return c;
+}
+
+// ---------- Interstitial HTML slide ----------
+function renderHtml(html) {
+  const c = h('div', { class: 'container htmlslide fade show' });
+  c.innerHTML = html || '';
+  return c;
+}
+
+// ---------- Interstitial external URL slide ----------
+function renderUrl(src) {
+  const f = h('iframe', {
+    src,
+    class: 'urlFill',
+    style: 'width:100%;height:100%;border:0'
+  });
+  const c = h('div', { class: 'container urlslide fade show' }, [f]);
+  return c;
+}
+
+// ---------- Interstitial DASH video slide ----------
+function renderDash(src) {
+  const v = h('video', {
+    autoplay: '',
+    loop: '',
+    muted: '',
+    playsinline: '',
+    style: 'width:100%;height:100%;object-fit:contain'
+  });
+
+  const initDash = () => {
+    if (!window.dashjs) return;
+    try {
+      const player = dashjs.MediaPlayer().create();
+      player.initialize(v, src, true);
+      player.on('ended', () => { try { v.play(); } catch {} });
+    } catch {}
+  };
+
+  if (window.dashjs) {
+    initDash();
+  } else {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/dashjs/dist/dash.all.min.js';
+    s.onload = initDash;
+    document.head.appendChild(s);
+    v.src = src; // Fallback
+  }
+
+  const c = h('div', { class: 'container videoslide fade show' }, [v]);
+  return c;
+}
+
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -624,7 +713,7 @@ function dwellMsForItem(item) {
     }
   }
 
-  if (item.type === 'image') {
+  if (['image', 'video', 'url', 'html', 'dash'].includes(item.type)) {
     if (mode !== 'per') {
       const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
       return sec(g) * 1000;
@@ -643,17 +732,22 @@ function step() {
   clearTimers();
 
 let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.url || '');
+let key  = item.type + '|' + (item.sauna || item.src || item.url || item.html || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
     idx++;
     item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.url || '');
+    key  = item.type + '|' + (item.sauna || item.src || item.url || item.html || '');
 }
   const el =
     (item.type === 'overview') ? renderOverview() :
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
-                                 renderImage(item.url);
+    (item.type === 'image')    ? renderImage(item.src) :
+    (item.type === 'video')    ? renderVideo(item.src) :
+    (item.type === 'html')     ? renderHtml(item.html) :
+    (item.type === 'url')      ? renderUrl(item.url) :
+    (item.type === 'dash')     ? renderDash(item.src) :
+                                 renderImage(item.src || item.url);
 
   show(el);
 lastKey = key;
