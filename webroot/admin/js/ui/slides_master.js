@@ -684,8 +684,10 @@ function interRow(i){
 
   const wrap = document.createElement('div');
   wrap.className = 'mediarow';
+  const ext = ((it.url || '').split(/[?#]/)[0].split('.').pop() || '').slice(0,10).toUpperCase();
   wrap.innerHTML = `
     <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
+    <span class="col-type">${escapeHtml(ext)}</span>
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
     <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
