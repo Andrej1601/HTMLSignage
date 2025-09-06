@@ -31,7 +31,20 @@ window.addEventListener('message', (e) => {
     e.source?.postMessage({ type:'htmlInit', id:d.id, html: it?.html || '' }, '*');
   } else if (d.type === 'htmlSave'){
     const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
-    if (it) { it.html = d.html || ''; renderSlidesMaster(); }
+    if (it){
+      it.html = d.html || '';
+      renderSlidesMaster();
+      fetch('/admin/api/preview.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type:'html', html: it.html })
+      }).then(r=>r.json()).then(j=>{
+        if(j.ok && j.thumb){
+          it.thumb = j.thumb;
+          renderSlidesMaster();
+        }
+      });
+    }
   }
 });
 
@@ -734,17 +747,14 @@ function interRow(i){
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
-  if (it.thumb){
-    preloadImg(it.thumb).then(r => {
-      if (r.ok){
-        $prev.src = it.thumb; $prev.title = `${r.w}×${r.h}`;
-      } else {
-        $prev.src = FALLBACK_THUMB; $prev.title = '';
-      }
+  const updatePrev = (src) => {
+    if (!src){ $prev.src = FALLBACK_THUMB; $prev.title = ''; return; }
+    preloadImg(src).then(r => {
+      if (r.ok){ $prev.src = src; $prev.title = `${r.w}×${r.h}`; }
+      else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
     });
-  } else {
-    $prev.src = FALLBACK_THUMB;
-  }
+  };
+  updatePrev(it.thumb);
 
   // Uniform-Mode blendet Dauer-Feld aus
   const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
@@ -753,26 +763,6 @@ function interRow(i){
   const renderMediaField = () => {
     if (!$media) return;
     $media.innerHTML = '';
-
-    // Preview Upload Button (immer vorhanden)
-    const pb = document.createElement('button');
-    pb.className = 'btn sm ghost icon';
-    pb.title = 'Vorschau-Bild hochladen';
-    pb.textContent = '⤴︎';
-    pb.onclick = () => {
-      const fi = document.createElement('input');
-      fi.type = 'file'; fi.accept = 'image/*';
-      fi.onchange = () => uploadGeneric(fi, (p) => {
-        it.thumb = p;
-        preloadImg(p).then(r => {
-          if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
-          else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
-        });
-      });
-      fi.click();
-    };
-    $media.appendChild(pb);
-
     const t = $type?.value || 'image';
     if (t === 'image' || t === 'video'){
       const mb = document.createElement('button');
@@ -783,29 +773,11 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        if (t === 'video'){
-          const ti = document.createElement('input');
-          ti.type = 'file'; ti.accept = 'image/*';
-          ti.onchange = () => uploadGeneric(fi, (p, tp) => {
-            it.url = p;
-            if (tp){
-              it.thumb = tp;
-              preloadImg(tp).then(r => {
-                if (r.ok){ $prev.src = tp; $prev.title = `${r.w}×${r.h}`; }
-                else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
-              });
-            }
-          }, ti);
-          fi.onchange = () => { if (fi.files[0]) ti.click(); };
-        } else {
-          fi.onchange = () => uploadGeneric(fi, (p) => {
-            it.url = p; it.thumb = p;
-            preloadImg(p).then(r => {
-              if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; }
-              else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
-            });
-          });
-        }
+        fi.onchange = () => uploadGeneric(fi, (p, tp) => {
+          it.url = p;
+          it.thumb = tp || (t === 'image' ? p : '');
+          updatePrev(it.thumb);
+        });
         fi.click();
       };
       $media.appendChild(mb);
@@ -814,7 +786,18 @@ function interRow(i){
       inp.type = 'text';
       inp.className = 'input';
       inp.value = it.url || '';
-      inp.onchange = () => { it.url = inp.value.trim(); };
+      inp.onchange = () => {
+        it.url = inp.value.trim();
+        if (t === 'url' && it.url){
+          fetch('/admin/api/preview.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ type:'url', url: it.url })
+          }).then(r=>r.json()).then(j=>{
+            if(j.ok && j.thumb){ it.thumb = j.thumb; updatePrev(j.thumb); }
+          });
+        }
+      };
       $media.appendChild(inp);
     } else if (t === 'html'){
       const btn = document.createElement('button');
