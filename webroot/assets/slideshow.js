@@ -535,7 +535,7 @@ function renderVideo(src) {
   v.loop = true;
   v.muted = true;
   v.playsInline = true;
-  v.setAttribute('style', 'width:100%;height:100%;object-fit:contain');
+  v.setAttribute('style', 'object-fit:cover');
   v.src = src;
   v.addEventListener('canplay', () => v.play());
   v.addEventListener('error', (e) => {
@@ -553,7 +553,7 @@ function renderUrl(src) {
   const f = h('iframe', {
     src,
     class: 'urlFill',
-    style: 'width:100%;height:100%;border:0'
+    style: 'border:0'
   });
   const c = h('div', { class: 'container urlslide fade show' }, [f]);
   return c;
