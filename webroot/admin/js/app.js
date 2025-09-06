@@ -152,6 +152,23 @@ async function loadAll(){
     if (draft) schedule = JSON.parse(draft);
   } catch {}
 
+  try {
+    const draft = localStorage.getItem('settingsDraft');
+    if (draft) {
+      const parsed = JSON.parse(draft);
+      (function merge(t, s) {
+        for (const k of Object.keys(s)) {
+          if (s[k] && typeof s[k] === 'object' && !Array.isArray(s[k])) {
+            t[k] = t[k] && typeof t[k] === 'object' ? t[k] : {};
+            merge(t[k], s[k]);
+          } else {
+            t[k] = s[k];
+          }
+        }
+      })(settings, parsed);
+    }
+  } catch {}
+
   // Defaults mergen (defensiv)
   settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
   settings.display       = { ...DEFAULTS.display,  ...(settings.display||{}) };
@@ -623,20 +640,24 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     body.settings.version = (Date.now()/1000|0);
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
-    if (j.ok){
-      baseSettings = deepClone(body.settings);
-      localStorage.removeItem('scheduleDraft');
+      if (j.ok){
+        baseSettings = deepClone(body.settings);
+        localStorage.removeItem('scheduleDraft');
+        localStorage.removeItem('settingsDraft');
+      }
+      alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
+    } else {
+      // Geräte-Override speichern
+      const payload = { device: currentDeviceCtx, settings: body.settings };
+      const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const j=await r.json().catch(()=>({ok:false}));
+      if (j.ok) {
+        localStorage.removeItem('scheduleDraft');
+        localStorage.removeItem('settingsDraft');
+      }
+      alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
     }
-    alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
-  } else {
-    // Geräte-Override speichern
-    const payload = { device: currentDeviceCtx, settings: body.settings };
-    const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-    const j=await r.json().catch(()=>({ok:false}));
-    if (j.ok) localStorage.removeItem('scheduleDraft');
-    alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
-  }
-});
+  });
 
 // --- Dock ----------------------------------------------------------
 let _dockTimer = 0;
