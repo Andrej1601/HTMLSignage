@@ -803,8 +803,9 @@ function interRow(i){
       $media.appendChild(mb);
     } else if (t === 'url'){
       const mb = document.createElement('button');
-      mb.className = 'btn sm ghost';
-      mb.textContent = 'URL';
+      mb.className = 'btn sm ghost icon';
+      mb.textContent = '🔗';
+      mb.title = 'URL';
       mb.onclick = () => {
         const val = prompt('URL:', it.url || '');
         if (val) {
