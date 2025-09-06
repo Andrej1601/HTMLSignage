@@ -799,20 +799,18 @@ function interRow(i){
         }
       };
       $media.appendChild(inp);
-    } else if (t === 'html'){
-      const btn = document.createElement('button');
-      btn.className = 'btn sm ghost';
-      btn.textContent = 'HTML';
-      btn.onclick = () => {
-        window.open('/admin/html-editor.html?id=' + encodeURIComponent(it.id), '_blank', 'width=800,height=600');
-      };
-      $media.appendChild(btn);
     }
   };
 
   renderMediaField();
 
   // Events
+  if ($prev) $prev.onclick = () => {
+    const t = $type?.value || 'image';
+    if (t === 'html'){
+      window.open('/admin/html-editor.html?id=' + it.id, '_blank', 'width=800,height=600');
+    }
+  };
   if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
   if ($type)  $type.onchange  = () => { it.type = $type.value; renderMediaField(); };
   if ($after) $after.onchange = () => {
