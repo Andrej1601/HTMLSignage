@@ -22,6 +22,19 @@ import { DEFAULTS } from '../core/defaults.js';
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
 
+// HTML-Editor Message Handling
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || !d.type) return;
+  if (d.type === 'htmlRequest'){
+    const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
+    e.source?.postMessage({ type:'htmlInit', id:d.id, html: it?.html || '' }, '*');
+  } else if (d.type === 'htmlSave'){
+    const it = (ctx?.getSettings().interstitials || []).find(im => im.id === d.id);
+    if (it) it.html = d.html || '';
+  }
+});
+
 // ============================================================================
 // 1) Wochentage / Presets
 // ============================================================================
@@ -684,27 +697,34 @@ function interRow(i){
 
   const wrap = document.createElement('div');
   wrap.className = 'mediarow';
-  const ext = ((it.url || '').split(/[?#]/)[0].split('.').pop() || '').slice(0,10).toUpperCase();
   wrap.innerHTML = `
     <input id="n_${id}" class="input name" type="text" value="${escapeHtml(it.name || '')}" />
-    <span class="col-type">${escapeHtml(ext)}</span>
+    <select id="t_${id}" class="input sel-type">
+      <option value="image">Bild</option>
+      <option value="video">Video</option>
+      <option value="url">URL</option>
+      <option value="mpd">MPD</option>
+      <option value="html">HTML</option>
+    </select>
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
-    <button class="btn sm ghost icon" id="f_${id}" title="Upload">⤴︎</button>
+    <span id="m_${id}" class="media-field"></span>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
     <input id="en_${id}" type="checkbox" />
   `;
 
   const $name  = wrap.querySelector('#n_'+id);
+  const $type  = wrap.querySelector('#t_'+id);
   const $prev  = wrap.querySelector('#p_'+id);
   const $sec   = wrap.querySelector('#sec_'+id);
-  const $up    = wrap.querySelector('#f_'+id);
+  const $media = wrap.querySelector('#m_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $after = wrap.querySelector('#a_'+id);
   const $en    = wrap.querySelector('#en_'+id);
 
   // Werte
+  if ($type) $type.value = it.type || 'image';
   if ($en) $en.checked = !!it.enabled;
   if ($sec){
     $sec.value = Number.isFinite(+it.dwellSec)
@@ -713,16 +733,71 @@ function interRow(i){
   }
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
-  if (it.url){
-    preloadImg(it.url).then(r => { if (r.ok){ $prev.src = it.url; $prev.title = `${r.w}×${r.h}`; } });
+  if (it.thumb){
+    preloadImg(it.thumb).then(r => { if (r.ok){ $prev.src = it.thumb; $prev.title = `${r.w}×${r.h}`; } });
   }
 
   // Uniform-Mode blendet Dauer-Feld aus
   const uniform = (ctx.getSettings().slides?.durationMode !== 'per');
   if ($sec) $sec.style.display = uniform ? 'none' : '';
 
+  const renderMediaField = () => {
+    if (!$media) return;
+    $media.innerHTML = '';
+
+    // Preview Upload Button (immer vorhanden)
+    const pb = document.createElement('button');
+    pb.className = 'btn sm ghost icon';
+    pb.title = 'Vorschau-Bild hochladen';
+    pb.textContent = '⤴︎';
+    pb.onclick = () => {
+      const fi = document.createElement('input');
+      fi.type = 'file'; fi.accept = 'image/*';
+      fi.onchange = () => uploadGeneric(fi, (p) => {
+        it.thumb = p;
+        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
+      });
+      fi.click();
+    };
+    $media.appendChild(pb);
+
+    const t = $type?.value || 'image';
+    if (t === 'image' || t === 'video'){
+      const mb = document.createElement('button');
+      mb.className = 'btn sm ghost icon';
+      mb.title = 'Datei hochladen';
+      mb.textContent = '⤴︎';
+      mb.onclick = () => {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = (t === 'video') ? 'video/*' : 'image/*';
+        fi.onchange = () => uploadGeneric(fi, (p) => { it.url = p; });
+        fi.click();
+      };
+      $media.appendChild(mb);
+    } else if (t === 'url' || t === 'mpd'){
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'input';
+      inp.value = it.url || '';
+      inp.onchange = () => { it.url = inp.value.trim(); };
+      $media.appendChild(inp);
+    } else if (t === 'html'){
+      const btn = document.createElement('button');
+      btn.className = 'btn sm ghost';
+      btn.textContent = 'HTML';
+      btn.onclick = () => {
+        window.open('/admin/html-editor.html?id=' + encodeURIComponent(it.id), '_blank', 'width=800,height=600');
+      };
+      $media.appendChild(btn);
+    }
+  };
+
+  renderMediaField();
+
   // Events
   if ($name)  $name.onchange  = () => { it.name = ($name.value || '').trim(); renderSlidesMaster(); };
+  if ($type)  $type.onchange  = () => { it.type = $type.value; renderMediaField(); };
   if ($after) $after.onchange = () => {
     const v = $after.value;
     if (v === 'img:' + it.id){
@@ -748,18 +823,6 @@ function interRow(i){
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
 
-  if ($up){
-    $up.onclick = () => {
-      const fi = document.createElement('input');
-      fi.type='file'; fi.accept='image/*';
-      fi.onchange = () => uploadGeneric(fi, (p) => {
-        it.url = p;
-        preloadImg(p).then(r => { if (r.ok){ $prev.src = p; $prev.title = `${r.w}×${r.h}`; } });
-      });
-      fi.click();
-    };
-  }
-
   if ($del) $del.onclick = () => { ctx.getSettings().interstitials.splice(i,1); renderSlidesMaster(); };
 
   return wrap;
@@ -767,7 +830,9 @@ function interRow(i){
 
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
-  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  settings.interstitials = list.map(it => ({ type:'image', thumb:'', html:'', ...it }));
+
   const host = document.getElementById(hostId);
   if (!host) return;
 
@@ -780,7 +845,10 @@ function renderInterstitialsPanel(hostId='interList2'){
       id:'im_'+Math.random().toString(36).slice(2,9),
       name:'',
       enabled:true,
+      type:'image',
       url:'',
+      thumb:'',
+      html:'',
       after:'overview',
       dwellSec:6
     });

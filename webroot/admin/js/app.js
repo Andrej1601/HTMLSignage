@@ -159,7 +159,20 @@ async function loadAll(){
   settings.fonts         = { ...DEFAULTS.fonts,    ...(settings.fonts||{}) };
   settings.assets        = { ...DEFAULTS.assets,   ...(settings.assets||{}) };
   settings.footnotes     = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes || []);
-  settings.interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  settings.interstitials = Array.isArray(settings.interstitials)
+    ? settings.interstitials.map(it => ({
+        id: it.id || genId('im_'),
+        name: it.name || '',
+        enabled: it.enabled !== false,
+        type: it.type || 'image',
+        url: it.url || '',
+        thumb: it.thumb || it.url || '',
+        html: it.html || '',
+        after: it.after || 'overview',
+        dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6,
+        afterRef: it.afterRef || undefined
+      }))
+    : [];
   settings.presets       = settings.presets || {};
 
   // --- UI-Module initialisieren ---------------------------------------------
