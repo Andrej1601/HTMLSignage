@@ -630,11 +630,28 @@ function usedAfterImageIds(exceptId){
   list.forEach(im => {
     if (!im || im.id === exceptId) return;
     const v = im.afterRef || '';
-    if (v.startsWith('img:')) { set.add(v.slice(4)); return; }
+    if (v.startsWith('img:')) {
+      const id = v.slice(4);
+      if (set.has(id)){
+        // Duplicate usage -> reset to overview
+        im.afterRef = 'overview';
+        im.after = 'overview';
+        return;
+      }
+      set.add(id);
+      return;
+    }
     // Legacy by name
     if (im.after && im.after !== 'overview' && !(ctx.getSchedule().saunas || []).includes(im.after)){
       const hit = list.find(x => x && x.id !== im.id && (x.name || '') === im.after);
-      if (hit && hit.id) set.add(hit.id);
+      if (hit && hit.id){
+        if (set.has(hit.id)){
+          im.afterRef = 'overview';
+          im.after = 'overview';
+        } else {
+          set.add(hit.id);
+        }
+      }
     }
   });
   return set;
@@ -651,12 +668,8 @@ function interAfterOptionsHTML(currentId){
 
   const imgOpts = (settings.interstitials || [])
     .filter(x => x && x.id && x.id !== currentId)
-    .map(x => {
-      const val = 'img:' + x.id;
-      const taken = used.has(x.id);
-      const label = 'Bild: ' + (x.name || x.id) + (taken ? ' (belegt)' : '');
-      return `<option value="${val}"${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
-    });
+    .filter(x => !used.has(x.id))
+    .map(x => `<option value="img:${x.id}">${escapeHtml('Bild: ' + (x.name || x.id))}</option>`);
 
   return [`<option value="overview">Übersicht</option>`, ...saunaOpts, ...imgOpts].join('');
 }
@@ -674,6 +687,15 @@ function getAfterSelectValue(it, currentId){
 
 function applyAfterSelect(it, value){
   const settings = ctx.getSettings();
+  // Ensure uniqueness of afterRef across all interstitials
+  if (value && value !== 'overview'){
+    (settings.interstitials || []).forEach(other => {
+      if (other && other !== it && other.afterRef === value){
+        other.afterRef = 'overview';
+        other.after = 'overview';
+      }
+    });
+  }
   it.afterRef = value;
   if (value === 'overview'){
     it.after = 'overview';
@@ -1012,6 +1034,18 @@ if (durPer) durPer.onchange = () => {
 // ============================================================================
 // 8) Public API
 // ============================================================================
+export function validateUniqueAfterRefs(){
+  const list = ctx.getSettings()?.interstitials || [];
+  const seen = new Set();
+  for (const im of list){
+    const v = im?.afterRef;
+    if (!v || v === 'overview') continue;
+    if (seen.has(v)) return false;
+    seen.add(v);
+  }
+  return true;
+}
+
 export function initSlidesMasterUI(context){
   ctx = context;
   if (!wiredStatic){
