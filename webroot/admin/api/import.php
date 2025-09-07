@@ -18,7 +18,9 @@ $writeAssets   = !empty($_POST['writeAssets']) || !empty($_GET['writeAssets']);
 $writeSettings = isset($_POST['writeSettings']) ? ($_POST['writeSettings']==='1') : true;
 $writeSchedule = isset($_POST['writeSchedule']) ? ($_POST['writeSchedule']==='1') : true;
 $settings = $j['settings'] ?? null; $schedule = $j['schedule'] ?? null;
-if (!$settings && !$schedule) fail('missing-sections');
+$hasSettings = array_key_exists('settings', $j);
+$hasSchedule = array_key_exists('schedule', $j);
+if (!$hasSettings && !$hasSchedule) fail('missing-sections');
 
 $base = '/var/www/signage';
 $assetsDir = $base.'/assets/img';
