@@ -18,16 +18,19 @@ if (!isset($dev['devices'][$devId])) {
 }
 
 // Version hochzählen (Signal für Clients)
-$set['version'] = intval($set['version'] ?? 0) + 1;
-if ($sch !== null) {
-  $sch['version'] = intval($sch['version'] ?? 0) + 1;
-}
-
 $dev['devices'][$devId]['overrides'] = $dev['devices'][$devId]['overrides'] ?? [];
-$dev['devices'][$devId]['overrides']['settings'] = $set;
+
+// Versionsnummern getrennt führen und erhöhen
+$currSetVer = intval($dev['devices'][$devId]['overrides']['settings']['version'] ?? 0);
+$set['version'] = $currSetVer + 1;
+
 if ($sch !== null) {
+  $currSchVer = intval($dev['devices'][$devId]['overrides']['schedule']['version'] ?? 0);
+  $sch['version'] = $currSchVer + 1;
   $dev['devices'][$devId]['overrides']['schedule'] = $sch;
 }
+
+$dev['devices'][$devId]['overrides']['settings'] = $set;
 
 $dev['devices'][$devId]['useOverrides'] = true;
 
