@@ -10,6 +10,17 @@ if (!is_string($url) || !preg_match('#^https?://#i', $url)) {
   exit;
 }
 
+if (!extension_loaded('curl')) {
+  error_log('url_thumb: curl extension not loaded');
+  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
+  exit;
+}
+if (!extension_loaded('gd')) {
+  error_log('url_thumb: gd extension not loaded');
+  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
+  exit;
+}
+
 $ch = curl_init($url);
 curl_setopt_array($ch, [
   CURLOPT_RETURNTRANSFER => true,
