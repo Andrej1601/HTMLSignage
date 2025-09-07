@@ -267,7 +267,6 @@ function buildQueue() {
   if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
   nextQueue.splice(0, nextQueue.length, ...queue);
-  idx = 0;
 }
 
   // ---------- DOM helpers ----------
@@ -822,6 +821,8 @@ console.error('[bootstrap] resolve failed:', e);
   }
 
   // Erst hier starten wir die Slideshow
+  idx = 0;
+  lastKey = null;
   step();
 
   // Live-Reload: bei Device NUR resolve pollen
@@ -845,7 +846,10 @@ console.error('[bootstrap] resolve failed:', e);
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
-            clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
+            clearTimers();
+            idx = idx % Math.max(1, nextQueue.length);
+            lastKey = null;
+            step();
           }
         } else {
           const s  = await loadJSON('/data/schedule.json');
@@ -853,7 +857,10 @@ console.error('[bootstrap] resolve failed:', e);
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
-            clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
+            clearTimers();
+            idx = idx % Math.max(1, nextQueue.length);
+            lastKey = null;
+            step();
           }
         }
 } catch(e) {
