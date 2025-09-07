@@ -54,7 +54,12 @@ async function loadDeviceResolved(id){
   const r = await fetch(`/pair/resolve?device=${encodeURIComponent(id)}&t=${Date.now()}`, {cache:'no-store'});
   if (!r.ok) throw new Error('device_resolve http '+r.status);
   const j = await r.json();
-  if (!j || j.ok === false || !j.settings || !j.schedule) {
+  if (!j || j.ok === false) {
+    const err = new Error('device_resolve not found');
+    err.status = 404;
+    throw err;
+  }
+  if (!j.settings || !j.schedule) {
     throw new Error('device_resolve payload invalid');
   }
   schedule = j.schedule;
