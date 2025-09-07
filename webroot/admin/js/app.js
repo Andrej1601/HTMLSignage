@@ -430,7 +430,6 @@ function ensureColorTools(){
     <div class="legendRow">
       <div class="legend">Farb-Werkzeuge</div>
 <button class="btn sm ghost" id="togglePickerSize" title="Iframe Höhe expandieren/zusammenklappen">⛶</button>
-<button class="btn sm ghost" id="dockPicker" title="Als schwebendes Fenster anzeigen">⇱</button>
 
 </div>
 
@@ -457,8 +456,8 @@ function ensureColorTools(){
     </div>
   `;
 
-  // vor die Farbliste setzen
-  host.parentElement.insertBefore(box, host);
+  // hinter die Farbliste setzen
+  host.after(box);
 
   // Controls
   const $wrap = document.getElementById('pickerWrap');
@@ -474,21 +473,19 @@ const savedW = parseInt(localStorage.getItem('colorPickerW') || '0', 10);
 if (savedH >= 140) $wrap.style.height = savedH + 'px';
 if (savedW >= 260) $wrap.style.width  = savedW + 'px';
 
-  // expand/collapse
-$toggle.onclick = ()=>{
-  if (!box.classList.contains('exp')){
-    box.dataset.prevH = $wrap.clientHeight;
-    box.dataset.prevW = $wrap.clientWidth;
-    box.classList.add('exp');
-    $wrap.style.width = '100%';
-  } else {
-    box.classList.remove('exp');
-    const h = parseInt(box.dataset.prevH || '180', 10);
-    const w = parseInt(box.dataset.prevW || '0',   10);
-    $wrap.style.height = Math.max(140, h) + 'px';
-    if (w) $wrap.style.width = Math.max(260, w) + 'px';
-  }
-};
+  // expand/collapse und Reset auf Standardmaße
+  $toggle.onclick = () => {
+    if (!box.classList.contains('exp')) {
+      box.classList.add('exp');
+      $wrap.style.width = '100%';
+    } else {
+      box.classList.remove('exp');
+      $wrap.style.height = '180px';
+      $wrap.style.width = '100%';
+      localStorage.removeItem('colorPickerH');
+      localStorage.removeItem('colorPickerW');
+    }
+  };
 
 // Größe speichern (nur wenn nicht expanded)
 const ro = new ResizeObserver((entries)=>{
@@ -514,8 +511,6 @@ ro.observe($wrap);
     try { await navigator.clipboard.writeText(v); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
     catch { $qh.select(); document.execCommand?.('copy'); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
   };
-const $dock = document.getElementById('dockPicker');
-$dock.onclick = ()=> box.classList.toggle('float');
 }
 
 
