@@ -559,7 +559,15 @@ function renderVideo(src, opts = {}) {
     if (v.parentNode) v.parentNode.replaceChild(fallback, v);
   });
   if (settings?.slides?.waitForVideo) {
-    v.addEventListener('ended', () => { idx++; step(); });
+    const done = () => {
+      if (done.called) return;
+      done.called = true;
+      slideTimer = 0;
+      hide(() => { idx++; step(); });
+    };
+    const maxMs = Math.max(1000, dwellMsForItem(opts));
+    slideTimer = setTimeout(done, maxMs);
+    v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
   }
   const c = h('div', { class: 'container videoslide fade show' });
   c.appendChild(v);
