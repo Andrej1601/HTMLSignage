@@ -57,6 +57,16 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
       if (isset($pathMap[$p])) $settings['assets']['rightImages'][$k] = $pathMap[$p];
     }
   }
+  if (!empty($settings['interstitials']) && is_array($settings['interstitials'])) {
+    foreach ($settings['interstitials'] as $i=>$it) {
+      if (!is_array($it)) continue;
+      foreach ($it as $k=>$v) {
+        if (is_string($v) && isset($pathMap[$v])) {
+          $settings['interstitials'][$i][$k] = $pathMap[$v];
+        }
+      }
+    }
+  }
 }
 
 // bump versions (nur wenn vorhanden & aktiviert)

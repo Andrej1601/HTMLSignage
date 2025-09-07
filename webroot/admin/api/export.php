@@ -35,7 +35,15 @@ if ($include && $incSettings) {
   if (!empty($settings['assets']['rightImages']) && is_array($settings['assets']['rightImages'])) {
     foreach ($settings['assets']['rightImages'] as $p) if ($p) $paths[] = $p;
   }
-  $paths = array_values(array_unique(array_filter($paths, fn($p)=>is_string($p) && str_starts_with($p,'/assets/img/'))));
+  if (!empty($settings['interstitials']) && is_array($settings['interstitials'])) {
+    foreach ($settings['interstitials'] as $it) {
+      if (!is_array($it)) continue;
+      foreach ($it as $v) {
+        if (is_string($v) && str_starts_with($v, '/assets/')) $paths[] = $v;
+      }
+    }
+  }
+  $paths = array_values(array_unique(array_filter($paths, fn($p)=>is_string($p) && str_starts_with($p,'/assets/'))));
   $blobs = [];
   $base = '/var/www/signage';
   $fi = new finfo(FILEINFO_MIME_TYPE);
