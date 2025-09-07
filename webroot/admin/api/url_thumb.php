@@ -34,6 +34,7 @@ if (preg_match('/<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\
   $imgUrl = $m[1];
 }
 if (!$imgUrl) {
+  error_log('url_thumb: no image found at '.$url);
   echo json_encode(['ok'=>false,'thumb'=>$fallback]);
   exit;
 }
@@ -74,7 +75,12 @@ $dir = '/var/www/signage/assets/media/img/';
 if (!is_dir($dir)) { @mkdir($dir, 02775, true); @chown($dir,'www-data'); @chgrp($dir,'www-data'); }
 $fname = 'preview_'.bin2hex(random_bytes(5)).'.jpg';
 $full = $dir.$fname;
-imagejpeg($im, $full, 90);
+if (!imagejpeg($im, $full, 90)) {
+  error_log('url_thumb: failed to save image to '.$full);
+  imagedestroy($im);
+  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
+  exit;
+}
 imagedestroy($im);
 @chmod($full,0644); @chown($full,'www-data'); @chgrp($full,'www-data');
 $public = '/assets/media/img/'.$fname;

@@ -803,30 +803,28 @@ function interRow(i){
       mb.title = 'URL';
       mb.onclick = () => {
         const val = prompt('URL:', it.url || '');
-        if (val) {
+        if (val !== null) {
           it.url = val.trim();
-          it.thumb = '';
-          updatePrev('');
-          fetch('/admin/api/url_thumb.php', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({url: it.url})
-          }).then(r=>r.json()).then(j=>{
-            if (j && j.ok && j.thumb){
-              const t = j.thumb + '?v=' + Date.now();
-              it.thumb = t;
-              updatePrev(t);
+          it.thumb = FALLBACK_THUMB;
+          updatePrev(FALLBACK_THUMB);
+          if (it.url) {
+            fetch('/admin/api/url_thumb.php', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ url: it.url })
+            }).then(r => r.json()).then(j => {
+              if (j && j.ok && j.thumb) {
+                const t = j.thumb + '?v=' + Date.now();
+                it.thumb = t;
+                updatePrev(t);
+              }
               renderSlidesMaster();
-            } else {
-              it.thumb = FALLBACK_THUMB;
-              updatePrev(FALLBACK_THUMB);
+            }).catch(() => {
               renderSlidesMaster();
-            }
-          }).catch(()=>{
-            it.thumb = FALLBACK_THUMB;
-            updatePrev(FALLBACK_THUMB);
+            });
+          } else {
             renderSlidesMaster();
-          });
+          }
         }
       };
       $media.appendChild(mb);
