@@ -106,13 +106,14 @@ if (!array_key_exists('presets', $overSettings) || !is_array($overSettings['pres
 $schedule = $baseSchedule;
 if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) && is_array($mergedSettings['presets'])) {
   $presets = $mergedSettings['presets'];
-  $preset = $presets[day_key()] ?? ($presets['Default'] ?? null);
+  $preset  = $presets[day_key()] ?? ($presets['Default'] ?? null);
   if (is_array($preset) && isset($preset['saunas']) && isset($preset['rows']) && is_array($preset['rows'])) {
     $schedule = $preset;
   }
 }
 
-if ($dev['useOverrides'] && !empty($overSchedule)) {
+$useOverrides = !empty($dev['useOverrides']);
+if ($useOverrides && !empty($overSchedule)) {
   $schedule = merge_r($schedule, $overSchedule);
   $schedule['version'] = intval($overSchedule['version'] ?? 0);
 } else {
@@ -120,7 +121,7 @@ if ($dev['useOverrides'] && !empty($overSchedule)) {
 }
 
 // Version als Cache-Bremse; bei aktivem Override nur dessen Version nutzen
-if ($dev['useOverrides'] && array_key_exists('version', $overSettings)) {
+if ($useOverrides && array_key_exists('version', $overSettings)) {
   $mergedSettings['version'] = intval($overSettings['version']);
 } else {
   $mergedSettings['version'] = intval($baseSettings['version'] ?? 0);
