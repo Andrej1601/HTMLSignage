@@ -32,8 +32,6 @@ if ($sch !== null) {
 
 $dev['devices'][$devId]['overrides']['settings'] = $set;
 
-$dev['devices'][$devId]['useOverrides'] = true;
-
 if (!devices_save($dev)) {
   echo json_encode(['ok'=>false, 'error'=>'write-failed']); exit;
 }
