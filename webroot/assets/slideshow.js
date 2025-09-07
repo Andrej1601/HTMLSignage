@@ -805,6 +805,36 @@ function showPairing(){
 }
 
 
+function showOffline(){
+  clearTimers();
+  if (document.getElementById('offline-msg')) return;
+  const box = document.createElement('div');
+  box.id = 'offline-msg';
+  box.textContent = 'Verbindungsaufbau';
+  box.style.cssText = 'position:fixed;bottom:10px;right:10px;padding:8px 12px;background:rgba(0,0,0,.7);color:#fff;font-weight:600;border-radius:4px;z-index:9999';
+  document.body.appendChild(box);
+}
+
+function hideOffline(){
+  const el = document.getElementById('offline-msg');
+  if (el) el.remove();
+}
+
+async function retryResolve(){
+  try{
+    showOffline();
+    await loadDeviceResolved(DEVICE_ID);
+    window.__pollErrs = 0;
+    hideOffline();
+    idx = idx % Math.max(1, nextQueue.length);
+    lastKey = null;
+    step();
+  } catch(e){
+    console.warn('[retryResolve] failed:', e);
+    setTimeout(retryResolve, 3000);
+  }
+}
+
   // ---------- Bootstrap & live update ----------
 async function bootstrap(){
 // Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
@@ -828,10 +858,11 @@ try {
  await loadDeviceResolved(DEVICE_ID);
  // Heartbeat: sofort + alle 30s (setzt "Zuletzt gesehen" direkt)
  fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{});
- setInterval(()=>{ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{}); }, 30000);     
+ setInterval(()=>{ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{}); }, 30000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
- showPairing();
+ showOffline();
+ retryResolve();
  return; // HIER abbrechen, sonst bleibt die Stage leer
       }
 } else {
@@ -891,7 +922,7 @@ console.error('[bootstrap] resolve failed:', e);
  console.warn('[poll] failed:', e);
  // robuster: nicht sofort zurück zum Pairing – erst nach 3 Fehlversuchen
  window.__pollErrs = (window.__pollErrs||0)+1;
- if (deviceMode && window.__pollErrs>=3) showPairing();      }
+ if (deviceMode && window.__pollErrs>=3) retryResolve();      }
     }, 3000);
   }
 }
