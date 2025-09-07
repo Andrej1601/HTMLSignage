@@ -552,16 +552,12 @@ function renderVideo(src, opts = {}) {
 }
 
 // ---------- Interstitial external URL slide ----------
-function renderUrl(src, sandbox) {
-  const proxied = '/admin/api/url_proxy.php?url=' + encodeURIComponent(src);
-  const attrs = {
-    src: proxied,
+function renderUrl(src) {
+  const f = h('iframe', {
+    src,
     class: 'urlFill',
     style: 'border:0'
-  };
-  const sb = sandbox || (settings?.slides?.urlSandbox ? 'allow-scripts allow-same-origin' : null);
-  if (sb) attrs.sandbox = sb;
-  const f = h('iframe', attrs);
+  });
   const c = h('div', { class: 'container urlslide fade show' }, [f]);
   return c;
 }
@@ -711,7 +707,7 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'sauna')    ? renderSauna(item.sauna) :
     (item.type === 'image')    ? renderImage(item.src) :
     (item.type === 'video')    ? renderVideo(item.src, item) :
-    (item.type === 'url')      ? renderUrl(item.url, item.sandbox) :
+    (item.type === 'url')      ? renderUrl(item.url) :
                                  renderImage(item.src || item.url);
 
   show(el);
