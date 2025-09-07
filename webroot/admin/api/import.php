@@ -43,7 +43,13 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
     $name = pathinfo($info['name'] ?? basename($rel), PATHINFO_FILENAME);
     $outRel = '/assets/img/import_'.date('Ymd_His').'_'.($i++).'.'.$ext;
     $outAbs = $base.$outRel;
-    file_put_contents($outAbs, base64_decode($b64));
+    error_clear_last();
+    $res = file_put_contents($outAbs, base64_decode($b64));
+    if ($res === false) {
+      $err = error_get_last();
+      error_log("file_put_contents failed for $outAbs: ".($err['message'] ?? 'unknown error'));
+      continue;
+    }
     @chmod($outAbs, 0644);
     $pathMap[$rel] = $outRel;
   }
@@ -75,10 +81,24 @@ if ($writeSchedule && is_array($schedule)) $schedule['version'] = time();
 
 $ok1 = true; $ok2 = true;
 if ($writeSettings && is_array($settings)) {
-  $ok1 = (bool)file_put_contents($base.'/data/settings.json', json_encode($settings, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+  $settingsFile = $base.'/data/settings.json';
+  error_clear_last();
+  $res = file_put_contents($settingsFile, json_encode($settings, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+  if ($res === false) {
+    $err = error_get_last();
+    error_log("file_put_contents failed for $settingsFile: ".($err['message'] ?? 'unknown error'));
+    $ok1 = false;
+  }
 }
 if ($writeSchedule && is_array($schedule)) {
-  $ok2 = (bool)file_put_contents($base.'/data/schedule.json', json_encode($schedule, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+  $scheduleFile = $base.'/data/schedule.json';
+  error_clear_last();
+  $res = file_put_contents($scheduleFile, json_encode($schedule, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
+  if ($res === false) {
+    $err = error_get_last();
+    error_log("file_put_contents failed for $scheduleFile: ".($err['message'] ?? 'unknown error'));
+    $ok2 = false;
+  }
 }
 if (!$ok1 || !$ok2) fail('write-failed', 500);
 
