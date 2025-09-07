@@ -106,7 +106,7 @@ if (!array_key_exists('presets', $overSettings) || !is_array($overSettings['pres
 $schedule = $baseSchedule;
 if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) && is_array($mergedSettings['presets'])) {
   $presets = $mergedSettings['presets'];
-  $preset = $presets[day_key()] ?? ($presets['Default'] ?? null);
+  $preset  = $presets[day_key()] ?? ($presets['Default'] ?? null);
   if (is_array($preset) && isset($preset['saunas']) && isset($preset['rows']) && is_array($preset['rows'])) {
     $schedule = $preset;
   }
