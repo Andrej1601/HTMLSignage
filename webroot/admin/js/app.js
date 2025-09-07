@@ -817,7 +817,7 @@ async function createDevicesPane(){
         tr.innerHTML = `
           <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
           <td><button class="btn sm" data-view>Ansehen</button></td>
-          <td><label class="toggle" data-mode-wrap>
+          <td><label class="toggle${useInd?' ind-active':''}" data-mode-wrap>
             <input type="checkbox" ${useInd?'checked':''} data-mode>
             <span data-mode-label>${modeLbl}</span>
           </label></td>
@@ -829,10 +829,12 @@ async function createDevicesPane(){
 
         const modeInput = tr.querySelector('[data-mode]');
         const modeLabel = tr.querySelector('[data-mode-label]');
+        const modeWrap = tr.querySelector('[data-mode-wrap]');
         modeInput.onchange = async ()=>{
           const mode = modeInput.checked ? 'device' : 'global';
           modeLabel.textContent = modeInput.checked ? 'Individuell' : 'Global';
           tr.classList.toggle('ind', modeInput.checked);
+          modeWrap.classList.toggle('ind-active', modeInput.checked);
           const r = await fetch('/admin/api/devices_set_mode.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -110,8 +110,8 @@ body.device-mode header{
   color: var(--btn-primary-fg);
 }
 body.device-mode #ctxBadge{
-  background: var(--btn-primary-fg);
-  color: var(--btn-primary);
+  background:color-mix(in oklab,var(--btn-primary-fg) 85%,var(--btn-primary));
+  color:var(--btn-primary);
   font-size:20px;
   padding:12px 20px;
 }
@@ -246,6 +246,19 @@ details[open] .chev{ transform: rotate(90deg); }
 
 .toggle input:checked::after{ left:14px; }
 
+.toggle.ind-active{
+  border-color:var(--btn-accent);
+  background:color-mix(in oklab,var(--btn-accent) 10%,var(--panel));
+}
+.toggle.ind-active input:checked{ background:var(--btn-accent); }
+.toggle.ind-active span[data-mode-label]{ color:var(--btn-accent); font-weight:700; }
+body.device-mode .toggle.ind-active{
+  border-color:var(--btn-primary);
+  background:color-mix(in oklab,var(--btn-primary) 10%,var(--panel));
+}
+body.device-mode .toggle.ind-active input:checked{ background:var(--btn-primary); }
+body.device-mode .toggle.ind-active span[data-mode-label]{ color:var(--btn-primary); }
+
 /* Badge für Geräte-Kontext */
 .ctx-badge{
     display:inline-block;
@@ -279,14 +292,20 @@ details[open] .chev{ transform: rotate(90deg); }
 #devPendingList .pend-item{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 #devPairedList table{width:100%;border-collapse:collapse;}
 #devPairedList td,#devPairedList th{padding:6px 8px;text-align:left;}
-#devPairedList tr.ind{background:var(--btn-accent);color:var(--btn-accent-fg);}
-#devPairedList tr.ind button{color:inherit;}
+#devPairedList tr.ind{border-left:4px solid var(--btn-accent);}
+body.device-mode #devPairedList tr.ind{border-left-color:var(--btn-primary);}
 body.device-mode #devPairedList tr.current{background:var(--btn-primary);color:var(--btn-primary-fg);}
 body.device-mode #devPairedList tr.current button{color:inherit;}
 
 /* Hervorgehobene Gerätezeile */
-#devPairedList tr.selected{outline:2px solid var(--btn-accent);}
-body.device-mode #devPairedList tr.selected{outline-color:var(--btn-primary);}
+#devPairedList tr.selected{
+  outline:2px solid var(--btn-accent);
+  background:color-mix(in oklab,var(--btn-accent) 10%,transparent);
+}
+body.device-mode #devPairedList tr.selected{
+  outline-color:var(--btn-primary);
+  background:color-mix(in oklab,var(--btn-primary) 10%,transparent);
+}
 
 /* Hinweistext unter dem Kontext-Badge */
 #ctxBadgeTip{display:block;margin-left:8px;margin-top:4px;color:var(--muted);font-size:13px;}
