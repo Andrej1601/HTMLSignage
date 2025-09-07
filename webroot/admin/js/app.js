@@ -643,7 +643,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
     } else {
       // Geräte-Override speichern
-      const payload = { device: currentDeviceCtx, settings: body.settings };
+      const payload = { device: currentDeviceCtx, settings: body.settings, schedule: body.schedule };
       const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const j=await r.json().catch(()=>({ok:false}));
       if (j.ok) {
