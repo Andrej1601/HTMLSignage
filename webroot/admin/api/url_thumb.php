@@ -76,6 +76,12 @@ if ($imgData === false) {
 }
 curl_close($ch);
 
+if (!function_exists('imagecreatefromstring')) {
+  error_log('url_thumb: gd-missing');
+  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
+  exit;
+}
+
 $im = @imagecreatefromstring($imgData);
 if (!$im) {
   error_log('url_thumb: invalid image data');
