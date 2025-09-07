@@ -38,9 +38,11 @@ function renderContextBadge(){
   if (!h1) return;
   let el = document.getElementById('ctxBadge');
   let tip = document.getElementById('ctxBadgeTip');
+  let modeBtn = document.getElementById('ctxDeviceMode');
   if (!currentDeviceCtx){
     if (el) el.remove();
     if (tip) tip.remove();
+    if (modeBtn) modeBtn.remove();
     return;
   }
   if (!el){
@@ -57,18 +59,25 @@ function renderContextBadge(){
     el.after(tip);
   }
   tip.textContent = 'Tipp: Klick auf × um zur globalen Ansicht zurückzukehren.';
+
+  if (!modeBtn){
+    modeBtn = document.createElement('button');
+    modeBtn.id = 'ctxDeviceMode';
+    modeBtn.className = 'btn sm';
+    tip.after(modeBtn);
+  }
+  modeBtn.textContent = 'Individuellen Plan aktivieren';
+  modeBtn.onclick = ()=>{
+    fetch('/admin/api/devices_set_mode.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: currentDeviceCtx, mode: 'device' })
+    }).catch(()=>{});
+  };
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
 async function enterDeviceContext(id, name){
-  // Modus auf individuelle Einstellungen setzen
-  fetch('/admin/api/devices_set_mode.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device: id, mode: 'device' })
-  }).catch(()=>{});
-
-
   // aktuelle Geräte-Daten holen, Overrides herausziehen
   const r = await fetch('/admin/api/devices_list.php');
   const j = await r.json();
