@@ -119,11 +119,12 @@ if ($dev['useOverrides'] && !empty($overSchedule)) {
   $schedule['version'] = $baseScheduleVersion;
 }
 
-// Version als einfache Cache-Bremse; nimmt höchste bekannte Version
-$mergedSettings['version'] = max(
-  intval($baseSettings['version'] ?? 0),
-  intval($overSettings['version'] ?? 0)
-);
+// Version als Cache-Bremse; bei aktivem Override nur dessen Version nutzen
+if ($dev['useOverrides'] && array_key_exists('version', $overSettings)) {
+  $mergedSettings['version'] = intval($overSettings['version']);
+} else {
+  $mergedSettings['version'] = intval($baseSettings['version'] ?? 0);
+}
 
 // --- Antwort ----------------------------------------------------------------
 

@@ -825,6 +825,7 @@ console.error('[bootstrap] resolve failed:', e);
   step();
 
   // Live-Reload: bei Device NUR resolve pollen
+  // Polling beibehalten, da Versionsänderungen zuverlässig erkannt werden
   if (!previewMode) {
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
