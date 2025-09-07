@@ -855,13 +855,25 @@ console.error('[bootstrap] resolve failed:', e);
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
 
-    setInterval(async () => {
+    const pollTimer = setInterval(async () => {
       try {
         if (deviceMode) {
           const r = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, {cache:'no-store'});
-          if (!r.ok) throw new Error('resolve http '+r.status);
+          if (r.status === 404) {
+            clearInterval(pollTimer);
+            clearTimers();
+            showPairing();
+            return;
+          }
+          if (!r.ok) {
+            console.warn('[poll] http', r.status);
+            return;
+          }
           const j = await r.json();
-          if (!j || j.ok === false) throw new Error('resolve payload');
+          if (!j || j.ok === false) {
+            console.warn('[poll] payload invalid');
+            return;
+          }
 
           const newSchedVer = j.schedule?.version || 0;
           const newSetVer   = j.settings?.version || 0;
@@ -887,11 +899,9 @@ console.error('[bootstrap] resolve failed:', e);
             step();
           }
         }
-} catch(e) {
- console.warn('[poll] failed:', e);
- // robuster: nicht sofort zurück zum Pairing – erst nach 3 Fehlversuchen
- window.__pollErrs = (window.__pollErrs||0)+1;
- if (deviceMode && window.__pollErrs>=3) showPairing();      }
+      } catch(e) {
+        console.warn('[poll] failed:', e);
+      }
     }, 3000);
   }
 }
