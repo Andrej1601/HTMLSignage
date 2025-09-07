@@ -112,7 +112,8 @@ if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) 
   }
 }
 
-if ($dev['useOverrides'] && !empty($overSchedule)) {
+$useOverrides = !empty($dev['useOverrides']);
+if ($useOverrides && !empty($overSchedule)) {
   $schedule = merge_r($schedule, $overSchedule);
   $schedule['version'] = intval($overSchedule['version'] ?? 0);
 } else {
@@ -120,7 +121,7 @@ if ($dev['useOverrides'] && !empty($overSchedule)) {
 }
 
 // Version als Cache-Bremse; bei aktivem Override nur dessen Version nutzen
-if ($dev['useOverrides'] && array_key_exists('version', $overSettings)) {
+if ($useOverrides && array_key_exists('version', $overSettings)) {
   $mergedSettings['version'] = intval($overSettings['version']);
 } else {
   $mergedSettings['version'] = intval($baseSettings['version'] ?? 0);
