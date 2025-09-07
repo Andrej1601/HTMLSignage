@@ -10,6 +10,7 @@ if (!$in || !isset($in['device']) || !is_array($in['settings'])) {
 }
 $devId = $in['device'];
 $set   = $in['settings'];
+$sch   = isset($in['schedule']) && is_array($in['schedule']) ? $in['schedule'] : null;
 
 $dev = devices_load();
 if (!isset($dev['devices'][$devId])) {
@@ -18,13 +19,23 @@ if (!isset($dev['devices'][$devId])) {
 
 // Version hochzählen (Signal für Clients)
 $set['version'] = intval($set['version'] ?? 0) + 1;
+if ($sch !== null) {
+  $sch['version'] = intval($sch['version'] ?? 0) + 1;
+}
 
 $dev['devices'][$devId]['overrides'] = $dev['devices'][$devId]['overrides'] ?? [];
 $dev['devices'][$devId]['overrides']['settings'] = $set;
+if ($sch !== null) {
+  $dev['devices'][$devId]['overrides']['schedule'] = $sch;
+}
 
 $dev['devices'][$devId]['useOverrides'] = true;
 
 if (!devices_save($dev)) {
   echo json_encode(['ok'=>false, 'error'=>'write-failed']); exit;
 }
-echo json_encode(['ok'=>true, 'version'=>$set['version']]);
+echo json_encode([
+  'ok'=>true,
+  'version'=>$set['version'],
+  'scheduleVersion'=> $sch['version'] ?? null
+]);

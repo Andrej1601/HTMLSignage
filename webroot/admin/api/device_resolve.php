@@ -75,11 +75,14 @@ $baseSchedule = read_json_file($docRoot . '/data/schedule.json');
 $baseScheduleVersion = intval($baseSchedule['version'] ?? 0);
 
 $overSettings = $dev['overrides']['settings'] ?? [];
+$overSchedule = $dev['overrides']['schedule'] ?? [];
 
 if (empty($dev['useOverrides'])) {
   $overSettings = [];
-} elseif (!is_array($overSettings)) {
-  $overSettings = [];
+  $overSchedule = [];
+} else {
+  if (!is_array($overSettings)) $overSettings = [];
+  if (!is_array($overSchedule)) $overSchedule = [];
 }
 
 
@@ -108,7 +111,13 @@ if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) 
     $schedule = $preset;
   }
 }
-$schedule['version'] = $baseScheduleVersion;
+
+if ($dev['useOverrides'] && !empty($overSchedule)) {
+  $schedule = merge_r($schedule, $overSchedule);
+  $schedule['version'] = intval($overSchedule['version'] ?? 0);
+} else {
+  $schedule['version'] = $baseScheduleVersion;
+}
 
 // Version als einfache Cache-Bremse; nimmt höchste bekannte Version
 $mergedSettings['version'] = max(

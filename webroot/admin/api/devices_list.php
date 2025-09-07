@@ -30,7 +30,10 @@ foreach (($db['devices'] ?? []) as $id => $d) {
     'name' => $d['name'] ?? $id,
     'lastSeenAt' => (int)($d['lastSeen'] ?? 0) ?: null,
     'useOverrides' => !empty($d['useOverrides']),
-    'overrides' => [ 'settings' => $d['overrides']['settings'] ?? (object)[] ]
+    'overrides' => [
+      'settings' => $d['overrides']['settings'] ?? (object)[],
+      'schedule' => $d['overrides']['schedule'] ?? (object)[]
+    ]
   ];
 
 }
