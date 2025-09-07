@@ -263,6 +263,22 @@ function buildQueue() {
     remaining = postponed;
   }
 
+  if (remaining.length) {
+    console.warn('Unplaced media items, appending to end:', remaining);
+    let insPos = idxOverview();
+    insPos = (insPos >= 0) ? insPos + 1 : queue.length;
+    for (const it of remaining) {
+      const dwell = Number.isFinite(+it.dwellSec)
+        ? +it.dwellSec
+        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+
+      const node = { type: it.type, dwell, __id: it.id || null };
+      if (it.src) node.src = it.src;
+      if (it.url && it.type === 'url') node.url = it.url;
+      queue.splice(insPos++, 0, node);
+    }
+  }
+
   // Falls nichts bleibt, notfalls Übersicht zeigen
   if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
