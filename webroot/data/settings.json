@@ -44,5 +44,6 @@
     },
     "flameImage": "/assets/img/flame_test.svg"
   },
+  "popupSelectors": [],
   "footnote": "* Nur am Fr und Sa"
 }

@@ -585,6 +585,21 @@ function renderUrl(src) {
     class: 'urlFill',
     style: 'border:0'
   });
+  f.addEventListener('load', () => {
+    try {
+      const doc = f.contentWindow.document;
+      const selectors = ['[id*="cookie"]', '.cookie-banner', '.cc-window', '.cookie-consent'];
+      if (Array.isArray(settings?.popupSelectors)) {
+        selectors.push(...settings.popupSelectors);
+      }
+      doc.querySelectorAll(selectors.join(',')).forEach(el => {
+        if (typeof el.remove === 'function') el.remove();
+        else el.style.display = 'none';
+      });
+    } catch (e) {
+      /* ignore cross-origin */
+    }
+  });
   const c = h('div', { class: 'container urlslide fade show' }, [f]);
   return c;
 }
