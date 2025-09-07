@@ -788,8 +788,17 @@ function interRow(i){
         fi.onchange = () => uploadGeneric(fi, (p, tp) => {
           const suffix = '?v=' + Date.now();
           it.url = p + suffix;
-          const tv = tp || (t === 'image' ? p : '');
-          it.thumb = tv ? tv + suffix : '';
+          if (t === 'video') {
+            if (tp) {
+              it.thumb = tp + suffix;
+            } else {
+              it.thumb = FALLBACK_THUMB;
+              alert('Kein Thumbnail vom Server erhalten.');
+            }
+          } else {
+            const tv = tp || p;
+            it.thumb = tv ? tv + suffix : '';
+          }
           updatePrev(it.thumb);
           renderSlidesMaster();
         });

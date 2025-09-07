@@ -88,8 +88,11 @@ if ($subDir === 'video' && !$thumbPath){
   $cmd = 'ffmpeg -hide_banner -loglevel error -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
   $o=[]; $ret=0;
   exec($cmd, $o, $ret);
+  $out = implode("\n", $o);
   if ($ret !== 0 || !file_exists($thumbDest)){
-    error_log('ffmpeg-thumb-failed: '.$cmd.'; output='.implode("\n", $o));
+    error_log('ffmpeg-thumb-failed: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
+  } else {
+    error_log('ffmpeg-thumb-success: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
   }
   if (file_exists($thumbDest)){
     @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
