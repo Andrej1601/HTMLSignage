@@ -565,9 +565,13 @@ function renderVideo(src, opts = {}) {
       slideTimer = 0;
       hide(() => { idx++; step(); });
     };
-    const maxMs = Math.max(1000, dwellMsForItem(opts));
-    slideTimer = setTimeout(done, maxMs);
+    v.addEventListener('loadedmetadata', () => {
+      const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : (dwellMsForItem(opts) / 1000);
+      const ms = Math.max(1000, dur * 1000) + 500;
+      slideTimer = setTimeout(done, ms);
+    }, { once: true });
     v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
+    v.addEventListener('error', () => { done(); }, { once: true });
   }
   const c = h('div', { class: 'container videoslide fade show' });
   c.appendChild(v);
