@@ -14,7 +14,7 @@ export function uploadGeneric(fileInput, onDone, thumbInput){
   xhr.onload = () => {
     try{
       const j = JSON.parse(xhr.responseText||'{}');
-      if (j.ok) onDone(j.path, j.thumb);
+      if (j.ok) onDone(j.path, j.thumb, j.error);
       else alert('Upload-Fehler: '+(j.error||''));
     }catch{
       alert('Upload fehlgeschlagen');
@@ -35,7 +35,7 @@ export function uploadFile(file, onDone){
   xhr.onload = () => {
     try{
       const j = JSON.parse(xhr.responseText||'{}');
-      if (j.ok) onDone(j.path, j.thumb);
+      if (j.ok) onDone(j.path, j.thumb, j.error);
       else alert('Upload-Fehler: '+(j.error||''));
     }catch{
       alert('Upload fehlgeschlagen');

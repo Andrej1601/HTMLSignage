@@ -50,6 +50,7 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
 // optional or auto-generated preview image (thumb)
 $thumbPath = null;
+$thumbError = null;
 if ($subDir === 'img'){
   $thumbPath = $publicPath;
 } elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
@@ -91,6 +92,7 @@ if ($subDir === 'video' && !$thumbPath){
   $out = implode("\n", $o);
   if ($ret !== 0 || !file_exists($thumbDest)){
     error_log('ffmpeg-thumb-failed: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
+    $thumbError = 'thumbnail generation failed';
   } else {
     error_log('ffmpeg-thumb-success: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
   }
@@ -100,4 +102,6 @@ if ($subDir === 'video' && !$thumbPath){
   }
 }
 
-echo json_encode(['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath]);
+$resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
+if ($thumbError) $resp['error'] = $thumbError;
+echo json_encode($resp);

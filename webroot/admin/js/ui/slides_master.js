@@ -785,7 +785,7 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p, tp) => {
+        fi.onchange = () => uploadGeneric(fi, (p, tp, err) => {
           const suffix = '?v=' + Date.now();
           it.url = p + suffix;
           if (t === 'video') {
@@ -793,7 +793,7 @@ function interRow(i){
               it.thumb = tp + suffix;
             } else {
               it.thumb = FALLBACK_THUMB;
-              alert('Kein Thumbnail vom Server erhalten.');
+              if (err) alert(err);
             }
           } else {
             const tv = tp || p;
