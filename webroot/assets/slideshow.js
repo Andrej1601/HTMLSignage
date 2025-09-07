@@ -268,6 +268,7 @@ function buildQueue() {
 
   nextQueue.splice(0, nextQueue.length, ...queue);
   idx = 0;
+  lastKey = null;
 }
 
   // ---------- DOM helpers ----------
@@ -844,7 +845,7 @@ console.error('[bootstrap] resolve failed:', e);
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue(); lastKey = null;
             clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
           }
         } else {
@@ -852,7 +853,7 @@ console.error('[bootstrap] resolve failed:', e);
           const cf = await loadJSON('/data/settings.json');
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue(); lastKey = null;
             clearTimers(); idx = idx % Math.max(1, nextQueue.length); step();
           }
         }
