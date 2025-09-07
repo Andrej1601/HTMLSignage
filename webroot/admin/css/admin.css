@@ -1,0 +1,553 @@
+/* ===================== Admin UI – Compact, Aligned, Themed ===================== */
+/* Light ist Default (body class="theme-light"), Dark via .theme-dark auf <body>  */
+/* ============================================================================== */
+
+/* ---------- Design Tokens: LIGHT (Default) ---------- */
+:root{
+  /* Flächen & Text */
+  --bg:#f6f8ff; --panel:#ffffff; --fg:#0b1220; --muted:#5b6478;
+  --border:#d6deee; --inbr:#c9d4ea;
+
+  /* Buttons – Flieder (default) + Orange (primary) */
+  --btn-accent:#7C3AED; --btn-accent-hover:#6D28D9; --btn-accent-fg:#ffffff;
+  --btn-primary:#F59E0B; --btn-primary-2:#FBBF24; --btn-primary-fg:#0b0d12;
+
+  /* Ghost-Buttons */
+  --ghost-bg:transparent; --ghost-border:#c9d4ea; --ghost-fg:#0b1220;
+
+  /* Inputs */
+  --input-bg:#ffffff; --input-fg:#0b1220; --input-border:#c9d4ea; --input-focus:#6D28D9;
+
+  /* Grid/Übersicht (Fallbacks – können per Settings überschrieben werden) */
+  --gridTable:#d1d5db; --gridTableW:2px;
+  --headRowBg:#f3f4f6; --headRowFg:#111827;
+  --zebra1:#ffffff; --zebra2:#f9fafb;
+  --timeZebra1:#f3f4f6; --timeZebra2:#eef2f7;
+  --cornerBg:#eef2f7; --cornerFg:#6b7280;
+
+  /* Grid: Zellen vs. Eingabe farblich trennen */
+  --grid-cell-bg:#f2f5fb;  /* Tabellenzelle */
+  --grid-entry-bg:#ffffff; /* Button in Zelle (.cellbtn) */
+
+  /* „Kein Aufguss“-Pillen (Light) */
+  --pill-bg:#edf1f7;
+
+  /* Größen */
+  --fs:14px;
+  --input-min-h:30px;          /* kompakt wie früher */
+  --input-pad:4px 8px;
+  --btn-pad:9px 12px;
+  --btn-sm-pad:6px 10px;
+  --radius:12px; --radius-sm:10px;
+
+  /* Innerer Rand rechts für Inputs, damit sie nicht am Boxrand kleben */
+  --edge-gap:6px;
+
+  /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
+  --col-name:minmax(140px,0.9fr);
+  --col-type:8ch;
+  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px; --col-after:minmax(150px,1fr);
+
+  /* Preview-Größe */
+  --prev-w:60px; --prev-h:42px;
+
+  /* Dichte */
+  --gap:6px;
+}
+
+/* ---------- Design Tokens: DARK (aktiv via .theme-dark) ---------- */
+.theme-dark{
+  --bg:#0b1220; --panel:#111827; --fg:#e5e7eb; --muted:#9ca3af;
+  --border:#1f2937; --inbr:#263041;
+
+  --btn-accent:#C4B5FD; --btn-accent-hover:#A78BFA; --btn-accent-fg:#111827;
+  --btn-primary:#F59E0B; --btn-primary-2:#FBBF24; --btn-primary-fg:#0b0d12;
+
+  --ghost-bg:rgba(255,255,255,.04); --ghost-border:#263041; --ghost-fg:var(--fg);
+
+  --input-bg:#0f1629; --input-fg:var(--fg); --input-border:#1f2937; --input-focus:#8B5CF6;
+
+  --gridTable:#374151; --headRowBg:#111827; --headRowFg:#e5e7eb;
+  --zebra1:#0f1629; --zebra2:#0d1426; --timeZebra1:#0e162b; --timeZebra2:#0c1324;
+  --cornerBg:#0d1426; --cornerFg:#9ca3af;
+
+  --grid-cell-bg:#0f1629; --grid-entry-bg:#121a34;
+  --pill-bg:#182134;
+}
+
+/* ---------- Base ---------- */
+html,body{height:100%}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:var(--fs)/1.45 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+}
+a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:none; }
+
+.row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.mut,.help{ color:var(--muted); }
+
+/* Utility classes for headings and toolbars */
+.subh{ font-weight:700; margin:8px 0; }
+.card-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; }
+.card-title{ font-weight:800; }
+.device-toolbar{ display:flex; flex-wrap:wrap; gap:6px; }
+.btn.icon-label{ gap:4px; }
+.devices-section{ margin-top:12px; }
+
+/* ---------- Header ---------- */
+header{
+  position:sticky; top:0; z-index:60;
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  background: color-mix(in oklab, var(--panel) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+h1{ margin:0; font-size:16px; letter-spacing:.3px; }
+
+body.device-mode header{
+  background: var(--btn-primary);
+  color: var(--btn-primary-fg);
+}
+body.device-mode #ctxBadge{
+  background:color-mix(in oklab,var(--btn-primary-fg) 85%,var(--btn-primary));
+  color:var(--btn-primary);
+  font-size:20px;
+  padding:12px 20px;
+}
+
+/* ---------- Layout: Main + Rightbar ---------- */
+main.layout{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) clamp(420px, 36vw, 640px);
+  gap:14px; padding:16px 12px 18px 16px; align-items:start;
+}
+.leftcol{ display:flex; flex-direction:column; gap:16px; min-width:0; }
+.rightbar{
+  position:sticky; top:64px;
+  max-height:calc(100svh - 64px);
+  overflow:auto; padding-right:6px;
+  justify-self:end;
+  width: clamp(420px, 36vw, 640px);
+}
+
+body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
+
+/* ---------- Cards / Details ---------- */
+.card, details.ac{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:16px; box-shadow:0 8px 20px rgba(0,0,0,.06);
+}
+.card .content, .content{ padding:12px 14px; }
+summary{
+  list-style:none; cursor:pointer; display:flex; align-items:center;
+  justify-content:space-between; gap:12px; padding:12px 14px;
+  border-bottom:1px solid transparent;
+}
+details[open] > summary{ border-bottom-color:var(--border); }
+summary .ttl{ display:flex; align-items:center; gap:10px; font-weight:700; }
+summary .actions{ display:flex; gap:8px; }
+summary .chev{ transition: transform .2s ease; }
+details[open] .chev{ transform: rotate(90deg); }
+
+/* ---------- Inputs ---------- */
+.input, select, textarea{
+  background:var(--input-bg); color:var(--input-fg);
+  border:1px solid var(--input-border); border-radius:10px;
+  padding:var(--input-pad); min-height:var(--input-min-h);
+  width:100%;
+}
+.input::placeholder, textarea::placeholder{
+  color: color-mix(in oklab, var(--input-fg) 55%, transparent);
+}
+.input:focus, select:focus, textarea:focus{
+  outline:0; border-color:var(--input-focus);
+  box-shadow:0 0 0 3px color-mix(in oklab, var(--input-focus) 25%, transparent);
+}
+
+/* kleiner Innenabstand rechts in der Sidebar, damit Inputs nicht am Rand kleben */
+.rightbar .input,
+.rightbar select,
+.rightbar textarea{
+  width: calc(100% - var(--edge-gap));
+  margin-right: var(--edge-gap);
+  min-height:30px; padding:4px 8px; border-radius:10px; font-size:14px; line-height:1.2;
+}
+
+/* spezielle kompakte Inputs */
+.input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0; }
+.input.name{ width:auto; min-width:140px; }
+
+/* ---------- Buttons ---------- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; padding:var(--btn-pad); border-radius:12px;
+  border:1px solid transparent; cursor:pointer; user-select:none;
+  transition: transform .06s ease, filter .15s, background .15s, border-color .15s, color .15s;
+}
+.btn:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  filter:grayscale(40%);
+}
+.btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
+.btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
+
+/* Default (flieder) */
+.btn:not(.ghost):not(.primary){ background:var(--btn-accent); color:var(--btn-accent-fg); }
+.btn:not(.ghost):not(.primary):hover{ background:var(--btn-accent-hover); }
+.btn:not(.ghost):not(.primary):active{ transform:translateY(1px); }
+
+/* Primary (orange) */
+.btn.primary{
+  background: linear-gradient(180deg, var(--btn-primary), var(--btn-primary-2));
+  color: var(--btn-primary-fg); border-color: var(--btn-primary);
+}
+
+/* Ghost (grau) */
+.btn.ghost{
+  background:var(--ghost-bg); color:var(--ghost-fg); border:1px solid var(--ghost-border);
+}
+
+/* ---------- Hilfe-Overlay & Tooltips ---------- */
+.tip{ cursor:help; color:var(--muted); margin-left:4px; }
+
+#helpOverlay{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(0,0,0,.6);
+  display:flex; align-items:center; justify-content:center;
+}
+#helpOverlay[hidden]{ display:none; }
+#helpOverlay .panel{
+  background:var(--panel); color:var(--fg);
+  border:1px solid var(--border); border-radius:16px;
+  padding:24px; max-width:500px; width:90%;
+  position:relative;
+}
+#helpOverlay .panel h2{ margin-top:0; }
+#helpClose{ position:absolute; top:8px; right:8px; }
+.btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+
+/* Toggle */
+.toggle{
+  display:flex; align-items:center; gap:8px;
+  border:1px solid var(--ghost-border); padding:7px 10px; border-radius:12px; background:var(--panel);
+}
+.toggle input{
+  appearance:none; width:28px; height:16px; border-radius:999px; background:#94a3b8; position:relative; outline:0;
+}
+.theme-dark .toggle input{ background:#4b5563; }
+.toggle input:checked{ background:#22c55e; }
+.toggle input::after{
+  content:''; position:absolute; top:2px; left:2px; width:12px; height:12px;
+  border-radius:50%; background:#fff; transition:left .15s;
+}
+
+.toggle input:checked::after{ left:14px; }
+
+.toggle.ind-active{
+  border-color:var(--btn-accent);
+  background:color-mix(in oklab,var(--btn-accent) 10%,var(--panel));
+}
+.toggle.ind-active input:checked{ background:var(--btn-accent); }
+.toggle.ind-active span[data-mode-label]{ color:var(--btn-accent); font-weight:700; }
+body.device-mode .toggle.ind-active{
+  border-color:var(--btn-primary);
+  background:color-mix(in oklab,var(--btn-primary) 10%,var(--panel));
+}
+body.device-mode .toggle.ind-active input:checked{ background:var(--btn-primary); }
+body.device-mode .toggle.ind-active span[data-mode-label]{ color:var(--btn-primary); }
+
+/* Badge für Geräte-Kontext */
+.ctx-badge{
+    display:inline-block;
+    margin-left:8px;
+    padding:10px 16px;
+    border-radius:12px;
+    background:var(--btn-accent);
+    color:var(--btn-accent-fg);
+    font-size:18px;
+    font-weight:700;
+}
+.ctx-badge button{
+  margin-left:6px;
+  border:none;
+  background:transparent;
+  color:inherit;
+  cursor:pointer;
+  font-weight:700;
+}
+
+/* Hervorhebung des aktiven Geräts in der Liste */
+  .pill.current{
+    background:var(--btn-accent);
+    color:var(--btn-accent-fg);
+    border-color:var(--btn-accent);
+    font-weight:700;
+  }
+
+/* Geräte-Tabellenansicht */
+#devPendingList{display:flex;flex-wrap:wrap;gap:8px;}
+#devPendingList .pend-item{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+#devPairedList table{width:100%;border-collapse:collapse;}
+#devPairedList td,#devPairedList th{padding:6px 8px;text-align:left;}
+#devPairedList tr.ind{border-left:4px solid var(--btn-accent);}
+body.device-mode #devPairedList tr.ind{border-left-color:var(--btn-primary);}
+body.device-mode #devPairedList tr.current{background:var(--btn-primary);color:var(--btn-primary-fg);}
+body.device-mode #devPairedList tr.current button{color:inherit;}
+
+/* Hervorgehobene Gerätezeile */
+#devPairedList tr.selected{
+  outline:2px solid var(--btn-accent);
+  background:color-mix(in oklab,var(--btn-accent) 10%,transparent);
+}
+body.device-mode #devPairedList tr.selected{
+  outline-color:var(--btn-primary);
+  background:color-mix(in oklab,var(--btn-primary) 10%,transparent);
+}
+
+/* Hinweistext unter dem Kontext-Badge */
+#ctxBadgeTip{display:block;margin-left:8px;margin-top:4px;color:var(--muted);font-size:13px;}
+
+
+/* ---------- Grid-Tabelle (links) ---------- */
+table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
+.tbl th,.tbl td{ border:1px solid var(--inbr); padding:7px; }
+.tbl th{
+  background:var(--headRowBg); color:var(--headRowFg);
+  position:sticky; top:64px; z-index:1;
+}
+.tbl td{ background:var(--grid-cell-bg); color:var(--fg); }
+.tbl .time{ min-width:8ch; text-align:center; font-weight:700; }
+
+/* Button in der Zelle = „Eingabe“ */
+.cellbtn{
+  width:100%; text-align:left;
+  background:var(--grid-entry-bg);
+  border:1px dashed color-mix(in oklab, var(--input-border) 75%, transparent);
+  color:var(--fg); padding:8px; border-radius:12px;
+}
+.cellbtn.filled{
+  border-style:solid;
+  background: color-mix(in oklab, var(--grid-entry-bg) 85%, transparent);
+  border-color: color-mix(in oklab, var(--input-border) 85%, transparent);
+}
+
+/* ---------- Key/Value-Linien ---------- */
+.kv{
+  display:grid; grid-template-columns:220px minmax(0,1fr);
+  gap:10px; align-items:center;
+}
+.content .kv{ margin-bottom:8px; }
+
+/* „Dauer (einheitlich)“: Inputs exakt untereinander (2-zeiliges Grid in Spalte 2) */
+#rowDwellAll > .row{
+  display:grid;
+  grid-template-columns:auto max-content;
+  grid-auto-rows:auto;
+  column-gap:8px; row-gap:6px;
+  align-items:center;
+  width: calc(100% - var(--edge-gap));   /* kleiner Innenabstand rechts */
+  margin-right: var(--edge-gap);
+}
+/* Reihenfolge passt: span,input,span,input  → 2x2 Raster automatisch */
+#rowDwellAll .mut{ white-space:nowrap; }
+#rowDwellAll .input.num3{ justify-self:start; }
+
+/* ---------- Slides-Listen (rechte Sidebar) ---------- */
+.groupHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.groupHead .legend, #extraTitle{ font-weight:800; }
+
+/* Spaltenköpfe + Zeilen – exakt gleiche Grid-Spalten */
+.sl-head, .saunarow, .mediarow{
+  width:100%; display:grid; gap:var(--gap); align-items:center; grid-auto-rows:minmax(42px,auto);
+}
+.sl-head{ margin: 2px 0 6px; }
+.sl-head span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.sl-head.sl-saunas, .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+.sl-head.sl-images, .mediarow{
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+
+/* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
+body.mode-uniform #headSaunaDur, body.mode-uniform #headImgDur{ display:none; }
+body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
+  grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
+}
+body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+}
+body.mode-uniform .intSec{ display:none !important; }
+body.mode-uniform #ovSec{ display:none !important; }
+
+/* Übersicht-Row: Canvas/IMG wie Previews dimensionieren */
+#overviewRow .prev, #overviewRow canvas#ovPrev{ width:var(--prev-w); height:var(--prev-h); }
+
+/* Preview-Kacheln */
+.prev{
+  width:var(--prev-w); height:var(--prev-h);
+  display:grid; place-items:center; font-size:12px; opacity:.9;
+  background:var(--panel); border:1px solid var(--inbr); border-radius:10px; object-fit:cover;
+}
+
+/* Checkbox-Spalte bündig */
+.saunarow input[type="checkbox"], .mediarow input[type="checkbox"]{ justify-self:center; }
+
+/* Upload/Default Buttons kompakt */
+.btn.icon{ width:28px; height:28px; }
+
+/* Kein Überlaufen der Grids in der Sidebar */
+.saunarow > *, .mediarow > *{ min-width:0; }
+
+/* --- Wunschanpassungen: Breiten innerhalb der Spalten ----------------------- */
+/* Sauna-Namen 20% schmaler (lässt innen Luft im Spaltenbereich) */
+.saunarow .input.name{ width:80%; }
+
+/* Medien-Slides: Name 30% schmaler */
+.mediarow .input.name{ width:50%; }
+
+/* Medien-Slides: „Nach Slide“-Select 20% schmaler */
+.mediarow .sel-after{ width:70%; justify-self:start; min-width:120px; max-width:100%; }
+
+/* „Kein Aufguss“-Pillen – kleiner, mehr Abstand */
+.pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pill{
+  font-size:10.5px; line-height:1; padding:2px 6px;
+  border:1px solid var(--inbr); border-radius:999px; background:var(--pill-bg);
+  opacity:.96;
+}
+.saunarow .namewrap{ display:flex; flex-direction:column; gap:6px; }
+.saunarow .tag{ display:inline-block; margin-left:6px; padding:2px 6px; border:1px solid var(--inbr); border-radius:8px; font-size:11px; opacity:.8; }
+
+/* DnD Feedback */
+.sauna-bucket{ border:1px dashed var(--inbr); border-radius:12px; padding:8px; margin-top:6px; }
+.sauna-bucket.drag-over{ outline:2px solid var(--btn-accent); }
+.saunarow[draggable="true"]{ cursor:grab; }
+.saunarow[draggable="true"]:active{ cursor:grabbing; }
+
+/* Wochentags-Pills */
+.day-pills .day-btn{
+  border:1px solid var(--ghost-border); border-radius:999px; padding:6px 10px;
+  background:transparent; cursor:pointer; color:var(--ghost-fg);
+}
+.day-btn.active{
+  background:var(--btn-accent); color:var(--btn-accent-fg); border-color:var(--btn-accent); font-weight:700;
+}
+
+/* ---------- Farben-Editor ---------- */
+.color-cols{ display:grid; grid-template-columns:1fr; gap:12px; }
+.fieldset{ border:1px dashed var(--inbr); border-radius:12px; padding:10px 12px; }
+.fieldset > .legend{ opacity:.85; font-weight:700; margin-bottom:8px; }
+.color-item{ display:flex; align-items:center; gap:8px; }
+.swatch{ width:24px; height:24px; border-radius:6px; border:1px solid var(--inbr); }
+
+/* ---------- Footer ---------- */
+footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border); color:var(--muted); }
+
+/* ---------- Modal ---------- */
+.modal{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; place-items:center; z-index:100; }
+.box{ background:var(--panel); color:var(--fg); border:1px solid var(--inbr); border-radius:16px;
+  min-width:min(340px,95vw); max-width:95vw; max-height:90svh; overflow:auto; padding:16px; }
+.grid2{ display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; align-items:center; width:min(560px,calc(95vw - 36px)); margin:0 auto 12px; }
+.iframeWrap{ width:min(92vw,1600px); height:min(85svh,900px); border:1px solid var(--inbr); border-radius:14px; overflow:hidden; background:#000; }
+.iframeWrap iframe{ width:100%; height:100%; display:block; border:0; }
+
+/* Card in der linken Spalte immer voll breit strecken */
+.leftcol > .card,
+.leftcol > .card .content {
+  width: 100%;
+}
+
+/* Docked Preview: volle Breite + 16:9, inkl. Fallback ohne aspect-ratio */
+.dockWrap{
+  display:block;
+  width:100%;
+  max-width:100%;
+  background:#000;
+  border:1px solid var(--inbr);
+  border-radius:14px;
+  overflow:hidden;
+  position:relative;
+  aspect-ratio: 16 / 9; /* moderne Browser */
+}
+
+/* Fallback für ältere Mobile Browser (kein aspect-ratio) */
+@supports not (aspect-ratio: 1 / 1) {
+  .dockWrap { height:auto; }
+  .dockWrap::before{
+    content:"";
+    display:block;
+    padding-top:56.25%; /* 16:9 */
+  }
+  .dockWrap > iframe{
+    position:absolute;
+    inset:0;
+  }
+}
+
+.dockWrap > iframe{
+  position:absolute;  /* bei aspect-ratio: greift auch */
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  display:block;
+}
+
+/* Falls die Dock-Box mal in einer .row (flex) sitzt: trotzdem volle Zeile belegen */
+.row > .dockWrap{
+  flex: 1 1 100%;
+}
+
+/* Farb-Tools (über der Farbliste) */
+.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
+#colorTools{margin-bottom:12px}
+.pickerFrame{width:100%;height:180px;border:1px dashed var(--inbr);border-radius:12px;background:#0000}
+#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
+#quickHex{text-transform:uppercase;width:10ch}
+#copyHex{white-space:nowrap}
+
+/* Farb-Tools */
+.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
+#colorTools{margin-bottom:12px}
+#colorTools .legendRow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+#togglePickerSize{min-width:0;padding:4px 8px}
+.pickerResizable{
+  height:180px;
+  width:100%;
+  min-height:140px;
+  max-height:70vh;
+  min-width:260px;
+  max-width:calc(100vw - 48px);
+  resize:both;               
+  overflow:auto;
+  border:1px dashed var(--inbr);
+  border-radius:12px;
+  background:#0000;
+  transition:height .2s ease;
+}
+#colorTools.exp .pickerResizable{ height:420px; width:100%; }
+.pickerFrame{width:100%;height:100%;border:0}
+#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
+#quickHex{text-transform:uppercase;width:10ch}
+#copyHex{white-space:nowrap}
+
+/* Ansicht-Menü (Header) */
+.menuwrap{ position:relative; }
+.dropdown{
+  position:absolute; top:calc(100% + 6px); left:0; z-index:80;
+  min-width: 220px; padding:6px;
+  background:var(--panel); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 12px 24px rgba(0,0,0,.12);
+}
+.dd-item{
+  display:flex; align-items:center; gap:8px;
+  width:100%; padding:8px 10px; border:0; background:transparent; cursor:pointer;
+  border-radius:10px; text-align:left; font-weight:700; color:var(--fg);
+}
+.dd-item:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+.dd-item[aria-checked="true"]{ outline:2px solid color-mix(in oklab, var(--btn-accent) 60%, transparent); outline-offset:2px; }

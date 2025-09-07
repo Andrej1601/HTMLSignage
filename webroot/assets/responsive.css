@@ -1,0 +1,17 @@
+/* Responsive tweaks for slideshow layout */
+
+@media (max-width: 900px), (orientation: portrait) {
+  :root {
+    --rightW:30%;
+    --cutTop:40%;
+    --cutBottom:20%;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --rightW:24%;
+    --cutTop:45%;
+    --cutBottom:25%;
+  }
+}
