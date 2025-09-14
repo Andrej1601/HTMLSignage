@@ -202,7 +202,11 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return cachedDisp;
   }
 
-  function chooseFit(mediaW, mediaH) {
+  function chooseFit(mediaW, mediaH, opts = {}) {
+    if (opts.type === 'video') {
+      const d = settings?.display || {};
+      return d.videoFit || 'cover';
+    }
     const disp = getDisplayRatio();
     const ratio = mediaW / mediaH;
     return ratio >= disp ? 'cover' : 'contain';
@@ -626,7 +630,11 @@ function renderVideo(src, opts = {}) {
   const fit = () => {
     const baseW = settings?.display?.baseW || 1920;
     const baseH = settings?.display?.baseH || 1080;
-    v.style.objectFit = chooseFit(v.videoWidth || baseW, v.videoHeight || baseH);
+    v.style.objectFit = chooseFit(
+      v.videoWidth || baseW,
+      v.videoHeight || baseH,
+      { type: 'video' }
+    );
   };
   if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
   v.src = src;
