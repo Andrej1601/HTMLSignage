@@ -18,6 +18,7 @@ import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
+const OFFLINE_AFTER_MIN = 10;
 
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
 const LS_MEM = {};
@@ -759,6 +760,7 @@ async function createDevicesPane(){
     const L = document.getElementById('devPairedList');
     L.innerHTML = '';
     const paired = (j.devices || []);
+    const now = Date.now() / 1000;
     if (!paired.length) {
       L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
     } else {
@@ -772,11 +774,14 @@ async function createDevicesPane(){
       };
       paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        const offline = !d.lastSeenAt || ((now - d.lastSeenAt) / 60) > OFFLINE_AFTER_MIN;
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');
         if (currentDeviceCtx===d.id) tr.classList.add('current');
         if (useInd) tr.classList.add('ind');
+        if (offline) tr.classList.add('offline');
+        const statusCell = offline ? '<td class="status offline">offline</td>' : `<td class="mut">${seen}</td>`;
         tr.innerHTML = `
           <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
           <td><button class="btn sm" data-view>Ansehen</button></td>
@@ -787,7 +792,7 @@ async function createDevicesPane(){
           <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
           <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
           <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
-          <td class="mut">${seen}</td>
+          ${statusCell}
         `;
 
         const modeInput = tr.querySelector('[data-mode]');

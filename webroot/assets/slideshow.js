@@ -951,10 +951,17 @@ async function bootstrap(){
   if (!previewMode) {
     if (deviceMode) {
 try {
- await loadDeviceResolved(DEVICE_ID);
- // Heartbeat: sofort + alle 30s (setzt "Zuletzt gesehen" direkt)
- fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{});
- setInterval(()=>{ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{}); }, 30000);     
+    await loadDeviceResolved(DEVICE_ID);
+    // Heartbeat: sofort + alle 5min
+    const sendHeartbeat = () => {
+      fetch('/api/heartbeat.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device: DEVICE_ID })
+      }).catch(()=>{});
+    };
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 5 * 60 * 1000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
  showPairing();
