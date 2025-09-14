@@ -1028,12 +1028,10 @@ function initBackupButtons(){
 // ============================================================================
 function initThemeToggle(){
   const cb = document.getElementById('themeMode');
-  const label = document.getElementById('themeLabel');
 
   const apply = (mode) => {
     document.body.classList.toggle('theme-light', mode === 'light');
     document.body.classList.toggle('theme-dark',  mode === 'dark');
-    label.textContent = (mode === 'light') ? 'Hell' : 'Dunkel';
     localStorage.setItem('adminTheme', mode);
   };
 
