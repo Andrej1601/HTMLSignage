@@ -538,39 +538,6 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
   flex: 1 1 100%;
 }
 
-/* Farb-Tools (über der Farbliste) */
-.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
-#colorTools{margin-bottom:12px}
-.pickerFrame{width:100%;height:180px;border:1px dashed var(--inbr);border-radius:12px;background:#0000}
-#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
-#quickHex{text-transform:uppercase;width:10ch}
-#copyHex{white-space:nowrap}
-
-/* Farb-Tools */
-.fieldset .legend{opacity:.8;font-weight:700;margin-bottom:8px}
-#colorTools{margin-bottom:12px}
-#colorTools .legendRow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-#togglePickerSize{min-width:0;padding:4px 8px}
-.pickerResizable{
-  height:180px;
-  width:100%;
-  min-height:140px;
-  max-height:70vh;
-  min-width:260px;
-  max-width:calc(100vw - 48px);
-  resize:both;               
-  overflow:auto;
-  border:1px dashed var(--inbr);
-  border-radius:12px;
-  background:#0000;
-  transition:height .2s ease;
-}
-#colorTools.exp .pickerResizable{ height:420px; width:100%; }
-.pickerFrame{width:100%;height:100%;border:0}
-#quickColor{width:52px;min-width:52px;padding:3px;border-radius:10px}
-#quickHex{text-transform:uppercase;width:10ch}
-#copyHex{white-space:nowrap}
-
 /* Ansicht-Menü (Header) */
 #btnDevices, #viewMenuWrap{ flex-shrink:0; }
 .menuwrap{ position:relative; }
