@@ -311,8 +311,11 @@ body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-prima
 
 /* Badge für Geräte-Kontext */
 .ctx-badge{
+    position:absolute;
+    left:50%;
+    top:14px;
+    transform:translateX(-50%);
     display:inline-block;
-    margin-left:8px;
     padding:10px 16px;
     border-radius:12px;
     background:var(--btn-accent);
