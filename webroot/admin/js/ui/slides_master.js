@@ -793,7 +793,7 @@ function interRow(i){
               it.thumb = tp + suffix;
             } else {
               it.thumb = FALLBACK_THUMB;
-              if (err) alert(err);
+              alert(err || 'Kein Thumbnail vom Server erhalten');
             }
           } else {
             const tv = tp || p;
@@ -826,9 +826,13 @@ function interRow(i){
                 const t = j.thumb + '?v=' + Date.now();
                 it.thumb = t;
                 updatePrev(t);
+              } else {
+                const msg = j?.error || 'Kein Thumbnail gefunden (og:image?)';
+                alert('Thumbnail-Fehler: ' + msg);
               }
               renderSlidesMaster();
             }).catch(() => {
+              alert('Thumbnail-Fehler: Netzwerkproblem');
               renderSlidesMaster();
             });
           } else {
