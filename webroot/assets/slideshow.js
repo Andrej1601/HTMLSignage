@@ -167,7 +167,22 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       document.documentElement.style.setProperty('--vwScale', String(s));
     };
     updateVwScale();
-    window.addEventListener('resize', updateVwScale, { passive:true });
+
+    let resizeRaf = null;
+    const onResize = () => {
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateVwScale();
+      });
+    };
+
+    window.addEventListener('resize', onResize, { passive:true });
+    window.addEventListener('orientationchange', onResize);
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(onResize).observe(document.documentElement);
+    }
   }
 
   function getDisplayRatio() {
