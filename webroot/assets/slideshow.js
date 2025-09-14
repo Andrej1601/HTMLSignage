@@ -16,6 +16,7 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
   let idx = 0;
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
+  let cachedDisp = null;
 
   const imgCache = new Set();
   function preloadImage(url){
@@ -152,6 +153,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   function applyDisplay() {
+    cachedDisp = null;
     const d = settings?.display || {};
     if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
     if (typeof d.cutTopPercent === 'number')     document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
@@ -166,6 +168,15 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     };
     updateVwScale();
     window.addEventListener('resize', updateVwScale, { passive:true });
+  }
+
+  function getDisplayRatio() {
+    if (cachedDisp !== null) return cachedDisp;
+    const d = settings?.display || {};
+    const baseW = d.baseW || 1920;
+    const baseH = d.baseH || 1080;
+    cachedDisp = baseW / baseH;
+    return cachedDisp;
   }
 
 // ---------- Slide queue ----------
@@ -570,6 +581,7 @@ function renderImage(url) {
 
 // ---------- Interstitial video slide ----------
 function renderVideo(src, opts = {}) {
+  const disp = getDisplayRatio();
   const v = document.createElement('video');
   v.preload = 'auto';
   v.autoplay = true;
@@ -606,7 +618,7 @@ function renderVideo(src, opts = {}) {
     v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
     v.addEventListener('error', () => { done(); }, { once: true });
   }
-  const c = h('div', { class: 'container videoslide fade show' });
+  const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
   return c;
 }
