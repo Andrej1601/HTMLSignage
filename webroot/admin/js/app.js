@@ -350,6 +350,7 @@ function colorField(key,label,init){
     <div class="color-item">
       <div class="swatch" id="sw_${key}"></div>
       <input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB">
+      <input type="color" id="cp_${key}" value="${init}">
     </div>`;
   return row;
 }
@@ -392,18 +393,31 @@ const host = $('#colorList');
 
   host.appendChild(A); host.appendChild(B); host.appendChild(C);
 
-  // Swatch-Vorschau & Reset
-  $$('#colorList input[type="text"]').forEach(inp=>{
-    const sw=$('#sw_'+inp.id.replace(/^cl_/,''));
-    const setPrev=v=> sw.style.background=v;
-    setPrev(inp.value);
-    inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); });
+  // Swatch-Vorschau & Synchronisation
+  $$('#colorList .color-item').forEach(item=>{
+    const txt = item.querySelector('input[type="text"]');
+    const pick = item.querySelector('input[type="color"]');
+    const sw = item.querySelector('.swatch');
+    const setVal = v=>{
+      const hex = v.startsWith('#') ? v : '#'+v;
+      sw.style.background = hex;
+      pick.value = hex.toLowerCase();
+      txt.value = hex.toUpperCase();
+    };
+    setVal(txt.value);
+    txt.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(txt.value)) setVal(txt.value); });
+    pick.addEventListener('input',()=> setVal(pick.value));
   });
-  $('#resetColors').onclick = ()=>{ 
-    $$('#colorList input[type="text"]').forEach(inp=>{
-      const k=inp.id.replace(/^cl_/,'');
-      inp.value=(DEFAULTS.theme[k]||'#FFFFFF');
-      const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value;
+
+  $('#resetColors').onclick = ()=>{
+    $$('#colorList .color-item').forEach(item=>{
+      const txt = item.querySelector('input[type="text"]');
+      const pick = item.querySelector('input[type="color"]');
+      const k = txt.id.replace(/^cl_/,'');
+      const def = DEFAULTS.theme[k]||'#FFFFFF';
+      txt.value = def;
+      pick.value = def;
+      const sw = item.querySelector('.swatch'); if(sw) sw.style.background=def;
     });
     const bws=document.getElementById('bw_gridTableW');
     if(bws) bws.value = DEFAULTS.theme.gridTableW ?? 2;
