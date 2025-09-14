@@ -392,14 +392,17 @@ function updateFlamePreview(u){
 // 4) Farben-Panel
 // ============================================================================
 function colorField(key,label,init){
+  const valUp = String(init||'').toUpperCase();
+  const valLow = valUp.toLowerCase();
   const row=document.createElement('div');
   row.className='kv';
   row.innerHTML = `
     <label>${label}</label>
     <div class="color-item">
       <div class="swatch" id="sw_${key}"></div>
-      <input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB">
-      <input type="color" id="cp_${key}" value="${init}">
+      <input class="input" id="cl_${key}" type="text" value="${valUp}" placeholder="#RRGGBB">
+      <input type="color" id="cp_${key}" value="${valLow}">
+      <button class="btn sm pipette" id="ey_${key}" type="button">Pipette</button>
     </div>`;
   return row;
 }
@@ -446,16 +449,33 @@ const host = $('#colorList');
   $$('#colorList .color-item').forEach(item=>{
     const txt = item.querySelector('input[type="text"]');
     const pick = item.querySelector('input[type="color"]');
+    const pip = item.querySelector('.pipette');
     const sw = item.querySelector('.swatch');
     const setVal = v=>{
       const hex = v.startsWith('#') ? v : '#'+v;
+      if(!/^#([0-9A-Fa-f]{6})$/.test(hex)) return;
       sw.style.background = hex;
       pick.value = hex.toLowerCase();
       txt.value = hex.toUpperCase();
     };
     setVal(txt.value);
-    txt.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(txt.value)) setVal(txt.value); });
+    txt.addEventListener('input',()=>{
+      txt.value = txt.value.toUpperCase();
+      if(/^#([0-9A-F]{6})$/.test(txt.value)) setVal(txt.value);
+    });
     pick.addEventListener('input',()=> setVal(pick.value));
+    pip?.addEventListener('click', async ()=>{
+      if(!window.EyeDropper){
+        alert('EyeDropper wird nicht unterstützt.');
+        return;
+      }
+      try{
+        const res = await new EyeDropper().open();
+        if(res?.sRGBHex) setVal(res.sRGBHex);
+      }catch(err){
+        console.warn('EyeDropper abgebrochen', err);
+      }
+    });
   });
 
   $('#resetColors').onclick = ()=>{
@@ -520,14 +540,14 @@ function fnRow(fn,i){
 // 6) Speichern / Preview / Export / Import
 // ============================================================================
 function collectColors(){ 
-  const theme={...(settings.theme||{})}; 
+  const theme={...(settings.theme||{})};
   $$('#colorList input[type="text"]').forEach(inp=>{
     const v=String(inp.value).toUpperCase();
-    if(/^#([0-9A-Fa-f]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v;
+    if(/^#([0-9A-F]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v;
   });
   const bw=document.getElementById('bw_gridTableW');
   if(bw) theme.gridTableW = Math.max(0, Math.min(10, +bw.value||0));
-  return theme; 
+  return theme;
 }
 
 function collectSettings(){
