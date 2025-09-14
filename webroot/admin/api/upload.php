@@ -52,6 +52,7 @@ $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
 $thumbPath = null;
 $thumbError = null;
 $thumbFallback = false;
+$errorDetail = null;
 if ($subDir === 'img'){
   $thumbPath = $publicPath;
 } elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
@@ -87,36 +88,48 @@ if ($subDir === 'video' && !$thumbPath){
   $thumbDest = $tbase . $fname . '.jpg';
   $tpi = pathinfo($thumbDest); $tfname = $tpi['filename']; $ti=0;
   while (file_exists($thumbDest)) { $ti++; $thumbDest = $tpi['dirname'].'/'.$tfname.'_'.$ti.'.jpg'; }
-  $cmd = 'ffmpeg -hide_banner -loglevel error -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
-  $o=[]; $ret=0;
-  exec($cmd, $o, $ret);
-  $out = implode("\n", $o);
-  if ($ret !== 0 || !file_exists($thumbDest)){
-    error_log('ffmpeg-thumb-failed: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
-    // try fallback at 1s position
-    $cmd2 = 'ffmpeg -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
-    $o2=[]; $ret2=0;
-    exec($cmd2, $o2, $ret2);
-    $out2 = implode("\n", $o2);
-    if ($ret2 !== 0 || !file_exists($thumbDest)){
-      error_log('ffmpeg-thumb-fallback-failed: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
-      $thumbError = 'thumbnail generation failed';
-      $thumbPath = '/assets/img/thumb_fallback.svg';
-      $thumbFallback = true;
+  $ffmpeg = trim(shell_exec('command -v ffmpeg 2>&1'));
+  if (!$ffmpeg){
+    $thumbError = 'ffmpeg not found';
+    $thumbPath = '/assets/img/thumb_fallback.svg';
+    $thumbFallback = true;
+    $errorDetail = 'ffmpeg not installed';
+    error_log('ffmpeg-thumb-missing');
+  } else {
+    $cmd = 'ffmpeg -hide_banner -loglevel error -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
+    $o=[]; $ret=0;
+    exec($cmd, $o, $ret);
+    $out = implode("\n", $o);
+    if ($ret !== 0 || !file_exists($thumbDest)){
+      $errorDetail = $out;
+      error_log('ffmpeg-thumb-failed: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
+      // try fallback at 1s position
+      $cmd2 = 'ffmpeg -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
+      $o2=[]; $ret2=0;
+      exec($cmd2, $o2, $ret2);
+      $out2 = implode("\n", $o2);
+      if ($ret2 !== 0 || !file_exists($thumbDest)){
+        $errorDetail = $out2;
+        error_log('ffmpeg-thumb-fallback-failed: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
+        $thumbError = 'thumbnail generation failed';
+        $thumbPath = '/assets/img/thumb_fallback.svg';
+        $thumbFallback = true;
+      } else {
+        error_log('ffmpeg-thumb-fallback-success: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
+        @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
+        $thumbPath = '/assets/media/img/' . basename($thumbDest);
+        $thumbFallback = true;
+      }
     } else {
-      error_log('ffmpeg-thumb-fallback-success: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
+      error_log('ffmpeg-thumb-success: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
       @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
       $thumbPath = '/assets/media/img/' . basename($thumbDest);
-      $thumbFallback = true;
     }
-  } else {
-    error_log('ffmpeg-thumb-success: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
-    @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
-    $thumbPath = '/assets/media/img/' . basename($thumbDest);
   }
 }
 
 $resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
 if ($thumbError) $resp['error'] = $thumbError;
 if ($thumbFallback) $resp['thumbFallback'] = true;
+if ($errorDetail) $resp['errorDetail'] = $errorDetail;
 echo json_encode($resp);

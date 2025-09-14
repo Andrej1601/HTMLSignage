@@ -5,7 +5,7 @@ $fallback = '/assets/img/thumb_fallback.svg';
 function fail($msg){
   global $fallback;
   error_log('url_thumb: '.$msg);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback,'error'=>$msg]);
+  echo json_encode(['ok'=>false,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>$msg]);
   exit;
 }
 
@@ -52,11 +52,9 @@ if (preg_match('/<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\
   $imgUrl = $m[1];
 } elseif (preg_match('/<link\s+[^>]*rel=["\'](?:shortcut )?icon["\'][^>]*href=["\']([^"\']+)["\']/i', $html, $m)) {
   $imgUrl = $m[1];
-}
-if (!$imgUrl && !empty($base['host'])) {
+} elseif (!empty($base['host'])) {
   $imgUrl = 'https://'.$base['host'].'/favicon.ico';
-}
-if (!$imgUrl) {
+} else {
   default_thumb('no image found');
 }
 $imgUrl = html_entity_decode($imgUrl, ENT_QUOTES|ENT_HTML5, 'UTF-8');
