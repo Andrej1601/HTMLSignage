@@ -28,6 +28,16 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
       imgCache.add(url);
     });
   }
+
+  function preloadImg(url){
+    return new Promise(resolve => {
+      if (!url) return resolve({ ok:false });
+      const img = new Image();
+      img.onload  = () => resolve({ ok:true,  w:img.naturalWidth, h:img.naturalHeight });
+      img.onerror = () => resolve({ ok:false });
+      img.src = url;
+    });
+  }
   async function preloadRightImages(){
     const urls = Object.values(settings?.assets?.rightImages || {});
     await Promise.all(urls.filter(Boolean).map(preloadImage));
@@ -565,17 +575,22 @@ onResizeCurrent = recalc;
 
 // ---------- Interstitial image slide ----------
 function renderImage(url) {
-  const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
-  const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
-  const img = new Image();
-  img.onload = () => {
+  const c = h('div', { class: 'container imgslide fade show' });
+  preloadImg(url).then(r => {
+    if (!r.ok) {
+      const fb = h('div', { class: 'img-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Bild konnte nicht geladen werden');
+      c.appendChild(fb);
+      advanceQueue();
+      return;
+    }
+    const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
+    c.appendChild(fill);
     const baseW = settings?.display?.baseW || 1920;
     const baseH = settings?.display?.baseH || 1080;
     const disp = baseW / baseH;
-    const ratio = img.naturalWidth / img.naturalHeight;
+    const ratio = r.w / r.h;
     fill.style.backgroundSize = ratio >= disp ? 'cover' : 'contain';
-  };
-  img.src = url;
+  });
   return c;
 }
 
@@ -602,6 +617,7 @@ function renderVideo(src, opts = {}) {
     console.error('[video] error', e);
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     if (v.parentNode) v.parentNode.replaceChild(fallback, v);
+    advanceQueue();
   });
   if (settings?.slides?.waitForVideo) {
     const done = () => {
@@ -616,7 +632,6 @@ function renderVideo(src, opts = {}) {
       slideTimer = setTimeout(done, ms);
     }, { once: true });
     v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
-    v.addEventListener('error', () => { done(); }, { once: true });
   }
   const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
@@ -744,6 +759,11 @@ if (footNodes.length){
     } else {
       cb();
     }
+  }
+
+  function advanceQueue(){
+    clearTimers();
+    hide(() => { idx++; step(); });
   }
 
 function dwellMsForItem(item) {
