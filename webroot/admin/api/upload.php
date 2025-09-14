@@ -1,3 +1,4 @@
+
 <?php
 // file: /var/www/signage/admin/api/upload.php
 // Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos)
@@ -65,7 +66,6 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
 // optional preview image (thumb)
 $thumbPath = null;
-$thumbFallback = false;
 if ($subDir === 'img'){
   $thumbPath = $publicPath;
 } elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
@@ -97,9 +97,6 @@ if ($subDir === 'img'){
 // final fallback to generic icon
 if (!$thumbPath){
   $thumbPath = $fallbackThumb;
-  $thumbFallback = true;
 }
 
-$resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
-if ($thumbFallback) $resp['thumbFallback'] = true;
-echo json_encode($resp);
+echo json_encode(['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath]);

@@ -363,12 +363,12 @@ function renderHighlightBox(){
   const flameTf = settings.assets?.flameThumbFallback;
   updateFlamePreview(flameTf ? THUMB_FALLBACK : $('#flameImg').value);
 
-  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p, tp, err, tf)=>{
+  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p, tp)=>{
     settings.assets = settings.assets || {};
     settings.assets.flameImage = p;
-    settings.assets.flameThumbFallback = !!tf;
+    settings.assets.flameThumbFallback = (tp === THUMB_FALLBACK);
     $('#flameImg').value = p;
-    updateFlamePreview(tf ? THUMB_FALLBACK : p);
+    updateFlamePreview(tp);
   });
 
   $('#resetFlame').onclick = ()=>{
