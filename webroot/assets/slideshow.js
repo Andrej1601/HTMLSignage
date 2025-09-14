@@ -62,6 +62,19 @@
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
   let cachedDisp = null;
+  let heartbeatTimer = null;
+  let pollTimer = null;
+
+  window.addEventListener('beforeunload', () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  });
 
   const imgCache = new Set();
   function preloadImage(url){
@@ -921,22 +934,28 @@ function showPairing(){
       const el = document.getElementById('code');
       if (el) el.textContent = code;
 
-      const timer = setInterval(async ()=>{
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
         try {
-          const rr = await fetch('/pair/poll?code='+encodeURIComponent(code), {cache:'no-store'});
+          const rr = await fetch('/pair/poll?code=' + encodeURIComponent(code), { cache: 'no-store' });
           if (!rr.ok) return;
           const jj = await rr.json();
-          if (jj && jj.paired && jj.deviceId){
-            clearInterval(timer);
+          if (jj && jj.paired && jj.deviceId) {
+            clearInterval(pollTimer);
+            pollTimer = null;
             ls.remove('pairState');
             ls.set('deviceId', jj.deviceId);
             // sofortigen Heartbeat absetzen und dann aktualisieren
             fetch('/api/heartbeat.php', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ device: jj.deviceId })
             }).catch(e => console.error('[heartbeat] post-pair failed', e));
-            location.replace('/?device='+encodeURIComponent(jj.deviceId));
+            location.replace('/?device=' + encodeURIComponent(jj.deviceId));
           }
         } catch {}
       }, 3000);
@@ -981,7 +1000,8 @@ try {
       }).catch(e => console.error('[heartbeat] failed', e));
     };
     sendHeartbeat();
-    setInterval(sendHeartbeat, 60 * 1000);
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(sendHeartbeat, 60 * 1000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
  showPairing();
@@ -1008,12 +1028,14 @@ console.error('[bootstrap] resolve failed:', e);
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
 
-    const pollTimer = setInterval(async () => {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
       try {
         if (deviceMode) {
           const r = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, {cache:'no-store'});
           if (r.status === 404) {
             clearInterval(pollTimer);
+            pollTimer = null;
             clearTimers();
             showPairing();
             return;
