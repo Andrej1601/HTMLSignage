@@ -554,9 +554,17 @@ onResizeCurrent = recalc;
 
 // ---------- Interstitial image slide ----------
 function renderImage(url) {
-  const c = h('div', { class: 'container imgslide fade show' }, [
-    h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' })
-  ]);
+  const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
+  const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
+  const img = new Image();
+  img.onload = () => {
+    const baseW = settings?.display?.baseW || 1920;
+    const baseH = settings?.display?.baseH || 1080;
+    const disp = baseW / baseH;
+    const ratio = img.naturalWidth / img.naturalHeight;
+    fill.style.backgroundSize = ratio >= disp ? 'cover' : 'contain';
+  };
+  img.src = url;
   return c;
 }
 
@@ -568,7 +576,14 @@ function renderVideo(src, opts = {}) {
   if (opts.muted !== undefined) v.muted = !!opts.muted;
   else v.muted = true;
   v.playsInline = true;
-  v.setAttribute('style', 'object-fit:cover');
+  const fit = () => {
+    const baseW = settings?.display?.baseW || 1920;
+    const baseH = settings?.display?.baseH || 1080;
+    const disp = baseW / baseH;
+    const ratio = (v.videoWidth || baseW) / (v.videoHeight || baseH);
+    v.style.objectFit = ratio >= disp ? 'cover' : 'contain';
+  };
+  if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
   v.src = src;
   v.addEventListener('canplay', () => v.play());
   v.addEventListener('error', (e) => {
