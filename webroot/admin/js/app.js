@@ -224,9 +224,6 @@ function renderSlidesBox(){
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
 
-  // Anzeige / Scaling
-  setV('#fitMode', settings.display?.fit || 'cover');
-
   // Schrift
   setV('#fontFamily', f.family ?? DEFAULTS.fonts.family);
   setV('#fontScale',  f.scale  ?? 1);
@@ -263,8 +260,6 @@ function renderSlidesBox(){
   const reset = document.querySelector('#resetSlides');
   if (!reset) return;
   reset.onclick = ()=>{
-    setV('#fitMode', 'cover');
-
     setV('#fontFamily', DEFAULTS.fonts.family);
     setV('#fontScale', 1);
     setV('#h1Scale', 1);
@@ -534,7 +529,7 @@ function collectSettings(){
         minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
       },
       assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
-      display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080,
+      display:{ ...(settings.display||{}), fit: 'auto', baseW:1920, baseH:1080,
         rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
       footnotes: settings.footnotes,
       interstitials: settings.interstitials || [],
