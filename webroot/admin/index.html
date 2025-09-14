@@ -8,28 +8,28 @@
 </head>
 <body class="theme-light">
   <header>
-    <div class="row header-title">
+    <div class="header-title">
       <h1>Anzeigensteuerung – Admin</h1>
       <label class="toggle" title="Hell/Dunkel">
         <input type="checkbox" id="themeMode">
         <span id="themeLabel">Dunkel</span>
       </label>
-      <div class="header-actions">
-        <!-- Ansicht-Menü -->
-        <button class="btn" id="btnDevices">Geräte</button>
-        <div class="menuwrap" id="viewMenuWrap">
-          <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-            Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-          </button>
-          <div class="dropdown" id="viewMenu" role="menu" hidden>
-            <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-            <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-          </div>
+    </div>
+    <div class="header-actions">
+      <!-- Ansicht-Menü -->
+      <button class="btn" id="btnDevices">Geräte</button>
+      <div class="menuwrap" id="viewMenuWrap">
+        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+        </button>
+        <div class="dropdown" id="viewMenu" role="menu" hidden>
+          <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+          <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
         </div>
-        <button class="btn" id="btnHelp">Hilfe</button>
-        <button class="btn" id="btnOpen">Slideshow öffnen</button>
-        <button class="btn primary" id="btnSave">Speichern</button>
       </div>
+      <button class="btn" id="btnHelp">Hilfe</button>
+      <button class="btn" id="btnOpen">Slideshow öffnen</button>
+      <button class="btn primary" id="btnSave">Speichern</button>
     </div>
   </header>
 
