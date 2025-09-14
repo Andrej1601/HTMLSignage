@@ -21,8 +21,7 @@
   "display": {
     "rightWidthPercent": 38,
     "cutTopPercent": 28,
-    "cutBottomPercent": 12,
-    "videoFit": "cover"
+    "cutBottomPercent": 12
   },
   "slides": {
     "overviewDurationSec": 10,
