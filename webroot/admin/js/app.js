@@ -976,17 +976,21 @@ function destroyDockPane(){
   }
 }
 
-function viewLabel(v){ return v==='preview' ? 'Vorschau' : v==='devices' ? 'Geräte' : 'Grid'; }
+function viewLabel(v){
+  return v === 'preview' ? 'Vorschau' : 'Grid';
+}
 
 async function showView(v){
   currentView = v;
   localStorage.setItem('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
-  if (labelEl) labelEl.textContent = viewLabel(v);
-  document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
-    it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
-  });
+  if (labelEl && v !== 'devices') labelEl.textContent = viewLabel(v);
+  if (v !== 'devices'){
+    document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
+      it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
+    });
+  }
 
   const gridCard = document.getElementById('gridPane');
   if (!gridCard) return;
@@ -1061,6 +1065,9 @@ function initViewMenu(){
     if (e.key === '2') { await showView('preview'); closeMenu(); }
     if (e.key === '3') { await showView('devices'); closeMenu(); }
   });
+
+  const btnDevices = document.getElementById('btnDevices');
+  if (btnDevices) btnDevices.onclick = ()=> showView('devices');
 
   document.getElementById('viewMenuLabel').textContent = viewLabel(currentView);
   // Initial zeichnen

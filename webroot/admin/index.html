@@ -13,20 +13,17 @@
         <input type="checkbox" id="themeMode">
         <span id="themeLabel">Dunkel</span>
       </label>
-      <h1>Aufguss – Admin</h1>
-    </div>
-    <div class="row">
-      <!-- Ansicht-Menü -->
-      <div class="menuwrap" id="viewMenuWrap">
-        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-        </button>
-        <div class="dropdown" id="viewMenu" role="menu" hidden>
-          <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-          <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-          <button class="dd-item" role="menuitemradio" data-view="devices" aria-checked="false">🖥 Geräte</button>
-        </div>
-      </div>
+<!-- Ansicht-Menü -->
+<button class="btn" id="btnDevices">Geräte</button>
+<div class="menuwrap" id="viewMenuWrap">
+  <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+    Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+  </button>
+  <div class="dropdown" id="viewMenu" role="menu" hidden>
+    <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+    <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+  </div>
+</div>
       <button class="btn" id="btnHelp">Hilfe</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
