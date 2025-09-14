@@ -708,14 +708,14 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p) => {
+        fi.onchange = () => uploadGeneric(fi, (p, tp) => {
           const ts = Date.now();
           const addV = (u) => {
             const clean = stripCache(u);
             return clean + (clean.includes('?') ? '&' : '?') + 'v=' + ts;
           };
-          it.url = addV(p);
-          it.thumb = FALLBACK_THUMB;
+          it.url   = addV(p);
+          it.thumb = addV(tp || p || FALLBACK_THUMB);
           updatePrev(it.thumb);
           renderSlidesMaster();
         });
