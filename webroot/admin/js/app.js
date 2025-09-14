@@ -729,22 +729,16 @@ async function createDevicesPane(){
   // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
   async function fetchDevicesStatus(){
     try {
-      const r = await fetch('/admin/api/devices_status.php', {cache:'no-store'});
+      const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
       if (r.ok) {
         const j = await r.json();
-        const pairings = [];
-        if (j.openPairing) {
-          const created = j.openPairing.created ?? j.openPairing.createdAt;
-          pairings.push({
-            code: j.openPairing.code,
-            createdAt: created,
-            expiresAt: created ? created + 900 : null
-          });
-        }
+        const pairings = j.pairings || [];
         const devices = (j.devices || []).map(d => ({
           id: d.id,
           name: d.name || '',
-          lastSeenAt: d.lastSeen || d.lastSeenAt || 0
+          lastSeenAt: d.lastSeenAt || 0,
+          offline: !!d.offline,
+          useOverrides: !!d.useOverrides
         }));
         return { ok:true, pairings, devices };
       }
@@ -756,8 +750,19 @@ async function createDevicesPane(){
         const pairings = Object.values(j2.pairings || {})
           .filter(p => !p.deviceId)
           .map(p => ({ code: p.code, createdAt: p.created }));
-        const devices = Object.values(j2.devices || {})
-          .map(d => ({ id: d.id, name: d.name || '', lastSeenAt: d.lastSeen || 0 }));
+        const now = j2.now || 0;
+        const OFFLINE_AFTER_MIN = 10;
+        const devices = Object.values(j2.devices || {}).map(d => {
+          const lastSeenAt = d.lastSeen || 0;
+          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+          return {
+            id: d.id,
+            name: d.name || '',
+            lastSeenAt,
+            offline,
+            useOverrides: !!d.useOverrides
+          };
+        });
         return { ok:true, pairings, devices };
       }
     } catch(e){}
