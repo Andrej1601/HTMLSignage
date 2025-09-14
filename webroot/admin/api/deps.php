@@ -8,7 +8,6 @@ function hasCommand($cmd){
 }
 
 $resp = [
-  'ffmpeg' => ['cli' => hasCommand('ffmpeg')],
   'curl'   => ['cli' => hasCommand('curl'), 'extension' => extension_loaded('curl')],
   'gd'     => ['extension' => extension_loaded('gd')]
 ];
