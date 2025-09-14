@@ -18,7 +18,6 @@ import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
-const OFFLINE_AFTER_MIN = 10;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
 
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
@@ -790,7 +789,6 @@ async function createDevicesPane(){
     const L = document.getElementById('devPairedList');
     L.innerHTML = '';
     const paired = (j.devices || []);
-    const now = Date.now() / 1000;
     if (!paired.length) {
       L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
     } else {
@@ -804,7 +802,7 @@ async function createDevicesPane(){
       };
       paired.forEach(d=>{
         const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
-        const offline = !d.lastSeenAt || ((now - d.lastSeenAt) / 60) > OFFLINE_AFTER_MIN;
+        const offline = d.offline;
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');
