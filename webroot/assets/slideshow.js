@@ -999,6 +999,8 @@ function showPairing(){
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ device: jj.deviceId })
+            }).then(r => {
+              if (!r.ok) throw new Error('heartbeat http ' + r.status);
             }).catch(e => console.error('[heartbeat] post-pair failed', e));
             location.replace('/?device=' + encodeURIComponent(jj.deviceId));
           }

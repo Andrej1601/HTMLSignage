@@ -9,6 +9,7 @@ header('Cache-Control: no-store');
 
 $db = devices_load();
 $now = time();
+if (!defined('OFFLINE_AFTER_MIN')) define('OFFLINE_AFTER_MIN', 10);
 
 $pairings = [];
 foreach (($db['pairings'] ?? []) as $code => $row) {
@@ -25,10 +26,13 @@ usort($pairings, fn($a,$b)=>($b['createdAt']??0)-($a['createdAt']??0));
 $devices = [];
 foreach (($db['devices'] ?? []) as $id => $d) {
 
+  $lastSeen = (int)($d['lastSeen'] ?? 0);
+  $offline = !$lastSeen || ($now - $lastSeen) > OFFLINE_AFTER_MIN * 60;
   $devices[] = [
     'id' => $id,
     'name' => $d['name'] ?? $id,
-    'lastSeenAt' => (int)($d['lastSeen'] ?? 0) ?: null,
+    'lastSeenAt' => $lastSeen ?: null,
+    'offline' => $offline,
     'useOverrides' => !empty($d['useOverrides']),
     'overrides' => [
       'settings' => $d['overrides']['settings'] ?? (object)[],
