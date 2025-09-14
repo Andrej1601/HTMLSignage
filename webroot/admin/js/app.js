@@ -23,11 +23,18 @@ const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
 
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
 const LS_MEM = {};
+let lsWarned = false;
+function lsNotice(){
+  if (lsWarned) return;
+  lsWarned = true;
+  alert('Speicher voll – Daten werden nur temporär gespeichert.');
+}
 function lsGet(key) {
   try { return localStorage.getItem(key); }
   catch (e) {
     if (e instanceof DOMException) {
       console.warn('[admin] localStorage.getItem failed', e);
+      lsNotice();
       return LS_MEM[key] ?? null;
     }
     return null;
@@ -38,6 +45,7 @@ function lsSet(key, val) {
   catch (e) {
     if (e instanceof DOMException) {
       console.warn('[admin] localStorage.setItem failed', e);
+      lsNotice();
       LS_MEM[key] = String(val);
     }
   }
@@ -47,6 +55,7 @@ function lsRemove(key) {
   catch (e) {
     if (e instanceof DOMException) {
       console.warn('[admin] localStorage.removeItem failed', e);
+      lsNotice();
     }
   }
   delete LS_MEM[key];

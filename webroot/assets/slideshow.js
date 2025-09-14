@@ -5,18 +5,42 @@
   const Q = new URLSearchParams(location.search);
   const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
   const LS_MEM = {};
+  let lsWarned = false;
+  function lsNotice(){
+    if (lsWarned) return;
+    lsWarned = true;
+    alert('Speicher voll – Daten werden nur temporär gespeichert.');
+  }
   const ls = {
     get(k){
       try { return localStorage.getItem(k); }
-      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.getItem failed', e); return LS_MEM[k] ?? null; } return null; }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.getItem failed', e);
+          lsNotice();
+          return LS_MEM[k] ?? null;
+        }
+        return null;
+      }
     },
     set(k,v){
       try { localStorage.setItem(k,v); }
-      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.setItem failed', e); LS_MEM[k] = String(v); } }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.setItem failed', e);
+          lsNotice();
+          LS_MEM[k] = String(v);
+        }
+      }
     },
     remove(k){
       try { localStorage.removeItem(k); }
-      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.removeItem failed', e); } }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.removeItem failed', e);
+          lsNotice();
+        }
+      }
       delete LS_MEM[k];
     }
   };
@@ -878,7 +902,7 @@ function showPairing(){
   (async ()=>{
     try {
       // Bestehenden Code (localStorage) wiederverwenden – Tabs teilen den Code
-      let st = null; try { st = JSON.parse(localStorage.getItem('pairState')||'null'); } catch {}
+      let st = null; try { st = JSON.parse(ls.get('pairState')||'null'); } catch {}
       let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
 
       if (!code) {
@@ -891,7 +915,7 @@ function showPairing(){
         const j0 = await r.json();
         if (!j0 || !j0.code) throw new Error('begin payload');
         code = j0.code;
-        localStorage.setItem('pairState', JSON.stringify({ code, createdAt: Date.now() }));
+        ls.set('pairState', JSON.stringify({ code, createdAt: Date.now() }));
       }
 
       const el = document.getElementById('code');
@@ -904,7 +928,7 @@ function showPairing(){
           const jj = await rr.json();
           if (jj && jj.paired && jj.deviceId){
             clearInterval(timer);
-            try{ localStorage.removeItem('pairState'); }catch{}
+            ls.remove('pairState');
             ls.set('deviceId', jj.deviceId);
             // sofortigen Heartbeat absetzen und dann aktualisieren
             fetch('/api/heartbeat.php', {
