@@ -22,7 +22,12 @@
   };
   const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
   const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
-  if (!DEVICE_ID) ls.remove('deviceId'); // Karteileichen loswerden
+  if (DEVICE_ID) {
+    // persist valid device IDs for subsequent loads
+    ls.set('deviceId', DEVICE_ID);
+  } else {
+    ls.remove('deviceId'); // Karteileichen loswerden
+  }
   let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
 
   let schedule = null;
@@ -901,6 +906,12 @@ function showPairing(){
             clearInterval(timer);
             try{ localStorage.removeItem('pairState'); }catch{}
             ls.set('deviceId', jj.deviceId);
+            // sofortigen Heartbeat absetzen und dann aktualisieren
+            fetch('/api/heartbeat.php', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ device: jj.deviceId })
+            }).catch(e => console.error('[heartbeat] post-pair failed', e));
             location.replace('/?device='+encodeURIComponent(jj.deviceId));
           }
         } catch {}
@@ -935,16 +946,18 @@ async function bootstrap(){
     if (deviceMode) {
 try {
     await loadDeviceResolved(DEVICE_ID);
-    // Heartbeat: sofort + alle 5min
+    // Heartbeat: sofort + alle 60s
     const sendHeartbeat = () => {
       fetch('/api/heartbeat.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ device: DEVICE_ID })
-      }).catch(()=>{});
+      }).then(r => {
+        if (!r.ok) throw new Error('heartbeat http ' + r.status);
+      }).catch(e => console.error('[heartbeat] failed', e));
     };
     sendHeartbeat();
-    setInterval(sendHeartbeat, 5 * 60 * 1000);
+    setInterval(sendHeartbeat, 60 * 1000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
  showPairing();
