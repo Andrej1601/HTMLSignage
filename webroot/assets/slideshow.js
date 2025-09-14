@@ -332,86 +332,18 @@ function buildQueue() {
     }
   }
 
-  // Hilfen
+  // Medien nach Übersicht einfügen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
-
-  // Mehrpass-Einfügen, damit "nach Bild" funktioniert
-  let remaining = media.slice();
-  let guard = 0;
-  while (remaining.length && guard++ < media.length * 3) {
-    const postponed = [];
-    for (const it of remaining) {
-      const ref = (it.afterRef || it.after || 'overview');
-      let insPos = -1;
-
-      if (ref === 'overview') {
-        const io = idxOverview();
-        insPos = (io >= 0) ? io + 1 : 0;
-      } else if (String(ref).startsWith('img:')) {
-        // nach Bild/Medien-Item: nur einfügen, wenn das Ziel bereits platziert ist
-        const prevId = String(ref).slice(4);
-        const prevIndex = queue.findIndex(x => x.__id === prevId);
-        if (prevIndex === -1) { postponed.push(it); continue; }
-        insPos = prevIndex + 1;
-      } else {
-        // nach Sauna (Name)
-        const saunaName = decodeURIComponent(String(ref));
-        const direct = queue.findIndex(x => x.type === 'sauna' && x.sauna === saunaName);
-        if (direct !== -1) {
-          // Zielsauna ist sichtbar → direkt dahinter
-          insPos = direct + 1;
-        } else {
-          // Zielsauna ist NICHT sichtbar → vor der nächsten sichtbaren Sauna in der Referenz-Reihenfolge
-          let nextVisible = null;
-          if (saunaOrderRef.length && visibleSaunas.length) {
-            const start = saunaOrderRef.indexOf(saunaName);
-            // falls die Referenzsauna gar nicht existiert, einfach ab 0 suchen
-            let k = (start >= 0 ? start : -1) + 1;
-            for (let step = 0; step < saunaOrderRef.length; step++, k++) {
-              const cand = saunaOrderRef[k % saunaOrderRef.length];
-              if (!hidden.has(cand)) { nextVisible = cand; break; }
-            }
-          }
-          if (nextVisible) {
-            const posQ = queue.findIndex(x => x.type === 'sauna' && x.sauna === nextVisible);
-            insPos = (posQ >= 0) ? posQ : -1; // vor nächster Sauna einfügen
-          }
-
-          // Fallback: nach Overview oder ganz vorn
-          if (insPos === -1) {
-            const io = idxOverview();
-            insPos = (io >= 0) ? io + 1 : 0;
-          }
-        }
-      }
-
-      // Medien-Node einfügen
-      const dwell = Number.isFinite(+it.dwellSec)
-        ? +it.dwellSec
-        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
-
-      const node = { type: it.type, dwell, __id: it.id || null };
-      if (it.src) node.src = it.src;
-      if (it.url && it.type === 'url') node.url = it.url;
-      queue.splice(insPos, 0, node);
-    }
-    remaining = postponed;
-  }
-
-  if (remaining.length) {
-    console.warn('Unplaced media items, appending to end:', remaining);
-    let insPos = idxOverview();
-    insPos = (insPos >= 0) ? insPos + 1 : queue.length;
-    for (const it of remaining) {
-      const dwell = Number.isFinite(+it.dwellSec)
-        ? +it.dwellSec
-        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
-
-      const node = { type: it.type, dwell, __id: it.id || null };
-      if (it.src) node.src = it.src;
-      if (it.url && it.type === 'url') node.url = it.url;
-      queue.splice(insPos++, 0, node);
-    }
+  let insPos = idxOverview();
+  insPos = (insPos >= 0) ? insPos + 1 : 0;
+  for (const it of media) {
+    const dwell = Number.isFinite(+it.dwellSec)
+      ? +it.dwellSec
+      : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+    const node = { type: it.type, dwell, __id: it.id || null };
+    if (it.src) node.src = it.src;
+    if (it.url && it.type === 'url') node.url = it.url;
+    queue.splice(insPos++, 0, node);
   }
 
   // Falls nichts bleibt, notfalls Übersicht zeigen
