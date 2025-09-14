@@ -11,6 +11,14 @@ structure:
 The installer applies secure defaults (basic auth for the admin interface,
 strict file permissions and PHP hardening) and ensures reproducible setup.
 
+## Requirements
+
+PHP extensions `curl` and `gd` must be enabled. On Debian/Ubuntu systems:
+
+```bash
+sudo apt-get install php-curl php-gd
+```
+
 ## Usage
 
 Run the installer as root:

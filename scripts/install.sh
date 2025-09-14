@@ -43,7 +43,7 @@ main(){
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
-  apt-get install -y nginx php8.3-fpm php8.3-cli php8.3-xml php8.3-mbstring php8.3-curl jq unzip curl git rsync
+  apt-get install -y nginx php8.3-fpm php8.3-cli php8.3-xml php8.3-mbstring php8.3-curl php8.3-gd jq unzip curl git rsync
 
   log "Deploying application files"
   rsync -a webroot/ "$APP_DIR"/
