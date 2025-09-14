@@ -946,8 +946,8 @@ function showPairing(){
 
   (async ()=>{
     try {
-      // Bestehenden Code (Session) wiederverwenden – verhindert neuen Code bei Refresh
-      let st = null; try { st = JSON.parse(sessionStorage.getItem('pairState')||'null'); } catch {}
+      // Bestehenden Code (localStorage) wiederverwenden – Tabs teilen den Code
+      let st = null; try { st = JSON.parse(localStorage.getItem('pairState')||'null'); } catch {}
       let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
 
       if (!code) {
@@ -960,7 +960,7 @@ function showPairing(){
         const j0 = await r.json();
         if (!j0 || !j0.code) throw new Error('begin payload');
         code = j0.code;
-        sessionStorage.setItem('pairState', JSON.stringify({ code, createdAt: Date.now() }));
+        localStorage.setItem('pairState', JSON.stringify({ code, createdAt: Date.now() }));
       }
 
       const el = document.getElementById('code');
@@ -973,7 +973,7 @@ function showPairing(){
           const jj = await rr.json();
           if (jj && jj.paired && jj.deviceId){
             clearInterval(timer);
-            try{ sessionStorage.removeItem('pairState'); }catch{}
+            try{ localStorage.removeItem('pairState'); }catch{}
             ls.set('deviceId', jj.deviceId);
             location.replace('/?device='+encodeURIComponent(jj.deviceId));
           }

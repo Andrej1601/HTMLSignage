@@ -709,7 +709,7 @@ async function createDevicesPane(){
         <div id="devPairedList" class="kv"></div>
       </div>
 
-      <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code.</small>
+      <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code. Codes werden nach 15 Minuten Inaktivität neu erzeugt.</small>
     </div>`;
 
   host?.insertBefore(card, host.firstChild);
