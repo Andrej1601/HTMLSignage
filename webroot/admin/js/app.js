@@ -413,98 +413,17 @@ const host = $('#colorList');
 function ensureColorTools(){
   const host = document.getElementById('colorList');
   if (!host) return;
-  if (document.getElementById('colorTools')) return; // schon da
+  if (document.getElementById('colorToolsLink')) return; // schon da
 
-  const box = document.createElement('div');
-  box.id = 'colorTools';
-  box.className = 'fieldset';
-  box.innerHTML = `
-    <div class="legendRow">
-      <div class="legend">Farb-Werkzeuge</div>
-<button class="btn sm ghost" id="togglePickerSize" title="Iframe Höhe expandieren/zusammenklappen">⛶</button>
-
-</div>
-
-        <div id="pickerWrap" class="pickerResizable">
-          <iframe
-            id="hexPickerFrame"
-            class="pickerFrame"
-            src="https://colorhunt.co/"
-            loading="lazy"
-            referrerpolicy="no-referrer"
-            title="Hex Color Picker"></iframe>
-        </div>
-      </div>
-    </div>
-
-    <div class="kv">
-      <label>Schnell-Picker</label>
-      <div class="row" style="gap:8px;flex-wrap:nowrap">
-        <input type="color" id="quickColor" class="input">
-        <input type="text" id="quickHex" class="input" value="#FFDD66" placeholder="#RRGGBB">
-        <button class="btn sm" id="copyHex" title="Hex in Zwischenablage kopieren"># kopieren</button>
-        <span id="copyState" class="mut"></span>
-      </div>
-    </div>
-  `;
+  const link = document.createElement('a');
+  link.id = 'colorToolsLink';
+  link.href = 'https://colorhunt.co';
+  link.target = '_blank';
+  link.textContent = 'Colorhunt öffnen';
 
   // hinter die Farbliste setzen
-  host.after(box);
-
-  // Controls
-  const $wrap = document.getElementById('pickerWrap');
-  const $toggle = document.getElementById('togglePickerSize');
-  const $qc = document.getElementById('quickColor');
-  const $qh = document.getElementById('quickHex');
-  const $cp = document.getElementById('copyHex');
-  const $st = document.getElementById('copyState');
-
-  // Höhe aus LocalStorage wiederherstellen (nur "Normalmodus")
-const savedH = parseInt(localStorage.getItem('colorPickerH') || '0', 10);
-const savedW = parseInt(localStorage.getItem('colorPickerW') || '0', 10);
-if (savedH >= 140) $wrap.style.height = savedH + 'px';
-if (savedW >= 260) $wrap.style.width  = savedW + 'px';
-
-  // expand/collapse und Reset auf Standardmaße
-  $toggle.onclick = () => {
-    if (!box.classList.contains('exp')) {
-      box.classList.add('exp');
-      $wrap.style.width = '100%';
-    } else {
-      box.classList.remove('exp');
-      $wrap.style.height = '180px';
-      $wrap.style.width = '100%';
-      localStorage.removeItem('colorPickerH');
-      localStorage.removeItem('colorPickerW');
-    }
-  };
-
-// Größe speichern (nur wenn nicht expanded)
-const ro = new ResizeObserver((entries)=>{
-  if (box.classList.contains('exp')) return;
-  for (const e of entries){
-    const {height, width} = e.contentRect;
-    if (height >= 140) localStorage.setItem('colorPickerH', String(Math.round(height)));
-    if (width  >= 260) localStorage.setItem('colorPickerW', String(Math.round(width)));
-  }
-});
-ro.observe($wrap);
-
-  // Schnell-Picker Logik
-  if (/^#([0-9A-Fa-f]{6})$/.test($qh.value)) $qc.value = $qh.value;
-  $qc.addEventListener('input', ()=>{ $qh.value = ($qc.value || '').toUpperCase(); });
-  $qh.addEventListener('input', ()=>{
-    const v = ($qh.value||'').trim();
-    if (/^#([0-9A-Fa-f]{6})$/.test(v)) $qc.value = v;
-  });
-  $cp.onclick = async ()=>{
-    const v = ($qh.value||'').trim().toUpperCase();
-    if (!/^#([0-9A-F]{6})$/.test(v)) { alert('Bitte gültigen Hex-Wert: #RRGGBB'); return; }
-    try { await navigator.clipboard.writeText(v); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
-    catch { $qh.select(); document.execCommand?.('copy'); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
-  };
+  host.after(link);
 }
-
 
 // ============================================================================
 // 5) Fußnoten
