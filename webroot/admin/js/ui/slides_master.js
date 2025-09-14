@@ -940,26 +940,67 @@ function renderInterstitialsPanel(hostId='interList2'){
 // ============================================================================
 export function renderSlideOrderView(){
   const settings = ctx.getSettings();
-  const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const schedule = ctx.getSchedule();
   const host = document.getElementById('slideOrderGrid');
   if (!host) return;
 
+  const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
+  const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
+    .map(it => ({ kind: 'media', item: it }));
+
+  let combined = [];
+  const ord = settings?.slides?.sortOrder;
+  if (Array.isArray(ord) && ord.length){
+    const mapS = new Map(saunas.map(s => [s.name, s]));
+    const mapM = new Map(media.map(m => [String(m.item.id), m]));
+    for (const o of ord){
+      if (o.type === 'sauna' && mapS.has(o.name)){
+        combined.push(mapS.get(o.name));
+        mapS.delete(o.name);
+      } else if (o.type === 'media' && mapM.has(String(o.id))){
+        combined.push(mapM.get(String(o.id)));
+        mapM.delete(String(o.id));
+      }
+    }
+    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()));
+    // sortOrder ggf. bereinigen (nicht mehr existierende Einträge entfernen)
+    settings.slides.sortOrder = combined.map(e => e.kind === 'sauna'
+      ? { type:'sauna', name:e.name }
+      : { type:'media', id:e.item.id });
+  } else {
+    combined = saunas.concat(media);
+  }
+
   host.innerHTML = '';
-  list.forEach((it, idx) => {
+  combined.forEach((entry, idx) => {
     const tile = document.createElement('div');
     tile.className = 'slide-order-tile';
     tile.draggable = true;
     tile.dataset.idx = idx;
+    tile.dataset.type = entry.kind;
 
     const title = document.createElement('div');
     title.className = 'title';
-    title.textContent = it.name || '(unbenannt)';
-    tile.appendChild(title);
-
-    const img = document.createElement('img');
-    img.src = it.thumb || it.url || '';
-    img.alt = it.name || '';
-    tile.appendChild(img);
+    if (entry.kind === 'sauna'){
+      tile.dataset.name = entry.name;
+      title.textContent = entry.name;
+      tile.appendChild(title);
+      const imgSrc = settings.assets?.rightImages?.[entry.name] || '';
+      if (imgSrc){
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = entry.name || '';
+        tile.appendChild(img);
+      }
+    } else {
+      tile.dataset.id = entry.item.id;
+      title.textContent = entry.item.name || '(unbenannt)';
+      tile.appendChild(title);
+      const img = document.createElement('img');
+      img.src = entry.item.thumb || entry.item.url || '';
+      img.alt = entry.item.name || '';
+      tile.appendChild(img);
+    }
 
     host.appendChild(tile);
   });
@@ -984,8 +1025,26 @@ export function renderSlideOrderView(){
     tile.addEventListener('dragend', () => {
       tile.classList.remove('dragging');
       const tiles = Array.from(host.children);
-      settings.interstitials = tiles.map(el => list[+el.dataset.idx]);
+      const reordered = tiles.map(el => combined[+el.dataset.idx]);
+      combined = reordered;
       tiles.forEach((el, i) => el.dataset.idx = i);
+
+      const newSaunas = [];
+      const newMedia = [];
+      const sortOrder = [];
+      for (const entry of reordered){
+        if (entry.kind === 'sauna'){
+          newSaunas.push(entry.name);
+          sortOrder.push({ type:'sauna', name: entry.name });
+        } else {
+          newMedia.push(entry.item);
+          sortOrder.push({ type:'media', id: entry.item.id });
+        }
+      }
+      schedule.saunas = newSaunas;
+      settings.interstitials = newMedia;
+      settings.slides ||= {};
+      settings.slides.sortOrder = sortOrder;
     });
   });
 }

@@ -236,6 +236,63 @@ function buildQueue() {
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
   const allSaunas = (schedule?.saunas || []);
+  const sortOrder = Array.isArray(settings?.slides?.sortOrder) ? settings.slides.sortOrder : null;
+
+  if (sortOrder && sortOrder.length) {
+    const queue = [];
+    if (showOverview) queue.push({ type: 'overview' });
+    const mediaAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+    const mediaMap = new Map(mediaAll.map(it => [String(it.id), it]));
+    const usedSaunas = new Set();
+    const usedMedia = new Set();
+    for (const entry of sortOrder) {
+      if (entry.type === 'sauna') {
+        const name = entry.name;
+        if (allSaunas.includes(name) && !hidden.has(name)) {
+          queue.push({ type: 'sauna', sauna: name });
+          usedSaunas.add(name);
+        }
+      } else if (entry.type === 'media') {
+        const it = mediaMap.get(String(entry.id));
+        if (it && it.enabled) {
+          const dwell = Number.isFinite(+it.dwellSec)
+            ? +it.dwellSec
+            : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+          const node = { type: it.type, dwell, __id: it.id || null };
+          if (it.url) {
+            if (it.type === 'url') node.url = it.url; else node.src = it.url;
+          }
+          queue.push(node);
+          usedMedia.add(String(it.id));
+        }
+      }
+    }
+    for (const s of allSaunas) {
+      if (!usedSaunas.has(s) && !hidden.has(s)) queue.push({ type: 'sauna', sauna: s });
+    }
+    for (const it of mediaAll) {
+      const idStr = String(it.id);
+      if (!usedMedia.has(idStr) && it && it.enabled) {
+        const dwell = Number.isFinite(+it.dwellSec)
+          ? +it.dwellSec
+          : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+        const node = { type: it.type, dwell, __id: it.id || null };
+        if (it.url) {
+          if (it.type === 'url') node.url = it.url; else node.src = it.url;
+        }
+        queue.push(node);
+      }
+    }
+    const clean = [];
+    for (const q of queue) {
+      if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
+      else if (q.__id != null) clean.push({ type: 'media', id: q.__id });
+    }
+    settings.slides.sortOrder = clean;
+    if (!queue.length && showOverview) queue.push({ type: 'overview' });
+    nextQueue.splice(0, nextQueue.length, ...queue);
+    return;
+  }
 
   // Referenz-Reihenfolge für Saunen (Order aus Settings, dann Rest)
   const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
