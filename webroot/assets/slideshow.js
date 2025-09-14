@@ -1035,19 +1035,31 @@ async function bootstrap(){
     if (deviceMode) {
 try {
     await loadDeviceResolved(DEVICE_ID);
-    // Heartbeat: sofort + alle 60s
+    // Heartbeat: sofort + alle 30s
     const sendHeartbeat = () => {
-      fetch('/api/heartbeat.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device: DEVICE_ID })
-      }).then(r => {
-        if (!r.ok) throw new Error('heartbeat http ' + r.status);
-      }).catch(e => console.error('[heartbeat] failed', e));
+      const payload = JSON.stringify({ device: DEVICE_ID });
+      const blob = new Blob([payload], { type: 'application/json' });
+      let sent = false;
+      if (navigator.sendBeacon) {
+        try {
+          sent = navigator.sendBeacon('/api/heartbeat.php', blob);
+        } catch (e) {
+          console.error('[heartbeat] beacon failed', e);
+        }
+      }
+      if (!sent) {
+        fetch('/api/heartbeat.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload
+        }).then(r => {
+          if (!r.ok) throw new Error('heartbeat http ' + r.status);
+        }).catch(e => console.error('[heartbeat] failed', e));
+      }
     };
     sendHeartbeat();
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    heartbeatTimer = setInterval(sendHeartbeat, 60 * 1000);
+    heartbeatTimer = setInterval(sendHeartbeat, 30 * 1000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
  showPairing();
