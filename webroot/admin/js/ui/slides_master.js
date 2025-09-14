@@ -806,7 +806,7 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p, tp, err) => {
+        fi.onchange = () => uploadGeneric(fi, (p, tp, err, tf) => {
           const ts = Date.now();
           const addV = (u) => {
             const clean = stripCache(u);
@@ -814,11 +814,15 @@ function interRow(i){
           };
           it.url = addV(p);
           if (t === 'video') {
-            if (tp) {
+            if (tf) {
+              it.thumb = FALLBACK_THUMB;
+            } else if (tp) {
               it.thumb = addV(tp);
-            } else {
+            } else if (err) {
               it.thumb = FALLBACK_THUMB;
               alert(err || 'Kein Thumbnail vom Server erhalten');
+            } else {
+              it.thumb = FALLBACK_THUMB;
             }
           } else {
             const tv = tp || p;
@@ -849,11 +853,13 @@ function interRow(i){
             }).then(r => r.json()).then(j => {
               if (j && j.ok && j.thumb) {
                 const base = stripCache(j.thumb);
-                const t = base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
+                const isFallback = j.thumbFallback || base.endsWith('thumb_fallback.svg');
+                const t = isFallback ? FALLBACK_THUMB : base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
                 it.thumb = t;
                 updatePrev(t);
+                if (!isFallback && j.error) console.warn('Thumbnail-Hinweis:', j.error);
               } else {
-                const msg = j?.error || 'Kein Thumbnail gefunden (og:image?)';
+                const msg = j?.error || 'Kein Thumbnail gefunden';
                 alert('Thumbnail-Fehler: ' + msg);
               }
               renderSlidesMaster();
