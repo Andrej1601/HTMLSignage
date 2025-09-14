@@ -177,7 +177,22 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       document.documentElement.style.setProperty('--vwScale', String(s));
     };
     updateVwScale();
-    window.addEventListener('resize', updateVwScale, { passive:true });
+
+    let resizeRaf = null;
+    const onResize = () => {
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateVwScale();
+      });
+    };
+
+    window.addEventListener('resize', onResize, { passive:true });
+    window.addEventListener('orientationchange', onResize);
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(onResize).observe(document.documentElement);
+    }
   }
 
   function getDisplayRatio() {
@@ -187,6 +202,12 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const baseH = d.baseH || 1080;
     cachedDisp = baseW / baseH;
     return cachedDisp;
+  }
+
+  function chooseFit(mediaW, mediaH) {
+    const disp = getDisplayRatio();
+    const ratio = mediaW / mediaH;
+    return ratio >= disp ? 'cover' : 'contain';
   }
 
 // ---------- Slide queue ----------
@@ -541,18 +562,28 @@ return h('div', {}, [ t ]);
 
     const availH = container.clientHeight;
 
-    // Nur typografisch skalieren (breite bleibt 100%)
-    let iter = 0, lastTotal = Infinity;
+    // Erster grober Faktor
     let m = measure();
-while (m.totalH > availH && iter < 12) {
-  const target = availH / m.totalH;
-  const s = Math.max(0.25, Math.min(1, target * (iter ? 0.98 : 1)));
-      container.style.setProperty('--ovAuto', String(s));
-      lastTotal = m.totalH;
-      m = measure();
-      if (Math.abs(m.totalH - lastTotal) < 0.5) break;
-      iter++;
-    }
+    let s = Math.max(0.25, Math.min(1, availH / m.totalH));
+    container.style.setProperty('--ovAuto', String(s));
+
+    // Nach Layout-Update neu messen und ggf. nachjustieren
+    requestAnimationFrame(() => {
+      let m2 = measure();
+      if (m2.totalH <= availH) return;
+      let lo = 0.25, hi = s;
+      for (let i = 0; i < 4; i++) {
+        const mid = (lo + hi) / 2;
+        container.style.setProperty('--ovAuto', String(mid));
+        m2 = measure();
+        if (m2.totalH > availH) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+        if (Math.abs(m2.totalH - availH) < 1) break;
+      }
+    });
   }
 
   function renderOverview() {
@@ -575,22 +606,13 @@ onResizeCurrent = recalc;
 
 // ---------- Interstitial image slide ----------
 function renderImage(url) {
-  const c = h('div', { class: 'container imgslide fade show' });
-  preloadImg(url).then(r => {
-    if (!r.ok) {
-      const fb = h('div', { class: 'img-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Bild konnte nicht geladen werden');
-      c.appendChild(fb);
-      advanceQueue();
-      return;
-    }
-    const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
-    c.appendChild(fill);
-    const baseW = settings?.display?.baseW || 1920;
-    const baseH = settings?.display?.baseH || 1080;
-    const disp = baseW / baseH;
-    const ratio = r.w / r.h;
-    fill.style.backgroundSize = ratio >= disp ? 'cover' : 'contain';
-  });
+  const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
+  const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
+  const img = new Image();
+  img.onload = () => {
+    fill.style.backgroundSize = chooseFit(img.naturalWidth, img.naturalHeight);
+  };
+  img.src = url;
   return c;
 }
 
@@ -606,9 +628,7 @@ function renderVideo(src, opts = {}) {
   const fit = () => {
     const baseW = settings?.display?.baseW || 1920;
     const baseH = settings?.display?.baseH || 1080;
-    const disp = baseW / baseH;
-    const ratio = (v.videoWidth || baseW) / (v.videoHeight || baseH);
-    v.style.objectFit = ratio >= disp ? 'cover' : 'contain';
+    v.style.objectFit = chooseFit(v.videoWidth || baseW, v.videoHeight || baseH);
   };
   if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
   v.src = src;
