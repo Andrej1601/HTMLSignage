@@ -179,6 +179,12 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return cachedDisp;
   }
 
+  function chooseFit(mediaW, mediaH) {
+    const disp = getDisplayRatio();
+    const ratio = mediaW / mediaH;
+    return ratio >= disp ? 'cover' : 'contain';
+  }
+
 // ---------- Slide queue ----------
 function buildQueue() {
   // Tages-Preset ggf. anwenden
@@ -569,11 +575,7 @@ function renderImage(url) {
   const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
   const img = new Image();
   img.onload = () => {
-    const baseW = settings?.display?.baseW || 1920;
-    const baseH = settings?.display?.baseH || 1080;
-    const disp = baseW / baseH;
-    const ratio = img.naturalWidth / img.naturalHeight;
-    fill.style.backgroundSize = ratio >= disp ? 'cover' : 'contain';
+    fill.style.backgroundSize = chooseFit(img.naturalWidth, img.naturalHeight);
   };
   img.src = url;
   return c;
@@ -591,9 +593,7 @@ function renderVideo(src, opts = {}) {
   const fit = () => {
     const baseW = settings?.display?.baseW || 1920;
     const baseH = settings?.display?.baseH || 1080;
-    const disp = baseW / baseH;
-    const ratio = (v.videoWidth || baseW) / (v.videoHeight || baseH);
-    v.style.objectFit = ratio >= disp ? 'cover' : 'contain';
+    v.style.objectFit = chooseFit(v.videoWidth || baseW, v.videoHeight || baseH);
   };
   if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
   v.src = src;
