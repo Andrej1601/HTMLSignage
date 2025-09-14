@@ -360,11 +360,13 @@ function renderHighlightBox(){
 
   // Flammenbild
   $('#flameImg').value = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
-  updateFlamePreview($('#flameImg').value);
+  const flameTf = settings.assets?.flameThumbFallback;
+  updateFlamePreview(flameTf ? THUMB_FALLBACK : $('#flameImg').value);
 
   $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p, tp, err, tf)=>{
     settings.assets = settings.assets || {};
     settings.assets.flameImage = p;
+    settings.assets.flameThumbFallback = !!tf;
     $('#flameImg').value = p;
     updateFlamePreview(tf ? THUMB_FALLBACK : p);
   });
@@ -373,6 +375,7 @@ function renderHighlightBox(){
     const def = DEFAULTS.assets.flameImage;
     settings.assets = settings.assets || {};
     settings.assets.flameImage = def;
+    settings.assets.flameThumbFallback = false;
     $('#flameImg').value = def;
     updateFlamePreview(def);
   };

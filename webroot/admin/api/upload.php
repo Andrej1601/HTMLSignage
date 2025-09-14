@@ -23,8 +23,10 @@ function makeVideoThumb($src, $fallback){
   $tpi = pathinfo($thumbDest); $tfname = $tpi['filename']; $ti = 0;
   while (file_exists($thumbDest)) { $ti++; $thumbDest = $tpi['dirname'].'/'.$tfname.'_'.$ti.'.jpg'; }
 
-  $ffmpeg = trim(shell_exec('command -v ffmpeg 2>&1'));
-  if (!$ffmpeg){
+  $o = []; $ret = 0;
+  exec('command -v ffmpeg 2>&1', $o, $ret);
+  $ffmpeg = trim($o[0] ?? '');
+  if ($ret !== 0 || !$ffmpeg){
     $detail = 'ffmpeg not installed';
     error_log(json_encode(['event'=>'ffmpeg-thumb-missing','src'=>$src,'ffmpeg'=>$ffmpeg,'detail'=>$detail]));
     return ['path'=>$fallback,'error'=>'ffmpeg not found','fallback'=>true,'detail'=>$detail];
