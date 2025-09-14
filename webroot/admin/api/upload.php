@@ -15,34 +15,6 @@ function fail($msg, $code=400, $detail=null){
   exit;
 }
 
-function makeVideoThumb($src, $fallback){
-  $tbase = '/var/www/signage/assets/media/img/';
-  if (!is_dir($tbase)) { @mkdir($tbase, 02775, true); @chown($tbase,'www-data'); @chgrp($tbase,'www-data'); }
-  $pi = pathinfo($src);
-  $thumbDest = $tbase . $pi['filename'] . '.jpg';
-  $tpi = pathinfo($thumbDest); $tfname = $tpi['filename']; $ti = 0;
-  while (file_exists($thumbDest)) { $ti++; $thumbDest = $tpi['dirname'].'/'.$tfname.'_'.$ti.'.jpg'; }
-
-  $o = []; $ret = 0;
-  exec('command -v ffmpeg 2>&1', $o, $ret);
-  $ffmpeg = trim($o[0] ?? '');
-  if ($ret !== 0 || !$ffmpeg){
-    $detail = 'ffmpeg not installed';
-    error_log(json_encode(['event'=>'ffmpeg-thumb-missing','src'=>$src,'ffmpeg'=>$ffmpeg,'detail'=>$detail]));
-    return ['path'=>$fallback,'error'=>'ffmpeg not found','fallback'=>true,'detail'=>$detail];
-  }
-
-  $cmd = $ffmpeg . ' -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($src).' -vframes 1 '.escapeshellarg($thumbDest).' 2>&1';
-  $o = []; $ret = 0; exec($cmd, $o, $ret); $out = implode("\n", $o);
-  if ($ret !== 0 || !file_exists($thumbDest)){
-    error_log(json_encode(['event'=>'ffmpeg-thumb-failed','ffmpeg'=>$ffmpeg,'cmd'=>$cmd,'ret'=>$ret,'output'=>$out]));
-    return ['path'=>$fallback,'error'=>'thumbnail generation failed','fallback'=>true,'detail'=>$out];
-  }
-
-  @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
-  return ['path'=>'/assets/media/img/'.basename($thumbDest),'error'=>null,'fallback'=>false,'detail'=>null];
-}
-
 if ($_SERVER['REQUEST_METHOD']!=='POST') fail('method');
 if (!isset($_FILES['file'])) fail('nofile');
 
@@ -91,11 +63,9 @@ if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 @chmod($dest, 0644); @chown($dest,'www-data'); @chgrp($dest,'www-data');
 
 $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
-// optional or auto-generated preview image (thumb)
+// optional preview image (thumb)
 $thumbPath = null;
-$thumbError = null;
 $thumbFallback = false;
-$errorDetail = null;
 if ($subDir === 'img'){
   $thumbPath = $publicPath;
 } elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
@@ -124,15 +94,6 @@ if ($subDir === 'img'){
   $thumbPath = '/assets/media/img/' . basename($tdest);
 }
 
-// auto-generate thumb for videos if not provided
-if ($subDir === 'video' && !$thumbPath){
-  $res = makeVideoThumb($dest, $fallbackThumb);
-  $thumbPath = $res['path'];
-  if ($res['error']) $thumbError = $res['error'];
-  if ($res['fallback']) $thumbFallback = true;
-  if ($res['detail']) $errorDetail = $res['detail'];
-}
-
 // final fallback to generic icon
 if (!$thumbPath){
   $thumbPath = $fallbackThumb;
@@ -140,7 +101,5 @@ if (!$thumbPath){
 }
 
 $resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
-if ($thumbError) $resp['error'] = $thumbError;
 if ($thumbFallback) $resp['thumbFallback'] = true;
-if ($errorDetail) $resp['errorDetail'] = $errorDetail;
 echo json_encode($resp);
