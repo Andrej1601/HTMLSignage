@@ -34,8 +34,9 @@ if (devicesPinned) document.body?.classList.add('devices-pinned');
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
 function renderContextBadge(){
-  const h1 = document.querySelector('header h1');
-  if (!h1) return;
+  const header = document.querySelector('header');
+  const h1 = header?.querySelector('h1');
+  if (!header || !h1) return;
   let el = document.getElementById('ctxBadge');
   let tip = document.getElementById('ctxBadgeTip');
   if (!currentDeviceCtx){
@@ -47,10 +48,15 @@ function renderContextBadge(){
     el = document.createElement('span'); el.id='ctxBadge';
     el.className='ctx-badge';
     el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
-    h1.after(el);
+    header.appendChild(el);
   }
-  el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
-  el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
+  el.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx} `;
+  const resetBtn = document.createElement('button');
+  resetBtn.id = 'ctxReset';
+  resetBtn.title = 'Zurück zu Global';
+  resetBtn.textContent = '×';
+  resetBtn.onclick = () => exitDeviceContext();
+  el.appendChild(resetBtn);
   if (!tip){
     tip = document.createElement('small');
     tip.id = 'ctxBadgeTip';
