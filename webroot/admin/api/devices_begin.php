@@ -13,13 +13,13 @@ if (strtolower($_SERVER['HTTP_X_PAIR_REQUEST'] ?? '') !== '1') {
   exit;
 }
 
-$db = dev_db_load();
+$db = devices_load();
 dev_gc($db);
 
 $code = dev_gen_code($db);
 if (!$code) { http_response_code(500); echo json_encode(['ok'=>false,'error'=>'code-gen']); exit; }
 
 $db['pairings'][$code] = ['code'=>$code, 'created'=>time(), 'deviceId'=>null];
-dev_db_save($db);
+devices_save($db);
 
 echo json_encode(['ok'=>true,'code'=>$code]);
