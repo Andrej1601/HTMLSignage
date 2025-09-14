@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, validateUniqueAfterRefs } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
@@ -221,9 +221,7 @@ async function loadAll(){
         type: it.type || 'image',
         url: it.url || '',
         thumb: it.thumb || it.url || '',
-        after: it.after || 'overview',
-        dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6,
-        afterRef: it.afterRef || undefined
+        dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6
       }))
     : [];
   settings.presets       = settings.presets || {};
@@ -577,7 +575,7 @@ function collectSettings(){
       display:{ ...(settings.display||{}), fit: 'auto', baseW:1920, baseH:1080,
         rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
       footnotes: settings.footnotes,
-      interstitials: settings.interstitials || [],
+      interstitials: (settings.interstitials || []).map(({after, afterRef, ...rest}) => rest),
       presets: settings.presets || {},
       presetAuto: !!document.getElementById('presetAuto')?.checked
     }
@@ -588,10 +586,6 @@ function collectSettings(){
 $('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/', '_blank'));
 
 $('#btnSave')?.addEventListener('click', async ()=>{
-  if (!validateUniqueAfterRefs()){
-    alert('Fehler: Mehrfachzuweisung bei "Nach Slide".');
-    return;
-  }
   const body = collectSettings();
 
   if (!currentDeviceCtx){

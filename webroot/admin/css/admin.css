@@ -46,7 +46,7 @@
   /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
   --col-name:minmax(140px,0.9fr);
   --col-type:8ch;
-  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px; --col-after:minmax(150px,1fr);
+  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px;
 
   /* Preview-Größe */
   --prev-w:60px; --prev-h:42px;
@@ -463,7 +463,7 @@ table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 .sl-head.sl-images, .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-del) var(--col-vis);
 }
 
 /* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
@@ -472,7 +472,7 @@ body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-btn) var(--col-del) var(--col-after) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
 body.mode-uniform #ovSec{ display:none !important; }
@@ -503,8 +503,6 @@ body.mode-uniform #ovSec{ display:none !important; }
 /* Medien-Slides: Name 30% schmaler */
 .mediarow .input.name{ width:50%; }
 
-/* Medien-Slides: „Nach Slide“-Select 20% schmaler */
-.mediarow .sel-after{ width:70%; justify-self:start; min-width:120px; max-width:100%; }
 
 /* „Kein Aufguss“-Pillen – kleiner, mehr Abstand */
 .pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
