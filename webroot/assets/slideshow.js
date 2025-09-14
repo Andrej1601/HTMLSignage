@@ -537,18 +537,28 @@ return h('div', {}, [ t ]);
 
     const availH = container.clientHeight;
 
-    // Nur typografisch skalieren (breite bleibt 100%)
-    let iter = 0, lastTotal = Infinity;
+    // Erster grober Faktor
     let m = measure();
-while (m.totalH > availH && iter < 12) {
-  const target = availH / m.totalH;
-  const s = Math.max(0.25, Math.min(1, target * (iter ? 0.98 : 1)));
-      container.style.setProperty('--ovAuto', String(s));
-      lastTotal = m.totalH;
-      m = measure();
-      if (Math.abs(m.totalH - lastTotal) < 0.5) break;
-      iter++;
-    }
+    let s = Math.max(0.25, Math.min(1, availH / m.totalH));
+    container.style.setProperty('--ovAuto', String(s));
+
+    // Nach Layout-Update neu messen und ggf. nachjustieren
+    requestAnimationFrame(() => {
+      let m2 = measure();
+      if (m2.totalH <= availH) return;
+      let lo = 0.25, hi = s;
+      for (let i = 0; i < 4; i++) {
+        const mid = (lo + hi) / 2;
+        container.style.setProperty('--ovAuto', String(mid));
+        m2 = measure();
+        if (m2.totalH > availH) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+        if (Math.abs(m2.totalH - availH) < 1) break;
+      }
+    });
   }
 
   function renderOverview() {
