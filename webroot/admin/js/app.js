@@ -19,16 +19,47 @@ import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 
+// Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
+const LS_MEM = {};
+function lsGet(key) {
+  try { return localStorage.getItem(key); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.getItem failed', e);
+      return LS_MEM[key] ?? null;
+    }
+    return null;
+  }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.setItem failed', e);
+      LS_MEM[key] = String(val);
+    }
+  }
+}
+function lsRemove(key) {
+  try { localStorage.removeItem(key); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.removeItem failed', e);
+    }
+  }
+  delete LS_MEM[key];
+}
+
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
 let baseSettings = null;            // globale Settings (Quelle)
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
-let currentView = localStorage.getItem('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
+let currentView = lsGet('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
 let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
 let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
-let devicesPinned = (localStorage.getItem('devicesPinned') === '1');
+let devicesPinned = (lsGet('devicesPinned') === '1');
 if (devicesPinned) document.body?.classList.add('devices-pinned');
 
 
@@ -152,12 +183,12 @@ async function loadAll(){
   baseSettings = deepClone(settings);
 
   try {
-    const draft = localStorage.getItem('scheduleDraft');
+    const draft = lsGet('scheduleDraft');
     if (draft) schedule = JSON.parse(draft);
   } catch {}
 
   try {
-    const draft = localStorage.getItem('settingsDraft');
+    const draft = lsGet('settingsDraft');
     if (draft) {
       const parsed = JSON.parse(draft);
       (function merge(t, s) {
@@ -569,8 +600,8 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     const j=await r.json().catch(()=>({ok:false}));
       if (j.ok){
         baseSettings = deepClone(body.settings);
-        localStorage.removeItem('scheduleDraft');
-        localStorage.removeItem('settingsDraft');
+        lsRemove('scheduleDraft');
+        lsRemove('settingsDraft');
       }
       alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
     } else {
@@ -579,8 +610,8 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const j=await r.json().catch(()=>({ok:false}));
       if (j.ok) {
-        localStorage.removeItem('scheduleDraft');
-        localStorage.removeItem('settingsDraft');
+        lsRemove('scheduleDraft');
+        lsRemove('settingsDraft');
       }
       alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
     }
@@ -830,7 +861,7 @@ async function createDevicesPane(){
     pinBtn.innerHTML = `<span class="icon">📌</span><span class="label">${devicesPinned ? 'Loslösen' : 'Anpinnen'}</span>`;
     document.body.classList.toggle('devices-pinned', devicesPinned);
   };
-  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
+  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; lsSet('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
   updatePin();
 
 card.querySelector('#devGc').onclick = async ()=>{
@@ -922,7 +953,7 @@ function viewLabel(v){
 
 async function showView(v){
   currentView = v;
-  localStorage.setItem('adminView', v);
+  lsSet('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
   if (labelEl && v !== 'devices') labelEl.textContent = viewLabel(v);
@@ -1053,11 +1084,11 @@ function initThemeToggle(){
   const apply = (mode) => {
     document.body.classList.toggle('theme-light', mode === 'light');
     document.body.classList.toggle('theme-dark',  mode === 'dark');
-    localStorage.setItem('adminTheme', mode);
+    lsSet('adminTheme', mode);
   };
 
   // ⬇️ Standard jetzt "light"
-  const saved = localStorage.getItem('adminTheme') || 'light';
+  const saved = lsGet('adminTheme') || 'light';
   cb.checked = (saved === 'light');
   apply(saved);
 
