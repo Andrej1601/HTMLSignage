@@ -31,6 +31,22 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
     const urls = Object.values(settings?.assets?.rightImages || {});
     await Promise.all(urls.filter(Boolean).map(preloadImage));
   }
+  async function preloadSlideImages(){
+    const list = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+    const urls = [];
+    for (const it of list) {
+      if (!it || !it.enabled || !it.url) continue;
+      switch (it.type) {
+        case 'video':
+          break;
+        case 'image':
+        case 'url':
+        default:
+          urls.push(it.url);
+      }
+    }
+    await Promise.all(urls.map(preloadImage));
+  }
 
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -61,6 +77,7 @@ async function loadDeviceResolved(id){
   settings = j.settings;
   applyTheme(); applyDisplay(); maybeApplyPreset();
   await preloadRightImages();
+  await preloadSlideImages();
   await buildQueue();
 }
 
@@ -77,6 +94,7 @@ async function loadDeviceResolved(id){
     applyDisplay();
     maybeApplyPreset();
     await preloadRightImages();
+    await preloadSlideImages();
     await buildQueue();
   }
 
