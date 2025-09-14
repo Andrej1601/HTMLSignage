@@ -573,18 +573,29 @@ function applyDnD(){
 function enableSaunaOrder(){
   const host = $('#saunaList');
   if (!host) return;
-  const schedule = ctx.getSchedule();
-  const settings = ctx.getSettings();
   let dragIdx = null;
-  Array.from(host.children).forEach((row,i)=>{
-    row.draggable = true;
-    row.addEventListener('dragstart', e=>{ dragIdx = i; e.dataTransfer.effectAllowed='move'; });
-    row.addEventListener('dragover', e=>e.preventDefault());
-    row.addEventListener('drop', e=>{
+
+  if (!host.dataset.orderBound){
+    host.addEventListener('dragstart', e => {
+      const row = e.target.closest('.saunarow');
+      if (!row) return;
+      dragIdx = Array.from(host.children).indexOf(row);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    host.addEventListener('dragover', e => {
+      if (e.target.closest('.saunarow')) e.preventDefault();
+    });
+
+    host.addEventListener('drop', e => {
+      const row = e.target.closest('.saunarow');
+      if (!row) return;
       e.preventDefault();
       const rows = Array.from(host.children);
       const dropIdx = rows.indexOf(row);
       if (dropIdx === -1 || dragIdx === null || dragIdx === dropIdx) return;
+      const schedule = ctx.getSchedule();
+      const settings = ctx.getSettings();
       const arr = schedule.saunas || [];
       const [m] = arr.splice(dragIdx,1);
       arr.splice(dropIdx,0,m);
@@ -592,8 +603,11 @@ function enableSaunaOrder(){
       settings.slides.order = arr.slice();
       renderSlidesMaster();
       renderGridUI();
+      dragIdx = null;
     });
-  });
+
+    host.dataset.orderBound = '1';
+  }
 }
 
 // ============================================================================
