@@ -19,6 +19,7 @@ import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const OFFLINE_AFTER_MIN = 10;
+const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
 
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
 const LS_MEM = {};
@@ -354,11 +355,11 @@ function renderHighlightBox(){
   $('#flameImg').value = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
   updateFlamePreview($('#flameImg').value);
 
-  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p)=>{
+  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p, tp, err, tf)=>{
     settings.assets = settings.assets || {};
     settings.assets.flameImage = p;
     $('#flameImg').value = p;
-    updateFlamePreview(p);
+    updateFlamePreview(tf ? THUMB_FALLBACK : p);
   });
 
   $('#resetFlame').onclick = ()=>{
