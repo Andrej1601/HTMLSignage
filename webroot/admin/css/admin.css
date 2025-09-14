@@ -229,21 +229,56 @@ details[open] .chev{ transform: rotate(90deg); }
 /* ---------- Hilfe-Overlay & Tooltips ---------- */
 .tip{ cursor:help; color:var(--muted); margin-left:4px; }
 
-#helpOverlay{
+#helpOverlay,
+#slideOrderOverlay{
   position:fixed; inset:0; z-index:100;
   background:rgba(0,0,0,.6);
   display:flex; align-items:center; justify-content:center;
 }
-#helpOverlay[hidden]{ display:none; }
-#helpOverlay .panel{
+#helpOverlay[hidden],
+#slideOrderOverlay[hidden]{ display:none; }
+#helpOverlay .panel,
+#slideOrderOverlay .panel{
   background:var(--panel); color:var(--fg);
   border:1px solid var(--border); border-radius:16px;
-  padding:24px; max-width:500px; width:90%;
+  padding:24px; max-width:700px; width:90%;
   position:relative;
 }
-#helpOverlay .panel h2{ margin-top:0; }
-#helpClose{ position:absolute; top:8px; right:8px; }
+#helpOverlay .panel h2,
+#slideOrderOverlay .panel h2{ margin-top:0; }
+#helpClose,
+#slideOrderClose{ position:absolute; top:8px; right:8px; }
 .btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+
+.slide-order-grid{
+  display:grid;
+  gap:12px;
+  grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
+  margin-top:16px;
+}
+
+.slide-order-tile{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:8px;
+  background:var(--panel);
+  cursor:grab;
+}
+
+.slide-order-tile img{
+  width:100%;
+  height:80px;
+  object-fit:cover;
+  border-radius:8px;
+}
+
+.slide-order-tile .title{
+  font-weight:600;
+  margin-bottom:4px;
+}
 
 /* Toggle */
 .toggle{
