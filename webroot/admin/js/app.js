@@ -402,6 +402,7 @@ function colorField(key,label,init){
       <div class="swatch" id="sw_${key}"></div>
       <input class="input" id="cl_${key}" type="text" value="${valUp}" placeholder="#RRGGBB">
       <input type="color" id="cp_${key}" value="${valLow}">
+      <button class="btn sm undo" type="button">Undo</button>
     </div>`;
   return row;
 }
@@ -449,6 +450,7 @@ const host = $('#colorList');
     const txt = item.querySelector('input[type="text"]');
     const pick = item.querySelector('input[type="color"]');
     const sw = item.querySelector('.swatch');
+    const undo = item.querySelector('.undo');
     const setVal = v=>{
       const hex = v.startsWith('#') ? v : '#'+v;
       if(!/^#([0-9A-Fa-f]{6})$/.test(hex)) return;
@@ -457,11 +459,28 @@ const host = $('#colorList');
       txt.value = hex.toUpperCase();
     };
     setVal(txt.value);
+    item.dataset.prev = txt.value;
     txt.addEventListener('input',()=>{
       txt.value = txt.value.toUpperCase();
       if(/^#([0-9A-F]{6})$/.test(txt.value)) setVal(txt.value);
     });
     pick.addEventListener('input',()=> setVal(pick.value));
+    if(undo){
+      undo.addEventListener('click',()=>{
+        const prev = item.dataset.prev;
+        if(!prev) return;
+        setVal(prev);
+        item.dataset.prev = prev;
+      });
+      [txt,pick].forEach(el=>{
+        el.addEventListener('keydown',e=>{
+          if((e.ctrlKey||e.metaKey) && e.key==='z'){
+            e.preventDefault();
+            undo.click();
+          }
+        });
+      });
+    }
   });
 
   $('#resetColors').onclick = ()=>{
