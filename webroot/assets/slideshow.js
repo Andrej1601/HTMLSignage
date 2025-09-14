@@ -28,6 +28,16 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
       imgCache.add(url);
     });
   }
+
+  function preloadImg(url){
+    return new Promise(resolve => {
+      if (!url) return resolve({ ok:false });
+      const img = new Image();
+      img.onload  = () => resolve({ ok:true,  w:img.naturalWidth, h:img.naturalHeight });
+      img.onerror = () => resolve({ ok:false });
+      img.src = url;
+    });
+  }
   async function preloadRightImages(){
     const urls = Object.values(settings?.assets?.rightImages || {});
     await Promise.all(urls.filter(Boolean).map(preloadImage));
@@ -627,6 +637,7 @@ function renderVideo(src, opts = {}) {
     console.error('[video] error', e);
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     if (v.parentNode) v.parentNode.replaceChild(fallback, v);
+    advanceQueue();
   });
   if (settings?.slides?.waitForVideo) {
     const done = () => {
@@ -641,7 +652,6 @@ function renderVideo(src, opts = {}) {
       slideTimer = setTimeout(done, ms);
     }, { once: true });
     v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
-    v.addEventListener('error', () => { done(); }, { once: true });
   }
   const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
@@ -769,6 +779,11 @@ if (footNodes.length){
     } else {
       cb();
     }
+  }
+
+  function advanceQueue(){
+    clearTimers();
+    hide(() => { idx++; step(); });
   }
 
 function dwellMsForItem(item) {
