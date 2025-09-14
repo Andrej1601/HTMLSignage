@@ -5,7 +5,7 @@ require_once __DIR__.'/devices_store.php';
 $code = isset($_GET['code']) ? strtoupper(preg_replace('/[^A-Z0-9]/','',$_GET['code'])) : '';
 if ($code===''){ echo json_encode(['ok'=>false,'error'=>'no-code']); exit; }
 
-$db = dev_db_load();
+$db = devices_load();
 $p = $db['pairings'][$code] ?? null;
 if (!$p){ echo json_encode(['ok'=>true,'paired'=>false,'exists'=>false]); exit; }
 

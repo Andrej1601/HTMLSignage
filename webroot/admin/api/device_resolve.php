@@ -5,7 +5,7 @@
  * Warum wichtige Checks: Verhindert "undefined"-Geräte & sorgt für robuste Fallbacks.
  */
 
-require_once __DIR__ . '/devices_lib.php';
+require_once __DIR__ . '/devices_store.php';
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');

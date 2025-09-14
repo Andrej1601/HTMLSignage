@@ -1,24 +1,31 @@
 <?php
-// /admin/api/devices_store.php – vollständige Helfer (ohne Platzhalter)
-// Warum: Wird von /pair/* Endpunkten und Admin-API geteilt; zentrale, robuste Umsetzung.
+// /admin/api/devices_store.php – gemeinsame Helfer für Geräte-Datenbank
+// Wird von Heartbeat- und Admin-APIs genutzt. Pfade werden zentral über
+// devices_path() bestimmt, um harte Pfadangaben zu vermeiden.
 
-const DEV_DB = '/var/www/signage/data/devices.json';
+function devices_path() {
+  if (!empty($_ENV['DEVICES_PATH'])) return $_ENV['DEVICES_PATH'];
+  $root = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 2);
+  return rtrim($root, '/') . '/data/devices.json';
+}
 
-function dev_db_load(){
-  if (!is_file(DEV_DB)) return ['version'=>1,'pairings'=>[],'devices'=>[]];
-  $j = json_decode(@file_get_contents(DEV_DB), true);
+function devices_load(){
+  $p = devices_path();
+  if (!is_file($p)) return ['version'=>1,'pairings'=>[],'devices'=>[]];
+  $j = json_decode(@file_get_contents($p), true);
   return is_array($j) ? $j : ['version'=>1,'pairings'=>[],'devices'=>[]];
 }
 
-function dev_db_save($db){
-  @mkdir(dirname(DEV_DB), 02775, true);
+function devices_save($db){
+  $p = devices_path();
+  @mkdir(dirname($p), 02775, true);
   $json = json_encode($db, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT);
-  $bytes = @file_put_contents(DEV_DB, $json, LOCK_EX);
+  $bytes = @file_put_contents($p, $json, LOCK_EX);
   if ($bytes === false) {
     throw new RuntimeException('Unable to write device database');
   }
-  @chmod(DEV_DB, 0644);
-  @chown(DEV_DB,'www-data'); @chgrp(DEV_DB,'www-data');
+  @chmod($p, 0644);
+  @chown($p,'www-data'); @chgrp($p,'www-data');
   return true;
 }
 

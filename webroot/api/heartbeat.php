@@ -13,12 +13,12 @@ if (!preg_match('/^dev_[a-f0-9]{12}$/i', $id)) {
   exit;
 }
 
-$db = dev_db_load();
+$db = devices_load();
 if (!isset($db['devices'][$id])) {
   echo json_encode(['ok'=>false, 'error'=>'unknown-device']);
   exit;
 }
 $db['devices'][$id]['lastSeen'] = time();
-dev_db_save($db);
+devices_save($db);
 
 echo json_encode(['ok'=>true]);
