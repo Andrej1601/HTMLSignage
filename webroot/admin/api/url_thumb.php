@@ -2,23 +2,25 @@
 header('Content-Type: application/json; charset=UTF-8');
 $fallback = '/assets/img/thumb_fallback.svg';
 
+function fail($msg){
+  global $fallback;
+  error_log('url_thumb: '.$msg);
+  echo json_encode(['ok'=>false,'thumb'=>$fallback,'error'=>$msg]);
+  exit;
+}
+
 $raw = file_get_contents('php://input');
 $req = json_decode($raw, true);
 $url = $req['url'] ?? '';
 if (!is_string($url) || !preg_match('#^https?://#i', $url)) {
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('invalid-url');
 }
 
 if (!extension_loaded('curl')) {
-  error_log('url_thumb: curl extension not loaded');
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('curl extension not loaded');
 }
 if (!extension_loaded('gd')) {
-  error_log('url_thumb: gd extension not loaded');
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('gd extension not loaded');
 }
 
 $ch = curl_init($url);
@@ -30,10 +32,9 @@ curl_setopt_array($ch, [
 ]);
 $html = curl_exec($ch);
 if ($html === false) {
-  error_log('url_thumb html curl error: '.curl_error($ch));
+  $err = curl_error($ch);
   curl_close($ch);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('html curl error: '.$err);
 }
 $baseUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL) ?: $url;
 curl_close($ch);
@@ -45,9 +46,7 @@ if (preg_match('/<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\
   $imgUrl = $m[1];
 }
 if (!$imgUrl) {
-  error_log('url_thumb: no image found at '.$url);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('no image found');
 }
 $imgUrl = html_entity_decode($imgUrl, ENT_QUOTES|ENT_HTML5, 'UTF-8');
 $base = parse_url($baseUrl);
@@ -69,34 +68,27 @@ curl_setopt_array($ch, [
 ]);
 $imgData = curl_exec($ch);
 if ($imgData === false) {
-  error_log('url_thumb image curl error: '.curl_error($ch));
+  $err = curl_error($ch);
   curl_close($ch);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('image curl error: '.$err);
 }
 curl_close($ch);
 
 if (!function_exists('imagecreatefromstring')) {
-  error_log('url_thumb: gd-missing');
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('gd-missing');
 }
 
 $im = @imagecreatefromstring($imgData);
 if (!$im) {
-  error_log('url_thumb: invalid image data');
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('invalid image data');
 }
 $dir = '/var/www/signage/assets/media/img/';
 if (!is_dir($dir)) { @mkdir($dir, 02775, true); @chown($dir,'www-data'); @chgrp($dir,'www-data'); }
 $fname = 'preview_'.bin2hex(random_bytes(5)).'.jpg';
 $full = $dir.$fname;
 if (!imagejpeg($im, $full, 90)) {
-  error_log('url_thumb: failed to save image to '.$full);
   imagedestroy($im);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback]);
-  exit;
+  fail('failed to save image');
 }
 imagedestroy($im);
 @chmod($full,0644); @chown($full,'www-data'); @chgrp($full,'www-data');
