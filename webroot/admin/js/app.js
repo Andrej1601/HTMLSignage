@@ -711,18 +711,40 @@ async function createDevicesPane(){
   // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
   async function fetchDevicesStatus(){
     try {
-      const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
-      if (r.ok) { const j = await r.json(); j.ok ??= true; return j; }
+      const r = await fetch('/admin/api/devices_status.php', {cache:'no-store'});
+      if (r.ok) {
+        const j = await r.json();
+        const pairings = [];
+        if (j.openPairing) {
+          const created = j.openPairing.created ?? j.openPairing.createdAt;
+          pairings.push({
+            code: j.openPairing.code,
+            createdAt: created,
+            expiresAt: created ? created + 900 : null
+          });
+        }
+        const devices = (j.devices || []).map(d => ({
+          id: d.id,
+          name: d.name || '',
+          lastSeenAt: d.lastSeen || d.lastSeenAt || 0
+        }));
+        return { ok:true, pairings, devices };
+      }
     } catch(e){}
-    // Fallback: /data/devices.json -> normalisierte Struktur
-    const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
-    const j2 = await r2.json();
-    const pairings = Object.values(j2.pairings || {})
-      .filter(p => !p.deviceId)
-      .map(p => ({ code: p.code, createdAt: p.created }));
-    const devices = Object.values(j2.devices || {})
-      .map(d => ({ id: d.id, name: d.name || '', lastSeenAt: d.lastSeen || 0 }));
-    return { ok:true, pairings, devices };
+    try {
+      const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
+      if (r2.ok){
+        const j2 = await r2.json();
+        const pairings = Object.values(j2.pairings || {})
+          .filter(p => !p.deviceId)
+          .map(p => ({ code: p.code, createdAt: p.created }));
+        const devices = Object.values(j2.devices || {})
+          .map(d => ({ id: d.id, name: d.name || '', lastSeenAt: d.lastSeen || 0 }));
+        return { ok:true, pairings, devices };
+      }
+    } catch(e){}
+    console.warn('[admin] konnte Geräte-Status weder über API noch Datei laden');
+    return { ok:false, pairings:[], devices:[] };
   }
 
   async function render(){

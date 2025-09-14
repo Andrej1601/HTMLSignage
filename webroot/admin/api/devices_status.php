@@ -1,10 +1,9 @@
 <?php
 // /var/www/signage/admin/api/devices_status.php
+require_once __DIR__ . '/devices_store.php';
 header('Content-Type: application/json; charset=UTF-8');
 
-$fn = __DIR__ . '/../../data/devices.json';
-$state = json_decode(@file_get_contents($fn), true);
-if (!$state) $state = ['version'=>1, 'devices'=>[], 'pairings'=>[]];
+$state = devices_load();
 
 $pairings = array_values($state['pairings'] ?? []);
 // neuestes NICHT beanspruchtes Pairing finden
