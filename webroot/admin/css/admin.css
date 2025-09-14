@@ -345,11 +345,16 @@ body.device-mode .toggle.ind-active input:not(:checked) ~ .sun,
 body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-primary); }
 
 /* Badge für Geräte-Kontext */
-.ctx-badge{
+.ctx-wrap{
     position:absolute;
     left:50%;
     top:14px;
     transform:translateX(-50%);
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+.ctx-badge{
     display:inline-block;
     padding:10px 16px;
     border-radius:12px;
