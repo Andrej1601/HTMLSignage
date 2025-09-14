@@ -726,33 +726,19 @@ function interRow(i){
         const val = prompt('URL:', it.url ? stripCache(it.url) : '');
         if (val !== null) {
           it.url = stripCache(val.trim());
-          it.thumb = FALLBACK_THUMB;
-          updatePrev(FALLBACK_THUMB);
           if (it.url) {
-            fetch('/admin/api/url_thumb.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ url: it.url })
-            }).then(r => r.json()).then(j => {
-              if (j && j.ok && j.thumb) {
-                const base = stripCache(j.thumb);
-                const isFallback = j.thumbFallback || base.endsWith('thumb_fallback.svg');
-                const t = isFallback ? FALLBACK_THUMB : base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
-                it.thumb = t;
-                updatePrev(t);
-                if (!isFallback && j.error) console.warn('Thumbnail-Hinweis:', j.error);
-              } else {
-                const msg = j?.error || 'Kein Thumbnail gefunden';
-                alert('Thumbnail-Fehler: ' + msg);
-              }
-              renderSlidesMaster();
-            }).catch(() => {
-              alert('Thumbnail-Fehler: Netzwerkproblem');
-              renderSlidesMaster();
-            });
+            try {
+              const origin = new URL(it.url).origin;
+              it.thumb = `${origin}/favicon.ico`;
+            } catch {
+              it.thumb = FALLBACK_THUMB;
+            }
+            updatePrev(it.thumb);
           } else {
-            renderSlidesMaster();
+            it.thumb = FALLBACK_THUMB;
+            updatePrev(FALLBACK_THUMB);
           }
+          renderSlidesMaster();
         }
       };
       $media.appendChild(mb);
