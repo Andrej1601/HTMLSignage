@@ -1,5 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=UTF-8');
+
 $fallback = '/assets/img/thumb_fallback.svg';
 $errorDetail = null;
 
@@ -15,16 +16,70 @@ if (!$host) {
   exit;
 }
 
-$imgUrl = 'https://'.$host.'/favicon.ico';
-
 $curlInfo = null;
 $curlErrno = null;
+$curlStep = 'page';
+$imgUrl = null;
 
 try {
   if (!function_exists('curl_init')) {
     $errorDetail = 'curl extension not loaded';
     throw new Exception('curl-missing');
   }
+
+  // --- Fetch HTML page ----------------------------------------------------
+  $ch = curl_init($url);
+  curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_TIMEOUT => 5,
+    CURLOPT_USERAGENT => 'Mozilla/5.0'
+  ]);
+  $html = curl_exec($ch);
+  $curlErrno = curl_errno($ch);
+  $curlInfo = curl_getinfo($ch);
+  $code = $curlInfo['http_code'] ?? 0;
+  if ($html === false || $curlErrno !== 0 || $code >= 400) {
+    $err = curl_error($ch);
+    $errorDetail = $err ?: ('HTTP '.$code);
+    curl_close($ch);
+    throw new Exception($err ?: 'page-download-failed');
+  }
+  curl_close($ch);
+
+  // --- Parse og:image / link rel=icon ------------------------------------
+  libxml_use_internal_errors(true);
+  $doc = new DOMDocument();
+  @$doc->loadHTML($html);
+  libxml_clear_errors();
+  $xp = new DOMXPath($doc);
+  $node = $xp->query("//meta[@property='og:image' or @name='og:image']/@content")->item(0);
+  if ($node) $imgUrl = trim($node->nodeValue);
+  if (!$imgUrl) {
+    $node = $xp->query("//link[contains(translate(@rel,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'icon')]/@href")->item(0);
+    if ($node) $imgUrl = trim($node->nodeValue);
+  }
+
+  // --- Fallback to host favicon ------------------------------------------
+  if (!$imgUrl) {
+    $imgUrl = 'https://'.$host.'/favicon.ico';
+  } else {
+    // make URL absolute if needed
+    if (!preg_match('#^https?://#i', $imgUrl)) {
+      $scheme = $parts['scheme'] ?? 'https';
+      if (strpos($imgUrl, '//') === 0) {
+        $imgUrl = $scheme.':'.$imgUrl;
+      } elseif (substr($imgUrl,0,1) === '/') {
+        $imgUrl = $scheme.'://'.$host.$imgUrl;
+      } else {
+        $basePath = isset($parts['path']) ? rtrim(dirname($parts['path']), '/') : '';
+        $imgUrl = $scheme.'://'.$host.$basePath.'/'.$imgUrl;
+      }
+    }
+  }
+
+  // --- Download image -----------------------------------------------------
+  $curlStep = 'image';
   $ch = curl_init($imgUrl);
   curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -48,6 +103,7 @@ try {
     $errorDetail = 'gd extension not loaded';
     throw new Exception('gd-missing');
   }
+
   $im = @imagecreatefromstring($imgData);
   if (!$im) {
     $errorDetail = 'invalid image data';
@@ -72,6 +128,7 @@ try {
   error_log(json_encode([
     'event'=>'url_thumb-error',
     'url'=>$url,
+    'step'=>$curlStep,
     'error'=>$e->getMessage(),
     'detail'=>$errorDetail,
     'curl_errno'=>$curlErrno,
