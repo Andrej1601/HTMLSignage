@@ -649,6 +649,25 @@ function interRow(i){
   const $del   = wrap.querySelector('#x_'+id);
   const $en    = wrap.querySelector('#en_'+id);
 
+  if ($prev) $prev.onclick = () => {
+    if ($type?.value !== 'video' && $type?.value !== 'url') return;
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
+      if (!p) return;
+      const ts = Date.now();
+      const addV = (u) => {
+        const clean = stripCache(u);
+        return clean + (clean.includes('?') ? '&' : '?') + 'v=' + ts;
+      };
+      it.thumb = addV(p);
+      updatePrev(it.thumb);
+      renderSlidesMaster();
+    });
+    fi.click();
+  };
+
   // Werte
   if ($type) $type.value = it.type || 'image';
   if ($en) $en.checked = !!it.enabled;
