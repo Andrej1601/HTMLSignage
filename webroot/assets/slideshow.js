@@ -219,13 +219,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   function chooseFit(mediaW, mediaH, opts = {}) {
-    if (opts.type === 'video') {
-      const d = settings?.display || {};
-      return d.videoFit || 'cover';
-    }
-    const disp = getDisplayRatio();
-    const ratio = mediaW / mediaH;
-    return ratio >= disp ? 'cover' : 'contain';
+    return 'cover';
   }
 
 // ---------- Slide queue ----------
