@@ -87,8 +87,7 @@ async function loadDeviceResolved(id){
   schedule = j.schedule;
   settings = j.settings;
   applyTheme(); applyDisplay(); maybeApplyPreset();
-  await preloadRightImages();
-  await preloadSlideImages();
+  await Promise.all([preloadRightImages(), preloadSlideImages()]);
   await buildQueue();
 }
 
@@ -104,8 +103,7 @@ async function loadDeviceResolved(id){
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
-    await preloadRightImages();
-    await preloadSlideImages();
+    await Promise.all([preloadRightImages(), preloadSlideImages()]);
     await buildQueue();
   }
 
