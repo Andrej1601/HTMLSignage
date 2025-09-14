@@ -758,9 +758,16 @@ function interRow(i){
   if ($after) $after.value = getAfterSelectValue(it, it.id);
 
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
+  const stripCache = (u = '') => {
+    const [base, q] = u.split('?', 2);
+    if (!q) return u;
+    const params = q.split('&').filter(p => !p.startsWith('v='));
+    return params.length ? base + '?' + params.join('&') : base;
+  };
   const updatePrev = (src) => {
     if (!src){ $prev.src = FALLBACK_THUMB; $prev.title = ''; return; }
-    const url = src + '?v=' + Date.now();
+    src = stripCache(src);
+    const url = src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now();
     preloadImg(url).then(r => {
       if (r.ok){ $prev.src = url; $prev.title = `${r.w}×${r.h}`; }
       else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
@@ -786,18 +793,22 @@ function interRow(i){
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
         fi.onchange = () => uploadGeneric(fi, (p, tp, err) => {
-          const suffix = '?v=' + Date.now();
-          it.url = p + suffix;
+          const ts = Date.now();
+          const addV = (u) => {
+            const clean = stripCache(u);
+            return clean + (clean.includes('?') ? '&' : '?') + 'v=' + ts;
+          };
+          it.url = addV(p);
           if (t === 'video') {
             if (tp) {
-              it.thumb = tp + suffix;
+              it.thumb = addV(tp);
             } else {
               it.thumb = FALLBACK_THUMB;
               alert(err || 'Kein Thumbnail vom Server erhalten');
             }
           } else {
             const tv = tp || p;
-            it.thumb = tv ? tv + suffix : '';
+            it.thumb = tv ? addV(tv) : '';
           }
           updatePrev(it.thumb);
           renderSlidesMaster();
@@ -811,9 +822,9 @@ function interRow(i){
       mb.textContent = '🔗';
       mb.title = 'URL';
       mb.onclick = () => {
-        const val = prompt('URL:', it.url || '');
+        const val = prompt('URL:', it.url ? stripCache(it.url) : '');
         if (val !== null) {
-          it.url = val.trim();
+          it.url = stripCache(val.trim());
           it.thumb = FALLBACK_THUMB;
           updatePrev(FALLBACK_THUMB);
           if (it.url) {
@@ -823,7 +834,8 @@ function interRow(i){
               body: JSON.stringify({ url: it.url })
             }).then(r => r.json()).then(j => {
               if (j && j.ok && j.thumb) {
-                const t = j.thumb + '?v=' + Date.now();
+                const base = stripCache(j.thumb);
+                const t = base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
                 it.thumb = t;
                 updatePrev(t);
               } else {
