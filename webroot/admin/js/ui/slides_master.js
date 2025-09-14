@@ -659,19 +659,15 @@ function interRow(i){
   }
 
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
-  const stripCache = (u = '') => {
-    const [base, q] = u.split('?', 2);
-    if (!q) return u;
-    const params = q.split('&').filter(p => !p.startsWith('v='));
-    return params.length ? base + '?' + params.join('&') : base;
-  };
+  const stripCache = (u = '') => u.split('?')[0];
   const updatePrev = (src) => {
     if (!src){ $prev.src = FALLBACK_THUMB; $prev.title = ''; return; }
     src = stripCache(src);
-    const url = src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now();
+    if (src === FALLBACK_THUMB){ $prev.src = FALLBACK_THUMB; $prev.title=''; return; }
+    const url = src + '?v=' + Date.now();
     preloadImg(url).then(r => {
       if (r.ok){ $prev.src = url; $prev.title = `${r.w}×${r.h}`; }
-      else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
+      else { $prev.src = FALLBACK_THUMB; $prev.title = ''; it.thumb = FALLBACK_THUMB; }
     });
   };
   updatePrev(it.thumb);
