@@ -110,6 +110,14 @@ header .header-title{
   display:flex;
   align-items:center;
   gap:12px;
+  flex-wrap:wrap;
+}
+
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-left:auto;
 }
 
 body.device-mode header{
@@ -238,20 +246,40 @@ details[open] .chev{ transform: rotate(90deg); }
 
 /* Toggle */
 .toggle{
-  display:flex; align-items:center; gap:8px;
-  border:1px solid var(--ghost-border); padding:7px 10px; border-radius:12px; background:var(--panel);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  border:1px solid var(--ghost-border);
+  padding:10px 7px;
+  border-radius:12px;
+  background:var(--panel);
 }
 .toggle input{
-  appearance:none; width:28px; height:16px; border-radius:999px; background:#94a3b8; position:relative; outline:0;
+  appearance:none;
+  writing-mode:vertical-lr;
+  width:16px;
+  height:28px;
+  border-radius:999px;
+  background:#94a3b8;
+  position:relative;
+  outline:0;
 }
 .theme-dark .toggle input{ background:#4b5563; }
 .toggle input:checked{ background:#22c55e; }
 .toggle input::after{
-  content:''; position:absolute; top:2px; left:2px; width:12px; height:12px;
-  border-radius:50%; background:#fff; transition:left .15s;
+  content:'';
+  position:absolute;
+  top:2px;
+  left:2px;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  background:#fff;
+  transition:top .15s;
 }
 
-.toggle input:checked::after{ left:14px; }
+.toggle input:checked::after{ top:14px; }
 
 .toggle.ind-active{
   border-color:var(--btn-accent);
