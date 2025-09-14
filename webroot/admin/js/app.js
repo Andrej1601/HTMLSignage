@@ -838,6 +838,7 @@ async function createDevicesPane(){
             <span data-mode-label>${modeLbl}</span>
           </label></td>
           <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
+          <td><button class="btn sm" data-rename>Umbenennen</button></td>
           <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
           <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
           ${statusCell}
@@ -891,6 +892,19 @@ async function createDevicesPane(){
         tr.querySelector('[data-edit]').onclick = ()=>{
           selectRow(tr);
           enterDeviceContext(d.id, d.name || d.id);
+        };
+        tr.querySelector('[data-rename]').onclick = async ()=>{
+          const newName = prompt('Neuer Gerätename:', d.name || '');
+          if (newName === null) return;
+          const r = await fetch('/admin/api/devices_rename.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ device: d.id, name: newName })
+          });
+          const jj = await r.json().catch(()=>({ok:false}));
+          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
+          alert('Name gespeichert.');
+          render();
         };
         tbody.appendChild(tr);
       });
