@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=UTF-8');
 $fallback = '/assets/img/thumb_fallback.svg';
+$errorDetail = null;
 
 $raw = file_get_contents('php://input');
 $req = json_decode($raw, true);
@@ -8,15 +9,19 @@ $url = $req['url'] ?? '';
 $parts = parse_url($url);
 $host = $parts['host'] ?? '';
 if (!$host) {
+  $errorDetail = 'missing host';
   error_log('url_thumb: invalid-url '.$url);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>'invalid-url']);
+  echo json_encode(['ok'=>false,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>'invalid-url','errorDetail'=>$errorDetail]);
   exit;
 }
 
 $imgUrl = 'https://'.$host.'/favicon.ico';
 
 try {
-  if (!function_exists('curl_init')) throw new Exception('curl-missing');
+  if (!function_exists('curl_init')) {
+    $errorDetail = 'curl extension not loaded';
+    throw new Exception('curl-missing');
+  }
   $ch = curl_init($imgUrl);
   curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -25,22 +30,31 @@ try {
     CURLOPT_USERAGENT => 'Mozilla/5.0'
   ]);
   $imgData = curl_exec($ch);
-  if ($imgData === false || curl_getinfo($ch, CURLINFO_HTTP_CODE) >= 400) {
+  $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  if ($imgData === false || $code >= 400) {
     $err = curl_error($ch);
+    $errorDetail = $err ?: ('HTTP '.$code);
     curl_close($ch);
     throw new Exception($err ?: 'download-failed');
   }
   curl_close($ch);
 
-  if (!function_exists('imagecreatefromstring')) throw new Exception('gd-missing');
+  if (!function_exists('imagecreatefromstring')) {
+    $errorDetail = 'gd extension not loaded';
+    throw new Exception('gd-missing');
+  }
   $im = @imagecreatefromstring($imgData);
-  if (!$im) throw new Exception('invalid-image');
+  if (!$im) {
+    $errorDetail = 'invalid image data';
+    throw new Exception('invalid-image');
+  }
 
   $dir = '/var/www/signage/assets/media/img/';
   if (!is_dir($dir)) { @mkdir($dir, 02775, true); @chown($dir,'www-data'); @chgrp($dir,'www-data'); }
   $fname = 'preview_'.bin2hex(random_bytes(5)).'.jpg';
   $full = $dir.$fname;
   if (!imagejpeg($im, $full, 90)) {
+    $errorDetail = 'imagejpeg failed';
     imagedestroy($im);
     throw new Exception('save-failed');
   }
@@ -50,8 +64,8 @@ try {
   echo json_encode(['ok'=>true,'thumb'=>$public]);
   exit;
 } catch (Exception $e) {
-  error_log('url_thumb: '.$e->getMessage());
-  echo json_encode(['ok'=>true,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>$e->getMessage()]);
+  error_log(json_encode(['event'=>'url_thumb-error','url'=>$url,'error'=>$e->getMessage(),'detail'=>$errorDetail]));
+  echo json_encode(['ok'=>true,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>$e->getMessage(),'errorDetail'=>$errorDetail]);
   exit;
 }
 

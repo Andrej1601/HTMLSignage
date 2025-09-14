@@ -5,9 +5,17 @@
 
 header('Content-Type: application/json; charset=UTF-8');
 
-function fail($msg, $code=400){ http_response_code($code); echo json_encode(['ok'=>false,'error'=>$msg]); exit; }
+$fallbackThumb = '/assets/img/thumb_fallback.svg';
 
-function makeVideoThumb($src){
+function fail($msg, $code=400, $detail=null){
+  http_response_code($code);
+  $resp = ['ok'=>false,'error'=>$msg];
+  if ($detail) $resp['errorDetail'] = $detail;
+  echo json_encode($resp);
+  exit;
+}
+
+function makeVideoThumb($src, $fallback){
   $tbase = '/var/www/signage/assets/media/img/';
   if (!is_dir($tbase)) { @mkdir($tbase, 02775, true); @chown($tbase,'www-data'); @chgrp($tbase,'www-data'); }
   $pi = pathinfo($src);
@@ -19,14 +27,14 @@ function makeVideoThumb($src){
   if (!$ffmpeg){
     $detail = 'ffmpeg not installed';
     error_log(json_encode(['event'=>'ffmpeg-thumb-missing','src'=>$src,'detail'=>$detail]));
-    return ['path'=>'/assets/img/thumb_fallback.svg','error'=>'ffmpeg not found','fallback'=>true,'detail'=>$detail];
+    return ['path'=>$fallback,'error'=>'ffmpeg not found','fallback'=>true,'detail'=>$detail];
   }
 
   $cmd = $ffmpeg . ' -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($src).' -vframes 1 '.escapeshellarg($thumbDest).' 2>&1';
   $o = []; $ret = 0; exec($cmd, $o, $ret); $out = implode("\n", $o);
   if ($ret !== 0 || !file_exists($thumbDest)){
     error_log(json_encode(['event'=>'ffmpeg-thumb-failed','cmd'=>$cmd,'ret'=>$ret,'output'=>$out]));
-    return ['path'=>'/assets/img/thumb_fallback.svg','error'=>'thumbnail generation failed','fallback'=>true,'detail'=>$out];
+    return ['path'=>$fallback,'error'=>'thumbnail generation failed','fallback'=>true,'detail'=>$out];
   }
 
   @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
@@ -109,11 +117,17 @@ if ($subDir === 'img'){
 
 // auto-generate thumb for videos if not provided
 if ($subDir === 'video' && !$thumbPath){
-  $res = makeVideoThumb($dest);
+  $res = makeVideoThumb($dest, $fallbackThumb);
   $thumbPath = $res['path'];
   if ($res['error']) $thumbError = $res['error'];
   if ($res['fallback']) $thumbFallback = true;
   if ($res['detail']) $errorDetail = $res['detail'];
+}
+
+// final fallback to generic icon
+if (!$thumbPath){
+  $thumbPath = $fallbackThumb;
+  $thumbFallback = true;
 }
 
 $resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
