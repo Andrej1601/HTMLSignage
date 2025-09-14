@@ -700,6 +700,7 @@ async function createDevicesPane(){
         <div class="device-toolbar">
           <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
           <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
+          <span class="mut" id="devLastUpdate"></span>
           <button class="btn sm icon-label" id="devPin"></button>
           <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
         </div>
@@ -876,6 +877,8 @@ async function createDevicesPane(){
         tbody.appendChild(tr);
       });
     }
+    const ts = card.querySelector('#devLastUpdate');
+    if (ts) ts.textContent = 'Stand: ' + new Date().toLocaleString('de-DE');
   }
 
   // oben rechts: „Code eingeben…“
@@ -889,6 +892,7 @@ async function createDevicesPane(){
   // Refresh & einmalig laden
   card.querySelector('#devRefresh').onclick = render;
   await render();
+  card.__refreshInterval = setInterval(render, 60_000);
 
   const pinBtn = card.querySelector('#devPin');
   const updatePin = ()=>{
@@ -981,6 +985,15 @@ function destroyDockPane(){
   }
 }
 
+function destroyDevicesPane(){
+  if (devicesPane){
+    clearInterval(devicesPane.__refreshInterval);
+    window.__refreshDevicesPane = undefined;
+    devicesPane.remove();
+    devicesPane = null;
+  }
+}
+
 function viewLabel(v){
   return v === 'preview' ? 'Vorschau' : 'Grid';
 }
@@ -1015,13 +1028,13 @@ async function showView(v){
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned) destroyDevicesPane();
     return;
   }
 
   if (v === 'preview'){
     gridCard.style.display = 'none';
-    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (!devicesPinned) destroyDevicesPane();
     if (!document.getElementById('dockPane')) createDockPane();
     attachDockLivePush();
     return;
