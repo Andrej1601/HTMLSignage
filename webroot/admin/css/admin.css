@@ -537,6 +537,7 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
 #copyHex{white-space:nowrap}
 
 /* Ansicht-Menü (Header) */
+#btnDevices, #viewMenuWrap{ flex-shrink:0; }
 .menuwrap{ position:relative; }
 .dropdown{
   position:absolute; top:calc(100% + 6px); left:0; z-index:80;
