@@ -64,14 +64,42 @@
   let cachedDisp = null;
 
   const imgCache = new Set();
-  function preloadImage(url){
-    return new Promise(res=>{
-      if (!url || imgCache.has(url)) return res();
-      const i = new Image();
-      i.onload = i.onerror = () => res();
-      i.src = url;
-      imgCache.add(url);
+  const preloadQueue = [];
+  const queuedUrls = new Set();
+  let activePreloads = 0;
+  const MAX_PRELOAD = 3;
+  const PRELOAD_AHEAD = 4;
+
+  function runPreloadQueue(){
+    while (activePreloads < MAX_PRELOAD && preloadQueue.length) {
+      const { url, resolve } = preloadQueue.shift();
+      activePreloads++;
+      const img = new Image();
+      const done = () => {
+        img.onload = img.onerror = null;
+        img.src = '';
+        queuedUrls.delete(url);
+        imgCache.add(url);
+        activePreloads--;
+        resolve();
+        runPreloadQueue();
+      };
+      img.onload = img.onerror = done;
+      img.src = url;
+    }
+  }
+
+  function queuePreload(url){
+    if (!url || imgCache.has(url) || queuedUrls.has(url)) return Promise.resolve();
+    queuedUrls.add(url);
+    return new Promise(resolve => {
+      preloadQueue.push({ url, resolve });
+      runPreloadQueue();
     });
+  }
+
+  function preloadImage(url){
+    return queuePreload(url);
   }
 
   function preloadImg(url){
@@ -87,21 +115,19 @@
     const urls = Object.values(settings?.assets?.rightImages || {});
     await Promise.all(urls.filter(Boolean).map(preloadImage));
   }
-  async function preloadSlideImages(){
-    const list = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+  async function preloadNextImages(){
+    if (!nextQueue.length) return;
     const urls = [];
-    for (const it of list) {
-      if (!it || !it.enabled || !it.url) continue;
-      switch (it.type) {
-        case 'video':
-          break;
-        case 'image':
-        case 'url':
-        default:
-          urls.push(it.url);
-      }
+    for (let i = 0; i < PRELOAD_AHEAD; i++) {
+      const item = nextQueue[(idx + i) % nextQueue.length];
+      const url = (item && item.type === 'image') ? item.src : null;
+      if (url) urls.push(url);
     }
     await Promise.all(urls.map(preloadImage));
+  }
+
+  async function preloadSlideImages(){
+    await preloadNextImages();
   }
 
   // ---------- Time helpers ----------
@@ -132,8 +158,8 @@ async function loadDeviceResolved(id){
   schedule = j.schedule;
   settings = j.settings;
   applyTheme(); applyDisplay(); maybeApplyPreset();
+  buildQueue();
   await Promise.all([preloadRightImages(), preloadSlideImages()]);
-  await buildQueue();
 }
 
 
@@ -148,8 +174,8 @@ async function loadDeviceResolved(id){
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
+    buildQueue();
     await Promise.all([preloadRightImages(), preloadSlideImages()]);
-    await buildQueue();
   }
 
   // ---------- Theme & Display ----------
@@ -817,7 +843,7 @@ if (footNodes.length){
 
   function advanceQueue(){
     clearTimers();
-    hide(() => { idx++; step(); });
+    hide(() => { idx++; step(); preloadNextImages(); });
   }
 
 function dwellMsForItem(item) {
@@ -961,9 +987,10 @@ async function bootstrap(){
  if (p.schedule) schedule = p.schedule;
  if (p.settings) settings = p.settings;
  applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+ preloadSlideImages();
  idx = 0; lastKey = null;
  step();
- });
+});
   const deviceMode = !!DEVICE_ID;
 
   if (!previewMode) {
@@ -1035,6 +1062,7 @@ console.error('[bootstrap] resolve failed:', e);
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            preloadSlideImages();
             clearTimers();
             idx = idx % Math.max(1, nextQueue.length);
             lastKey = null;
@@ -1046,6 +1074,7 @@ console.error('[bootstrap] resolve failed:', e);
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            preloadSlideImages();
             clearTimers();
             idx = idx % Math.max(1, nextQueue.length);
             lastKey = null;
