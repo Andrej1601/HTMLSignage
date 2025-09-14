@@ -2,12 +2,28 @@
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
-const Q = new URLSearchParams(location.search);
-const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
-const rawDevice = (Q.get('device') || localStorage.getItem('deviceId') || '').trim();
-const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
-if (!DEVICE_ID) localStorage.removeItem('deviceId'); // Karteileichen loswerden
-let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
+  const Q = new URLSearchParams(location.search);
+  const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
+  const LS_MEM = {};
+  const ls = {
+    get(k){
+      try { return localStorage.getItem(k); }
+      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.getItem failed', e); return LS_MEM[k] ?? null; } return null; }
+    },
+    set(k,v){
+      try { localStorage.setItem(k,v); }
+      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.setItem failed', e); LS_MEM[k] = String(v); } }
+    },
+    remove(k){
+      try { localStorage.removeItem(k); }
+      catch(e){ if (e instanceof DOMException){ console.warn('[slideshow] localStorage.removeItem failed', e); } }
+      delete LS_MEM[k];
+    }
+  };
+  const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
+  const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
+  if (!DEVICE_ID) ls.remove('deviceId'); // Karteileichen loswerden
+  let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
 
   let schedule = null;
   let settings = null;
@@ -901,7 +917,7 @@ function showPairing(){
           if (jj && jj.paired && jj.deviceId){
             clearInterval(timer);
             try{ sessionStorage.removeItem('pairState'); }catch{}
-            localStorage.setItem('deviceId', jj.deviceId);
+            ls.set('deviceId', jj.deviceId);
             location.replace('/?device='+encodeURIComponent(jj.deviceId));
           }
         } catch {}
