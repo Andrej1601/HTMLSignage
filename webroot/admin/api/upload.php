@@ -51,6 +51,7 @@ $publicPath = '/assets/media/'.$subDir.'/' . basename($dest);
 // optional or auto-generated preview image (thumb)
 $thumbPath = null;
 $thumbError = null;
+$thumbFallback = false;
 if ($subDir === 'img'){
   $thumbPath = $publicPath;
 } elseif (isset($_FILES['thumb']) && is_uploaded_file($_FILES['thumb']['tmp_name'])) {
@@ -92,11 +93,24 @@ if ($subDir === 'video' && !$thumbPath){
   $out = implode("\n", $o);
   if ($ret !== 0 || !file_exists($thumbDest)){
     error_log('ffmpeg-thumb-failed: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
-    $thumbError = 'thumbnail generation failed';
+    // try fallback at 1s position
+    $cmd2 = 'ffmpeg -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($dest).' -vf "thumbnail,scale=640:-1" -frames:v 1 '.escapeshellarg($thumbDest).' 2>&1';
+    $o2=[]; $ret2=0;
+    exec($cmd2, $o2, $ret2);
+    $out2 = implode("\n", $o2);
+    if ($ret2 !== 0 || !file_exists($thumbDest)){
+      error_log('ffmpeg-thumb-fallback-failed: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
+      $thumbError = 'thumbnail generation failed';
+      $thumbPath = '/assets/img/thumb_fallback.svg';
+      $thumbFallback = true;
+    } else {
+      error_log('ffmpeg-thumb-fallback-success: cmd='.$cmd2.'; ret='.$ret2.'; dest='.$thumbDest.'; output='.$out2);
+      @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
+      $thumbPath = '/assets/media/img/' . basename($thumbDest);
+      $thumbFallback = true;
+    }
   } else {
     error_log('ffmpeg-thumb-success: cmd='.$cmd.'; ret='.$ret.'; dest='.$thumbDest.'; output='.$out);
-  }
-  if (file_exists($thumbDest)){
     @chmod($thumbDest,0644); @chown($thumbDest,'www-data'); @chgrp($thumbDest,'www-data');
     $thumbPath = '/assets/media/img/' . basename($thumbDest);
   }
@@ -104,4 +118,5 @@ if ($subDir === 'video' && !$thumbPath){
 
 $resp = ['ok'=>true,'path'=>$publicPath,'thumb'=>$thumbPath];
 if ($thumbError) $resp['error'] = $thumbError;
+if ($thumbFallback) $resp['thumbFallback'] = true;
 echo json_encode($resp);
