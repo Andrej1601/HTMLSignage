@@ -11,11 +11,14 @@ $host = $parts['host'] ?? '';
 if (!$host) {
   $errorDetail = 'missing host';
   error_log('url_thumb: invalid-url '.$url);
-  echo json_encode(['ok'=>false,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>'invalid-url','errorDetail'=>$errorDetail]);
+  echo json_encode(['ok'=>true,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>'invalid-url','errorDetail'=>$errorDetail]);
   exit;
 }
 
 $imgUrl = 'https://'.$host.'/favicon.ico';
+
+$curlInfo = null;
+$curlErrno = null;
 
 try {
   if (!function_exists('curl_init')) {
@@ -30,8 +33,10 @@ try {
     CURLOPT_USERAGENT => 'Mozilla/5.0'
   ]);
   $imgData = curl_exec($ch);
-  $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-  if ($imgData === false || $code >= 400) {
+  $curlErrno = curl_errno($ch);
+  $curlInfo = curl_getinfo($ch);
+  $code = $curlInfo['http_code'] ?? 0;
+  if ($imgData === false || $curlErrno !== 0 || $code >= 400) {
     $err = curl_error($ch);
     $errorDetail = $err ?: ('HTTP '.$code);
     curl_close($ch);
@@ -64,8 +69,21 @@ try {
   echo json_encode(['ok'=>true,'thumb'=>$public]);
   exit;
 } catch (Exception $e) {
-  error_log(json_encode(['event'=>'url_thumb-error','url'=>$url,'error'=>$e->getMessage(),'detail'=>$errorDetail]));
-  echo json_encode(['ok'=>true,'thumb'=>$fallback,'thumbFallback'=>true,'error'=>$e->getMessage(),'errorDetail'=>$errorDetail]);
+  error_log(json_encode([
+    'event'=>'url_thumb-error',
+    'url'=>$url,
+    'error'=>$e->getMessage(),
+    'detail'=>$errorDetail,
+    'curl_errno'=>$curlErrno,
+    'curl_info'=>$curlInfo
+  ]));
+  echo json_encode([
+    'ok'=>true,
+    'thumb'=>$fallback,
+    'thumbFallback'=>true,
+    'error'=>$e->getMessage(),
+    'errorDetail'=>$errorDetail
+  ]);
   exit;
 }
 

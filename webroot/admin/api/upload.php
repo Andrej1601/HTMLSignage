@@ -26,14 +26,14 @@ function makeVideoThumb($src, $fallback){
   $ffmpeg = trim(shell_exec('command -v ffmpeg 2>&1'));
   if (!$ffmpeg){
     $detail = 'ffmpeg not installed';
-    error_log(json_encode(['event'=>'ffmpeg-thumb-missing','src'=>$src,'detail'=>$detail]));
+    error_log(json_encode(['event'=>'ffmpeg-thumb-missing','src'=>$src,'ffmpeg'=>$ffmpeg,'detail'=>$detail]));
     return ['path'=>$fallback,'error'=>'ffmpeg not found','fallback'=>true,'detail'=>$detail];
   }
 
   $cmd = $ffmpeg . ' -hide_banner -loglevel error -ss 1 -i '.escapeshellarg($src).' -vframes 1 '.escapeshellarg($thumbDest).' 2>&1';
   $o = []; $ret = 0; exec($cmd, $o, $ret); $out = implode("\n", $o);
   if ($ret !== 0 || !file_exists($thumbDest)){
-    error_log(json_encode(['event'=>'ffmpeg-thumb-failed','cmd'=>$cmd,'ret'=>$ret,'output'=>$out]));
+    error_log(json_encode(['event'=>'ffmpeg-thumb-failed','ffmpeg'=>$ffmpeg,'cmd'=>$cmd,'ret'=>$ret,'output'=>$out]));
     return ['path'=>$fallback,'error'=>'thumbnail generation failed','fallback'=>true,'detail'=>$out];
   }
 
@@ -50,7 +50,8 @@ if (!is_uploaded_file($u['tmp_name'])) fail('tmp-missing');
 
 // Limits (kann via PHP-INI/Nginx größer sein)
 $maxBytes = 256*1024*1024; // 256MB
-if (filesize($u['tmp_name']) > $maxBytes) fail('too-large (server limit)');
+$fileSize = filesize($u['tmp_name']);
+if ($fileSize > $maxBytes) fail('too-large (server limit)');
 
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 $mime = $finfo->file($u['tmp_name']) ?: 'application/octet-stream';
@@ -77,6 +78,12 @@ $dest = $baseDir . $orig;
 $pi = pathinfo($dest);
 $fname = $pi['filename']; $i=0;
 while (file_exists($dest)) { $i++; $dest = $pi['dirname'].'/'.$fname.'_'.$i.'.'.$ext; }
+
+$free = @disk_free_space($baseDir);
+if ($free !== false && $free < $fileSize) {
+  $detail = 'free='.$free.' need='.$fileSize;
+  fail('disk-full', 507, $detail);
+}
 
 if (!@move_uploaded_file($u['tmp_name'], $dest)) fail('move-failed', 500);
 @chmod($dest, 0644); @chown($dest,'www-data'); @chgrp($dest,'www-data');
