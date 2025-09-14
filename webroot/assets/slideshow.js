@@ -704,12 +704,14 @@ function renderVideo(src, opts = {}) {
     );
   };
   if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
-  v.src = src;
   v.addEventListener('canplay', () => v.play());
   v.addEventListener('error', (e) => {
     console.error('[video] error', e);
+    const srcUrl = v.src;
+    v.remove();
+    if (srcUrl.startsWith('blob:')) URL.revokeObjectURL(srcUrl);
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
-    if (v.parentNode) v.parentNode.replaceChild(fallback, v);
+    c.appendChild(fallback);
     advanceQueue();
   });
   if (settings?.slides?.waitForVideo) {
@@ -728,6 +730,23 @@ function renderVideo(src, opts = {}) {
   }
   const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
+
+  fetch(src, { method: 'HEAD' }).then(res => {
+    if (!res.ok) {
+      v.remove();
+      const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
+      c.appendChild(fallback);
+      advanceQueue();
+      return;
+    }
+    v.src = src;
+  }).catch(() => {
+    v.remove();
+    const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
+    c.appendChild(fallback);
+    advanceQueue();
+  });
+
   return c;
 }
 
