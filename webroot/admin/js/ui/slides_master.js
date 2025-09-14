@@ -922,6 +922,61 @@ function renderInterstitialsPanel(hostId='interList2'){
 }
 
 // ============================================================================
+// 6b) Slide Order View
+// ============================================================================
+export function renderSlideOrderView(){
+  const settings = ctx.getSettings();
+  const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const host = document.getElementById('slideOrderGrid');
+  if (!host) return;
+
+  host.innerHTML = '';
+  list.forEach((it, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'slide-order-tile';
+    tile.draggable = true;
+    tile.dataset.idx = idx;
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = it.name || '(unbenannt)';
+    tile.appendChild(title);
+
+    const img = document.createElement('img');
+    img.src = it.thumb || it.url || '';
+    img.alt = it.name || '';
+    tile.appendChild(img);
+
+    host.appendChild(tile);
+  });
+
+  let dragged = null;
+  host.querySelectorAll('.slide-order-tile').forEach(tile => {
+    tile.addEventListener('dragstart', e => {
+      dragged = tile;
+      tile.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    tile.addEventListener('dragover', e => {
+      e.preventDefault();
+      const target = tile;
+      if (target === dragged) return;
+      const tiles = Array.from(host.children);
+      const draggedIndex = tiles.indexOf(dragged);
+      const targetIndex = tiles.indexOf(target);
+      if (draggedIndex < targetIndex) target.after(dragged);
+      else target.before(dragged);
+    });
+    tile.addEventListener('dragend', () => {
+      tile.classList.remove('dragging');
+      const tiles = Array.from(host.children);
+      settings.interstitials = tiles.map(el => list[+el.dataset.idx]);
+      tiles.forEach((el, i) => el.dataset.idx = i);
+    });
+  });
+}
+
+// ============================================================================
 // 7) Haupt-Renderer
 // ============================================================================
 export function renderSlidesMaster(){
@@ -1038,6 +1093,26 @@ if (durPer) durPer.onchange = () => {
 
   // Medien-Slides
   renderInterstitialsPanel('interList2');
+
+  const sortBtn = $('#btnSortSlides');
+  const orderOverlay = $('#slideOrderOverlay');
+  const closeOrder = $('#slideOrderClose');
+  if (sortBtn) sortBtn.onclick = () => {
+    if (orderOverlay) {
+      orderOverlay.hidden = false;
+      renderSlideOrderView();
+    }
+  };
+  if (closeOrder) closeOrder.onclick = () => {
+    if (orderOverlay) orderOverlay.hidden = true;
+    renderSlidesMaster();
+  };
+  if (orderOverlay) orderOverlay.addEventListener('click', e => {
+    if (e.target === orderOverlay) {
+      orderOverlay.hidden = true;
+      renderSlidesMaster();
+    }
+  });
 
   // Reset & Add Sauna
   const rs = $('#resetTiming');
