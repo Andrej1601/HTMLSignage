@@ -756,18 +756,23 @@ async function createDevicesPane(){
   };
 
   async function fetchDevicesStatus(){
+    const OFFLINE_AFTER_MIN = 10;
     try {
       const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
       if (r.ok) {
         const j = await r.json();
         const pairings = j.pairings || [];
-        const devices = (j.devices || []).map(d => ({
-          id: d.id,
-          name: d.name || '',
-          lastSeenAt: normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0),
-          offline: !!d.offline,
-          useOverrides: !!d.useOverrides
-        }));
+        const devices = (j.devices || []).map(d => {
+          const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
+          const offline = !lastSeenAt || (Date.now()/1000 - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+          return {
+            id: d.id,
+            name: d.name || '',
+            lastSeenAt,
+            offline,
+            useOverrides: !!d.useOverrides
+          };
+        });
         return { ok:true, pairings, devices };
       }
     } catch(e){}
@@ -779,7 +784,6 @@ async function createDevicesPane(){
           .filter(p => !p.deviceId)
           .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
         const now = normalizeSeconds(j2.now || Date.now());
-        const OFFLINE_AFTER_MIN = 10;
         const devices = Object.values(j2.devices || {}).map(d => {
           const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
           const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
