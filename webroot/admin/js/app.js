@@ -66,11 +66,14 @@ let settings = null;
 let baseSettings = null;            // globale Settings (Quelle)
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
-let currentView = lsGet('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
+let storedView = lsGet('adminView');
+if (storedView === 'devices') storedView = 'grid';
+if (storedView !== 'grid' && storedView !== 'preview') storedView = 'grid';
+let currentView = storedView; // 'grid' | 'preview'
 let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
-let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
+let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
 let devicesPinned = (lsGet('devicesPinned') === '1');
-if (devicesPinned) document.body?.classList.add('devices-pinned');
+document.body?.classList.toggle('devices-pinned', devicesPinned);
 
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
@@ -725,7 +728,6 @@ async function createDevicesPane(){
           <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
           <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
           <span class="mut" id="devLastUpdate"></span>
-          <button class="btn sm icon-label" id="devPin"></button>
           <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
         </div>
       </div>
@@ -962,14 +964,6 @@ async function createDevicesPane(){
   await render();
   card.__refreshInterval = setInterval(render, 60_000);
 
-  const pinBtn = card.querySelector('#devPin');
-  const updatePin = ()=>{
-    pinBtn.innerHTML = `<span class="icon">📌</span><span class="label">${devicesPinned ? 'Loslösen' : 'Anpinnen'}</span>`;
-    document.body.classList.toggle('devices-pinned', devicesPinned);
-  };
-  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; lsSet('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
-  updatePin();
-
 card.querySelector('#devGc').onclick = async ()=>{
   const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
   if ((conf||'').trim().toLowerCase() !== 'ja') return;
@@ -1062,62 +1056,58 @@ function destroyDevicesPane(){
   }
 }
 
+async function applyDevicesPaneState(){
+  lsSet('devicesPinned', devicesPinned ? '1' : '0');
+  document.body.classList.toggle('devices-pinned', devicesPinned);
+  if (devicesPinned){
+    if (!devicesPane){
+      devicesPane = await createDevicesPane();
+    } else {
+      devicesPane.style.display = '';
+      if (typeof window.__refreshDevicesPane === 'function'){
+        await window.__refreshDevicesPane();
+      }
+    }
+  } else {
+    destroyDevicesPane();
+  }
+}
+
 function viewLabel(v){
   return v === 'preview' ? 'Vorschau' : 'Grid';
 }
 
 async function showView(v){
+  if (v === 'devices') v = 'grid';
+  if (v !== 'grid' && v !== 'preview') v = 'grid';
+
   currentView = v;
   lsSet('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
-  if (labelEl && v !== 'devices') labelEl.textContent = viewLabel(v);
-  if (v !== 'devices'){
-    document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
-      it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
-    });
-  }
+  if (labelEl) labelEl.textContent = viewLabel(v);
+
+  document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
+    it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
+  });
 
   const gridCard = document.getElementById('gridPane');
   if (!gridCard) return;
 
-  // Alles schließen/aufräumen
   detachDockLivePush();
-
-  if (devicesPinned && v !== 'devices'){
-    gridCard.style.display = (v === 'grid') ? '' : 'none';
-    if (v === 'preview'){ if (!document.getElementById('dockPane')) createDockPane(); attachDockLivePush(); }
-    else { destroyDockPane(); }
-    if (!devicesPane){ devicesPane = await createDevicesPane(); }
-    devicesPane.style.display = '';
-    return;
-  }
+  await applyDevicesPaneState();
 
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (!devicesPinned) destroyDevicesPane();
+    if (devicesPane) devicesPane.style.display = '';
     return;
   }
 
-  if (v === 'preview'){
-    gridCard.style.display = 'none';
-    if (!devicesPinned) destroyDevicesPane();
-    if (!document.getElementById('dockPane')) createDockPane();
-    attachDockLivePush();
-    return;
-  }
-
-  if (v === 'devices'){
-    gridCard.style.display = 'none';
-    destroyDockPane();
-    if (!devicesPane){
-      // WICHTIG: createDevicesPane ist async → Ergebnis abwarten
-      devicesPane = await createDevicesPane();
-    }
-    devicesPane.style.display = '';
-    return;
-  }
+  gridCard.style.display = 'none';
+  if (devicesPane) devicesPane.style.display = '';
+  if (!document.getElementById('dockPane')) createDockPane();
+  attachDockLivePush();
 }
 
 function initViewMenu(){
@@ -1143,17 +1133,29 @@ function initViewMenu(){
   document.addEventListener('click', (e)=>{
     if (!menu.hidden && !document.getElementById('viewMenuWrap').contains(e.target)) closeMenu();
   });
+  const btnDevices = document.getElementById('btnDevices');
+  const updateDevicesButton = ()=>{
+    if (!btnDevices) return;
+    btnDevices.classList.toggle('active', devicesPinned);
+    btnDevices.setAttribute('aria-pressed', devicesPinned ? 'true' : 'false');
+  };
+  const toggleDevicesPane = async ()=>{
+    devicesPinned = !devicesPinned;
+    await applyDevicesPaneState();
+    updateDevicesButton();
+    await showView(currentView);
+  };
   document.addEventListener('keydown', async (e)=>{
     if (e.key === 'Escape' && !menu.hidden) closeMenu();
     const typing = /input|textarea|select/i.test(e.target?.tagName||'');
     if (typing) return;
     if (e.key === '1') { await showView('grid');    closeMenu(); }
     if (e.key === '2') { await showView('preview'); closeMenu(); }
-    if (e.key === '3') { await showView('devices'); closeMenu(); }
+    if (e.key === '3') { await toggleDevicesPane(); closeMenu(); }
   });
 
-  const btnDevices = document.getElementById('btnDevices');
-  if (btnDevices) btnDevices.onclick = ()=> showView('devices');
+  if (btnDevices) btnDevices.onclick = toggleDevicesPane;
+  updateDevicesButton();
 
   document.getElementById('viewMenuLabel').textContent = viewLabel(currentView);
   // Initial zeichnen
