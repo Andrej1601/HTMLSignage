@@ -36,6 +36,13 @@ $timestamp = time();
 $dev['lastSeen'] = $timestamp;
 $dev['lastSeenAt'] = $timestamp;
 
-devices_save($db);
+try {
+  devices_save($db);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device heartbeat: ' . $e->getMessage());
+  echo json_encode(['ok'=>false, 'error'=>'storage-failed']);
+  exit;
+}
 
 echo json_encode(['ok'=>true]);
