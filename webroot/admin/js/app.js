@@ -746,6 +746,15 @@ async function createDevicesPane(){
   host?.insertBefore(card, host.firstChild);
 
   // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
+  const normalizeSeconds = (value)=>{
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return 0;
+    if (num > 1e12) return Math.floor(num / 1000);
+    if (num > 1e10) return Math.floor(num / 1000);
+    return Math.floor(num);
+  };
+
   async function fetchDevicesStatus(){
     try {
       const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
@@ -755,7 +764,7 @@ async function createDevicesPane(){
         const devices = (j.devices || []).map(d => ({
           id: d.id,
           name: d.name || '',
-          lastSeenAt: d.lastSeenAt || 0,
+          lastSeenAt: normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0),
           offline: !!d.offline,
           useOverrides: !!d.useOverrides
         }));
@@ -768,11 +777,11 @@ async function createDevicesPane(){
         const j2 = await r2.json();
         const pairings = Object.values(j2.pairings || {})
           .filter(p => !p.deviceId)
-          .map(p => ({ code: p.code, createdAt: p.created }));
-        const now = j2.now || 0;
+          .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
+        const now = normalizeSeconds(j2.now || Date.now());
         const OFFLINE_AFTER_MIN = 10;
         const devices = Object.values(j2.devices || {}).map(d => {
-          const lastSeenAt = d.lastSeen || 0;
+          const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
           const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
           return {
             id: d.id,
@@ -831,15 +840,19 @@ async function createDevicesPane(){
         tr.classList.add('selected');
       };
       paired.forEach(d=>{
-        const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
-        const offline = d.offline;
+        const lastSeenAt = Number(d.lastSeenAt) || 0;
+        const seen = lastSeenAt ? new Date(lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        const offline = !lastSeenAt || (Date.now()/1000 - lastSeenAt) > 10*60;
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');
         if (currentDeviceCtx===d.id) tr.classList.add('current');
         if (useInd) tr.classList.add('ind');
         if (offline) tr.classList.add('offline');
-        const statusCell = offline ? '<td class="status offline">offline</td>' : `<td class="mut">${seen}</td>`;
+        const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seen}</small>` : '';
+        const statusCell = offline
+          ? `<td class="status offline">offline${lastSeenHtml}</td>`
+          : `<td class="status online">online${lastSeenHtml}</td>`;
         tr.innerHTML = `
           <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
           <td><button class="btn sm" data-view>Ansehen</button></td>
