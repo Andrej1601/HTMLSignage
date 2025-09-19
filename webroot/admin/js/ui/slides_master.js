@@ -895,12 +895,16 @@ export function renderSlideOrderView(){
       ev.preventDefault();
     };
 
-    const makeCtrlButton = (dir, label, iconText) => {
+    const makeCtrlButton = (dir, label) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `reorder-btn ${dir > 0 ? 'reorder-down' : 'reorder-up'}`;
       btn.setAttribute('aria-label', label);
-      btn.innerHTML = `<span aria-hidden="true">${iconText}</span>`;
+      btn.title = label;
+      const iconMarkup = dir < 0
+        ? '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="M8 3.5 12.5 8l-.7.7L8 4.9 4.2 8.7l-.7-.7Z"/></svg>'
+        : '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="m8 12.5-4.5-4.5.7-.7L8 11.1l3.8-3.8.7.7Z"/></svg>';
+      btn.innerHTML = iconMarkup;
       btn.draggable = false;
       btn.addEventListener('pointerdown', stopDragPropagation);
       btn.addEventListener('mousedown', stopDragPropagation);
@@ -929,8 +933,8 @@ export function renderSlideOrderView(){
       return btn;
     };
 
-    controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben', '↑'));
-    controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben', '↓'));
+    controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben'));
+    controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben'));
     tile.appendChild(controls);
 
     host.appendChild(tile);

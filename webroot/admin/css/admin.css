@@ -369,26 +369,34 @@ details[open] .chev{ transform: rotate(90deg); }
 
 .slide-order-tile .reorder-controls{
   display:flex;
+  justify-content:center;
   gap:8px;
   margin-top:8px;
   width:100%;
 }
 
 .slide-order-tile .reorder-btn{
-  flex:1 1 0;
-  display:flex;
+  --btn-size:28px;
+  flex:0 0 auto;
+  inline-size:var(--btn-size);
+  block-size:var(--btn-size);
+  display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:4px;
-  padding:6px;
-  border-radius:8px;
+  border-radius:999px;
   border:1px solid var(--ghost-border);
   background:var(--ghost-bg);
   color:var(--fg);
-  font-size:18px;
-  line-height:1;
   cursor:pointer;
-  min-height:34px;
+  padding:0;
+  transition:background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+
+.slide-order-tile .reorder-btn svg{
+  width:16px;
+  height:16px;
+  fill:currentColor;
+  pointer-events:none;
 }
 
 .slide-order-tile .reorder-btn span{ pointer-events:none; }
