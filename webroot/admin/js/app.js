@@ -755,16 +755,22 @@ async function createDevicesPane(){
     return Math.floor(num);
   };
 
+  const resolveNow = (value)=>{
+    if (value === undefined || value === null) return normalizeSeconds(Date.now());
+    return normalizeSeconds(value);
+  };
+
   async function fetchDevicesStatus(){
     const OFFLINE_AFTER_MIN = 10;
     try {
       const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
       if (r.ok) {
         const j = await r.json();
+        const now = resolveNow(j.now);
         const pairings = j.pairings || [];
         const devices = (j.devices || []).map(d => {
           const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
-          const offline = !lastSeenAt || (Date.now()/1000 - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
           return {
             id: d.id,
             name: d.name || '',
@@ -773,7 +779,7 @@ async function createDevicesPane(){
             useOverrides: !!d.useOverrides
           };
         });
-        return { ok:true, pairings, devices };
+        return { ok:true, now, pairings, devices };
       }
     } catch(e){}
     try {
@@ -783,7 +789,7 @@ async function createDevicesPane(){
         const pairings = Object.values(j2.pairings || {})
           .filter(p => !p.deviceId)
           .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
-        const now = normalizeSeconds(j2.now || Date.now());
+        const now = resolveNow(j2.now);
         const devices = Object.values(j2.devices || {}).map(d => {
           const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
           const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
@@ -795,7 +801,7 @@ async function createDevicesPane(){
             useOverrides: !!d.useOverrides
           };
         });
-        return { ok:true, pairings, devices };
+        return { ok:true, now, pairings, devices };
       }
     } catch(e){}
     console.warn('[admin] konnte Geräte-Status weder über API noch Datei laden');
@@ -804,6 +810,7 @@ async function createDevicesPane(){
 
   async function render(){
     const j = await fetchDevicesStatus();
+    const now = resolveNow(j.now);
 
     // Pending
     const P = document.getElementById('devPendingList');
@@ -846,7 +853,9 @@ async function createDevicesPane(){
       paired.forEach(d=>{
         const lastSeenAt = Number(d.lastSeenAt) || 0;
         const seen = lastSeenAt ? new Date(lastSeenAt*1000).toLocaleString('de-DE') : '—';
-        const offline = !lastSeenAt || (Date.now()/1000 - lastSeenAt) > 10*60;
+        const offline = typeof d.offline === 'boolean'
+          ? d.offline
+          : (!lastSeenAt || (now - lastSeenAt) > 10*60);
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');

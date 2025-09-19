@@ -42,4 +42,9 @@ foreach (($db['devices'] ?? []) as $id => $d) {
 
 }
 
-echo json_encode(['ok'=>true, 'pairings'=>$pairings, 'devices'=>$devices], JSON_UNESCAPED_SLASHES);
+echo json_encode([
+  'ok' => true,
+  'now' => $now,
+  'pairings' => $pairings,
+  'devices' => $devices
+], JSON_UNESCAPED_SLASHES);
