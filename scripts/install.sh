@@ -62,7 +62,10 @@ main(){
   cp config/nginx/snippets/signage-pairing.conf /etc/nginx/snippets/
   sed -i "s/__PUBLIC_PORT__/${SIGNAGE_PUBLIC_PORT}/" /etc/nginx/sites-available/signage-slideshow.conf
   sed -i "s/__ADMIN_PORT__/${SIGNAGE_ADMIN_PORT}/" /etc/nginx/sites-available/signage-admin.conf
-  sed -i "s|__PHP_SOCK__|${PHP_SOCK}|" /etc/nginx/sites-available/signage-admin.conf /etc/nginx/snippets/signage-pairing.conf
+  sed -i "s|__PHP_SOCK__|${PHP_SOCK}|" \
+    /etc/nginx/sites-available/signage-admin.conf \
+    /etc/nginx/sites-available/signage-slideshow.conf \
+    /etc/nginx/snippets/signage-pairing.conf
   ln -sf /etc/nginx/sites-available/signage-slideshow.conf /etc/nginx/sites-enabled/signage-slideshow.conf
   ln -sf /etc/nginx/sites-available/signage-admin.conf /etc/nginx/sites-enabled/signage-admin.conf
   rm -f /etc/nginx/sites-enabled/default
