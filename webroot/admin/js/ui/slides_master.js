@@ -884,6 +884,55 @@ export function renderSlideOrderView(){
       tile.appendChild(img);
     }
 
+    const controls = document.createElement('div');
+    controls.className = 'reorder-controls';
+
+    const stopDragPropagation = ev => {
+      ev.stopPropagation();
+    };
+
+    const preventDragStart = ev => {
+      ev.preventDefault();
+    };
+
+    const makeCtrlButton = (dir, label, iconText) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `reorder-btn ${dir > 0 ? 'reorder-down' : 'reorder-up'}`;
+      btn.setAttribute('aria-label', label);
+      btn.innerHTML = `<span aria-hidden="true">${iconText}</span>`;
+      btn.draggable = false;
+      btn.addEventListener('pointerdown', stopDragPropagation);
+      btn.addEventListener('mousedown', stopDragPropagation);
+      btn.addEventListener('touchstart', stopDragPropagation);
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        let moved = false;
+        if (dir < 0){
+          const prev = tile.previousElementSibling;
+          if (prev){
+            prev.before(tile);
+            moved = true;
+          }
+        } else {
+          const next = tile.nextElementSibling;
+          if (next){
+            next.after(tile);
+            moved = true;
+          }
+        }
+        if (!moved) return;
+        clearDropIndicators();
+        commitReorder();
+      });
+      btn.addEventListener('dragstart', preventDragStart);
+      return btn;
+    };
+
+    controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben', '↑'));
+    controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben', '↓'));
+    tile.appendChild(controls);
+
     host.appendChild(tile);
   });
 
