@@ -812,6 +812,7 @@ export function renderSlideOrderView(){
   const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
   const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
     .map(it => ({ kind: 'media', item: it }));
+  const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
 
   let combined = [];
   const ord = settings?.slides?.sortOrder;
@@ -844,12 +845,27 @@ export function renderSlideOrderView(){
     tile.dataset.idx = idx;
     tile.dataset.type = entry.kind;
 
+    const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
+    const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
+    if (isHiddenSauna) tile.classList.add('is-hidden');
+    if (isHiddenSauna || isDisabledMedia) tile.classList.add('is-disabled');
+
     const title = document.createElement('div');
     title.className = 'title';
+    let statusEl = null;
+    if (isHiddenSauna || isDisabledMedia){
+      statusEl = document.createElement('div');
+      statusEl.className = 'slide-status';
+      statusEl.dataset.state = isHiddenSauna ? 'hidden' : 'disabled';
+      statusEl.textContent = isHiddenSauna
+        ? 'Momentan ausgeblendet'
+        : 'Momentan deaktiviert';
+    }
     if (entry.kind === 'sauna'){
       tile.dataset.name = entry.name;
       title.textContent = entry.name;
       tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
       const imgSrc = settings.assets?.rightImages?.[entry.name] || '';
       if (imgSrc){
         const img = document.createElement('img');
@@ -861,6 +877,7 @@ export function renderSlideOrderView(){
       tile.dataset.id = entry.item.id;
       title.textContent = entry.item.name || '(unbenannt)';
       tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
       const img = document.createElement('img');
       img.src = entry.item.thumb || entry.item.url || '';
       img.alt = entry.item.name || '';
