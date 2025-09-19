@@ -405,7 +405,7 @@ function colorField(key,label,init){
       <div class="swatch" id="sw_${key}"></div>
       <input class="input" id="cl_${key}" type="text" value="${valUp}" placeholder="#RRGGBB">
       <input type="color" id="cp_${key}" value="${valLow}">
-      <button class="btn sm undo" type="button">Undo</button>
+      <button class="btn sm ghost icon undo" type="button" title="Letzten Wert zurücksetzen" aria-label="Letzten Wert zurücksetzen">⟳</button>
     </div>`;
   return row;
 }
