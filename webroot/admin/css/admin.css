@@ -325,6 +325,42 @@ details[open] .chev{ transform: rotate(90deg); }
   margin-bottom:4px;
 }
 
+.slide-order-tile .reorder-controls{
+  display:flex;
+  gap:8px;
+  margin-top:8px;
+  width:100%;
+}
+
+.slide-order-tile .reorder-btn{
+  flex:1 1 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  padding:6px;
+  border-radius:8px;
+  border:1px solid var(--ghost-border);
+  background:var(--ghost-bg);
+  color:var(--fg);
+  font-size:18px;
+  line-height:1;
+  cursor:pointer;
+  min-height:34px;
+}
+
+.slide-order-tile .reorder-btn span{ pointer-events:none; }
+
+.slide-order-tile .reorder-btn:focus-visible{
+  outline:0;
+  box-shadow:0 0 0 3px color-mix(in oklab, var(--input-focus) 30%, transparent);
+  border-color:var(--input-focus);
+}
+
+.slide-order-tile .reorder-btn:active{
+  background: color-mix(in oklab, var(--ghost-fg, var(--fg)) 6%, transparent);
+}
+
 /* Toggle */
 .toggle{
   display:flex;
