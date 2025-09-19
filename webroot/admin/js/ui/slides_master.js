@@ -871,46 +871,101 @@ export function renderSlideOrderView(){
   });
 
   let dragged = null;
+  const DROP_BEFORE = 'drop-before';
+  const DROP_AFTER = 'drop-after';
+
+  const clearDropIndicators = () => {
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+  };
+
+  const commitReorder = () => {
+    const tiles = Array.from(host.children);
+    const reordered = tiles.map(el => combined[+el.dataset.idx]);
+    combined = reordered;
+    tiles.forEach((el, i) => { el.dataset.idx = i; });
+
+    const newSaunas = [];
+    const newMedia = [];
+    const sortOrder = [];
+    for (const entry of reordered){
+      if (entry.kind === 'sauna'){
+        newSaunas.push(entry.name);
+        sortOrder.push({ type:'sauna', name: entry.name });
+      } else {
+        newMedia.push(entry.item);
+        sortOrder.push({ type:'media', id: entry.item.id });
+      }
+    }
+    schedule.saunas = newSaunas;
+    settings.interstitials = newMedia;
+    settings.slides ||= {};
+    settings.slides.sortOrder = sortOrder;
+  };
+
+  const updateDropIndicator = (target, before) => {
+    if (!target || target === dragged) return;
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      if (el !== target) el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    target.classList.remove(DROP_BEFORE, DROP_AFTER);
+    target.classList.add(before ? DROP_BEFORE : DROP_AFTER);
+  };
+
+  const isBeforeTarget = (event, target) => {
+    const rect = target.getBoundingClientRect();
+    const horizontal = rect.width > rect.height;
+    return horizontal
+      ? (event.clientX < rect.left + rect.width / 2)
+      : (event.clientY < rect.top + rect.height / 2);
+  };
+
   host.querySelectorAll('.slide-order-tile').forEach(tile => {
     tile.addEventListener('dragstart', e => {
       dragged = tile;
       tile.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
     });
+    tile.addEventListener('dragenter', e => {
+      if (!dragged || tile === dragged) return;
+      e.preventDefault();
+      const before = isBeforeTarget(e, tile);
+      updateDropIndicator(tile, before);
+    });
     tile.addEventListener('dragover', e => {
       e.preventDefault();
       const target = tile;
       if (target === dragged) return;
-      const tiles = Array.from(host.children);
-      const draggedIndex = tiles.indexOf(dragged);
-      const targetIndex = tiles.indexOf(target);
-      if (draggedIndex < targetIndex) target.after(dragged);
-      else target.before(dragged);
+      const before = isBeforeTarget(e, target);
+      updateDropIndicator(target, before);
+      if (before) target.before(dragged);
+      else target.after(dragged);
+    });
+    tile.addEventListener('dragleave', e => {
+      if (tile.contains(e.relatedTarget)) return;
+      tile.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    tile.addEventListener('drop', e => {
+      e.preventDefault();
+      clearDropIndicators();
     });
     tile.addEventListener('dragend', () => {
+      clearDropIndicators();
       tile.classList.remove('dragging');
-      const tiles = Array.from(host.children);
-      const reordered = tiles.map(el => combined[+el.dataset.idx]);
-      combined = reordered;
-      tiles.forEach((el, i) => el.dataset.idx = i);
-
-      const newSaunas = [];
-      const newMedia = [];
-      const sortOrder = [];
-      for (const entry of reordered){
-        if (entry.kind === 'sauna'){
-          newSaunas.push(entry.name);
-          sortOrder.push({ type:'sauna', name: entry.name });
-        } else {
-          newMedia.push(entry.item);
-          sortOrder.push({ type:'media', id: entry.item.id });
-        }
-      }
-      schedule.saunas = newSaunas;
-      settings.interstitials = newMedia;
-      settings.slides ||= {};
-      settings.slides.sortOrder = sortOrder;
+      commitReorder();
+      dragged = null;
     });
+  });
+
+  host.addEventListener('drop', e => {
+    e.preventDefault();
+    clearDropIndicators();
+    if (dragged) dragged.classList.remove('dragging');
+  });
+
+  host.addEventListener('dragover', e => {
+    e.preventDefault();
   });
 }
 
