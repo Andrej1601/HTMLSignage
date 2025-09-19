@@ -209,6 +209,24 @@ details[open] .chev{ transform: rotate(90deg); }
 }
 .btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
 .btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
+.btn.has-meta{ position:relative; padding-right:38px; }
+.btn.sm.has-meta{ padding-right:34px; }
+.btn.has-meta .meta{
+  position:absolute;
+  top:50%;
+  right:10px;
+  transform:translateY(-50%);
+  font-size:11px;
+  line-height:1;
+  font-weight:600;
+  padding:2px 6px;
+  border-radius:999px;
+  background:rgba(0,0,0,.25);
+  color:inherit;
+  opacity:.85;
+  pointer-events:none;
+  white-space:nowrap;
+}
 
 /* Default (flieder) */
 .btn:not(.ghost):not(.primary){ background:var(--btn-accent); color:var(--btn-accent-fg); }

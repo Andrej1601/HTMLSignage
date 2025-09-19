@@ -726,8 +726,7 @@ async function createDevicesPane(){
         <div class="card-title">Geräte</div>
         <div class="device-toolbar">
           <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
-          <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
-          <span class="mut" id="devLastUpdate"></span>
+          <button class="btn sm icon-label has-meta" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span><span class="meta" id="devLastUpdate" aria-live="polite"></span></button>
           <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
         </div>
       </div>
@@ -948,7 +947,13 @@ async function createDevicesPane(){
       });
     }
     const ts = card.querySelector('#devLastUpdate');
-    if (ts) ts.textContent = 'Stand: ' + new Date().toLocaleString('de-DE');
+    if (ts) {
+      const fallbackNow = normalizeSeconds(Date.now());
+      const tsSeconds = now || fallbackNow;
+      const tsDate = new Date(tsSeconds * 1000);
+      ts.textContent = tsDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      ts.title = 'Stand: ' + tsDate.toLocaleString('de-DE');
+    }
   }
 
   // oben rechts: „Code eingeben…“
