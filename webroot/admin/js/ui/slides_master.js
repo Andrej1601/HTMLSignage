@@ -856,10 +856,8 @@ export function renderSlideOrderView(){
     if (isHiddenSauna || isDisabledMedia){
       statusEl = document.createElement('div');
       statusEl.className = 'slide-status';
-      statusEl.dataset.state = isHiddenSauna ? 'hidden' : 'disabled';
-      statusEl.textContent = isHiddenSauna
-        ? 'Momentan ausgeblendet'
-        : 'Momentan deaktiviert';
+      statusEl.dataset.state = 'hidden';
+      statusEl.textContent = 'Ausgeblendet';
     }
     if (entry.kind === 'sauna'){
       tile.dataset.name = entry.name;

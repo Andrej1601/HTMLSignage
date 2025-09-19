@@ -350,21 +350,9 @@ details[open] .chev{ transform: rotate(90deg); }
   border-radius:999px;
   text-align:center;
   width:100%;
-  border:1px solid color-mix(in oklab, var(--border) 55%, transparent);
-  color:color-mix(in oklab, var(--fg) 75%, var(--muted));
-  background:color-mix(in oklab, var(--muted) 18%, transparent);
-}
-
-.slide-order-tile .slide-status[data-state="hidden"]{
   border-color:color-mix(in oklab, var(--btn-accent) 45%, var(--border));
   color:color-mix(in oklab, var(--btn-accent) 70%, var(--fg));
   background:color-mix(in oklab, var(--btn-accent) 18%, var(--panel));
-}
-
-.slide-order-tile .slide-status[data-state="disabled"]{
-  border-color:color-mix(in oklab, #EF4444 45%, var(--border));
-  color:color-mix(in oklab, #B91C1C 72%, var(--fg));
-  background:color-mix(in oklab, #EF4444 16%, var(--panel));
 }
 
 .slide-order-tile .reorder-controls{
