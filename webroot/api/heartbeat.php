@@ -5,6 +5,9 @@ require_once __DIR__ . '/../admin/api/devices_store.php';
 
 $raw = file_get_contents('php://input');
 $payload = json_decode($raw, true);
+if (!is_array($payload)) {
+  $payload = [];
+}
 $id = $payload['device'] ?? ($_POST['device'] ?? ($_GET['device'] ?? ''));
 $id = is_string($id) ? trim($id) : '';
 
