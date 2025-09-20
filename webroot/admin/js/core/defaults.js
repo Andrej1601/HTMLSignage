@@ -95,6 +95,9 @@ export const DEFAULTS = {
     aromaItalic:false,
     infobadgeColor:'#5C3101',
     infobadgeIcon:'ℹ️',
+    showIcons:true,
+    cardIcons:{},
+    cardIconsMigrated:true,
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic'
