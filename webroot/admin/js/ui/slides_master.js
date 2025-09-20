@@ -143,6 +143,43 @@ function applyStyleSet(settings, id){
   return true;
 }
 
+function ensureCardIconMap(settings){
+  settings.slides ||= {};
+  const raw = settings.slides.cardIcons;
+  const clean = {};
+  if (raw && typeof raw === 'object'){
+    Object.entries(raw).forEach(([key, value]) => {
+      const safeKey = String(key ?? '');
+      if (!safeKey) return;
+      const url = (typeof value === 'string') ? value.trim() : '';
+      if (url) clean[safeKey] = url;
+    });
+  }
+  settings.slides.cardIcons = clean;
+  return clean;
+}
+
+function maybeMigrateCardIcons(settings){
+  settings.slides ||= {};
+  if (settings.slides.cardIconsMigrated === true){
+    return ensureCardIconMap(settings);
+  }
+  const map = ensureCardIconMap(settings);
+  if (!Object.keys(map).length){
+    const legacy = settings.assets?.rightImages;
+    if (legacy && typeof legacy === 'object'){
+      Object.entries(legacy).forEach(([key, value]) => {
+        const safeKey = String(key ?? '');
+        if (!safeKey) return;
+        const url = (typeof value === 'string') ? value.trim() : '';
+        if (url) map[safeKey] = url;
+      });
+    }
+  }
+  settings.slides.cardIconsMigrated = true;
+  return map;
+}
+
 // ============================================================================
 // 1) Wochentage / Presets
 // ============================================================================
@@ -266,6 +303,10 @@ function deleteSaunaEverywhere(name){
     delete settings.assets.rightImages[name];
   }
 
+  // 4b) Karten-Icons
+  const iconMap = ensureCardIconMap(settings);
+  delete iconMap[name];
+
   // 5) Per-Sauna-Dauern
   if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name] != null){
     delete settings.slides.saunaDurations[name];
@@ -305,6 +346,12 @@ function renameSaunaEverywhere(oldName, newName){
     const val = settings.assets.rightImages[oldName];
     delete settings.assets.rightImages[oldName];
     settings.assets.rightImages[newName] = val;
+  }
+
+  const iconMap = ensureCardIconMap(settings);
+  if (Object.prototype.hasOwnProperty.call(iconMap, oldName)){
+    iconMap[newName] = iconMap[oldName];
+    delete iconMap[oldName];
   }
 
   // Per-Sauna-Dauern
@@ -642,6 +689,138 @@ if ($name && mode === 'normal') {
 const saunaExtraRow = (name, dayLabels) =>
   saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
 
+function cardIconFallbackLabel(name){
+  const trimmed = (name || '').trim();
+  if (trimmed.length >= 2) return trimmed.slice(0, 2).toUpperCase();
+  if (trimmed.length === 1) return trimmed.toUpperCase();
+  return '–';
+}
+
+function cardIconRow(name){
+  const settings = ctx.getSettings();
+  const iconMap = ensureCardIconMap(settings);
+  const iconUrl = iconMap[name] || '';
+  const rightImage = settings.assets?.rightImages?.[name] || '';
+  const suggestion = (!iconUrl && rightImage) ? rightImage : '';
+  const isLegacyIcon = !!iconUrl && rightImage && iconUrl === rightImage;
+
+  const row = document.createElement('div');
+  row.className = 'iconrow';
+  if (iconUrl) row.classList.add('has-icon');
+  else if (suggestion) row.classList.add('has-suggestion');
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'iconrow-name';
+  nameEl.textContent = String(name || '');
+  row.appendChild(nameEl);
+
+  const preview = document.createElement('div');
+  preview.className = 'iconrow-preview';
+  row.appendChild(preview);
+
+  const actions = document.createElement('div');
+  actions.className = 'iconrow-actions';
+  row.appendChild(actions);
+
+  const updatePreview = (src) => {
+    preview.innerHTML = '';
+    preview.title = '';
+    if (src){
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      preview.appendChild(img);
+      preloadImg(src).then(r => {
+        if (r.ok) preview.title = `${r.w}×${r.h}`;
+      });
+    } else {
+      const span = document.createElement('span');
+      span.className = 'iconrow-placeholder';
+      span.textContent = cardIconFallbackLabel(name);
+      preview.appendChild(span);
+    }
+  };
+
+  if (iconUrl) updatePreview(iconUrl);
+  else if (suggestion) updatePreview(suggestion);
+  else updatePreview('');
+
+  const rerender = () => {
+    renderSlidesMaster();
+    if (typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
+  };
+
+  if (suggestion){
+    const adoptBtn = document.createElement('button');
+    adoptBtn.type = 'button';
+    adoptBtn.className = 'btn sm ghost';
+    adoptBtn.textContent = 'Übernehmen';
+    adoptBtn.onclick = () => {
+      iconMap[name] = suggestion;
+      rerender();
+    };
+    actions.appendChild(adoptBtn);
+  }
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'btn sm ghost';
+  uploadBtn.textContent = iconUrl ? 'Ersetzen' : 'Hochladen';
+  uploadBtn.onclick = () => {
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
+      if (!p) return;
+      iconMap[name] = p;
+      rerender();
+    });
+    fi.click();
+  };
+  actions.appendChild(uploadBtn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn sm ghost';
+  removeBtn.textContent = 'Entfernen';
+  removeBtn.disabled = !iconUrl;
+  removeBtn.onclick = () => {
+    if (!iconMap[name]) return;
+    delete iconMap[name];
+    rerender();
+  };
+  actions.appendChild(removeBtn);
+
+  if (!iconUrl && suggestion){
+    const note = document.createElement('div');
+    note.className = 'iconrow-note';
+    note.textContent = 'Vorschlag aus „Bild rechts“.';
+    row.appendChild(note);
+  } else if (isLegacyIcon){
+    const note = document.createElement('div');
+    note.className = 'iconrow-note';
+    note.textContent = 'Aus „Bild rechts“ übernommen.';
+    row.appendChild(note);
+  }
+
+  return row;
+}
+
+function renderSaunaIconList(){
+  const host = $('#saunaIconList');
+  if (!host) return;
+  host.innerHTML = '';
+  const all = getAllSaunas();
+  if (!all.length){
+    const empty = document.createElement('div');
+    empty.className = 'mut';
+    empty.textContent = 'Keine Saunen im Inventar.';
+    host.appendChild(empty);
+    return;
+  }
+  all.forEach(name => host.appendChild(cardIconRow(name)));
+}
+
 // ============================================================================
 // 4) Drag & Drop
 // ============================================================================
@@ -945,6 +1124,69 @@ function ensureStorySlides(settings){
     story.intro = typeof story.intro === 'string' ? story.intro : '';
     story.ritual = typeof story.ritual === 'string' ? story.ritual : '';
     story.tips = typeof story.tips === 'string' ? story.tips : '';
+    const normalizeSection = (section = {}, secIdx = 0) => {
+      const src = section && typeof section === 'object' ? section : { text: typeof section === 'string' ? section : '' };
+      const out = { ...src };
+      const legacyImg = (out.image && typeof out.image === 'object') ? out.image : null;
+      if (!out.id) out.id = 'story_sec_' + Math.random().toString(36).slice(2, 9);
+      out.title = typeof out.title === 'string' ? out.title : '';
+      out.text = typeof out.text === 'string'
+        ? out.text
+        : (typeof out.body === 'string' ? out.body : '');
+      out.imageUrl = typeof out.imageUrl === 'string'
+        ? out.imageUrl
+        : (typeof out.mediaUrl === 'string' ? out.mediaUrl
+          : (legacyImg && typeof legacyImg.url === 'string' ? legacyImg.url : (typeof out.image === 'string' ? out.image : '')));
+      out.imageAlt = typeof out.imageAlt === 'string'
+        ? out.imageAlt
+        : (legacyImg && typeof legacyImg.alt === 'string' ? legacyImg.alt : '');
+      out.imageCaption = typeof out.imageCaption === 'string'
+        ? out.imageCaption
+        : (legacyImg && typeof legacyImg.caption === 'string' ? legacyImg.caption : '');
+      const layout = typeof out.layout === 'string' ? out.layout : '';
+      out.layout = ['media-left', 'media-right', 'full'].includes(layout) ? layout : '';
+      delete out.image;
+      delete out.mediaUrl;
+      delete out.body;
+      return out;
+    };
+    const normalizeGalleryItem = (entry = {}, gIdx = 0) => {
+      if (entry && typeof entry === 'string') {
+        return {
+          id: 'story_gal_' + Math.random().toString(36).slice(2, 9),
+          url: entry,
+          alt: '',
+          caption: ''
+        };
+      }
+      const src = entry && typeof entry === 'object' ? entry : {};
+      const out = { ...src };
+      const legacyImg = (out.image && typeof out.image === 'object') ? out.image : null;
+      if (!out.id) out.id = 'story_gal_' + Math.random().toString(36).slice(2, 9);
+      out.url = typeof out.url === 'string'
+        ? out.url
+        : (typeof out.imageUrl === 'string' ? out.imageUrl
+          : (legacyImg && typeof legacyImg.url === 'string' ? legacyImg.url : ''));
+      out.alt = typeof out.alt === 'string'
+        ? out.alt
+        : (typeof out.imageAlt === 'string' ? out.imageAlt
+          : (legacyImg && typeof legacyImg.alt === 'string' ? legacyImg.alt : ''));
+      out.caption = typeof out.caption === 'string'
+        ? out.caption
+        : (typeof out.title === 'string' ? out.title
+          : (legacyImg && typeof legacyImg.caption === 'string' ? legacyImg.caption : ''));
+      delete out.imageUrl;
+      delete out.imageAlt;
+      delete out.title;
+      delete out.image;
+      return out;
+    };
+    story.sections = Array.isArray(story.sections)
+      ? story.sections.map(normalizeSection)
+      : [];
+    story.gallery = Array.isArray(story.gallery)
+      ? story.gallery.map(normalizeGalleryItem)
+      : [];
   });
   settings.slides.storySlides = list;
   return settings.slides.storySlides;
@@ -960,6 +1202,8 @@ function storyDefaults(){
     intro: '',
     ritual: '',
     tips: '',
+    sections: [],
+    gallery: [],
     faq: [],
     enabled: true
   };
@@ -1164,6 +1408,416 @@ function storyEditor(story, idx){
   wrap.appendChild(makeTextarea('Einführung', 'intro', 3, 'Hintergrund & Wirkung'));
   wrap.appendChild(makeTextarea('Ritual', 'ritual', 3, 'Ablauf oder Besonderheiten'));
   wrap.appendChild(makeTextarea('Tipps (je Zeile ein Tipp)', 'tips', 3, 'Tipps oder Hinweise'));
+
+  const sectionsHeader = document.createElement('div');
+  sectionsHeader.className = 'subh';
+  sectionsHeader.textContent = 'Abschnitte';
+  wrap.appendChild(sectionsHeader);
+
+  const sectionsList = document.createElement('div');
+  sectionsList.className = 'story-sections-editor';
+  sectionsList.style.display = 'grid';
+  sectionsList.style.gap = '12px';
+  wrap.appendChild(sectionsList);
+
+  const renderSections = () => {
+    sectionsList.innerHTML = '';
+    const sections = Array.isArray(story.sections) ? story.sections : (story.sections = []);
+    if (!sections.length) {
+      const empty = document.createElement('div');
+      empty.className = 'mut';
+      empty.textContent = 'Noch keine Abschnitte angelegt.';
+      sectionsList.appendChild(empty);
+      return;
+    }
+    sections.forEach((section, sectionIdx) => {
+      const card = document.createElement('div');
+      card.className = 'story-section-card';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      card.style.gap = '10px';
+      card.style.padding = '12px';
+      card.style.border = '1px solid rgba(0,0,0,.12)';
+      card.style.borderRadius = '10px';
+
+      const head = document.createElement('div');
+      head.className = 'row story-section-card-head';
+      head.style.alignItems = 'center';
+      head.style.gap = '8px';
+
+      const label = document.createElement('strong');
+      label.className = 'story-section-card-title';
+      label.textContent = section.title?.trim() ? section.title.trim() : `Abschnitt ${sectionIdx + 1}`;
+      head.appendChild(label);
+
+      const controls = document.createElement('div');
+      controls.className = 'row story-section-card-controls';
+      controls.style.gap = '4px';
+
+      const move = (delta) => {
+        const arr = Array.isArray(story.sections) ? story.sections : [];
+        const nextIdx = sectionIdx + delta;
+        if (nextIdx < 0 || nextIdx >= arr.length) return;
+        const [item] = arr.splice(sectionIdx, 1);
+        arr.splice(nextIdx, 0, item);
+        renderSlidesMaster();
+      };
+
+      const makeCtrlBtn = (labelTxt, title) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn sm ghost icon';
+        btn.textContent = labelTxt;
+        btn.title = title;
+        return btn;
+      };
+
+      const upBtn = makeCtrlBtn('↑', 'Nach oben verschieben');
+      upBtn.onclick = () => move(-1);
+      controls.appendChild(upBtn);
+
+      const downBtn = makeCtrlBtn('↓', 'Nach unten verschieben');
+      downBtn.onclick = () => move(1);
+      controls.appendChild(downBtn);
+
+      const delBtn = makeCtrlBtn('✕', 'Abschnitt entfernen');
+      delBtn.onclick = () => {
+        const arr = Array.isArray(story.sections) ? story.sections : [];
+        arr.splice(sectionIdx, 1);
+        renderSlidesMaster();
+      };
+      controls.appendChild(delBtn);
+
+      head.appendChild(controls);
+      card.appendChild(head);
+
+      const titleWrap = document.createElement('div');
+      titleWrap.className = 'kv';
+      const titleLabel = document.createElement('label');
+      titleLabel.textContent = 'Titel';
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.className = 'input';
+      titleInput.placeholder = 'Abschnittstitel';
+      titleInput.value = section.title || '';
+      titleInput.onchange = () => { section.title = titleInput.value.trim(); renderSlidesMaster(); };
+      titleWrap.appendChild(titleLabel);
+      titleWrap.appendChild(titleInput);
+      card.appendChild(titleWrap);
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'kv';
+      const textLabel = document.createElement('label');
+      textLabel.textContent = 'Text';
+      const textArea = document.createElement('textarea');
+      textArea.className = 'input';
+      textArea.rows = 3;
+      textArea.placeholder = 'Abschnittsbeschreibung';
+      textArea.value = section.text || '';
+      textArea.onchange = () => { section.text = textArea.value.trim(); renderSlidesMaster(); };
+      textWrap.appendChild(textLabel);
+      textWrap.appendChild(textArea);
+      card.appendChild(textWrap);
+
+      const mediaRow = document.createElement('div');
+      mediaRow.className = 'row story-section-card-media';
+      mediaRow.style.gap = '12px';
+      mediaRow.style.flexWrap = 'wrap';
+      mediaRow.style.alignItems = 'center';
+
+      const preview = document.createElement('img');
+      preview.className = 'story-section-card-preview';
+      preview.style.width = '140px';
+      preview.style.height = '100px';
+      preview.style.objectFit = 'cover';
+      preview.style.borderRadius = '8px';
+      preview.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,.12)';
+
+      const updatePreview = () => {
+        if (section.imageUrl) {
+          preview.src = section.imageUrl;
+          preview.title = stripCacheSimple(section.imageUrl);
+        } else {
+          preview.src = FALLBACK_HERO;
+          preview.title = 'Kein Bild ausgewählt';
+        }
+      };
+      updatePreview();
+
+      const mediaBtns = document.createElement('div');
+      mediaBtns.className = 'row';
+      mediaBtns.style.gap = '6px';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.type = 'button';
+      uploadBtn.className = 'btn sm ghost';
+      uploadBtn.textContent = 'Bild hochladen';
+      uploadBtn.onclick = () => {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = 'image/*';
+        fi.onchange = () => uploadGeneric(fi, (url) => {
+          const clean = stripCacheSimple(url || '');
+          section.imageUrl = clean
+            ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
+            : '';
+          renderSlidesMaster();
+        });
+        fi.click();
+      };
+      mediaBtns.appendChild(uploadBtn);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn sm ghost';
+      removeBtn.textContent = 'Bild entfernen';
+      removeBtn.onclick = () => { section.imageUrl = ''; renderSlidesMaster(); };
+      mediaBtns.appendChild(removeBtn);
+
+      mediaRow.appendChild(preview);
+      mediaRow.appendChild(mediaBtns);
+      card.appendChild(mediaRow);
+
+      const altWrap = document.createElement('div');
+      altWrap.className = 'kv';
+      const altLabel = document.createElement('label');
+      altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
+      const altInput = document.createElement('input');
+      altInput.type = 'text';
+      altInput.className = 'input';
+      altInput.placeholder = 'Optional für Screenreader';
+      altInput.value = section.imageAlt || '';
+      altInput.onchange = () => { section.imageAlt = altInput.value.trim(); renderSlidesMaster(); };
+      altWrap.appendChild(altLabel);
+      altWrap.appendChild(altInput);
+      card.appendChild(altWrap);
+
+      const captionWrap = document.createElement('div');
+      captionWrap.className = 'kv';
+      const captionLabel = document.createElement('label');
+      captionLabel.textContent = 'Bildunterschrift (optional)';
+      const captionInput = document.createElement('input');
+      captionInput.type = 'text';
+      captionInput.className = 'input';
+      captionInput.placeholder = 'Kurze Bildbeschreibung';
+      captionInput.value = section.imageCaption || '';
+      captionInput.onchange = () => { section.imageCaption = captionInput.value.trim(); renderSlidesMaster(); };
+      captionWrap.appendChild(captionLabel);
+      captionWrap.appendChild(captionInput);
+      card.appendChild(captionWrap);
+
+      sectionsList.appendChild(card);
+    });
+  };
+  renderSections();
+
+  const addSectionBtn = document.createElement('button');
+  addSectionBtn.type = 'button';
+  addSectionBtn.className = 'btn sm ghost';
+  addSectionBtn.textContent = 'Abschnitt hinzufügen';
+  addSectionBtn.onclick = () => {
+    (story.sections ||= []).push({
+      id: 'story_sec_' + Math.random().toString(36).slice(2, 9),
+      title: '',
+      text: '',
+      imageUrl: '',
+      imageAlt: '',
+      imageCaption: ''
+    });
+    renderSlidesMaster();
+  };
+  wrap.appendChild(addSectionBtn);
+
+  const galleryHeader = document.createElement('div');
+  galleryHeader.className = 'subh';
+  galleryHeader.textContent = 'Galerie';
+  wrap.appendChild(galleryHeader);
+
+  const galleryList = document.createElement('div');
+  galleryList.className = 'story-gallery-editor';
+  galleryList.style.display = 'grid';
+  galleryList.style.gap = '12px';
+  wrap.appendChild(galleryList);
+
+  const renderGallery = () => {
+    galleryList.innerHTML = '';
+    const gallery = Array.isArray(story.gallery) ? story.gallery : (story.gallery = []);
+    if (!gallery.length) {
+      const empty = document.createElement('div');
+      empty.className = 'mut';
+      empty.textContent = 'Noch keine Galerie-Bilder.';
+      galleryList.appendChild(empty);
+      return;
+    }
+    gallery.forEach((entry, gIdx) => {
+      const row = document.createElement('div');
+      row.className = 'story-gallery-card';
+      row.style.display = 'flex';
+      row.style.flexDirection = 'column';
+      row.style.gap = '10px';
+      row.style.padding = '12px';
+      row.style.border = '1px solid rgba(0,0,0,.12)';
+      row.style.borderRadius = '10px';
+
+      const head = document.createElement('div');
+      head.className = 'row story-gallery-card-head';
+      head.style.gap = '8px';
+      head.style.alignItems = 'center';
+
+      const label = document.createElement('strong');
+      label.textContent = entry.caption?.trim() || `Bild ${gIdx + 1}`;
+      head.appendChild(label);
+
+      const controls = document.createElement('div');
+      controls.className = 'row';
+      controls.style.gap = '4px';
+
+      const move = (delta) => {
+        const arr = Array.isArray(story.gallery) ? story.gallery : [];
+        const nextIdx = gIdx + delta;
+        if (nextIdx < 0 || nextIdx >= arr.length) return;
+        const [item] = arr.splice(gIdx, 1);
+        arr.splice(nextIdx, 0, item);
+        renderSlidesMaster();
+      };
+
+      const up = document.createElement('button');
+      up.type = 'button';
+      up.className = 'btn sm ghost icon';
+      up.textContent = '↑';
+      up.title = 'Nach oben verschieben';
+      up.onclick = () => move(-1);
+      controls.appendChild(up);
+
+      const down = document.createElement('button');
+      down.type = 'button';
+      down.className = 'btn sm ghost icon';
+      down.textContent = '↓';
+      down.title = 'Nach unten verschieben';
+      down.onclick = () => move(1);
+      controls.appendChild(down);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn sm ghost icon';
+      remove.textContent = '✕';
+      remove.title = 'Bild entfernen';
+      remove.onclick = () => {
+        const arr = Array.isArray(story.gallery) ? story.gallery : [];
+        arr.splice(gIdx, 1);
+        renderSlidesMaster();
+      };
+      controls.appendChild(remove);
+
+      head.appendChild(controls);
+      row.appendChild(head);
+
+      const mediaRow = document.createElement('div');
+      mediaRow.className = 'row story-gallery-card-media';
+      mediaRow.style.gap = '12px';
+      mediaRow.style.flexWrap = 'wrap';
+      mediaRow.style.alignItems = 'center';
+
+      const preview = document.createElement('img');
+      preview.className = 'story-gallery-card-preview';
+      preview.style.width = '140px';
+      preview.style.height = '100px';
+      preview.style.objectFit = 'cover';
+      preview.style.borderRadius = '8px';
+      preview.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,.12)';
+
+      const updatePreview = () => {
+        if (entry.url) {
+          preview.src = entry.url;
+          preview.title = stripCacheSimple(entry.url);
+        } else {
+          preview.src = FALLBACK_HERO;
+          preview.title = 'Kein Bild ausgewählt';
+        }
+      };
+      updatePreview();
+
+      const mediaBtns = document.createElement('div');
+      mediaBtns.className = 'row';
+      mediaBtns.style.gap = '6px';
+
+      const upload = document.createElement('button');
+      upload.type = 'button';
+      upload.className = 'btn sm ghost';
+      upload.textContent = 'Bild hochladen';
+      upload.onclick = () => {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = 'image/*';
+        fi.onchange = () => uploadGeneric(fi, (url) => {
+          const clean = stripCacheSimple(url || '');
+          entry.url = clean
+            ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
+            : '';
+          renderSlidesMaster();
+        });
+        fi.click();
+      };
+      mediaBtns.appendChild(upload);
+
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'btn sm ghost';
+      clear.textContent = 'Bild entfernen';
+      clear.onclick = () => { entry.url = ''; renderSlidesMaster(); };
+      mediaBtns.appendChild(clear);
+
+      mediaRow.appendChild(preview);
+      mediaRow.appendChild(mediaBtns);
+      row.appendChild(mediaRow);
+
+      const altWrap = document.createElement('div');
+      altWrap.className = 'kv';
+      const altLabel = document.createElement('label');
+      altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
+      const altInput = document.createElement('input');
+      altInput.type = 'text';
+      altInput.className = 'input';
+      altInput.placeholder = 'Optional für Screenreader';
+      altInput.value = entry.alt || '';
+      altInput.onchange = () => { entry.alt = altInput.value.trim(); renderSlidesMaster(); };
+      altWrap.appendChild(altLabel);
+      altWrap.appendChild(altInput);
+      row.appendChild(altWrap);
+
+      const captionWrap = document.createElement('div');
+      captionWrap.className = 'kv';
+      const captionLabel = document.createElement('label');
+      captionLabel.textContent = 'Bildunterschrift (optional)';
+      const captionInput = document.createElement('input');
+      captionInput.type = 'text';
+      captionInput.className = 'input';
+      captionInput.placeholder = 'Kurzbeschreibung';
+      captionInput.value = entry.caption || '';
+      captionInput.onchange = () => { entry.caption = captionInput.value.trim(); renderSlidesMaster(); };
+      captionWrap.appendChild(captionLabel);
+      captionWrap.appendChild(captionInput);
+      row.appendChild(captionWrap);
+
+      galleryList.appendChild(row);
+    });
+  };
+  renderGallery();
+
+  const addGalleryBtn = document.createElement('button');
+  addGalleryBtn.type = 'button';
+  addGalleryBtn.className = 'btn sm ghost';
+  addGalleryBtn.textContent = 'Galerie-Bild hinzufügen';
+  addGalleryBtn.onclick = () => {
+    (story.gallery ||= []).push({
+      id: 'story_gal_' + Math.random().toString(36).slice(2, 9),
+      url: '',
+      alt: '',
+      caption: ''
+    });
+    renderSlidesMaster();
+  };
+  wrap.appendChild(addGalleryBtn);
 
   const faqHeader = document.createElement('div');
   faqHeader.className = 'subh';
@@ -1524,6 +2178,8 @@ export function renderSlidesMaster(){
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
   const componentFlags = ensureEnabledComponents(settings);
+  maybeMigrateCardIcons(settings);
+  const showIcons = settings.slides?.showIcons !== false;
 
   // Transition
   const transEl = $('#transMs2');
@@ -1545,6 +2201,7 @@ export function renderSlidesMaster(){
     waitEl.checked = !!settings.slides?.waitForVideo;
     waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
   }
+
 
   const heroToggle = $('#heroTimelineEnabled');
   const heroSettingsRow = $('#heroTimelineSettings');
@@ -1828,6 +2485,7 @@ if (sHost){
 // --- „Kein Aufguss“ + Drag&Drop ---
 renderSaunaOffList();
 applyDnD();
+renderSaunaIconList();
 
 // --- Sichtbarkeit der Dauer-Inputs gezielt steuern ---
 // Per-Sauna-Dauer (nur im PER-Modus)
@@ -1922,6 +2580,9 @@ if (durPer) durPer.onchange = () => {
     settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaDurations = {};
+    settings.slides.showIcons = true;
+    settings.slides.cardIcons = {};
+    settings.slides.cardIconsMigrated = true;
     renderSlidesMaster();
   };
 

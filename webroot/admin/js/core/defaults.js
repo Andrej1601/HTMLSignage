@@ -1,6 +1,5 @@
 // /admin/js/core/defaults.js
 // DEFAULTS + Wochentags-Helfer als Single Source of Truth
-
 const DEFAULT_THEME = {
   bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
   gridBorder:'#5C3101',
@@ -95,6 +94,9 @@ export const DEFAULTS = {
     aromaItalic:false,
     infobadgeColor:'#5C3101',
     infobadgeIcon:'ℹ️',
+    showIcons:true,
+    cardIcons:{},
+    cardIconsMigrated:true,
     heroEnabled:false,
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,
@@ -103,19 +105,7 @@ export const DEFAULTS = {
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic'
   },
-  display:{
-    fit:'auto',
-    baseW:1920,
-    baseH:1080,
-    rightWidthPercent:38,
-    cutTopPercent:28,
-    cutBottomPercent:12,
-    layoutMode:'single',
-    pages:{
-      left:{ source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'] },
-      right:{ source:'media', timerSec:null, contentTypes:['image','video','url'] }
-    }
-  },
+  display:{ fit:'auto', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
   theme:{ ...DEFAULT_THEME },
   highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
   fonts:{ ...DEFAULT_FONTS },
