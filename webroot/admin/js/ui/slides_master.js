@@ -143,6 +143,43 @@ function applyStyleSet(settings, id){
   return true;
 }
 
+function ensureCardIconMap(settings){
+  settings.slides ||= {};
+  const raw = settings.slides.cardIcons;
+  const clean = {};
+  if (raw && typeof raw === 'object'){
+    Object.entries(raw).forEach(([key, value]) => {
+      const safeKey = String(key ?? '');
+      if (!safeKey) return;
+      const url = (typeof value === 'string') ? value.trim() : '';
+      if (url) clean[safeKey] = url;
+    });
+  }
+  settings.slides.cardIcons = clean;
+  return clean;
+}
+
+function maybeMigrateCardIcons(settings){
+  settings.slides ||= {};
+  if (settings.slides.cardIconsMigrated === true){
+    return ensureCardIconMap(settings);
+  }
+  const map = ensureCardIconMap(settings);
+  if (!Object.keys(map).length){
+    const legacy = settings.assets?.rightImages;
+    if (legacy && typeof legacy === 'object'){
+      Object.entries(legacy).forEach(([key, value]) => {
+        const safeKey = String(key ?? '');
+        if (!safeKey) return;
+        const url = (typeof value === 'string') ? value.trim() : '';
+        if (url) map[safeKey] = url;
+      });
+    }
+  }
+  settings.slides.cardIconsMigrated = true;
+  return map;
+}
+
 // ============================================================================
 // 1) Wochentage / Presets
 // ============================================================================
@@ -266,6 +303,10 @@ function deleteSaunaEverywhere(name){
     delete settings.assets.rightImages[name];
   }
 
+  // 4b) Karten-Icons
+  const iconMap = ensureCardIconMap(settings);
+  delete iconMap[name];
+
   // 5) Per-Sauna-Dauern
   if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name] != null){
     delete settings.slides.saunaDurations[name];
@@ -305,6 +346,12 @@ function renameSaunaEverywhere(oldName, newName){
     const val = settings.assets.rightImages[oldName];
     delete settings.assets.rightImages[oldName];
     settings.assets.rightImages[newName] = val;
+  }
+
+  const iconMap = ensureCardIconMap(settings);
+  if (Object.prototype.hasOwnProperty.call(iconMap, oldName)){
+    iconMap[newName] = iconMap[oldName];
+    delete iconMap[oldName];
   }
 
   // Per-Sauna-Dauern
@@ -641,6 +688,138 @@ if ($name && mode === 'normal') {
 
 const saunaExtraRow = (name, dayLabels) =>
   saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
+
+function cardIconFallbackLabel(name){
+  const trimmed = (name || '').trim();
+  if (trimmed.length >= 2) return trimmed.slice(0, 2).toUpperCase();
+  if (trimmed.length === 1) return trimmed.toUpperCase();
+  return '–';
+}
+
+function cardIconRow(name){
+  const settings = ctx.getSettings();
+  const iconMap = ensureCardIconMap(settings);
+  const iconUrl = iconMap[name] || '';
+  const rightImage = settings.assets?.rightImages?.[name] || '';
+  const suggestion = (!iconUrl && rightImage) ? rightImage : '';
+  const isLegacyIcon = !!iconUrl && rightImage && iconUrl === rightImage;
+
+  const row = document.createElement('div');
+  row.className = 'iconrow';
+  if (iconUrl) row.classList.add('has-icon');
+  else if (suggestion) row.classList.add('has-suggestion');
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'iconrow-name';
+  nameEl.textContent = String(name || '');
+  row.appendChild(nameEl);
+
+  const preview = document.createElement('div');
+  preview.className = 'iconrow-preview';
+  row.appendChild(preview);
+
+  const actions = document.createElement('div');
+  actions.className = 'iconrow-actions';
+  row.appendChild(actions);
+
+  const updatePreview = (src) => {
+    preview.innerHTML = '';
+    preview.title = '';
+    if (src){
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      preview.appendChild(img);
+      preloadImg(src).then(r => {
+        if (r.ok) preview.title = `${r.w}×${r.h}`;
+      });
+    } else {
+      const span = document.createElement('span');
+      span.className = 'iconrow-placeholder';
+      span.textContent = cardIconFallbackLabel(name);
+      preview.appendChild(span);
+    }
+  };
+
+  if (iconUrl) updatePreview(iconUrl);
+  else if (suggestion) updatePreview(suggestion);
+  else updatePreview('');
+
+  const rerender = () => {
+    renderSlidesMaster();
+    if (typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
+  };
+
+  if (suggestion){
+    const adoptBtn = document.createElement('button');
+    adoptBtn.type = 'button';
+    adoptBtn.className = 'btn sm ghost';
+    adoptBtn.textContent = 'Übernehmen';
+    adoptBtn.onclick = () => {
+      iconMap[name] = suggestion;
+      rerender();
+    };
+    actions.appendChild(adoptBtn);
+  }
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'btn sm ghost';
+  uploadBtn.textContent = iconUrl ? 'Ersetzen' : 'Hochladen';
+  uploadBtn.onclick = () => {
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
+      if (!p) return;
+      iconMap[name] = p;
+      rerender();
+    });
+    fi.click();
+  };
+  actions.appendChild(uploadBtn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn sm ghost';
+  removeBtn.textContent = 'Entfernen';
+  removeBtn.disabled = !iconUrl;
+  removeBtn.onclick = () => {
+    if (!iconMap[name]) return;
+    delete iconMap[name];
+    rerender();
+  };
+  actions.appendChild(removeBtn);
+
+  if (!iconUrl && suggestion){
+    const note = document.createElement('div');
+    note.className = 'iconrow-note';
+    note.textContent = 'Vorschlag aus „Bild rechts“.';
+    row.appendChild(note);
+  } else if (isLegacyIcon){
+    const note = document.createElement('div');
+    note.className = 'iconrow-note';
+    note.textContent = 'Aus „Bild rechts“ übernommen.';
+    row.appendChild(note);
+  }
+
+  return row;
+}
+
+function renderSaunaIconList(){
+  const host = $('#saunaIconList');
+  if (!host) return;
+  host.innerHTML = '';
+  const all = getAllSaunas();
+  if (!all.length){
+    const empty = document.createElement('div');
+    empty.className = 'mut';
+    empty.textContent = 'Keine Saunen im Inventar.';
+    host.appendChild(empty);
+    return;
+  }
+  all.forEach(name => host.appendChild(cardIconRow(name)));
+}
 
 // ============================================================================
 // 4) Drag & Drop
@@ -1524,6 +1703,8 @@ export function renderSlidesMaster(){
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
   const componentFlags = ensureEnabledComponents(settings);
+  maybeMigrateCardIcons(settings);
+  const showIcons = settings.slides?.showIcons !== false;
 
   // Transition
   const transEl = $('#transMs2');
@@ -1545,6 +1726,7 @@ export function renderSlidesMaster(){
     waitEl.checked = !!settings.slides?.waitForVideo;
     waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
   }
+
 
   const heroToggle = $('#heroTimelineEnabled');
   const heroSettingsRow = $('#heroTimelineSettings');
@@ -1828,6 +2010,7 @@ if (sHost){
 // --- „Kein Aufguss“ + Drag&Drop ---
 renderSaunaOffList();
 applyDnD();
+renderSaunaIconList();
 
 // --- Sichtbarkeit der Dauer-Inputs gezielt steuern ---
 // Per-Sauna-Dauer (nur im PER-Modus)
@@ -1922,6 +2105,9 @@ if (durPer) durPer.onchange = () => {
     settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaDurations = {};
+    settings.slides.showIcons = true;
+    settings.slides.cardIcons = {};
+    settings.slides.cardIconsMigrated = true;
     renderSlidesMaster();
   };
 

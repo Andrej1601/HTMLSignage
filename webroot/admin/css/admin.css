@@ -809,6 +809,40 @@ body.mode-uniform #ovSec{ display:none !important; }
 .saunarow .namewrap{ display:flex; flex-direction:column; gap:6px; }
 .saunarow .tag{ display:inline-block; margin-left:6px; padding:2px 6px; border:1px solid var(--inbr); border-radius:8px; font-size:11px; opacity:.8; }
 
+.icon-config-list{ display:flex; flex-direction:column; gap:8px; }
+.iconrow{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) max-content max-content;
+  gap:12px;
+  align-items:center;
+  padding:4px 0;
+}
+.iconrow + .iconrow{
+  border-top:1px solid var(--ghost-border);
+  margin-top:8px;
+  padding-top:8px;
+}
+.iconrow-name{ font-weight:600; }
+.iconrow-preview{
+  width:56px;
+  height:56px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--inbr);
+  border-radius:12px;
+  background:var(--panel);
+  overflow:hidden;
+}
+.iconrow-preview img{ width:100%; height:100%; object-fit:contain; }
+.iconrow-placeholder{
+  font-weight:700;
+  letter-spacing:.08em;
+  opacity:.65;
+}
+.iconrow-actions{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.iconrow.has-suggestion:not(.has-icon) .iconrow-preview{ border-style:dashed; opacity:.8; }
+.iconrow-note{ grid-column:1 / -1; font-size:12px; opacity:.7; }
+
 /* DnD Feedback */
 .sauna-bucket{ border:1px dashed var(--inbr); border-radius:12px; padding:8px; margin-top:6px; }
 .sauna-bucket.drag-over{ outline:2px solid var(--btn-accent); }

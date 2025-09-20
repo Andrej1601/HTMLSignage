@@ -1334,9 +1334,11 @@ function renderStorySlide(story = {}) {
     const padding = 32;
     return Math.max(0, cw - intrude - padding);
   }
-  function applyTileSizing(container) {
+  function applyTileSizing(container, opts = {}) {
+    const useIcons = opts.useIcons !== false;
     const avail = computeAvailContentWidth(container);
-    const pct = (settings?.slides?.tileWidthPercent ?? 45) / 100;
+    const defaultPct = useIcons ? 45 : 42;
+    const pct = ((settings?.slides?.tileWidthPercent ?? defaultPct) / 100);
     const target = Math.max(0, avail * pct);
     const minScale = Math.max(0, settings?.slides?.tileMinScale ?? 0.25);
     const maxScale = Math.max(minScale, settings?.slides?.tileMaxScale ?? 0.57);
@@ -1350,16 +1352,19 @@ function renderStorySlide(story = {}) {
     const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
     const iconSize = clamp(60, t * 0.18, 200);
-    const padY = clamp(14, t * 0.045, 44);
-    const padX = Math.max(clamp(20, t * 0.07, 68), padY + 6);
-    const gap = clamp(16, t * 0.05, 38);
-    const contentGap = clamp(8, t * 0.03, 26);
-    const chipGap = clamp(6, t * 0.022, 22);
-    const badgeOffset = clamp(10, t * 0.02, 28);
-    const radius = clamp(18, t * 0.06, 48);
-    const metaScale = clamp(0.72, t / 720, 1.12);
+    const padY = useIcons ? clamp(14, t * 0.045, 44) : clamp(10, t * 0.035, 32);
+    const padX = useIcons
+      ? Math.max(clamp(20, t * 0.07, 68), padY + 6)
+      : Math.max(clamp(18, t * 0.06, 48), padY + 4);
+    const gap = useIcons ? clamp(16, t * 0.05, 38) : clamp(12, t * 0.04, 30);
+    const contentGap = useIcons ? clamp(8, t * 0.03, 26) : clamp(6, t * 0.022, 18);
+    const chipGap = useIcons ? clamp(6, t * 0.022, 22) : clamp(4, t * 0.018, 16);
+    const badgeOffset = useIcons ? clamp(10, t * 0.02, 28) : clamp(8, t * 0.018, 22);
+    const radius = useIcons ? clamp(18, t * 0.06, 48) : clamp(16, t * 0.05, 44);
+    const metaScale = useIcons ? clamp(0.72, t / 720, 1.12) : clamp(0.78, t / 820, 1.08);
+    const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
 
-    container.style.setProperty('--tileIconSizePx', iconSize.toFixed(2) + 'px');
+    container.style.setProperty('--tileIconSizePx', useIcons ? (iconSize.toFixed(2) + 'px') : '0px');
     container.style.setProperty('--tilePadYPx', padY.toFixed(2) + 'px');
     container.style.setProperty('--tilePadXPx', padX.toFixed(2) + 'px');
     container.style.setProperty('--tileGapPx', gap.toFixed(2) + 'px');
@@ -1368,12 +1373,20 @@ function renderStorySlide(story = {}) {
     container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
     container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
     container.style.setProperty('--tileMetaScale', metaScale.toFixed(3));
+    container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
   }
 
   // ---------- Sauna slide ----------
   function renderSauna(name) {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
+    const iconsEnabled = settings?.slides?.showIcons !== false;
+    const cardIconMap = (iconsEnabled && settings?.slides?.cardIcons && typeof settings.slides.cardIcons === 'object')
+      ? settings.slides.cardIcons
+      : null;
+    const migrationDone = settings?.slides?.cardIconsMigrated === true;
+    const defaultIconForSauna = (cardIconMap && typeof cardIconMap[name] === 'string') ? cardIconMap[name] : '';
+    const legacyIconFallback = (!migrationDone && iconsEnabled && rightUrl) ? rightUrl : '';
     const headingWrap = h('div', { class: 'headings' }, [
       h('h1', { class: 'h1', style: 'color:var(--saunaColor);' }, name),
       h('h2', { class: 'h2' }, computeH2Text() || '')
@@ -1382,13 +1395,13 @@ function renderStorySlide(story = {}) {
       h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url(' + JSON.stringify(rightUrl) + ')') : 'display:none;' }),
       headingWrap
     ]);
+    if (iconsEnabled) c.classList.add('has-card-icons'); else c.classList.add('no-card-icons');
 
     const body = h('div', { class: 'body' });
     const list = h('div', { class: 'list' });
 
     const notes = footnoteMap();
     const colIdx = (schedule.saunas || []).indexOf(name);
-    const iconFallback = settings?.slides?.cardIcons?.[name] || rightUrl || '';
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
     const componentFlags = getSlideComponentFlags();
 
@@ -1418,9 +1431,10 @@ function renderStorySlide(story = {}) {
     for (const it of items) {
       const baseTitle = String(it.title).replace(/\*+$/, '');
       const hasStar = /\*$/.test(it.title || '');
-      const tileClass = 'tile'
-        + ((hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) ? ' highlight' : '')
-        + ((it.hidden || hiddenSaunas.has(name)) ? ' is-hidden' : '');
+      const tileClasses = ['tile'];
+      if (hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) tileClasses.push('highlight');
+      if (it.hidden || hiddenSaunas.has(name)) tileClasses.push('is-hidden');
+      if (!iconsEnabled) tileClasses.push('tile--compact');
 
       const titleNode = h('div', { class: 'title' });
       const timeNode = h('span', { class: 'time' }, it.time + ' Uhr');
@@ -1447,27 +1461,29 @@ function renderStorySlide(story = {}) {
       ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
         .forEach(node => contentBlock.appendChild(node));
 
-      const iconUrl = it.icon || iconFallback;
-      const iconBox = h('div', { class: 'card-icon' + (iconUrl ? '' : ' is-empty') });
-      if (iconUrl) {
-        iconBox.appendChild(h('img', { src: iconUrl, alt: '' }));
-      } else {
-        const fallbackLabel = (() => {
-          if (typeof name === 'string') {
-            const trimmed = name.trim();
-            if (trimmed.length >= 2) return trimmed.slice(0, 2);
-            if (trimmed.length === 1) return trimmed;
-          }
-          return '?';
-        })();
-        iconBox.appendChild(h('span', { class: 'card-icon__fallback' }, fallbackLabel));
+      const tileChildren = [];
+      if (iconsEnabled) {
+        const iconUrl = it.icon || defaultIconForSauna || legacyIconFallback || '';
+        const iconBox = h('div', { class: 'card-icon' + (iconUrl ? '' : ' is-empty') });
+        if (iconUrl) {
+          iconBox.appendChild(h('img', { src: iconUrl, alt: '' }));
+        } else {
+          const fallbackLabel = (() => {
+            if (typeof name === 'string') {
+              const trimmed = name.trim();
+              if (trimmed.length >= 2) return trimmed.slice(0, 2);
+              if (trimmed.length === 1) return trimmed;
+            }
+            return '?';
+          })();
+          iconBox.appendChild(h('span', { class: 'card-icon__fallback' }, fallbackLabel));
+        }
+        tileChildren.push(iconBox);
       }
+      tileChildren.push(contentBlock);
+      tileChildren.push(flamesWrap(it.flames));
 
-      const tile = h('div', { class: tileClass, 'data-time': it.time }, [
-        iconBox,
-        contentBlock,
-        flamesWrap(it.flames)
-      ]);
+      const tile = h('div', { class: tileClasses.join(' '), 'data-time': it.time }, tileChildren);
       tile.style.setProperty('--tile-index', String(list.children.length));
 
       if (it.hidden || hiddenSaunas.has(name)) {
@@ -1502,7 +1518,7 @@ function renderStorySlide(story = {}) {
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
-    const recalc = () => applyTileSizing(c);
+    const recalc = () => applyTileSizing(c, { useIcons: iconsEnabled });
     setTimeout(recalc, 0);
     onResizeCurrent = recalc;
 
