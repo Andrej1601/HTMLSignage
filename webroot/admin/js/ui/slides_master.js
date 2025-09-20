@@ -12,7 +12,7 @@
 
 'use strict';
 
-import { $, $$, preloadImg, escapeHtml } from '../core/utils.js';
+import { $, $$, preloadImg, escapeHtml, genId } from '../core/utils.js';
 import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
@@ -31,7 +31,7 @@ const STYLE_THEME_KEYS = [
 ];
 
 const STYLE_FONT_KEYS = ['family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale'];
-const STYLE_SLIDE_KEYS = ['aromaItalic','infobadgeColor','infobadgeIcon'];
+const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary'];
 
 const cloneValue = (value) => {
   if (value == null) return value;
@@ -104,6 +104,37 @@ function ensureStyleSets(settings){
     settings.slides.activeStyleSet = ids[0] || '';
   }
   return cleaned;
+}
+
+function ensureBadgeLibrary(settings){
+  settings.slides ||= {};
+  const seen = new Set();
+  const normalized = [];
+  const pushEntry = (entry, assignId = false) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = String(entry.id ?? '').trim();
+    if (!id && assignId) id = genId('bdg_');
+    if (!id || seen.has(id)) return;
+    const icon = typeof entry.icon === 'string' ? entry.icon : '';
+    const label = typeof entry.label === 'string' ? entry.label : '';
+    normalized.push({ id, icon, label });
+    seen.add(id);
+  };
+
+  const raw = settings.slides.badgeLibrary;
+  const hadArray = Array.isArray(raw);
+  const hadEntries = hadArray && raw.some(entry => entry && typeof entry === 'object');
+  if (hadArray){
+    raw.forEach(entry => pushEntry(entry, true));
+  }
+
+  if (!normalized.length && (!hadArray || hadEntries)){
+    const fallback = DEFAULTS.slides?.badgeLibrary || [];
+    if (Array.isArray(fallback)) fallback.forEach(entry => pushEntry(entry, true));
+  }
+
+  settings.slides.badgeLibrary = normalized;
+  return normalized;
 }
 
 function snapshotStyleSet(settings){
@@ -2285,26 +2316,6 @@ export function renderSlidesMaster(){
     };
   }
 
-  const aromaItalicEl = $('#aromaItalic');
-  if (aromaItalicEl){
-    aromaItalicEl.checked = !!settings.slides?.aromaItalic;
-    aromaItalicEl.onchange = () => { (settings.slides ||= {}).aromaItalic = !!aromaItalicEl.checked; };
-  }
-
-  const badgeIconEl = $('#badgeIcon');
-  if (badgeIconEl){
-    const iconVal = settings.slides?.infobadgeIcon ?? DEFAULTS.slides.infobadgeIcon ?? '';
-    const options = Array.from(badgeIconEl.options || []);
-    if (iconVal && !options.some(opt => opt.value === iconVal)){
-      const opt = document.createElement('option');
-      opt.value = iconVal;
-      opt.textContent = iconVal;
-      badgeIconEl.appendChild(opt);
-    }
-    badgeIconEl.value = iconVal;
-    badgeIconEl.onchange = () => { (settings.slides ||= {}).infobadgeIcon = badgeIconEl.value; };
-  }
-
   const badgeColorEl = $('#badgeColor');
   if (badgeColorEl){
     const rawInit = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
@@ -2318,6 +2329,81 @@ export function renderSlidesMaster(){
       badgeColorEl.value = next;
     };
   }
+
+  const badgeListHost = $('#badgeLibraryList');
+  const badgeAddBtn = $('#badgeAdd');
+  const renderBadgeLibraryRows = () => {
+    const list = ensureBadgeLibrary(settings);
+    if (!badgeListHost) return;
+    badgeListHost.innerHTML = '';
+    if (!list.length){
+      const empty = document.createElement('div');
+      empty.className = 'mut';
+      empty.textContent = 'Noch keine Badges angelegt.';
+      badgeListHost.appendChild(empty);
+      return;
+    }
+    list.forEach((badge, index) => {
+      const row = document.createElement('div');
+      row.className = 'kv badge-lib-row';
+
+      const label = document.createElement('label');
+      label.textContent = 'Icon & Label';
+      row.appendChild(label);
+
+      const fieldWrap = document.createElement('div');
+      fieldWrap.className = 'badge-lib-fields';
+
+      const iconInput = document.createElement('input');
+      iconInput.type = 'text';
+      iconInput.className = 'input badge-lib-icon';
+      iconInput.value = badge.icon || '';
+      iconInput.placeholder = 'Icon (z.B. 🌿)';
+      iconInput.maxLength = 6;
+      iconInput.onchange = () => {
+        badge.icon = iconInput.value || '';
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      };
+
+      const textInput = document.createElement('input');
+      textInput.type = 'text';
+      textInput.className = 'input badge-lib-label';
+      textInput.value = badge.label || '';
+      textInput.placeholder = 'Label';
+      textInput.onchange = () => {
+        badge.label = textInput.value || '';
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      };
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn sm';
+      removeBtn.textContent = '✕';
+      removeBtn.title = 'Badge entfernen';
+      removeBtn.onclick = () => {
+        const listRef = ensureBadgeLibrary(settings);
+        listRef.splice(index, 1);
+        renderBadgeLibraryRows();
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      };
+
+      fieldWrap.appendChild(iconInput);
+      fieldWrap.appendChild(textInput);
+      fieldWrap.appendChild(removeBtn);
+      row.appendChild(fieldWrap);
+      badgeListHost.appendChild(row);
+    });
+  };
+
+  if (badgeAddBtn){
+    badgeAddBtn.onclick = () => {
+      const list = ensureBadgeLibrary(settings);
+      list.push({ id: genId('bdg_'), icon:'', label:'' });
+      renderBadgeLibraryRows();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+  }
+  renderBadgeLibraryRows();
 
   const toggleWrap = $('#componentToggleWrap');
   if (toggleWrap){

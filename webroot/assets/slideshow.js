@@ -767,12 +767,40 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   function collectCellDetails(cell){
-    if (!cell) return { description:'', aromas:[], facts:[], badgeLabel:'' };
+    if (!cell) return { description:'', aromas:[], facts:[], badgeItems:[] };
     const description = firstText(cell.description, cell.detail, cell.subtitle, cell.text, cell.extra);
     const aromas = gatherList(cell.aromaList, cell.aromas, cell.aroma, cell.scent, cell.scents);
     const facts = gatherList(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
-    const badgeLabel = firstText(cell.type);
-    return { description, aromas, facts, badgeLabel };
+    const badgeItems = (() => {
+      const libraryRaw = Array.isArray(settings?.slides?.badgeLibrary) ? settings.slides.badgeLibrary : [];
+      const library = new Map();
+      libraryRaw.forEach(entry => {
+        if (!entry || typeof entry !== 'object') return;
+        const id = String(entry.id ?? '').trim();
+        if (!id || library.has(id)) return;
+        const icon = typeof entry.icon === 'string' ? entry.icon : '';
+        const label = typeof entry.label === 'string' ? entry.label : '';
+        library.set(id, { icon, label });
+      });
+      const ids = Array.isArray(cell?.badgeIds) ? cell.badgeIds : [];
+      const items = [];
+      ids.forEach(rawId => {
+        const id = String(rawId ?? '').trim();
+        if (!id) return;
+        const ref = library.get(id);
+        if (ref){
+          const icon = ref.icon || '';
+          const label = ref.label || '';
+          if (icon || label) items.push({ icon, label });
+        }
+      });
+      if (!items.length){
+        const fallback = firstText(cell?.type);
+        if (fallback) items.push({ icon:'', label:fallback });
+      }
+      return items;
+    })();
+    return { description, aromas, facts, badgeItems };
   }
 
   function createDescriptionNode(text, className){
@@ -796,15 +824,20 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return h('ul', { class: className }, nodes);
   }
 
-  function createBadgeRow(label, className){
-    const str = String(label || '').trim();
-    if (!str) return null;
-    const iconChar = settings?.slides?.infobadgeIcon || '';
-    const bits = [];
-    if (iconChar) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, iconChar));
-    bits.push(h('span', { class: 'badge-label' }, str));
-    const badge = h('span', { class: 'badge' }, bits);
-    return h('div', { class: className || 'badge-row' }, [badge]);
+  function createBadgeRow(items, className){
+    const list = Array.isArray(items)
+      ? items.filter(entry => entry && (String(entry.icon || '').trim() || String(entry.label || '').trim()))
+      : [];
+    if (!list.length) return null;
+    const badges = list.map(entry => {
+      const bits = [];
+      const icon = String(entry.icon || '').trim();
+      const label = String(entry.label || '').trim();
+      if (icon) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, icon));
+      if (label) bits.push(h('span', { class: 'badge-label' }, label));
+      return h('span', { class: 'badge' }, bits);
+    });
+    return h('div', { class: className || 'badge-row' }, badges);
   }
 
   // ---------- Highlight logic ----------
@@ -1443,7 +1476,7 @@ function renderStorySlide(story = {}, region = 'left') {
         { key: 'description', render: () => createDescriptionNode(entry.description, 'story-availability-description') },
         { key: 'aromas', render: () => createAromaListNode(entry.aromas, 'aroma-list story-availability-aromas') },
         { key: 'facts', render: () => createFactsList(entry.facts, 'story-availability-facts', 'card-chip story-card-chip') },
-        { key: 'badges', render: () => createBadgeRow(entry.badgeLabel, 'badge-row story-availability-badges') }
+        { key: 'badges', render: () => createBadgeRow(entry.badgeItems, 'badge-row story-availability-badges') }
       ];
       renderComponentNodes(componentFlags, components, (anyEnabled) => h('div', {
         class: 'story-availability-empty-detail'
@@ -1559,7 +1592,7 @@ function renderStorySlide(story = {}, region = 'left') {
           description: details.description,
           aromas: details.aromas,
           facts: details.facts,
-          badgeLabel: details.badgeLabel,
+          badgeItems: details.badgeItems,
           hidden: isHidden,
           icon: cell.icon || null
         });
@@ -1597,7 +1630,7 @@ function renderStorySlide(story = {}, region = 'left') {
         { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
         { key: 'aromas', render: () => createAromaListNode(it.aromas, (settings?.slides?.aromaItalic ? 'aroma-list is-italic' : 'aroma-list')) },
         { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
-        { key: 'badges', render: () => createBadgeRow(it.badgeLabel, 'badge-row') }
+        { key: 'badges', render: () => createBadgeRow(it.badgeItems, 'badge-row') }
       ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
         .forEach(node => contentBlock.appendChild(node));
 

@@ -31,6 +31,31 @@ const PAGE_CONTENT_TYPES = [
 const PAGE_CONTENT_TYPE_KEYS = new Set(PAGE_CONTENT_TYPES.map(([key]) => key));
 const PAGE_SOURCE_KEYS = ['master','schedule','media','story'];
 
+function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback } = {}) {
+  const seen = new Set();
+  const normalized = [];
+  const pushEntry = (entry, assignId = false) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = String(entry.id ?? '').trim();
+    if (!id && assignId) id = genId('bdg_');
+    if (!id || seen.has(id)) return;
+    const icon = typeof entry.icon === 'string' ? entry.icon : '';
+    const label = typeof entry.label === 'string' ? entry.label : '';
+    normalized.push({ id, icon, label });
+    seen.add(id);
+  };
+
+  if (Array.isArray(list)){
+    list.forEach(entry => pushEntry(entry, assignMissingIds));
+  }
+
+  if (!normalized.length && Array.isArray(fallback)){
+    fallback.forEach(entry => pushEntry(entry, true));
+  }
+
+  return normalized;
+}
+
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
 const LS_MEM = {};
 let lsWarned = false;
@@ -144,6 +169,11 @@ function normalizeSettings(source, { assignMissingIds = false } = {}) {
     left: sanitizePageConfig(pagesRaw.left, defaultDisplayPages.left),
     right: sanitizePageConfig(pagesRaw.right, defaultDisplayPages.right)
   };
+  const hasBadgeArray = Array.isArray(src.slides?.badgeLibrary);
+  src.slides.badgeLibrary = sanitizeBadgeLibrary(src.slides.badgeLibrary, {
+    assignMissingIds,
+    fallback: hasBadgeArray ? undefined : DEFAULTS.slides?.badgeLibrary
+  });
   return src;
 }
 
@@ -593,10 +623,8 @@ function renderSlidesBox(){
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
-  setC('#aromaItalic',   !!settings.slides?.aromaItalic);
   const badgeColor = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor;
   setV('#badgeColor', badgeColor);
-  setV('#badgeIcon', settings.slides?.infobadgeIcon ?? DEFAULTS.slides.infobadgeIcon ?? '');
 
   // Bildspalte / Schrägschnitt
   setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
@@ -651,8 +679,6 @@ function renderSlidesBox(){
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
-    setC('#aromaItalic',   DEFAULTS.slides.aromaItalic);
-    setV('#badgeIcon',     DEFAULTS.slides.infobadgeIcon);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
 
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
@@ -935,14 +961,17 @@ function collectSettings(){
         tileWidthPercent:+($('#tilePct')?.value || 45),
         tileMinScale:+($('#tileMin')?.value || 0.25),
         tileMaxScale:+($('#tileMax')?.value || 0.57),
-        aromaItalic: !!document.getElementById('aromaItalic')?.checked,
-        infobadgeIcon: document.getElementById('badgeIcon')?.value || '',
         infobadgeColor:(() => {
           const el = document.getElementById('badgeColor');
           const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
           const current = (typeof fallback === 'string' ? fallback.toUpperCase() : '#5C3101');
           const raw = el?.value || '';
           return /^#([0-9A-F]{6})$/i.test(raw) ? raw.toUpperCase() : current;
+        })(),
+        badgeLibrary: (() => {
+          const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
+          (settings.slides ||= {}).badgeLibrary = sanitized;
+          return sanitized;
         })(),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {

@@ -26,13 +26,6 @@ function cloneRows(rows){
   }));
 }
 
-function parseList(str){
-  return String(str || '')
-    .split(/[\n\r;,|•·]+/)
-    .map(item => item.trim())
-    .filter(Boolean);
-}
-
 function normalizeText(value){
   if (value == null) return '';
   if (Array.isArray(value)){
@@ -45,26 +38,78 @@ function normalizeText(value){
   return String(value);
 }
 
-function gatherListForInput(...values){
+function getBadgeLibrary(){
+  const settings = ctx?.getSettings?.();
+  const list = Array.isArray(settings?.slides?.badgeLibrary) ? settings.slides.badgeLibrary : [];
+  const seen = new Set();
   const out = [];
-  const walk = (value) => {
-    if (value == null) return;
-    if (Array.isArray(value)){
-      value.forEach(walk);
-      return;
+  list.forEach(entry => {
+    if (!entry || typeof entry !== 'object') return;
+    const id = String(entry.id ?? '').trim();
+    if (!id || seen.has(id)) return;
+    const icon = typeof entry.icon === 'string' ? entry.icon : '';
+    const label = typeof entry.label === 'string' ? entry.label : '';
+    out.push({ id, icon, label });
+    seen.add(id);
+  });
+  return out;
+}
+
+function renderBadgePicker(selectedIds = []){
+  const host = $('#m_badgeList');
+  if (!host) return;
+  const library = getBadgeLibrary();
+  const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(id => String(id ?? '')).filter(Boolean));
+  host.innerHTML = '';
+
+  if (!library.length){
+    const empty = document.createElement('div');
+    empty.className = 'mut';
+    empty.textContent = 'Keine Badges konfiguriert.';
+    host.appendChild(empty);
+    return;
+  }
+
+  library.forEach(badge => {
+    const labelEl = document.createElement('label');
+    labelEl.className = 'badge-choice';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = badge.id;
+    input.checked = selected.has(badge.id);
+    input.onchange = () => {
+      labelEl.classList.toggle('is-checked', input.checked);
+    };
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'badge-choice-icon';
+    if (badge.icon){
+      iconSpan.textContent = badge.icon;
+    } else {
+      iconSpan.hidden = true;
     }
-    if (typeof value === 'object'){
-      walk(value.text ?? value.label ?? value.value ?? value.name);
-      return;
-    }
-    const str = String(value);
-    str.split(/[\n\r;,|•·]+/).forEach(part => {
-      const trimmed = part.trim();
-      if (trimmed) out.push(trimmed);
-    });
-  };
-  values.forEach(walk);
-  return out.join('\n');
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'badge-choice-label';
+    textSpan.textContent = badge.label || badge.id;
+
+    labelEl.appendChild(input);
+    if (badge.icon) labelEl.appendChild(iconSpan);
+    labelEl.appendChild(textSpan);
+    labelEl.classList.toggle('has-icon', !!badge.icon);
+    labelEl.classList.toggle('is-checked', input.checked);
+
+    host.appendChild(labelEl);
+  });
+
+  const missing = Array.from(selected).filter(id => !library.some(b => b.id === id));
+  if (missing.length){
+    const note = document.createElement('div');
+    note.className = 'mut badge-choice-missing';
+    note.textContent = `Nicht verfügbar: ${missing.join(', ')}`;
+    host.appendChild(note);
+  }
 }
 
 function pushHistory(){
@@ -183,9 +228,15 @@ export function renderGrid(){
       $('#m_title').value = cell.title || '';
       $('#m_flames').value= cell.flames || '';
       $('#m_description').value = normalizeText(cell.description ?? cell.detail ?? cell.subtitle ?? cell.text ?? cell.extra ?? '');
-      $('#m_aromas').value = gatherListForInput(cell.aromas, cell.aromaList, cell.aroma, cell.scent, cell.scents);
-      $('#m_facts').value = gatherListForInput(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
-      $('#m_type').value = normalizeText(cell.type ?? '');
+      const initialBadgeIds = (() => {
+        if (Array.isArray(cell.badgeIds) && cell.badgeIds.length) return cell.badgeIds;
+        const legacyLabel = normalizeText(cell.type ?? '');
+        if (!legacyLabel) return [];
+        const library = getBadgeLibrary();
+        const match = library.find(entry => entry.label && entry.label.trim().toLowerCase() === legacyLabel.toLowerCase());
+        return match ? [match.id] : [];
+      })();
+      renderBadgePicker(initialBadgeIds);
 
       populateNoteSelect();
       const has = !!cell.noteId;
@@ -221,9 +272,17 @@ function initOnce(){
     const hasNote = $('#m_hasNote').checked;
     const noteId  = hasNote ? $('#m_note').value : null;
     const description = $('#m_description').value.trim();
-    const aromas = parseList($('#m_aromas').value);
-    const facts = parseList($('#m_facts').value);
-    const type = $('#m_type').value.trim();
+    const badgeIds = (() => {
+      const host = $('#m_badgeList');
+      if (!host) return [];
+      const checked = Array.from(host.querySelectorAll('input[type=checkbox]:checked'));
+      const unique = new Set();
+      checked.forEach(inp => {
+        const value = String(inp.value ?? '').trim();
+        if (value) unique.add(value);
+      });
+      return Array.from(unique);
+    })();
 
     if (!newTime && title) { alert('Bitte Zeit HH:MM'); return; }
 
@@ -231,9 +290,7 @@ function initOnce(){
     if (newCell && hasNote) newCell.noteId = noteId;
     if (newCell){
       if (description) newCell.description = description;
-      if (aromas.length) newCell.aromas = aromas;
-      if (facts.length) newCell.facts = facts;
-      if (type) newCell.type = type;
+      if (badgeIds.length) newCell.badgeIds = badgeIds;
     }
 
     pushHistory();

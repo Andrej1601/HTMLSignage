@@ -31,6 +31,12 @@ const DEFAULT_ENABLED_COMPONENTS = {
   badges:true
 };
 
+const DEFAULT_BADGE_LIBRARY = [
+  { id:'bdg_classic', icon:'🌿', label:'Klassisch' },
+  { id:'bdg_event', icon:'⭐', label:'Event' },
+  { id:'bdg_ritual', icon:'🔥', label:'Ritual' }
+];
+
 const DEFAULT_STYLE_SETS = {
   classic:{
     label:'Klassisch',
@@ -45,9 +51,8 @@ const DEFAULT_STYLE_SETS = {
       flameGapScale:DEFAULT_FONTS.flameGapScale
     },
     slides:{
-      aromaItalic:false,
       infobadgeColor:'#5C3101',
-      infobadgeIcon:'ℹ️'
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY))
     }
   },
   fresh:{
@@ -76,9 +81,8 @@ const DEFAULT_STYLE_SETS = {
       flameGapScale:0.16
     },
     slides:{
-      aromaItalic:true,
       infobadgeColor:'#4EA8DE',
-      infobadgeIcon:'🌿'
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY))
     }
   }
 };
@@ -91,9 +95,8 @@ export const DEFAULTS = {
     tileWidthPercent:45,
     tileMinScale:0.25,
     tileMaxScale:0.57,
-    aromaItalic:false,
     infobadgeColor:'#5C3101',
-    infobadgeIcon:'ℹ️',
+    badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
     showIcons:true,
     cardIcons:{},
     cardIconsMigrated:true,
