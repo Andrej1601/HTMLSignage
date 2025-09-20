@@ -355,6 +355,33 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return '';
   }
 
+  function firstImageUrl(...values) {
+    for (const value of values) {
+      if (value == null) continue;
+      if (Array.isArray(value)) {
+        const found = firstImageUrl(...value);
+        if (found) return found;
+        continue;
+      }
+      if (typeof value === 'object') {
+        const nested = firstImageUrl(
+          value.url,
+          value.src,
+          value.href,
+          value.image,
+          value.imageUrl,
+          value.path,
+          value.value
+        );
+        if (nested) return nested;
+        continue;
+      }
+      const str = String(value).trim();
+      if (str) return str;
+    }
+    return '';
+  }
+
   function collectHeroTimelineData() {
     heroTimeline = [];
     if (!schedule || !Array.isArray(schedule.rows)) return heroTimeline;
@@ -395,12 +422,25 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
           cell.aromas,
           cell.extra
         );
+        const badges = collectCellBadges(cell);
+        const saunaImage = settings?.assets?.rightImages?.[saunaName];
+        const imageUrl = firstImageUrl(
+          cell.heroImage,
+          cell.timelineImage,
+          cell.image,
+          cell.imageUrl,
+          cell.mediaUrl,
+          cell.badgeImage,
+          saunaImage
+        );
         const key = 'r' + ri + 'c' + colIdx;
         entries.push({
           sauna: saunaName,
           title: label,
           detail,
-          highlight: !!highlight.byCell[key]
+          highlight: !!highlight.byCell[key],
+          badges,
+          imageUrl: imageUrl ? imageUrl : ''
         });
       });
       if (entries.length) heroTimeline.push({ time, minute, entries });
@@ -1226,11 +1266,40 @@ return h('div', {}, [ t ]);
 
         const details = h('div', { class: 'timeline-details' });
         row.entries.forEach(entry => {
-          const entryCls = 'timeline-entry' + (entry.highlight ? ' highlight' : '');
-          const entryNode = h('div', { class: entryCls });
-          entryNode.appendChild(h('span', { class: 'timeline-sauna' }, entry.sauna));
-          entryNode.appendChild(h('span', { class: 'timeline-title' }, entry.title));
-          if (entry.detail) entryNode.appendChild(h('span', { class: 'timeline-detail' }, entry.detail));
+          const hasBadges = Array.isArray(entry.badges) && entry.badges.length > 0;
+          const classParts = ['timeline-entry'];
+          if (entry.highlight) classParts.push('highlight');
+          if (entry.imageUrl) classParts.push('has-thumb'); else classParts.push('no-thumb');
+          if (hasBadges) classParts.push('has-badges');
+          const entryNode = h('div', { class: classParts.join(' ') });
+
+          const thumb = h('div', { class: 'timeline-entry-thumb' });
+          if (entry.imageUrl) {
+            const style = 'background-image:url(' + JSON.stringify(entry.imageUrl) + ')';
+            thumb.appendChild(h('div', { class: 'timeline-entry-thumb-image', style }));
+          } else {
+            thumb.classList.add('is-empty');
+            const fallbackSrc = firstText(entry.sauna, entry.title, entry.detail).trim();
+            const fallbackChar = fallbackSrc ? fallbackSrc.charAt(0).toUpperCase() : '';
+            if (fallbackChar) {
+              thumb.appendChild(h('span', { class: 'timeline-entry-thumb-fallback' }, fallbackChar));
+            }
+          }
+          entryNode.appendChild(thumb);
+
+          const content = h('div', { class: 'timeline-entry-content' });
+          const header = h('div', { class: 'timeline-entry-header' });
+          header.appendChild(h('span', { class: 'timeline-sauna' }, entry.sauna));
+          header.appendChild(h('span', { class: 'timeline-title' }, entry.title));
+          content.appendChild(header);
+          if (entry.detail) {
+            content.appendChild(h('div', { class: 'timeline-detail' }, entry.detail));
+          }
+          if (hasBadges) {
+            const badgeRow = createBadgeRow(entry.badges, 'timeline-entry-badges');
+            if (badgeRow) content.appendChild(badgeRow);
+          }
+          entryNode.appendChild(content);
           details.appendChild(entryNode);
         });
         item.appendChild(details);
