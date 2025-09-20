@@ -58,58 +58,182 @@ function getBadgeLibrary(){
 function renderBadgePicker(selectedIds = []){
   const host = $('#m_badgeList');
   if (!host) return;
+  if (host._badgePointerHandler){
+    document.removeEventListener('pointerdown', host._badgePointerHandler);
+    delete host._badgePointerHandler;
+  }
+  if (host._badgeKeyHandler){
+    document.removeEventListener('keydown', host._badgeKeyHandler);
+    delete host._badgeKeyHandler;
+  }
+  host.classList.remove('is-open');
   const library = getBadgeLibrary();
   const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(id => String(id ?? '')).filter(Boolean));
   host.innerHTML = '';
+  host.classList.remove('is-open', 'is-disabled');
+  host.classList.add('badge-picker');
 
   if (!library.length){
+    host.classList.add('is-disabled');
     const empty = document.createElement('div');
-    empty.className = 'mut';
+    empty.className = 'badge-picker-empty';
     empty.textContent = 'Keine Badges konfiguriert.';
     host.appendChild(empty);
     return;
   }
 
+  const wrapper = document.createElement('div');
+  wrapper.className = 'badge-picker-wrap';
+  host.appendChild(wrapper);
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'badge-picker-toggle';
+  toggle.setAttribute('aria-haspopup', 'listbox');
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const toggleLabel = document.createElement('span');
+  toggleLabel.className = 'badge-picker-toggle-label';
+  toggle.appendChild(toggleLabel);
+
+  wrapper.appendChild(toggle);
+
+  const chips = document.createElement('div');
+  chips.className = 'badge-picker-chips';
+  wrapper.appendChild(chips);
+
+  const popup = document.createElement('div');
+  popup.className = 'badge-picker-popup';
+  popup.setAttribute('role', 'listbox');
+  popup.setAttribute('aria-hidden', 'true');
+  wrapper.appendChild(popup);
+
+  const optionList = document.createElement('div');
+  optionList.className = 'badge-picker-options';
+  popup.appendChild(optionList);
+
+  const updateSummary = () => {
+    const selectedBadges = library.filter(entry => selected.has(entry.id));
+    toggleLabel.textContent = selectedBadges.length
+      ? `${selectedBadges.length} ausgewählt`
+      : 'Badges wählen';
+
+    chips.innerHTML = '';
+    if (!selectedBadges.length){
+      const placeholder = document.createElement('span');
+      placeholder.className = 'badge-picker-placeholder';
+      placeholder.textContent = 'Keine Badges ausgewählt.';
+      chips.appendChild(placeholder);
+    } else {
+      selectedBadges.forEach(entry => {
+        const chip = document.createElement('span');
+        chip.className = 'badge-picker-chip';
+        if (entry.icon){
+          const icon = document.createElement('span');
+          icon.className = 'badge-picker-chip-icon';
+          icon.textContent = entry.icon;
+          chip.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = entry.label || entry.id;
+        chip.appendChild(label);
+        chips.appendChild(chip);
+      });
+    }
+
+    const missing = Array.from(selected).filter(id => !library.some(b => b.id === id));
+    if (missing.length){
+      const note = document.createElement('div');
+      note.className = 'badge-picker-missing';
+      note.textContent = `Nicht verfügbar: ${missing.join(', ')}`;
+      chips.appendChild(note);
+    }
+  };
+
   library.forEach(badge => {
-    const labelEl = document.createElement('label');
-    labelEl.className = 'badge-choice';
+    const option = document.createElement('label');
+    option.className = 'badge-picker-option';
 
     const input = document.createElement('input');
     input.type = 'checkbox';
     input.value = badge.id;
     input.checked = selected.has(badge.id);
-    input.onchange = () => {
-      labelEl.classList.toggle('is-checked', input.checked);
-    };
+    input.tabIndex = -1;
+    input.addEventListener('change', () => {
+      if (input.checked){
+        selected.add(badge.id);
+      } else {
+        selected.delete(badge.id);
+      }
+      option.classList.toggle('is-checked', input.checked);
+      updateSummary();
+    });
 
-    const iconSpan = document.createElement('span');
-    iconSpan.className = 'badge-choice-icon';
+    const icon = document.createElement('span');
+    icon.className = 'badge-picker-option-icon';
     if (badge.icon){
-      iconSpan.textContent = badge.icon;
+      icon.textContent = badge.icon;
     } else {
-      iconSpan.hidden = true;
+      icon.hidden = true;
     }
 
-    const textSpan = document.createElement('span');
-    textSpan.className = 'badge-choice-label';
-    textSpan.textContent = badge.label || badge.id;
+    const label = document.createElement('span');
+    label.className = 'badge-picker-option-label';
+    label.textContent = badge.label || badge.id;
 
-    labelEl.appendChild(input);
-    if (badge.icon) labelEl.appendChild(iconSpan);
-    labelEl.appendChild(textSpan);
-    labelEl.classList.toggle('has-icon', !!badge.icon);
-    labelEl.classList.toggle('is-checked', input.checked);
+    option.appendChild(input);
+    if (badge.icon) option.appendChild(icon);
+    option.appendChild(label);
+    option.classList.toggle('is-checked', input.checked);
 
-    host.appendChild(labelEl);
+    optionList.appendChild(option);
   });
 
-  const missing = Array.from(selected).filter(id => !library.some(b => b.id === id));
-  if (missing.length){
-    const note = document.createElement('div');
-    note.className = 'mut badge-choice-missing';
-    note.textContent = `Nicht verfügbar: ${missing.join(', ')}`;
-    host.appendChild(note);
-  }
+  let pointerHandler = null;
+  let keyHandler = null;
+
+  const setOpen = (open) => {
+    const isOpen = host.classList.contains('is-open');
+    if (open === isOpen) return;
+    if (open){
+      host.classList.add('is-open');
+      toggle.setAttribute('aria-expanded', 'true');
+      popup.setAttribute('aria-hidden', 'false');
+      optionList.querySelectorAll('input[type="checkbox"]').forEach(inp => { inp.tabIndex = 0; });
+      pointerHandler = (ev) => {
+        if (!wrapper.contains(ev.target)) setOpen(false);
+      };
+      keyHandler = (ev) => {
+        if (ev.key === 'Escape'){ ev.preventDefault(); setOpen(false); toggle.focus(); }
+      };
+      document.addEventListener('pointerdown', pointerHandler);
+      document.addEventListener('keydown', keyHandler);
+      host._badgePointerHandler = pointerHandler;
+      host._badgeKeyHandler = keyHandler;
+    } else {
+      host.classList.remove('is-open');
+      toggle.setAttribute('aria-expanded', 'false');
+      popup.setAttribute('aria-hidden', 'true');
+      optionList.querySelectorAll('input[type="checkbox"]').forEach(inp => { inp.tabIndex = -1; });
+      if (pointerHandler){
+        document.removeEventListener('pointerdown', pointerHandler);
+        if (host._badgePointerHandler === pointerHandler) delete host._badgePointerHandler;
+        pointerHandler = null;
+      }
+      if (keyHandler){
+        document.removeEventListener('keydown', keyHandler);
+        if (host._badgeKeyHandler === keyHandler) delete host._badgeKeyHandler;
+        keyHandler = null;
+      }
+    }
+  };
+
+  toggle.addEventListener('click', () => {
+    setOpen(!host.classList.contains('is-open'));
+  });
+
+  updateSummary();
+  setOpen(false);
 }
 
 function pushHistory(){
