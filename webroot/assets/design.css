@@ -497,14 +497,14 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 .tile-badge-stripe__fallback-text{display:block;}
 .tile-badge-stripe__segment.is-fallback .tile-badge-stripe__img{opacity:0;}
 .tile-badge-stripe__segment.is-fallback .tile-badge-stripe__fallback{opacity:1;}
-.container.no-card-icons{ --tileIconSizePx:0px; }
-.container.no-card-icons{ --tileIconColumnPx:0px; }
+.container.no-card-icons:not(.has-badge-stripe){ --tileIconSizePx:0px; }
+.container.no-card-icons:not(.has-badge-stripe){ --tileIconColumnPx:0px; }
 .tile.tile--compact{
   grid-template-columns:minmax(0,1fr) auto;
   min-height:auto;
 }
 .tile.tile--compact .tile-badge-stripe{ display:none; }
-.container.no-card-icons .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
+.container.no-card-icons:not(.has-badge-stripe) .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
 .card-content{
   display:flex;
   flex-direction:column;
