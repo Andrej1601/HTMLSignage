@@ -512,26 +512,6 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   justify-content:center;
   align-items:flex-start;
   min-width:0;
-  width:100%;
-}
-.card-content .card-meta{
-  display:flex;
-  align-items:center;
-  gap:.5em;
-  font-size:calc(26px*var(--scale)*var(--tileMetaScale,1));
-  letter-spacing:.12em;
-  text-transform:uppercase;
-  opacity:.8;
-  color:rgba(255,255,255,.86);
-  white-space:nowrap;
-}
-.card-content .card-main{
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:calc(var(--tileContentGapPx, calc(10px*var(--vwScale))) * .75);
-  min-width:0;
-  width:100%;
 }
 .tile .title{
   display:flex;
@@ -542,6 +522,17 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   font-weight:var(--tileWeight);
   line-height:1.05;
   min-width:0;
+}
+.tile .title .time{
+  font-size:calc(.65em*var(--tileMetaScale,1));
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  opacity:.8;
+  white-space:nowrap;
+}
+.tile .title .sep{
+  opacity:.7;
+  font-size:.8em;
 }
 .tile .title .label{display:flex;align-items:baseline;gap:.35em;flex-wrap:wrap;min-width:0;}
 .tile .title .label .notewrap{flex:0 0 auto;}
