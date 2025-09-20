@@ -175,16 +175,19 @@ body.device-mode #ctxBadge{
   font-size:20px;
   padding:14px 22px;
 }
-body.device-mode #ctxBadge button{
+body.device-mode .ctx-close{
   border-color:color-mix(in oklab, var(--btn-primary) 70%, transparent);
-  background:color-mix(in oklab, var(--btn-primary-fg) 85%, transparent);
+  background:color-mix(in oklab, var(--btn-primary-fg) 92%, transparent);
   color:var(--btn-primary);
-  box-shadow:0 6px 16px rgba(0,0,0,.2);
+  box-shadow:0 8px 20px rgba(0,0,0,.22);
 }
-body.device-mode #ctxBadge button:hover,
-body.device-mode #ctxBadge button:focus-visible{
+body.device-mode .ctx-close:hover,
+body.device-mode .ctx-close:focus-visible{
   background:var(--btn-primary-fg);
   border-color:color-mix(in oklab, var(--btn-primary) 85%, transparent);
+}
+body.device-mode .ctx-close:focus-visible{
+  outline:3px solid color-mix(in oklab, var(--btn-primary) 70%, transparent);
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -574,13 +577,12 @@ body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-prima
 
 /* Badge für Geräte-Kontext */
 .ctx-wrap{
-    position:absolute;
-    left:50%;
-    top:14px;
-    transform:translateX(-50%);
     display:flex;
-    gap:8px;
+    flex-basis:100%;
+    justify-content:center;
     align-items:center;
+    gap:8px;
+    margin-top:4px;
 }
 .ctx-badge{
     display:inline-flex;
@@ -593,34 +595,34 @@ body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-prima
     font-size:18px;
     font-weight:700;
 }
-.ctx-badge button{
-  margin-left:4px;
-  inline-size:38px;
-  block-size:38px;
+.ctx-close{
+  margin-left:8px;
+  inline-size:42px;
+  block-size:42px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   border-radius:999px;
   border:2px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
-  background:color-mix(in oklab, var(--btn-accent-fg) 85%, transparent);
+  background:color-mix(in oklab, var(--btn-accent-fg) 92%, transparent);
   color:var(--btn-accent);
   cursor:pointer;
   font-weight:800;
-  font-size:24px;
+  font-size:26px;
   line-height:1;
-  box-shadow:0 6px 16px rgba(0,0,0,.18);
+  box-shadow:0 8px 18px rgba(0,0,0,.22);
   transition:transform .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease;
 }
-.ctx-badge button:hover,
-.ctx-badge button:focus-visible{
+.ctx-close:hover,
+.ctx-close:focus-visible{
   transform:translateY(-1px);
   background:var(--btn-accent-fg);
   color:var(--btn-accent);
   border-color:color-mix(in oklab, var(--btn-accent) 85%, transparent);
-  box-shadow:0 8px 20px rgba(0,0,0,.24);
+  box-shadow:0 10px 24px rgba(0,0,0,.28);
 }
-.ctx-badge button:focus-visible{
-  outline:3px solid color-mix(in oklab, var(--btn-accent) 65%, transparent);
+.ctx-close:focus-visible{
+  outline:3px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
   outline-offset:2px;
 }
 

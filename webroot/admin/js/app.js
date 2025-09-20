@@ -262,11 +262,10 @@ if (document.readyState === 'loading'){
 function renderContextBadge(){
   const header = document.querySelector('header');
   const h1 = header?.querySelector('h1');
+  const actions = header?.querySelector('.header-actions');
   if (!header || !h1) return;
   let wrap = header.querySelector('.ctx-wrap');
   let el = document.getElementById('ctxBadge');
-  const oldTip = document.getElementById('ctxBadgeTip');
-  if (oldTip) oldTip.remove();
   if (!currentDeviceCtx){
     if (wrap) wrap.remove();
     return;
@@ -274,7 +273,13 @@ function renderContextBadge(){
   if (!wrap){
     wrap = document.createElement('div');
     wrap.className = 'ctx-wrap';
-    header.appendChild(wrap);
+    if (actions){
+      header.insertBefore(wrap, actions);
+    } else {
+      header.appendChild(wrap);
+    }
+  } else if (actions && wrap.nextElementSibling !== actions){
+    header.insertBefore(wrap, actions);
   }
   if (!el){
     el = document.createElement('span');
@@ -286,6 +291,7 @@ function renderContextBadge(){
   el.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx} `;
   const resetBtn = document.createElement('button');
   resetBtn.id = 'ctxReset';
+  resetBtn.classList.add('ctx-close');
   resetBtn.title = 'Zurück zu Global';
   resetBtn.textContent = '×';
   resetBtn.onclick = () => exitDeviceContext();
