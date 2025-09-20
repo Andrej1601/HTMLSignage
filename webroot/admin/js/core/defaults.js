@@ -95,6 +95,10 @@ export const DEFAULTS = {
     aromaItalic:false,
     infobadgeColor:'#5C3101',
     infobadgeIcon:'ℹ️',
+    heroEnabled:false,
+    heroTimelineFillMs:8000,
+    heroTimelineBaseMinutes:15,
+    heroTimelineMaxEntries:null,
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic'
