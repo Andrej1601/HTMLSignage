@@ -209,13 +209,17 @@ details[open] .chev{ transform: rotate(90deg); }
 }
 .btn.sm{ padding:var(--btn-sm-pad); border-radius:10px; }
 .btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
-.btn.has-meta{ position:relative; padding-right:38px; }
-.btn.sm.has-meta{ padding-right:34px; }
+.btn.has-meta{ flex-wrap:wrap; }
+.btn.has-meta .label-wrap{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  flex-wrap:wrap;
+}
 .btn.has-meta .meta{
-  position:absolute;
-  top:50%;
-  right:10px;
-  transform:translateY(-50%);
+  display:inline-flex;
+  align-items:center;
   font-size:11px;
   line-height:1;
   font-weight:600;
@@ -226,6 +230,7 @@ details[open] .chev{ transform: rotate(90deg); }
   opacity:.85;
   pointer-events:none;
   white-space:nowrap;
+  flex-shrink:0;
 }
 
 /* Default (flieder) */
