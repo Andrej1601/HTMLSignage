@@ -103,7 +103,19 @@ export const DEFAULTS = {
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic'
   },
-  display:{ fit:'auto', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
+  display:{
+    fit:'auto',
+    baseW:1920,
+    baseH:1080,
+    rightWidthPercent:38,
+    cutTopPercent:28,
+    cutBottomPercent:12,
+    layoutMode:'single',
+    pages:{
+      left:{ source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'] },
+      right:{ source:'media', timerSec:null, contentTypes:['image','video','url'] }
+    }
+  },
   theme:{ ...DEFAULT_THEME },
   highlightNext:{ enabled:false, color:'#FFDD66', minutesBeforeNext:15, minutesAfterStart:15 },
   fonts:{ ...DEFAULT_FONTS },

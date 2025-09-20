@@ -2,6 +2,8 @@
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
+  const STAGE_LEFT  = document.getElementById('stage-left');
+  const STAGE_RIGHT = document.getElementById('stage-right');
   const Q = new URLSearchParams(location.search);
   const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
   const LS_MEM = {};
@@ -56,13 +58,10 @@
 
   let schedule = null;
   let settings = null;
-  let nextQueue = [];
   let heroTimeline = [];
-  let lastKey = null; // verhindert direkte Wiederholung derselben Folie
-  let idx = 0;
-  let slideTimer = 0, transTimer = 0;
-  let onResizeCurrent = null;
   let cachedDisp = null;
+  const stageControllers = [];
+  const resizeHandlers = new Map();
   let heartbeatTimer = null;
   let pollTimer = null;
 
@@ -130,26 +129,38 @@
     await Promise.all(urls.filter(Boolean).map(preloadImage));
   }
   async function preloadNextImages(){
-    if (!nextQueue.length) return;
-    const urls = [];
-    for (let i = 0; i < PRELOAD_AHEAD; i++) {
-      const item = nextQueue[(idx + i) % nextQueue.length];
-      let url = null;
-      if (item) {
-        if (item.type === 'image') {
-          url = item.src;
-        } else if (item.type === 'story') {
-          url = item.story?.heroUrl || item.story?.hero?.url || null;
-        }
-      }
-      if (url) urls.push(url);
-    }
-    await Promise.all(urls.map(preloadImage));
+    const tasks = stageControllers.map(ctrl => preloadUpcomingForStage(ctrl, { offset: 0 }));
+    await Promise.all(tasks);
   }
 
   async function preloadSlideImages(){
     await preloadNextImages();
   }
+
+  function setResizeHandler(region, handler){
+    if (!region) return;
+    if (typeof handler === 'function') {
+      resizeHandlers.set(region, handler);
+    } else {
+      resizeHandlers.delete(region);
+    }
+  }
+
+  function runResizeHandlers(){
+    resizeHandlers.forEach((fn, key) => {
+      if (typeof fn !== 'function') {
+        resizeHandlers.delete(key);
+        return;
+      }
+      try {
+        fn();
+      } catch (err) {
+        console.warn('[slideshow] resize handler failed', err);
+      }
+    });
+  }
+
+  window.addEventListener('resize', runResizeHandlers, { passive:true });
 
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -179,7 +190,7 @@ async function loadDeviceResolved(id){
   schedule = j.schedule;
   settings = j.settings;
   applyTheme(); applyDisplay(); maybeApplyPreset();
-  buildQueue();
+  refreshStageQueues({ resetIndex:true, autoplay:false });
   await Promise.all([preloadRightImages(), preloadSlideImages()]);
 }
 
@@ -195,7 +206,7 @@ async function loadDeviceResolved(id){
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
-    buildQueue();
+    refreshStageQueues({ resetIndex:true, autoplay:false });
     await Promise.all([preloadRightImages(), preloadSlideImages()]);
   }
 
@@ -267,6 +278,8 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   function applyDisplay() {
     cachedDisp = null;
     const d = settings?.display || {};
+    const layoutMode = (d.layoutMode === 'split') ? 'split' : 'single';
+    updateLayoutModeAttr(layoutMode);
     if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
     if (typeof d.cutTopPercent === 'number')     document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
     if (typeof d.cutBottomPercent === 'number')  document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
@@ -412,18 +425,13 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   // ---------- Slide queue ----------
-  function buildQueue() {
-  // Tages-Preset ggf. anwenden
-  maybeApplyPreset();
+  function buildMasterQueue() {
+    maybeApplyPreset();
 
-  const heroEnabled = !!(settings?.slides?.heroEnabled);
-  const timeline = heroEnabled ? collectHeroTimelineData() : (heroTimeline = []);
-  const hasHero = heroEnabled && timeline.length > 0;
-
-  const finalizeQueue = (queue) => {
-    const out = hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
-    nextQueue.splice(0, nextQueue.length, ...out);
-  };
+    const heroEnabled = !!(settings?.slides?.heroEnabled);
+    const timeline = heroEnabled ? collectHeroTimelineData() : (heroTimeline = []);
+    const hasHero = heroEnabled && timeline.length > 0;
+    const withHero = (queue) => hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
 
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
@@ -518,8 +526,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     }
     settings.slides.sortOrder = clean;
     if (!queue.length && showOverview) queue.push({ type: 'overview' });
-    finalizeQueue(queue);
-    return;
+    return withHero(queue);
   }
 
   // Referenz-Reihenfolge für Saunen (Order aus Settings, dann Rest)
@@ -582,7 +589,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   // Falls nichts bleibt, notfalls Übersicht zeigen
   if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
-  finalizeQueue(queue);
+  return withHero(queue);
 }
 
   // ---------- DOM helpers ----------
@@ -596,10 +603,6 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     }
     return el;
   }
-
-  function clearTimers(){ if (slideTimer){ clearTimeout(slideTimer); slideTimer = 0; } if (transTimer){ clearTimeout(transTimer); transTimer = 0; } }
-  // ein globaler Resize-Listener ruft die für die aktuelle Folie gesetzte Funktion auf
-  window.addEventListener('resize', () => { if (typeof onResizeCurrent === 'function') onResizeCurrent(); }, { passive:true });
 
   // ---------- Flames ----------
   function inlineFlameSVG() { return h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, [ h('path', { d: 'M12 2c2 4-1 5-1 7 0 1 1 2 2 2 2 0 3-2 3-4 2 2 4 4 4 7 0 4-3 8-8 8s-8-4-8-8c0-5 5-7 8-12z' }) ]); }
@@ -954,7 +957,7 @@ return h('div', {}, [ t ]);
     });
   }
 
-  function renderOverview() {
+  function renderOverview(region = 'left') {
     const hlMap = getHighlightMap();
     const table = tableGrid(hlMap);
     const rightH2 = (((settings?.h2?.showOnOverview) ?? true) && (settings?.h2?.mode||'text')!=='none')
@@ -962,17 +965,17 @@ return h('div', {}, [ t ]);
       : null;
     const bar = h('div',{class:'ovbar headings'}, [ h('h1',{class:'h1'}, 'Aufgussplan'), rightH2 ]);
     const c = h('div', {class:'container overview fade show'}, [ bar, h('div', {class:'ovwrap'}, [table]) ]);
-const recalc = () => { 
-  autoScaleOverview(c);
-  fitChipsIn(c); // nach dem Autoscale die Chip-Texte einpassen
-};
-setTimeout(recalc, 0);
-if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
-onResizeCurrent = recalc;
+    const recalc = () => {
+      autoScaleOverview(c);
+      fitChipsIn(c); // nach dem Autoscale die Chip-Texte einpassen
+    };
+    setTimeout(recalc, 0);
+    if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
+    setResizeHandler(region, recalc);
     return c;
   }
 
-  function renderHeroTimeline() {
+  function renderHeroTimeline(region = 'left') {
     const data = (heroTimeline.length ? heroTimeline : collectHeroTimelineData()).slice();
     const headingWrap = h('div', { class: 'headings hero-headings' }, [
       h('h1', { class: 'h1' }, settings?.slides?.heroTitle || 'Tagesüberblick'),
@@ -1021,12 +1024,12 @@ onResizeCurrent = recalc;
       h('div', { class: 'brand' }, 'Signage')
     ]);
 
-    onResizeCurrent = null;
+    setResizeHandler(region, null);
     return container;
   }
 
 // ---------- Interstitial image slide ----------
-function renderImage(url) {
+function renderImage(url, region = 'left', ctx = {}) {
   const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
   const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
   const img = new Image();
@@ -1038,7 +1041,7 @@ function renderImage(url) {
 }
 
 // ---------- Interstitial video slide ----------
-function renderVideo(src, opts = {}) {
+function renderVideo(src, opts = {}, region = 'left', ctx = {}) {
   const disp = getDisplayRatio();
   const v = document.createElement('video');
   v.preload = 'auto';
@@ -1046,6 +1049,9 @@ function renderVideo(src, opts = {}) {
   if (opts.muted !== undefined) v.muted = !!opts.muted;
   else v.muted = true;
   v.playsInline = true;
+  const advance = typeof ctx.advance === 'function' ? ctx.advance : null;
+  const scheduleAdvance = typeof ctx.scheduleAdvance === 'function' ? ctx.scheduleAdvance : null;
+  const clearScheduledAdvance = typeof ctx.clearScheduledAdvance === 'function' ? ctx.clearScheduledAdvance : null;
   const fit = () => {
     const baseW = settings?.display?.baseW || 1920;
     const baseH = settings?.display?.baseH || 1080;
@@ -1064,21 +1070,23 @@ function renderVideo(src, opts = {}) {
     if (srcUrl.startsWith('blob:')) URL.revokeObjectURL(srcUrl);
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     c.appendChild(fallback);
-    advanceQueue();
+    if (advance) advance();
   });
   if (settings?.slides?.waitForVideo) {
     const done = () => {
       if (done.called) return;
       done.called = true;
-      slideTimer = 0;
-      hide(() => { idx++; step(); });
+      if (clearScheduledAdvance) clearScheduledAdvance();
+      if (advance) advance();
     };
     v.addEventListener('loadedmetadata', () => {
-      const dur = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : (dwellMsForItem(opts) / 1000);
+      const dur = Number.isFinite(v.duration) && v.duration > 0
+        ? v.duration
+        : (dwellMsForItem(opts, ctx.pageConfig) / 1000);
       const ms = Math.max(1000, dur * 1000) + 500;
-      slideTimer = setTimeout(done, ms);
+      if (scheduleAdvance) scheduleAdvance(ms);
     }, { once: true });
-    v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
+    v.addEventListener('ended', () => { if (clearScheduledAdvance) clearScheduledAdvance(); done(); }, { once: true });
   }
   const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
@@ -1088,7 +1096,7 @@ function renderVideo(src, opts = {}) {
       v.remove();
       const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
       c.appendChild(fallback);
-      advanceQueue();
+      if (advance) advance();
       return;
     }
     v.src = src;
@@ -1096,14 +1104,14 @@ function renderVideo(src, opts = {}) {
     v.remove();
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     c.appendChild(fallback);
-    advanceQueue();
+    if (advance) advance();
   });
 
   return c;
 }
 
 // ---------- Interstitial external URL slide ----------
-function renderUrl(src) {
+function renderUrl(src, region = 'left', ctx = {}) {
   const f = h('iframe', {
     src,
     class: 'urlFill',
@@ -1128,7 +1136,7 @@ function renderUrl(src) {
   return c;
 }
 
-function renderStorySlide(story = {}) {
+function renderStorySlide(story = {}, region = 'left') {
   const data = story || {};
   const container = h('div', { class: 'container story-slide fade show' });
   const columns = h('div', { class: 'story-columns' });
@@ -1371,7 +1379,7 @@ function renderStorySlide(story = {}) {
   }
 
   // ---------- Sauna slide ----------
-  function renderSauna(name) {
+  function renderSauna(name, region = 'left') {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
     const headingWrap = h('div', { class: 'headings' }, [
@@ -1504,115 +1512,403 @@ function renderStorySlide(story = {}) {
 
     const recalc = () => applyTileSizing(c);
     setTimeout(recalc, 0);
-    onResizeCurrent = recalc;
+    setResizeHandler(region, recalc);
 
     return c;
   }
 
-  // ---------- Stage helpers ----------
-  function show(el) { STAGE.innerHTML = ''; STAGE.appendChild(el); requestAnimationFrame(() => { el.classList.add('show'); }); }
-  function hide(cb) {
-    const cur = STAGE.firstChild; if (cur) cur.classList.remove('show');
-    const t = (settings?.slides?.transitionMs ?? 500);
-    if (t > 0) {
-      transTimer = setTimeout(cb, t);
-    } else {
-      cb();
+  // ---------- Stage management ----------
+  const EMPTY_STAGE_MESSAGES = {
+    left: 'Keine Inhalte verfügbar.',
+    right: 'Keine Inhalte für rechte Seite definiert.'
+  };
+
+  const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story'];
+  const PAGE_DEFAULTS = {
+    left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'] },
+    right:{ source:'media',  timerSec:null, contentTypes:['image','video','url'] }
+  };
+  const SOURCE_FILTERS = {
+    master: null,
+    schedule: ['overview','sauna','hero-timeline'],
+    media: ['image','video','url'],
+    story: ['story']
+  };
+
+  function updateLayoutModeAttr(mode){
+    const normalized = (mode === 'split') ? 'split' : 'single';
+    if (document.body) document.body.setAttribute('data-layout', normalized);
+    if (STAGE) STAGE.dataset.layout = normalized;
+  }
+
+  function slideKey(item){
+    if (!item) return '';
+    return item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
+  }
+
+  function dwellMsForItem(item, pageConfig) {
+    const override = Number(pageConfig?.timerSec);
+    if (Number.isFinite(override) && override > 0) {
+      return Math.max(1, Math.round(override)) * 1000;
     }
-  }
 
-  function advanceQueue(){
-    clearTimers();
-    hide(() => { idx++; step(); preloadNextImages(); });
-  }
+    const slides = settings?.slides || {};
+    const mode = slides.durationMode || 'uniform';
+    const sec = (x) => Math.max(1, Math.floor(+x || 0));
 
-function dwellMsForItem(item) {
-  const slides = settings?.slides || {};
-  const mode = slides.durationMode || 'uniform';
-  const sec = (x) => Math.max(1, Math.floor(+x || 0));
-
-  if (item.type === 'overview') {
-    return sec(slides.overviewDurationSec ?? 10) * 1000;
-  }
-
-  if (item.type === 'sauna') {
-    if (mode !== 'per') {
-      const g = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
-      return sec(g) * 1000;
-    } else {
-      const perMap = slides.saunaDurations || {};
-      const v = perMap[item.sauna];
-      const fb = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
-      return sec(Number.isFinite(+v) ? v : fb) * 1000;
+    if (item.type === 'overview') {
+      return sec(slides.overviewDurationSec ?? 10) * 1000;
     }
-  }
 
-  if (['image', 'video', 'url'].includes(item.type)) {
-    if (mode !== 'per') {
-      const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
-      return sec(g) * 1000;
-    } else {
-      const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
+    if (item.type === 'sauna') {
+      if (mode !== 'per') {
+        const g = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
+        return sec(g) * 1000;
+      } else {
+        const perMap = slides.saunaDurations || {};
+        const v = perMap[item.sauna];
+        const fb = slides.globalDwellSec ?? slides.saunaDurationSec ?? 6;
+        return sec(Number.isFinite(+v) ? v : fb) * 1000;
+      }
+    }
+
+    if (['image', 'video', 'url'].includes(item.type)) {
+      if (mode !== 'per') {
+        const g = slides.globalDwellSec ?? slides.imageDurationSec ?? slides.saunaDurationSec ?? 6;
+        return sec(g) * 1000;
+      } else {
+        const v = Number.isFinite(+item.dwell) ? +item.dwell : (slides.imageDurationSec ?? slides.globalDwellSec ?? 6);
+        return sec(v) * 1000;
+      }
+    }
+
+    if (item.type === 'story') {
+      const story = item.story || {};
+      if (mode !== 'per') {
+        const g = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
+        return sec(g) * 1000;
+      }
+      const v = Number.isFinite(+story.dwellSec)
+        ? +story.dwellSec
+        : (slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8);
       return sec(v) * 1000;
     }
-  }
 
-  if (item.type === 'story') {
-    const story = item.story || {};
-    if (mode !== 'per') {
-      const g = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
-      return sec(g) * 1000;
+    if (item.type === 'hero-timeline') {
+      const fallback = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
+      return sec(fallback) * 1000;
     }
-    const v = Number.isFinite(+story.dwellSec)
-      ? +story.dwellSec
-      : (slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8);
-    return sec(v) * 1000;
+
+    return 6000;
   }
 
-  if (item.type === 'hero-timeline') {
-    const fallback = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
-    return sec(fallback) * 1000;
+  function renderStageFallback(id){
+    return h('div', { class: 'container fade show empty' }, [
+      h('div', { class: 'empty-message' }, EMPTY_STAGE_MESSAGES[id] || 'Keine Inhalte verfügbar.')
+    ]);
   }
 
-  return 6000; // Fallback
-}
+  function createStageController(id, element){
+    let queue = [];
+    let index = 0;
+    let last = null;
+    let slideTimer = 0;
+    let transTimer = 0;
+    let config = { enabled: id === 'left', timerSec: null, source:'master', contentTypes: [] };
+    let hasCustomContent = false;
 
-  // ---------- Loop ----------
-function step() {
-  if (!nextQueue.length) return;
-  clearTimers();
+    const controller = {
+      id,
+      element,
+      apply,
+      play,
+      stop: clear,
+      advance,
+      showCustom,
+      isEnabled: () => !!config.enabled,
+      getQueue: () => queue,
+      getIndex: () => index,
+      getConfig: () => ({ ...config }),
+      scheduleAdvance
+    };
 
-let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
-if (key === lastKey && nextQueue.length > 1) {
-  // eine Folie würde direkt wiederholt → eine weiter
-    idx++;
-    item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
-}
-  const el =
-    (item.type === 'overview') ? renderOverview() :
-    (item.type === 'sauna')    ? renderSauna(item.sauna) :
-    (item.type === 'image')    ? renderImage(item.src) :
-    (item.type === 'video')    ? renderVideo(item.src, item) :
-    (item.type === 'url')      ? renderUrl(item.url) :
-    (item.type === 'story')    ? renderStorySlide(item.story) :
-    (item.type === 'hero-timeline') ? renderHeroTimeline() :
-                                 renderImage(item.src || item.url);
+    stageControllers.push(controller);
+    updateActiveState();
+    return controller;
 
-  show(el);
-  lastKey = key;
+    function updateActiveState(){
+      if (!element) return;
+      const active = config.enabled || hasCustomContent;
+      element.classList.toggle('stage-area--inactive', !active);
+      element.classList.toggle('stage-area--empty', active && !hasCustomContent && queue.length === 0);
+      element.classList.toggle('stage-area--custom', hasCustomContent);
+    }
 
-  if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
-    const dwell = dwellMsForItem(item);
-    slideTimer = setTimeout(() => hide(() => { idx++; step(); }), dwell);
+    function clearTimers(){
+      if (slideTimer) { clearTimeout(slideTimer); slideTimer = 0; }
+      if (transTimer) { clearTimeout(transTimer); transTimer = 0; }
+    }
+
+    function show(node){
+      if (!element) return;
+      element.innerHTML = '';
+      if (!node) return;
+      element.appendChild(node);
+      requestAnimationFrame(() => node.classList.add('show'));
+    }
+
+    function hide(cb){
+      if (!element) { if (typeof cb === 'function') cb(); return; }
+      const cur = element.firstChild;
+      if (cur) cur.classList.remove('show');
+      setResizeHandler(id, null);
+      const raw = settings?.slides?.transitionMs;
+      const ms = Number.isFinite(+raw) ? Math.max(0, +raw) : 500;
+      if (ms > 0) {
+        transTimer = setTimeout(() => {
+          transTimer = 0;
+          if (typeof cb === 'function') cb();
+        }, ms);
+      } else if (typeof cb === 'function') {
+        cb();
+      }
+    }
+
+    function scheduleAdvance(ms){
+      clearTimeout(slideTimer);
+      const wait = Math.max(250, Math.floor(ms || 0));
+      slideTimer = setTimeout(() => {
+        slideTimer = 0;
+        advance();
+      }, wait);
+    }
+
+    function apply(newQueue, newConfig = {}, { resetIndex = true } = {}){
+      hasCustomContent = false;
+      if (element) element.classList.remove('stage-area--custom');
+      queue = Array.isArray(newQueue) ? newQueue.slice() : [];
+      config = { ...config, ...newConfig };
+      if (resetIndex || index >= queue.length) {
+        index = 0;
+        last = null;
+      }
+      updateActiveState();
+    }
+
+    function step(){
+      clearTimers();
+      if (!config.enabled) {
+        clear();
+        return;
+      }
+      if (!queue.length) {
+        show(renderStageFallback(id));
+        updateActiveState();
+        return;
+      }
+      if (index < 0 || index >= queue.length) {
+        index = ((index % queue.length) + queue.length) % queue.length;
+      }
+      let item = queue[index];
+      let key = slideKey(item);
+      if (key === last && queue.length > 1) {
+        index = (index + 1) % queue.length;
+        item = queue[index];
+        key = slideKey(item);
+      }
+      const ctx = {
+        region: id,
+        advance,
+        scheduleAdvance,
+        clearScheduledAdvance: () => { if (slideTimer) { clearTimeout(slideTimer); slideTimer = 0; } },
+        pageConfig: config
+      };
+      const node = renderSlideNode(item, ctx);
+      show(node);
+      last = key;
+      updateActiveState();
+      if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
+        const dwell = dwellMsForItem(item, config);
+        scheduleAdvance(dwell);
+      }
+      preloadUpcomingForStage(controller, { offset: 1 });
+    }
+
+    function advance(){
+      clearTimers();
+      if (!config.enabled) {
+        clear();
+        return;
+      }
+      if (!queue.length) {
+        show(renderStageFallback(id));
+        updateActiveState();
+        return;
+      }
+      hide(() => {
+        index = (index + 1) % queue.length;
+        step();
+      });
+    }
+
+    function play(){
+      clearTimers();
+      if (!config.enabled) {
+        clear();
+        return;
+      }
+      if (!queue.length) {
+        show(renderStageFallback(id));
+        updateActiveState();
+        return;
+      }
+      step();
+    }
+
+    function clear(){
+      clearTimers();
+      hasCustomContent = false;
+      if (element) {
+        element.classList.remove('stage-area--custom');
+        element.innerHTML = '';
+      }
+      setResizeHandler(id, null);
+      updateActiveState();
+    }
+
+    function showCustom(node){
+      clearTimers();
+      hasCustomContent = !!node;
+      config.enabled = false;
+      queue = [];
+      index = 0;
+      last = null;
+      setResizeHandler(id, null);
+      if (element) {
+        element.classList.toggle('stage-area--custom', hasCustomContent);
+        element.innerHTML = '';
+        if (node) {
+          element.appendChild(node);
+          requestAnimationFrame(() => node.classList.add('show'));
+        }
+      }
+      updateActiveState();
+    }
   }
 
-}
+  function renderSlideNode(item, ctx){
+    const region = ctx?.region || 'left';
+    if (!item) return renderStageFallback(region);
+    switch (item.type) {
+      case 'overview':
+        return renderOverview(region);
+      case 'sauna':
+        return renderSauna(item.sauna, region);
+      case 'image':
+        return renderImage(item.src, region, ctx);
+      case 'video':
+        return renderVideo(item.src, item, region, ctx);
+      case 'url':
+        return renderUrl(item.url, region, ctx);
+      case 'story':
+        return renderStorySlide(item.story, region);
+      case 'hero-timeline':
+        return renderHeroTimeline(region);
+      default:
+        return renderImage(item.src || item.url || '', region, ctx);
+    }
+  }
+
+  function baseQueueForSource(masterQueue, source){
+    const filter = SOURCE_FILTERS[source] || null;
+    if (!filter) return masterQueue.slice();
+    const allowed = new Set(filter);
+    return masterQueue.filter(item => allowed.has(item.type));
+  }
+
+  function filterQueueForPage(masterQueue, pageConfig){
+    const base = baseQueueForSource(masterQueue, pageConfig?.source || 'master');
+    const types = Array.isArray(pageConfig?.contentTypes) && pageConfig.contentTypes.length
+      ? new Set(pageConfig.contentTypes)
+      : null;
+    if (!types) return base;
+    return base.filter(item => types.has(item.type));
+  }
+
+  function getPageConfig(id){
+    const display = settings?.display || {};
+    const pages = display.pages || {};
+    const raw = (typeof pages[id] === 'object' && pages[id]) ? pages[id] : {};
+    const defaults = PAGE_DEFAULTS[id] || PAGE_DEFAULTS.left;
+    const layoutMode = (display.layoutMode === 'split') ? 'split' : 'single';
+    const enabled = id === 'left' ? true : (layoutMode === 'split');
+    const source = SOURCE_FILTERS[raw.source] ? raw.source : (SOURCE_FILTERS[defaults.source] ? defaults.source : 'master');
+    const timerNum = Number(raw.timerSec);
+    const timerSec = Number.isFinite(timerNum) && timerNum > 0 ? Math.max(1, Math.round(timerNum)) : null;
+    const rawTypes = Array.isArray(raw.contentTypes) ? raw.contentTypes : defaults.contentTypes;
+    const filtered = rawTypes.filter(type => VALID_CONTENT_TYPES.includes(type));
+    const contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaults.contentTypes;
+    return { id, enabled, source, timerSec, contentTypes };
+  }
+
+  async function preloadUpcomingForStage(controller, { offset = 0 } = {}){
+    if (!controller || !controller.isEnabled()) return;
+    const queue = controller.getQueue();
+    if (!Array.isArray(queue) || !queue.length) return;
+    let start = controller.getIndex() + offset;
+    const len = queue.length;
+    if (len <= 0) return;
+    if (start < 0) start = ((start % len) + len) % len;
+    const urls = [];
+    for (let i = 0; i < PRELOAD_AHEAD && i < len; i++) {
+      const item = queue[(start + i) % len];
+      if (!item) continue;
+      let url = null;
+      if (item.type === 'image') {
+        url = item.src;
+      } else if (item.type === 'story') {
+        url = item.story?.heroUrl || item.story?.hero?.url || null;
+      }
+      if (url) urls.push(url);
+    }
+    if (!urls.length) return;
+    await Promise.all(urls.map(preloadImage));
+  }
+
+  const stageLeftController = createStageController('left', STAGE_LEFT || STAGE);
+  const stageRightController = createStageController('right', STAGE_RIGHT);
+
+  function stopAllStages(){
+    stageControllers.forEach(ctrl => ctrl.stop());
+  }
+
+  function applyStagePlaylists(masterQueue, { resetIndex = true } = {}){
+    const leftCfg = getPageConfig('left');
+    const rightCfg = getPageConfig('right');
+    stageLeftController.apply(
+      filterQueueForPage(masterQueue, leftCfg),
+      { enabled: leftCfg.enabled, timerSec: leftCfg.timerSec, source: leftCfg.source, contentTypes: leftCfg.contentTypes },
+      { resetIndex }
+    );
+    stageRightController.apply(
+      filterQueueForPage(masterQueue, rightCfg),
+      { enabled: rightCfg.enabled, timerSec: rightCfg.timerSec, source: rightCfg.source, contentTypes: rightCfg.contentTypes },
+      { resetIndex }
+    );
+    updateLayoutModeAttr(rightCfg.enabled ? 'split' : 'single');
+  }
+
+  function refreshStageQueues({ resetIndex = true, autoplay = true } = {}){
+    const masterQueue = buildMasterQueue();
+    applyStagePlaylists(masterQueue, { resetIndex });
+    if (autoplay) stageControllers.forEach(ctrl => ctrl.play());
+    return masterQueue;
+  }
 
 //Showpairing
 function showPairing(){
-  STAGE.innerHTML = '';
+  stopAllStages();
+  updateLayoutModeAttr('single');
   const box = document.createElement('div');
   box.className = 'container fade show';
   box.style.cssText = 'display:flex;align-items:center;justify-content:center;';
@@ -1622,7 +1918,17 @@ function showPairing(){
       <div id="code" style="font-size:42px;font-weight:900;letter-spacing:4px;background:rgba(255,255,255,.1);padding:8px 14px;border-radius:12px;display:inline-block;min-width:12ch">…</div>
       <div style="margin-top:10px;opacity:.9">Öffne im Admin „Geräte“ und gib den Code ein.</div>
     </div>`;
-  STAGE.appendChild(box);
+
+  if (stageLeftController) stageLeftController.showCustom(box);
+  else if (STAGE_LEFT || STAGE) {
+    const target = STAGE_LEFT || STAGE;
+    if (target) {
+      target.innerHTML = '';
+      target.appendChild(box);
+      requestAnimationFrame(() => box.classList.add('show'));
+    }
+  }
+  if (stageRightController) stageRightController.showCustom(null);
 
   (async ()=>{
     try {
@@ -1686,17 +1992,18 @@ function showPairing(){
 async function bootstrap(){
 // Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
  window.addEventListener('message', (ev) => {
- const d = ev?.data || {};
- if (d?.type !== 'preview') return;
- previewMode = true;
- try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
- const p = d.payload || {};
- if (p.schedule) schedule = p.schedule;
- if (p.settings) settings = p.settings;
- applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
- preloadSlideImages();
- idx = 0; lastKey = null;
- step();
+  const d = ev?.data || {};
+  if (d?.type !== 'preview') return;
+  previewMode = true;
+  try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
+  const p = d.payload || {};
+  if (p.schedule) schedule = p.schedule;
+  if (p.settings) settings = p.settings;
+  applyTheme();
+  applyDisplay();
+  maybeApplyPreset();
+  refreshStageQueues({ resetIndex:true });
+  preloadSlideImages();
 });
   const deviceMode = !!DEVICE_ID;
 
@@ -1736,7 +2043,16 @@ console.error('[bootstrap] resolve failed:', e);
       }
 } else {
   if (IS_PREVIEW) {
-    STAGE.innerHTML = '<div style="padding:16px;color:#fff;opacity:.75">Vorschau lädt…</div>';
+    const info = document.createElement('div');
+    info.className = 'container fade show empty';
+    const inner = document.createElement('div');
+    inner.className = 'empty-message';
+    inner.textContent = 'Vorschau lädt…';
+    info.appendChild(inner);
+    stopAllStages();
+    updateLayoutModeAttr('single');
+    if (stageLeftController) stageLeftController.showCustom(info);
+    if (stageRightController) stageRightController.showCustom(null);
     return; // kein Pairing im Admin-Dock
   }
   showPairing();
@@ -1745,9 +2061,8 @@ console.error('[bootstrap] resolve failed:', e);
   }
 
   // Erst hier starten wir die Slideshow
-  idx = 0;
-  lastKey = null;
-  step();
+  refreshStageQueues({ resetIndex:true });
+  preloadSlideImages();
 
   // Live-Reload: bei Device NUR resolve pollen
   // Polling beibehalten, da Versionsänderungen zuverlässig erkannt werden
@@ -1763,7 +2078,7 @@ console.error('[bootstrap] resolve failed:', e);
           if (r.status === 404) {
             clearInterval(pollTimer);
             pollTimer = null;
-            clearTimers();
+            stopAllStages();
             showPairing();
             return;
           }
@@ -1783,24 +2098,22 @@ console.error('[bootstrap] resolve failed:', e);
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            applyTheme();
+            applyDisplay();
+            maybeApplyPreset();
+            refreshStageQueues({ resetIndex:true });
             preloadSlideImages();
-            clearTimers();
-            idx = idx % Math.max(1, nextQueue.length);
-            lastKey = null;
-            step();
           }
         } else {
           const s  = await loadJSON('/data/schedule.json');
           const cf = await loadJSON('/data/settings.json');
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
-            applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            applyTheme();
+            applyDisplay();
+            maybeApplyPreset();
+            refreshStageQueues({ resetIndex:true });
             preloadSlideImages();
-            clearTimers();
-            idx = idx % Math.max(1, nextQueue.length);
-            lastKey = null;
-            step();
           }
         }
       } catch(e) {

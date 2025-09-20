@@ -94,6 +94,12 @@ body{
 a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:none; }
 
 .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.type-list{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.type-list label{ display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:color-mix(in oklab, var(--panel) 94%, transparent); cursor:pointer; font-weight:600; }
+.type-list label.is-checked{ border-color:var(--btn-accent); background:color-mix(in oklab, var(--btn-accent) 15%, var(--panel)); color:color-mix(in oklab, var(--btn-accent) 75%, var(--fg)); }
+.type-list input{ margin:0; }
+.layout-page{ margin-bottom:12px; }
+.layout-page .help{ margin-top:4px; }
 .mut,.help{ color:var(--muted); }
 
 /* Utility classes for headings and toolbars */

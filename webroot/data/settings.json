@@ -21,7 +21,20 @@
   "display": {
     "rightWidthPercent": 38,
     "cutTopPercent": 28,
-    "cutBottomPercent": 12
+    "cutBottomPercent": 12,
+    "layoutMode": "single",
+    "pages": {
+      "left": {
+        "source": "master",
+        "timerSec": null,
+        "contentTypes": ["overview", "sauna", "hero-timeline", "story", "image", "video", "url"]
+      },
+      "right": {
+        "source": "media",
+        "timerSec": null,
+        "contentTypes": ["image", "video", "url"]
+      }
+    }
   },
   "slides": {
     "overviewDurationSec": 10,

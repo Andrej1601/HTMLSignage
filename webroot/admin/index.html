@@ -355,6 +355,56 @@
           <div class="kv"><label>Schnitt unten (%)</label><input id="cutBottom" class="input" type="number" min="0" max="100" value="12"></div>
           <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
 
+          <div class="subh">Layout &amp; Seiten</div>
+          <div class="kv">
+            <label>Darstellung</label>
+            <select id="layoutMode" class="input">
+              <option value="single">Einspaltig</option>
+              <option value="split">Zweispaltig</option>
+            </select>
+          </div>
+          <div class="fieldset layout-page" id="layoutLeft">
+            <div class="legend">Linke Seite</div>
+            <div class="kv">
+              <label>Quelle</label>
+              <select id="pageLeftSource" class="input">
+                <option value="master">Alle Inhalte</option>
+                <option value="schedule">Aufgussplan</option>
+                <option value="media">Medien</option>
+                <option value="story">Erklärungen</option>
+              </select>
+            </div>
+            <div class="kv">
+              <label>Timer (Sekunden)</label>
+              <input id="pageLeftTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+            </div>
+            <div class="kv">
+              <label>Inhaltstypen</label>
+              <div class="type-list" id="pageLeftTypes"></div>
+            </div>
+          </div>
+          <div class="fieldset layout-page" id="layoutRight">
+            <div class="legend">Rechte Seite</div>
+            <div class="kv">
+              <label>Quelle</label>
+              <select id="pageRightSource" class="input">
+                <option value="media">Medien</option>
+                <option value="master">Alle Inhalte</option>
+                <option value="schedule">Aufgussplan</option>
+                <option value="story">Erklärungen</option>
+              </select>
+            </div>
+            <div class="kv">
+              <label>Timer (Sekunden)</label>
+              <input id="pageRightTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+            </div>
+            <div class="kv">
+              <label>Inhaltstypen</label>
+              <div class="type-list" id="pageRightTypes"></div>
+            </div>
+            <div class="help">Wird verwendet, wenn das Zweispalten-Layout aktiv ist.</div>
+          </div>
+
           <div class="subh">Flammen / Hervorhebungen</div>
           <div class="kv"><label>Highlight aktiv</label><input id="hlEnabled" type="checkbox"></div>
           <div class="kv"><label>Highlight‑Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
