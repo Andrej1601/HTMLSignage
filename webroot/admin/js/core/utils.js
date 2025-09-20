@@ -31,3 +31,31 @@ export function escapeHtml(str) {
 
 // simple Deep-Clone (JSON-basiert, reicht für unsere Datenstrukturen)
 export const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+
+export function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object') {
+    if (Array.isArray(b)) return false;
+    const keysA = Object.keys(a).filter((key) => typeof a[key] !== 'undefined').sort();
+    const keysB = Object.keys(b).filter((key) => typeof b[key] !== 'undefined').sort();
+    if (keysA.length !== keysB.length) return false;
+    for (let i = 0; i < keysA.length; i++) {
+      if (keysA[i] !== keysB[i]) return false;
+    }
+    for (const key of keysA) {
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  if (Number.isNaN(a) && Number.isNaN(b)) return true;
+  return false;
+}
