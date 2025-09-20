@@ -150,7 +150,8 @@ function renderContextBadge(){
   if (!header || !h1) return;
   let wrap = header.querySelector('.ctx-wrap');
   let el = document.getElementById('ctxBadge');
-  let tip = document.getElementById('ctxBadgeTip');
+  const oldTip = document.getElementById('ctxBadgeTip');
+  if (oldTip) oldTip.remove();
   if (!currentDeviceCtx){
     if (wrap) wrap.remove();
     return;
@@ -174,12 +175,6 @@ function renderContextBadge(){
   resetBtn.textContent = '×';
   resetBtn.onclick = () => exitDeviceContext();
   el.appendChild(resetBtn);
-  if (!tip){
-    tip = document.createElement('small');
-    tip.id = 'ctxBadgeTip';
-    wrap.appendChild(tip);
-  }
-  tip.textContent = 'Tipp: Klick auf × um zur globalen Ansicht zurückzukehren.';
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
