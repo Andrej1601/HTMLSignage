@@ -977,7 +977,7 @@ function ensureStorySlides(settings){
   settings.slides ||= {};
   let list = Array.isArray(settings.slides.storySlides) ? settings.slides.storySlides : [];
   list = list.filter(item => item && typeof item === 'object');
-  list.forEach((story, idx) => {
+  list.forEach((story) => {
     if (!story.id) story.id = 'story_' + Math.random().toString(36).slice(2, 9);
     if (!Array.isArray(story.faq)) story.faq = [];
     if (Array.isArray(story.saunaRefs) && !Array.isArray(story.saunas)) {
@@ -990,69 +990,122 @@ function ensureStorySlides(settings){
     story.intro = typeof story.intro === 'string' ? story.intro : '';
     story.ritual = typeof story.ritual === 'string' ? story.ritual : '';
     story.tips = typeof story.tips === 'string' ? story.tips : '';
-    const normalizeSection = (section = {}, secIdx = 0) => {
-      const src = section && typeof section === 'object' ? section : { text: typeof section === 'string' ? section : '' };
-      const out = { ...src };
-      const legacyImg = (out.image && typeof out.image === 'object') ? out.image : null;
-      if (!out.id) out.id = 'story_sec_' + Math.random().toString(36).slice(2, 9);
-      out.title = typeof out.title === 'string' ? out.title : '';
-      out.text = typeof out.text === 'string'
-        ? out.text
-        : (typeof out.body === 'string' ? out.body : '');
-      out.imageUrl = typeof out.imageUrl === 'string'
-        ? out.imageUrl
-        : (typeof out.mediaUrl === 'string' ? out.mediaUrl
-          : (legacyImg && typeof legacyImg.url === 'string' ? legacyImg.url : (typeof out.image === 'string' ? out.image : '')));
-      out.imageAlt = typeof out.imageAlt === 'string'
-        ? out.imageAlt
-        : (legacyImg && typeof legacyImg.alt === 'string' ? legacyImg.alt : '');
-      out.imageCaption = typeof out.imageCaption === 'string'
-        ? out.imageCaption
-        : (legacyImg && typeof legacyImg.caption === 'string' ? legacyImg.caption : '');
-      const layout = typeof out.layout === 'string' ? out.layout : '';
-      out.layout = ['media-left', 'media-right', 'full'].includes(layout) ? layout : '';
-      delete out.image;
-      delete out.mediaUrl;
-      delete out.body;
-      return out;
-    };
-    const normalizeGalleryItem = (entry = {}, gIdx = 0) => {
-      if (entry && typeof entry === 'string') {
+
+    const ensureSectionId = () => 'story_sec_' + Math.random().toString(36).slice(2, 9);
+    const normalizeSection = (section = {}, { defaultFullImage = false } = {}) => {
+      if (section && typeof section === 'string') {
         return {
-          id: 'story_gal_' + Math.random().toString(36).slice(2, 9),
-          url: entry,
-          alt: '',
-          caption: ''
+          id: ensureSectionId(),
+          heading: '',
+          body: String(section || '').trim(),
+          imageUrl: '',
+          imageAlt: '',
+          fullImage: !!defaultFullImage
         };
       }
-      const src = entry && typeof entry === 'object' ? entry : {};
-      const out = { ...src };
-      const legacyImg = (out.image && typeof out.image === 'object') ? out.image : null;
-      if (!out.id) out.id = 'story_gal_' + Math.random().toString(36).slice(2, 9);
-      out.url = typeof out.url === 'string'
-        ? out.url
-        : (typeof out.imageUrl === 'string' ? out.imageUrl
-          : (legacyImg && typeof legacyImg.url === 'string' ? legacyImg.url : ''));
-      out.alt = typeof out.alt === 'string'
-        ? out.alt
-        : (typeof out.imageAlt === 'string' ? out.imageAlt
-          : (legacyImg && typeof legacyImg.alt === 'string' ? legacyImg.alt : ''));
-      out.caption = typeof out.caption === 'string'
-        ? out.caption
-        : (typeof out.title === 'string' ? out.title
-          : (legacyImg && typeof legacyImg.caption === 'string' ? legacyImg.caption : ''));
-      delete out.imageUrl;
-      delete out.imageAlt;
-      delete out.title;
-      delete out.image;
-      return out;
+      const src = (section && typeof section === 'object') ? section : {};
+      let id = src.id != null ? String(src.id) : '';
+      if (!id) id = ensureSectionId();
+      const heading = typeof src.heading === 'string'
+        ? src.heading
+        : (typeof src.title === 'string' ? src.title : '');
+      const body = typeof src.body === 'string'
+        ? src.body
+        : (typeof src.text === 'string' ? src.text : '');
+      let imageUrl = typeof src.imageUrl === 'string'
+        ? src.imageUrl
+        : (typeof src.url === 'string' ? src.url
+          : (typeof src.mediaUrl === 'string' ? src.mediaUrl : ''));
+      if (!imageUrl && src.image && typeof src.image === 'string') {
+        imageUrl = src.image;
+      } else if (!imageUrl && src.image && typeof src.image.url === 'string') {
+        imageUrl = src.image.url;
+      }
+      let imageAlt = typeof src.imageAlt === 'string'
+        ? src.imageAlt
+        : (typeof src.alt === 'string' ? src.alt : '');
+      if (!imageAlt && src.image && typeof src.image.alt === 'string') {
+        imageAlt = src.image.alt;
+      }
+      const fullImage = src.fullImage === true
+        || src.full === true
+        || src.onlyImage === true
+        || src.layout === 'full'
+        || (!!defaultFullImage && src.fullImage !== false);
+      return {
+        id,
+        heading: String(heading || '').trim(),
+        body: String(body || '').trim(),
+        imageUrl: String(imageUrl || '').trim(),
+        imageAlt: String(imageAlt || '').trim(),
+        fullImage: !!fullImage
+      };
     };
-    story.sections = Array.isArray(story.sections)
-      ? story.sections.map(normalizeSection)
-      : [];
-    story.gallery = Array.isArray(story.gallery)
-      ? story.gallery.map(normalizeGalleryItem)
-      : [];
+
+    const columnsSrc = (story.columns && typeof story.columns === 'object') ? story.columns : {};
+    let left = Array.isArray(columnsSrc.left) ? columnsSrc.left.map(entry => normalizeSection(entry)) : [];
+    let right = Array.isArray(columnsSrc.right) ? columnsSrc.right.map(entry => normalizeSection(entry)) : [];
+
+    if (!left.length) {
+      const legacySections = Array.isArray(story.sections) ? story.sections : [];
+      left = legacySections.map(entry => normalizeSection({ ...entry }));
+    }
+
+    if (!right.length) {
+      const legacyGallery = Array.isArray(story.gallery) ? story.gallery : [];
+      right = legacyGallery
+        .map(entry => {
+          if (!entry) return null;
+          if (typeof entry === 'string') {
+            return normalizeSection({ imageUrl: entry }, { defaultFullImage: true });
+          }
+          const imageUrl = entry.url ?? entry.imageUrl ?? '';
+          const imageAlt = entry.alt ?? entry.imageAlt ?? '';
+          const heading = entry.caption ?? entry.title ?? '';
+          return normalizeSection({
+            id: entry.id,
+            heading,
+            body: '',
+            imageUrl,
+            imageAlt,
+            fullImage: true
+          }, { defaultFullImage: true });
+        })
+        .filter(Boolean);
+    }
+
+    story.columns = {
+      left,
+      right
+    };
+
+    const layoutRaw = typeof story.layout === 'string' ? story.layout : '';
+    let layout = (layoutRaw === 'double') ? 'double' : 'single';
+    if (layout !== 'double' && right.length) layout = 'double';
+    story.layout = layout;
+
+    story.heading = typeof story.heading === 'string' ? story.heading.trim() : '';
+    const legacyTitle = typeof story.title === 'string' ? story.title.trim() : '';
+    if (!story.heading && legacyTitle) story.heading = legacyTitle;
+    story.title = story.heading || legacyTitle;
+
+    story.sections = left.map(section => ({
+      id: section.id,
+      title: section.heading,
+      text: section.body,
+      imageUrl: section.imageUrl,
+      imageAlt: section.imageAlt,
+      imageCaption: section.fullImage ? section.heading || '' : ''
+    }));
+
+    story.gallery = right
+      .filter(section => section.imageUrl)
+      .map(section => ({
+        id: section.id,
+        url: section.imageUrl,
+        alt: section.imageAlt,
+        caption: section.heading || section.body || ''
+      }));
   });
   settings.slides.storySlides = list;
   return settings.slides.storySlides;
@@ -1061,7 +1114,10 @@ function ensureStorySlides(settings){
 function storyDefaults(){
   return {
     id: 'story_' + Math.random().toString(36).slice(2, 9),
+    heading: '',
     title: '',
+    layout: 'single',
+    columns: { left: [], right: [] },
     heroUrl: '',
     heroAlt: '',
     saunas: [],
@@ -1082,8 +1138,8 @@ function storyEditor(story, idx){
 
   const legend = document.createElement('div');
   legend.className = 'legend';
-  const legendTitle = String(story.title || '').trim();
-  legend.textContent = legendTitle ? `Erklärung: ${legendTitle}` : 'Neue Erklärung';
+  const legendTitle = String(story.heading || story.title || '').trim();
+  legend.textContent = legendTitle ? `Information: ${legendTitle}` : 'Neue Information';
   if (story.enabled === false) legend.textContent += ' (deaktiviert)';
   wrap.appendChild(legend);
 
@@ -1092,13 +1148,44 @@ function storyEditor(story, idx){
   header.style.gap = '8px';
   header.style.flexWrap = 'wrap';
 
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.className = 'input';
-  titleInput.placeholder = 'Titel (z. B. Finnische Sauna)';
-  titleInput.value = story.title || '';
-  titleInput.onchange = () => { story.title = titleInput.value.trim(); renderSlidesMaster(); };
-  header.appendChild(titleInput);
+  const headingInput = document.createElement('input');
+  headingInput.type = 'text';
+  headingInput.className = 'input';
+  headingInput.placeholder = 'Überschrift (H1)';
+  headingInput.value = story.heading || story.title || '';
+  headingInput.onchange = () => {
+    const value = headingInput.value.trim();
+    story.heading = value;
+    story.title = value;
+    renderSlidesMaster();
+  };
+  header.appendChild(headingInput);
+
+  const layoutWrap = document.createElement('div');
+  layoutWrap.className = 'row story-layout-toggle';
+  layoutWrap.style.gap = '6px';
+  const layoutLabel = document.createElement('span');
+  layoutLabel.className = 'mut';
+  layoutLabel.textContent = 'Layout';
+  layoutWrap.appendChild(layoutLabel);
+  const layoutOptions = [
+    { value: 'single', label: 'Einspaltig' },
+    { value: 'double', label: 'Zweispaltig' }
+  ];
+  layoutOptions.forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn sm ghost';
+    btn.textContent = option.label;
+    btn.classList.toggle('is-active', story.layout === option.value);
+    btn.onclick = () => {
+      if (story.layout === option.value) return;
+      story.layout = option.value;
+      renderSlidesMaster();
+    };
+    layoutWrap.appendChild(btn);
+  });
+  header.appendChild(layoutWrap);
 
   const enabledLabel = document.createElement('label');
   enabledLabel.className = 'btn sm ghost';
@@ -1275,415 +1362,268 @@ function storyEditor(story, idx){
   wrap.appendChild(makeTextarea('Ritual', 'ritual', 3, 'Ablauf oder Besonderheiten'));
   wrap.appendChild(makeTextarea('Tipps (je Zeile ein Tipp)', 'tips', 3, 'Tipps oder Hinweise'));
 
-  const sectionsHeader = document.createElement('div');
-  sectionsHeader.className = 'subh';
-  sectionsHeader.textContent = 'Abschnitte';
-  wrap.appendChild(sectionsHeader);
+  const layoutHeader = document.createElement('div');
+  layoutHeader.className = 'subh';
+  layoutHeader.textContent = 'Abschnitte & Spalten';
+  wrap.appendChild(layoutHeader);
 
-  const sectionsList = document.createElement('div');
-  sectionsList.className = 'story-sections-editor';
-  sectionsList.style.display = 'grid';
-  sectionsList.style.gap = '12px';
-  wrap.appendChild(sectionsList);
+  const layoutHelp = document.createElement('div');
+  layoutHelp.className = 'help';
+  layoutHelp.textContent = 'Spalten individuell mit Texten, Bildern und Specials befüllen.';
+  wrap.appendChild(layoutHelp);
 
-  const renderSections = () => {
-    sectionsList.innerHTML = '';
-    const sections = Array.isArray(story.sections) ? story.sections : (story.sections = []);
-    if (!sections.length) {
-      const empty = document.createElement('div');
-      empty.className = 'mut';
-      empty.textContent = 'Noch keine Abschnitte angelegt.';
-      sectionsList.appendChild(empty);
-      return;
+  const columnsWrap = document.createElement('div');
+  columnsWrap.className = 'story-columns-editor';
+  wrap.appendChild(columnsWrap);
+
+  const ensureColumns = () => {
+    if (!story.columns || typeof story.columns !== 'object') {
+      story.columns = { left: [], right: [] };
     }
-    sections.forEach((section, sectionIdx) => {
-      const card = document.createElement('div');
-      card.className = 'story-section-card';
-      card.style.display = 'flex';
-      card.style.flexDirection = 'column';
-      card.style.gap = '10px';
-      card.style.padding = '12px';
-      card.style.border = '1px solid rgba(0,0,0,.12)';
-      card.style.borderRadius = '10px';
+    if (!Array.isArray(story.columns.left)) story.columns.left = [];
+    if (!Array.isArray(story.columns.right)) story.columns.right = [];
+    return story.columns;
+  };
 
-      const head = document.createElement('div');
-      head.className = 'row story-section-card-head';
-      head.style.alignItems = 'center';
-      head.style.gap = '8px';
+  const createSectionDefaults = (_columnKey) => ({
+    id: 'story_sec_' + Math.random().toString(36).slice(2, 9),
+    heading: '',
+    body: '',
+    imageUrl: '',
+    imageAlt: '',
+    fullImage: false
+  });
 
-      const label = document.createElement('strong');
-      label.className = 'story-section-card-title';
-      label.textContent = section.title?.trim() ? section.title.trim() : `Abschnitt ${sectionIdx + 1}`;
-      head.appendChild(label);
+  const renderColumns = () => {
+    const columns = ensureColumns();
+    columnsWrap.innerHTML = '';
 
-      const controls = document.createElement('div');
-      controls.className = 'row story-section-card-controls';
-      controls.style.gap = '4px';
+    const makeColumn = (columnKey, labelText) => {
+      const columnWrap = document.createElement('div');
+      columnWrap.className = 'story-column-card';
+      columnWrap.dataset.column = columnKey;
+      const isRight = columnKey === 'right';
+      const isCollapsed = isRight && story.layout !== 'double';
+      columnWrap.classList.toggle('is-collapsed', isCollapsed);
 
-      const move = (delta) => {
-        const arr = Array.isArray(story.sections) ? story.sections : [];
-        const nextIdx = sectionIdx + delta;
-        if (nextIdx < 0 || nextIdx >= arr.length) return;
-        const [item] = arr.splice(sectionIdx, 1);
-        arr.splice(nextIdx, 0, item);
+      const headRow = document.createElement('div');
+      headRow.className = 'story-column-head';
+      const title = document.createElement('div');
+      title.className = 'story-column-title';
+      title.textContent = labelText;
+      headRow.appendChild(title);
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn sm ghost';
+      addBtn.textContent = 'Abschnitt hinzufügen';
+      addBtn.onclick = () => {
+        columns[columnKey].push(createSectionDefaults(columnKey));
         renderSlidesMaster();
       };
+      headRow.appendChild(addBtn);
+      columnWrap.appendChild(headRow);
 
-      const makeCtrlBtn = (labelTxt, title) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn sm ghost icon';
-        btn.textContent = labelTxt;
-        btn.title = title;
-        return btn;
-      };
+      if (isCollapsed) {
+        const note = document.createElement('div');
+        note.className = 'story-column-placeholder';
+        const count = columns[columnKey].length;
+        note.textContent = count
+          ? `Im einspaltigen Layout ausgeblendet (${count} Abschnitt${count === 1 ? '' : 'e'} hinterlegt).`
+          : 'Im einspaltigen Layout ausgeblendet. Wechsle zu „Zweispaltig“, um Inhalte hinzuzufügen.';
+        columnWrap.appendChild(note);
+      }
 
-      const upBtn = makeCtrlBtn('↑', 'Nach oben verschieben');
-      upBtn.onclick = () => move(-1);
-      controls.appendChild(upBtn);
+      const list = document.createElement('div');
+      list.className = 'story-section-list';
+      columnWrap.appendChild(list);
 
-      const downBtn = makeCtrlBtn('↓', 'Nach unten verschieben');
-      downBtn.onclick = () => move(1);
-      controls.appendChild(downBtn);
+      const arr = columns[columnKey];
+      if (!arr.length) {
+        const empty = document.createElement('div');
+        empty.className = 'story-column-empty';
+        empty.textContent = 'Noch keine Abschnitte angelegt.';
+        list.appendChild(empty);
+      } else {
+        arr.forEach((section, sectionIdx) => {
+          const card = document.createElement('div');
+          card.className = 'story-section-card';
+          card.classList.toggle('is-full-image', section.fullImage);
 
-      const delBtn = makeCtrlBtn('✕', 'Abschnitt entfernen');
-      delBtn.onclick = () => {
-        const arr = Array.isArray(story.sections) ? story.sections : [];
-        arr.splice(sectionIdx, 1);
-        renderSlidesMaster();
-      };
-      controls.appendChild(delBtn);
+          const head = document.createElement('div');
+          head.className = 'row story-section-card-head';
+          head.style.alignItems = 'center';
+          head.style.gap = '6px';
 
-      head.appendChild(controls);
-      card.appendChild(head);
+          const label = document.createElement('strong');
+          label.className = 'story-section-card-title';
+          label.textContent = section.heading?.trim() ? section.heading.trim() : `Abschnitt ${sectionIdx + 1}`;
+          head.appendChild(label);
 
-      const titleWrap = document.createElement('div');
-      titleWrap.className = 'kv';
-      const titleLabel = document.createElement('label');
-      titleLabel.textContent = 'Titel';
-      const titleInput = document.createElement('input');
-      titleInput.type = 'text';
-      titleInput.className = 'input';
-      titleInput.placeholder = 'Abschnittstitel';
-      titleInput.value = section.title || '';
-      titleInput.onchange = () => { section.title = titleInput.value.trim(); renderSlidesMaster(); };
-      titleWrap.appendChild(titleLabel);
-      titleWrap.appendChild(titleInput);
-      card.appendChild(titleWrap);
+          const controls = document.createElement('div');
+          controls.className = 'row story-section-card-controls';
+          controls.style.gap = '4px';
 
-      const textWrap = document.createElement('div');
-      textWrap.className = 'kv';
-      const textLabel = document.createElement('label');
-      textLabel.textContent = 'Text';
-      const textArea = document.createElement('textarea');
-      textArea.className = 'input';
-      textArea.rows = 3;
-      textArea.placeholder = 'Abschnittsbeschreibung';
-      textArea.value = section.text || '';
-      textArea.onchange = () => { section.text = textArea.value.trim(); renderSlidesMaster(); };
-      textWrap.appendChild(textLabel);
-      textWrap.appendChild(textArea);
-      card.appendChild(textWrap);
+          const move = (delta) => {
+            const base = columns[columnKey];
+            const nextIdx = sectionIdx + delta;
+            if (nextIdx < 0 || nextIdx >= base.length) return;
+            const [item] = base.splice(sectionIdx, 1);
+            base.splice(nextIdx, 0, item);
+            renderSlidesMaster();
+          };
 
-      const mediaRow = document.createElement('div');
-      mediaRow.className = 'row story-section-card-media';
-      mediaRow.style.gap = '12px';
-      mediaRow.style.flexWrap = 'wrap';
-      mediaRow.style.alignItems = 'center';
+          const makeBtn = (labelTxt, titleTxt) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn sm ghost icon';
+            btn.textContent = labelTxt;
+            btn.title = titleTxt;
+            return btn;
+          };
 
-      const preview = document.createElement('img');
-      preview.className = 'story-section-card-preview';
-      preview.style.width = '140px';
-      preview.style.height = '100px';
-      preview.style.objectFit = 'cover';
-      preview.style.borderRadius = '8px';
-      preview.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,.12)';
+          const upBtn = makeBtn('↑', 'Nach oben verschieben');
+          upBtn.onclick = () => move(-1);
+          controls.appendChild(upBtn);
 
-      const updatePreview = () => {
-        if (section.imageUrl) {
-          preview.src = section.imageUrl;
-          preview.title = stripCacheSimple(section.imageUrl);
-        } else {
-          preview.src = FALLBACK_HERO;
-          preview.title = 'Kein Bild ausgewählt';
-        }
-      };
-      updatePreview();
+          const downBtn = makeBtn('↓', 'Nach unten verschieben');
+          downBtn.onclick = () => move(1);
+          controls.appendChild(downBtn);
 
-      const mediaBtns = document.createElement('div');
-      mediaBtns.className = 'row';
-      mediaBtns.style.gap = '6px';
+          const removeBtn = makeBtn('✕', 'Abschnitt entfernen');
+          removeBtn.onclick = () => {
+            const base = columns[columnKey];
+            base.splice(sectionIdx, 1);
+            renderSlidesMaster();
+          };
+          controls.appendChild(removeBtn);
 
-      const uploadBtn = document.createElement('button');
-      uploadBtn.type = 'button';
-      uploadBtn.className = 'btn sm ghost';
-      uploadBtn.textContent = 'Bild hochladen';
-      uploadBtn.onclick = () => {
-        const fi = document.createElement('input');
-        fi.type = 'file';
-        fi.accept = 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (url) => {
-          const clean = stripCacheSimple(url || '');
-          section.imageUrl = clean
-            ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
-            : '';
-          renderSlidesMaster();
+          head.appendChild(controls);
+          card.appendChild(head);
+
+          const mediaRow = document.createElement('div');
+          mediaRow.className = 'row story-section-card-media';
+          mediaRow.style.gap = '12px';
+          mediaRow.style.flexWrap = 'wrap';
+          mediaRow.style.alignItems = 'center';
+
+          const preview = document.createElement('img');
+          preview.className = 'story-section-card-preview';
+          preview.alt = section.imageAlt || '';
+          if (section.imageUrl) {
+            preview.src = section.imageUrl;
+            preview.title = stripCacheSimple(section.imageUrl);
+          } else {
+            preview.src = FALLBACK_HERO;
+            preview.title = 'Kein Bild ausgewählt';
+          }
+          mediaRow.appendChild(preview);
+
+          const mediaBtns = document.createElement('div');
+          mediaBtns.className = 'row';
+          mediaBtns.style.gap = '6px';
+
+          const uploadBtn = document.createElement('button');
+          uploadBtn.type = 'button';
+          uploadBtn.className = 'btn sm ghost';
+          uploadBtn.textContent = 'Bild hochladen';
+          uploadBtn.onclick = () => {
+            const fi = document.createElement('input');
+            fi.type = 'file';
+            fi.accept = 'image/*';
+            fi.onchange = () => uploadGeneric(fi, (url) => {
+              const clean = stripCacheSimple(url || '');
+              section.imageUrl = clean
+                ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
+                : '';
+              renderSlidesMaster();
+            });
+            fi.click();
+          };
+          mediaBtns.appendChild(uploadBtn);
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'btn sm ghost';
+          clearBtn.textContent = 'Bild entfernen';
+          clearBtn.onclick = () => { section.imageUrl = ''; renderSlidesMaster(); };
+          mediaBtns.appendChild(clearBtn);
+
+          mediaRow.appendChild(mediaBtns);
+          card.appendChild(mediaRow);
+
+          const altWrap = document.createElement('div');
+          altWrap.className = 'kv';
+          const altLabel = document.createElement('label');
+          altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
+          const altInput = document.createElement('input');
+          altInput.type = 'text';
+          altInput.className = 'input';
+          altInput.placeholder = 'Optional für Screenreader';
+          altInput.value = section.imageAlt || '';
+          altInput.onchange = () => { section.imageAlt = altInput.value.trim(); renderSlidesMaster(); };
+          altWrap.appendChild(altLabel);
+          altWrap.appendChild(altInput);
+          card.appendChild(altWrap);
+
+          const headingWrap = document.createElement('div');
+          headingWrap.className = 'kv';
+          const headingLabel = document.createElement('label');
+          headingLabel.textContent = 'Überschrift';
+          const headingField = document.createElement('input');
+          headingField.type = 'text';
+          headingField.className = 'input';
+          headingField.placeholder = columnKey === 'right' ? 'Optionale Überschrift' : 'Abschnittstitel';
+          headingField.value = section.heading || '';
+          headingField.disabled = (columnKey === 'right' && section.fullImage);
+          headingField.onchange = () => { section.heading = headingField.value.trim(); renderSlidesMaster(); };
+          headingWrap.appendChild(headingLabel);
+          headingWrap.appendChild(headingField);
+          card.appendChild(headingWrap);
+
+          const bodyWrap = document.createElement('div');
+          bodyWrap.className = 'kv';
+          const bodyLabel = document.createElement('label');
+          bodyLabel.textContent = 'Text';
+          const bodyArea = document.createElement('textarea');
+          bodyArea.className = 'input';
+          bodyArea.rows = 3;
+          bodyArea.placeholder = 'Inhalt';
+          bodyArea.value = section.body || '';
+          bodyArea.disabled = (columnKey === 'right' && section.fullImage);
+          bodyArea.onchange = () => { section.body = bodyArea.value.trim(); renderSlidesMaster(); };
+          bodyWrap.appendChild(bodyLabel);
+          bodyWrap.appendChild(bodyArea);
+          card.appendChild(bodyWrap);
+
+          if (columnKey === 'right') {
+            const toggleWrap = document.createElement('label');
+            toggleWrap.className = 'story-fullimage-toggle';
+            const toggle = document.createElement('input');
+            toggle.type = 'checkbox';
+            toggle.checked = !!section.fullImage;
+            toggle.onchange = () => {
+              section.fullImage = !!toggle.checked;
+              renderSlidesMaster();
+            };
+            const toggleText = document.createElement('span');
+            toggleText.textContent = 'Nur großes Bild';
+            toggleWrap.appendChild(toggle);
+            toggleWrap.appendChild(toggleText);
+            card.appendChild(toggleWrap);
+          }
+
+          list.appendChild(card);
         });
-        fi.click();
-      };
-      mediaBtns.appendChild(uploadBtn);
+      }
 
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'btn sm ghost';
-      removeBtn.textContent = 'Bild entfernen';
-      removeBtn.onclick = () => { section.imageUrl = ''; renderSlidesMaster(); };
-      mediaBtns.appendChild(removeBtn);
+      return columnWrap;
+    };
 
-      mediaRow.appendChild(preview);
-      mediaRow.appendChild(mediaBtns);
-      card.appendChild(mediaRow);
-
-      const altWrap = document.createElement('div');
-      altWrap.className = 'kv';
-      const altLabel = document.createElement('label');
-      altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
-      const altInput = document.createElement('input');
-      altInput.type = 'text';
-      altInput.className = 'input';
-      altInput.placeholder = 'Optional für Screenreader';
-      altInput.value = section.imageAlt || '';
-      altInput.onchange = () => { section.imageAlt = altInput.value.trim(); renderSlidesMaster(); };
-      altWrap.appendChild(altLabel);
-      altWrap.appendChild(altInput);
-      card.appendChild(altWrap);
-
-      const captionWrap = document.createElement('div');
-      captionWrap.className = 'kv';
-      const captionLabel = document.createElement('label');
-      captionLabel.textContent = 'Bildunterschrift (optional)';
-      const captionInput = document.createElement('input');
-      captionInput.type = 'text';
-      captionInput.className = 'input';
-      captionInput.placeholder = 'Kurze Bildbeschreibung';
-      captionInput.value = section.imageCaption || '';
-      captionInput.onchange = () => { section.imageCaption = captionInput.value.trim(); renderSlidesMaster(); };
-      captionWrap.appendChild(captionLabel);
-      captionWrap.appendChild(captionInput);
-      card.appendChild(captionWrap);
-
-      sectionsList.appendChild(card);
-    });
+    columnsWrap.appendChild(makeColumn('left', 'Linke Spalte'));
+    columnsWrap.appendChild(makeColumn('right', 'Rechte Spalte'));
   };
-  renderSections();
-
-  const addSectionBtn = document.createElement('button');
-  addSectionBtn.type = 'button';
-  addSectionBtn.className = 'btn sm ghost';
-  addSectionBtn.textContent = 'Abschnitt hinzufügen';
-  addSectionBtn.onclick = () => {
-    (story.sections ||= []).push({
-      id: 'story_sec_' + Math.random().toString(36).slice(2, 9),
-      title: '',
-      text: '',
-      imageUrl: '',
-      imageAlt: '',
-      imageCaption: ''
-    });
-    renderSlidesMaster();
-  };
-  wrap.appendChild(addSectionBtn);
-
-  const galleryHeader = document.createElement('div');
-  galleryHeader.className = 'subh';
-  galleryHeader.textContent = 'Galerie';
-  wrap.appendChild(galleryHeader);
-
-  const galleryList = document.createElement('div');
-  galleryList.className = 'story-gallery-editor';
-  galleryList.style.display = 'grid';
-  galleryList.style.gap = '12px';
-  wrap.appendChild(galleryList);
-
-  const renderGallery = () => {
-    galleryList.innerHTML = '';
-    const gallery = Array.isArray(story.gallery) ? story.gallery : (story.gallery = []);
-    if (!gallery.length) {
-      const empty = document.createElement('div');
-      empty.className = 'mut';
-      empty.textContent = 'Noch keine Galerie-Bilder.';
-      galleryList.appendChild(empty);
-      return;
-    }
-    gallery.forEach((entry, gIdx) => {
-      const row = document.createElement('div');
-      row.className = 'story-gallery-card';
-      row.style.display = 'flex';
-      row.style.flexDirection = 'column';
-      row.style.gap = '10px';
-      row.style.padding = '12px';
-      row.style.border = '1px solid rgba(0,0,0,.12)';
-      row.style.borderRadius = '10px';
-
-      const head = document.createElement('div');
-      head.className = 'row story-gallery-card-head';
-      head.style.gap = '8px';
-      head.style.alignItems = 'center';
-
-      const label = document.createElement('strong');
-      label.textContent = entry.caption?.trim() || `Bild ${gIdx + 1}`;
-      head.appendChild(label);
-
-      const controls = document.createElement('div');
-      controls.className = 'row';
-      controls.style.gap = '4px';
-
-      const move = (delta) => {
-        const arr = Array.isArray(story.gallery) ? story.gallery : [];
-        const nextIdx = gIdx + delta;
-        if (nextIdx < 0 || nextIdx >= arr.length) return;
-        const [item] = arr.splice(gIdx, 1);
-        arr.splice(nextIdx, 0, item);
-        renderSlidesMaster();
-      };
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn sm ghost icon';
-      up.textContent = '↑';
-      up.title = 'Nach oben verschieben';
-      up.onclick = () => move(-1);
-      controls.appendChild(up);
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn sm ghost icon';
-      down.textContent = '↓';
-      down.title = 'Nach unten verschieben';
-      down.onclick = () => move(1);
-      controls.appendChild(down);
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn sm ghost icon';
-      remove.textContent = '✕';
-      remove.title = 'Bild entfernen';
-      remove.onclick = () => {
-        const arr = Array.isArray(story.gallery) ? story.gallery : [];
-        arr.splice(gIdx, 1);
-        renderSlidesMaster();
-      };
-      controls.appendChild(remove);
-
-      head.appendChild(controls);
-      row.appendChild(head);
-
-      const mediaRow = document.createElement('div');
-      mediaRow.className = 'row story-gallery-card-media';
-      mediaRow.style.gap = '12px';
-      mediaRow.style.flexWrap = 'wrap';
-      mediaRow.style.alignItems = 'center';
-
-      const preview = document.createElement('img');
-      preview.className = 'story-gallery-card-preview';
-      preview.style.width = '140px';
-      preview.style.height = '100px';
-      preview.style.objectFit = 'cover';
-      preview.style.borderRadius = '8px';
-      preview.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,.12)';
-
-      const updatePreview = () => {
-        if (entry.url) {
-          preview.src = entry.url;
-          preview.title = stripCacheSimple(entry.url);
-        } else {
-          preview.src = FALLBACK_HERO;
-          preview.title = 'Kein Bild ausgewählt';
-        }
-      };
-      updatePreview();
-
-      const mediaBtns = document.createElement('div');
-      mediaBtns.className = 'row';
-      mediaBtns.style.gap = '6px';
-
-      const upload = document.createElement('button');
-      upload.type = 'button';
-      upload.className = 'btn sm ghost';
-      upload.textContent = 'Bild hochladen';
-      upload.onclick = () => {
-        const fi = document.createElement('input');
-        fi.type = 'file';
-        fi.accept = 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (url) => {
-          const clean = stripCacheSimple(url || '');
-          entry.url = clean
-            ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
-            : '';
-          renderSlidesMaster();
-        });
-        fi.click();
-      };
-      mediaBtns.appendChild(upload);
-
-      const clear = document.createElement('button');
-      clear.type = 'button';
-      clear.className = 'btn sm ghost';
-      clear.textContent = 'Bild entfernen';
-      clear.onclick = () => { entry.url = ''; renderSlidesMaster(); };
-      mediaBtns.appendChild(clear);
-
-      mediaRow.appendChild(preview);
-      mediaRow.appendChild(mediaBtns);
-      row.appendChild(mediaRow);
-
-      const altWrap = document.createElement('div');
-      altWrap.className = 'kv';
-      const altLabel = document.createElement('label');
-      altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
-      const altInput = document.createElement('input');
-      altInput.type = 'text';
-      altInput.className = 'input';
-      altInput.placeholder = 'Optional für Screenreader';
-      altInput.value = entry.alt || '';
-      altInput.onchange = () => { entry.alt = altInput.value.trim(); renderSlidesMaster(); };
-      altWrap.appendChild(altLabel);
-      altWrap.appendChild(altInput);
-      row.appendChild(altWrap);
-
-      const captionWrap = document.createElement('div');
-      captionWrap.className = 'kv';
-      const captionLabel = document.createElement('label');
-      captionLabel.textContent = 'Bildunterschrift (optional)';
-      const captionInput = document.createElement('input');
-      captionInput.type = 'text';
-      captionInput.className = 'input';
-      captionInput.placeholder = 'Kurzbeschreibung';
-      captionInput.value = entry.caption || '';
-      captionInput.onchange = () => { entry.caption = captionInput.value.trim(); renderSlidesMaster(); };
-      captionWrap.appendChild(captionLabel);
-      captionWrap.appendChild(captionInput);
-      row.appendChild(captionWrap);
-
-      galleryList.appendChild(row);
-    });
-  };
-  renderGallery();
-
-  const addGalleryBtn = document.createElement('button');
-  addGalleryBtn.type = 'button';
-  addGalleryBtn.className = 'btn sm ghost';
-  addGalleryBtn.textContent = 'Galerie-Bild hinzufügen';
-  addGalleryBtn.onclick = () => {
-    (story.gallery ||= []).push({
-      id: 'story_gal_' + Math.random().toString(36).slice(2, 9),
-      url: '',
-      alt: '',
-      caption: ''
-    });
-    renderSlidesMaster();
-  };
-  wrap.appendChild(addGalleryBtn);
+  renderColumns();
 
   const faqHeader = document.createElement('div');
   faqHeader.className = 'subh';
