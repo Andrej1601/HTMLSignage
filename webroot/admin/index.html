@@ -120,6 +120,27 @@
 
 <div class="kv"><label>Weiter erst nach Video-Ende</label><input id="waitForVideo" type="checkbox"></div>
 
+<div class="fieldset" id="heroTimelineBox">
+  <div class="legend">Hero-Timeline</div>
+  <div class="kv">
+    <label class="row" style="gap:8px;align-items:center">
+      <input id="heroTimelineEnabled" type="checkbox">
+      <span>Hero-Timeline anzeigen</span>
+    </label>
+  </div>
+  <div class="kv" id="heroTimelineSettings" hidden>
+    <label>Einstellungen</label>
+    <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="mut">Dauer (s)</span>
+      <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="120" step="1">
+      <span class="mut">Basis-Minuten</span>
+      <input id="heroTimelineBase" class="input num3" type="number" min="1" max="120" step="1">
+      <span class="mut">Max. Einträge</span>
+      <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
+    </div>
+  </div>
+</div>
+
     <!-- Unterbox 1: Saunen & Übersicht -->
     <details class="ac sub" open id="boxSaunas">
       <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
@@ -455,6 +476,14 @@
             <select id="m_note" class="input"></select>
           </div>
         </div>
+        <label>Beschreibung</label>
+        <textarea id="m_description" class="input" rows="3" placeholder="Kurze Beschreibung oder Ritual"></textarea>
+        <label>Aromen</label>
+        <textarea id="m_aromas" class="input" rows="2" placeholder="Eine Zeile pro Aroma"></textarea>
+        <label>Fakten / Chips</label>
+        <textarea id="m_facts" class="input" rows="2" placeholder="Eine Zeile pro Fakt"></textarea>
+        <label>Aufgussart-Badge</label>
+        <input id="m_type" class="input" type="text" placeholder="z.B. Klassisch">
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:14px">
         <button class="btn" id="m_cancel">Abbrechen</button>

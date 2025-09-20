@@ -348,11 +348,15 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
 
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
     const highlight = getHighlightMap();
-    const baseMinutes = Math.max(1, Number.isFinite(+settings?.slides?.heroTimelineBaseMinutes)
-      ? +settings.slides.heroTimelineBaseMinutes
-      : 15);
-    const maxEntries = Number.isFinite(+settings?.slides?.heroTimelineMaxEntries)
-      ? Math.max(1, Math.floor(+settings.slides.heroTimelineMaxEntries))
+    const rawBase = settings?.slides?.heroTimelineBaseMinutes;
+    const parsedBase = Number(rawBase);
+    const baseMinutes = Number.isFinite(parsedBase) && parsedBase > 0
+      ? Math.max(1, Math.round(parsedBase))
+      : 15;
+    const rawMax = settings?.slides?.heroTimelineMaxEntries;
+    const parsedMax = Number(rawMax);
+    const maxEntries = Number.isFinite(parsedMax) && parsedMax > 0
+      ? Math.max(1, Math.floor(parsedMax))
       : null;
 
     (schedule.rows || []).forEach((row, ri) => {

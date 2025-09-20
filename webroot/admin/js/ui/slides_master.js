@@ -1727,13 +1727,86 @@ export function renderSlidesMaster(){
     waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
   }
 
-  const showIconsEl = $('#toggleCardIcons');
-  if (showIconsEl){
-    showIconsEl.checked = showIcons;
-    showIconsEl.onchange = () => {
-      (settings.slides ||= {}).showIcons = !!showIconsEl.checked;
-      renderSlidesMaster();
-      if (typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
+
+  const heroToggle = $('#heroTimelineEnabled');
+  const heroSettingsRow = $('#heroTimelineSettings');
+  if (heroToggle){
+    const enabled = !!settings.slides?.heroEnabled;
+    heroToggle.checked = enabled;
+    if (heroSettingsRow) heroSettingsRow.hidden = !enabled;
+    heroToggle.onchange = () => {
+      (settings.slides ||= {}).heroEnabled = !!heroToggle.checked;
+      if (heroSettingsRow) heroSettingsRow.hidden = !heroToggle.checked;
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+  } else if (heroSettingsRow){
+    heroSettingsRow.hidden = true;
+  }
+
+  const heroDurationEl = $('#heroTimelineDuration');
+  if (heroDurationEl){
+    const fallback = Math.max(1000, Math.round(DEFAULTS.slides?.heroTimelineFillMs ?? 8000));
+    const raw = settings.slides?.heroTimelineFillMs;
+    const init = Number.isFinite(+raw) ? Math.max(1000, Math.round(+raw)) : fallback;
+    heroDurationEl.value = String(Math.round(init / 1000));
+    heroDurationEl.onchange = () => {
+      const num = Number(heroDurationEl.value);
+      if (!Number.isFinite(num) || num <= 0){
+        (settings.slides ||= {}).heroTimelineFillMs = fallback;
+        heroDurationEl.value = String(Math.round(fallback / 1000));
+        return;
+      }
+      const secs = Math.max(1, Math.round(num));
+      (settings.slides ||= {}).heroTimelineFillMs = secs * 1000;
+      heroDurationEl.value = String(secs);
+    };
+  }
+
+  const heroBaseEl = $('#heroTimelineBase');
+  if (heroBaseEl){
+    const fallback = Math.max(1, Math.round(DEFAULTS.slides?.heroTimelineBaseMinutes ?? 15));
+    const raw = settings.slides?.heroTimelineBaseMinutes;
+    const init = Number.isFinite(+raw) ? Math.max(1, Math.round(+raw)) : fallback;
+    heroBaseEl.value = String(init);
+    heroBaseEl.onchange = () => {
+      const num = Number(heroBaseEl.value);
+      if (!Number.isFinite(num) || num <= 0){
+        (settings.slides ||= {}).heroTimelineBaseMinutes = fallback;
+        heroBaseEl.value = String(fallback);
+        return;
+      }
+      const minutes = Math.max(1, Math.round(num));
+      (settings.slides ||= {}).heroTimelineBaseMinutes = minutes;
+      heroBaseEl.value = String(minutes);
+    };
+  }
+
+  const heroMaxEl = $('#heroTimelineMax');
+  if (heroMaxEl){
+    const raw = settings.slides?.heroTimelineMaxEntries;
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0){
+      const normalized = Math.max(1, Math.floor(raw));
+      (settings.slides ||= {}).heroTimelineMaxEntries = normalized;
+      heroMaxEl.value = String(normalized);
+    } else {
+      heroMaxEl.value = '';
+    }
+    heroMaxEl.onchange = () => {
+      const value = heroMaxEl.value;
+      if (value == null || String(value).trim() === ''){
+        (settings.slides ||= {}).heroTimelineMaxEntries = null;
+        heroMaxEl.value = '';
+        return;
+      }
+      const num = Number(value);
+      if (!Number.isFinite(num) || num <= 0){
+        (settings.slides ||= {}).heroTimelineMaxEntries = null;
+        heroMaxEl.value = '';
+        return;
+      }
+      const normalized = Math.max(1, Math.floor(num));
+      (settings.slides ||= {}).heroTimelineMaxEntries = normalized;
+      heroMaxEl.value = String(normalized);
     };
   }
 

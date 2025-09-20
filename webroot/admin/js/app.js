@@ -847,12 +847,36 @@ function collectSettings(){
         const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
         const fallback = settings?.slides?.overviewDurationSec ?? (DEFAULTS?.slides?.overviewDurationSec ?? 10);
         const v = el?.value;
-  	const n = Number(v);
-  	return Number.isFinite(n) ? Math.max(1, Math.min(120, n)) : fallback;
-	})(),
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.max(1, Math.min(120, n)) : fallback;
+        })(),
         transitionMs: +(document.getElementById('transMs2')?.value || 500),
         durationMode: (document.querySelector('input[name=durMode]:checked')?.value || 'uniform'),
-        globalDwellSec: +(document.getElementById('dwellAll')?.value || 6)
+        globalDwellSec: +(document.getElementById('dwellAll')?.value || 6),
+        heroEnabled: !!document.getElementById('heroTimelineEnabled')?.checked,
+        heroTimelineFillMs: (() => {
+          const el = document.getElementById('heroTimelineDuration');
+          const fallback = settings?.slides?.heroTimelineFillMs ?? (DEFAULTS?.slides?.heroTimelineFillMs ?? 8000);
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw) || raw <= 0) return Math.max(1000, Math.round(fallback));
+          return Math.max(1, Math.round(raw)) * 1000;
+        })(),
+        heroTimelineBaseMinutes: (() => {
+          const el = document.getElementById('heroTimelineBase');
+          const fallback = settings?.slides?.heroTimelineBaseMinutes ?? (DEFAULTS?.slides?.heroTimelineBaseMinutes ?? 15);
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw) || raw <= 0) return Math.max(1, Math.round(fallback));
+          return Math.max(1, Math.round(raw));
+        })(),
+        heroTimelineMaxEntries: (() => {
+          const el = document.getElementById('heroTimelineMax');
+          if (!el) return settings.slides?.heroTimelineMaxEntries ?? null;
+          const raw = el.value;
+          if (raw == null || String(raw).trim() === '') return null;
+          const num = Number(raw);
+          if (!Number.isFinite(num) || num <= 0) return null;
+          return Math.max(1, Math.floor(num));
+        })()
       },
       theme: collectColors(),
       highlightNext:{
