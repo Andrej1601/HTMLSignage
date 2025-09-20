@@ -6,6 +6,10 @@
     --cutTop:40%;
     --cutBottom:20%;
   }
+  body[data-layout='split'] .stage{
+    flex-direction:column;
+    gap:calc(12px*var(--vwScale));
+  }
 }
 
 @media (max-width: 600px) {
@@ -13,5 +17,8 @@
     --rightW:24%;
     --cutTop:45%;
     --cutBottom:25%;
+  }
+  body[data-layout='split'] .stage{
+    gap:calc(10px*var(--vwScale));
   }
 }

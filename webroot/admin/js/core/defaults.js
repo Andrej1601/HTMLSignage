@@ -1,6 +1,5 @@
 // /admin/js/core/defaults.js
 // DEFAULTS + Wochentags-Helfer als Single Source of Truth
-
 const DEFAULT_THEME = {
   bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',
   gridBorder:'#5C3101',

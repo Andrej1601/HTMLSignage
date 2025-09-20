@@ -19,6 +19,17 @@ import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
+const PAGE_CONTENT_TYPES = [
+  ['overview','Übersicht'],
+  ['sauna','Saunen'],
+  ['hero-timeline','Hero-Timeline'],
+  ['story','Erklärungen'],
+  ['image','Bilder'],
+  ['video','Videos'],
+  ['url','Webseiten']
+];
+const PAGE_CONTENT_TYPE_KEYS = new Set(PAGE_CONTENT_TYPES.map(([key]) => key));
+const PAGE_SOURCE_KEYS = ['master','schedule','media','story'];
 
 // Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
 const LS_MEM = {};
@@ -113,6 +124,26 @@ function normalizeSettings(source, { assignMissingIds = false } = {}) {
       })
     : [];
   src.presets       = src.presets || {};
+
+  const defaultDisplayPages = DEFAULTS.display?.pages || {};
+  const sanitizePageConfig = (page, defaults = {}) => {
+    const cfg = page && typeof page === 'object' ? { ...page } : {};
+    const def = defaults && typeof defaults === 'object' ? defaults : {};
+    cfg.source = PAGE_SOURCE_KEYS.includes(cfg.source) ? cfg.source : (PAGE_SOURCE_KEYS.includes(def.source) ? def.source : 'master');
+    const timerNum = Number(cfg.timerSec);
+    cfg.timerSec = Number.isFinite(timerNum) && timerNum > 0 ? Math.max(1, Math.round(timerNum)) : null;
+    const rawList = Array.isArray(cfg.contentTypes) ? cfg.contentTypes : def.contentTypes;
+    const filtered = Array.isArray(rawList) ? rawList.filter(type => PAGE_CONTENT_TYPE_KEYS.has(type)) : [];
+    const defaultTypes = Array.isArray(def.contentTypes) ? def.contentTypes.slice() : PAGE_CONTENT_TYPES.map(([key]) => key);
+    cfg.contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaultTypes;
+    return cfg;
+  };
+  const pagesRaw = src.display?.pages || {};
+  src.display.layoutMode = (src.display.layoutMode === 'split') ? 'split' : 'single';
+  src.display.pages = {
+    left: sanitizePageConfig(pagesRaw.left, defaultDisplayPages.left),
+    right: sanitizePageConfig(pagesRaw.right, defaultDisplayPages.right)
+  };
   return src;
 }
 
@@ -512,6 +543,29 @@ function renderSlidesBox(){
   const f = settings.fonts || {};
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
+  const renderTypeList = (hostId, selectedList = []) => {
+    const host = document.getElementById(hostId);
+    if (!host) return;
+    host.innerHTML = '';
+    const selected = new Set(Array.isArray(selectedList) ? selectedList.filter(key => PAGE_CONTENT_TYPE_KEYS.has(key)) : []);
+    PAGE_CONTENT_TYPES.forEach(([key, label]) => {
+      const option = document.createElement('label');
+      const input = document.createElement('input');
+      const text = document.createElement('span');
+      option.className = 'type-pill';
+      input.type = 'checkbox';
+      input.value = key;
+      input.checked = selected.has(key);
+      input.addEventListener('change', () => {
+        option.classList.toggle('is-checked', input.checked);
+      });
+      text.textContent = label;
+      option.appendChild(input);
+      option.appendChild(text);
+      if (input.checked) option.classList.add('is-checked');
+      host.appendChild(option);
+    });
+  };
 
   // Schrift
   setV('#fontFamily', f.family ?? DEFAULTS.fonts.family);
@@ -549,6 +603,28 @@ function renderSlidesBox(){
   setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
   setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
 
+  const display = settings.display || {};
+  const pages = display.pages || {};
+  const leftCfg = pages.left || {};
+  const rightCfg = pages.right || {};
+  const layoutMode = (display.layoutMode === 'split') ? 'split' : 'single';
+  setV('#layoutMode', layoutMode);
+  setV('#pageLeftSource', PAGE_SOURCE_KEYS.includes(leftCfg.source) ? leftCfg.source : 'master');
+  setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(rightCfg.source) ? rightCfg.source : 'media');
+  setV('#pageLeftTimer', leftCfg.timerSec ?? '');
+  setV('#pageRightTimer', rightCfg.timerSec ?? '');
+  renderTypeList('pageLeftTypes', leftCfg.contentTypes);
+  renderTypeList('pageRightTypes', rightCfg.contentTypes);
+  const layoutModeSelect = document.getElementById('layoutMode');
+  const applyLayoutVisibility = (mode) => {
+    const rightWrap = document.getElementById('layoutRight');
+    if (rightWrap) rightWrap.hidden = (mode !== 'split');
+  };
+  applyLayoutVisibility(layoutMode);
+  if (layoutModeSelect) {
+    layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
+  }
+
   // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');
   if (!reset) return;
@@ -582,6 +658,16 @@ function renderSlidesBox(){
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
     setV('#cutTop',   DEFAULTS.display.cutTopPercent);
     setV('#cutBottom',DEFAULTS.display.cutBottomPercent);
+    setV('#layoutMode', DEFAULTS.display.layoutMode || 'single');
+    const defLeft = DEFAULTS.display.pages?.left || {};
+    const defRight = DEFAULTS.display.pages?.right || {};
+    setV('#pageLeftSource', PAGE_SOURCE_KEYS.includes(defLeft.source) ? defLeft.source : 'master');
+    setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(defRight.source) ? defRight.source : 'media');
+    setV('#pageLeftTimer', defLeft.timerSec ?? '');
+    setV('#pageRightTimer', defRight.timerSec ?? '');
+    renderTypeList('pageLeftTypes', defLeft.contentTypes);
+    renderTypeList('pageRightTypes', defRight.contentTypes);
+    applyLayoutVisibility(DEFAULTS.display.layoutMode || 'single');
   };
 }
 
@@ -801,6 +887,22 @@ function collectColors(){
 }
 
 function collectSettings(){
+  const sanitizeTimer = (val) => {
+    const num = Number(val);
+    return Number.isFinite(num) && num > 0 ? Math.max(1, Math.round(num)) : null;
+  };
+  const collectTypes = (hostId) => {
+    const host = document.getElementById(hostId);
+    if (!host) return [];
+    return Array.from(host.querySelectorAll('input[type=checkbox]:checked'))
+      .map(input => input.value)
+      .filter(value => PAGE_CONTENT_TYPE_KEYS.has(value));
+  };
+  const getSourceValue = (id, fallback) => {
+    const el = document.getElementById(id);
+    const val = el?.value || fallback;
+    return PAGE_SOURCE_KEYS.includes(val) ? val : fallback;
+  };
   settings.presets ||= {};
   settings.presets[getActiveDayKey()] = deepClone(schedule);
   return {
@@ -886,8 +988,30 @@ function collectSettings(){
         minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
       },
       assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
-      display:{ ...(settings.display||{}), fit: 'auto', baseW:1920, baseH:1080,
-        rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
+      display:{
+        ...(settings.display||{}),
+        fit: 'auto',
+        baseW:1920,
+        baseH:1080,
+        rightWidthPercent:+($('#rightW').value||38),
+        cutTopPercent:+($('#cutTop').value||28),
+        cutBottomPercent:+($('#cutBottom').value||12),
+        layoutMode:(document.getElementById('layoutMode')?.value === 'split') ? 'split' : 'single',
+        pages:{
+          left:{
+            ...(((settings.display||{}).pages||{}).left||{}),
+            source:getSourceValue('pageLeftSource', 'master'),
+            timerSec:sanitizeTimer(document.getElementById('pageLeftTimer')?.value),
+            contentTypes:collectTypes('pageLeftTypes')
+          },
+          right:{
+            ...(((settings.display||{}).pages||{}).right||{}),
+            source:getSourceValue('pageRightSource', 'media'),
+            timerSec:sanitizeTimer(document.getElementById('pageRightTimer')?.value),
+            contentTypes:collectTypes('pageRightTypes')
+          }
+        }
+      },
       footnotes: settings.footnotes,
       interstitials: (settings.interstitials || []).map(({after, afterRef, ...rest}) => rest),
       presets: settings.presets || {},
