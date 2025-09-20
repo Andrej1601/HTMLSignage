@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
@@ -30,6 +30,94 @@ const PAGE_CONTENT_TYPES = [
 ];
 const PAGE_CONTENT_TYPE_KEYS = new Set(PAGE_CONTENT_TYPES.map(([key]) => key));
 const PAGE_SOURCE_KEYS = ['master','schedule','media','story'];
+const SOURCE_PLAYLIST_LIMITS = {
+  master: null,
+  schedule: new Set(['overview', 'sauna', 'hero-timeline']),
+  media: new Set(['media']),
+  story: new Set(['story'])
+};
+
+function playlistKeyFromSanitizedEntry(entry){
+  if (!entry || typeof entry !== 'object') return null;
+  switch (entry.type) {
+    case 'overview':
+    case 'hero-timeline':
+      return entry.type;
+    case 'sauna':
+      return entry.name ? 'sauna:' + entry.name : null;
+    case 'story':
+      return entry.id != null ? 'story:' + String(entry.id) : null;
+    case 'media':
+      return entry.id != null ? 'media:' + String(entry.id) : null;
+    default:
+      return null;
+  }
+}
+
+function playlistEntryKey(entry){
+  if (!entry || typeof entry !== 'object') return null;
+  let type = String(entry.type || '').trim();
+  if (!type) return null;
+  if (type === 'image' || type === 'video' || type === 'url') type = 'media';
+  switch (type) {
+    case 'overview':
+    case 'hero-timeline':
+      return type;
+    case 'sauna': {
+      const name = typeof entry.name === 'string' ? entry.name : (typeof entry.sauna === 'string' ? entry.sauna : '');
+      return name ? 'sauna:' + name : null;
+    }
+    case 'story': {
+      const rawId = entry.id ?? entry.storyId;
+      return rawId != null ? 'story:' + String(rawId) : null;
+    }
+    case 'media': {
+      const rawId = entry.id ?? entry.mediaId ?? entry.__id ?? entry.slug;
+      return rawId != null ? 'media:' + String(rawId) : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function sanitizePagePlaylist(list = []){
+  if (!Array.isArray(list)) return [];
+  const normalized = [];
+  const seen = new Set();
+  for (const entry of list){
+    const key = playlistEntryKey(entry);
+    if (!key || seen.has(key)) continue;
+    const [prefix, rest] = key.split(':');
+    switch (prefix) {
+      case 'overview':
+      case 'hero-timeline':
+        normalized.push({ type: prefix });
+        seen.add(key);
+        break;
+      case 'sauna':
+        if (rest) {
+          normalized.push({ type: 'sauna', name: rest });
+          seen.add(key);
+        }
+        break;
+      case 'story':
+        if (rest) {
+          normalized.push({ type: 'story', id: rest });
+          seen.add(key);
+        }
+        break;
+      case 'media':
+        if (rest) {
+          normalized.push({ type: 'media', id: rest });
+          seen.add(key);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return normalized;
+}
 
 function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback } = {}) {
   const seen = new Set();
@@ -171,6 +259,8 @@ function normalizeSettings(source, { assignMissingIds = false } = {}) {
     const filtered = Array.isArray(rawList) ? rawList.filter(type => PAGE_CONTENT_TYPE_KEYS.has(type)) : [];
     const defaultTypes = Array.isArray(def.contentTypes) ? def.contentTypes.slice() : PAGE_CONTENT_TYPES.map(([key]) => key);
     cfg.contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaultTypes;
+    const rawPlaylist = Array.isArray(cfg.playlist) ? cfg.playlist : def.playlist;
+    cfg.playlist = sanitizePagePlaylist(rawPlaylist);
     return cfg;
   };
   const pagesRaw = src.display?.pages || {};
@@ -663,28 +753,355 @@ function renderSlidesBox(){
   const f = settings.fonts || {};
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
-  const renderTypeList = (hostId, selectedList = []) => {
+  const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left', source } = {}) => {
     const host = document.getElementById(hostId);
     if (!host) return;
-    host.innerHTML = '';
-    const selected = new Set(Array.isArray(selectedList) ? selectedList.filter(key => PAGE_CONTENT_TYPE_KEYS.has(key)) : []);
-    PAGE_CONTENT_TYPES.forEach(([key, label]) => {
-      const option = document.createElement('label');
-      const input = document.createElement('input');
-      const text = document.createElement('span');
-      option.className = 'type-pill';
-      input.type = 'checkbox';
-      input.value = key;
-      input.checked = selected.has(key);
-      input.addEventListener('change', () => {
-        option.classList.toggle('is-checked', input.checked);
-      });
-      text.textContent = label;
-      option.appendChild(input);
-      option.appendChild(text);
-      if (input.checked) option.classList.add('is-checked');
-      host.appendChild(option);
+    const normalizedKey = pageKey === 'right' ? 'right' : 'left';
+    const displayCfg = settings.display = settings.display || {};
+    const pagesCfg = displayCfg.pages = displayCfg.pages || {};
+    const pageState = pagesCfg[normalizedKey] = pagesCfg[normalizedKey] || {};
+    const sanitized = sanitizePagePlaylist(Array.isArray(playlistList) ? playlistList : pageState.playlist);
+    const existing = Array.isArray(pageState.playlist) ? pageState.playlist : [];
+    if (JSON.stringify(existing) !== JSON.stringify(sanitized)) {
+      pageState.playlist = sanitized;
+    }
+
+    const { entries: baseEntries, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: false });
+    const showOverview = settings?.slides?.showOverview !== false;
+    const heroEnabled = !!(settings?.slides?.heroEnabled);
+    const allowedSetRaw = source && SOURCE_PLAYLIST_LIMITS[source] ? SOURCE_PLAYLIST_LIMITS[source] : (SOURCE_PLAYLIST_LIMITS[pageState.source] || null);
+    const allowedSet = allowedSetRaw instanceof Set ? allowedSetRaw : null;
+
+    const entryList = [];
+    const entryMap = new Map();
+    const pushEntry = (entry) => {
+      entryList.push(entry);
+      entryMap.set(entry.key, entry);
+    };
+
+    pushEntry({
+      key: 'overview',
+      kind: 'overview',
+      label: 'Übersicht',
+      thumb: THUMB_FALLBACK,
+      disabled: !showOverview,
+      statusText: showOverview ? null : 'Deaktiviert'
     });
+
+    pushEntry({
+      key: 'hero-timeline',
+      kind: 'hero-timeline',
+      label: 'Hero-Timeline',
+      thumb: THUMB_FALLBACK,
+      disabled: !heroEnabled,
+      statusText: heroEnabled ? null : 'Deaktiviert'
+    });
+
+    baseEntries.forEach(entry => {
+      if (!entry) return;
+      if (entry.kind === 'sauna') {
+        const name = entry.name || '';
+        if (!name) return;
+        pushEntry({
+          key: 'sauna:' + name,
+          kind: 'sauna',
+          name,
+          label: name,
+          thumb: settings.assets?.rightImages?.[name] || '',
+          disabled: hiddenSaunas.has(name),
+          statusText: hiddenSaunas.has(name) ? 'Ausgeblendet' : null
+        });
+      } else if (entry.kind === 'media') {
+        const id = entry.item?.id != null ? String(entry.item.id) : '';
+        if (!id) return;
+        pushEntry({
+          key: 'media:' + id,
+          kind: 'media',
+          id,
+          label: entry.item?.name || '(unbenannt)',
+          thumb: entry.item?.thumb || entry.item?.url || '',
+          disabled: entry.item?.enabled === false,
+          statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
+        });
+      } else if (entry.kind === 'story') {
+        const storyId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
+        if (!storyId) return;
+        pushEntry({
+          key: 'story:' + storyId,
+          kind: 'story',
+          id: storyId,
+          label: entry.item?.title || 'Story-Slide',
+          thumb: entry.item?.heroUrl || THUMB_FALLBACK,
+          disabled: entry.item?.enabled === false,
+          statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
+        });
+      }
+    });
+
+    entryList.forEach(entry => {
+      if (!allowedSet) return;
+      const typeKey = entry.kind;
+      if (!allowedSet.has(typeKey)) {
+        entry.disabled = true;
+        entry.statusText = entry.statusText || 'Nicht verfügbar (Quelle)';
+      }
+    });
+
+    const selectedKeys = sanitized.map(playlistKeyFromSanitizedEntry).filter(Boolean);
+    const orderList = [];
+    const seenKeys = new Set();
+    selectedKeys.forEach(key => {
+      const entry = entryMap.get(key);
+      if (entry && !seenKeys.has(key)) {
+        orderList.push(entry);
+        seenKeys.add(key);
+      }
+    });
+    entryList.forEach(entry => {
+      if (!seenKeys.has(entry.key)) {
+        orderList.push(entry);
+        seenKeys.add(entry.key);
+      }
+    });
+
+    const selected = new Set();
+    selectedKeys.forEach(key => {
+      if (seenKeys.has(key)) selected.add(key);
+    });
+
+    host.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'slide-order-grid';
+    host.appendChild(grid);
+
+    const DROP_BEFORE = 'drop-before';
+    const DROP_AFTER = 'drop-after';
+    let draggedEntry = null;
+
+    const clearDropIndicators = () => {
+      grid.querySelectorAll('.slide-order-tile').forEach(tile => tile.classList.remove(DROP_BEFORE, DROP_AFTER));
+    };
+
+    const isBeforeTarget = (event, target) => {
+      const rect = target.getBoundingClientRect();
+      const horizontal = rect.width > rect.height;
+      return horizontal
+        ? (event.clientX < rect.left + rect.width / 2)
+        : (event.clientY < rect.top + rect.height / 2);
+    };
+
+    const commitPlaylist = () => {
+      const next = [];
+      for (const entry of orderList) {
+        if (!selected.has(entry.key)) continue;
+        switch (entry.kind) {
+          case 'overview':
+            next.push({ type: 'overview' });
+            break;
+          case 'hero-timeline':
+            next.push({ type: 'hero-timeline' });
+            break;
+          case 'sauna':
+            next.push({ type: 'sauna', name: entry.name });
+            break;
+          case 'media':
+            next.push({ type: 'media', id: entry.id });
+            break;
+          case 'story':
+            next.push({ type: 'story', id: entry.id });
+            break;
+          default:
+            break;
+        }
+      }
+      const prevStr = JSON.stringify(Array.isArray(pageState.playlist) ? pageState.playlist : []);
+      const nextStr = JSON.stringify(next);
+      pageState.playlist = next;
+      if (prevStr !== nextStr) {
+        setUnsavedState(true);
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      }
+    };
+
+    const moveEntry = (entry, dir) => {
+      const idx = orderList.indexOf(entry);
+      if (idx === -1) return;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= orderList.length) return;
+      orderList.splice(idx, 1);
+      orderList.splice(newIdx, 0, entry);
+      commitPlaylist();
+      renderTiles();
+    };
+
+    const reorderEntries = (source, target, before) => {
+      const fromIdx = orderList.indexOf(source);
+      const toIdx = orderList.indexOf(target);
+      if (fromIdx === -1 || toIdx === -1 || source === target) return;
+      orderList.splice(fromIdx, 1);
+      let insertIdx = before ? toIdx : toIdx + 1;
+      if (insertIdx > fromIdx) insertIdx--;
+      orderList.splice(insertIdx, 0, source);
+      commitPlaylist();
+      renderTiles();
+    };
+
+    const toggleEntry = (entry) => {
+      const isSelected = selected.has(entry.key);
+      if (entry.disabled && !isSelected) return;
+      if (isSelected) selected.delete(entry.key);
+      else selected.add(entry.key);
+      commitPlaylist();
+      renderTiles();
+    };
+
+    const renderTiles = () => {
+      grid.innerHTML = '';
+      orderList.forEach((entry, idx) => {
+        const tile = document.createElement('div');
+        tile.className = 'slide-order-tile';
+        tile.dataset.key = entry.key;
+        tile.dataset.idx = String(idx);
+        const isSelected = selected.has(entry.key);
+        if (!isSelected) tile.classList.add('is-unselected');
+        if (entry.disabled) tile.classList.add('is-disabled');
+        if (entry.kind === 'sauna' && hiddenSaunas.has(entry.name)) tile.classList.add('is-hidden');
+
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = entry.label || '';
+        tile.appendChild(title);
+
+        if (entry.statusText) {
+          const statusEl = document.createElement('div');
+          statusEl.className = 'slide-status';
+          statusEl.textContent = entry.statusText;
+          tile.appendChild(statusEl);
+        }
+
+        if (entry.thumb) {
+          const img = document.createElement('img');
+          img.src = entry.thumb;
+          img.alt = entry.label || '';
+          tile.appendChild(img);
+        }
+
+        const stateBadge = document.createElement('div');
+        stateBadge.className = 'playlist-state';
+        stateBadge.textContent = isSelected ? 'Aktiv' : 'Inaktiv';
+        tile.appendChild(stateBadge);
+
+        if (isSelected) {
+          const controls = document.createElement('div');
+          controls.className = 'reorder-controls';
+
+          const makeCtrlButton = (dir, label) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `reorder-btn ${dir > 0 ? 'reorder-down' : 'reorder-up'}`;
+            btn.title = label;
+            btn.setAttribute('aria-label', label);
+            btn.innerHTML = dir < 0
+              ? '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="M8 3.5 12.5 8l-.7.7L8 4.9 4.2 8.7l-.7-.7Z"/></svg>'
+              : '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="m8 12.5-4.5-4.5.7-.7L8 11.1l3.8-3.8.7.7Z"/></svg>';
+            btn.addEventListener('click', ev => {
+              ev.stopPropagation();
+              moveEntry(entry, dir);
+            });
+            btn.addEventListener('pointerdown', ev => ev.stopPropagation());
+            btn.addEventListener('mousedown', ev => ev.stopPropagation());
+            btn.addEventListener('touchstart', ev => ev.stopPropagation());
+            btn.draggable = false;
+            return btn;
+          };
+
+          controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben'));
+          controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben'));
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'reorder-btn playlist-remove';
+          removeBtn.innerHTML = '✕';
+          removeBtn.title = 'Aus Playlist entfernen';
+          removeBtn.setAttribute('aria-label', 'Aus Playlist entfernen');
+          removeBtn.addEventListener('click', ev => {
+            ev.stopPropagation();
+            selected.delete(entry.key);
+            commitPlaylist();
+            renderTiles();
+          });
+          controls.appendChild(removeBtn);
+          tile.appendChild(controls);
+        }
+
+        tile.addEventListener('click', ev => {
+          if (ev.target.closest('.reorder-controls')) return;
+          toggleEntry(entry);
+        });
+
+        if (selected.has(entry.key)) {
+          tile.draggable = true;
+          tile.addEventListener('dragstart', ev => {
+            draggedEntry = entry;
+            tile.classList.add('dragging');
+            ev.dataTransfer?.setData('text/plain', entry.key);
+            ev.dataTransfer.effectAllowed = 'move';
+          });
+          tile.addEventListener('dragend', () => {
+            draggedEntry = null;
+            tile.classList.remove('dragging');
+            clearDropIndicators();
+          });
+        } else {
+          tile.draggable = false;
+        }
+
+        tile.addEventListener('dragenter', ev => {
+          if (!draggedEntry || draggedEntry === entry) return;
+          ev.preventDefault();
+          const before = isBeforeTarget(ev, tile);
+          clearDropIndicators();
+          tile.classList.add(before ? DROP_BEFORE : DROP_AFTER);
+        });
+
+        tile.addEventListener('dragover', ev => {
+          if (!draggedEntry || draggedEntry === entry) return;
+          ev.preventDefault();
+          const before = isBeforeTarget(ev, tile);
+          clearDropIndicators();
+          tile.classList.add(before ? DROP_BEFORE : DROP_AFTER);
+        });
+
+        tile.addEventListener('dragleave', ev => {
+          if (tile.contains(ev.relatedTarget)) return;
+          tile.classList.remove(DROP_BEFORE, DROP_AFTER);
+        });
+
+        tile.addEventListener('drop', ev => {
+          if (!draggedEntry || draggedEntry === entry) return;
+          ev.preventDefault();
+          const before = isBeforeTarget(ev, tile);
+          clearDropIndicators();
+          reorderEntries(draggedEntry, entry, before);
+        });
+
+        grid.appendChild(tile);
+      });
+    };
+
+    if (!grid.dataset.dndBound) {
+      grid.addEventListener('dragover', ev => {
+        if (draggedEntry) ev.preventDefault();
+      });
+      grid.addEventListener('drop', ev => {
+        if (draggedEntry) ev.preventDefault();
+        draggedEntry = null;
+        clearDropIndicators();
+      });
+      grid.dataset.dndBound = '1';
+    }
+
+    renderTiles();
   };
 
   // Schrift
@@ -731,8 +1148,8 @@ function renderSlidesBox(){
   setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(rightCfg.source) ? rightCfg.source : 'media');
   setV('#pageLeftTimer', leftCfg.timerSec ?? '');
   setV('#pageRightTimer', rightCfg.timerSec ?? '');
-  renderTypeList('pageLeftTypes', leftCfg.contentTypes);
-  renderTypeList('pageRightTypes', rightCfg.contentTypes);
+  renderPagePlaylist('pageLeftPlaylist', leftCfg.playlist, { pageKey: 'left', source: leftCfg.source });
+  renderPagePlaylist('pageRightPlaylist', rightCfg.playlist, { pageKey: 'right', source: rightCfg.source });
   const layoutModeSelect = document.getElementById('layoutMode');
   const applyLayoutVisibility = (mode) => {
     const rightWrap = document.getElementById('layoutRight');
@@ -742,6 +1159,18 @@ function renderSlidesBox(){
   if (layoutModeSelect) {
     layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
   }
+
+  const bindPlaylistSource = (selectId, pageKey, hostId) => {
+    const el = document.getElementById(selectId);
+    if (!el || el.dataset.playlistBound === '1') return;
+    el.addEventListener('change', () => {
+      const pageCfg = ((settings.display || {}).pages || {})[pageKey] || {};
+      renderPagePlaylist(hostId, pageCfg.playlist, { pageKey, source: el.value });
+    });
+    el.dataset.playlistBound = '1';
+  };
+  bindPlaylistSource('pageLeftSource', 'left', 'pageLeftPlaylist');
+  bindPlaylistSource('pageRightSource', 'right', 'pageRightPlaylist');
 
   // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');
@@ -781,8 +1210,18 @@ function renderSlidesBox(){
     setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(defRight.source) ? defRight.source : 'media');
     setV('#pageLeftTimer', defLeft.timerSec ?? '');
     setV('#pageRightTimer', defRight.timerSec ?? '');
-    renderTypeList('pageLeftTypes', defLeft.contentTypes);
-    renderTypeList('pageRightTypes', defRight.contentTypes);
+    const defLeftPlaylist = sanitizePagePlaylist(defLeft.playlist);
+    const defRightPlaylist = sanitizePagePlaylist(defRight.playlist);
+    const displayCfg = settings.display = settings.display || {};
+    const pagesCfg = displayCfg.pages = displayCfg.pages || {};
+    const leftState = pagesCfg.left = pagesCfg.left || {};
+    const rightState = pagesCfg.right = pagesCfg.right || {};
+    leftState.contentTypes = Array.isArray(defLeft.contentTypes) ? defLeft.contentTypes.slice() : [];
+    rightState.contentTypes = Array.isArray(defRight.contentTypes) ? defRight.contentTypes.slice() : [];
+    leftState.playlist = defLeftPlaylist;
+    rightState.playlist = defRightPlaylist;
+    renderPagePlaylist('pageLeftPlaylist', defLeftPlaylist, { pageKey: 'left', source: defLeft.source });
+    renderPagePlaylist('pageRightPlaylist', defRightPlaylist, { pageKey: 'right', source: defRight.source });
     applyLayoutVisibility(DEFAULTS.display.layoutMode || 'single');
   };
 }
@@ -1007,17 +1446,20 @@ function collectSettings(){
     const num = Number(val);
     return Number.isFinite(num) && num > 0 ? Math.max(1, Math.round(num)) : null;
   };
-  const collectTypes = (hostId) => {
-    const host = document.getElementById(hostId);
-    if (!host) return [];
-    return Array.from(host.querySelectorAll('input[type=checkbox]:checked'))
-      .map(input => input.value)
-      .filter(value => PAGE_CONTENT_TYPE_KEYS.has(value));
-  };
   const getSourceValue = (id, fallback) => {
     const el = document.getElementById(id);
     const val = el?.value || fallback;
     return PAGE_SOURCE_KEYS.includes(val) ? val : fallback;
+  };
+  const collectPlaylist = (pageState) => {
+    const sanitized = sanitizePagePlaylist(pageState?.playlist);
+    return sanitized.map(entry => ({ ...entry }));
+  };
+  const getContentTypes = (pageState, defaults) => {
+    const list = Array.isArray(pageState?.contentTypes) ? pageState.contentTypes.filter(type => PAGE_CONTENT_TYPE_KEYS.has(type)) : [];
+    if (list.length) return Array.from(new Set(list));
+    const fallback = Array.isArray(defaults?.contentTypes) ? defaults.contentTypes : [];
+    return fallback.slice();
   };
   settings.presets ||= {};
   settings.presets[getActiveDayKey()] = deepClone(schedule);
@@ -1121,13 +1563,15 @@ function collectSettings(){
             ...(((settings.display||{}).pages||{}).left||{}),
             source:getSourceValue('pageLeftSource', 'master'),
             timerSec:sanitizeTimer(document.getElementById('pageLeftTimer')?.value),
-            contentTypes:collectTypes('pageLeftTypes')
+            contentTypes:getContentTypes(((settings.display||{}).pages||{}).left, DEFAULTS.display?.pages?.left),
+            playlist:collectPlaylist(((settings.display||{}).pages||{}).left)
           },
           right:{
             ...(((settings.display||{}).pages||{}).right||{}),
             source:getSourceValue('pageRightSource', 'media'),
             timerSec:sanitizeTimer(document.getElementById('pageRightTimer')?.value),
-            contentTypes:collectTypes('pageRightTypes')
+            contentTypes:getContentTypes(((settings.display||{}).pages||{}).right, DEFAULTS.display?.pages?.right),
+            playlist:collectPlaylist(((settings.display||{}).pages||{}).right)
           }
         }
       },

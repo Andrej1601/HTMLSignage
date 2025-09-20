@@ -2099,8 +2099,8 @@ function renderStorySlide(story = {}, region = 'left') {
 
   const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story'];
   const PAGE_DEFAULTS = {
-    left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'] },
-    right:{ source:'media',  timerSec:null, contentTypes:['image','video','url'] }
+    left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'], playlist:[] },
+    right:{ source:'media',  timerSec:null, contentTypes:['image','video','url'], playlist:[] }
   };
   const SOURCE_FILTERS = {
     master: null,
@@ -2400,8 +2400,112 @@ function renderStorySlide(story = {}, region = 'left') {
     return masterQueue.filter(item => allowed.has(item.type));
   }
 
+  function playlistEntryKeyFromConfig(entry){
+    if (!entry || typeof entry !== 'object') return null;
+    let type = String(entry.type || '').trim();
+    if (!type) return null;
+    if (type === 'image' || type === 'video' || type === 'url') type = 'media';
+    switch (type) {
+      case 'overview':
+      case 'hero-timeline':
+        return type;
+      case 'sauna': {
+        const name = typeof entry.name === 'string' ? entry.name : (typeof entry.sauna === 'string' ? entry.sauna : '');
+        return name ? 'sauna:' + name : null;
+      }
+      case 'story': {
+        const rawId = entry.id ?? entry.storyId;
+        return rawId != null ? 'story:' + String(rawId) : null;
+      }
+      case 'media': {
+        const rawId = entry.id ?? entry.mediaId ?? entry.__id ?? entry.slug;
+        return rawId != null ? 'media:' + String(rawId) : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  function sanitizePlaylistConfig(list){
+    if (!Array.isArray(list)) return [];
+    const normalized = [];
+    const seen = new Set();
+    for (const entry of list){
+      const key = playlistEntryKeyFromConfig(entry);
+      if (!key || seen.has(key)) continue;
+      const [prefix, rest] = key.split(':');
+      switch (prefix) {
+        case 'overview':
+        case 'hero-timeline':
+          normalized.push({ type: prefix });
+          seen.add(key);
+          break;
+        case 'sauna':
+          if (rest) {
+            normalized.push({ type: 'sauna', name: rest });
+            seen.add(key);
+          }
+          break;
+        case 'story':
+          if (rest) {
+            normalized.push({ type: 'story', id: rest });
+            seen.add(key);
+          }
+          break;
+        case 'media':
+          if (rest) {
+            normalized.push({ type: 'media', id: rest });
+            seen.add(key);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    return normalized;
+  }
+
+  function playlistKeyForQueueItem(item){
+    if (!item) return null;
+    if (item.type === 'overview') return 'overview';
+    if (item.type === 'hero-timeline') return 'hero-timeline';
+    if (item.type === 'sauna') {
+      const name = item.sauna || item.name;
+      return name ? 'sauna:' + name : null;
+    }
+    if (item.type === 'story') {
+      const id = item.storyId ?? item.story?.id;
+      return id != null ? 'story:' + String(id) : null;
+    }
+    if (item.type === 'image' || item.type === 'video' || item.type === 'url') {
+      const id = item.__id ?? item.id ?? null;
+      return id != null ? 'media:' + String(id) : null;
+    }
+    return null;
+  }
+
   function filterQueueForPage(masterQueue, pageConfig){
     const base = baseQueueForSource(masterQueue, pageConfig?.source || 'master');
+    const playlist = Array.isArray(pageConfig?.playlist) ? sanitizePlaylistConfig(pageConfig.playlist) : [];
+    if (playlist.length){
+      const buckets = new Map();
+      base.forEach(item => {
+        const key = playlistKeyForQueueItem(item);
+        if (!key) return;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(item);
+      });
+      const ordered = [];
+      playlist.forEach(entry => {
+        const key = playlistEntryKeyFromConfig(entry);
+        if (!key) return;
+        const bucket = buckets.get(key);
+        if (bucket && bucket.length) {
+          ordered.push(bucket.shift());
+        }
+      });
+      if (ordered.length) return ordered;
+    }
     const types = Array.isArray(pageConfig?.contentTypes) && pageConfig.contentTypes.length
       ? new Set(pageConfig.contentTypes)
       : null;
@@ -2422,7 +2526,9 @@ function renderStorySlide(story = {}, region = 'left') {
     const rawTypes = Array.isArray(raw.contentTypes) ? raw.contentTypes : defaults.contentTypes;
     const filtered = rawTypes.filter(type => VALID_CONTENT_TYPES.includes(type));
     const contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaults.contentTypes;
-    return { id, enabled, source, timerSec, contentTypes };
+    const rawPlaylist = Array.isArray(raw.playlist) ? raw.playlist : defaults.playlist;
+    const playlist = sanitizePlaylistConfig(rawPlaylist);
+    return { id, enabled, source, timerSec, contentTypes, playlist };
   }
 
   async function preloadUpcomingForStage(controller, { offset = 0 } = {}){
@@ -2461,12 +2567,12 @@ function renderStorySlide(story = {}, region = 'left') {
     const rightCfg = getPageConfig('right');
     stageLeftController.apply(
       filterQueueForPage(masterQueue, leftCfg),
-      { enabled: leftCfg.enabled, timerSec: leftCfg.timerSec, source: leftCfg.source, contentTypes: leftCfg.contentTypes },
+      { enabled: leftCfg.enabled, timerSec: leftCfg.timerSec, source: leftCfg.source, contentTypes: leftCfg.contentTypes, playlist: leftCfg.playlist },
       { resetIndex }
     );
     stageRightController.apply(
       filterQueueForPage(masterQueue, rightCfg),
-      { enabled: rightCfg.enabled, timerSec: rightCfg.timerSec, source: rightCfg.source, contentTypes: rightCfg.contentTypes },
+      { enabled: rightCfg.enabled, timerSec: rightCfg.timerSec, source: rightCfg.source, contentTypes: rightCfg.contentTypes, playlist: rightCfg.playlist },
       { resetIndex }
     );
     updateLayoutModeAttr(rightCfg.enabled ? 'split' : 'single');
