@@ -9,7 +9,8 @@ header('Cache-Control: no-store');
 
 $db = devices_load();
 $now = time();
-if (!defined('OFFLINE_AFTER_MIN')) define('OFFLINE_AFTER_MIN', 10);
+// Geräte gelten nach dieser Anzahl von Minuten ohne Heartbeat als offline.
+if (!defined('OFFLINE_AFTER_MIN')) define('OFFLINE_AFTER_MIN', 2);
 
 $pairings = [];
 foreach (($db['pairings'] ?? []) as $code => $row) {

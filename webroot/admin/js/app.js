@@ -761,8 +761,9 @@ async function createDevicesPane(){
     return normalizeSeconds(value);
   };
 
+  const OFFLINE_AFTER_MIN = 2;
+
   async function fetchDevicesStatus(){
-    const OFFLINE_AFTER_MIN = 10;
     try {
       const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
       if (r.ok) {
@@ -856,7 +857,7 @@ async function createDevicesPane(){
         const seen = lastSeenAt ? new Date(lastSeenAt*1000).toLocaleString('de-DE') : '—';
         const offline = typeof d.offline === 'boolean'
           ? d.offline
-          : (!lastSeenAt || (now - lastSeenAt) > 10*60);
+          : (!lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60);
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');
