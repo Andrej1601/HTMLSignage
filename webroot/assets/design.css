@@ -32,7 +32,8 @@
   --baseW:1920px;
   --tileMinScale:0.25; --tileMaxScale:0.57;
   --tileTargetPx:860px;
-  --tileIconSizePx:calc(96px*var(--vwScale));
+  --tileIconSizePx:calc(84px*var(--vwScale));
+  --tileIconColumnPx:calc(72px*var(--vwScale));
   --tilePadXPx:calc(20px*var(--vwScale));
   --tilePadYPx:calc(18px*var(--vwScale));
   --tileGapPx:calc(18px*var(--vwScale));
@@ -41,6 +42,8 @@
   --tileRadiusPx:calc(22px*var(--vwScale));
   --tileBadgeOffsetPx:calc(12px*var(--vwScale));
   --tileMetaScale:1;
+  --tileMinHeightPx:calc(120px*var(--vwScale));
+  --tileIconHeightScale:.9;
   --badgeBg:var(--accent);
   --badgeFg:var(--boxfg);
   --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
@@ -278,12 +281,18 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 .tile{
   position:relative;
   display:grid;
-  grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;
+  grid-template-columns:
+    minmax(0, var(--tileIconColumnPx, var(--tileIconSizePx, calc(84px*var(--vwScale)))))
+    minmax(0,1fr)
+    auto;
   align-items:center;
   gap:var(--tileGapPx, calc(18px*var(--vwScale)));
   width: clamp(calc(var(--baseW)*var(--tileMinScale)*var(--vwScale)), var(--tileTargetPx), calc(var(--baseW)*var(--tileMaxScale)*var(--vwScale)));
   padding:var(--tilePadYPx, calc(18px*var(--vwScale))) var(--tilePadXPx, calc(20px*var(--vwScale)));
-  min-height:calc(var(--tileIconSizePx, 96px) + var(--tilePadYPx, 18px) * 2);
+  min-height:calc(
+    max(var(--tileMinHeightPx, 0px), var(--tileIconSizePx, 0px) * var(--tileIconHeightScale, .9))
+    + var(--tilePadYPx, calc(18px*var(--vwScale))) * 2
+  );
   background:var(--cell);
   border:calc(var(--tileBorderW)*var(--vwScale)) solid var(--tileBorder);
   border-radius:var(--tileRadiusPx, calc(22px*var(--vwScale)));
@@ -308,18 +317,28 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 }
 .tile > *{position:relative; z-index:1;}
 .tile .card-icon{
-  width:var(--tileIconSizePx, calc(96px*var(--vwScale)));
-  height:var(--tileIconSizePx, calc(96px*var(--vwScale)));
+  position:relative;
+  width:var(--tileIconSizePx, calc(84px*var(--vwScale)));
+  height:var(--tileIconSizePx, calc(84px*var(--vwScale)));
   display:flex;
   align-items:center;
   justify-content:center;
-  border-radius:calc(var(--tileIconSizePx, 96px) * .28);
-  background:rgba(0,0,0,.35);
-  box-shadow:0 10px 26px rgba(0,0,0,.3);
+  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .26);
+  background:color-mix(in srgb, var(--fg) 45%, transparent);
+  box-shadow:0 12px 30px rgba(0,0,0,.28);
   overflow:hidden;
+  isolation:isolate;
+  transition:border-radius .25s ease, transform .25s ease;
 }
 .tile .card-icon.is-empty{background:rgba(0,0,0,.22);}
-.tile .card-icon img{width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));}
+.tile .card-icon img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  display:block;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));
+  background:transparent;
+}
 .tile .card-icon__fallback{
   font-size:calc(32px*var(--scale));
   font-weight:700;
@@ -327,12 +346,54 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   text-transform:uppercase;
   opacity:.8;
 }
+.tile .card-icon.card-icon--round,
+.tile .card-icon.card-icon--badge{
+  border-radius:999px;
+}
+.tile .card-icon.card-icon--badge{
+  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .82);
+  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .82);
+  border:1px solid color-mix(in srgb, var(--boxfg) 45%, transparent);
+  background:color-mix(in srgb, var(--boxfg) 16%, transparent);
+  box-shadow:0 10px 24px rgba(0,0,0,.26);
+}
+.tile .card-icon.card-icon--strip{
+  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * 1.45);
+  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .64);
+  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .24);
+  justify-content:flex-start;
+  padding-inline:calc(var(--tilePadXPx, 20px) * .35);
+  background:linear-gradient(135deg, rgba(0,0,0,.36), rgba(0,0,0,.18));
+}
+.tile .card-icon.card-icon--strip img{
+  object-fit:cover;
+}
+.tile .card-icon.card-icon--overlay{
+  position:absolute;
+  top:var(--tilePadYPx, calc(18px*var(--vwScale)));
+  inset-inline-start:var(--tilePadXPx, calc(20px*var(--vwScale)));
+  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .74);
+  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .74);
+  box-shadow:0 12px 32px rgba(0,0,0,.32);
+  opacity:.96;
+  pointer-events:none;
+  backdrop-filter:blur(2px);
+}
 .container.no-card-icons{ --tileIconSizePx:0px; }
+.container.no-card-icons{ --tileIconColumnPx:0px; }
 .tile.tile--compact{
   grid-template-columns:minmax(0,1fr) auto;
   min-height:auto;
 }
 .tile.tile--compact .card-icon{ display:none; }
+.tile.tile--icon-badge{ --tileIconColumnPx:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .78); }
+.tile.tile--icon-strip{ --tileIconColumnPx:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * 1.38); }
+.tile.tile--icon-overlay{
+  --tileIconColumnPx:0px;
+}
+.tile.tile--icon-overlay .card-content{
+  padding-inline-start:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .45 + var(--tileContentGapPx, calc(10px*var(--vwScale))));
+}
 .container.no-card-icons .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
 .card-content{
   display:flex;
