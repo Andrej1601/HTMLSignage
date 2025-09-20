@@ -1194,7 +1194,109 @@ function renderStorySlide(story = {}) {
     ]);
   };
 
+  const richSectionNodes = () => {
+    const items = Array.isArray(data.sections) ? data.sections : [];
+    const nodes = [];
+    items.forEach(entry => {
+      if (!entry || typeof entry !== 'object') return;
+      const title = String(entry.title || '').trim();
+      let textSource = entry.text;
+      if (Array.isArray(textSource)) textSource = textSource.join('\n\n');
+      const text = paragraphNodes(textSource);
+      let tipSource = entry.tips;
+      if (tipSource == null && Array.isArray(entry.list)) tipSource = entry.list;
+      if (Array.isArray(tipSource)) tipSource = tipSource.join('\n');
+      const tips = tipsNodes(tipSource);
+      const allContent = [];
+      if (title) allContent.push(h('h3', { class: 'story-section-title' }, title));
+      allContent.push(...text);
+      allContent.push(...tips);
+      const hasContent = allContent.length > 0;
+      const imgUrl = entry.imageUrl || entry.mediaUrl || '';
+      const imgAlt = entry.imageAlt || '';
+      const imgCaption = entry.imageCaption || '';
+      const layoutRaw = String(entry.layout || '').trim();
+      const layout = ['media-left', 'media-right', 'full'].includes(layoutRaw) ? layoutRaw : 'media-right';
+      if (!hasContent && !imgUrl) return;
+      const sectionClass = ['story-section', 'story-section-rich'];
+      if (imgUrl) {
+        sectionClass.push('has-media');
+        sectionClass.push('layout-' + layout);
+      }
+      const section = h('div', { class: sectionClass.join(' ') });
+      const body = h('div', { class: 'story-section-content' }, allContent);
+      let figure = null;
+      if (imgUrl) {
+        const img = h('img', { src: imgUrl, alt: imgAlt });
+        figure = h('figure', { class: 'story-section-media' }, [
+          img,
+          imgCaption ? h('figcaption', imgCaption) : null
+        ].filter(Boolean));
+        img.addEventListener('error', () => {
+          figure.classList.add('is-error');
+          figure.replaceChildren(h('div', { class: 'story-section-media-fallback' }, 'Bild nicht verfügbar'));
+        });
+      }
+
+      if (figure) {
+        if (layout === 'media-left') {
+          section.appendChild(figure);
+          section.appendChild(body);
+        } else if (layout === 'full') {
+          section.appendChild(body);
+          section.appendChild(figure);
+        } else {
+          section.appendChild(body);
+          section.appendChild(figure);
+        }
+      } else {
+        section.appendChild(body);
+      }
+      nodes.push(section);
+    });
+    return nodes;
+  };
+
+  const gallerySection = () => {
+    const list = Array.isArray(data.gallery) ? data.gallery : [];
+    const normalized = list
+      .map(entry => {
+        if (!entry) return null;
+        if (typeof entry === 'string') {
+          return { url: entry, alt: '', caption: '' };
+        }
+        const url = entry.url || entry.imageUrl || '';
+        if (!url) return null;
+        return {
+          url,
+          alt: entry.alt || entry.imageAlt || '',
+          caption: entry.caption || ''
+        };
+      })
+      .filter(Boolean);
+    if (!normalized.length) return null;
+    const grid = h('div', { class: 'story-gallery-grid' });
+    normalized.forEach(item => {
+      const img = h('img', { src: item.url, alt: item.alt || '' });
+      const figure = h('figure', { class: 'story-gallery-item' }, [
+        img,
+        item.caption ? h('figcaption', item.caption) : null
+      ].filter(Boolean));
+      img.addEventListener('error', () => {
+        figure.classList.add('is-error');
+        figure.replaceChildren(h('div', { class: 'story-gallery-fallback' }, 'Bild nicht verfügbar'));
+      });
+      grid.appendChild(figure);
+    });
+    const label = String(data.galleryTitle || '').trim() || 'Galerie';
+    return h('div', { class: 'story-section story-gallery' }, [
+      h('h3', { class: 'story-section-title' }, label),
+      grid
+    ]);
+  };
+
   const introSection = makeSection('story-intro', 'Einführung', paragraphNodes(data.intro));
+  richSectionNodes().forEach(node => content.appendChild(node));
   if (introSection) content.appendChild(introSection);
 
   const ritualSection = makeSection('story-ritual', 'Ritual', paragraphNodes(data.ritual));
@@ -1202,6 +1304,9 @@ function renderStorySlide(story = {}) {
 
   const tipsSection = makeSection('story-tips', 'Tipps', tipsNodes(data.tips));
   if (tipsSection) content.appendChild(tipsSection);
+
+  const galleryNode = gallerySection();
+  if (galleryNode) content.appendChild(galleryNode);
 
   const faqItems = Array.isArray(data.faq) ? data.faq.filter(item => {
     if (!item) return false;
