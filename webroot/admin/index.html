@@ -45,7 +45,10 @@
       <button class="btn" id="btnHelp">Hilfe</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
-      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">Änderungen noch nicht gespeichert</span>
+      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
+        <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
+        <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
+      </span>
     </div>
   </header>
 
