@@ -345,37 +345,16 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 }
 .tile .title .label{display:flex;align-items:baseline;gap:.35em;flex-wrap:wrap;min-width:0;}
 .tile .title .label .notewrap{flex:0 0 auto;}
-.card-content .description{
+.tile .aroma{
   display:block;
   font-size:calc(22px*var(--scale)*var(--tileMetaScale,1));
   font-weight:500;
   letter-spacing:.02em;
   opacity:.9;
-  color:rgba(255,255,255,.82);
-  margin:0;
+  color:rgba(255,255,255,.8);
+  font-style:normal;
 }
-.aroma-list{
-  display:flex;
-  flex-wrap:wrap;
-  gap:var(--tileChipGapPx, calc(8px*var(--vwScale)));
-  padding:0;
-  margin:0;
-  list-style:none;
-  font-size:calc(18px*var(--scale)*var(--tileMetaScale,1));
-  font-weight:500;
-  letter-spacing:.02em;
-  color:rgba(255,255,255,.78);
-}
-.aroma-list li{
-  padding:.35em .9em;
-  border-radius:999px;
-  background:rgba(0,0,0,.22);
-}
-.aroma-list.is-italic li{font-style:italic;}
-.badge-row{
-  display:flex;
-  align-items:center;
-}
+.tile .aroma.is-italic{font-style:italic;}
 .tile .badge{
   display:inline-flex;
   align-items:center;
@@ -417,10 +396,6 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
   max-width:100%;
   overflow:hidden;
   text-overflow:ellipsis;
-}
-.card-empty{
-  font-size:calc(18px*var(--scale)*var(--tileMetaScale,1));
-  opacity:.72;
 }
 .card-chip--status{
   position:absolute;
@@ -497,22 +472,12 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 .story-slide .story-faq-list dd{margin:0; opacity:.9;}
 .story-slide .story-availability{margin-top:auto; padding:clamp(16px, 2vh, 24px); border-radius:22px; background:linear-gradient(135deg, rgba(255,255,255,.88), rgba(255,255,255,.45)); box-shadow:0 18px 40px rgba(0,0,0,.18); border-left:6px solid var(--accent);}
 .story-slide .story-availability-list{margin:0; padding:0; list-style:none; display:grid; gap:8px; font-size:calc(22px*var(--scale));}
-.story-slide .story-availability-item{display:flex; flex-direction:column; gap:8px; align-items:stretch; padding:10px 12px; border-radius:14px; background:rgba(0,0,0,.05);}
+.story-slide .story-availability-item{display:grid; grid-template-columns:minmax(0,8ch) minmax(0,1fr); gap:14px; align-items:baseline; padding:6px 10px; border-radius:14px; background:rgba(0,0,0,.05);}
 .story-slide .story-availability-item.is-upcoming{background:rgba(255,221,102,.28);}
 .story-slide .story-availability-item.is-next{background:rgba(255,221,102,.48); box-shadow:0 0 0 2px rgba(92,49,1,.18);}
-.story-slide .story-availability-head{display:grid; grid-template-columns:minmax(0,8ch) minmax(0,1fr); gap:12px; align-items:baseline;}
 .story-slide .story-availability-time{font-variant-numeric:tabular-nums; font-weight:700;}
-.story-slide .story-availability-headline{display:flex; flex-direction:column; gap:2px; min-width:0;}
 .story-slide .story-availability-sauna{font-weight:600;}
 .story-slide .story-availability-title{opacity:.9;}
-.story-slide .story-availability-description{margin:0; font-size:calc(21px*var(--scale)); line-height:1.45; opacity:.92;}
-.story-slide .story-availability-aromas{margin:0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:6px; font-size:calc(20px*var(--scale)); opacity:.85;}
-.story-slide .story-availability-aromas li{padding:.3em .8em; border-radius:999px; background:rgba(0,0,0,.08);}
-.story-slide .story-availability-facts{margin:0; padding:0; list-style:none; display:flex; flex-wrap:wrap; gap:6px;}
-.story-slide .story-card-chip{background:rgba(0,0,0,.12); border-color:rgba(0,0,0,.15); color:inherit;}
-.story-slide .story-availability-badges{display:flex; flex-wrap:wrap; gap:6px;}
-.story-slide .story-availability-badges .badge{box-shadow:none; font-size:calc(18px*var(--scale)); padding:.3em .8em;}
-.story-slide .story-availability-empty-detail{font-style:italic; opacity:.65; font-size:calc(18px*var(--scale));}
 .story-slide .story-availability-empty{margin:0; font-style:italic; opacity:.75; font-size:calc(21px*var(--scale));}
 
 @media (max-width: 1366px), (max-aspect-ratio: 4/3){

@@ -384,9 +384,7 @@ async function enterDeviceContext(id, name){
     getSchedule:()=>schedule,
     getSettings:()=>settings,
     setSchedule:(s)=>{schedule=s;},
-    setSettings:(cs)=>{settings=cs;},
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
+    setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
   window.__refreshDevicesPane?.();
@@ -414,9 +412,7 @@ function exitDeviceContext(){
     getSchedule:()=>schedule,
     getSettings:()=>settings,
     setSchedule:(s)=>{schedule=s;},
-    setSettings:(cs)=>{settings=cs;},
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
+    setSettings:(cs)=>{settings=cs;}
   });
   renderContextBadge();
   window.__refreshDevicesPane?.();
@@ -481,9 +477,7 @@ async function loadAll(){
     getSchedule : () => schedule,
     getSettings : () => settings,
     setSchedule : (s)  => { schedule = s; },
-    setSettings : (cs) => { settings = cs; },
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
+    setSettings : (cs) => { settings = cs; }
   });
 
   initGridDayLoader({
