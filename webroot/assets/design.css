@@ -391,11 +391,13 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   border-radius:999px;
   background:rgba(0,0,0,.22);
 }
-.aroma-list.is-italic li{font-style:italic;}
 .badge-row{
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
+  gap:var(--tileChipGapPx, calc(8px*var(--vwScale)));
 }
+.badge-row .badge{margin:0;}
 .tile .badge{
   display:inline-flex;
   align-items:center;
@@ -411,6 +413,8 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   box-shadow:0 12px 24px rgba(0,0,0,.28);
 }
 .tile .badge .badge-icon{line-height:1;font-size:1.1em;}
+.badge .badge-icon--image{display:inline-flex;align-items:center;justify-content:center;line-height:1;}
+.badge .badge-icon--image img{display:block;width:1.1em;height:1.1em;object-fit:contain;}
 .tile .badge .badge-label{white-space:nowrap;}
 .facts{
   display:flex;
