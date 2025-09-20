@@ -1819,19 +1819,26 @@ function collectStoryImageUrls(story, limit = 3) {
 
 function renderStorySlide(story = {}, region = 'left') {
   const normalized = normalizeStoryForRender(story || {});
-  const layoutClass = normalized.layout === 'double' ? 'story-layout-double' : 'story-layout-single';
+  const normalizedColumns = Array.isArray(normalized.columns) ? normalized.columns : [];
+  const hasDoubleLayout = normalized.layout === 'double' && normalizedColumns.length > 1;
+  const layoutClass = hasDoubleLayout ? 'story-layout-double' : 'story-layout-single';
   const container = h('div', { class: `container story-slide fade show ${layoutClass}`.trim() });
   const headingText = String(normalized.heading || '').trim();
   if (headingText) {
     container.appendChild(h('h1', { class: 'story-heading' }, headingText));
   }
-  if (normalized.subheading) {
-    container.appendChild(h('p', { class: 'story-subheading' }, normalized.subheading));
-  }
 
   const columnsWrap = h('div', { class: 'story-columns' });
-  const normalizedColumns = Array.isArray(normalized.columns) ? normalized.columns : [];
-  normalizedColumns.forEach((column, columnIndex) => {
+  const sourceColumns = hasDoubleLayout
+    ? normalizedColumns.slice(0, 2)
+    : [{
+        sections: normalizedColumns.reduce((allSections, col) => {
+          const list = Array.isArray(col && col.sections) ? col.sections : [];
+          list.forEach(section => allSections.push(section));
+          return allSections;
+        }, [])
+      }];
+  sourceColumns.forEach((column, columnIndex) => {
     const columnClasses = ['story-column'];
     const roleRaw = String(column.role || '').trim();
     if (roleRaw) {
@@ -1874,10 +1881,6 @@ function renderStorySlide(story = {}, region = 'left') {
     }
   });
 
-  if (columnsWrap.childNodes.length) {
-    columnsWrap.dataset.columnCount = String(columnsWrap.childNodes.length);
-  }
-
   if (!columnsWrap.childNodes.length) {
     const fallback = h('div', { class: 'story-column story-column--empty' }, [
       h('section', { class: 'story-card story-card--empty' }, [
@@ -1889,13 +1892,15 @@ function renderStorySlide(story = {}, region = 'left') {
     columnsWrap.appendChild(fallback);
   }
 
+  columnsWrap.dataset.columnCount = String(columnsWrap.childNodes.length);
+
   container.appendChild(columnsWrap);
   return container;
 
   function computeStoryColumnScale(count) {
     if (!count || count <= 1) return 1;
-    const base = 3.2 / count;
-    const min = 0.6;
+    const base = 3.1 / count;
+    const min = 0.65;
     const max = 1;
     return Math.min(max, Math.max(min, base));
   }
@@ -1925,24 +1930,30 @@ function renderStorySlide(story = {}, region = 'left') {
 
   function createStoryMediaFigure(image, options = {}) {
     const { className = 'story-card-media', fallbackText = 'Bild nicht verfügbar', showPlaceholder = false } = options;
-    const data = image || {};
+    const data = image && typeof image === 'object' ? image : {};
     const url = String(data.url || '').trim();
     const alt = String(data.alt || '').trim();
     const caption = String(data.caption || '').trim();
+    const classTokens = String(className || '').trim().split(/\s+/).filter(Boolean);
     if (!url && !showPlaceholder) return null;
-    const figure = h('figure', { class: className });
+    const figure = h('figure', { class: classTokens.join(' ') || 'story-card-media' });
     if (data.aspect) figure.dataset.aspect = data.aspect;
+    const fallbackClass = (classTokens[0] || 'story-card-media') + '-fallback';
     if (url) {
-      const img = h('img', { src: url, alt });
+      const img = h('img', { src: url, alt: alt || fallbackText });
+      img.loading = 'lazy';
+      img.decoding = 'async';
       img.addEventListener('error', () => {
         figure.classList.add('is-error');
-        figure.replaceChildren(h('div', { class: `${className}-fallback` }, fallbackText));
-      });
+        figure.replaceChildren(h('div', { class: fallbackClass }, fallbackText));
+        if (caption) figure.appendChild(h('figcaption', caption));
+      }, { once: true });
       figure.appendChild(img);
       if (caption) figure.appendChild(h('figcaption', caption));
     } else {
       figure.classList.add('is-placeholder');
-      figure.appendChild(h('div', { class: `${className}-fallback` }, fallbackText));
+      figure.appendChild(h('div', { class: fallbackClass }, fallbackText));
+      if (caption) figure.appendChild(h('figcaption', caption));
     }
     return figure;
   }
