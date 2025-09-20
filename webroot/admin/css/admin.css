@@ -215,10 +215,8 @@ details[open] .chev{ transform: rotate(90deg); }
 .btn.icon-label .icon{ display:inline-flex; align-items:center; justify-content:center; }
 .btn.icon-label .icon svg{ width:16px; height:16px; }
 .btn.has-meta .meta{
-  position:absolute;
-  top:50%;
-  right:10px;
-  transform:translateY(-50%);
+  display:inline-flex;
+  align-items:center;
   font-size:11px;
   line-height:1;
   font-weight:600;
@@ -229,6 +227,7 @@ details[open] .chev{ transform: rotate(90deg); }
   opacity:.85;
   pointer-events:none;
   white-space:nowrap;
+  flex-shrink:0;
 }
 
 /* Default (flieder) */
