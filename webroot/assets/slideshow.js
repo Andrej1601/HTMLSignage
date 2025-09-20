@@ -699,6 +699,14 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const enabled = flags || {};
     const anyEnabled = Object.values(enabled).some(Boolean);
     const nodes = [];
+    const slotMap = new Map();
+    const pushToSlot = (slot, node) => {
+      if (!node) return;
+      nodes.push(node);
+      const key = slot || 'content';
+      if (!slotMap.has(key)) slotMap.set(key, []);
+      slotMap.get(key).push(node);
+    };
     defs.forEach(def => {
       if (!def) return;
       const { key } = def;
@@ -706,12 +714,22 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       if (enabled[key] === false) return;
       const node = def.node ?? (typeof def.render === 'function' ? def.render() : null);
       if (!node) return;
-      nodes.push(node);
+      const slot = def.slot || 'content';
+      pushToSlot(slot, node);
     });
     if (!nodes.length && typeof fallbackFactory === 'function'){
       const fallbackNode = fallbackFactory(anyEnabled);
-      if (fallbackNode) nodes.push(fallbackNode);
+      if (fallbackNode) {
+        if (typeof fallbackNode === 'object' && fallbackNode !== null && 'node' in fallbackNode) {
+          const slot = fallbackNode.slot || 'content';
+          pushToSlot(slot, fallbackNode.node);
+        } else {
+          pushToSlot('content', fallbackNode);
+        }
+      }
     }
+    nodes.bySlot = slotMap;
+    nodes.anyEnabled = anyEnabled;
     return nodes;
   }
 
@@ -1826,8 +1844,6 @@ function renderStorySlide(story = {}, region = 'left') {
       }
 
       const titleNode = h('div', { class: 'title' });
-      const timeNode = h('span', { class: 'time' }, it.time + ' Uhr');
-      const sepNode = h('span', { class: 'sep', 'aria-hidden': 'true' }, '–');
       const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
       if (supNote) {
@@ -1836,8 +1852,6 @@ function renderStorySlide(story = {}, region = 'left') {
       } else if (hasStar) {
         labelNode.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
       }
-      titleNode.appendChild(timeNode);
-      titleNode.appendChild(sepNode);
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
@@ -1846,14 +1860,29 @@ function renderStorySlide(story = {}, region = 'left') {
         : [];
       const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
       const contentBlock = h('div', { class: 'card-content' });
-      renderComponentNodes(componentFlags, [
-        { key: 'title', node: titleNode },
-        { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
-        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list') },
-        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
-        { key: 'badges', render: () => badgeRowNode }
-      ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
-        .forEach(node => contentBlock.appendChild(node));
+      const metaBlock = h('div', { class: 'card-meta' });
+      const mainBlock = h('div', { class: 'card-main' });
+      const timeLabel = (it.time || '').trim();
+      if (componentFlags.title !== false && timeLabel) {
+        metaBlock.appendChild(h('span', { class: 'time' }, timeLabel + ' Uhr'));
+      }
+      const componentNodes = renderComponentNodes(componentFlags, [
+        { key: 'title', node: titleNode, slot: 'main' },
+        { key: 'description', render: () => createDescriptionNode(it.description, 'description'), slot: 'main' },
+        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list'), slot: 'main' },
+        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip'), slot: 'main' },
+        { key: 'badges', render: () => badgeRowNode, slot: 'main' }
+      ], (anyEnabled) => ({
+        slot: 'main',
+        node: h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.')
+      }));
+      const slotMap = componentNodes.bySlot instanceof Map ? componentNodes.bySlot : null;
+      const mainNodes = (slotMap && slotMap.get('main'))
+        || (slotMap && slotMap.get('content'))
+        || componentNodes;
+      mainNodes.forEach(node => mainBlock.appendChild(node));
+      if (metaBlock.childNodes.length) contentBlock.appendChild(metaBlock);
+      if (mainBlock.childNodes.length) contentBlock.appendChild(mainBlock);
 
       const tileChildren = [];
       let stripeNode = null;
