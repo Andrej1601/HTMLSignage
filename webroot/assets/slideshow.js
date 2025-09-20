@@ -794,10 +794,10 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const now = nowMinutes();
 
     const bySauna = {}; const byCell = {};
-    (schedule.saunas || []).forEach((saunaName, colIdx) => {
+    (schedule?.saunas ?? []).forEach((saunaName, colIdx) => {
       const times = [];
-      (schedule.rows || []).forEach((row, ri) => {
-        const cell = (row.entries || [])[colIdx];
+      (schedule?.rows ?? []).forEach((row, ri) => {
+        const cell = (row?.entries ?? [])[colIdx];
         if (cell && cell.title) { const m = parseHM(row.time); if (m !== null) times.push({ m, ri, time: row.time }); }
       });
       times.sort((a, b) => a.m - b.m);
@@ -856,28 +856,32 @@ function fitChipsIn(container){
 }
 
 function tableGrid(hlMap) {
-    const notes = footnoteMap();
-    const t = h('table', { class: 'grid' });
-    const colg = h('colgroup');
-    colg.appendChild(h('col', { class: 'c_time' }));
-    for (const _ of (schedule.saunas || [])) colg.appendChild(h('col', { class: 'c_auto' }));
-    t.appendChild(colg);
+  if (!schedule) {
+    return h('div', { class: 'caption grid-placeholder' }, 'Keine Daten verfügbar.');
+  }
 
-    const thead = h('thead');
-    const tr = h('tr');
-    tr.appendChild(h('th', { class: 'timecol corner' }, 'Zeit'));
-    for (const s of (schedule.saunas || [])) tr.appendChild(h('th', {}, s));
-    thead.appendChild(tr); t.appendChild(thead);
+  const notes = footnoteMap();
+  const t = h('table', { class: 'grid' });
+  const colg = h('colgroup');
+  colg.appendChild(h('col', { class: 'c_time' }));
+  for (const _ of (schedule?.saunas ?? [])) colg.appendChild(h('col', { class: 'c_auto' }));
+  t.appendChild(colg);
 
-    const usedSet = new Set();
-    const tb = h('tbody');
-    (schedule.rows || []).forEach((row, ri) => {
-      const trr = h('tr');
-      trr.appendChild(h('td', { class: 'timecol' }, row.time));
-      (row.entries || []).forEach((cell, ci) => {
-        const td = h('td', {}, []);
-        const key = 'r' + ri + 'c' + ci;
-        if (cell && cell.title) {
+  const thead = h('thead');
+  const tr = h('tr');
+  tr.appendChild(h('th', { class: 'timecol corner' }, 'Zeit'));
+  for (const s of (schedule?.saunas ?? [])) tr.appendChild(h('th', {}, s));
+  thead.appendChild(tr); t.appendChild(thead);
+
+  const usedSet = new Set();
+  const tb = h('tbody');
+  (schedule?.rows ?? []).forEach((row, ri) => {
+    const trr = h('tr');
+    trr.appendChild(h('td', { class: 'timecol' }, row?.time || ''));
+    (row?.entries ?? []).forEach((cell, ci) => {
+      const td = h('td', {}, []);
+      const key = 'r' + ri + 'c' + ci;
+      if (cell && cell.title) {
           const title = String(cell.title).replace(/\*+$/, '');
           const hasStarInText = /\*$/.test(cell.title || '');
 // Textbereich
@@ -890,7 +894,7 @@ if (supNote) { txt.appendChild(h('span', { class: 'notewrap' }, [supNote])); use
 const flamesBox = h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]);
 
 // Chip-Container (Flex: Text links, Flammen rechts)
-const chip = h('div', { class: 'chip' + (hlMap.byCell[key] ? ' highlight' : '') }, [txt, flamesBox]);
+const chip = h('div', { class: 'chip' + (hlMap?.byCell?.[key] ? ' highlight' : '') }, [txt, flamesBox]);
 const wrap = h('div', { class: 'cellwrap' }, [chip]);
           td.appendChild(wrap);
         } else {
