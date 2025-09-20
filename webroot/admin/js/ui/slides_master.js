@@ -2239,6 +2239,8 @@ export function renderSlidesMaster(){
     };
 
     const notifyChange = () => {
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
 
@@ -2408,6 +2410,8 @@ export function renderSlidesMaster(){
       list.push({ id: genId('bdg_'), icon:'', label:'', imageUrl:'' });
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
   }
@@ -2425,6 +2429,9 @@ export function renderSlidesMaster(){
       inp.onchange = () => {
         componentFlags[key] = !!inp.checked;
         if (label) label.classList.toggle('active', inp.checked);
+        window.__queueUnsaved?.();
+        window.__markUnsaved?.();
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
       };
     });
   }
@@ -2483,6 +2490,9 @@ export function renderSlidesMaster(){
           }
         });
       }
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
   }
 
@@ -2491,6 +2501,9 @@ export function renderSlidesMaster(){
       const currentId = styleSelect?.value || activeSetId;
       if (!currentId) return;
       if (!applyStyleSet(settings, currentId)) return;
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
       if (typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
       if (typeof ctx.refreshColors === 'function') ctx.refreshColors();
       renderSlidesMaster();
@@ -2508,6 +2521,9 @@ export function renderSlidesMaster(){
         fonts: snap.fonts,
         slides: snap.slides
       };
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
       renderSlidesMaster();
     };
   }
@@ -2527,6 +2543,9 @@ export function renderSlidesMaster(){
         slides: snap.slides
       };
       settings.slides.activeStyleSet = newId;
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
       renderSlidesMaster();
     };
   }
@@ -2544,6 +2563,9 @@ export function renderSlidesMaster(){
       if (settings.slides.activeStyleSet === currentId){
         settings.slides.activeStyleSet = Object.keys(styleSets)[0] || '';
       }
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
       renderSlidesMaster();
     };
   }
