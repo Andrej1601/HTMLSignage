@@ -32,9 +32,9 @@ const DEFAULT_ENABLED_COMPONENTS = {
 };
 
 const DEFAULT_BADGE_LIBRARY = [
-  { id:'bdg_classic', icon:'🌿', label:'Klassisch', imageUrl:'', iconUrl:'', presetKey:'classic' },
-  { id:'bdg_event', icon:'⭐', label:'Event', imageUrl:'', iconUrl:'', presetKey:'event' },
-  { id:'bdg_ritual', icon:'🔥', label:'Ritual', imageUrl:'', iconUrl:'', presetKey:'ritual' }
+  { id:'bdg_classic', icon:'🌿', label:'Klassisch', imageUrl:'' },
+  { id:'bdg_event', icon:'⭐', label:'Event', imageUrl:'' },
+  { id:'bdg_ritual', icon:'🔥', label:'Ritual', imageUrl:'' }
 ];
 
 const DEFAULT_STYLE_SETS = {
