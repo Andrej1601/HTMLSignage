@@ -649,6 +649,134 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return h('sup', { class: 'note' }, String(fn.label || '*'));
   }
 
+  const SLIDE_COMPONENT_DEFAULTS = { title:true, description:true, aromas:true, facts:true, badges:true };
+
+  function getSlideComponentFlags(){
+    const src = settings?.slides?.enabledComponents;
+    const merged = { ...SLIDE_COMPONENT_DEFAULTS };
+    if (src && typeof src === 'object'){
+      Object.keys(merged).forEach(key => {
+        if (Object.prototype.hasOwnProperty.call(src, key)) merged[key] = !!src[key];
+      });
+    }
+    return merged;
+  }
+
+  function renderComponentNodes(flags, defs, fallbackFactory){
+    const enabled = flags || {};
+    const anyEnabled = Object.values(enabled).some(Boolean);
+    const nodes = [];
+    defs.forEach(def => {
+      if (!def) return;
+      const { key } = def;
+      if (!key) return;
+      if (enabled[key] === false) return;
+      const node = def.node ?? (typeof def.render === 'function' ? def.render() : null);
+      if (!node) return;
+      nodes.push(node);
+    });
+    if (!nodes.length && typeof fallbackFactory === 'function'){
+      const fallbackNode = fallbackFactory(anyEnabled);
+      if (fallbackNode) nodes.push(fallbackNode);
+    }
+    return nodes;
+  }
+
+  function gatherList(...values){
+    const seen = new Set();
+    const out = [];
+    const add = (txt) => {
+      const str = String(txt ?? '').trim();
+      if (!str) return;
+      const key = str.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(str);
+    };
+    const walk = (value) => {
+      if (value == null) return;
+      if (Array.isArray(value)) { value.forEach(walk); return; }
+      if (typeof value === 'object') {
+        if (typeof value.text === 'string') { walk(value.text); return; }
+        if (typeof value.label === 'string') { walk(value.label); return; }
+        if (typeof value.value === 'string') { walk(value.value); return; }
+        if (typeof value.name === 'string') { walk(value.name); return; }
+        return;
+      }
+      if (typeof value === 'string') {
+        value.split(/[|•·;\n\r]+/).forEach(part => add(part));
+        return;
+      }
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        add(value);
+      }
+    };
+    values.forEach(walk);
+    return out;
+  }
+
+  function firstText(...values){
+    for (const value of values) {
+      if (value == null) continue;
+      if (Array.isArray(value)) {
+        const parts = value.map(v => firstText(v)).filter(Boolean);
+        if (parts.length) return parts.join(' · ');
+        continue;
+      }
+      if (typeof value === 'object') {
+        if (typeof value.text === 'string' && value.text.trim()) return value.text.trim();
+        if (typeof value.label === 'string' && value.label.trim()) return value.label.trim();
+        if (typeof value.value === 'string' && value.value.trim()) return value.value.trim();
+        if (typeof value.name === 'string' && value.name.trim()) return value.name.trim();
+        continue;
+      }
+      const str = String(value).trim();
+      if (str) return str;
+    }
+    return '';
+  }
+
+  function collectCellDetails(cell){
+    if (!cell) return { description:'', aromas:[], facts:[], badgeLabel:'' };
+    const description = firstText(cell.description, cell.detail, cell.subtitle, cell.text, cell.extra);
+    const aromas = gatherList(cell.aromaList, cell.aromas, cell.aroma, cell.scent, cell.scents);
+    const facts = gatherList(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
+    const badgeLabel = firstText(cell.type);
+    return { description, aromas, facts, badgeLabel };
+  }
+
+  function createDescriptionNode(text, className){
+    const str = String(text || '').trim();
+    if (!str) return null;
+    return h('p', { class: className || 'description' }, str);
+  }
+
+  function createAromaListNode(items, className){
+    const list = Array.isArray(items) ? items.filter(v => String(v || '').trim()) : [];
+    if (!list.length) return null;
+    const cls = className || 'aroma-list';
+    const nodes = list.map(item => h('li', String(item)));
+    return h('ul', { class: cls }, nodes);
+  }
+
+  function createFactsList(items, className = 'facts', chipClass = 'card-chip'){
+    const list = Array.isArray(items) ? items.filter(v => String(v || '').trim()) : [];
+    if (!list.length) return null;
+    const nodes = list.map(fact => h('li', { class: chipClass }, fact));
+    return h('ul', { class: className }, nodes);
+  }
+
+  function createBadgeRow(label, className){
+    const str = String(label || '').trim();
+    if (!str) return null;
+    const iconChar = settings?.slides?.infobadgeIcon || '';
+    const bits = [];
+    if (iconChar) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, iconChar));
+    bits.push(h('span', { class: 'badge-label' }, str));
+    const badge = h('span', { class: 'badge' }, bits);
+    return h('div', { class: className || 'badge-row' }, [badge]);
+  }
+
   // ---------- Highlight logic ----------
   function getHighlightMap() {
     const HL = settings?.highlightNext || {};
@@ -1000,6 +1128,7 @@ function renderStorySlide(story = {}) {
   const data = story || {};
   const container = h('div', { class: 'container story-slide fade show' });
   const columns = h('div', { class: 'story-columns' });
+  const componentFlags = getSlideComponentFlags();
 
   const hero = h('div', { class: 'story-hero' });
   const heroUrl = data.heroUrl || data.hero?.url || '';
@@ -1113,12 +1242,14 @@ function renderStorySlide(story = {}) {
       indices.forEach(({ name, idx }) => {
         const cell = Array.isArray(row.entries) ? row.entries[idx] : null;
         if (cell && cell.title) {
+          const details = collectCellDetails(cell);
           items.push({
             sauna: name,
             title: cell.title,
             time,
             minutes: m,
-            isUpcoming: (m != null) ? (m >= now) : false
+            isUpcoming: (m != null) ? (m >= now) : false,
+            ...details
           });
         }
       });
@@ -1150,11 +1281,29 @@ function renderStorySlide(story = {}) {
       const cls = ['story-availability-item'];
       if (entry.isNext) cls.push('is-next');
       else if (entry.isUpcoming) cls.push('is-upcoming');
-      const li = h('li', { class: cls.join(' ') }, [
-        h('span', { class: 'story-availability-time' }, entry.time || '–'),
-        h('span', { class: 'story-availability-sauna' }, entry.sauna),
-        entry.title ? h('span', { class: 'story-availability-title' }, entry.title) : null
-      ]);
+      const li = h('li', { class: cls.join(' ') });
+      const components = [
+        {
+          key: 'title',
+          render: () => {
+            const head = h('div', { class: 'story-availability-head' });
+            head.appendChild(h('span', { class: 'story-availability-time' }, entry.time || '–'));
+            const headline = h('div', { class: 'story-availability-headline' }, [
+              h('span', { class: 'story-availability-sauna' }, entry.sauna),
+              entry.title ? h('span', { class: 'story-availability-title' }, entry.title) : null
+            ].filter(Boolean));
+            head.appendChild(headline);
+            return head;
+          }
+        },
+        { key: 'description', render: () => createDescriptionNode(entry.description, 'story-availability-description') },
+        { key: 'aromas', render: () => createAromaListNode(entry.aromas, 'aroma-list story-availability-aromas') },
+        { key: 'facts', render: () => createFactsList(entry.facts, 'story-availability-facts', 'card-chip story-card-chip') },
+        { key: 'badges', render: () => createBadgeRow(entry.badgeLabel, 'badge-row story-availability-badges') }
+      ];
+      renderComponentNodes(componentFlags, components, (anyEnabled) => h('div', {
+        class: 'story-availability-empty-detail'
+      }, anyEnabled ? 'Keine weiteren Details hinterlegt.' : 'Alle Komponenten deaktiviert.')).forEach(node => li.appendChild(node));
       list.appendChild(li);
     });
     section.appendChild(list);
@@ -1237,84 +1386,23 @@ function renderStorySlide(story = {}) {
     const colIdx = (schedule.saunas || []).indexOf(name);
     const iconFallback = settings?.slides?.cardIcons?.[name] || rightUrl || '';
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
-
-    const gatherList = (...values) => {
-      const seen = new Set();
-      const out = [];
-      const add = (txt) => {
-        const str = String(txt ?? '').trim();
-        if (!str) return;
-        const key = str.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        out.push(str);
-      };
-      const walk = (value) => {
-        if (value == null) return;
-        if (Array.isArray(value)) { value.forEach(walk); return; }
-        if (typeof value === 'object') {
-          if (typeof value.text === 'string') { walk(value.text); return; }
-          if (typeof value.label === 'string') { walk(value.label); return; }
-          if (typeof value.value === 'string') { walk(value.value); return; }
-          if (typeof value.name === 'string') { walk(value.name); return; }
-          return;
-        }
-        if (typeof value === 'string') {
-          value.split(/[|•·;\n\r]+/).forEach(part => add(part));
-          return;
-        }
-        if (typeof value === 'number' || typeof value === 'boolean') {
-          add(value);
-        }
-      };
-      values.forEach(walk);
-      return out;
-    };
-
-    const firstText = (...values) => {
-      for (const value of values) {
-        if (value == null) continue;
-        if (Array.isArray(value)) {
-          const parts = value.map(v => firstText(v)).filter(Boolean);
-          if (parts.length) return parts.join(' · ');
-          continue;
-        }
-        if (typeof value === 'object') {
-          if (typeof value.text === 'string' && value.text.trim()) return value.text.trim();
-          if (typeof value.label === 'string' && value.label.trim()) return value.label.trim();
-          if (typeof value.value === 'string' && value.value.trim()) return value.value.trim();
-          if (typeof value.name === 'string' && value.name.trim()) return value.name.trim();
-          continue;
-        }
-        const str = String(value).trim();
-        if (str) return str;
-      }
-      return '';
-    };
+    const componentFlags = getSlideComponentFlags();
 
     const items = [];
     for (const row of (schedule.rows || [])) {
       const cell = (row.entries || [])[colIdx];
       if (cell && cell.title) {
-        const aromaText = firstText(cell.aroma, cell.aromas, cell.scent, cell.subtitle, cell.detail, cell.extra);
-        const factsList = gatherList(
-          cell.facts,
-          cell.details,
-          cell.detailsList,
-          cell.tags,
-          cell.chips,
-          cell.meta,
-          cell.badges
-        );
+        const details = collectCellDetails(cell);
         const isHidden = cell.hidden === true || cell.visible === false || cell.enabled === false;
         items.push({
           time: row.time,
           title: cell.title,
           flames: cell.flames || '',
           noteId: cell.noteId,
-          aroma: aromaText,
-          type: firstText(cell.type),
-          facts: factsList,
+          description: details.description,
+          aromas: details.aromas,
+          facts: details.facts,
+          badgeLabel: details.badgeLabel,
           hidden: isHidden,
           icon: cell.icon || null
         });
@@ -1345,23 +1433,15 @@ function renderStorySlide(story = {}) {
       titleNode.appendChild(sepNode);
       titleNode.appendChild(labelNode);
 
-      const contentChildren = [titleNode];
-      if (it.type) {
-        const badgeBits = [];
-        const iconChar = settings?.slides?.infobadgeIcon || '';
-        if (iconChar) badgeBits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, iconChar));
-        badgeBits.push(h('span', { class: 'badge-label' }, it.type));
-        contentChildren.push(h('span', { class: 'badge' }, badgeBits));
-      }
-      if (it.aroma) {
-        const aromaCls = 'aroma' + (settings?.slides?.aromaItalic ? ' is-italic' : '');
-        contentChildren.push(h('span', { class: aromaCls }, it.aroma));
-      }
-      if (it.facts && it.facts.length) {
-        const factItems = it.facts.map(fact => h('li', { class: 'card-chip' }, fact));
-        contentChildren.push(h('ul', { class: 'facts' }, factItems));
-      }
-      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
+      const contentBlock = h('div', { class: 'card-content' });
+      renderComponentNodes(componentFlags, [
+        { key: 'title', node: titleNode },
+        { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
+        { key: 'aromas', render: () => createAromaListNode(it.aromas, (settings?.slides?.aromaItalic ? 'aroma-list is-italic' : 'aroma-list')) },
+        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
+        { key: 'badges', render: () => createBadgeRow(it.badgeLabel, 'badge-row') }
+      ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
+        .forEach(node => contentBlock.appendChild(node));
 
       const iconUrl = it.icon || iconFallback;
       const iconBox = h('div', { class: 'card-icon' + (iconUrl ? '' : ' is-empty') });
