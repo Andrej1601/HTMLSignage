@@ -64,6 +64,7 @@
   const resizeHandlers = new Map();
   let heartbeatTimer = null;
   let pollTimer = null;
+  let badgeLookupCache = null;
 
   window.addEventListener('beforeunload', () => {
     if (heartbeatTimer) {
@@ -189,6 +190,7 @@ async function loadDeviceResolved(id){
   }
   schedule = j.schedule;
   settings = j.settings;
+  badgeLookupCache = null;
   applyTheme(); applyDisplay(); maybeApplyPreset();
   refreshStageQueues({ resetIndex:true, autoplay:false });
   await Promise.all([preloadRightImages(), preloadSlideImages()]);
@@ -203,6 +205,7 @@ async function loadDeviceResolved(id){
       loadJSON('/data/settings.json')
     ]);
     schedule = s; settings = cfg;
+    badgeLookupCache = null;
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
@@ -766,41 +769,122 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return '';
   }
 
+  function normalizeBadgeDescriptor(descriptor, fallbackId){
+    if (descriptor == null) return null;
+    const entry = (descriptor && typeof descriptor === 'object' && !Array.isArray(descriptor)) ? descriptor : null;
+    const visible = entry ? (entry.enabled !== false && entry.visible !== false && entry.hidden !== true) : true;
+    if (!visible) return null;
+    const label = entry ? firstText(entry.label, entry.text, entry.title, entry.name, entry.value) : firstText(descriptor);
+    const icon = entry ? firstText(entry.icon, entry.symbol, entry.glyph, entry.emoji) : '';
+    const iconUrl = entry ? firstText(entry.iconUrl, entry.image, entry.url, entry.href, entry.src) : '';
+    const fallbackStr = (typeof fallbackId === 'string' || typeof fallbackId === 'number' || typeof fallbackId === 'boolean')
+      ? String(fallbackId).trim()
+      : '';
+    let id = '';
+    if (entry) {
+      const rawId = entry.id ?? entry.key ?? entry.code ?? entry.slug ?? entry.uid ?? fallbackStr;
+      if (typeof rawId === 'string' || typeof rawId === 'number' || typeof rawId === 'boolean') {
+        id = String(rawId).trim();
+      }
+    } else {
+      id = fallbackStr;
+    }
+    const labelStr = String(label || '').trim();
+    const iconStr = String(icon || '').trim();
+    const iconUrlStr = String(iconUrl || '').trim();
+    const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
+    const finalId = preferLabelId ? (labelStr || iconStr || iconUrlStr || id) : (id || labelStr || iconStr || iconUrlStr);
+    if (!finalId || (!labelStr && !iconStr && !iconUrlStr)) return null;
+    return { id: finalId, label: labelStr, icon: iconStr, iconUrl: iconUrlStr };
+  }
+
+  function getBadgeLookup(){
+    const lib = settings?.slides?.badgeLibrary;
+    const source = lib || null;
+    if (badgeLookupCache && badgeLookupCache.source === source) return badgeLookupCache.value;
+    const byId = new Map();
+    const byLower = new Map();
+    const addEntry = (descriptor, fallbackId) => {
+      const badge = normalizeBadgeDescriptor(descriptor, fallbackId);
+      if (!badge) return;
+      const key = badge.id;
+      if (!key) return;
+      byId.set(key, badge);
+      byLower.set(key.toLowerCase(), badge);
+    };
+    if (Array.isArray(lib)) {
+      lib.forEach((entry, idx) => {
+        if (entry == null) return;
+        let fallback = `idx:${idx}`;
+        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+          const rawId = entry.id ?? entry.key ?? entry.code ?? entry.slug ?? entry.uid;
+          if (typeof rawId === 'string' || typeof rawId === 'number' || typeof rawId === 'boolean') {
+            fallback = rawId;
+          }
+        }
+        addEntry(entry, fallback);
+      });
+    } else if (lib && typeof lib === 'object') {
+      Object.entries(lib).forEach(([key, value]) => {
+        addEntry(value, key);
+      });
+    }
+    const value = { byId, byLower };
+    badgeLookupCache = { source, value };
+    return value;
+  }
+
+  function collectCellBadges(cell){
+    if (!cell) return [];
+    const { byId, byLower } = getBadgeLookup();
+    const out = [];
+    const seen = new Set();
+    const addBadge = (badge) => {
+      if (!badge) return;
+      const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
+      const composite = [badge.label, badge.icon, badge.iconUrl]
+        .map(v => String(v || '').trim().toLowerCase())
+        .join('|');
+      const dedupeKey = idKey || composite;
+      if (!dedupeKey || seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      out.push({ ...badge });
+    };
+    const lookupBadge = (raw, idx) => {
+      if (raw == null) return;
+      if (typeof raw === 'object' && !Array.isArray(raw)) {
+        const badge = normalizeBadgeDescriptor(raw, raw.id ?? raw.key ?? raw.code ?? `cell:${idx}`);
+        if (badge) addBadge(badge);
+        return;
+      }
+      let id = '';
+      if (typeof raw === 'string') id = raw.trim();
+      else if (typeof raw === 'number' || typeof raw === 'boolean') id = String(raw);
+      if (!id) return;
+      const badge = byId.get(id) || byLower.get(id.toLowerCase());
+      if (badge) addBadge(badge);
+    };
+    const ids = cell.badgeIds;
+    if (Array.isArray(ids)) ids.forEach((value, idx) => lookupBadge(value, idx));
+    else if (ids != null) lookupBadge(ids, 0);
+    if (cell.badgeId != null) lookupBadge(cell.badgeId, 'single');
+    if (!out.length) {
+      const legacy = normalizeBadgeDescriptor({
+        label: firstText(cell?.badgeLabel, cell?.badgeText, cell?.type),
+        icon: firstText(cell?.badgeIcon)
+      }, 'legacy');
+      if (legacy) addBadge(legacy);
+    }
+    return out;
+  }
+
   function collectCellDetails(cell){
-    if (!cell) return { description:'', aromas:[], facts:[], badgeItems:[] };
+    if (!cell) return { description:'', aromas:[], facts:[], badges:[] };
     const description = firstText(cell.description, cell.detail, cell.subtitle, cell.text, cell.extra);
     const aromas = gatherList(cell.aromaList, cell.aromas, cell.aroma, cell.scent, cell.scents);
     const facts = gatherList(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
-    const badgeItems = (() => {
-      const libraryRaw = Array.isArray(settings?.slides?.badgeLibrary) ? settings.slides.badgeLibrary : [];
-      const library = new Map();
-      libraryRaw.forEach(entry => {
-        if (!entry || typeof entry !== 'object') return;
-        const id = String(entry.id ?? '').trim();
-        if (!id || library.has(id)) return;
-        const icon = typeof entry.icon === 'string' ? entry.icon : '';
-        const label = typeof entry.label === 'string' ? entry.label : '';
-        library.set(id, { icon, label });
-      });
-      const ids = Array.isArray(cell?.badgeIds) ? cell.badgeIds : [];
-      const items = [];
-      ids.forEach(rawId => {
-        const id = String(rawId ?? '').trim();
-        if (!id) return;
-        const ref = library.get(id);
-        if (ref){
-          const icon = ref.icon || '';
-          const label = ref.label || '';
-          if (icon || label) items.push({ icon, label });
-        }
-      });
-      if (!items.length){
-        const fallback = firstText(cell?.type);
-        if (fallback) items.push({ icon:'', label:fallback });
-      }
-      return items;
-    })();
-    return { description, aromas, facts, badgeItems };
+    const badges = collectCellBadges(cell);
+    return { description, aromas, facts, badges };
   }
 
   function createDescriptionNode(text, className){
@@ -810,11 +894,38 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   function createAromaListNode(items, className){
-    const list = Array.isArray(items) ? items.filter(v => String(v || '').trim()) : [];
-    if (!list.length) return null;
-    const cls = className || 'aroma-list';
-    const nodes = list.map(item => h('li', String(item)));
-    return h('ul', { class: cls }, nodes);
+    const values = [];
+    let italic = false;
+    const pushValue = (value) => {
+      if (value == null) return;
+      if (Array.isArray(value)) { value.forEach(pushValue); return; }
+      const text = firstText(value);
+      if (text) values.push(text);
+    };
+    if (Array.isArray(items)) {
+      items.forEach(pushValue);
+    } else if (items && typeof items === 'object') {
+      if (Array.isArray(items.items)) items.items.forEach(pushValue);
+      else if (Array.isArray(items.list)) items.list.forEach(pushValue);
+      else if (Array.isArray(items.values)) items.values.forEach(pushValue);
+      else if (Array.isArray(items.aromas)) items.aromas.forEach(pushValue);
+      else pushValue(items);
+      italic = items.italic === true || items.isItalic === true || items.style === 'italic';
+    } else if (items != null) {
+      pushValue(items);
+    }
+    if (!values.length) return null;
+    const clsParts = (typeof className === 'string' && className.trim())
+      ? className.split(/\s+/).filter(Boolean)
+      : [];
+    const hadLegacyItalic = clsParts.includes('is-italic');
+    const filteredCls = clsParts.filter(cls => cls !== 'is-italic');
+    if (!filteredCls.length) filteredCls.push('aroma-list');
+    const shouldItalic = italic || hadLegacyItalic;
+    const attrs = { class: filteredCls.join(' ') };
+    if (shouldItalic) attrs.style = 'font-style:italic;';
+    const nodes = values.map(item => h('li', item));
+    return h('ul', attrs, nodes);
   }
 
   function createFactsList(items, className = 'facts', chipClass = 'card-chip'){
@@ -824,20 +935,54 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return h('ul', { class: className }, nodes);
   }
 
-  function createBadgeRow(items, className){
-    const list = Array.isArray(items)
-      ? items.filter(entry => entry && (String(entry.icon || '').trim() || String(entry.label || '').trim()))
-      : [];
+  function createBadgeRow(badges, className){
+    const list = [];
+    const collect = (value, idx) => {
+      if (value == null) return;
+      const fallbackId = (value && typeof value === 'object' && !Array.isArray(value))
+        ? (value.id ?? value.key ?? value.code ?? value.slug ?? value.uid ?? `row:${idx}`)
+        : `row:${idx}`;
+      const badge = normalizeBadgeDescriptor(value, fallbackId);
+      if (badge) list.push(badge);
+    };
+    if (Array.isArray(badges)) badges.forEach((value, idx) => collect(value, idx));
+    else if (badges != null) collect(badges, 0);
     if (!list.length) return null;
-    const badges = list.map(entry => {
+    const defaultIcon = String(settings?.slides?.infobadgeIcon || '').trim();
+    const seen = new Set();
+    const nodes = [];
+    list.forEach(badge => {
+      const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
+      const composite = [badge.label, badge.icon, badge.iconUrl]
+        .map(v => String(v || '').trim().toLowerCase())
+        .join('|');
+      const dedupeKey = idKey || composite;
+      if (!dedupeKey || seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+      const iconChar = String(badge.icon || '').trim();
+      const iconUrl = String(badge.iconUrl || '').trim();
+      const label = String(badge.label || '').trim();
       const bits = [];
-      const icon = String(entry.icon || '').trim();
-      const label = String(entry.label || '').trim();
-      if (icon) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, icon));
+      if (iconUrl) {
+        bits.push(h('span', { class: 'badge-icon badge-icon--image', 'aria-hidden': 'true' }, [
+          h('img', { src: iconUrl, alt: '' })
+        ]));
+      } else {
+        const glyph = iconChar || defaultIcon;
+        if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
+      }
       if (label) bits.push(h('span', { class: 'badge-label' }, label));
-      return h('span', { class: 'badge' }, bits);
+      if (!bits.length) return;
+      const attrs = { class: 'badge' };
+      if (badge.id) attrs['data-badge-id'] = badge.id;
+      nodes.push(h('span', attrs, bits));
     });
-    return h('div', { class: className || 'badge-row' }, badges);
+    if (!nodes.length) return null;
+    const clsParts = (typeof className === 'string' && className.trim())
+      ? className.split(/\s+/).filter(Boolean)
+      : [];
+    if (!clsParts.includes('badge-row')) clsParts.unshift('badge-row');
+    return h('div', { class: clsParts.join(' ') }, nodes);
   }
 
   // ---------- Highlight logic ----------
@@ -1476,7 +1621,7 @@ function renderStorySlide(story = {}, region = 'left') {
         { key: 'description', render: () => createDescriptionNode(entry.description, 'story-availability-description') },
         { key: 'aromas', render: () => createAromaListNode(entry.aromas, 'aroma-list story-availability-aromas') },
         { key: 'facts', render: () => createFactsList(entry.facts, 'story-availability-facts', 'card-chip story-card-chip') },
-        { key: 'badges', render: () => createBadgeRow(entry.badgeItems, 'badge-row story-availability-badges') }
+        { key: 'badges', render: () => createBadgeRow(entry.badges, 'badge-row story-availability-badges') }
       ];
       renderComponentNodes(componentFlags, components, (anyEnabled) => h('div', {
         class: 'story-availability-empty-detail'
@@ -1592,7 +1737,7 @@ function renderStorySlide(story = {}, region = 'left') {
           description: details.description,
           aromas: details.aromas,
           facts: details.facts,
-          badgeItems: details.badgeItems,
+          badges: details.badges,
           hidden: isHidden,
           icon: cell.icon || null
         });
@@ -1628,9 +1773,9 @@ function renderStorySlide(story = {}, region = 'left') {
       renderComponentNodes(componentFlags, [
         { key: 'title', node: titleNode },
         { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
-        { key: 'aromas', render: () => createAromaListNode(it.aromas, (settings?.slides?.aromaItalic ? 'aroma-list is-italic' : 'aroma-list')) },
+        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list') },
         { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
-        { key: 'badges', render: () => createBadgeRow(it.badgeItems, 'badge-row') }
+        { key: 'badges', render: () => createBadgeRow(it.badges, 'badge-row') }
       ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
         .forEach(node => contentBlock.appendChild(node));
 
@@ -2179,7 +2324,7 @@ async function bootstrap(){
   try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
   const p = d.payload || {};
   if (p.schedule) schedule = p.schedule;
-  if (p.settings) settings = p.settings;
+  if (p.settings) { settings = p.settings; badgeLookupCache = null; }
   applyTheme();
   applyDisplay();
   maybeApplyPreset();
@@ -2278,6 +2423,7 @@ console.error('[bootstrap] resolve failed:', e);
 
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
             schedule = j.schedule; settings = j.settings;
+            badgeLookupCache = null;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
             applyTheme();
             applyDisplay();
@@ -2290,6 +2436,7 @@ console.error('[bootstrap] resolve failed:', e);
           const cf = await loadJSON('/data/settings.json');
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
+            badgeLookupCache = null;
             applyTheme();
             applyDisplay();
             maybeApplyPreset();
