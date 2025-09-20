@@ -1877,6 +1877,8 @@ export function renderSlideOrderView(){
         if (!moved) return;
         clearDropIndicators();
         commitReorder();
+        window.__queueUnsaved?.();
+        window.dockPushDebounced?.();
       });
       btn.addEventListener('dragstart', preventDragStart);
       return btn;
@@ -1926,6 +1928,8 @@ export function renderSlideOrderView(){
     settings.slides.storySlides = newStories;
     settings.slides ||= {};
     settings.slides.sortOrder = sortOrder;
+    window.__queueUnsaved?.();
+    window.dockPushDebounced?.();
   };
 
   const updateDropIndicator = (target, before) => {
