@@ -173,7 +173,18 @@ body.device-mode #ctxBadge{
   background:color-mix(in oklab,var(--btn-primary-fg) 85%,var(--btn-primary));
   color:var(--btn-primary);
   font-size:20px;
-  padding:12px 20px;
+  padding:14px 22px;
+}
+body.device-mode #ctxBadge button{
+  border-color:color-mix(in oklab, var(--btn-primary) 70%, transparent);
+  background:color-mix(in oklab, var(--btn-primary-fg) 85%, transparent);
+  color:var(--btn-primary);
+  box-shadow:0 6px 16px rgba(0,0,0,.2);
+}
+body.device-mode #ctxBadge button:hover,
+body.device-mode #ctxBadge button:focus-visible{
+  background:var(--btn-primary-fg);
+  border-color:color-mix(in oklab, var(--btn-primary) 85%, transparent);
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -572,21 +583,45 @@ body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-prima
     align-items:center;
 }
 .ctx-badge{
-    display:inline-block;
-    padding:10px 16px;
-    border-radius:12px;
+    display:inline-flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 18px;
+    border-radius:14px;
     background:var(--btn-accent);
     color:var(--btn-accent-fg);
     font-size:18px;
     font-weight:700;
 }
 .ctx-badge button{
-  margin-left:6px;
-  border:none;
-  background:transparent;
-  color:inherit;
+  margin-left:4px;
+  inline-size:38px;
+  block-size:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  border:2px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
+  background:color-mix(in oklab, var(--btn-accent-fg) 85%, transparent);
+  color:var(--btn-accent);
   cursor:pointer;
-  font-weight:700;
+  font-weight:800;
+  font-size:24px;
+  line-height:1;
+  box-shadow:0 6px 16px rgba(0,0,0,.18);
+  transition:transform .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+.ctx-badge button:hover,
+.ctx-badge button:focus-visible{
+  transform:translateY(-1px);
+  background:var(--btn-accent-fg);
+  color:var(--btn-accent);
+  border-color:color-mix(in oklab, var(--btn-accent) 85%, transparent);
+  box-shadow:0 8px 20px rgba(0,0,0,.24);
+}
+.ctx-badge button:focus-visible{
+  outline:3px solid color-mix(in oklab, var(--btn-accent) 65%, transparent);
+  outline-offset:2px;
 }
 
 /* Hervorhebung des aktiven Geräts in der Liste */
@@ -616,10 +651,6 @@ body.device-mode #devPairedList tr.selected{
   outline-color:var(--btn-primary);
   background:color-mix(in oklab,var(--btn-primary) 10%,transparent);
 }
-
-/* Hinweistext unter dem Kontext-Badge */
-#ctxBadgeTip{display:block;margin-left:8px;margin-top:4px;color:var(--muted);font-size:13px;}
-
 
 /* ---------- Grid-Tabelle (links) ---------- */
 table.tbl{ width:100%; border-collapse:separate; border-spacing:0; }
