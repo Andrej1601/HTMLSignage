@@ -57,7 +57,6 @@
   let schedule = null;
   let settings = null;
   let nextQueue = [];
-  let heroTimeline = [];
   let lastKey = null; // verhindert direkte Wiederholung derselben Folie
   let idx = 0;
   let slideTimer = 0, transTimer = 0;
@@ -214,10 +213,6 @@ async function loadDeviceResolved(id){
 
   function applyTheme() {
     const t = settings?.theme || {};
-    const msVar = (value, fallback) => {
-      const num = Number.isFinite(+value) ? Math.max(0, +value) : fallback;
-      return (Number.isFinite(num) ? num : fallback) + 'ms';
-    };
     setVars({
       '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
       '--grid': t.gridBorder, '--cell': t.cellBg, '--boxfg': t.boxFg,
@@ -243,13 +238,7 @@ async function loadDeviceResolved(id){
       '--tileWeight': settings?.fonts?.tileWeight || 600,
       '--chipHScale': (settings?.fonts?.chipHeight || 1),
       '--badgeBg': settings?.slides?.infobadgeColor || t.accent || '#5C3101',
-      '--badgeFg': t.boxFg || '#FFFFFF',
-      '--tileEnterDuration': msVar(settings?.slides?.tileEnterMs, 600),
-      '--tileEnterDelay': msVar(settings?.slides?.tileStaggerMs, 80),
-      '--heroTimelineItemMs': msVar(settings?.slides?.heroTimelineItemMs, 500),
-      '--heroTimelineItemDelay': msVar(settings?.slides?.heroTimelineItemDelayMs, 140),
-      '--heroTimelineFillMs': msVar(settings?.slides?.heroTimelineFillMs, 8000),
-      '--heroTimelineDelayMs': msVar(settings?.slides?.heroTimelineDelayMs, 400)
+      '--badgeFg': t.boxFg || '#FFFFFF'
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
 // Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
@@ -310,116 +299,10 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return 'cover';
   }
 
-  function textFromValue(value) {
-    if (value == null) return '';
-    if (Array.isArray(value)) {
-      return value
-        .map(part => textFromValue(part))
-        .filter(Boolean)
-        .join(' · ');
-    }
-    if (typeof value === 'object') {
-      const candidates = ['text', 'label', 'name', 'value', 'title'];
-      for (const key of candidates) {
-        const v = value[key];
-        if (typeof v === 'string' && v.trim()) return v.trim();
-      }
-      return '';
-    }
-    if (typeof value === 'boolean') return value ? 'Ja' : 'Nein';
-    const str = String(value).trim();
-    return str;
-  }
-
-  function firstTextValue(...values) {
-    for (const value of values) {
-      const txt = textFromValue(value);
-      if (txt) return txt;
-    }
-    return '';
-  }
-
-  function collectHeroTimelineData() {
-    heroTimeline = [];
-    if (!schedule || !Array.isArray(schedule.rows)) return heroTimeline;
-
-    const saunas = Array.isArray(schedule.saunas) ? schedule.saunas : [];
-    if (!saunas.length) return heroTimeline;
-
-    const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
-    const highlight = getHighlightMap();
-    const baseMinutes = Math.max(1, Number.isFinite(+settings?.slides?.heroTimelineBaseMinutes)
-      ? +settings.slides.heroTimelineBaseMinutes
-      : 15);
-    const maxEntries = Number.isFinite(+settings?.slides?.heroTimelineMaxEntries)
-      ? Math.max(1, Math.floor(+settings.slides.heroTimelineMaxEntries))
-      : null;
-
-    (schedule.rows || []).forEach((row, ri) => {
-      if (!row) return;
-      const time = String(row.time || '').trim();
-      const minute = parseHM(time);
-      if (!time || minute === null) return;
-      const entries = [];
-      saunas.forEach((saunaName, colIdx) => {
-        if (hiddenSaunas.has(saunaName)) return;
-        const cell = (row.entries || [])[colIdx];
-        if (!cell || !cell.title) return;
-        if (cell.hidden === true || cell.visible === false || cell.enabled === false) return;
-        const label = String(cell.title).replace(/\*+$/, '').trim();
-        if (!label) return;
-        const detail = firstTextValue(
-          cell.subtitle,
-          cell.detail,
-          cell.aroma,
-          cell.aromas,
-          cell.extra
-        );
-        const key = 'r' + ri + 'c' + colIdx;
-        entries.push({
-          sauna: saunaName,
-          title: label,
-          detail,
-          highlight: !!highlight.byCell[key]
-        });
-      });
-      if (entries.length) heroTimeline.push({ time, minute, entries });
-    });
-
-    heroTimeline.sort((a, b) => {
-      if (a.minute !== b.minute) return a.minute - b.minute;
-      return a.time.localeCompare(b.time);
-    });
-
-    if (maxEntries && heroTimeline.length > maxEntries) {
-      heroTimeline = heroTimeline.slice(0, maxEntries);
-    }
-
-    for (let i = 0; i < heroTimeline.length; i++) {
-      const cur = heroTimeline[i];
-      const next = heroTimeline[i + 1] || null;
-      const diff = next ? Math.max(1, next.minute - cur.minute) : baseMinutes;
-      const ratio = diff / baseMinutes;
-      cur.durationRatio = Number.isFinite(ratio) ? Math.max(0.25, Math.min(4, ratio)) : 1;
-      cur.isActive = cur.entries.some(entry => entry.highlight);
-    }
-
-    return heroTimeline;
-  }
-
-  // ---------- Slide queue ----------
-  function buildQueue() {
+// ---------- Slide queue ----------
+function buildQueue() {
   // Tages-Preset ggf. anwenden
   maybeApplyPreset();
-
-  const heroEnabled = !!(settings?.slides?.heroEnabled);
-  const timeline = heroEnabled ? collectHeroTimelineData() : (heroTimeline = []);
-  const hasHero = heroEnabled && timeline.length > 0;
-
-  const finalizeQueue = (queue) => {
-    const out = hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
-    nextQueue.splice(0, nextQueue.length, ...out);
-  };
 
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
@@ -514,7 +397,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     }
     settings.slides.sortOrder = clean;
     if (!queue.length && showOverview) queue.push({ type: 'overview' });
-    finalizeQueue(queue);
+    nextQueue.splice(0, nextQueue.length, ...queue);
     return;
   }
 
@@ -578,7 +461,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   // Falls nichts bleibt, notfalls Übersicht zeigen
   if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
-  finalizeQueue(queue);
+  nextQueue.splice(0, nextQueue.length, ...queue);
 }
 
   // ---------- DOM helpers ----------
@@ -838,59 +721,6 @@ setTimeout(recalc, 0);
 if (document.fonts?.ready) { document.fonts.ready.then(recalc).catch(()=>{}); }
 onResizeCurrent = recalc;
     return c;
-  }
-
-  function renderHeroTimeline() {
-    const data = (heroTimeline.length ? heroTimeline : collectHeroTimelineData()).slice();
-    const headingWrap = h('div', { class: 'headings hero-headings' }, [
-      h('h1', { class: 'h1' }, settings?.slides?.heroTitle || 'Tagesüberblick'),
-      h('h2', { class: 'h2' }, computeH2Text() || '')
-    ]);
-
-    const list = h('div', { class: 'hero-timeline-list' });
-
-    if (!data.length) {
-      list.appendChild(h('div', { class: 'caption' }, 'Keine Einträge.'));
-    } else {
-      data.forEach((row, idx) => {
-        const cls = 'timeline-item' + (row.isActive ? ' is-active' : '');
-        const item = h('div', { class: cls });
-        item.style.setProperty('--hero-index', String(idx));
-        if (Number.isFinite(+row.durationRatio)) {
-          item.style.setProperty('--hero-duration-ratio', String(row.durationRatio));
-        }
-
-        item.appendChild(h('div', { class: 'timeline-time' }, row.time + ' Uhr'));
-
-        const details = h('div', { class: 'timeline-details' });
-        row.entries.forEach(entry => {
-          const entryCls = 'timeline-entry' + (entry.highlight ? ' highlight' : '');
-          const entryNode = h('div', { class: entryCls });
-          entryNode.appendChild(h('span', { class: 'timeline-sauna' }, entry.sauna));
-          entryNode.appendChild(h('span', { class: 'timeline-title' }, entry.title));
-          if (entry.detail) entryNode.appendChild(h('span', { class: 'timeline-detail' }, entry.detail));
-          details.appendChild(entryNode);
-        });
-        item.appendChild(details);
-
-        const bar = h('div', { class: 'timeline-bar' }, [
-          h('div', { class: 'timeline-progress' })
-        ]);
-        item.appendChild(bar);
-
-        list.appendChild(item);
-      });
-    }
-
-    const body = h('div', { class: 'hero-body' }, [list]);
-    const container = h('div', { class: 'container hero hero-timeline fade show' }, [
-      headingWrap,
-      body,
-      h('div', { class: 'brand' }, 'Signage')
-    ]);
-
-    onResizeCurrent = null;
-    return container;
   }
 
 // ---------- Interstitial image slide ----------
@@ -1384,7 +1214,6 @@ function renderStorySlide(story = {}) {
         contentBlock,
         flamesWrap(it.flames)
       ]);
-      tile.style.setProperty('--tile-index', String(list.children.length));
 
       if (it.hidden || hiddenSaunas.has(name)) {
         tile.appendChild(h('div', { class: 'card-chip card-chip--status', 'data-role': 'hidden' }, 'Ausgeblendet'));
@@ -1485,11 +1314,6 @@ function dwellMsForItem(item) {
     return sec(v) * 1000;
   }
 
-  if (item.type === 'hero-timeline') {
-    const fallback = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
-    return sec(fallback) * 1000;
-  }
-
   return 6000; // Fallback
 }
 
@@ -1513,7 +1337,6 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'video')    ? renderVideo(item.src, item) :
     (item.type === 'url')      ? renderUrl(item.url) :
     (item.type === 'story')    ? renderStorySlide(item.story) :
-    (item.type === 'hero-timeline') ? renderHeroTimeline() :
                                  renderImage(item.src || item.url);
 
   show(el);
