@@ -39,9 +39,23 @@ function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback } = {})
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = typeof entry.icon === 'string' ? entry.icon : '';
-    const label = typeof entry.label === 'string' ? entry.label : '';
-    normalized.push({ id, icon, label });
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
+      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
+    const imageUrl = String(imageUrlRaw || '').trim();
+    const presetRaw = typeof entry.presetKey === 'string' ? entry.presetKey
+      : (typeof entry.preset === 'string' ? entry.preset : '');
+    const presetKey = String(presetRaw || '').trim();
+    const record = {
+      id,
+      icon,
+      label,
+      imageUrl,
+      iconUrl: imageUrl,
+      presetKey: presetKey || null
+    };
+    normalized.push(record);
     seen.add(id);
   };
 
@@ -107,6 +121,7 @@ let baselineSchedule = null;        // Vergleichsbasis für Unsaved-Indikator
 let baselineSettings = null;
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
+let currentDeviceBadgeMeta = null;
 let storedView = lsGet('adminView');
 if (storedView === 'devices') storedView = 'grid';
 if (storedView !== 'grid' && storedView !== 'preview') storedView = 'grid';
@@ -355,6 +370,30 @@ if (document.readyState === 'loading'){
 }
 
 
+function normalizeContextBadge(source){
+  if (!source) return null;
+  if (typeof source === 'string'){
+    const trimmed = source.trim();
+    if (!trimmed) return null;
+    const isUrl = /^(?:https?:)?\//i.test(trimmed) || /^data:/i.test(trimmed);
+    if (isUrl) return { icon:'', imageUrl: trimmed, iconUrl: trimmed, presetKey: null, label:'' };
+    return { icon: trimmed, imageUrl:'', iconUrl:'', presetKey: null, label:'' };
+  }
+  if (typeof source !== 'object') return null;
+  const icon = typeof source.icon === 'string'
+    ? source.icon.trim()
+    : (typeof source.emoji === 'string' ? source.emoji.trim() : '');
+  const imageUrlRaw = typeof source.imageUrl === 'string' ? source.imageUrl
+    : (typeof source.iconUrl === 'string' ? source.iconUrl : '');
+  const imageUrl = String(imageUrlRaw || '').trim();
+  const presetRaw = typeof source.presetKey === 'string' ? source.presetKey
+    : (typeof source.preset === 'string' ? source.preset : '');
+  const presetKey = String(presetRaw || '').trim();
+  const label = typeof source.label === 'string' ? source.label.trim() : '';
+  if (!icon && !imageUrl) return null;
+  return { icon, imageUrl, iconUrl: imageUrl, presetKey: presetKey || null, label };
+}
+
 // --- Kontext-Badge (Header) im Modul-Scope ---
 function renderContextBadge(){
   const header = document.querySelector('header');
@@ -383,6 +422,28 @@ function renderContextBadge(){
 
     const label = document.createElement('span');
     label.className = 'ctx-badge-label';
+
+    const media = document.createElement('span');
+    media.className = 'ctx-badge-media';
+    media.hidden = true;
+
+    const mediaImage = document.createElement('img');
+    mediaImage.className = 'ctx-badge-media-image';
+    mediaImage.alt = '';
+    mediaImage.hidden = true;
+
+    const mediaIcon = document.createElement('span');
+    mediaIcon.className = 'ctx-badge-media-icon';
+    mediaIcon.hidden = true;
+
+    media.appendChild(mediaImage);
+    media.appendChild(mediaIcon);
+
+    const text = document.createElement('span');
+    text.className = 'ctx-badge-text';
+
+    label.appendChild(media);
+    label.appendChild(text);
     el.appendChild(label);
 
     const resetBtn = document.createElement('button');
@@ -397,9 +458,42 @@ function renderContextBadge(){
     wrap.appendChild(el);
   }
 
-  const labelEl = el.querySelector('.ctx-badge-label');
-  if (labelEl){
-    labelEl.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx}`;
+  const textEl = el.querySelector('.ctx-badge-text');
+  if (textEl){
+    textEl.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx}`;
+  }
+
+  const mediaWrap = el.querySelector('.ctx-badge-media');
+  const mediaImage = el.querySelector('.ctx-badge-media-image');
+  const mediaIcon = el.querySelector('.ctx-badge-media-icon');
+  const badge = currentDeviceBadgeMeta;
+  if (mediaWrap && mediaImage && mediaIcon){
+    const iconText = (badge?.icon || '').trim();
+    const imageUrl = (badge?.imageUrl || badge?.iconUrl || '').trim();
+    if (badge && (iconText || imageUrl)){
+      if (imageUrl){
+        mediaImage.src = imageUrl;
+        mediaImage.hidden = false;
+        mediaIcon.hidden = true;
+        mediaIcon.textContent = '';
+      } else {
+        mediaIcon.textContent = iconText;
+        mediaIcon.hidden = !iconText;
+        mediaImage.hidden = true;
+        mediaImage.removeAttribute('src');
+      }
+      mediaWrap.hidden = false;
+      mediaWrap.title = badge?.label || '';
+      el.classList.add('has-media');
+    } else {
+      mediaWrap.hidden = true;
+      mediaIcon.hidden = true;
+      mediaIcon.textContent = '';
+      mediaImage.hidden = true;
+      mediaImage.removeAttribute('src');
+      mediaWrap.removeAttribute('title');
+      el.classList.remove('has-media');
+    }
   }
 }
 
@@ -414,6 +508,9 @@ async function enterDeviceContext(id, name){
   currentDeviceCtx = id;
   currentDeviceName = name || id;
   document.body.classList.add('device-mode');
+  currentDeviceBadgeMeta = normalizeContextBadge(
+    dev?.contextBadge ?? dev?.badge ?? dev?.badgeInfo ?? null
+  );
 
   // globale Settings als Basis
   settings = deepClone(baseSettings);
@@ -460,6 +557,7 @@ function exitDeviceContext(){
   currentDeviceCtx = null;
   currentDeviceName = null;
   document.body.classList.remove('device-mode');
+  currentDeviceBadgeMeta = null;
 
   settings = deepClone(baseSettings);
   deviceBaseSchedule = null;

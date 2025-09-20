@@ -32,9 +32,9 @@ const DEFAULT_ENABLED_COMPONENTS = {
 };
 
 const DEFAULT_BADGE_LIBRARY = [
-  { id:'bdg_classic', icon:'🌿', label:'Klassisch' },
-  { id:'bdg_event', icon:'⭐', label:'Event' },
-  { id:'bdg_ritual', icon:'🔥', label:'Ritual' }
+  { id:'bdg_classic', icon:'🌿', label:'Klassisch', imageUrl:'', iconUrl:'', presetKey:'classic' },
+  { id:'bdg_event', icon:'⭐', label:'Event', imageUrl:'', iconUrl:'', presetKey:'event' },
+  { id:'bdg_ritual', icon:'🔥', label:'Ritual', imageUrl:'', iconUrl:'', presetKey:'ritual' }
 ];
 
 const DEFAULT_STYLE_SETS = {
@@ -97,9 +97,6 @@ export const DEFAULTS = {
     tileMaxScale:0.57,
     infobadgeColor:'#5C3101',
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
-    showIcons:true,
-    cardIcons:{},
-    cardIconsMigrated:true,
     heroEnabled:false,
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,
