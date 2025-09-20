@@ -316,84 +316,91 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   border-radius:inherit;
 }
 .tile > *{position:relative; z-index:1;}
-.tile .card-icon{
+.tile-badge-stripe{
   position:relative;
+  align-self:stretch;
   width:var(--tileIconSizePx, calc(84px*var(--vwScale)));
-  height:var(--tileIconSizePx, calc(84px*var(--vwScale)));
+  height:100%;
   display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .26);
-  background:color-mix(in srgb, var(--fg) 45%, transparent);
+  align-items:stretch;
+  justify-content:stretch;
+  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .3);
+  background:color-mix(in srgb, var(--fg) 42%, transparent);
   box-shadow:0 12px 30px rgba(0,0,0,.28);
   overflow:hidden;
   isolation:isolate;
-  transition:border-radius .25s ease, transform .25s ease;
+  clip-path:polygon(0 0, 100% 0, 82% 100%, 0% 100%);
 }
-.tile .card-icon.is-empty{background:rgba(0,0,0,.22);}
-.tile .card-icon img{
+.tile-badge-stripe::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(0,0,0,.35));
+  mix-blend-mode:soft-light;
+  pointer-events:none;
+}
+.tile-badge-stripe__inner{
+  position:relative;
+  display:flex;
   width:100%;
   height:100%;
-  object-fit:contain;
-  display:block;
-  filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));
-  background:transparent;
 }
-.tile .card-icon__fallback{
+.tile-badge-stripe__segment{
+  position:relative;
+  flex:1 1 0%;
+  overflow:hidden;
+  background:rgba(0,0,0,.3);
+}
+.tile-badge-stripe__segment:not(:last-child)::after{
+  content:"";
+  position:absolute;
+  top:-20%;
+  bottom:-20%;
+  right:-12%;
+  width:clamp(6px, calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .18), 26px);
+  background:linear-gradient(180deg, rgba(0,0,0,.45), rgba(255,255,255,.18));
+  transform:skewX(-18deg);
+  opacity:.55;
+  pointer-events:none;
+}
+.tile-badge-stripe__img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transition:opacity .25s ease;
+}
+.tile-badge-stripe__fallback{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.52);
+  opacity:0;
+  transition:opacity .25s ease;
+  color:rgba(255,255,255,.86);
   font-size:calc(32px*var(--scale));
   font-weight:700;
   letter-spacing:.12em;
   text-transform:uppercase;
-  opacity:.8;
 }
-.tile .card-icon.card-icon--round,
-.tile .card-icon.card-icon--badge{
-  border-radius:999px;
+.tile-badge-stripe__fallback-img{
+  width:68%;
+  height:68%;
+  object-fit:contain;
+  filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));
 }
-.tile .card-icon.card-icon--badge{
-  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .82);
-  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .82);
-  border:1px solid color-mix(in srgb, var(--boxfg) 45%, transparent);
-  background:color-mix(in srgb, var(--boxfg) 16%, transparent);
-  box-shadow:0 10px 24px rgba(0,0,0,.26);
-}
-.tile .card-icon.card-icon--strip{
-  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * 1.45);
-  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .64);
-  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .24);
-  justify-content:flex-start;
-  padding-inline:calc(var(--tilePadXPx, 20px) * .35);
-  background:linear-gradient(135deg, rgba(0,0,0,.36), rgba(0,0,0,.18));
-}
-.tile .card-icon.card-icon--strip img{
-  object-fit:cover;
-}
-.tile .card-icon.card-icon--overlay{
-  position:absolute;
-  top:var(--tilePadYPx, calc(18px*var(--vwScale)));
-  inset-inline-start:var(--tilePadXPx, calc(20px*var(--vwScale)));
-  width:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .74);
-  height:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .74);
-  box-shadow:0 12px 32px rgba(0,0,0,.32);
-  opacity:.96;
-  pointer-events:none;
-  backdrop-filter:blur(2px);
-}
+.tile-badge-stripe__fallback-text{display:block;}
+.tile-badge-stripe__segment.is-fallback .tile-badge-stripe__img{opacity:0;}
+.tile-badge-stripe__segment.is-fallback .tile-badge-stripe__fallback{opacity:1;}
 .container.no-card-icons{ --tileIconSizePx:0px; }
 .container.no-card-icons{ --tileIconColumnPx:0px; }
 .tile.tile--compact{
   grid-template-columns:minmax(0,1fr) auto;
   min-height:auto;
 }
-.tile.tile--compact .card-icon{ display:none; }
-.tile.tile--icon-badge{ --tileIconColumnPx:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .78); }
-.tile.tile--icon-strip{ --tileIconColumnPx:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * 1.38); }
-.tile.tile--icon-overlay{
-  --tileIconColumnPx:0px;
-}
-.tile.tile--icon-overlay .card-content{
-  padding-inline-start:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .45 + var(--tileContentGapPx, calc(10px*var(--vwScale))));
-}
+.tile.tile--compact .tile-badge-stripe{ display:none; }
 .container.no-card-icons .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
 .card-content{
   display:flex;

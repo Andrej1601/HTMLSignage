@@ -777,6 +777,18 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const label = entry ? firstText(entry.label, entry.text, entry.title, entry.name, entry.value) : firstText(descriptor);
     const icon = entry ? firstText(entry.icon, entry.symbol, entry.glyph, entry.emoji) : '';
     const iconUrl = entry ? firstText(entry.iconUrl, entry.image, entry.url, entry.href, entry.src) : '';
+    let imageUrl = '';
+    if (entry) {
+      const nestedImage = (entry.image && typeof entry.image === 'object') ? entry.image : null;
+      imageUrl = firstText(
+        entry.imageUrl,
+        entry.badgeImage,
+        entry.mediaUrl,
+        nestedImage?.url,
+        nestedImage?.src,
+        entry.image
+      );
+    }
     const fallbackStr = (typeof fallbackId === 'string' || typeof fallbackId === 'number' || typeof fallbackId === 'boolean')
       ? String(fallbackId).trim()
       : '';
@@ -792,10 +804,11 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const labelStr = String(label || '').trim();
     const iconStr = String(icon || '').trim();
     const iconUrlStr = String(iconUrl || '').trim();
+    const imageUrlStr = String(imageUrl || '').trim();
     const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
-    const finalId = preferLabelId ? (labelStr || iconStr || iconUrlStr || id) : (id || labelStr || iconStr || iconUrlStr);
-    if (!finalId || (!labelStr && !iconStr && !iconUrlStr)) return null;
-    return { id: finalId, label: labelStr, icon: iconStr, iconUrl: iconUrlStr };
+    const finalId = preferLabelId ? (labelStr || iconStr || iconUrlStr || imageUrlStr || id) : (id || labelStr || iconStr || iconUrlStr || imageUrlStr);
+    if (!finalId || (!labelStr && !iconStr && !iconUrlStr && !imageUrlStr)) return null;
+    return { id: finalId, label: labelStr, icon: iconStr, iconUrl: iconUrlStr, imageUrl: imageUrlStr };
   }
 
   function getBadgeLookup(){
@@ -842,7 +855,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const addBadge = (badge) => {
       if (!badge) return;
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.iconUrl]
+      const composite = [badge.label, badge.icon, badge.iconUrl, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -951,14 +964,16 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const defaultIcon = String(settings?.slides?.infobadgeIcon || '').trim();
     const seen = new Set();
     const nodes = [];
+    const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.iconUrl]
+      const composite = [badge.label, badge.icon, badge.iconUrl, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
       if (!dedupeKey || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
+      uniqueBadges.push({ ...badge, imageUrl: String(badge.imageUrl || '').trim() });
       const iconChar = String(badge.icon || '').trim();
       const iconUrl = String(badge.iconUrl || '').trim();
       const label = String(badge.label || '').trim();
@@ -982,7 +997,14 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       ? className.split(/\s+/).filter(Boolean)
       : [];
     if (!clsParts.includes('badge-row')) clsParts.unshift('badge-row');
-    return h('div', { class: clsParts.join(' ') }, nodes);
+    const node = h('div', { class: clsParts.join(' ') }, nodes);
+    Object.defineProperty(node, '__badgeList', {
+      configurable: true,
+      enumerable: false,
+      writable: true,
+      value: uniqueBadges
+    });
+    return node;
   }
 
   // ---------- Highlight logic ----------
@@ -1818,39 +1840,79 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(sepNode);
       titleNode.appendChild(labelNode);
 
+      const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
+      const badgeStripeSource = Array.isArray(badgeRowNode?.__badgeList)
+        ? badgeRowNode.__badgeList.map(entry => ({ ...entry }))
+        : [];
+      const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
       const contentBlock = h('div', { class: 'card-content' });
       renderComponentNodes(componentFlags, [
         { key: 'title', node: titleNode },
         { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
         { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list') },
         { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
-        { key: 'badges', render: () => createBadgeRow(it.badges, 'badge-row') }
+        { key: 'badges', render: () => badgeRowNode }
       ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
         .forEach(node => contentBlock.appendChild(node));
 
       const tileChildren = [];
-      if (iconsEnabled) {
+      let stripeNode = null;
+      if (iconsEnabled && hasAnyBadgeImage && badgeStripeSource.length) {
         const iconUrl = it.icon || defaultIconForSauna || legacyIconFallback || '';
-        const iconClassNames = ['card-icon'];
-        if (iconVariant && iconVariant !== 'default' && iconVariant !== 'hidden') {
-          iconClassNames.push('card-icon--' + iconVariant);
-        }
-        if (!iconUrl) iconClassNames.push('is-empty');
-        const iconBox = h('div', { class: iconClassNames.join(' ') });
-        if (iconUrl) {
-          iconBox.appendChild(h('img', { src: iconUrl, alt: '' }));
-        } else {
-          const fallbackLabel = (() => {
-            if (typeof name === 'string') {
-              const trimmed = name.trim();
-              if (trimmed.length >= 2) return trimmed.slice(0, 2);
-              if (trimmed.length === 1) return trimmed;
+        const fallbackLabel = (() => {
+          if (typeof name === 'string') {
+            const trimmed = name.trim();
+            if (trimmed.length >= 2) return trimmed.slice(0, 2);
+            if (trimmed.length === 1) return trimmed;
+          }
+          return '?';
+        })();
+        stripeNode = (() => {
+          const stripe = h('div', { class: 'tile-badge-stripe' });
+          const inner = h('div', { class: 'tile-badge-stripe__inner' });
+          badgeStripeSource.forEach((badge, idx) => {
+            const segment = h('div', { class: 'tile-badge-stripe__segment' });
+            segment.style.setProperty('--segment-index', String(idx));
+            segment.style.setProperty('--segment-count', String(badgeStripeSource.length));
+            if (badge.imageUrl) {
+              const img = h('img', { class: 'tile-badge-stripe__img', src: badge.imageUrl, alt: '' });
+              img.addEventListener('load', () => segment.classList.remove('is-fallback'));
+              img.addEventListener('error', () => segment.classList.add('is-fallback'));
+              segment.appendChild(img);
+            } else {
+              segment.classList.add('is-fallback');
             }
-            return '?';
-          })();
-          iconBox.appendChild(h('span', { class: 'card-icon__fallback' }, fallbackLabel));
-        }
-        tileChildren.push(iconBox);
+            const fallback = (() => {
+              const box = h('div', { class: 'tile-badge-stripe__fallback' });
+              let hasContent = false;
+              if (iconUrl) {
+                const fbImg = h('img', { class: 'tile-badge-stripe__fallback-img', src: iconUrl, alt: '' });
+                fbImg.addEventListener('error', () => {
+                  fbImg.remove();
+                  if (!hasContent && fallbackLabel) {
+                    box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
+                  }
+                });
+                box.appendChild(fbImg);
+                hasContent = true;
+              }
+              if (!hasContent && fallbackLabel) {
+                box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
+                hasContent = true;
+              }
+              return hasContent ? box : null;
+            })();
+            if (fallback) segment.appendChild(fallback);
+            inner.appendChild(segment);
+          });
+          stripe.appendChild(inner);
+          return stripe;
+        })();
+      }
+      if (!stripeNode) {
+        if (!tileClasses.includes('tile--compact')) tileClasses.push('tile--compact');
+      } else {
+        tileChildren.push(stripeNode);
       }
       tileChildren.push(contentBlock);
       tileChildren.push(flamesWrap(it.flames));
