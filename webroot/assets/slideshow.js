@@ -988,7 +988,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return h('ul', { class: className }, nodes);
   }
 
-  function createBadgeRow(badges, className){
+  function collectUniqueBadges(badges){
     const list = [];
     const collect = (value, idx) => {
       if (value == null) return;
@@ -1000,10 +1000,8 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     };
     if (Array.isArray(badges)) badges.forEach((value, idx) => collect(value, idx));
     else if (badges != null) collect(badges, 0);
-    if (!list.length) return null;
-    const defaultIcon = String(settings?.slides?.infobadgeIcon || '').trim();
+    if (!list.length) return [];
     const seen = new Set();
-    const nodes = [];
     const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
@@ -1014,6 +1012,16 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       if (!dedupeKey || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
       uniqueBadges.push({ ...badge, imageUrl: String(badge.imageUrl || '').trim() });
+    });
+    return uniqueBadges;
+  }
+
+  function createBadgeRow(badges, className){
+    const uniqueBadges = collectUniqueBadges(badges);
+    if (!uniqueBadges.length) return null;
+    const defaultIcon = String(settings?.slides?.infobadgeIcon || '').trim();
+    const nodes = [];
+    uniqueBadges.forEach(badge => {
       const iconChar = String(badge.icon || '').trim();
       const iconUrl = String(badge.iconUrl || '').trim();
       const label = String(badge.label || '').trim();
@@ -1910,8 +1918,11 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
-      const badgeStripeSource = Array.isArray(badgeRowNode?.__badgeList)
-        ? badgeRowNode.__badgeList.map(entry => ({ ...entry }))
+      const stripeSource = Array.isArray(badgeRowNode?.__badgeList)
+        ? badgeRowNode.__badgeList
+        : collectUniqueBadges(it.badges);
+      const badgeStripeSource = Array.isArray(stripeSource)
+        ? stripeSource.map(entry => ({ ...entry }))
         : [];
       const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
       const contentBlock = h('div', { class: 'card-content' });
