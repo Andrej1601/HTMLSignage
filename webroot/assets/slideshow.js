@@ -1805,40 +1805,101 @@ function convertLegacyStory(story, base = {}) {
   const hero = normalizeStoryImageEntry(heroRaw);
   const sections = [];
   const pushSection = (section) => { if (section) sections.push(section); };
-  const intro = normalizeParagraphString(story.intro);
-  if (intro) pushSection({ type: 'card', className: 'story-card--intro', heading: 'Einführung', text: intro });
-  const ritual = normalizeParagraphString(story.ritual);
-  if (ritual) pushSection({ type: 'card', className: 'story-card--ritual', heading: 'Ritual', text: ritual });
-  const tips = normalizeTipsList(story.tips);
-  if (tips.length) pushSection({ type: 'card', className: 'story-card--tips', heading: 'Tipps', list: tips });
-  (Array.isArray(story.sections) ? story.sections : []).forEach(entry => {
-    const card = normalizeLegacyRichSection(entry);
-    if (card) pushSection(card);
+
+  const createSimpleCard = ({ heading: cardHeading, subheading: cardSubheading, text, image, mediaPosition }) => {
+    const headingText = String(cardHeading || '').trim();
+    const subheadingText = String(cardSubheading || '').trim();
+    const paragraph = normalizeParagraphString(text);
+    const imageEntry = image ? normalizeStoryImageEntry(image) : null;
+    const hasImage = imageEntry && imageEntry.url;
+    const normalizedMediaPosition = normalizeMediaPosition(mediaPosition);
+    if (!headingText && !subheadingText && !paragraph && !hasImage) return null;
+    const card = { type: 'card' };
+    if (headingText) card.heading = headingText;
+    if (subheadingText) card.subheading = subheadingText;
+    if (paragraph) card.text = paragraph;
+    if (hasImage) card.image = imageEntry;
+    if (normalizedMediaPosition) card.mediaPosition = normalizedMediaPosition;
+    return card;
+  };
+
+  const convertLegacyRichSection = (entry) => {
+    const richCard = normalizeLegacyRichSection(entry);
+    if (!richCard) return null;
+    const parts = [];
+    if (richCard.text) parts.push(richCard.text);
+    if (Array.isArray(richCard.list) && richCard.list.length) {
+      parts.push(richCard.list.map(item => String(item || '').trim()).filter(Boolean).join(' · '));
+    }
+    return createSimpleCard({
+      heading: richCard.heading,
+      subheading: richCard.subheading,
+      text: parts.join('\n\n'),
+      image: richCard.image,
+      mediaPosition: richCard.mediaPosition
+    });
+  };
+
+  const legacyEntries = [];
+  if (Array.isArray(story.sections)) legacyEntries.push(...story.sections);
+  else if (Array.isArray(story.content)) legacyEntries.push(...story.content);
+
+  legacyEntries.forEach(entry => {
+    const section = convertLegacyRichSection(entry);
+    if (section) pushSection(section);
   });
+
+  const extras = [];
+  const addExtra = (section) => { if (section) extras.push(section); };
+
+  const intro = normalizeParagraphString(story.intro);
+  if (intro) addExtra(createSimpleCard({ heading: 'Einführung', text: intro }));
+
+  const ritual = normalizeParagraphString(story.ritual);
+  if (ritual) addExtra(createSimpleCard({ heading: 'Ritual', text: ritual }));
+
+  const tips = normalizeTipsList(story.tips);
+  if (tips.length) addExtra(createSimpleCard({ heading: 'Tipps', text: tips.join(' · ') }));
+
   const galleryItems = normalizeStoryGallery(story.gallery);
   if (galleryItems.length) {
-    pushSection({
-      type: 'card',
-      className: 'story-card--gallery',
-      heading: String(story.galleryTitle || 'Galerie').trim(),
-      gallery: galleryItems
+    const galleryTitle = String(story.galleryTitle || '').trim() || 'Galerie';
+    galleryItems.forEach((item, index) => {
+      const caption = String(item.caption || '').trim();
+      const headingText = index === 0 ? galleryTitle : (caption || galleryTitle);
+      const subheadingText = index === 0 && caption && caption !== headingText ? caption : '';
+      addExtra(createSimpleCard({ heading: headingText, subheading: subheadingText, image: item }));
     });
   }
+
   const faqItems = normalizeStoryFaq(story.faq);
   if (faqItems.length) {
-    pushSection({
-      type: 'card',
-      className: 'story-card--faq',
-      heading: 'FAQ',
-      faq: faqItems
-    });
+    const faqText = faqItems
+      .map(item => {
+        const question = String(item.question || '').trim();
+        const answer = String(item.answer || '').trim();
+        return [question ? `Q: ${question}` : '', answer ? `A: ${answer}` : ''].filter(Boolean).join(' ');
+      })
+      .filter(Boolean)
+      .join('\n\n');
+    addExtra(createSimpleCard({ heading: 'FAQ', text: faqText }));
   }
+
   const saunaTargets = gatherStorySaunaTargets(story.saunas || story.saunaRefs || story.sauna);
   if (saunaTargets.length) {
-    pushSection({ type: 'availability', title: 'Heute verfügbar', saunas: saunaTargets });
+    addExtra(createSimpleCard({ heading: 'Heute verfügbar', text: saunaTargets.join(', ') }));
   }
+
+  extras.forEach(pushSection);
+
+  if (!sections.length) {
+    const fallbackText = normalizeParagraphString(story.text || story.body || story.description);
+    const fallbackSection = createSimpleCard({ text: fallbackText });
+    if (fallbackSection) pushSection(fallbackSection);
+  }
+
   const columns = [];
-  columns.push({ sections });
+  if (sections.length) columns.push({ sections });
   if (hero.url) {
     columns.push({ sections: [{ type: 'image', image: hero, variant: 'hero', className: 'story-image-block--hero' }] });
   }
