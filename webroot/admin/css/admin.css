@@ -342,7 +342,16 @@ details[open] .chev{ transform: rotate(90deg); }
   gap:10px 16px;
   align-items:start;
 }
-.sys-action{ display:flex; align-items:center; justify-content:flex-start; }
+.sys-action{
+  display:flex;
+  align-items:stretch;
+  justify-content:flex-start;
+}
+.sys-action .btn.icon-label{
+  flex:1 1 100%;
+  min-width:0;
+  width:100%;
+}
 .sys-options{
   display:flex;
   flex-wrap:wrap;
