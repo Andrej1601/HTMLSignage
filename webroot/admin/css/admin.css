@@ -2,7 +2,10 @@
 /* Light ist Default (body class="theme-light"), Dark via .theme-dark auf <body>  */
 /* ============================================================================== */
 
+@layer tokens, base, layout, components, overlays, responsive;
+
 /* ---------- Design Tokens: LIGHT (Default) ---------- */
+@layer tokens{
 :root{
   /* Flächen & Text */
   --bg:#f6f8ff; --panel:#ffffff; --fg:#0b1220; --muted:#5b6478;
@@ -83,8 +86,10 @@
   --unsaved-fg:#111827;
   --unsaved-glow:rgba(252,165,165,.38);
 }
+}
 
 /* ---------- Base ---------- */
+@layer base{
 html,body{height:100%}
 *{box-sizing:border-box}
 body{
@@ -92,7 +97,9 @@ body{
   font:var(--fs)/1.45 system-ui, Segoe UI, Roboto, Arial, sans-serif;
 }
 a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:none; }
+}
 
+@layer layout{
 .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .type-list{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .type-list label{ display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--border); background:color-mix(in oklab, var(--panel) 94%, transparent); cursor:pointer; font-weight:600; }
@@ -244,8 +251,10 @@ main.layout{
 }
 
 body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
+}
 
 /* ---------- Cards / Details ---------- */
+@layer components{
 .card, details.ac{
   background:var(--panel); border:1px solid var(--border);
   border-radius:16px; box-shadow:0 8px 20px rgba(0,0,0,.06);
@@ -379,13 +388,10 @@ details[open] .chev{ transform: rotate(90deg); }
 }
 .sys-cleanup{ margin-top:12px; }
 
-@media (max-width: 520px){
-  .sys-grid{ gap:8px 12px; }
-  .sys-options{ gap:6px; }
-  .btn.icon-label{ gap:6px; }
 }
 
 /* ---------- Hilfe-Overlay & Tooltips ---------- */
+@layer overlays{
 .tip{ cursor:help; color:var(--muted); margin-left:4px; }
 
 #helpOverlay,
@@ -408,7 +414,9 @@ details[open] .chev{ transform: rotate(90deg); }
 #helpClose,
 #slideOrderClose{ position:absolute; top:8px; right:8px; }
 .btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
+}
 
+@layer components{
 .playlist-selector{
   display:flex;
   flex-direction:column;
@@ -469,14 +477,12 @@ details[open] .chev{ transform: rotate(90deg); }
   box-shadow:0 12px 24px rgba(15, 23, 42, 0.25);
 }
 
-.slide-order-tile.drop-before,
-.slide-order-tile.drop-after{
+.slide-order-tile:is(.drop-before, .drop-after){
   position:relative;
   box-shadow:0 0 0 2px rgba(124, 58, 237, 0.25);
 }
 
-.slide-order-tile.drop-before::after,
-.slide-order-tile.drop-after::after{
+.slide-order-tile:is(.drop-before, .drop-after)::after{
   content:'';
   position:absolute;
   left:12px;
@@ -489,8 +495,7 @@ details[open] .chev{ transform: rotate(90deg); }
 .slide-order-tile.drop-before::after{ top:-6px; }
 .slide-order-tile.drop-after::after{ bottom:-6px; }
 
-.slide-order-tile.drop-before::before,
-.slide-order-tile.drop-after::before{
+.slide-order-tile:is(.drop-before, .drop-after)::before{
   content:'';
   position:absolute;
   left:50%;
@@ -1170,11 +1175,6 @@ body.mode-uniform #ovSec{ display:none !important; }
   grid-template-columns: minmax(140px, .6fr) minmax(220px, 1.4fr);
   align-items:start;
 }
-@media (max-width: 720px){
-  .badge-lib-fields{
-    grid-template-columns: 1fr;
-  }
-}
 .badge-lib-field{
   display:flex;
   flex-direction:column;
@@ -1385,16 +1385,6 @@ body.mode-uniform #ovSec{ display:none !important; }
 .badge-picker-missing{ font-size:12px; color:var(--muted); }
 .badge-picker-empty{ font-size:12px; color:var(--muted); }
 
-@media (prefers-reduced-motion: reduce){
-  .badge-lib-body,
-  .badge-lib-toggle::after,
-  .badge-lib-row,
-  .badge-picker-toggle::after,
-  .badge-picker-popup{
-    transition:none !important;
-  }
-}
-
 /* ---------- Footer ---------- */
 footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1px solid var(--border); color:var(--muted); }
 
@@ -1456,22 +1446,11 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
   flex: 1 1 100%;
 }
 
+}
+
 @keyframes unsavedBtnGlow{
   from{ transform:translateY(0); box-shadow:0 6px 16px rgba(15,23,42,.18); }
   to{ transform:translateY(-1px); box-shadow:0 12px 26px color-mix(in oklab, var(--unsaved-bg) 30%, transparent); }
-}
-
-@media (prefers-reduced-motion: reduce){
-  #unsavedBadge,
-  body.has-unsaved-changes #btnSave{
-    animation:none !important;
-  }
-  #unsavedBadge .unsaved-badge-btn{
-    transition:none !important;
-  }
-  #unsavedBadge .unsaved-badge-btn:active{
-    transform:none !important;
-  }
 }
 
 /* Ansicht-Menü (Header) */
@@ -1494,3 +1473,72 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
 tr.offline .dev-name{ color:#dc2626; }
 .status.offline{ color:#dc2626; font-weight:700; }
 .status.online{ color:#15803d; font-weight:700; }
+
+@layer responsive{
+@media (max-width: 520px){
+  .sys-grid{ gap:8px 12px; }
+  .sys-options{ gap:6px; }
+  .btn.icon-label{ gap:6px; }
+}
+
+@media (max-width: 720px){
+  .badge-lib-fields{ grid-template-columns: 1fr; }
+}
+
+@media (orientation: portrait), (max-width: 900px){
+  main.layout{
+    grid-template-columns:1fr !important;
+    gap:12px !important;
+  }
+  .rightbar{
+    position:static !important;
+    max-height:unset !important;
+    padding-right:0 !important;
+  }
+  header{ position:sticky; top:0; }
+  .sl-head{ font-size:11px; }
+  .sl-head span{ white-space:normal; }
+}
+
+@media (orientation: landscape){
+  main.layout{
+    grid-template-columns:2fr 1fr !important;
+    gap:14px !important;
+  }
+  .rightbar{
+    position:sticky;
+    top:64px;
+    max-height:calc(100svh - 64px);
+    width:auto;
+  }
+}
+
+@media (hover: none) and (pointer: coarse){
+  .btn{ padding:10px 14px; }
+  .btn.sm{ padding:8px 12px; }
+  .input, select, textarea{ min-height:42px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .badge-lib-body,
+  .badge-lib-toggle::after,
+  .badge-lib-row,
+  .badge-picker-toggle::after,
+  .badge-picker-popup{
+    transition:none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  #unsavedBadge,
+  body.has-unsaved-changes #btnSave{
+    animation:none !important;
+  }
+  #unsavedBadge .unsaved-badge-btn{
+    transition:none !important;
+  }
+  #unsavedBadge .unsaved-badge-btn:active{
+    transform:none !important;
+  }
+}
+}
