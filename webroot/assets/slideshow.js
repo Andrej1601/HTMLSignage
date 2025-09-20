@@ -797,6 +797,31 @@ function renderUrl(src) {
     container.style.setProperty('--tileTargetPx', target + 'px');
     container.style.setProperty('--tileMinScale', String(minScale));
     container.style.setProperty('--tileMaxScale', String(maxScale));
+
+    const baseW = settings?.display?.baseW || 1920;
+    const fallbackTarget = baseW * ((minScale + maxScale) / 2);
+    const t = target > 0 ? target : fallbackTarget;
+    const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
+
+    const iconSize = clamp(60, t * 0.18, 200);
+    const padY = clamp(14, t * 0.045, 44);
+    const padX = Math.max(clamp(20, t * 0.07, 68), padY + 6);
+    const gap = clamp(16, t * 0.05, 38);
+    const contentGap = clamp(8, t * 0.03, 26);
+    const chipGap = clamp(6, t * 0.022, 22);
+    const badgeOffset = clamp(10, t * 0.02, 28);
+    const radius = clamp(18, t * 0.06, 48);
+    const metaScale = clamp(0.72, t / 720, 1.12);
+
+    container.style.setProperty('--tileIconSizePx', iconSize.toFixed(2) + 'px');
+    container.style.setProperty('--tilePadYPx', padY.toFixed(2) + 'px');
+    container.style.setProperty('--tilePadXPx', padX.toFixed(2) + 'px');
+    container.style.setProperty('--tileGapPx', gap.toFixed(2) + 'px');
+    container.style.setProperty('--tileContentGapPx', contentGap.toFixed(2) + 'px');
+    container.style.setProperty('--tileChipGapPx', chipGap.toFixed(2) + 'px');
+    container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
+    container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
+    container.style.setProperty('--tileMetaScale', metaScale.toFixed(3));
   }
 
   // ---------- Sauna slide ----------
@@ -817,10 +842,89 @@ function renderUrl(src) {
 
     const notes = footnoteMap();
     const colIdx = (schedule.saunas || []).indexOf(name);
+    const iconFallback = settings?.slides?.cardIcons?.[name] || rightUrl || '';
+    const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
+
+    const gatherList = (...values) => {
+      const seen = new Set();
+      const out = [];
+      const add = (txt) => {
+        const str = String(txt ?? '').trim();
+        if (!str) return;
+        const key = str.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(str);
+      };
+      const walk = (value) => {
+        if (value == null) return;
+        if (Array.isArray(value)) { value.forEach(walk); return; }
+        if (typeof value === 'object') {
+          if (typeof value.text === 'string') { walk(value.text); return; }
+          if (typeof value.label === 'string') { walk(value.label); return; }
+          if (typeof value.value === 'string') { walk(value.value); return; }
+          if (typeof value.name === 'string') { walk(value.name); return; }
+          return;
+        }
+        if (typeof value === 'string') {
+          value.split(/[|•·;\n\r]+/).forEach(part => add(part));
+          return;
+        }
+        if (typeof value === 'number' || typeof value === 'boolean') {
+          add(value);
+        }
+      };
+      values.forEach(walk);
+      return out;
+    };
+
+    const firstText = (...values) => {
+      for (const value of values) {
+        if (value == null) continue;
+        if (Array.isArray(value)) {
+          const parts = value.map(v => firstText(v)).filter(Boolean);
+          if (parts.length) return parts.join(' · ');
+          continue;
+        }
+        if (typeof value === 'object') {
+          if (typeof value.text === 'string' && value.text.trim()) return value.text.trim();
+          if (typeof value.label === 'string' && value.label.trim()) return value.label.trim();
+          if (typeof value.value === 'string' && value.value.trim()) return value.value.trim();
+          if (typeof value.name === 'string' && value.name.trim()) return value.name.trim();
+          continue;
+        }
+        const str = String(value).trim();
+        if (str) return str;
+      }
+      return '';
+    };
+
     const items = [];
     for (const row of (schedule.rows || [])) {
       const cell = (row.entries || [])[colIdx];
-      if (cell && cell.title) items.push({ time: row.time, title: cell.title, flames: cell.flames || '', noteId: cell.noteId });
+      if (cell && cell.title) {
+        const aromaText = firstText(cell.aroma, cell.aromas, cell.scent, cell.subtitle, cell.detail, cell.extra);
+        const factsList = gatherList(
+          cell.facts,
+          cell.details,
+          cell.detailsList,
+          cell.tags,
+          cell.chips,
+          cell.meta,
+          cell.badges
+        );
+        const isHidden = cell.hidden === true || cell.visible === false || cell.enabled === false;
+        items.push({
+          time: row.time,
+          title: cell.title,
+          flames: cell.flames || '',
+          noteId: cell.noteId,
+          aroma: aromaText,
+          facts: factsList,
+          hidden: isHidden,
+          icon: cell.icon || null
+        });
+      }
     }
     items.sort((a, b) => a.time.localeCompare(b.time));
 
@@ -828,29 +932,84 @@ function renderUrl(src) {
     for (const it of items) {
       const baseTitle = String(it.title).replace(/\*+$/, '');
       const hasStar = /\*$/.test(it.title || '');
-      const labelText = it.time + ' Uhr – ' + baseTitle;
-      const titleNode = h('div', { class: 'title' }, labelText);
+      const tileClass = 'tile'
+        + ((hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) ? ' highlight' : '')
+        + ((it.hidden || hiddenSaunas.has(name)) ? ' is-hidden' : '');
+
+      const titleNode = h('div', { class: 'title' });
+      const timeNode = h('span', { class: 'time' }, it.time + ' Uhr');
+      const sepNode = h('span', { class: 'sep', 'aria-hidden': 'true' }, '–');
+      const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
-      if (supNote) { titleNode.appendChild(h('span', { class: 'notewrap' }, [supNote])); usedSet.add(it.noteId); }
-      else if (hasStar) { titleNode.appendChild(h('span', { class: 'notewrap' }, [h('sup',{class:'note legacy'}, '*')])); }
-      const isHL = hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time);
-      const tile = h('div', { class: 'tile' + (isHL ? ' highlight' : '') }, [ titleNode, flamesWrap(it.flames) ]);
+      if (supNote) {
+        labelNode.appendChild(h('span', { class: 'notewrap' }, [supNote]));
+        usedSet.add(it.noteId);
+      } else if (hasStar) {
+        labelNode.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
+      }
+      titleNode.appendChild(timeNode);
+      titleNode.appendChild(sepNode);
+      titleNode.appendChild(labelNode);
+
+      const contentChildren = [titleNode];
+      if (it.aroma) contentChildren.push(h('span', { class: 'aroma' }, it.aroma));
+      if (it.facts && it.facts.length) {
+        const factItems = it.facts.map(fact => h('li', { class: 'card-chip' }, fact));
+        contentChildren.push(h('ul', { class: 'facts' }, factItems));
+      }
+      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
+
+      const iconUrl = it.icon || iconFallback;
+      const iconBox = h('div', { class: 'card-icon' + (iconUrl ? '' : ' is-empty') });
+      if (iconUrl) {
+        iconBox.appendChild(h('img', { src: iconUrl, alt: '' }));
+      } else {
+        const fallbackLabel = (() => {
+          if (typeof name === 'string') {
+            const trimmed = name.trim();
+            if (trimmed.length >= 2) return trimmed.slice(0, 2);
+            if (trimmed.length === 1) return trimmed;
+          }
+          return '?';
+        })();
+        iconBox.appendChild(h('span', { class: 'card-icon__fallback' }, fallbackLabel));
+      }
+
+      const tile = h('div', { class: tileClass, 'data-time': it.time }, [
+        iconBox,
+        contentBlock,
+        flamesWrap(it.flames)
+      ]);
+
+      if (it.hidden || hiddenSaunas.has(name)) {
+        tile.appendChild(h('div', { class: 'card-chip card-chip--status', 'data-role': 'hidden' }, 'Ausgeblendet'));
+      }
+
       list.appendChild(tile);
     }
     if (items.length === 0) list.appendChild(h('div', { class: 'caption' }, 'Keine Einträge.'));
 
-    body.appendChild(list); c.appendChild(body);
+    body.appendChild(list);
+    c.appendChild(body);
 
-const footNodes = [];
-const order = (settings?.footnotes||[]).map(fn=>fn.id);
-for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-const layout = (settings?.footnoteLayout ?? 'one-line');
-const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : 'fn-one');
-if (footNodes.length){
-  const nodes = [];
-  footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
-  c.appendChild(h('div', { class: fnClass }, nodes));
-}
+    const footNodes = [];
+    const order = (settings?.footnotes || []).map(fn => fn.id);
+    for (const id of order) {
+      if (usedSet.has(id)) {
+        const v = notes.get(id);
+        if (v) footNodes.push(h('div', { class: 'fnitem' }, [h('sup', { class: 'note' }, String(v.label || '*')), ' ', v.text]));
+      }
+    }
+    const layout = (settings?.footnoteLayout ?? 'one-line');
+    const fnClass = 'footer-note ' + (layout === 'multi' ? 'fn-multi' : layout === 'stacked' ? 'fn-stack' : 'fn-one');
+    if (footNodes.length) {
+      const nodes = [];
+      footNodes.forEach((n, i) => {
+        if (i > 0 && layout !== 'stacked') nodes.push(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
+        nodes.push(n);
+      });
+      c.appendChild(h('div', { class: fnClass }, nodes));
+    }
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
