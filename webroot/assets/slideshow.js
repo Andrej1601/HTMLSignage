@@ -229,7 +229,9 @@ async function loadDeviceResolved(id){
       '--ovCellScale': settings?.fonts?.overviewCellScale || 0.8,
       '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
       '--tileWeight': settings?.fonts?.tileWeight || 600,
-      '--chipHScale': (settings?.fonts?.chipHeight || 1)
+      '--chipHScale': (settings?.fonts?.chipHeight || 1),
+      '--badgeBg': settings?.slides?.infobadgeColor || t.accent || '#5C3101',
+      '--badgeFg': t.boxFg || '#FFFFFF'
     });
     if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
 // Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
@@ -920,6 +922,7 @@ function renderUrl(src) {
           flames: cell.flames || '',
           noteId: cell.noteId,
           aroma: aromaText,
+          type: firstText(cell.type),
           facts: factsList,
           hidden: isHidden,
           icon: cell.icon || null
@@ -952,7 +955,17 @@ function renderUrl(src) {
       titleNode.appendChild(labelNode);
 
       const contentChildren = [titleNode];
-      if (it.aroma) contentChildren.push(h('span', { class: 'aroma' }, it.aroma));
+      if (it.type) {
+        const badgeBits = [];
+        const iconChar = settings?.slides?.infobadgeIcon || '';
+        if (iconChar) badgeBits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, iconChar));
+        badgeBits.push(h('span', { class: 'badge-label' }, it.type));
+        contentChildren.push(h('span', { class: 'badge' }, badgeBits));
+      }
+      if (it.aroma) {
+        const aromaCls = 'aroma' + (settings?.slides?.aromaItalic ? ' is-italic' : '');
+        contentChildren.push(h('span', { class: aromaCls }, it.aroma));
+      }
       if (it.facts && it.facts.length) {
         const factItems = it.facts.map(fact => h('li', { class: 'card-chip' }, fact));
         contentChildren.push(h('ul', { class: 'facts' }, factItems));
