@@ -6,46 +6,14 @@
   const STAGE_RIGHT = document.getElementById('stage-right');
   const Q = new URLSearchParams(location.search);
   const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
-  const LS_MEM = {};
-  let lsWarned = false;
-  function lsNotice(){
-    if (lsWarned) return;
-    lsWarned = true;
-    alert('Speicher voll – Daten werden nur temporär gespeichert.');
-  }
-  const ls = {
-    get(k){
-      try { return localStorage.getItem(k); }
-      catch(e){
-        if (e instanceof DOMException){
-          console.warn('[slideshow] localStorage.getItem failed', e);
-          lsNotice();
-          return LS_MEM[k] ?? null;
-        }
-        return null;
+  const ls = createSafeLocalStorage({
+    onFallback: () => {
+      if (typeof alert === 'function') {
+        alert('Speicher voll – Daten werden nur temporär gespeichert.');
       }
     },
-    set(k,v){
-      try { localStorage.setItem(k,v); }
-      catch(e){
-        if (e instanceof DOMException){
-          console.warn('[slideshow] localStorage.setItem failed', e);
-          lsNotice();
-          LS_MEM[k] = String(v);
-        }
-      }
-    },
-    remove(k){
-      try { localStorage.removeItem(k); }
-      catch(e){
-        if (e instanceof DOMException){
-          console.warn('[slideshow] localStorage.removeItem failed', e);
-          lsNotice();
-        }
-      }
-      delete LS_MEM[k];
-    }
-  };
+    logger: (method, error) => console.warn(`[slideshow] localStorage.${method} failed`, error)
+  });
   const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
   const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
   if (DEVICE_ID) {
@@ -61,7 +29,7 @@
   let heroTimeline = [];
   let cachedDisp = null;
   const stageControllers = [];
-  const resizeHandlers = new Map();
+  const resizeRegistry = createResizeRegistry();
   let heartbeatTimer = null;
   let pollTimer = null;
   let badgeLookupCache = null;
@@ -77,57 +45,16 @@
     }
   });
 
-  const imgCache = new Set();
-  const preloadQueue = [];
-  const queuedUrls = new Set();
-  let activePreloads = 0;
-  const MAX_PRELOAD = 3;
+  const imagePreloader = createImagePreloader({ maxParallel: 3 });
   const PRELOAD_AHEAD = 4;
 
-  function runPreloadQueue(){
-    while (activePreloads < MAX_PRELOAD && preloadQueue.length) {
-      const { url, resolve } = preloadQueue.shift();
-      activePreloads++;
-      const img = new Image();
-      const done = () => {
-        img.onload = img.onerror = null;
-        img.src = '';
-        queuedUrls.delete(url);
-        imgCache.add(url);
-        activePreloads--;
-        resolve();
-        runPreloadQueue();
-      };
-      img.onload = img.onerror = done;
-      img.src = url;
-    }
-  }
-
-  function queuePreload(url){
-    if (!url || imgCache.has(url) || queuedUrls.has(url)) return Promise.resolve();
-    queuedUrls.add(url);
-    return new Promise(resolve => {
-      preloadQueue.push({ url, resolve });
-      runPreloadQueue();
-    });
-  }
-
   function preloadImage(url){
-    return queuePreload(url);
-  }
-
-  function preloadImg(url){
-    return new Promise(resolve => {
-      if (!url) return resolve({ ok:false });
-      const img = new Image();
-      img.onload  = () => resolve({ ok:true,  w:img.naturalWidth, h:img.naturalHeight });
-      img.onerror = () => resolve({ ok:false });
-      img.src = url;
-    });
+    return imagePreloader.preload(url);
   }
   async function preloadRightImages(){
-    const urls = Object.values(settings?.assets?.rightImages || {});
-    await Promise.all(urls.filter(Boolean).map(preloadImage));
+    const urls = Object.values(settings?.assets?.rightImages || {}).filter(Boolean);
+    if (!urls.length) return;
+    await imagePreloader.preloadMany(urls);
   }
   async function preloadNextImages(){
     const tasks = stageControllers.map(ctrl => preloadUpcomingForStage(ctrl, { offset: 0 }));
@@ -139,29 +66,173 @@
   }
 
   function setResizeHandler(region, handler){
-    if (!region) return;
-    if (typeof handler === 'function') {
-      resizeHandlers.set(region, handler);
-    } else {
-      resizeHandlers.delete(region);
-    }
+    resizeRegistry.set(region, handler);
   }
 
   function runResizeHandlers(){
-    resizeHandlers.forEach((fn, key) => {
-      if (typeof fn !== 'function') {
-        resizeHandlers.delete(key);
-        return;
-      }
-      try {
-        fn();
-      } catch (err) {
-        console.warn('[slideshow] resize handler failed', err);
-      }
-    });
+    resizeRegistry.run();
   }
 
   window.addEventListener('resize', runResizeHandlers, { passive:true });
+
+  function createSafeLocalStorage({ onFallback, logger } = {}) {
+    const memory = {};
+    let fallbackTriggered = false;
+    let store = null;
+
+    try {
+      if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+        store = globalThis.localStorage;
+      } else if (typeof window !== 'undefined' && window.localStorage) {
+        store = window.localStorage;
+      }
+    } catch (error) {
+      store = null;
+    }
+
+    const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+    const notifyFallback = () => {
+      if (fallbackTriggered) return;
+      fallbackTriggered = true;
+      if (typeof onFallback === 'function') onFallback();
+    };
+    const reportFailure = (method, error) => {
+      if (error) {
+        if (typeof logger === 'function') logger(method, error);
+        else console.warn(`[slideshow] localStorage.${method} failed`, error);
+      }
+      notifyFallback();
+    };
+
+    return {
+      get(key) {
+        if (store) {
+          try {
+            return store.getItem(key);
+          } catch (error) {
+            reportFailure('getItem', error);
+          }
+        }
+        return hasOwn(memory, key) ? memory[key] : null;
+      },
+      set(key, value) {
+        if (store) {
+          try {
+            store.setItem(key, value);
+            if (hasOwn(memory, key)) delete memory[key];
+            return;
+          } catch (error) {
+            reportFailure('setItem', error);
+          }
+        }
+        memory[key] = String(value);
+      },
+      remove(key) {
+        if (store) {
+          try {
+            store.removeItem(key);
+          } catch (error) {
+            reportFailure('removeItem', error);
+          }
+        }
+        delete memory[key];
+      }
+    };
+  }
+
+  function createImagePreloader({ maxParallel = 3 } = {}) {
+    const processed = new Set();
+    const queued = new Set();
+    const queue = [];
+    const limit = Number.isFinite(maxParallel) && maxParallel > 0
+      ? Math.max(1, Math.floor(maxParallel))
+      : 1;
+    const supportsImage = typeof Image !== 'undefined';
+    let active = 0;
+
+    const cleanup = (img) => {
+      if (!img) return;
+      img.onload = null;
+      img.onerror = null;
+      try { img.src = ''; } catch (err) { /* ignore */ }
+    };
+
+    const dequeue = (url, resolve, img) => {
+      cleanup(img);
+      queued.delete(url);
+      processed.add(url);
+      active = Math.max(0, active - 1);
+      resolve();
+      run();
+    };
+
+    const run = () => {
+      if (!supportsImage) {
+        while (queue.length) {
+          const { url, resolve } = queue.shift();
+          queued.delete(url);
+          processed.add(url);
+          resolve();
+        }
+        return;
+      }
+      while (active < limit && queue.length) {
+        const { url, resolve } = queue.shift();
+        active++;
+        const img = new Image();
+        const done = () => dequeue(url, resolve, img);
+        img.onload = done;
+        img.onerror = done;
+        img.src = url;
+      }
+    };
+
+    const enqueue = (rawUrl) => {
+      const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+      if (!url || processed.has(url) || queued.has(url)) return Promise.resolve();
+      queued.add(url);
+      return new Promise((resolve) => {
+        queue.push({ url, resolve });
+        run();
+      });
+    };
+
+    return {
+      preload: enqueue,
+      preloadMany(urls) {
+        if (!Array.isArray(urls) || !urls.length) return Promise.resolve();
+        return Promise.all(urls.map(enqueue));
+      },
+      has(url) {
+        const normalized = typeof url === 'string' ? url.trim() : '';
+        return processed.has(normalized);
+      }
+    };
+  }
+
+  function createResizeRegistry() {
+    const handlers = new Map();
+    return {
+      set(region, handler) {
+        if (!region) return;
+        if (typeof handler === 'function') handlers.set(region, handler);
+        else handlers.delete(region);
+      },
+      run() {
+        handlers.forEach((fn, key) => {
+          if (typeof fn !== 'function') {
+            handlers.delete(key);
+            return;
+          }
+          try {
+            fn();
+          } catch (error) {
+            console.warn('[slideshow] resize handler failed', error);
+          }
+        });
+      }
+    };
+  }
 
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
