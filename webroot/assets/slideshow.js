@@ -595,11 +595,34 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   // ---------- DOM helpers ----------
   function h(tag, attrs = {}, children = []) {
     const el = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === 'class') el.className = v; else if (k === 'style') el.setAttribute('style', v); else el.setAttribute(k, v);
+    const isNode = (val) => typeof Node !== 'undefined' && val instanceof Node;
+    const toArray = (val) => {
+      if (val === undefined || val === null) return [];
+      return Array.isArray(val) ? val : [val];
+    };
+
+    let attrObj = attrs;
+    let childList = children;
+
+    if (!attrObj || typeof attrObj !== 'object' || Array.isArray(attrObj) || isNode(attrObj)) {
+      childList = toArray(attrObj).concat(toArray(children));
+      attrObj = {};
+    } else {
+      childList = toArray(children);
     }
-    for (const c of [].concat(children)) {
-      if (typeof c === 'string') el.appendChild(document.createTextNode(c)); else if (c) el.appendChild(c);
+
+    for (const [k, v] of Object.entries(attrObj)) {
+      if (k === 'class') el.className = v;
+      else if (k === 'style') el.setAttribute('style', v);
+      else el.setAttribute(k, v);
+    }
+
+    for (const c of [].concat(childList)) {
+      if (typeof c === 'string' || typeof c === 'number') {
+        el.appendChild(document.createTextNode(String(c)));
+      } else if (c) {
+        el.appendChild(c);
+      }
     }
     return el;
   }
