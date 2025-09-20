@@ -2212,6 +2212,15 @@ export function renderSlidesMaster(){
   maybeMigrateCardIcons(settings);
   const showIcons = settings.slides?.showIcons !== false;
 
+  const iconToggle = $('#toggleCardIcons');
+  if (iconToggle instanceof HTMLInputElement){
+    iconToggle.checked = showIcons;
+    iconToggle.onchange = () => {
+      (settings.slides ||= {}).showIcons = !!iconToggle.checked;
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+  }
+
   // Transition
   const transEl = $('#transMs2');
   if (transEl){
