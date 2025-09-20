@@ -297,9 +297,8 @@ if (document.readyState === 'loading'){
 // --- Kontext-Badge (Header) im Modul-Scope ---
 function renderContextBadge(){
   const header = document.querySelector('header');
-  const h1 = header?.querySelector('h1');
   const actions = header?.querySelector('.header-actions');
-  if (!header || !h1) return;
+  if (!header) return;
   let wrap = header.querySelector('.ctx-wrap');
   let el = document.getElementById('ctxBadge');
   if (!currentDeviceCtx){
@@ -309,29 +308,38 @@ function renderContextBadge(){
   if (!wrap){
     wrap = document.createElement('div');
     wrap.className = 'ctx-wrap';
-    if (actions){
-      header.insertBefore(wrap, actions);
-    } else {
-      header.appendChild(wrap);
-    }
-  } else if (actions && wrap.nextElementSibling !== actions){
+  }
+  if (actions){
     header.insertBefore(wrap, actions);
+  } else if (!wrap.isConnected){
+    header.appendChild(wrap);
   }
   if (!el){
     el = document.createElement('span');
     el.id = 'ctxBadge';
     el.className = 'ctx-badge';
-    el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
+    el.title = 'Geräte-Kontext aktiv';
+
+    const label = document.createElement('span');
+    label.className = 'ctx-badge-label';
+    el.appendChild(label);
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.id = 'ctxReset';
+    resetBtn.className = 'ctx-badge-close';
+    resetBtn.title = 'Geräte-Kontext verlassen';
+    resetBtn.textContent = 'Kontext schließen';
+    resetBtn.addEventListener('click', () => exitDeviceContext());
+    el.appendChild(resetBtn);
+
     wrap.appendChild(el);
   }
-  el.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx} `;
-  const resetBtn = document.createElement('button');
-  resetBtn.id = 'ctxReset';
-  resetBtn.classList.add('ctx-close');
-  resetBtn.title = 'Zurück zu Global';
-  resetBtn.textContent = '×';
-  resetBtn.onclick = () => exitDeviceContext();
-  el.appendChild(resetBtn);
+
+  const labelEl = el.querySelector('.ctx-badge-label');
+  if (labelEl){
+    labelEl.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx}`;
+  }
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---

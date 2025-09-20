@@ -205,22 +205,20 @@ body.device-mode header{
 body.device-mode #ctxBadge{
   background:color-mix(in oklab,var(--btn-primary-fg) 85%,var(--btn-primary));
   color:var(--btn-primary);
-  font-size:20px;
-  padding:14px 22px;
 }
-body.device-mode .ctx-close{
-  border-color:color-mix(in oklab, var(--btn-primary) 70%, transparent);
+body.device-mode .ctx-badge-close{
+  border-color:color-mix(in oklab, var(--btn-primary) 60%, transparent);
   background:color-mix(in oklab, var(--btn-primary-fg) 92%, transparent);
   color:var(--btn-primary);
-  box-shadow:0 8px 20px rgba(0,0,0,.22);
+  box-shadow:0 5px 14px rgba(0,0,0,.2);
 }
-body.device-mode .ctx-close:hover,
-body.device-mode .ctx-close:focus-visible{
+body.device-mode .ctx-badge-close:hover,
+body.device-mode .ctx-badge-close:focus-visible{
   background:var(--btn-primary-fg);
-  border-color:color-mix(in oklab, var(--btn-primary) 85%, transparent);
+  border-color:color-mix(in oklab, var(--btn-primary) 80%, transparent);
 }
-body.device-mode .ctx-close:focus-visible{
-  outline:3px solid color-mix(in oklab, var(--btn-primary) 70%, transparent);
+body.device-mode .ctx-badge-close:focus-visible{
+  outline:2px solid color-mix(in oklab, var(--btn-primary) 70%, transparent);
 }
 
 /* ---------- Layout: Main + Rightbar ---------- */
@@ -610,52 +608,57 @@ body.device-mode .toggle.ind-active input:checked ~ .moon{ color:var(--btn-prima
 
 /* Badge für Geräte-Kontext */
 .ctx-wrap{
-    display:flex;
-    flex-basis:100%;
-    justify-content:center;
-    align-items:center;
-    gap:8px;
-    margin-top:4px;
+  display:flex;
+  flex:1 1 240px;
+  min-width:160px;
+  justify-content:center;
+  align-items:center;
+  gap:8px;
+  margin-top:0;
 }
 .ctx-badge{
-    display:inline-flex;
-    align-items:center;
-    gap:12px;
-    padding:12px 18px;
-    border-radius:14px;
-    background:var(--btn-accent);
-    color:var(--btn-accent-fg);
-    font-size:18px;
-    font-weight:700;
-}
-.ctx-close{
-  margin-left:8px;
-  inline-size:42px;
-  block-size:42px;
   display:inline-flex;
   align-items:center;
-  justify-content:center;
+  gap:10px;
+  padding:6px 12px;
   border-radius:999px;
-  border:2px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
+  background:var(--btn-accent);
+  color:var(--btn-accent-fg);
+  font-size:13px;
+  font-weight:600;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.ctx-badge-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.ctx-badge-close{
+  appearance:none;
+  margin:0;
+  padding:4px 12px;
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--btn-accent) 55%, transparent);
   background:color-mix(in oklab, var(--btn-accent-fg) 92%, transparent);
   color:var(--btn-accent);
   cursor:pointer;
-  font-weight:800;
-  font-size:26px;
-  line-height:1;
-  box-shadow:0 8px 18px rgba(0,0,0,.22);
-  transition:transform .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease;
+  font-weight:700;
+  font-size:12px;
+  line-height:1.1;
+  box-shadow:0 4px 12px rgba(0,0,0,.18);
+  transition:transform .16s ease, box-shadow .16s ease, background-color .16s ease, color .16s ease, border-color .16s ease;
 }
-.ctx-close:hover,
-.ctx-close:focus-visible{
+.ctx-badge-close:hover,
+.ctx-badge-close:focus-visible{
   transform:translateY(-1px);
   background:var(--btn-accent-fg);
   color:var(--btn-accent);
-  border-color:color-mix(in oklab, var(--btn-accent) 85%, transparent);
-  box-shadow:0 10px 24px rgba(0,0,0,.28);
+  border-color:color-mix(in oklab, var(--btn-accent) 75%, transparent);
+  box-shadow:0 6px 16px rgba(0,0,0,.22);
 }
-.ctx-close:focus-visible{
-  outline:3px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
+.ctx-badge-close:focus-visible{
+  outline:2px solid color-mix(in oklab, var(--btn-accent) 70%, transparent);
   outline-offset:2px;
 }
 
