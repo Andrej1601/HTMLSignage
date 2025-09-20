@@ -1669,7 +1669,7 @@ function renderStorySlide(story = {}, region = 'left') {
     const t = target > 0 ? target : fallbackTarget;
     const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
-    const iconSize = clamp(60, t * 0.18, 200);
+    const iconSize = clamp(56, t * 0.16, 200);
     const padY = useIcons ? clamp(14, t * 0.045, 44) : clamp(10, t * 0.035, 32);
     const padX = useIcons
       ? Math.max(clamp(20, t * 0.07, 68), padY + 6)
@@ -1681,6 +1681,13 @@ function renderStorySlide(story = {}, region = 'left') {
     const radius = useIcons ? clamp(18, t * 0.06, 48) : clamp(16, t * 0.05, 44);
     const metaScale = useIcons ? clamp(0.72, t / 720, 1.12) : clamp(0.78, t / 820, 1.08);
     const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
+    const iconColumn = useIcons ? clamp(44, iconSize * 0.78, iconSize * 1.52) : 0;
+    const tileMinHeight = useIcons
+      ? clamp(92, iconSize * 0.9, iconSize * 1.18)
+      : clamp(80, padY * 3.4, 132);
+    const iconHeightScale = useIcons
+      ? clamp(0.72, tileMinHeight / Math.max(iconSize, 1), 1.05)
+      : 0;
 
     container.style.setProperty('--tileIconSizePx', useIcons ? (iconSize.toFixed(2) + 'px') : '0px');
     container.style.setProperty('--tilePadYPx', padY.toFixed(2) + 'px');
@@ -1692,6 +1699,9 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
     container.style.setProperty('--tileMetaScale', metaScale.toFixed(3));
     container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
+    container.style.setProperty('--tileIconColumnPx', useIcons ? (iconColumn.toFixed(2) + 'px') : '0px');
+    container.style.setProperty('--tileMinHeightPx', tileMinHeight.toFixed(2) + 'px');
+    container.style.setProperty('--tileIconHeightScale', iconHeightScale.toFixed(3));
   }
 
   // ---------- Sauna slide ----------
@@ -1722,6 +1732,37 @@ function renderStorySlide(story = {}, region = 'left') {
     const colIdx = (schedule.saunas || []).indexOf(name);
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
     const componentFlags = getSlideComponentFlags();
+    const iconVariantMap = (settings?.slides?.iconVariants && typeof settings.slides.iconVariants === 'object')
+      ? settings.slides.iconVariants
+      : null;
+    const iconVariantDefault = (() => {
+      const norm = normalizeIconVariant(settings?.slides?.iconVariant);
+      return norm || 'default';
+    })();
+
+    function normalizeIconVariant(value) {
+      if (typeof value !== 'string') return '';
+      const norm = value.trim().toLowerCase();
+      if (!norm) return '';
+      if (norm === 'round' || norm === 'circle') return 'badge';
+      if (norm === 'corner') return 'overlay';
+      if (norm === 'stripe' || norm === 'banner') return 'strip';
+      if (['default', 'badge', 'strip', 'overlay'].includes(norm)) return norm;
+      return '';
+    }
+
+    function resolveIconVariant(preferred) {
+      if (!iconsEnabled) return 'hidden';
+      const fromItem = normalizeIconVariant(preferred);
+      if (fromItem) return fromItem;
+      if (iconVariantMap) {
+        const bySauna = normalizeIconVariant(iconVariantMap[name]);
+        if (bySauna) return bySauna;
+        const wildcard = normalizeIconVariant(iconVariantMap['*'] || iconVariantMap.default);
+        if (wildcard) return wildcard;
+      }
+      return iconVariantDefault;
+    }
 
     const items = [];
     for (const row of (schedule.rows || [])) {
@@ -1739,7 +1780,8 @@ function renderStorySlide(story = {}, region = 'left') {
           facts: details.facts,
           badges: details.badges,
           hidden: isHidden,
-          icon: cell.icon || null
+          icon: cell.icon || null,
+          iconVariant: cell.iconVariant || cell.iconLayout || null
         });
       }
     }
@@ -1753,6 +1795,13 @@ function renderStorySlide(story = {}, region = 'left') {
       if (hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) tileClasses.push('highlight');
       if (it.hidden || hiddenSaunas.has(name)) tileClasses.push('is-hidden');
       if (!iconsEnabled) tileClasses.push('tile--compact');
+      let iconVariant = 'default';
+      if (iconsEnabled) {
+        iconVariant = resolveIconVariant(it.iconVariant);
+        if (iconVariant === 'badge') tileClasses.push('tile--icon-badge');
+        if (iconVariant === 'strip') tileClasses.push('tile--icon-strip');
+        if (iconVariant === 'overlay') tileClasses.push('tile--icon-overlay');
+      }
 
       const titleNode = h('div', { class: 'title' });
       const timeNode = h('span', { class: 'time' }, it.time + ' Uhr');
@@ -1782,7 +1831,12 @@ function renderStorySlide(story = {}, region = 'left') {
       const tileChildren = [];
       if (iconsEnabled) {
         const iconUrl = it.icon || defaultIconForSauna || legacyIconFallback || '';
-        const iconBox = h('div', { class: 'card-icon' + (iconUrl ? '' : ' is-empty') });
+        const iconClassNames = ['card-icon'];
+        if (iconVariant && iconVariant !== 'default' && iconVariant !== 'hidden') {
+          iconClassNames.push('card-icon--' + iconVariant);
+        }
+        if (!iconUrl) iconClassNames.push('is-empty');
+        const iconBox = h('div', { class: iconClassNames.join(' ') });
         if (iconUrl) {
           iconBox.appendChild(h('img', { src: iconUrl, alt: '' }));
         } else {
