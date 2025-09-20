@@ -133,7 +133,14 @@
     const urls = [];
     for (let i = 0; i < PRELOAD_AHEAD; i++) {
       const item = nextQueue[(idx + i) % nextQueue.length];
-      const url = (item && item.type === 'image') ? item.src : null;
+      let url = null;
+      if (item) {
+        if (item.type === 'image') {
+          url = item.src;
+        } else if (item.type === 'story') {
+          url = item.story?.heroUrl || item.story?.hero?.url || null;
+        }
+      }
       if (url) urls.push(url);
     }
     await Promise.all(urls.map(preloadImage));
@@ -302,6 +309,25 @@ function buildQueue() {
   const allSaunas = (schedule?.saunas || []);
   const sortOrder = Array.isArray(settings?.slides?.sortOrder) ? settings.slides.sortOrder : null;
 
+  const storySlidesAll = Array.isArray(settings?.slides?.storySlides)
+    ? settings.slides.storySlides
+    : [];
+  const storyKey = (story, idx) => {
+    if (!story) return null;
+    if (story.id != null) return String(story.id);
+    return 'story_idx_' + idx;
+  };
+  const storyEntriesAll = storySlidesAll
+    .map((story, idx) => {
+      const key = storyKey(story, idx);
+      if (!story || !key) return null;
+      return { key, story, idx };
+    })
+    .filter(Boolean);
+  const storyEntriesEnabled = storyEntriesAll.filter(entry => entry.story.enabled !== false);
+  const storyMapAll = new Map(storyEntriesAll.map(entry => [entry.key, entry.story]));
+  const storyMapEnabled = new Map(storyEntriesEnabled.map(entry => [entry.key, entry.story]));
+
   if (sortOrder && sortOrder.length) {
     const queue = [];
     if (showOverview) queue.push({ type: 'overview' });
@@ -309,6 +335,7 @@ function buildQueue() {
     const mediaMap = new Map(mediaAll.map(it => [String(it.id), it]));
     const usedSaunas = new Set();
     const usedMedia = new Set();
+    const usedStories = new Set();
     for (const entry of sortOrder) {
       if (entry.type === 'sauna') {
         const name = entry.name;
@@ -329,6 +356,13 @@ function buildQueue() {
           queue.push(node);
           usedMedia.add(String(it.id));
         }
+      } else if (entry.type === 'story') {
+        const key = String(entry.id ?? '');
+        const story = storyMapEnabled.get(key);
+        if (story) {
+          queue.push({ type: 'story', story, storyId: key });
+          usedStories.add(key);
+        }
       }
     }
     for (const s of allSaunas) {
@@ -347,10 +381,19 @@ function buildQueue() {
         queue.push(node);
       }
     }
+    for (const entry of storyEntriesEnabled) {
+      if (!usedStories.has(entry.key)) {
+        queue.push({ type: 'story', story: entry.story, storyId: entry.key });
+      }
+    }
     const clean = [];
     for (const q of queue) {
       if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
       else if (q.__id != null) clean.push({ type: 'media', id: q.__id });
+      else if (q.type === 'story') {
+        const id = q.storyId ?? (q.story?.id ?? null);
+        if (id != null && storyMapAll.has(String(id))) clean.push({ type: 'story', id: String(id) });
+      }
     }
     settings.slides.sortOrder = clean;
     if (!queue.length && showOverview) queue.push({ type: 'overview' });
@@ -408,6 +451,11 @@ function buildQueue() {
     if (it.src) node.src = it.src;
     if (it.url && it.type === 'url') node.url = it.url;
     queue.splice(insPos++, 0, node);
+  }
+
+  // Story-Slides anhängen
+  for (const entry of storyEntriesEnabled) {
+    queue.push({ type: 'story', story: entry.story, storyId: entry.key });
   }
 
   // Falls nichts bleibt, notfalls Übersicht zeigen
@@ -778,6 +826,179 @@ function renderUrl(src) {
   return c;
 }
 
+function renderStorySlide(story = {}) {
+  const data = story || {};
+  const container = h('div', { class: 'container story-slide fade show' });
+  const columns = h('div', { class: 'story-columns' });
+
+  const hero = h('div', { class: 'story-hero' });
+  const heroUrl = data.heroUrl || data.hero?.url || '';
+  const heroAlt = data.heroAlt || data.hero?.alt || '';
+  if (heroUrl) {
+    const img = h('img', { src: heroUrl, alt: heroAlt });
+    img.addEventListener('error', () => {
+      hero.classList.add('story-hero--placeholder');
+      hero.innerHTML = '';
+      hero.appendChild(h('div', { class: 'story-hero-placeholder' }, 'Bild nicht verfügbar'));
+    });
+    hero.appendChild(img);
+  } else {
+    hero.classList.add('story-hero--placeholder');
+    hero.appendChild(h('div', { class: 'story-hero-placeholder' }, 'Kein Bild ausgewählt'));
+  }
+
+  const content = h('div', { class: 'story-content' });
+  const title = String(data.title || '').trim() || 'Saunen & Aufgüsse erklärt';
+  content.appendChild(h('h1', { class: 'story-title' }, title));
+  if (data.subtitle) {
+    content.appendChild(h('p', { class: 'story-subtitle' }, data.subtitle));
+  }
+
+  const paragraphNodes = (text) => {
+    const str = String(text ?? '').trim();
+    if (!str) return [];
+    const lines = str.split(/\r?\n/).map(line => line.trim());
+    const groups = [];
+    let buf = [];
+    for (const line of lines) {
+      if (!line) {
+        if (buf.length) { groups.push(buf.join(' ')); buf = []; }
+      } else {
+        buf.push(line);
+      }
+    }
+    if (buf.length) groups.push(buf.join(' '));
+    return groups.map(par => h('p', { class: 'story-paragraph' }, par));
+  };
+
+  const tipsNodes = (text) => {
+    const str = String(text ?? '').trim();
+    if (!str) return [];
+    const lines = str.split(/\r?\n/).map(line => line.trim().replace(/^[-•]\s*/, '')).filter(Boolean);
+    if (!lines.length) return [];
+    if (lines.length === 1) return [h('p', { class: 'story-paragraph' }, lines[0])];
+    const ul = h('ul', { class: 'story-tip-list' });
+    lines.forEach(line => ul.appendChild(h('li', line)));
+    return [ul];
+  };
+
+  const makeSection = (className, label, nodes) => {
+    const items = nodes.filter(Boolean);
+    if (!items.length) return null;
+    return h('div', { class: 'story-section ' + className }, [
+      h('h3', { class: 'story-section-title' }, label),
+      ...items
+    ]);
+  };
+
+  const introSection = makeSection('story-intro', 'Einführung', paragraphNodes(data.intro));
+  if (introSection) content.appendChild(introSection);
+
+  const ritualSection = makeSection('story-ritual', 'Ritual', paragraphNodes(data.ritual));
+  if (ritualSection) content.appendChild(ritualSection);
+
+  const tipsSection = makeSection('story-tips', 'Tipps', tipsNodes(data.tips));
+  if (tipsSection) content.appendChild(tipsSection);
+
+  const faqItems = Array.isArray(data.faq) ? data.faq.filter(item => {
+    if (!item) return false;
+    const q = String(item.question || '').trim();
+    const a = String(item.answer || '').trim();
+    return q || a;
+  }) : [];
+  if (faqItems.length) {
+    const dl = h('dl', { class: 'story-faq-list' });
+    faqItems.forEach(item => {
+      const q = String(item.question || '').trim();
+      const a = String(item.answer || '').trim();
+      dl.appendChild(h('dt', q || 'Frage'));
+      dl.appendChild(h('dd', a || ''));
+    });
+    const faqSection = makeSection('story-faq', 'FAQ', [dl]);
+    if (faqSection) content.appendChild(faqSection);
+  }
+
+  const computeAvailability = () => {
+    if (!schedule || !Array.isArray(schedule.rows) || !Array.isArray(schedule.saunas)) return [];
+    const targetsRaw = Array.isArray(data.saunas) ? data.saunas
+      : Array.isArray(data.saunaRefs) ? data.saunaRefs
+      : (data.sauna ? [data.sauna] : []);
+    const targets = targetsRaw
+      .map(name => String(name || '').trim())
+      .filter(Boolean);
+    const indices = [];
+    for (const name of targets) {
+      const idx = schedule.saunas.indexOf(name);
+      if (idx >= 0 && !indices.some(entry => entry.idx === idx)) {
+        indices.push({ name, idx });
+      }
+    }
+    if (!indices.length) return [];
+    const now = nowMinutes();
+    const items = [];
+    (schedule.rows || []).forEach(row => {
+      if (!row) return;
+      const time = row.time || '';
+      const m = parseHM(time);
+      indices.forEach(({ name, idx }) => {
+        const cell = Array.isArray(row.entries) ? row.entries[idx] : null;
+        if (cell && cell.title) {
+          items.push({
+            sauna: name,
+            title: cell.title,
+            time,
+            minutes: m,
+            isUpcoming: (m != null) ? (m >= now) : false
+          });
+        }
+      });
+    });
+    items.sort((a, b) => {
+      const am = a.minutes ?? Infinity;
+      const bm = b.minutes ?? Infinity;
+      if (am === bm) return a.sauna.localeCompare(b.sauna, 'de');
+      return am - bm;
+    });
+    const nextIdx = items.findIndex(it => it.minutes != null && it.minutes >= now);
+    if (nextIdx >= 0) items[nextIdx].isNext = true;
+    return items;
+  };
+
+  const availability = () => {
+    const section = h('div', { class: 'story-section story-availability' });
+    section.appendChild(h('h3', { class: 'story-section-title' }, 'Heute verfügbar'));
+    const entries = computeAvailability();
+    if (!entries.length) {
+      const message = Array.isArray(data.saunas) && data.saunas.length
+        ? 'Heute keine passenden Aufgüsse eingetragen.'
+        : 'Keine Zuordnung zum Tagesplan hinterlegt.';
+      section.appendChild(h('p', { class: 'story-availability-empty' }, message));
+      return section;
+    }
+    const list = h('ul', { class: 'story-availability-list' });
+    entries.forEach(entry => {
+      const cls = ['story-availability-item'];
+      if (entry.isNext) cls.push('is-next');
+      else if (entry.isUpcoming) cls.push('is-upcoming');
+      const li = h('li', { class: cls.join(' ') }, [
+        h('span', { class: 'story-availability-time' }, entry.time || '–'),
+        h('span', { class: 'story-availability-sauna' }, entry.sauna),
+        entry.title ? h('span', { class: 'story-availability-title' }, entry.title) : null
+      ]);
+      list.appendChild(li);
+    });
+    section.appendChild(list);
+    return section;
+  };
+
+  content.appendChild(availability());
+
+  columns.appendChild(hero);
+  columns.appendChild(content);
+  container.appendChild(columns);
+  return container;
+}
+
   // ---------- Sauna tile sizing by unobscured width ----------
   function computeAvailContentWidth(container) {
     const cw = container.clientWidth;
@@ -1081,6 +1302,18 @@ function dwellMsForItem(item) {
     }
   }
 
+  if (item.type === 'story') {
+    const story = item.story || {};
+    if (mode !== 'per') {
+      const g = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
+      return sec(g) * 1000;
+    }
+    const v = Number.isFinite(+story.dwellSec)
+      ? +story.dwellSec
+      : (slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8);
+    return sec(v) * 1000;
+  }
+
   return 6000; // Fallback
 }
 
@@ -1090,12 +1323,12 @@ function step() {
   clearTimers();
 
 let item = nextQueue[idx % nextQueue.length];
-let key  = item.type + '|' + (item.sauna || item.src || item.url || '');
+let key  = item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
 if (key === lastKey && nextQueue.length > 1) {
   // eine Folie würde direkt wiederholt → eine weiter
     idx++;
     item = nextQueue[idx % nextQueue.length];
-    key  = item.type + '|' + (item.sauna || item.src || item.url || '');
+    key  = item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
 }
   const el =
     (item.type === 'overview') ? renderOverview() :
@@ -1103,6 +1336,7 @@ if (key === lastKey && nextQueue.length > 1) {
     (item.type === 'image')    ? renderImage(item.src) :
     (item.type === 'video')    ? renderVideo(item.src, item) :
     (item.type === 'url')      ? renderUrl(item.url) :
+    (item.type === 'story')    ? renderStorySlide(item.story) :
                                  renderImage(item.src || item.url);
 
   show(el);

@@ -801,6 +801,339 @@ function renderInterstitialsPanel(hostId='interList2'){
 }
 
 // ============================================================================
+// 6c) Story Slides
+// ============================================================================
+
+const FALLBACK_HERO = '/assets/img/thumb_fallback.svg';
+const stripCacheSimple = (u = '') => u.split('?')[0];
+
+function ensureStorySlides(settings){
+  settings.slides ||= {};
+  let list = Array.isArray(settings.slides.storySlides) ? settings.slides.storySlides : [];
+  list = list.filter(item => item && typeof item === 'object');
+  list.forEach((story, idx) => {
+    if (!story.id) story.id = 'story_' + Math.random().toString(36).slice(2, 9);
+    if (!Array.isArray(story.faq)) story.faq = [];
+    if (Array.isArray(story.saunaRefs) && !Array.isArray(story.saunas)) {
+      story.saunas = story.saunaRefs.slice();
+    }
+    if (!Array.isArray(story.saunas)) story.saunas = [];
+    story.enabled = (story.enabled === false) ? false : true;
+    story.heroUrl = typeof story.heroUrl === 'string' ? story.heroUrl : '';
+    story.heroAlt = typeof story.heroAlt === 'string' ? story.heroAlt : '';
+    story.intro = typeof story.intro === 'string' ? story.intro : '';
+    story.ritual = typeof story.ritual === 'string' ? story.ritual : '';
+    story.tips = typeof story.tips === 'string' ? story.tips : '';
+  });
+  settings.slides.storySlides = list;
+  return settings.slides.storySlides;
+}
+
+function storyDefaults(){
+  return {
+    id: 'story_' + Math.random().toString(36).slice(2, 9),
+    title: '',
+    heroUrl: '',
+    heroAlt: '',
+    saunas: [],
+    intro: '',
+    ritual: '',
+    tips: '',
+    faq: [],
+    enabled: true
+  };
+}
+
+function storyEditor(story, idx){
+  const settings = ctx.getSettings();
+  const wrap = document.createElement('div');
+  wrap.className = 'story-editor fieldset';
+
+  const legend = document.createElement('div');
+  legend.className = 'legend';
+  const legendTitle = String(story.title || '').trim();
+  legend.textContent = legendTitle ? `Erklärung: ${legendTitle}` : 'Neue Erklärung';
+  if (story.enabled === false) legend.textContent += ' (deaktiviert)';
+  wrap.appendChild(legend);
+
+  const header = document.createElement('div');
+  header.className = 'row story-editor-head';
+  header.style.gap = '8px';
+  header.style.flexWrap = 'wrap';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'input';
+  titleInput.placeholder = 'Titel (z. B. Finnische Sauna)';
+  titleInput.value = story.title || '';
+  titleInput.onchange = () => { story.title = titleInput.value.trim(); renderSlidesMaster(); };
+  header.appendChild(titleInput);
+
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'btn sm ghost';
+  enabledLabel.style.gap = '6px';
+  const enabledInput = document.createElement('input');
+  enabledInput.type = 'checkbox';
+  enabledInput.checked = story.enabled !== false;
+  enabledInput.onchange = () => { story.enabled = !!enabledInput.checked; renderSlidesMaster(); };
+  enabledLabel.appendChild(enabledInput);
+  enabledLabel.appendChild(document.createTextNode('Aktiv'));
+  header.appendChild(enabledLabel);
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'btn sm ghost icon';
+  delBtn.title = 'Erklärung entfernen';
+  delBtn.textContent = '✕';
+  delBtn.onclick = () => {
+    const arr = settings.slides.storySlides || [];
+    arr.splice(idx, 1);
+    if (Array.isArray(settings.slides.sortOrder)) {
+      settings.slides.sortOrder = settings.slides.sortOrder.filter(entry => {
+        if (!entry || entry.type !== 'story') return true;
+        const id = String(entry.id ?? '');
+        const sid = String(story.id ?? '');
+        return id !== sid;
+      });
+    }
+    renderSlidesMaster();
+  };
+  header.appendChild(delBtn);
+
+  wrap.appendChild(header);
+
+  const heroSection = document.createElement('div');
+  heroSection.className = 'story-hero-editor';
+  heroSection.style.display = 'grid';
+  heroSection.style.gap = '8px';
+
+  const heroRow = document.createElement('div');
+  heroRow.className = 'row';
+  heroRow.style.gap = '12px';
+  heroRow.style.flexWrap = 'wrap';
+  heroRow.style.alignItems = 'center';
+
+  const heroPreview = document.createElement('img');
+  heroPreview.className = 'story-hero-preview';
+  heroPreview.style.maxWidth = '160px';
+  heroPreview.style.height = '100px';
+  heroPreview.style.objectFit = 'cover';
+  heroPreview.style.borderRadius = '8px';
+  heroPreview.alt = story.heroAlt || '';
+
+  const updateHeroPreview = () => {
+    if (story.heroUrl) {
+      heroPreview.src = story.heroUrl;
+      heroPreview.title = stripCacheSimple(story.heroUrl);
+    } else {
+      heroPreview.src = FALLBACK_HERO;
+      heroPreview.title = 'Kein Bild ausgewählt';
+    }
+  };
+
+  const heroBtnWrap = document.createElement('div');
+  heroBtnWrap.className = 'row';
+  heroBtnWrap.style.gap = '6px';
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.className = 'btn sm ghost';
+  uploadBtn.textContent = 'Bild hochladen';
+  uploadBtn.onclick = () => {
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (url) => {
+      const clean = stripCacheSimple(url || '');
+      story.heroUrl = clean
+        ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
+        : '';
+      renderSlidesMaster();
+    });
+    fi.click();
+  };
+  heroBtnWrap.appendChild(uploadBtn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn sm ghost';
+  removeBtn.textContent = 'Bild entfernen';
+  removeBtn.onclick = () => { story.heroUrl = ''; renderSlidesMaster(); };
+  heroBtnWrap.appendChild(removeBtn);
+
+  heroRow.appendChild(heroPreview);
+  heroRow.appendChild(heroBtnWrap);
+  heroSection.appendChild(heroRow);
+
+  const altWrap = document.createElement('div');
+  altWrap.className = 'kv';
+  const altLabel = document.createElement('label');
+  altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
+  const altInput = document.createElement('input');
+  altInput.type = 'text';
+  altInput.className = 'input';
+  altInput.placeholder = 'Optional für Screenreader';
+  altInput.value = story.heroAlt || '';
+  altInput.onchange = () => { story.heroAlt = altInput.value.trim(); renderSlidesMaster(); };
+  altWrap.appendChild(altLabel);
+  altWrap.appendChild(altInput);
+  heroSection.appendChild(altWrap);
+
+  wrap.appendChild(heroSection);
+  updateHeroPreview();
+
+  const saunaWrap = document.createElement('div');
+  saunaWrap.className = 'kv story-sauna-select';
+  const saunaLabel = document.createElement('label');
+  saunaLabel.textContent = 'Zugehörige Saunen';
+  saunaWrap.appendChild(saunaLabel);
+  const saunaList = document.createElement('div');
+  saunaList.className = 'story-sauna-options';
+  saunaList.style.display = 'flex';
+  saunaList.style.flexWrap = 'wrap';
+  saunaList.style.gap = '6px';
+
+  const selected = new Set(Array.isArray(story.saunas) ? story.saunas : []);
+  const saunas = getAllSaunas();
+  if (saunas.length) {
+    saunas.forEach(name => {
+      const option = document.createElement('label');
+      option.className = 'btn sm ghost story-sauna-option';
+      option.style.gap = '4px';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = selected.has(name);
+      cb.onchange = () => {
+        const base = Array.isArray(story.saunas) ? story.saunas.slice() : [];
+        const idxSel = base.indexOf(name);
+        if (cb.checked && idxSel === -1) base.push(name);
+        if (!cb.checked && idxSel !== -1) base.splice(idxSel, 1);
+        story.saunas = base.sort((a, b) => a.localeCompare(b, 'de'));
+        renderSlidesMaster();
+      };
+      option.appendChild(cb);
+      option.appendChild(document.createTextNode(name));
+      saunaList.appendChild(option);
+    });
+  } else {
+    const empty = document.createElement('div');
+    empty.className = 'mut';
+    empty.textContent = 'Noch keine Saunen im Inventar.';
+    saunaList.appendChild(empty);
+  }
+  saunaWrap.appendChild(saunaList);
+  wrap.appendChild(saunaWrap);
+
+  const makeTextarea = (label, prop, rows = 3, placeholder = '') => {
+    const kv = document.createElement('div');
+    kv.className = 'kv';
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    const ta = document.createElement('textarea');
+    ta.className = 'input';
+    ta.rows = rows;
+    ta.placeholder = placeholder || label;
+    ta.value = story[prop] || '';
+    ta.onchange = () => { story[prop] = ta.value.trim(); renderSlidesMaster(); };
+    kv.appendChild(lbl);
+    kv.appendChild(ta);
+    return kv;
+  };
+
+  wrap.appendChild(makeTextarea('Einführung', 'intro', 3, 'Hintergrund & Wirkung'));
+  wrap.appendChild(makeTextarea('Ritual', 'ritual', 3, 'Ablauf oder Besonderheiten'));
+  wrap.appendChild(makeTextarea('Tipps (je Zeile ein Tipp)', 'tips', 3, 'Tipps oder Hinweise'));
+
+  const faqHeader = document.createElement('div');
+  faqHeader.className = 'subh';
+  faqHeader.textContent = 'FAQ';
+  wrap.appendChild(faqHeader);
+
+  const faqList = document.createElement('div');
+  faqList.className = 'story-faq-editor';
+  faqList.style.display = 'grid';
+  faqList.style.gap = '8px';
+  wrap.appendChild(faqList);
+
+  const renderFaqList = () => {
+    faqList.innerHTML = '';
+    const data = Array.isArray(story.faq) ? story.faq : [];
+    if (!data.length) {
+      const empty = document.createElement('div');
+      empty.className = 'mut';
+      empty.textContent = 'Noch keine Fragen hinterlegt.';
+      faqList.appendChild(empty);
+      return;
+    }
+    data.forEach((entry, faqIdx) => {
+      const row = document.createElement('div');
+      row.className = 'row story-faq-row';
+      row.style.gap = '6px';
+      row.style.flexWrap = 'wrap';
+
+      const q = document.createElement('input');
+      q.type = 'text';
+      q.className = 'input';
+      q.style.flex = '1 1 220px';
+      q.placeholder = 'Frage';
+      q.value = entry?.question || '';
+      q.onchange = () => { entry.question = q.value.trim(); renderSlidesMaster(); };
+
+      const a = document.createElement('textarea');
+      a.className = 'input';
+      a.rows = 2;
+      a.style.flex = '1 1 320px';
+      a.placeholder = 'Antwort';
+      a.value = entry?.answer || '';
+      a.onchange = () => { entry.answer = a.value.trim(); renderSlidesMaster(); };
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn sm ghost icon';
+      del.title = 'Eintrag entfernen';
+      del.textContent = '✕';
+      del.onclick = () => {
+        data.splice(faqIdx, 1);
+        renderSlidesMaster();
+      };
+
+      row.appendChild(q);
+      row.appendChild(a);
+      row.appendChild(del);
+      faqList.appendChild(row);
+    });
+  };
+  renderFaqList();
+
+  const addFaqBtn = document.createElement('button');
+  addFaqBtn.type = 'button';
+  addFaqBtn.className = 'btn sm ghost';
+  addFaqBtn.textContent = 'FAQ hinzufügen';
+  addFaqBtn.onclick = () => {
+    (story.faq ||= []).push({ question: '', answer: '' });
+    renderSlidesMaster();
+  };
+  wrap.appendChild(addFaqBtn);
+
+  return wrap;
+}
+
+function renderStorySlidesPanel(hostId='storyList'){
+  const settings = ctx.getSettings();
+  const list = ensureStorySlides(settings);
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  host.innerHTML = '';
+  list.forEach((story, idx) => host.appendChild(storyEditor(story, idx)));
+
+  const addBtn = document.getElementById('btnStoryAdd');
+  if (addBtn) addBtn.onclick = () => {
+    ensureStorySlides(settings).push(storyDefaults());
+    renderSlidesMaster();
+  };
+}
+
+// ============================================================================
 // 6b) Slide Order View
 // ============================================================================
 export function renderSlideOrderView(){
@@ -812,6 +1145,8 @@ export function renderSlideOrderView(){
   const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
   const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
     .map(it => ({ kind: 'media', item: it }));
+  const storiesRaw = ensureStorySlides(settings);
+  const stories = storiesRaw.map((item, i) => ({ kind: 'story', item, key: item?.id != null ? String(item.id) : 'story_idx_' + i }));
   const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
 
   let combined = [];
@@ -819,6 +1154,7 @@ export function renderSlideOrderView(){
   if (Array.isArray(ord) && ord.length){
     const mapS = new Map(saunas.map(s => [s.name, s]));
     const mapM = new Map(media.map(m => [String(m.item.id), m]));
+    const mapStory = new Map(stories.map(st => [st.key, st]));
     for (const o of ord){
       if (o.type === 'sauna' && mapS.has(o.name)){
         combined.push(mapS.get(o.name));
@@ -826,15 +1162,20 @@ export function renderSlideOrderView(){
       } else if (o.type === 'media' && mapM.has(String(o.id))){
         combined.push(mapM.get(String(o.id)));
         mapM.delete(String(o.id));
+      } else if (o.type === 'story' && mapStory.has(String(o.id))){
+        combined.push(mapStory.get(String(o.id)));
+        mapStory.delete(String(o.id));
       }
     }
-    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()));
+    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()), Array.from(mapStory.values()));
     // sortOrder ggf. bereinigen (nicht mehr existierende Einträge entfernen)
-    settings.slides.sortOrder = combined.map(e => e.kind === 'sauna'
-      ? { type:'sauna', name:e.name }
-      : { type:'media', id:e.item.id });
+    settings.slides.sortOrder = combined.map(e => {
+      if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
+      if (e.kind === 'media') return { type: 'media', id: e.item.id };
+      return { type: 'story', id: e.item?.id ?? e.key };
+    });
   } else {
-    combined = saunas.concat(media);
+    combined = saunas.concat(media, stories);
   }
 
   host.innerHTML = '';
@@ -847,13 +1188,14 @@ export function renderSlideOrderView(){
 
     const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
     const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
+    const isDisabledStory = entry.kind === 'story' && entry.item?.enabled === false;
     if (isHiddenSauna) tile.classList.add('is-hidden');
-    if (isHiddenSauna || isDisabledMedia) tile.classList.add('is-disabled');
+    if (isHiddenSauna || isDisabledMedia || isDisabledStory) tile.classList.add('is-disabled');
 
     const title = document.createElement('div');
     title.className = 'title';
     let statusEl = null;
-    if (isHiddenSauna || isDisabledMedia){
+    if (isHiddenSauna || isDisabledMedia || isDisabledStory){
       statusEl = document.createElement('div');
       statusEl.className = 'slide-status';
       statusEl.dataset.state = 'hidden';
@@ -871,7 +1213,7 @@ export function renderSlideOrderView(){
         img.alt = entry.name || '';
         tile.appendChild(img);
       }
-    } else {
+    } else if (entry.kind === 'media') {
       tile.dataset.id = entry.item.id;
       title.textContent = entry.item.name || '(unbenannt)';
       tile.appendChild(title);
@@ -879,6 +1221,15 @@ export function renderSlideOrderView(){
       const img = document.createElement('img');
       img.src = entry.item.thumb || entry.item.url || '';
       img.alt = entry.item.name || '';
+      tile.appendChild(img);
+    } else {
+      tile.dataset.storyId = entry.item?.id || entry.key || '';
+      title.textContent = entry.item?.title || 'Story-Slide';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const img = document.createElement('img');
+      img.src = entry.item?.heroUrl || FALLBACK_HERO;
+      img.alt = entry.item?.heroAlt || '';
       tile.appendChild(img);
     }
 
@@ -956,18 +1307,23 @@ export function renderSlideOrderView(){
 
     const newSaunas = [];
     const newMedia = [];
+    const newStories = [];
     const sortOrder = [];
     for (const entry of reordered){
       if (entry.kind === 'sauna'){
         newSaunas.push(entry.name);
         sortOrder.push({ type:'sauna', name: entry.name });
-      } else {
+      } else if (entry.kind === 'media') {
         newMedia.push(entry.item);
         sortOrder.push({ type:'media', id: entry.item.id });
+      } else if (entry.kind === 'story') {
+        newStories.push(entry.item);
+        sortOrder.push({ type:'story', id: entry.item?.id ?? entry.key });
       }
     }
     schedule.saunas = newSaunas;
     settings.interstitials = newMedia;
+    settings.slides.storySlides = newStories;
     settings.slides ||= {};
     settings.slides.sortOrder = sortOrder;
   };
@@ -1043,6 +1399,8 @@ export function renderSlideOrderView(){
 export function renderSlidesMaster(){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
+
+  ensureStorySlides(settings);
 
   // Transition
   const transEl = $('#transMs2');
@@ -1185,6 +1543,9 @@ if (durPer) durPer.onchange = () => {
     renderSlidesMaster();
   }
 };
+
+  // Story-Slides
+  renderStorySlidesPanel('storyList');
 
   // Medien-Slides
   renderInterstitialsPanel('interList2');
