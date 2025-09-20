@@ -13,50 +13,333 @@
 import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, validateUniqueAfterRefs } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
+const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
+
+// Lokaler Speicher mit Fallback bei DOMException (z.B. QuotaExceeded)
+const LS_MEM = {};
+let lsWarned = false;
+function lsNotice(){
+  if (lsWarned) return;
+  lsWarned = true;
+  alert('Speicher voll – Daten werden nur temporär gespeichert.');
+}
+function lsGet(key) {
+  try { return localStorage.getItem(key); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.getItem failed', e);
+      lsNotice();
+      return LS_MEM[key] ?? null;
+    }
+    return null;
+  }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.setItem failed', e);
+      lsNotice();
+      LS_MEM[key] = String(val);
+    }
+  }
+}
+function lsRemove(key) {
+  try { localStorage.removeItem(key); }
+  catch (e) {
+    if (e instanceof DOMException) {
+      console.warn('[admin] localStorage.removeItem failed', e);
+      lsNotice();
+    }
+  }
+  delete LS_MEM[key];
+}
 
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
+let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
+let deviceBaseSchedule = null;      // Basis für Geräte-Kontext
+let deviceBaseSettings = null;
+let baselineSchedule = null;        // Vergleichsbasis für Unsaved-Indikator
+let baselineSettings = null;
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
-let currentView = localStorage.getItem('adminView') || 'grid'; // 'grid' | 'preview' | 'devices'
+let storedView = lsGet('adminView');
+if (storedView === 'devices') storedView = 'grid';
+if (storedView !== 'grid' && storedView !== 'preview') storedView = 'grid';
+let currentView = storedView; // 'grid' | 'preview'
 let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
-let devicesPane = null;  // Geräte-Pane (nur bei "Geräte")
-let devicesPinned = (localStorage.getItem('devicesPinned') === '1');
-if (devicesPinned) document.body?.classList.add('devices-pinned');
+let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
+let devicesPinned = (lsGet('devicesPinned') === '1');
+document.body?.classList.toggle('devices-pinned', devicesPinned);
+
+const unsavedBadge = document.getElementById('unsavedBadge');
+let hasUnsavedChanges = false;
+let _unsavedIndicatorTimer = 0;
+let _unsavedInputListener = null;
+let _unsavedBlurListener = null;
+let _unsavedEvalTimer = 0;
+
+function normalizeSettings(source, { assignMissingIds = false } = {}) {
+  const src = source ? deepClone(source) : {};
+  src.slides        = { ...DEFAULTS.slides,   ...(src.slides || {}) };
+  src.display       = { ...DEFAULTS.display,  ...(src.display || {}) };
+  src.theme         = { ...DEFAULTS.theme,    ...(src.theme || {}) };
+  src.fonts         = { ...DEFAULTS.fonts,    ...(src.fonts || {}) };
+  src.assets        = { ...DEFAULTS.assets,   ...(src.assets || {}) };
+  src.h2            = { ...DEFAULTS.h2,       ...(src.h2 || {}) };
+  src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
+  src.footnotes     = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
+  src.interstitials = Array.isArray(src.interstitials)
+    ? src.interstitials.map(it => {
+        const next = {
+          id: it?.id || null,
+          name: it?.name || '',
+          enabled: (it?.enabled !== false),
+          type: it?.type || 'image',
+          url: it?.url || '',
+          thumb: it?.thumb || it?.url || '',
+          dwellSec: Number.isFinite(it?.dwellSec) ? it.dwellSec : 6
+        };
+        if (!next.id && assignMissingIds) next.id = genId('im_');
+        return next;
+      })
+    : [];
+  src.presets       = src.presets || {};
+  return src;
+}
+
+function sanitizeScheduleForCompare(src) {
+  return deepClone(src || {});
+}
+
+function sanitizeSettingsForCompare(src) {
+  return normalizeSettings(src || {}, { assignMissingIds: false });
+}
+
+function updateBaseline(scheduleSrc, settingsSrc) {
+  baselineSchedule = sanitizeScheduleForCompare(scheduleSrc);
+  baselineSettings = sanitizeSettingsForCompare(settingsSrc);
+}
+
+function getActiveBaselineSources(){
+  if (currentDeviceCtx && deviceBaseSchedule && deviceBaseSettings){
+    return { schedule: deviceBaseSchedule, settings: deviceBaseSettings };
+  }
+  return { schedule: baseSchedule, settings: baseSettings };
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object') {
+    if (Array.isArray(b)) return false;
+    const keysA = Object.keys(a).filter(k => typeof a[k] !== 'undefined').sort();
+    const keysB = Object.keys(b).filter(k => typeof b[k] !== 'undefined').sort();
+    if (keysA.length !== keysB.length) return false;
+    for (let i = 0; i < keysA.length; i++) {
+      if (keysA[i] !== keysB[i]) return false;
+    }
+    for (const key of keysA) {
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  if (Number.isNaN(a) && Number.isNaN(b)) return true;
+  return false;
+}
+
+function matchesBaseline() {
+  if (!baselineSchedule || !baselineSettings) return false;
+  const currentSchedule = sanitizeScheduleForCompare(schedule);
+  const currentSettings = sanitizeSettingsForCompare(settings);
+  return deepEqual(currentSchedule, baselineSchedule) && deepEqual(currentSettings, baselineSettings);
+}
+
+function clearDraftsIfPresent() {
+  lsRemove('scheduleDraft');
+  lsRemove('settingsDraft');
+}
+
+function evaluateUnsavedState({ immediate = false } = {}) {
+  if (!baselineSchedule || !baselineSettings) return;
+  clearTimeout(_unsavedIndicatorTimer);
+  if (matchesBaseline()) {
+    clearTimeout(_unsavedEvalTimer);
+    clearDraftsIfPresent();
+    setUnsavedState(false);
+    return;
+  }
+  if (immediate) {
+    setUnsavedState(true);
+  } else {
+    _unsavedIndicatorTimer = setTimeout(() => setUnsavedState(true), 180);
+  }
+}
+
+function queueUnsavedEvaluation(options) {
+  clearTimeout(_unsavedEvalTimer);
+  _unsavedEvalTimer = setTimeout(() => {
+    _unsavedEvalTimer = 0;
+    evaluateUnsavedState(options || {});
+  }, 60);
+}
+
+function setUnsavedState(state){
+  const next = !!state;
+  hasUnsavedChanges = next;
+  if (unsavedBadge){
+    unsavedBadge.hidden = !next;
+    unsavedBadge.setAttribute('aria-hidden', next ? 'false' : 'true');
+  }
+  document.body?.classList.toggle('has-unsaved-changes', next);
+  if (!next){
+    clearTimeout(_unsavedIndicatorTimer);
+    clearTimeout(_unsavedEvalTimer);
+  }
+}
+
+function restoreFromBaseline(){
+  const { schedule: baseSched, settings: baseSet } = getActiveBaselineSources();
+  if (!baseSched || !baseSet) return;
+
+  schedule = deepClone(baseSched);
+  settings = normalizeSettings(deepClone(baseSet), { assignMissingIds: false });
+
+  try { renderGridUI(); } catch (err) { console.warn('[admin] Grid re-render failed after reset', err); }
+  try { renderSlidesBox(); } catch (err) { console.warn('[admin] Slides box re-render failed after reset', err); }
+  try { renderHighlightBox(); } catch (err) { console.warn('[admin] Highlight box re-render failed after reset', err); }
+  try { renderColors(); } catch (err) { console.warn('[admin] Colors re-render failed after reset', err); }
+  try { renderFootnotes(); } catch (err) { console.warn('[admin] Footnotes re-render failed after reset', err); }
+  try { renderSlidesMaster(); } catch (err) { console.warn('[admin] Slides master re-render failed after reset', err); }
+
+  clearDraftsIfPresent();
+  updateBaseline(baseSched, baseSet);
+  setUnsavedState(false);
+}
+
+const unsavedBadgeResetBtn = document.getElementById('unsavedBadgeReset');
+if (unsavedBadgeResetBtn){
+  unsavedBadgeResetBtn.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    restoreFromBaseline();
+  });
+}
+
+function markUnsavedSoon(){
+  queueUnsavedEvaluation();
+}
+
+function ensureUnsavedChangeListener(){
+  if (!_unsavedInputListener){
+    _unsavedInputListener = (ev)=>{
+      if (!ev?.isTrusted) return;
+      if (ev?.target?.type === 'file') return;
+      markUnsavedSoon();
+      dockPushDebounced();
+    };
+    document.addEventListener('input',  _unsavedInputListener, true);
+    document.addEventListener('change', _unsavedInputListener, true);
+  }
+  if (!_unsavedBlurListener){
+    _unsavedBlurListener = ()=> queueUnsavedEvaluation();
+    document.addEventListener('focusout', _unsavedBlurListener, true);
+  }
+}
+
+try {
+  const nativeSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function patchedSetItem(key, value){
+    let result;
+    try {
+      result = nativeSetItem.apply(this, arguments);
+      return result;
+    } finally {
+      const store = (typeof globalThis !== 'undefined' && globalThis.localStorage) ? globalThis.localStorage : null;
+      if (store && this === store && (key === 'scheduleDraft' || key === 'settingsDraft')){
+        markUnsavedSoon();
+      }
+    }
+  };
+} catch (err) {
+  console.warn('[admin] Unsaved badge: Storage patch failed', err);
+}
+
+const globalScope = (typeof globalThis === 'object') ? globalThis : (typeof window === 'object' ? window : undefined);
+if (globalScope){
+  globalScope.__markUnsaved = ()=> evaluateUnsavedState({ immediate: true });
+  globalScope.__queueUnsaved = ()=> queueUnsavedEvaluation();
+  globalScope.__clearUnsaved = ()=> setUnsavedState(false);
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', ()=> setUnsavedState(hasUnsavedChanges));
+} else {
+  setUnsavedState(hasUnsavedChanges);
+}
 
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
 function renderContextBadge(){
-  const h1 = document.querySelector('header h1');
-  if (!h1) return;
+  const header = document.querySelector('header');
+  const actions = header?.querySelector('.header-actions');
+  if (!header) return;
+  let wrap = header.querySelector('.ctx-wrap');
   let el = document.getElementById('ctxBadge');
-  let tip = document.getElementById('ctxBadgeTip');
   if (!currentDeviceCtx){
-    if (el) el.remove();
-    if (tip) tip.remove();
+    if (wrap) wrap.remove();
     return;
   }
+  if (!wrap){
+    wrap = document.createElement('div');
+    wrap.className = 'ctx-wrap';
+  }
+  if (actions){
+    header.insertBefore(wrap, actions);
+  } else if (!wrap.isConnected){
+    header.appendChild(wrap);
+  }
   if (!el){
-    el = document.createElement('span'); el.id='ctxBadge';
-    el.className='ctx-badge';
-    el.title = 'Klick ×, um zur globalen Ansicht zurückzukehren';
-    h1.after(el);
+    el = document.createElement('span');
+    el.id = 'ctxBadge';
+    el.className = 'ctx-badge';
+    el.title = 'Geräte-Kontext aktiv';
+
+    const label = document.createElement('span');
+    label.className = 'ctx-badge-label';
+    el.appendChild(label);
+
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.id = 'ctxReset';
+    resetBtn.className = 'ctx-badge-close';
+    resetBtn.title = 'Geräte-Kontext verlassen';
+    resetBtn.textContent = 'Kontext schließen';
+    resetBtn.addEventListener('click', () => exitDeviceContext());
+    el.appendChild(resetBtn);
+
+    wrap.appendChild(el);
   }
-  el.innerHTML = `Kontext: ${currentDeviceName || currentDeviceCtx} <button id="ctxReset" title="Zurück zu Global">×</button>`;
-  el.querySelector('#ctxReset').onclick = ()=> exitDeviceContext();
-  if (!tip){
-    tip = document.createElement('small');
-    tip.id = 'ctxBadgeTip';
-    el.after(tip);
+
+  const labelEl = el.querySelector('.ctx-badge-label');
+  if (labelEl){
+    labelEl.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx}`;
   }
-  tip.textContent = 'Tipp: Klick auf × um zur globalen Ansicht zurückzukehren.';
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
@@ -86,6 +369,12 @@ async function enterDeviceContext(id, name){
     }
   })(settings, ov);
 
+  settings = normalizeSettings(settings, { assignMissingIds: false });
+  deviceBaseSchedule = deepClone(schedule);
+  deviceBaseSettings = deepClone(settings);
+  updateBaseline(deviceBaseSchedule, deviceBaseSettings);
+  setUnsavedState(false);
+
   // UI neu zeichnen
   renderSlidesBox();
   renderHighlightBox();
@@ -110,6 +399,10 @@ function exitDeviceContext(){
   document.body.classList.remove('device-mode');
 
   settings = deepClone(baseSettings);
+  deviceBaseSchedule = null;
+  deviceBaseSettings = null;
+  updateBaseline(baseSchedule, baseSettings);
+  evaluateUnsavedState({ immediate: true });
 
   renderSlidesBox();
   renderHighlightBox();
@@ -130,22 +423,30 @@ function exitDeviceContext(){
 // 1) Bootstrap: Laden + Initialisieren
 // ============================================================================
 async function loadAll(){
+  let unsavedFromDraft = false;
   const [s, cfg] = await Promise.all([
     fetch('/admin/api/load.php').then(r=>r.json()),
     fetch('/admin/api/load_settings.php').then(r=>r.json())
   ]);
 
-  schedule = s || {};
-  settings = cfg || {};
+  schedule = deepClone(s || {});
+  settings = normalizeSettings(cfg || {}, { assignMissingIds: true });
+  baseSchedule = deepClone(schedule);
   baseSettings = deepClone(settings);
+  deviceBaseSchedule = null;
+  deviceBaseSettings = null;
+  updateBaseline(baseSchedule, baseSettings);
 
   try {
-    const draft = localStorage.getItem('scheduleDraft');
-    if (draft) schedule = JSON.parse(draft);
+    const draft = lsGet('scheduleDraft');
+    if (draft) {
+      schedule = JSON.parse(draft);
+      unsavedFromDraft = true;
+    }
   } catch {}
 
   try {
-    const draft = localStorage.getItem('settingsDraft');
+    const draft = lsGet('settingsDraft');
     if (draft) {
       const parsed = JSON.parse(draft);
       (function merge(t, s) {
@@ -158,30 +459,12 @@ async function loadAll(){
           }
         }
       })(settings, parsed);
+      unsavedFromDraft = true;
     }
   } catch {}
+  settings = normalizeSettings(settings, { assignMissingIds: false });
 
-  // Defaults mergen (defensiv)
-  settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
-  settings.display       = { ...DEFAULTS.display,  ...(settings.display||{}) };
-  settings.theme         = { ...DEFAULTS.theme,    ...(settings.theme||{}) };
-  settings.fonts         = { ...DEFAULTS.fonts,    ...(settings.fonts||{}) };
-  settings.assets        = { ...DEFAULTS.assets,   ...(settings.assets||{}) };
-  settings.footnotes     = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes || []);
-  settings.interstitials = Array.isArray(settings.interstitials)
-    ? settings.interstitials.map(it => ({
-        id: it.id || genId('im_'),
-        name: it.name || '',
-        enabled: it.enabled !== false,
-        type: it.type || 'image',
-        url: it.url || '',
-        thumb: it.thumb || it.url || '',
-        after: it.after || 'overview',
-        dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6,
-        afterRef: it.afterRef || undefined
-      }))
-    : [];
-  settings.presets       = settings.presets || {};
+  setUnsavedState(unsavedFromDraft);
 
   // --- UI-Module initialisieren ---------------------------------------------
   initGridUI({
@@ -224,9 +507,6 @@ function renderSlidesBox(){
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
 
-  // Anzeige / Scaling
-  setV('#fitMode', settings.display?.fit || 'cover');
-
   // Schrift
   setV('#fontFamily', f.family ?? DEFAULTS.fonts.family);
   setV('#fontScale',  f.scale  ?? 1);
@@ -263,8 +543,6 @@ function renderSlidesBox(){
   const reset = document.querySelector('#resetSlides');
   if (!reset) return;
   reset.onclick = ()=>{
-    setV('#fitMode', 'cover');
-
     setV('#fontFamily', DEFAULTS.fonts.family);
     setV('#fontScale', 1);
     setV('#h1Scale', 1);
@@ -313,19 +591,22 @@ function renderHighlightBox(){
 
   // Flammenbild
   $('#flameImg').value = settings.assets?.flameImage || DEFAULTS.assets.flameImage;
-  updateFlamePreview($('#flameImg').value);
+  const flameTf = settings.assets?.flameThumbFallback;
+  updateFlamePreview(flameTf ? THUMB_FALLBACK : $('#flameImg').value);
 
-  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p)=>{
+  $('#flameFile').onchange = ()=> uploadGeneric($('#flameFile'), (p, tp)=>{
     settings.assets = settings.assets || {};
     settings.assets.flameImage = p;
+    settings.assets.flameThumbFallback = (tp === THUMB_FALLBACK);
     $('#flameImg').value = p;
-    updateFlamePreview(p);
+    updateFlamePreview(tp);
   });
 
   $('#resetFlame').onclick = ()=>{
     const def = DEFAULTS.assets.flameImage;
     settings.assets = settings.assets || {};
     settings.assets.flameImage = def;
+    settings.assets.flameThumbFallback = false;
     $('#flameImg').value = def;
     updateFlamePreview(def);
   };
@@ -343,13 +624,17 @@ function updateFlamePreview(u){
 // 4) Farben-Panel
 // ============================================================================
 function colorField(key,label,init){
+  const valUp = String(init||'').toUpperCase();
+  const valLow = valUp.toLowerCase();
   const row=document.createElement('div');
   row.className='kv';
   row.innerHTML = `
     <label>${label}</label>
     <div class="color-item">
       <div class="swatch" id="sw_${key}"></div>
-      <input class="input" id="cl_${key}" type="text" value="${init}" placeholder="#RRGGBB">
+      <input class="input" id="cl_${key}" type="text" value="${valUp}" placeholder="#RRGGBB">
+      <input type="color" id="cp_${key}" value="${valLow}">
+      <button class="btn sm ghost icon undo" type="button" title="Letzten Wert zurücksetzen" aria-label="Letzten Wert zurücksetzen">⟳</button>
     </div>`;
   return row;
 }
@@ -392,18 +677,53 @@ const host = $('#colorList');
 
   host.appendChild(A); host.appendChild(B); host.appendChild(C);
 
-  // Swatch-Vorschau & Reset
-  $$('#colorList input[type="text"]').forEach(inp=>{
-    const sw=$('#sw_'+inp.id.replace(/^cl_/,''));
-    const setPrev=v=> sw.style.background=v;
-    setPrev(inp.value);
-    inp.addEventListener('input',()=>{ if(/^#([0-9A-Fa-f]{6})$/.test(inp.value)) setPrev(inp.value); });
+  // Swatch-Vorschau & Synchronisation
+  $$('#colorList .color-item').forEach(item=>{
+    const txt = item.querySelector('input[type="text"]');
+    const pick = item.querySelector('input[type="color"]');
+    const sw = item.querySelector('.swatch');
+    const undo = item.querySelector('.undo');
+    const setVal = v=>{
+      const hex = v.startsWith('#') ? v : '#'+v;
+      if(!/^#([0-9A-Fa-f]{6})$/.test(hex)) return;
+      sw.style.background = hex;
+      pick.value = hex.toLowerCase();
+      txt.value = hex.toUpperCase();
+    };
+    setVal(txt.value);
+    item.dataset.prev = txt.value;
+    txt.addEventListener('input',()=>{
+      txt.value = txt.value.toUpperCase();
+      if(/^#([0-9A-F]{6})$/.test(txt.value)) setVal(txt.value);
+    });
+    pick.addEventListener('input',()=> setVal(pick.value));
+    if(undo){
+      undo.addEventListener('click',()=>{
+        const prev = item.dataset.prev;
+        if(!prev) return;
+        setVal(prev);
+        item.dataset.prev = prev;
+      });
+      [txt,pick].forEach(el=>{
+        el.addEventListener('keydown',e=>{
+          if((e.ctrlKey||e.metaKey) && e.key==='z'){
+            e.preventDefault();
+            undo.click();
+          }
+        });
+      });
+    }
   });
-  $('#resetColors').onclick = ()=>{ 
-    $$('#colorList input[type="text"]').forEach(inp=>{
-      const k=inp.id.replace(/^cl_/,'');
-      inp.value=(DEFAULTS.theme[k]||'#FFFFFF');
-      const sw=$('#sw_'+k); if(sw) sw.style.background=inp.value;
+
+  $('#resetColors').onclick = ()=>{
+    $$('#colorList .color-item').forEach(item=>{
+      const txt = item.querySelector('input[type="text"]');
+      const pick = item.querySelector('input[type="color"]');
+      const k = txt.id.replace(/^cl_/,'');
+      const def = DEFAULTS.theme[k]||'#FFFFFF';
+      txt.value = def;
+      pick.value = def;
+      const sw = item.querySelector('.swatch'); if(sw) sw.style.background=def;
     });
     const bws=document.getElementById('bw_gridTableW');
     if(bws) bws.value = DEFAULTS.theme.gridTableW ?? 2;
@@ -413,98 +733,17 @@ const host = $('#colorList');
 function ensureColorTools(){
   const host = document.getElementById('colorList');
   if (!host) return;
-  if (document.getElementById('colorTools')) return; // schon da
+  if (document.getElementById('colorToolsLink')) return; // schon da
 
-  const box = document.createElement('div');
-  box.id = 'colorTools';
-  box.className = 'fieldset';
-  box.innerHTML = `
-    <div class="legendRow">
-      <div class="legend">Farb-Werkzeuge</div>
-<button class="btn sm ghost" id="togglePickerSize" title="Iframe Höhe expandieren/zusammenklappen">⛶</button>
-
-</div>
-
-        <div id="pickerWrap" class="pickerResizable">
-          <iframe
-            id="hexPickerFrame"
-            class="pickerFrame"
-            src="https://colorhunt.co/"
-            loading="lazy"
-            referrerpolicy="no-referrer"
-            title="Hex Color Picker"></iframe>
-        </div>
-      </div>
-    </div>
-
-    <div class="kv">
-      <label>Schnell-Picker</label>
-      <div class="row" style="gap:8px;flex-wrap:nowrap">
-        <input type="color" id="quickColor" class="input">
-        <input type="text" id="quickHex" class="input" value="#FFDD66" placeholder="#RRGGBB">
-        <button class="btn sm" id="copyHex" title="Hex in Zwischenablage kopieren"># kopieren</button>
-        <span id="copyState" class="mut"></span>
-      </div>
-    </div>
-  `;
+  const link = document.createElement('a');
+  link.id = 'colorToolsLink';
+  link.href = 'https://colorhunt.co';
+  link.target = '_blank';
+  link.textContent = 'Colorhunt öffnen';
 
   // hinter die Farbliste setzen
-  host.after(box);
-
-  // Controls
-  const $wrap = document.getElementById('pickerWrap');
-  const $toggle = document.getElementById('togglePickerSize');
-  const $qc = document.getElementById('quickColor');
-  const $qh = document.getElementById('quickHex');
-  const $cp = document.getElementById('copyHex');
-  const $st = document.getElementById('copyState');
-
-  // Höhe aus LocalStorage wiederherstellen (nur "Normalmodus")
-const savedH = parseInt(localStorage.getItem('colorPickerH') || '0', 10);
-const savedW = parseInt(localStorage.getItem('colorPickerW') || '0', 10);
-if (savedH >= 140) $wrap.style.height = savedH + 'px';
-if (savedW >= 260) $wrap.style.width  = savedW + 'px';
-
-  // expand/collapse und Reset auf Standardmaße
-  $toggle.onclick = () => {
-    if (!box.classList.contains('exp')) {
-      box.classList.add('exp');
-      $wrap.style.width = '100%';
-    } else {
-      box.classList.remove('exp');
-      $wrap.style.height = '180px';
-      $wrap.style.width = '100%';
-      localStorage.removeItem('colorPickerH');
-      localStorage.removeItem('colorPickerW');
-    }
-  };
-
-// Größe speichern (nur wenn nicht expanded)
-const ro = new ResizeObserver((entries)=>{
-  if (box.classList.contains('exp')) return;
-  for (const e of entries){
-    const {height, width} = e.contentRect;
-    if (height >= 140) localStorage.setItem('colorPickerH', String(Math.round(height)));
-    if (width  >= 260) localStorage.setItem('colorPickerW', String(Math.round(width)));
-  }
-});
-ro.observe($wrap);
-
-  // Schnell-Picker Logik
-  if (/^#([0-9A-Fa-f]{6})$/.test($qh.value)) $qc.value = $qh.value;
-  $qc.addEventListener('input', ()=>{ $qh.value = ($qc.value || '').toUpperCase(); });
-  $qh.addEventListener('input', ()=>{
-    const v = ($qh.value||'').trim();
-    if (/^#([0-9A-Fa-f]{6})$/.test(v)) $qc.value = v;
-  });
-  $cp.onclick = async ()=>{
-    const v = ($qh.value||'').trim().toUpperCase();
-    if (!/^#([0-9A-F]{6})$/.test(v)) { alert('Bitte gültigen Hex-Wert: #RRGGBB'); return; }
-    try { await navigator.clipboard.writeText(v); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
-    catch { $qh.select(); document.execCommand?.('copy'); $st.textContent = 'kopiert'; setTimeout(()=> $st.textContent='', 1000); }
-  };
+  host.after(link);
 }
-
 
 // ============================================================================
 // 5) Fußnoten
@@ -538,14 +777,14 @@ function fnRow(fn,i){
 // 6) Speichern / Preview / Export / Import
 // ============================================================================
 function collectColors(){ 
-  const theme={...(settings.theme||{})}; 
+  const theme={...(settings.theme||{})};
   $$('#colorList input[type="text"]').forEach(inp=>{
     const v=String(inp.value).toUpperCase();
-    if(/^#([0-9A-Fa-f]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v;
+    if(/^#([0-9A-F]{6})$/.test(v)) theme[inp.id.replace(/^cl_/,'')]=v;
   });
   const bw=document.getElementById('bw_gridTableW');
   if(bw) theme.gridTableW = Math.max(0, Math.min(10, +bw.value||0));
-  return theme; 
+  return theme;
 }
 
 function collectSettings(){
@@ -601,10 +840,10 @@ function collectSettings(){
         minutesAfterStart: +( $('#hlAfter').value || DEFAULTS.highlightNext.minutesAfterStart )
       },
       assets:{ ...(settings.assets||{}), flameImage: $('#flameImg').value || DEFAULTS.assets.flameImage },
-      display:{ ...(settings.display||{}), fit: $('#fitMode').value, baseW:1920, baseH:1080,
+      display:{ ...(settings.display||{}), fit: 'auto', baseW:1920, baseH:1080,
         rightWidthPercent:+($('#rightW').value||38), cutTopPercent:+($('#cutTop').value||28), cutBottomPercent:+($('#cutBottom').value||12) },
       footnotes: settings.footnotes,
-      interstitials: settings.interstitials || [],
+      interstitials: (settings.interstitials || []).map(({after, afterRef, ...rest}) => rest),
       presets: settings.presets || {},
       presetAuto: !!document.getElementById('presetAuto')?.checked
     }
@@ -615,10 +854,6 @@ function collectSettings(){
 $('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/', '_blank'));
 
 $('#btnSave')?.addEventListener('click', async ()=>{
-  if (!validateUniqueAfterRefs()){
-    alert('Fehler: Mehrfachzuweisung bei "Nach Slide".');
-    return;
-  }
   const body = collectSettings();
 
   if (!currentDeviceCtx){
@@ -628,9 +863,13 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
       if (j.ok){
-        baseSettings = deepClone(body.settings);
-        localStorage.removeItem('scheduleDraft');
-        localStorage.removeItem('settingsDraft');
+        baseSchedule = deepClone(schedule);
+        baseSettings = deepClone(settings);
+        deviceBaseSchedule = null;
+        deviceBaseSettings = null;
+        updateBaseline(baseSchedule, baseSettings);
+        clearDraftsIfPresent();
+        setUnsavedState(false);
       }
       alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
     } else {
@@ -639,8 +878,11 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const j=await r.json().catch(()=>({ok:false}));
       if (j.ok) {
-        localStorage.removeItem('scheduleDraft');
-        localStorage.removeItem('settingsDraft');
+        deviceBaseSchedule = deepClone(schedule);
+        deviceBaseSettings = deepClone(settings);
+        updateBaseline(deviceBaseSchedule, deviceBaseSettings);
+        clearDraftsIfPresent();
+        setUnsavedState(false);
       }
       alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
     }
@@ -648,11 +890,15 @@ $('#btnSave')?.addEventListener('click', async ()=>{
 
 // --- Dock ----------------------------------------------------------
 let _dockTimer = 0;
-let _dockInputListener = null;
+let dockLiveActive = false;
 
 function dockPushDebounced(){
+  if (!dockLiveActive) return;
   clearTimeout(_dockTimer);
-  _dockTimer = setTimeout(()=> dockSend(false), 250);
+  _dockTimer = setTimeout(()=>{
+    if (!dockLiveActive) return;
+    dockSend(false);
+  }, 250);
 }
 window.dockPushDebounced = dockPushDebounced;
 function dockSend(reload){
@@ -667,21 +913,14 @@ function dockSend(reload){
   try { frame.contentWindow.postMessage({type:'preview', payload}, SLIDESHOW_ORIGIN); } catch {}
 }
 function attachDockLivePush(){
-  if (_dockInputListener) return;
-  _dockInputListener = (ev)=>{
-    if (ev?.target?.type === 'file') return;
-    dockPushDebounced();
-  };
-  document.addEventListener('input',  _dockInputListener, true);
-  document.addEventListener('change', _dockInputListener, true);
+  dockLiveActive = true;
 }
 function detachDockLivePush(){
-  if (!_dockInputListener) return;
-  document.removeEventListener('input',  _dockInputListener, true);
-  document.removeEventListener('change', _dockInputListener, true);
-  _dockInputListener = null;
+  dockLiveActive = false;
   clearTimeout(_dockTimer);
 }
+
+ensureUnsavedChangeListener();
 
 
 // --- Devices: Claim ----------------------------------------------------------
@@ -720,8 +959,7 @@ async function createDevicesPane(){
         <div class="card-title">Geräte</div>
         <div class="device-toolbar">
           <button class="btn sm icon-label" id="devPairManual"><span class="icon">⌨️</span><span class="label">Code eingeben…</span></button>
-          <button class="btn sm icon-label" id="devRefresh"><span class="icon">⟳</span><span class="label">Aktualisieren</span></button>
-          <button class="btn sm icon-label" id="devPin"></button>
+          <button class="btn sm icon-label has-meta" id="devRefresh"><span class="icon">⟳</span><span class="label-wrap"><span class="label">Aktualisieren</span><span class="meta" id="devLastUpdate" aria-live="polite"></span></span></button>
           <button class="btn sm danger icon-label" id="devGc"><span class="icon">🧹</span><span class="label">Aufräumen</span></button>
         </div>
       </div>
@@ -736,30 +974,78 @@ async function createDevicesPane(){
         <div id="devPairedList" class="kv"></div>
       </div>
 
-      <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code.</small>
+      <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code. Codes werden nach 15 Minuten Inaktivität neu erzeugt.</small>
     </div>`;
 
   host?.insertBefore(card, host.firstChild);
 
   // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
+  const normalizeSeconds = (value)=>{
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return 0;
+    if (num > 1e12) return Math.floor(num / 1000);
+    if (num > 1e10) return Math.floor(num / 1000);
+    return Math.floor(num);
+  };
+
+  const resolveNow = (value)=>{
+    if (value === undefined || value === null) return normalizeSeconds(Date.now());
+    return normalizeSeconds(value);
+  };
+
+  const OFFLINE_AFTER_MIN = 2;
+
   async function fetchDevicesStatus(){
     try {
       const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
-      if (r.ok) { const j = await r.json(); j.ok ??= true; return j; }
+      if (r.ok) {
+        const j = await r.json();
+        const now = resolveNow(j.now);
+        const pairings = j.pairings || [];
+        const devices = (j.devices || []).map(d => {
+          const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
+          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+          return {
+            id: d.id,
+            name: d.name || '',
+            lastSeenAt,
+            offline,
+            useOverrides: !!d.useOverrides
+          };
+        });
+        return { ok:true, now, pairings, devices };
+      }
     } catch(e){}
-    // Fallback: /data/devices.json -> normalisierte Struktur
-    const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
-    const j2 = await r2.json();
-    const pairings = Object.values(j2.pairings || {})
-      .filter(p => !p.deviceId)
-      .map(p => ({ code: p.code, createdAt: p.created }));
-    const devices = Object.values(j2.devices || {})
-      .map(d => ({ id: d.id, name: d.name || '', lastSeenAt: d.lastSeen || 0 }));
-    return { ok:true, pairings, devices };
+    try {
+      const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
+      if (r2.ok){
+        const j2 = await r2.json();
+        const pairings = Object.values(j2.pairings || {})
+          .filter(p => !p.deviceId)
+          .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
+        const now = resolveNow(j2.now);
+        const devices = Object.values(j2.devices || {}).map(d => {
+          const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
+          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+          return {
+            id: d.id,
+            name: d.name || '',
+            lastSeenAt,
+            offline,
+            useOverrides: !!d.useOverrides
+          };
+        });
+        return { ok:true, now, pairings, devices };
+      }
+    } catch(e){}
+    console.warn('[admin] konnte Geräte-Status weder über API noch Datei laden');
+    return { ok:false, pairings:[], devices:[] };
   }
 
   async function render(){
     const j = await fetchDevicesStatus();
+    const now = resolveNow(j.now);
 
     // Pending
     const P = document.getElementById('devPendingList');
@@ -800,12 +1086,21 @@ async function createDevicesPane(){
         tr.classList.add('selected');
       };
       paired.forEach(d=>{
-        const seen = d.lastSeenAt ? new Date(d.lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        const lastSeenAt = Number(d.lastSeenAt) || 0;
+        const seen = lastSeenAt ? new Date(lastSeenAt*1000).toLocaleString('de-DE') : '—';
+        const offline = typeof d.offline === 'boolean'
+          ? d.offline
+          : (!lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60);
         const useInd = d.useOverrides;
         const modeLbl = useInd ? 'Individuell' : 'Global';
         const tr = document.createElement('tr');
         if (currentDeviceCtx===d.id) tr.classList.add('current');
         if (useInd) tr.classList.add('ind');
+        if (offline) tr.classList.add('offline');
+        const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seen}</small>` : '';
+        const statusCell = offline
+          ? `<td class="status offline">offline${lastSeenHtml}</td>`
+          : `<td class="status online">online${lastSeenHtml}</td>`;
         tr.innerHTML = `
           <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
           <td><button class="btn sm" data-view>Ansehen</button></td>
@@ -814,9 +1109,10 @@ async function createDevicesPane(){
             <span data-mode-label>${modeLbl}</span>
           </label></td>
           <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
+          <td><button class="btn sm" data-rename>Umbenennen</button></td>
           <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
           <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
-          <td class="mut">${seen}</td>
+          ${statusCell}
         `;
 
         const modeInput = tr.querySelector('[data-mode]');
@@ -868,8 +1164,29 @@ async function createDevicesPane(){
           selectRow(tr);
           enterDeviceContext(d.id, d.name || d.id);
         };
+        tr.querySelector('[data-rename]').onclick = async ()=>{
+          const newName = prompt('Neuer Gerätename:', d.name || '');
+          if (newName === null) return;
+          const r = await fetch('/admin/api/devices_rename.php', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ device: d.id, name: newName })
+          });
+          const jj = await r.json().catch(()=>({ok:false}));
+          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
+          alert('Name gespeichert.');
+          render();
+        };
         tbody.appendChild(tr);
       });
+    }
+    const ts = card.querySelector('#devLastUpdate');
+    if (ts) {
+      const fallbackNow = normalizeSeconds(Date.now());
+      const tsSeconds = now || fallbackNow;
+      const tsDate = new Date(tsSeconds * 1000);
+      ts.textContent = tsDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      ts.title = 'Stand: ' + tsDate.toLocaleString('de-DE');
     }
   }
 
@@ -884,14 +1201,7 @@ async function createDevicesPane(){
   // Refresh & einmalig laden
   card.querySelector('#devRefresh').onclick = render;
   await render();
-
-  const pinBtn = card.querySelector('#devPin');
-  const updatePin = ()=>{
-    pinBtn.innerHTML = `<span class="icon">📌</span><span class="label">${devicesPinned ? 'Loslösen' : 'Anpinnen'}</span>`;
-    document.body.classList.toggle('devices-pinned', devicesPinned);
-  };
-  pinBtn.onclick = ()=>{ devicesPinned = !devicesPinned; localStorage.setItem('devicesPinned', devicesPinned?'1':'0'); updatePin(); showView(currentView); };
-  updatePin();
+  card.__refreshInterval = setInterval(render, 60_000);
 
 card.querySelector('#devGc').onclick = async ()=>{
   const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
@@ -976,14 +1286,46 @@ function destroyDockPane(){
   }
 }
 
-function viewLabel(v){ return v==='preview' ? 'Vorschau' : v==='devices' ? 'Geräte' : 'Grid'; }
+function destroyDevicesPane(){
+  if (devicesPane){
+    clearInterval(devicesPane.__refreshInterval);
+    window.__refreshDevicesPane = undefined;
+    devicesPane.remove();
+    devicesPane = null;
+  }
+}
+
+async function applyDevicesPaneState(){
+  lsSet('devicesPinned', devicesPinned ? '1' : '0');
+  document.body.classList.toggle('devices-pinned', devicesPinned);
+  if (devicesPinned){
+    if (!devicesPane){
+      devicesPane = await createDevicesPane();
+    } else {
+      devicesPane.style.display = '';
+      if (typeof window.__refreshDevicesPane === 'function'){
+        await window.__refreshDevicesPane();
+      }
+    }
+  } else {
+    destroyDevicesPane();
+  }
+}
+
+function viewLabel(v){
+  return v === 'preview' ? 'Vorschau' : 'Grid';
+}
 
 async function showView(v){
+  if (v === 'devices') v = 'grid';
+  if (v !== 'grid' && v !== 'preview') v = 'grid';
+
   currentView = v;
-  localStorage.setItem('adminView', v);
+  lsSet('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
   if (labelEl) labelEl.textContent = viewLabel(v);
+
   document.querySelectorAll('#viewMenu .dd-item').forEach(it=>{
     it.setAttribute('aria-checked', it.dataset.view === v ? 'true' : 'false');
   });
@@ -991,43 +1333,20 @@ async function showView(v){
   const gridCard = document.getElementById('gridPane');
   if (!gridCard) return;
 
-  // Alles schließen/aufräumen
   detachDockLivePush();
-
-  if (devicesPinned && v !== 'devices'){
-    gridCard.style.display = (v === 'grid') ? '' : 'none';
-    if (v === 'preview'){ if (!document.getElementById('dockPane')) createDockPane(); attachDockLivePush(); }
-    else { destroyDockPane(); }
-    if (!devicesPane){ devicesPane = await createDevicesPane(); }
-    devicesPane.style.display = '';
-    return;
-  }
+  await applyDevicesPaneState();
 
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
+    if (devicesPane) devicesPane.style.display = '';
     return;
   }
 
-  if (v === 'preview'){
-    gridCard.style.display = 'none';
-    if (!devicesPinned && devicesPane && devicesPane.remove) { devicesPane.remove(); devicesPane = null; }
-    if (!document.getElementById('dockPane')) createDockPane();
-    attachDockLivePush();
-    return;
-  }
-
-  if (v === 'devices'){
-    gridCard.style.display = 'none';
-    destroyDockPane();
-    if (!devicesPane){
-      // WICHTIG: createDevicesPane ist async → Ergebnis abwarten
-      devicesPane = await createDevicesPane();
-    }
-    devicesPane.style.display = '';
-    return;
-  }
+  gridCard.style.display = 'none';
+  if (devicesPane) devicesPane.style.display = '';
+  if (!document.getElementById('dockPane')) createDockPane();
+  attachDockLivePush();
 }
 
 function initViewMenu(){
@@ -1053,14 +1372,29 @@ function initViewMenu(){
   document.addEventListener('click', (e)=>{
     if (!menu.hidden && !document.getElementById('viewMenuWrap').contains(e.target)) closeMenu();
   });
+  const btnDevices = document.getElementById('btnDevices');
+  const updateDevicesButton = ()=>{
+    if (!btnDevices) return;
+    btnDevices.classList.toggle('active', devicesPinned);
+    btnDevices.setAttribute('aria-pressed', devicesPinned ? 'true' : 'false');
+  };
+  const toggleDevicesPane = async ()=>{
+    devicesPinned = !devicesPinned;
+    await applyDevicesPaneState();
+    updateDevicesButton();
+    await showView(currentView);
+  };
   document.addEventListener('keydown', async (e)=>{
     if (e.key === 'Escape' && !menu.hidden) closeMenu();
     const typing = /input|textarea|select/i.test(e.target?.tagName||'');
     if (typing) return;
     if (e.key === '1') { await showView('grid');    closeMenu(); }
     if (e.key === '2') { await showView('preview'); closeMenu(); }
-    if (e.key === '3') { await showView('devices'); closeMenu(); }
+    if (e.key === '3') { await toggleDevicesPane(); closeMenu(); }
   });
+
+  if (btnDevices) btnDevices.onclick = toggleDevicesPane;
+  updateDevicesButton();
 
   document.getElementById('viewMenuLabel').textContent = viewLabel(currentView);
   // Initial zeichnen
@@ -1102,17 +1436,15 @@ function initBackupButtons(){
 // ============================================================================
 function initThemeToggle(){
   const cb = document.getElementById('themeMode');
-  const label = document.getElementById('themeLabel');
 
   const apply = (mode) => {
     document.body.classList.toggle('theme-light', mode === 'light');
     document.body.classList.toggle('theme-dark',  mode === 'dark');
-    label.textContent = (mode === 'light') ? 'Hell' : 'Dunkel';
-    localStorage.setItem('adminTheme', mode);
+    lsSet('adminTheme', mode);
   };
 
   // ⬇️ Standard jetzt "light"
-  const saved = localStorage.getItem('adminTheme') || 'light';
+  const saved = lsGet('adminTheme') || 'light';
   cb.checked = (saved === 'light');
   apply(saved);
 

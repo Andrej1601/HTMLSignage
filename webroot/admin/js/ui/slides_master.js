@@ -155,18 +155,6 @@ function deleteSaunaEverywhere(name){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
   }
 
-  // 7) Verweise in Medien-Slides („Nach Slide“)
-  (settings.interstitials || []).forEach(it => {
-    const v = it.afterRef || '';
-    if (v && v.startsWith('sauna:')){
-      const n = decodeURIComponent(v.slice(6));
-      if (n === name){ it.afterRef = 'overview'; it.after = 'overview'; }
-    } else if (it.after === name){
-      it.after = 'overview';
-      it.afterRef = 'overview';
-    }
-  });
-
   renderSlidesMaster();
   renderGridUI();
 }
@@ -209,14 +197,6 @@ function renameSaunaEverywhere(oldName, newName){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.map(n => n===oldName ? newName : n);
   }
 
-  // Interstitial-Referenzen
-  (settings.interstitials||[]).forEach(it=>{
-    if (!it) return;
-    if (it.after === oldName) it.after = newName;
-    const encOld = 'sauna:' + encodeURIComponent(oldName);
-    const encNew = 'sauna:' + encodeURIComponent(newName);
-    if (it.afterRef === encOld) it.afterRef = encNew;
-  });
 }
 
 function addSaunaToActive(name){
@@ -573,18 +553,29 @@ function applyDnD(){
 function enableSaunaOrder(){
   const host = $('#saunaList');
   if (!host) return;
-  const schedule = ctx.getSchedule();
-  const settings = ctx.getSettings();
   let dragIdx = null;
-  Array.from(host.children).forEach((row,i)=>{
-    row.draggable = true;
-    row.addEventListener('dragstart', e=>{ dragIdx = i; e.dataTransfer.effectAllowed='move'; });
-    row.addEventListener('dragover', e=>e.preventDefault());
-    row.addEventListener('drop', e=>{
+
+  if (!host.dataset.orderBound){
+    host.addEventListener('dragstart', e => {
+      const row = e.target.closest('.saunarow');
+      if (!row) return;
+      dragIdx = Array.from(host.children).indexOf(row);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    host.addEventListener('dragover', e => {
+      if (e.target.closest('.saunarow')) e.preventDefault();
+    });
+
+    host.addEventListener('drop', e => {
+      const row = e.target.closest('.saunarow');
+      if (!row) return;
       e.preventDefault();
       const rows = Array.from(host.children);
       const dropIdx = rows.indexOf(row);
       if (dropIdx === -1 || dragIdx === null || dragIdx === dropIdx) return;
+      const schedule = ctx.getSchedule();
+      const settings = ctx.getSettings();
       const arr = schedule.saunas || [];
       const [m] = arr.splice(dragIdx,1);
       arr.splice(dropIdx,0,m);
@@ -592,8 +583,11 @@ function enableSaunaOrder(){
       settings.slides.order = arr.slice();
       renderSlidesMaster();
       renderGridUI();
+      dragIdx = null;
     });
-  });
+
+    host.dataset.orderBound = '1';
+  }
 }
 
 // ============================================================================
@@ -626,96 +620,6 @@ function renderSaunaOffList(){
 // ============================================================================
 // 6) Interstitial Media (Medien-Slides)
 // ============================================================================
-function usedAfterRefs(exceptId){
-  const settings = ctx.getSettings();
-  const list = settings.interstitials || [];
-  const set = new Set();
-  list.forEach(im => {
-    if (!im || im.id === exceptId) return;
-    let v = im.afterRef;
-    if (!v) v = getAfterSelectValue(im, im.id);
-    if (!v) v = 'overview';
-    if (set.has(v)){
-      // Duplicate usage -> reset to overview
-      im.afterRef = 'overview';
-      im.after = 'overview';
-      set.add('overview');
-      return;
-    }
-    set.add(v);
-  });
-  return set;
-}
-
-function interAfterOptionsHTML(currentId){
-  const schedule = ctx.getSchedule();
-  const settings = ctx.getSettings();
-
-  const used = usedAfterRefs(currentId);
-
-  const opts = [];
-  if (!used.has('overview')) opts.push('<option value="overview">Übersicht</option>');
-
-  const saunaOpts = (schedule.saunas || [])
-    .filter(v => !used.has('sauna:' + encodeURIComponent(v)))
-    .map(v => `<option value="sauna:${encodeURIComponent(v)}">${escapeHtml(v)}</option>`);
-
-  const imgOpts = (settings.interstitials || [])
-    .filter(x => x && x.id && x.id !== currentId)
-    .filter(x => !used.has('img:' + x.id))
-    .map(x => {
-      const prefixMap = { image: 'Bild', video: 'Video', url: 'URL' };
-      const prefix = (prefixMap[x.type] || 'Bild') + ': ';
-      return `<option value="img:${x.id}">${escapeHtml(prefix + (x.name || x.id))}</option>`;
-    });
-
-  return [...opts, ...saunaOpts, ...imgOpts].join('');
-}
-
-function getAfterSelectValue(it, currentId){
-  const schedule = ctx.getSchedule();
-  if (it.afterRef) return it.afterRef;
-  const a = it.after;
-  if (a === 'overview' || !a) return 'overview';
-  if ((schedule.saunas || []).includes(a)) return 'sauna:' + encodeURIComponent(a);
-  const hit = (ctx.getSettings().interstitials || []).find(im => im && im.id !== currentId && (im.name || '') === a);
-  if (hit) return 'img:' + hit.id;
-  return 'overview';
-}
-
-function applyAfterSelect(it, value){
-  const settings = ctx.getSettings();
-  // Ensure uniqueness of afterRef across all interstitials
-  if (value){
-    (settings.interstitials || []).forEach(other => {
-      if (other && other !== it && other.afterRef === value){
-        other.afterRef = 'overview';
-        other.after = 'overview';
-      }
-    });
-  }
-  it.afterRef = value;
-  if (value === 'overview'){
-    it.after = 'overview';
-  } else if (value.startsWith('sauna:')){
-    const name = decodeURIComponent(value.slice(6));
-    it.after = name;
-  } else if (value.startsWith('img:')){
-    const id = value.slice(4);
-    const img = (settings.interstitials || []).find(im => im && im.id === id);
-    it.after = img ? (img.name || '') : '';
-  }
-
-  // Refresh all "Nach Slide" selects so that used slides are hidden
-  $$('.sel-after').forEach(sel => {
-    const idx = +sel.id.replace('a_inter_', '');
-    const current = (settings.interstitials || [])[idx];
-    if (!current) return;
-    sel.innerHTML = interAfterOptionsHTML(current.id);
-    sel.value = getAfterSelectValue(current, current.id);
-  });
-}
-
 function interRow(i){
   const settings = ctx.getSettings();
   const it = settings.interstitials[i];
@@ -734,7 +638,6 @@ function interRow(i){
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
     <span id="m_${id}" class="media-field"></span>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
-    <select id="a_${id}" class="input sel-after">${interAfterOptionsHTML(it.id)}</select>
     <input id="en_${id}" type="checkbox" />
   `;
 
@@ -744,8 +647,26 @@ function interRow(i){
   const $sec   = wrap.querySelector('#sec_'+id);
   const $media = wrap.querySelector('#m_'+id);
   const $del   = wrap.querySelector('#x_'+id);
-  const $after = wrap.querySelector('#a_'+id);
   const $en    = wrap.querySelector('#en_'+id);
+
+  if ($prev) $prev.onclick = () => {
+    if ($type?.value !== 'video' && $type?.value !== 'url') return;
+    const fi = document.createElement('input');
+    fi.type = 'file';
+    fi.accept = 'image/*';
+    fi.onchange = () => uploadGeneric(fi, (p) => {
+      if (!p) return;
+      const ts = Date.now();
+      const addV = (u) => {
+        const clean = stripCache(u);
+        return clean + (clean.includes('?') ? '&' : '?') + 'v=' + ts;
+      };
+      it.thumb = addV(p);
+      updatePrev(it.thumb);
+      renderSlidesMaster();
+    });
+    fi.click();
+  };
 
   // Werte
   if ($type) $type.value = it.type || 'image';
@@ -755,15 +676,17 @@ function interRow(i){
       ? +it.dwellSec
       : (ctx.getSettings().slides?.imageDurationSec ?? ctx.getSettings().slides?.saunaDurationSec ?? 6);
   }
-  if ($after) $after.value = getAfterSelectValue(it, it.id);
 
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
+  const stripCache = (u = '') => u.split('?')[0];
   const updatePrev = (src) => {
     if (!src){ $prev.src = FALLBACK_THUMB; $prev.title = ''; return; }
+    src = stripCache(src);
+    if (src === FALLBACK_THUMB){ $prev.src = FALLBACK_THUMB; $prev.title=''; return; }
     const url = src + '?v=' + Date.now();
     preloadImg(url).then(r => {
       if (r.ok){ $prev.src = url; $prev.title = `${r.w}×${r.h}`; }
-      else { $prev.src = FALLBACK_THUMB; $prev.title = ''; }
+      else { $prev.src = FALLBACK_THUMB; $prev.title = ''; it.thumb = FALLBACK_THUMB; }
     });
   };
   updatePrev(it.thumb);
@@ -785,20 +708,14 @@ function interRow(i){
         const fi = document.createElement('input');
         fi.type = 'file';
         fi.accept = (t === 'video') ? 'video/*' : 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p, tp, err) => {
-          const suffix = '?v=' + Date.now();
-          it.url = p + suffix;
-          if (t === 'video') {
-            if (tp) {
-              it.thumb = tp + suffix;
-            } else {
-              it.thumb = FALLBACK_THUMB;
-              if (err) alert(err);
-            }
-          } else {
-            const tv = tp || p;
-            it.thumb = tv ? tv + suffix : '';
-          }
+        fi.onchange = () => uploadGeneric(fi, (p, tp) => {
+          const ts = Date.now();
+          const addV = (u) => {
+            const clean = stripCache(u);
+            return clean + (clean.includes('?') ? '&' : '?') + 'v=' + ts;
+          };
+          it.url   = addV(p);
+          it.thumb = addV(tp || p || FALLBACK_THUMB);
           updatePrev(it.thumb);
           renderSlidesMaster();
         });
@@ -811,29 +728,22 @@ function interRow(i){
       mb.textContent = '🔗';
       mb.title = 'URL';
       mb.onclick = () => {
-        const val = prompt('URL:', it.url || '');
+        const val = prompt('URL:', it.url ? stripCache(it.url) : '');
         if (val !== null) {
-          it.url = val.trim();
-          it.thumb = FALLBACK_THUMB;
-          updatePrev(FALLBACK_THUMB);
+          it.url = stripCache(val.trim());
           if (it.url) {
-            fetch('/admin/api/url_thumb.php', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ url: it.url })
-            }).then(r => r.json()).then(j => {
-              if (j && j.ok && j.thumb) {
-                const t = j.thumb + '?v=' + Date.now();
-                it.thumb = t;
-                updatePrev(t);
-              }
-              renderSlidesMaster();
-            }).catch(() => {
-              renderSlidesMaster();
-            });
+            try {
+              const origin = new URL(it.url).origin;
+              it.thumb = `${origin}/favicon.ico`;
+            } catch {
+              it.thumb = FALLBACK_THUMB;
+            }
+            updatePrev(it.thumb);
           } else {
-            renderSlidesMaster();
+            it.thumb = FALLBACK_THUMB;
+            updatePrev(FALLBACK_THUMB);
           }
+          renderSlidesMaster();
         }
       };
       $media.appendChild(mb);
@@ -852,23 +762,6 @@ function interRow(i){
     renderMediaField();
     renderSlidesMaster();
   };
-  if ($after) $after.onchange = () => {
-    const v = $after.value;
-    if (v === 'img:' + it.id){
-      alert('Ein Bild kann nicht nach sich selbst kommen.');
-      $after.value = 'overview';
-      applyAfterSelect(it, 'overview');
-      return;
-    }
-    const used = usedAfterRefs(it.id);
-    if (used.has(v)){
-      alert('Dieses Ziel ist bereits als „Nach Slide“ gewählt.');
-      $after.value = 'overview';
-      applyAfterSelect(it, 'overview');
-      return;
-    }
-    applyAfterSelect(it, v);
-  };
 
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
@@ -881,7 +774,10 @@ function interRow(i){
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
   const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
-  settings.interstitials = list.map(it => ({ type:'image', thumb:'', ...it }));
+  settings.interstitials = list.map(it => {
+    const { after, afterRef, ...rest } = it || {};
+    return ({ type:'image', thumb:'', ...rest });
+  });
 
   const host = document.getElementById(hostId);
   if (!host) return;
@@ -898,11 +794,247 @@ function renderInterstitialsPanel(hostId='interList2'){
       type:'image',
       url:'',
       thumb:'',
-      after:'overview',
       dwellSec:6
     });
     renderSlidesMaster();
   };
+}
+
+// ============================================================================
+// 6b) Slide Order View
+// ============================================================================
+export function renderSlideOrderView(){
+  const settings = ctx.getSettings();
+  const schedule = ctx.getSchedule();
+  const host = document.getElementById('slideOrderGrid');
+  if (!host) return;
+
+  const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
+  const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
+    .map(it => ({ kind: 'media', item: it }));
+  const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
+
+  let combined = [];
+  const ord = settings?.slides?.sortOrder;
+  if (Array.isArray(ord) && ord.length){
+    const mapS = new Map(saunas.map(s => [s.name, s]));
+    const mapM = new Map(media.map(m => [String(m.item.id), m]));
+    for (const o of ord){
+      if (o.type === 'sauna' && mapS.has(o.name)){
+        combined.push(mapS.get(o.name));
+        mapS.delete(o.name);
+      } else if (o.type === 'media' && mapM.has(String(o.id))){
+        combined.push(mapM.get(String(o.id)));
+        mapM.delete(String(o.id));
+      }
+    }
+    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()));
+    // sortOrder ggf. bereinigen (nicht mehr existierende Einträge entfernen)
+    settings.slides.sortOrder = combined.map(e => e.kind === 'sauna'
+      ? { type:'sauna', name:e.name }
+      : { type:'media', id:e.item.id });
+  } else {
+    combined = saunas.concat(media);
+  }
+
+  host.innerHTML = '';
+  combined.forEach((entry, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'slide-order-tile';
+    tile.draggable = true;
+    tile.dataset.idx = idx;
+    tile.dataset.type = entry.kind;
+
+    const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
+    const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
+    if (isHiddenSauna) tile.classList.add('is-hidden');
+    if (isHiddenSauna || isDisabledMedia) tile.classList.add('is-disabled');
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    let statusEl = null;
+    if (isHiddenSauna || isDisabledMedia){
+      statusEl = document.createElement('div');
+      statusEl.className = 'slide-status';
+      statusEl.dataset.state = 'hidden';
+      statusEl.textContent = 'Ausgeblendet';
+    }
+    if (entry.kind === 'sauna'){
+      tile.dataset.name = entry.name;
+      title.textContent = entry.name;
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const imgSrc = settings.assets?.rightImages?.[entry.name] || '';
+      if (imgSrc){
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = entry.name || '';
+        tile.appendChild(img);
+      }
+    } else {
+      tile.dataset.id = entry.item.id;
+      title.textContent = entry.item.name || '(unbenannt)';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const img = document.createElement('img');
+      img.src = entry.item.thumb || entry.item.url || '';
+      img.alt = entry.item.name || '';
+      tile.appendChild(img);
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'reorder-controls';
+
+    const stopDragPropagation = ev => {
+      ev.stopPropagation();
+    };
+
+    const preventDragStart = ev => {
+      ev.preventDefault();
+    };
+
+    const makeCtrlButton = (dir, label) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `reorder-btn ${dir > 0 ? 'reorder-down' : 'reorder-up'}`;
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+      const iconMarkup = dir < 0
+        ? '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="M8 3.5 12.5 8l-.7.7L8 4.9 4.2 8.7l-.7-.7Z"/></svg>'
+        : '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="m8 12.5-4.5-4.5.7-.7L8 11.1l3.8-3.8.7.7Z"/></svg>';
+      btn.innerHTML = iconMarkup;
+      btn.draggable = false;
+      btn.addEventListener('pointerdown', stopDragPropagation);
+      btn.addEventListener('mousedown', stopDragPropagation);
+      btn.addEventListener('touchstart', stopDragPropagation);
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        let moved = false;
+        if (dir < 0){
+          const prev = tile.previousElementSibling;
+          if (prev){
+            prev.before(tile);
+            moved = true;
+          }
+        } else {
+          const next = tile.nextElementSibling;
+          if (next){
+            next.after(tile);
+            moved = true;
+          }
+        }
+        if (!moved) return;
+        clearDropIndicators();
+        commitReorder();
+      });
+      btn.addEventListener('dragstart', preventDragStart);
+      return btn;
+    };
+
+    controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben'));
+    controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben'));
+    tile.appendChild(controls);
+
+    host.appendChild(tile);
+  });
+
+  let dragged = null;
+  const DROP_BEFORE = 'drop-before';
+  const DROP_AFTER = 'drop-after';
+
+  const clearDropIndicators = () => {
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+  };
+
+  const commitReorder = () => {
+    const tiles = Array.from(host.children);
+    const reordered = tiles.map(el => combined[+el.dataset.idx]);
+    combined = reordered;
+    tiles.forEach((el, i) => { el.dataset.idx = i; });
+
+    const newSaunas = [];
+    const newMedia = [];
+    const sortOrder = [];
+    for (const entry of reordered){
+      if (entry.kind === 'sauna'){
+        newSaunas.push(entry.name);
+        sortOrder.push({ type:'sauna', name: entry.name });
+      } else {
+        newMedia.push(entry.item);
+        sortOrder.push({ type:'media', id: entry.item.id });
+      }
+    }
+    schedule.saunas = newSaunas;
+    settings.interstitials = newMedia;
+    settings.slides ||= {};
+    settings.slides.sortOrder = sortOrder;
+  };
+
+  const updateDropIndicator = (target, before) => {
+    if (!target || target === dragged) return;
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      if (el !== target) el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    target.classList.remove(DROP_BEFORE, DROP_AFTER);
+    target.classList.add(before ? DROP_BEFORE : DROP_AFTER);
+  };
+
+  const isBeforeTarget = (event, target) => {
+    const rect = target.getBoundingClientRect();
+    const horizontal = rect.width > rect.height;
+    return horizontal
+      ? (event.clientX < rect.left + rect.width / 2)
+      : (event.clientY < rect.top + rect.height / 2);
+  };
+
+  host.querySelectorAll('.slide-order-tile').forEach(tile => {
+    tile.addEventListener('dragstart', e => {
+      dragged = tile;
+      tile.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    tile.addEventListener('dragenter', e => {
+      if (!dragged || tile === dragged) return;
+      e.preventDefault();
+      const before = isBeforeTarget(e, tile);
+      updateDropIndicator(tile, before);
+    });
+    tile.addEventListener('dragover', e => {
+      e.preventDefault();
+      const target = tile;
+      if (target === dragged) return;
+      const before = isBeforeTarget(e, target);
+      updateDropIndicator(target, before);
+      if (before) target.before(dragged);
+      else target.after(dragged);
+    });
+    tile.addEventListener('dragleave', e => {
+      if (tile.contains(e.relatedTarget)) return;
+      tile.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    tile.addEventListener('drop', e => {
+      e.preventDefault();
+      clearDropIndicators();
+    });
+    tile.addEventListener('dragend', () => {
+      clearDropIndicators();
+      tile.classList.remove('dragging');
+      commitReorder();
+      dragged = null;
+    });
+  });
+
+  host.addEventListener('drop', e => {
+    e.preventDefault();
+    clearDropIndicators();
+    if (dragged) dragged.classList.remove('dragging');
+  });
+
+  host.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
 }
 
 // ============================================================================
@@ -1023,6 +1155,26 @@ if (durPer) durPer.onchange = () => {
   // Medien-Slides
   renderInterstitialsPanel('interList2');
 
+  const sortBtn = $('#btnSortSlides');
+  const orderOverlay = $('#slideOrderOverlay');
+  const closeOrder = $('#slideOrderClose');
+  if (sortBtn) sortBtn.onclick = () => {
+    if (orderOverlay) {
+      orderOverlay.hidden = false;
+      renderSlideOrderView();
+    }
+  };
+  if (closeOrder) closeOrder.onclick = () => {
+    if (orderOverlay) orderOverlay.hidden = true;
+    renderSlidesMaster();
+  };
+  if (orderOverlay) orderOverlay.addEventListener('click', e => {
+    if (e.target === orderOverlay) {
+      orderOverlay.hidden = true;
+      renderSlidesMaster();
+    }
+  });
+
   // Reset & Add Sauna
   const rs = $('#resetTiming');
   if (rs) rs.onclick = () => {
@@ -1056,18 +1208,6 @@ if (durPer) durPer.onchange = () => {
 // ============================================================================
 // 8) Public API
 // ============================================================================
-export function validateUniqueAfterRefs(){
-  const list = ctx.getSettings()?.interstitials || [];
-  const seen = new Set();
-  for (const im of list){
-    const v = im?.afterRef;
-    if (!v || v === 'overview') continue;
-    if (seen.has(v)) return false;
-    seen.add(v);
-  }
-  return true;
-}
-
 export function initSlidesMasterUI(context){
   ctx = context;
   if (!wiredStatic){

@@ -8,26 +8,47 @@
 </head>
 <body class="theme-light">
   <header>
-    <h1>Aufguss – Admin</h1>
-    <div class="row">
+    <div class="header-title">
+      <h1>Anzeigensteuerung – Admin</h1>
       <label class="toggle" title="Hell/Dunkel">
         <input type="checkbox" id="themeMode">
-        <span id="themeLabel">Dunkel</span>
+        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="4" fill="currentColor"/>
+          <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="2" x2="12" y2="4"/>
+            <line x1="12" y1="20" x2="12" y2="22"/>
+            <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+            <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+            <line x1="2" y1="12" x2="4" y2="12"/>
+            <line x1="20" y1="12" x2="22" y2="12"/>
+            <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+            <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+          </g>
+        </svg>
+        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
+        </svg>
       </label>
-<!-- Ansicht-Menü -->
-<div class="menuwrap" id="viewMenuWrap">
-  <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-    Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-  </button>
-  <div class="dropdown" id="viewMenu" role="menu" hidden>
-    <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-    <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-    <button class="dd-item" role="menuitemradio" data-view="devices" aria-checked="false">🖥 Geräte</button>
-  </div>
-</div>
+    </div>
+    <div class="header-actions">
+      <!-- Ansicht-Menü -->
+      <button class="btn" id="btnDevices">Geräte</button>
+      <div class="menuwrap" id="viewMenuWrap">
+        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+        </button>
+        <div class="dropdown" id="viewMenu" role="menu" hidden>
+          <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+          <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+        </div>
+      </div>
       <button class="btn" id="btnHelp">Hilfe</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
+      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
+        <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
+        <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
+      </span>
     </div>
   </header>
 
@@ -162,7 +183,7 @@
     <details class="ac sub" id="boxImages">
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
-    <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button></div>
+    <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button><button class="btn sm" id="btnSortSlides">Slides sortieren</button></div>
   </summary>
 <small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
   <div class="content">
@@ -173,7 +194,6 @@
     <span class="col-dur" id="headImgDur">Dauer (s)</span>
     <span class="col-up">Upload</span>
     <span class="col-del">✕</span>
-    <span class="col-after">Nach Slide</span>
     <span class="col-vis">Anzeigen</span>
   </div>
     <div id="interList2"></div>
@@ -192,13 +212,10 @@
           <div class="subh">Skalierung & 16:9</div>
           <div class="kv"><label>Fit‑Modus</label>
             <select id="fitMode" class="input">
-              <option value="cover">Cover (bildschirmfüllend, kann beschneiden)</option>
-              <option value="contain">Contain (einpassen, keine Beschneidung)</option>
-              <option value="width">Nur Breite anpassen</option>
               <option value="auto">Auto</option>
             </select>
           </div>
-          <div class="help">„Cover“ füllt 1080p/1440p **ohne Rand**. Andere Verhältnisse werden ggf. beschnitten. „Contain“ zeigt immer alles (Rand möglich).</div>
+          <div class="help">Passt je nach Seitenverhältnis automatisch an (Cover oder Contain).</div>
 
           <div class="subh">Schrift</div>
           <div class="kv"><label>Schriftfamilie</label>
@@ -295,33 +312,60 @@
           <div class="ttl">▶<span class="chev">⮞</span> System</div>
         </summary>
         <div class="content">
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            <button class="btn" id="btnExport">Export</button>
-
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="expWithSettings" checked>Einstellungen einschließen
-            </label>
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="expWithSchedule" checked>Aufgusszeiten einschließen
-            </label>
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="expWithImg">Bilder einschließen
-            </label>
-
-            <label class="btn" style="position:relative;overflow:hidden">
-              Import<input id="importFile" type="file" accept="application/json" style="position:absolute;inset:0;opacity:0">
-            </label>
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="impWriteSettings" checked>Einstellungen anwenden
-            </label>
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="impWriteSchedule" checked>Aufgusszeiten anwenden
-            </label>
-            <label class="btn sm ghost" style="gap:6px;display:flex;align-items:center">
-              <input type="checkbox" id="impWriteImg" checked>Bilder einspielen
-            </label>
-         <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
- </div>
+          <div class="sys-grid">
+            <div class="sys-action">
+              <button class="btn icon-label" id="btnExport">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 3a1 1 0 0 1 .82.42l4 5.5A1 1 0 0 1 16 10h-3v6a1 1 0 1 1-2 0v-6H8a1 1 0 0 1-.82-1.58l4-5.5A1 1 0 0 1 12 3zm8 16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2h16z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Export</span>
+              </button>
+            </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithImg">
+                <span>Bilder</span>
+              </label>
+            </div>
+            <div class="sys-action">
+              <label class="btn icon-label sys-file-btn">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 21a1 1 0 0 1-.82-.42l-4-5.5A1 1 0 0 1 8 14h3V8a1 1 0 0 1 2 0v6h3a1 1 0 0 1 .82 1.58l-4 5.5A1 1 0 0 1 12 21zM4 5a1 1 0 0 1 0-2h16a1 1 0 0 1 0 2H4z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Import</span>
+                <input id="importFile" type="file" accept="application/json">
+              </label>
+            </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteImg" checked>
+                <span>Bilder</span>
+              </label>
+            </div>
+          </div>
+          <div class="sys-cleanup">
+            <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
+          </div>
           <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
         </div>
       </details>
@@ -374,6 +418,14 @@
     <small class="mut" style="display:block;margin-top:8px">
       Live-Ansicht des ausgewählten Geräts (nur Lesen; kein Pairing, keine Speicherung).
     </small>
+  </div>
+</div>
+
+<div id="slideOrderOverlay" hidden>
+  <div class="panel">
+    <button id="slideOrderClose" class="btn icon" aria-label="Schließen">✕</button>
+    <h2>Slides sortieren</h2>
+    <div id="slideOrderGrid" class="slide-order-grid"></div>
   </div>
 </div>
 

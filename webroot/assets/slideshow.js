@@ -2,12 +2,57 @@
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
-const Q = new URLSearchParams(location.search);
-const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
-const rawDevice = (Q.get('device') || localStorage.getItem('deviceId') || '').trim();
-const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
-if (!DEVICE_ID) localStorage.removeItem('deviceId'); // Karteileichen loswerden
-let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
+  const Q = new URLSearchParams(location.search);
+  const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
+  const LS_MEM = {};
+  let lsWarned = false;
+  function lsNotice(){
+    if (lsWarned) return;
+    lsWarned = true;
+    alert('Speicher voll – Daten werden nur temporär gespeichert.');
+  }
+  const ls = {
+    get(k){
+      try { return localStorage.getItem(k); }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.getItem failed', e);
+          lsNotice();
+          return LS_MEM[k] ?? null;
+        }
+        return null;
+      }
+    },
+    set(k,v){
+      try { localStorage.setItem(k,v); }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.setItem failed', e);
+          lsNotice();
+          LS_MEM[k] = String(v);
+        }
+      }
+    },
+    remove(k){
+      try { localStorage.removeItem(k); }
+      catch(e){
+        if (e instanceof DOMException){
+          console.warn('[slideshow] localStorage.removeItem failed', e);
+          lsNotice();
+        }
+      }
+      delete LS_MEM[k];
+    }
+  };
+  const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
+  const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
+  if (DEVICE_ID) {
+    // persist valid device IDs for subsequent loads
+    ls.set('deviceId', DEVICE_ID);
+  } else {
+    ls.remove('deviceId'); // Karteileichen loswerden
+  }
+  let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
 
   let schedule = null;
   let settings = null;
@@ -16,20 +61,86 @@ let previewMode = IS_PREVIEW; // NEU: in Preview sofort aktiv (kein Pairing)
   let idx = 0;
   let slideTimer = 0, transTimer = 0;
   let onResizeCurrent = null;
+  let cachedDisp = null;
+  let heartbeatTimer = null;
+  let pollTimer = null;
+
+  window.addEventListener('beforeunload', () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  });
 
   const imgCache = new Set();
+  const preloadQueue = [];
+  const queuedUrls = new Set();
+  let activePreloads = 0;
+  const MAX_PRELOAD = 3;
+  const PRELOAD_AHEAD = 4;
+
+  function runPreloadQueue(){
+    while (activePreloads < MAX_PRELOAD && preloadQueue.length) {
+      const { url, resolve } = preloadQueue.shift();
+      activePreloads++;
+      const img = new Image();
+      const done = () => {
+        img.onload = img.onerror = null;
+        img.src = '';
+        queuedUrls.delete(url);
+        imgCache.add(url);
+        activePreloads--;
+        resolve();
+        runPreloadQueue();
+      };
+      img.onload = img.onerror = done;
+      img.src = url;
+    }
+  }
+
+  function queuePreload(url){
+    if (!url || imgCache.has(url) || queuedUrls.has(url)) return Promise.resolve();
+    queuedUrls.add(url);
+    return new Promise(resolve => {
+      preloadQueue.push({ url, resolve });
+      runPreloadQueue();
+    });
+  }
+
   function preloadImage(url){
-    return new Promise(res=>{
-      if (!url || imgCache.has(url)) return res();
-      const i = new Image();
-      i.onload = i.onerror = () => res();
-      i.src = url;
-      imgCache.add(url);
+    return queuePreload(url);
+  }
+
+  function preloadImg(url){
+    return new Promise(resolve => {
+      if (!url) return resolve({ ok:false });
+      const img = new Image();
+      img.onload  = () => resolve({ ok:true,  w:img.naturalWidth, h:img.naturalHeight });
+      img.onerror = () => resolve({ ok:false });
+      img.src = url;
     });
   }
   async function preloadRightImages(){
     const urls = Object.values(settings?.assets?.rightImages || {});
     await Promise.all(urls.filter(Boolean).map(preloadImage));
+  }
+  async function preloadNextImages(){
+    if (!nextQueue.length) return;
+    const urls = [];
+    for (let i = 0; i < PRELOAD_AHEAD; i++) {
+      const item = nextQueue[(idx + i) % nextQueue.length];
+      const url = (item && item.type === 'image') ? item.src : null;
+      if (url) urls.push(url);
+    }
+    await Promise.all(urls.map(preloadImage));
+  }
+
+  async function preloadSlideImages(){
+    await preloadNextImages();
   }
 
   // ---------- Time helpers ----------
@@ -60,8 +171,8 @@ async function loadDeviceResolved(id){
   schedule = j.schedule;
   settings = j.settings;
   applyTheme(); applyDisplay(); maybeApplyPreset();
-  await preloadRightImages();
-  await buildQueue();
+  buildQueue();
+  await Promise.all([preloadRightImages(), preloadSlideImages()]);
 }
 
 
@@ -76,8 +187,8 @@ async function loadDeviceResolved(id){
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
-    await preloadRightImages();
-    await buildQueue();
+    buildQueue();
+    await Promise.all([preloadRightImages(), preloadSlideImages()]);
   }
 
   // ---------- Theme & Display ----------
@@ -134,6 +245,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
   }
 
   function applyDisplay() {
+    cachedDisp = null;
     const d = settings?.display || {};
     if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
     if (typeof d.cutTopPercent === 'number')     document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
@@ -147,7 +259,35 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       document.documentElement.style.setProperty('--vwScale', String(s));
     };
     updateVwScale();
-    window.addEventListener('resize', updateVwScale, { passive:true });
+
+    let resizeRaf = null;
+    const onResize = () => {
+      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        updateVwScale();
+      });
+    };
+
+    window.addEventListener('resize', onResize, { passive:true });
+    window.addEventListener('orientationchange', onResize);
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(onResize).observe(document.documentElement);
+    }
+  }
+
+  function getDisplayRatio() {
+    if (cachedDisp !== null) return cachedDisp;
+    const d = settings?.display || {};
+    const baseW = d.baseW || 1920;
+    const baseH = d.baseH || 1080;
+    cachedDisp = baseW / baseH;
+    return cachedDisp;
+  }
+
+  function chooseFit(mediaW, mediaH, opts = {}) {
+    return 'cover';
   }
 
 // ---------- Slide queue ----------
@@ -158,6 +298,63 @@ function buildQueue() {
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
   const allSaunas = (schedule?.saunas || []);
+  const sortOrder = Array.isArray(settings?.slides?.sortOrder) ? settings.slides.sortOrder : null;
+
+  if (sortOrder && sortOrder.length) {
+    const queue = [];
+    if (showOverview) queue.push({ type: 'overview' });
+    const mediaAll = Array.isArray(settings?.interstitials) ? settings.interstitials : [];
+    const mediaMap = new Map(mediaAll.map(it => [String(it.id), it]));
+    const usedSaunas = new Set();
+    const usedMedia = new Set();
+    for (const entry of sortOrder) {
+      if (entry.type === 'sauna') {
+        const name = entry.name;
+        if (allSaunas.includes(name) && !hidden.has(name)) {
+          queue.push({ type: 'sauna', sauna: name });
+          usedSaunas.add(name);
+        }
+      } else if (entry.type === 'media') {
+        const it = mediaMap.get(String(entry.id));
+        if (it && it.enabled) {
+          const dwell = Number.isFinite(+it.dwellSec)
+            ? +it.dwellSec
+            : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+          const node = { type: it.type, dwell, __id: it.id || null };
+          if (it.url) {
+            if (it.type === 'url') node.url = it.url; else node.src = it.url;
+          }
+          queue.push(node);
+          usedMedia.add(String(it.id));
+        }
+      }
+    }
+    for (const s of allSaunas) {
+      if (!usedSaunas.has(s) && !hidden.has(s)) queue.push({ type: 'sauna', sauna: s });
+    }
+    for (const it of mediaAll) {
+      const idStr = String(it.id);
+      if (!usedMedia.has(idStr) && it && it.enabled) {
+        const dwell = Number.isFinite(+it.dwellSec)
+          ? +it.dwellSec
+          : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+        const node = { type: it.type, dwell, __id: it.id || null };
+        if (it.url) {
+          if (it.type === 'url') node.url = it.url; else node.src = it.url;
+        }
+        queue.push(node);
+      }
+    }
+    const clean = [];
+    for (const q of queue) {
+      if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
+      else if (q.__id != null) clean.push({ type: 'media', id: q.__id });
+    }
+    settings.slides.sortOrder = clean;
+    if (!queue.length && showOverview) queue.push({ type: 'overview' });
+    nextQueue.splice(0, nextQueue.length, ...queue);
+    return;
+  }
 
   // Referenz-Reihenfolge für Saunen (Order aus Settings, dann Rest)
   const cfgOrder = Array.isArray(settings?.slides?.order) ? settings.slides.order.slice() : null;
@@ -197,86 +394,18 @@ function buildQueue() {
     }
   }
 
-  // Hilfen
+  // Medien nach Übersicht einfügen
   const idxOverview = () => queue.findIndex(x => x.type === 'overview');
-
-  // Mehrpass-Einfügen, damit "nach Bild" funktioniert
-  let remaining = media.slice();
-  let guard = 0;
-  while (remaining.length && guard++ < media.length * 3) {
-    const postponed = [];
-    for (const it of remaining) {
-      const ref = (it.afterRef || it.after || 'overview');
-      let insPos = -1;
-
-      if (ref === 'overview') {
-        const io = idxOverview();
-        insPos = (io >= 0) ? io + 1 : 0;
-      } else if (String(ref).startsWith('img:')) {
-        // nach Bild/Medien-Item: nur einfügen, wenn das Ziel bereits platziert ist
-        const prevId = String(ref).slice(4);
-        const prevIndex = queue.findIndex(x => x.__id === prevId);
-        if (prevIndex === -1) { postponed.push(it); continue; }
-        insPos = prevIndex + 1;
-      } else {
-        // nach Sauna (Name)
-        const saunaName = decodeURIComponent(String(ref));
-        const direct = queue.findIndex(x => x.type === 'sauna' && x.sauna === saunaName);
-        if (direct !== -1) {
-          // Zielsauna ist sichtbar → direkt dahinter
-          insPos = direct + 1;
-        } else {
-          // Zielsauna ist NICHT sichtbar → vor der nächsten sichtbaren Sauna in der Referenz-Reihenfolge
-          let nextVisible = null;
-          if (saunaOrderRef.length && visibleSaunas.length) {
-            const start = saunaOrderRef.indexOf(saunaName);
-            // falls die Referenzsauna gar nicht existiert, einfach ab 0 suchen
-            let k = (start >= 0 ? start : -1) + 1;
-            for (let step = 0; step < saunaOrderRef.length; step++, k++) {
-              const cand = saunaOrderRef[k % saunaOrderRef.length];
-              if (!hidden.has(cand)) { nextVisible = cand; break; }
-            }
-          }
-          if (nextVisible) {
-            const posQ = queue.findIndex(x => x.type === 'sauna' && x.sauna === nextVisible);
-            insPos = (posQ >= 0) ? posQ : -1; // vor nächster Sauna einfügen
-          }
-
-          // Fallback: nach Overview oder ganz vorn
-          if (insPos === -1) {
-            const io = idxOverview();
-            insPos = (io >= 0) ? io + 1 : 0;
-          }
-        }
-      }
-
-      // Medien-Node einfügen
-      const dwell = Number.isFinite(+it.dwellSec)
-        ? +it.dwellSec
-        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
-
-      const node = { type: it.type, dwell, __id: it.id || null };
-      if (it.src) node.src = it.src;
-      if (it.url && it.type === 'url') node.url = it.url;
-      queue.splice(insPos, 0, node);
-    }
-    remaining = postponed;
-  }
-
-  if (remaining.length) {
-    console.warn('Unplaced media items, appending to end:', remaining);
-    let insPos = idxOverview();
-    insPos = (insPos >= 0) ? insPos + 1 : queue.length;
-    for (const it of remaining) {
-      const dwell = Number.isFinite(+it.dwellSec)
-        ? +it.dwellSec
-        : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
-
-      const node = { type: it.type, dwell, __id: it.id || null };
-      if (it.src) node.src = it.src;
-      if (it.url && it.type === 'url') node.url = it.url;
-      queue.splice(insPos++, 0, node);
-    }
+  let insPos = idxOverview();
+  insPos = (insPos >= 0) ? insPos + 1 : 0;
+  for (const it of media) {
+    const dwell = Number.isFinite(+it.dwellSec)
+      ? +it.dwellSec
+      : (settings?.slides?.imageDurationSec ?? settings?.slides?.saunaDurationSec ?? 6);
+    const node = { type: it.type, dwell, __id: it.id || null };
+    if (it.src) node.src = it.src;
+    if (it.url && it.type === 'url') node.url = it.url;
+    queue.splice(insPos++, 0, node);
   }
 
   // Falls nichts bleibt, notfalls Übersicht zeigen
@@ -502,18 +631,28 @@ return h('div', {}, [ t ]);
 
     const availH = container.clientHeight;
 
-    // Nur typografisch skalieren (breite bleibt 100%)
-    let iter = 0, lastTotal = Infinity;
+    // Erster grober Faktor
     let m = measure();
-while (m.totalH > availH && iter < 12) {
-  const target = availH / m.totalH;
-  const s = Math.max(0.25, Math.min(1, target * (iter ? 0.98 : 1)));
-      container.style.setProperty('--ovAuto', String(s));
-      lastTotal = m.totalH;
-      m = measure();
-      if (Math.abs(m.totalH - lastTotal) < 0.5) break;
-      iter++;
-    }
+    let s = Math.max(0.25, Math.min(1, availH / m.totalH));
+    container.style.setProperty('--ovAuto', String(s));
+
+    // Nach Layout-Update neu messen und ggf. nachjustieren
+    requestAnimationFrame(() => {
+      let m2 = measure();
+      if (m2.totalH <= availH) return;
+      let lo = 0.25, hi = s;
+      for (let i = 0; i < 4; i++) {
+        const mid = (lo + hi) / 2;
+        container.style.setProperty('--ovAuto', String(mid));
+        m2 = measure();
+        if (m2.totalH > availH) {
+          hi = mid;
+        } else {
+          lo = mid;
+        }
+        if (Math.abs(m2.totalH - availH) < 1) break;
+      }
+    });
   }
 
   function renderOverview() {
@@ -536,27 +675,44 @@ onResizeCurrent = recalc;
 
 // ---------- Interstitial image slide ----------
 function renderImage(url) {
-  const c = h('div', { class: 'container imgslide fade show' }, [
-    h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' })
-  ]);
+  const fill = h('div', { class: 'imgFill', style: 'background-image:url("'+url+'")' });
+  const c = h('div', { class: 'container imgslide fade show' }, [ fill ]);
+  const img = new Image();
+  img.onload = () => {
+    fill.style.backgroundSize = chooseFit(img.naturalWidth, img.naturalHeight);
+  };
+  img.src = url;
   return c;
 }
 
 // ---------- Interstitial video slide ----------
 function renderVideo(src, opts = {}) {
+  const disp = getDisplayRatio();
   const v = document.createElement('video');
   v.preload = 'auto';
   v.autoplay = true;
   if (opts.muted !== undefined) v.muted = !!opts.muted;
   else v.muted = true;
   v.playsInline = true;
-  v.setAttribute('style', 'object-fit:cover');
-  v.src = src;
+  const fit = () => {
+    const baseW = settings?.display?.baseW || 1920;
+    const baseH = settings?.display?.baseH || 1080;
+    v.style.objectFit = chooseFit(
+      v.videoWidth || baseW,
+      v.videoHeight || baseH,
+      { type: 'video' }
+    );
+  };
+  if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
   v.addEventListener('canplay', () => v.play());
   v.addEventListener('error', (e) => {
     console.error('[video] error', e);
+    const srcUrl = v.src;
+    v.remove();
+    if (srcUrl.startsWith('blob:')) URL.revokeObjectURL(srcUrl);
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
-    if (v.parentNode) v.parentNode.replaceChild(fallback, v);
+    c.appendChild(fallback);
+    advanceQueue();
   });
   if (settings?.slides?.waitForVideo) {
     const done = () => {
@@ -571,10 +727,26 @@ function renderVideo(src, opts = {}) {
       slideTimer = setTimeout(done, ms);
     }, { once: true });
     v.addEventListener('ended', () => { clearTimeout(slideTimer); done(); }, { once: true });
-    v.addEventListener('error', () => { done(); }, { once: true });
   }
-  const c = h('div', { class: 'container videoslide fade show' });
+  const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
   c.appendChild(v);
+
+  fetch(src, { method: 'HEAD' }).then(res => {
+    if (!res.ok) {
+      v.remove();
+      const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
+      c.appendChild(fallback);
+      advanceQueue();
+      return;
+    }
+    v.src = src;
+  }).catch(() => {
+    v.remove();
+    const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
+    c.appendChild(fallback);
+    advanceQueue();
+  });
+
   return c;
 }
 
@@ -701,6 +873,11 @@ if (footNodes.length){
     }
   }
 
+  function advanceQueue(){
+    clearTimers();
+    hide(() => { idx++; step(); preloadNextImages(); });
+  }
+
 function dwellMsForItem(item) {
   const slides = settings?.slides || {};
   const mode = slides.durationMode || 'uniform';
@@ -782,8 +959,8 @@ function showPairing(){
 
   (async ()=>{
     try {
-      // Bestehenden Code (Session) wiederverwenden – verhindert neuen Code bei Refresh
-      let st = null; try { st = JSON.parse(sessionStorage.getItem('pairState')||'null'); } catch {}
+      // Bestehenden Code (localStorage) wiederverwenden – Tabs teilen den Code
+      let st = null; try { st = JSON.parse(ls.get('pairState')||'null'); } catch {}
       let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
 
       if (!code) {
@@ -796,22 +973,36 @@ function showPairing(){
         const j0 = await r.json();
         if (!j0 || !j0.code) throw new Error('begin payload');
         code = j0.code;
-        sessionStorage.setItem('pairState', JSON.stringify({ code, createdAt: Date.now() }));
+        ls.set('pairState', JSON.stringify({ code, createdAt: Date.now() }));
       }
 
       const el = document.getElementById('code');
       if (el) el.textContent = code;
 
-      const timer = setInterval(async ()=>{
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
         try {
-          const rr = await fetch('/pair/poll?code='+encodeURIComponent(code), {cache:'no-store'});
+          const rr = await fetch('/pair/poll?code=' + encodeURIComponent(code), { cache: 'no-store' });
           if (!rr.ok) return;
           const jj = await rr.json();
-          if (jj && jj.paired && jj.deviceId){
-            clearInterval(timer);
-            try{ sessionStorage.removeItem('pairState'); }catch{}
-            localStorage.setItem('deviceId', jj.deviceId);
-            location.replace('/?device='+encodeURIComponent(jj.deviceId));
+          if (jj && jj.paired && jj.deviceId) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            ls.remove('pairState');
+            ls.set('deviceId', jj.deviceId);
+            // sofortigen Heartbeat absetzen und dann aktualisieren
+            fetch('/api/heartbeat.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ device: jj.deviceId })
+            }).then(r => {
+              if (!r.ok) throw new Error('heartbeat http ' + r.status);
+            }).catch(e => console.error('[heartbeat] post-pair failed', e));
+            location.replace('/?device=' + encodeURIComponent(jj.deviceId));
           }
         } catch {}
       }, 3000);
@@ -836,18 +1027,41 @@ async function bootstrap(){
  if (p.schedule) schedule = p.schedule;
  if (p.settings) settings = p.settings;
  applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+ preloadSlideImages();
  idx = 0; lastKey = null;
  step();
- });
+});
   const deviceMode = !!DEVICE_ID;
 
   if (!previewMode) {
     if (deviceMode) {
 try {
- await loadDeviceResolved(DEVICE_ID);
- // Heartbeat: sofort + alle 30s (setzt "Zuletzt gesehen" direkt)
- fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{});
- setInterval(()=>{ fetch('/pair/touch?device='+encodeURIComponent(DEVICE_ID)).catch(()=>{}); }, 30000);     
+    await loadDeviceResolved(DEVICE_ID);
+    // Heartbeat: sofort + alle 30s
+    const sendHeartbeat = () => {
+      const payload = JSON.stringify({ device: DEVICE_ID });
+      const blob = new Blob([payload], { type: 'application/json' });
+      let sent = false;
+      if (navigator.sendBeacon) {
+        try {
+          sent = navigator.sendBeacon('/api/heartbeat.php', blob);
+        } catch (e) {
+          console.error('[heartbeat] beacon failed', e);
+        }
+      }
+      if (!sent) {
+        fetch('/api/heartbeat.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload
+        }).then(r => {
+          if (!r.ok) throw new Error('heartbeat http ' + r.status);
+        }).catch(e => console.error('[heartbeat] failed', e));
+      }
+    };
+    sendHeartbeat();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(sendHeartbeat, 30 * 1000);
  } catch (e) {
 console.error('[bootstrap] resolve failed:', e);
  showPairing();
@@ -874,12 +1088,14 @@ console.error('[bootstrap] resolve failed:', e);
     let lastSchedVer = schedule?.version || 0;
     let lastSetVer   = settings?.version || 0;
 
-    const pollTimer = setInterval(async () => {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
       try {
         if (deviceMode) {
           const r = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, {cache:'no-store'});
           if (r.status === 404) {
             clearInterval(pollTimer);
+            pollTimer = null;
             clearTimers();
             showPairing();
             return;
@@ -901,6 +1117,7 @@ console.error('[bootstrap] resolve failed:', e);
             schedule = j.schedule; settings = j.settings;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            preloadSlideImages();
             clearTimers();
             idx = idx % Math.max(1, nextQueue.length);
             lastKey = null;
@@ -912,6 +1129,7 @@ console.error('[bootstrap] resolve failed:', e);
           if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
             schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
             applyTheme(); applyDisplay(); maybeApplyPreset(); buildQueue();
+            preloadSlideImages();
             clearTimers();
             idx = idx % Math.max(1, nextQueue.length);
             lastKey = null;

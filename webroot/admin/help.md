@@ -11,3 +11,8 @@
 3. Speichere, um die Änderungen zu übernehmen.
 
 Weitere Hinweise findest du direkt in der Anwendung.
+
+## Speichern & Entwürfe
+- Sobald alle Änderungen gespeichert wurden oder du per Undo/Reset zum ursprünglichen Stand zurückkehrst,
+  verschwindet der Hinweis-Badge „Änderungen noch nicht gespeichert“ automatisch.
+- Dabei werden auch lokale Entwürfe bereinigt, damit die angezeigten Daten wieder dem gespeicherten Stand entsprechen.
