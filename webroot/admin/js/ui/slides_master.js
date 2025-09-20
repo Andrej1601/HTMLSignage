@@ -1777,17 +1777,18 @@ function renderStorySlidesPanel(hostId='storyList'){
 // ============================================================================
 // 6b) Slide Order View
 // ============================================================================
-export function renderSlideOrderView(){
+export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
-  const host = document.getElementById('slideOrderGrid');
-  if (!host) return;
-
   const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
   const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
     .map(it => ({ kind: 'media', item: it }));
   const storiesRaw = ensureStorySlides(settings);
-  const stories = storiesRaw.map((item, i) => ({ kind: 'story', item, key: item?.id != null ? String(item.id) : 'story_idx_' + i }));
+  const stories = storiesRaw.map((item, i) => ({
+    kind: 'story',
+    item,
+    key: item?.id != null ? String(item.id) : 'story_idx_' + i
+  }));
   const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
 
   let combined = [];
@@ -1809,15 +1810,33 @@ export function renderSlideOrderView(){
       }
     }
     combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()), Array.from(mapStory.values()));
-    // sortOrder ggf. bereinigen (nicht mehr existierende Einträge entfernen)
-    settings.slides.sortOrder = combined.map(e => {
-      if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
-      if (e.kind === 'media') return { type: 'media', id: e.item.id };
-      return { type: 'story', id: e.item?.id ?? e.key };
-    });
+    if (normalizeSortOrder){
+      settings.slides.sortOrder = combined.map(e => {
+        if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
+        if (e.kind === 'media') return { type: 'media', id: e.item.id };
+        return { type: 'story', id: e.item?.id ?? e.key };
+      });
+    }
   } else {
     combined = saunas.concat(media, stories);
   }
+
+  return {
+    entries: combined,
+    saunas,
+    media,
+    stories,
+    hiddenSaunas
+  };
+}
+
+export function renderSlideOrderView(){
+  const settings = ctx.getSettings();
+  const host = document.getElementById('slideOrderGrid');
+  if (!host) return;
+
+  const { entries: combinedRaw, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: true });
+  let combined = combinedRaw.slice();
 
   host.innerHTML = '';
   combined.forEach((entry, idx) => {
