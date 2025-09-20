@@ -65,6 +65,8 @@ let schedule = null;
 let settings = null;
 let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
+let deviceBaseSchedule = null;      // Basis für Geräte-Kontext
+let deviceBaseSettings = null;
 let baselineSchedule = null;        // Vergleichsbasis für Unsaved-Indikator
 let baselineSettings = null;
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
@@ -125,6 +127,13 @@ function sanitizeSettingsForCompare(src) {
 function updateBaseline(scheduleSrc, settingsSrc) {
   baselineSchedule = sanitizeScheduleForCompare(scheduleSrc);
   baselineSettings = sanitizeSettingsForCompare(settingsSrc);
+}
+
+function getActiveBaselineSources(){
+  if (currentDeviceCtx && deviceBaseSchedule && deviceBaseSettings){
+    return { schedule: deviceBaseSchedule, settings: deviceBaseSettings };
+  }
+  return { schedule: baseSchedule, settings: baseSettings };
 }
 
 function deepEqual(a, b) {
@@ -203,6 +212,33 @@ function setUnsavedState(state){
     clearTimeout(_unsavedIndicatorTimer);
     clearTimeout(_unsavedEvalTimer);
   }
+}
+
+function restoreFromBaseline(){
+  const { schedule: baseSched, settings: baseSet } = getActiveBaselineSources();
+  if (!baseSched || !baseSet) return;
+
+  schedule = deepClone(baseSched);
+  settings = normalizeSettings(deepClone(baseSet), { assignMissingIds: false });
+
+  try { renderGridUI(); } catch (err) { console.warn('[admin] Grid re-render failed after reset', err); }
+  try { renderSlidesBox(); } catch (err) { console.warn('[admin] Slides box re-render failed after reset', err); }
+  try { renderHighlightBox(); } catch (err) { console.warn('[admin] Highlight box re-render failed after reset', err); }
+  try { renderColors(); } catch (err) { console.warn('[admin] Colors re-render failed after reset', err); }
+  try { renderFootnotes(); } catch (err) { console.warn('[admin] Footnotes re-render failed after reset', err); }
+  try { renderSlidesMaster(); } catch (err) { console.warn('[admin] Slides master re-render failed after reset', err); }
+
+  clearDraftsIfPresent();
+  updateBaseline(baseSched, baseSet);
+  setUnsavedState(false);
+}
+
+const unsavedBadgeResetBtn = document.getElementById('unsavedBadgeReset');
+if (unsavedBadgeResetBtn){
+  unsavedBadgeResetBtn.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    restoreFromBaseline();
+  });
 }
 
 function markUnsavedSoon(){
@@ -319,6 +355,12 @@ async function enterDeviceContext(id, name){
     }
   })(settings, ov);
 
+  settings = normalizeSettings(settings, { assignMissingIds: false });
+  deviceBaseSchedule = deepClone(schedule);
+  deviceBaseSettings = deepClone(settings);
+  updateBaseline(deviceBaseSchedule, deviceBaseSettings);
+  setUnsavedState(false);
+
   // UI neu zeichnen
   renderSlidesBox();
   renderHighlightBox();
@@ -343,6 +385,10 @@ function exitDeviceContext(){
   document.body.classList.remove('device-mode');
 
   settings = deepClone(baseSettings);
+  deviceBaseSchedule = null;
+  deviceBaseSettings = null;
+  updateBaseline(baseSchedule, baseSettings);
+  evaluateUnsavedState({ immediate: true });
 
   renderSlidesBox();
   renderHighlightBox();
@@ -371,8 +417,10 @@ async function loadAll(){
 
   schedule = deepClone(s || {});
   settings = normalizeSettings(cfg || {}, { assignMissingIds: true });
-  baseSchedule = sanitizeScheduleForCompare(schedule);
+  baseSchedule = deepClone(schedule);
   baseSettings = deepClone(settings);
+  deviceBaseSchedule = null;
+  deviceBaseSettings = null;
   updateBaseline(baseSchedule, baseSettings);
 
   try {
@@ -801,8 +849,10 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
       if (j.ok){
-        baseSchedule = sanitizeScheduleForCompare(schedule);
-        baseSettings = sanitizeSettingsForCompare(settings);
+        baseSchedule = deepClone(schedule);
+        baseSettings = deepClone(settings);
+        deviceBaseSchedule = null;
+        deviceBaseSettings = null;
         updateBaseline(baseSchedule, baseSettings);
         clearDraftsIfPresent();
         setUnsavedState(false);
@@ -814,7 +864,9 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const j=await r.json().catch(()=>({ok:false}));
       if (j.ok) {
-        updateBaseline(schedule, settings);
+        deviceBaseSchedule = deepClone(schedule);
+        deviceBaseSettings = deepClone(settings);
+        updateBaseline(deviceBaseSchedule, deviceBaseSettings);
         clearDraftsIfPresent();
         setUnsavedState(false);
       }
