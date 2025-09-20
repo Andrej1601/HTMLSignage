@@ -250,6 +250,7 @@ body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
   background:var(--panel); border:1px solid var(--border);
   border-radius:16px; box-shadow:0 8px 20px rgba(0,0,0,.06);
 }
+.content > details.ac.sub{ margin-top:12px; }
 .card .content, .content{ padding:12px 14px; }
 summary{
   list-style:none; cursor:pointer; display:flex; align-items:center;

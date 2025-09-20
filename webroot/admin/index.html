@@ -176,15 +176,20 @@
 	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
         <div id="extraSaunaList"></div>
 
-        <div class="fieldset" id="saunaIconFieldset">
-          <div class="legend">Karten-Icons</div>
-          <div class="kv">
-            <label>Icons anzeigen</label>
-            <input id="toggleCardIcons" type="checkbox">
+        <details class="ac sub" id="boxSaunaIcons" open>
+          <summary>
+            <div class="ttl">▶<span class="chev">⮞</span> Karten-Icons</div>
+            <div class="actions"></div>
+          </summary>
+          <div class="content">
+            <div class="kv">
+              <label>Icons anzeigen</label>
+              <input id="toggleCardIcons" type="checkbox">
+            </div>
+            <div class="help">Optionales Icon pro Sauna für die Kartenansicht. Ohne Icon wird automatisch eine Initiale angezeigt.</div>
+            <div id="saunaIconList" class="icon-config-list"></div>
           </div>
-          <div class="help">Optionales Icon pro Sauna für die Kartenansicht. Ohne Icon wird automatisch eine Initiale angezeigt.</div>
-          <div id="saunaIconList" class="icon-config-list"></div>
-        </div>
+        </details>
 
         <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
       </div>
