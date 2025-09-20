@@ -63,7 +63,10 @@ function lsRemove(key) {
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
+let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
+let baselineSchedule = null;        // Vergleichsbasis für Unsaved-Indikator
+let baselineSettings = null;
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
 let storedView = lsGet('adminView');
@@ -79,6 +82,114 @@ const unsavedBadge = document.getElementById('unsavedBadge');
 let hasUnsavedChanges = false;
 let _unsavedIndicatorTimer = 0;
 let _unsavedInputListener = null;
+let _unsavedBlurListener = null;
+let _unsavedEvalTimer = 0;
+
+function normalizeSettings(source, { assignMissingIds = false } = {}) {
+  const src = source ? deepClone(source) : {};
+  src.slides        = { ...DEFAULTS.slides,   ...(src.slides || {}) };
+  src.display       = { ...DEFAULTS.display,  ...(src.display || {}) };
+  src.theme         = { ...DEFAULTS.theme,    ...(src.theme || {}) };
+  src.fonts         = { ...DEFAULTS.fonts,    ...(src.fonts || {}) };
+  src.assets        = { ...DEFAULTS.assets,   ...(src.assets || {}) };
+  src.h2            = { ...DEFAULTS.h2,       ...(src.h2 || {}) };
+  src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
+  src.footnotes     = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
+  src.interstitials = Array.isArray(src.interstitials)
+    ? src.interstitials.map(it => {
+        const next = {
+          id: it?.id || null,
+          name: it?.name || '',
+          enabled: (it?.enabled !== false),
+          type: it?.type || 'image',
+          url: it?.url || '',
+          thumb: it?.thumb || it?.url || '',
+          dwellSec: Number.isFinite(it?.dwellSec) ? it.dwellSec : 6
+        };
+        if (!next.id && assignMissingIds) next.id = genId('im_');
+        return next;
+      })
+    : [];
+  src.presets       = src.presets || {};
+  return src;
+}
+
+function sanitizeScheduleForCompare(src) {
+  return deepClone(src || {});
+}
+
+function sanitizeSettingsForCompare(src) {
+  return normalizeSettings(src || {}, { assignMissingIds: false });
+}
+
+function updateBaseline(scheduleSrc, settingsSrc) {
+  baselineSchedule = sanitizeScheduleForCompare(scheduleSrc);
+  baselineSettings = sanitizeSettingsForCompare(settingsSrc);
+}
+
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== typeof b) return false;
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (typeof a === 'object') {
+    if (Array.isArray(b)) return false;
+    const keysA = Object.keys(a).filter(k => typeof a[k] !== 'undefined').sort();
+    const keysB = Object.keys(b).filter(k => typeof b[k] !== 'undefined').sort();
+    if (keysA.length !== keysB.length) return false;
+    for (let i = 0; i < keysA.length; i++) {
+      if (keysA[i] !== keysB[i]) return false;
+    }
+    for (const key of keysA) {
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+  }
+  if (Number.isNaN(a) && Number.isNaN(b)) return true;
+  return false;
+}
+
+function matchesBaseline() {
+  if (!baselineSchedule || !baselineSettings) return false;
+  const currentSchedule = sanitizeScheduleForCompare(schedule);
+  const currentSettings = sanitizeSettingsForCompare(settings);
+  return deepEqual(currentSchedule, baselineSchedule) && deepEqual(currentSettings, baselineSettings);
+}
+
+function clearDraftsIfPresent() {
+  lsRemove('scheduleDraft');
+  lsRemove('settingsDraft');
+}
+
+function evaluateUnsavedState({ immediate = false } = {}) {
+  if (!baselineSchedule || !baselineSettings) return;
+  clearTimeout(_unsavedIndicatorTimer);
+  if (matchesBaseline()) {
+    clearTimeout(_unsavedEvalTimer);
+    clearDraftsIfPresent();
+    setUnsavedState(false);
+    return;
+  }
+  if (immediate) {
+    setUnsavedState(true);
+  } else {
+    _unsavedIndicatorTimer = setTimeout(() => setUnsavedState(true), 180);
+  }
+}
+
+function queueUnsavedEvaluation(options) {
+  clearTimeout(_unsavedEvalTimer);
+  _unsavedEvalTimer = setTimeout(() => {
+    _unsavedEvalTimer = 0;
+    evaluateUnsavedState(options || {});
+  }, 60);
+}
 
 function setUnsavedState(state){
   const next = !!state;
@@ -90,25 +201,29 @@ function setUnsavedState(state){
   document.body?.classList.toggle('has-unsaved-changes', next);
   if (!next){
     clearTimeout(_unsavedIndicatorTimer);
+    clearTimeout(_unsavedEvalTimer);
   }
 }
 
 function markUnsavedSoon(){
-  if (hasUnsavedChanges) return;
-  clearTimeout(_unsavedIndicatorTimer);
-  _unsavedIndicatorTimer = setTimeout(()=> setUnsavedState(true), 180);
+  queueUnsavedEvaluation();
 }
 
 function ensureUnsavedChangeListener(){
-  if (_unsavedInputListener) return;
-  _unsavedInputListener = (ev)=>{
-    if (!ev?.isTrusted) return;
-    if (ev?.target?.type === 'file') return;
-    markUnsavedSoon();
-    dockPushDebounced();
-  };
-  document.addEventListener('input',  _unsavedInputListener, true);
-  document.addEventListener('change', _unsavedInputListener, true);
+  if (!_unsavedInputListener){
+    _unsavedInputListener = (ev)=>{
+      if (!ev?.isTrusted) return;
+      if (ev?.target?.type === 'file') return;
+      markUnsavedSoon();
+      dockPushDebounced();
+    };
+    document.addEventListener('input',  _unsavedInputListener, true);
+    document.addEventListener('change', _unsavedInputListener, true);
+  }
+  if (!_unsavedBlurListener){
+    _unsavedBlurListener = ()=> queueUnsavedEvaluation();
+    document.addEventListener('focusout', _unsavedBlurListener, true);
+  }
 }
 
 try {
@@ -131,8 +246,8 @@ try {
 
 const globalScope = (typeof globalThis === 'object') ? globalThis : (typeof window === 'object' ? window : undefined);
 if (globalScope){
-  globalScope.__markUnsaved = ()=> setUnsavedState(true);
-  globalScope.__queueUnsaved = markUnsavedSoon;
+  globalScope.__markUnsaved = ()=> evaluateUnsavedState({ immediate: true });
+  globalScope.__queueUnsaved = ()=> queueUnsavedEvaluation();
   globalScope.__clearUnsaved = ()=> setUnsavedState(false);
 }
 
@@ -254,9 +369,11 @@ async function loadAll(){
     fetch('/admin/api/load_settings.php').then(r=>r.json())
   ]);
 
-  schedule = s || {};
-  settings = cfg || {};
+  schedule = deepClone(s || {});
+  settings = normalizeSettings(cfg || {}, { assignMissingIds: true });
+  baseSchedule = sanitizeScheduleForCompare(schedule);
   baseSettings = deepClone(settings);
+  updateBaseline(baseSchedule, baseSettings);
 
   try {
     const draft = lsGet('scheduleDraft');
@@ -283,26 +400,7 @@ async function loadAll(){
       unsavedFromDraft = true;
     }
   } catch {}
-
-  // Defaults mergen (defensiv)
-  settings.slides        = { ...DEFAULTS.slides,   ...(settings.slides||{}) };
-  settings.display       = { ...DEFAULTS.display,  ...(settings.display||{}) };
-  settings.theme         = { ...DEFAULTS.theme,    ...(settings.theme||{}) };
-  settings.fonts         = { ...DEFAULTS.fonts,    ...(settings.fonts||{}) };
-  settings.assets        = { ...DEFAULTS.assets,   ...(settings.assets||{}) };
-  settings.footnotes     = Array.isArray(settings.footnotes) ? settings.footnotes : (DEFAULTS.footnotes || []);
-  settings.interstitials = Array.isArray(settings.interstitials)
-    ? settings.interstitials.map(it => ({
-        id: it.id || genId('im_'),
-        name: it.name || '',
-        enabled: it.enabled !== false,
-        type: it.type || 'image',
-        url: it.url || '',
-        thumb: it.thumb || it.url || '',
-        dwellSec: Number.isFinite(it.dwellSec) ? it.dwellSec : 6
-      }))
-    : [];
-  settings.presets       = settings.presets || {};
+  settings = normalizeSettings(settings, { assignMissingIds: false });
 
   setUnsavedState(unsavedFromDraft);
 
@@ -703,9 +801,10 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const j=await r.json().catch(()=>({ok:false}));
       if (j.ok){
-        baseSettings = deepClone(body.settings);
-        lsRemove('scheduleDraft');
-        lsRemove('settingsDraft');
+        baseSchedule = sanitizeScheduleForCompare(schedule);
+        baseSettings = sanitizeSettingsForCompare(settings);
+        updateBaseline(baseSchedule, baseSettings);
+        clearDraftsIfPresent();
         setUnsavedState(false);
       }
       alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
@@ -715,8 +814,8 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       const j=await r.json().catch(()=>({ok:false}));
       if (j.ok) {
-        lsRemove('scheduleDraft');
-        lsRemove('settingsDraft');
+        updateBaseline(schedule, settings);
+        clearDraftsIfPresent();
         setUnsavedState(false);
       }
       alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
