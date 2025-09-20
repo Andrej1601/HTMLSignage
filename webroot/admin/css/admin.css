@@ -1020,12 +1020,13 @@ body.mode-uniform #ovSec{ display:none !important; }
 .badge-lib-fields{
   display:grid;
   gap:8px;
+  grid-template-columns: minmax(140px, .6fr) minmax(220px, 1.4fr);
+  align-items:start;
 }
-.badge-lib-fields-main{
-  grid-template-columns: minmax(160px, 1.4fr) minmax(90px, .8fr) minmax(140px, 1fr);
-}
-.badge-lib-fields-secondary{
-  grid-template-columns: minmax(220px, 1fr);
+@media (max-width: 720px){
+  .badge-lib-fields{
+    grid-template-columns: 1fr;
+  }
 }
 .badge-lib-field{
   display:flex;
@@ -1039,16 +1040,10 @@ body.mode-uniform #ovSec{ display:none !important; }
   text-transform:uppercase;
   color:var(--muted);
 }
-.badge-lib-input,
-.badge-lib-select{
+.badge-lib-input{
   font-size:13px;
   padding:6px 8px;
   border-radius:8px;
-}
-.badge-lib-select{
-  border:1px solid var(--ghost-border);
-  background:var(--panel);
-  color:var(--fg);
 }
 .badge-lib-upload{
   display:flex;

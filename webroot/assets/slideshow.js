@@ -845,10 +845,11 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const iconStr = String(icon || '').trim();
     const iconUrlStr = String(iconUrl || '').trim();
     const imageUrlStr = String(imageUrl || '').trim();
+    const finalImageUrl = imageUrlStr || iconUrlStr;
     const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
-    const finalId = preferLabelId ? (labelStr || iconStr || iconUrlStr || imageUrlStr || id) : (id || labelStr || iconStr || iconUrlStr || imageUrlStr);
-    if (!finalId || (!labelStr && !iconStr && !iconUrlStr && !imageUrlStr)) return null;
-    return { id: finalId, label: labelStr, icon: iconStr, iconUrl: iconUrlStr, imageUrl: imageUrlStr };
+    const finalId = preferLabelId ? (labelStr || iconStr || finalImageUrl || id) : (id || labelStr || iconStr || finalImageUrl);
+    if (!finalId || (!labelStr && !iconStr && !finalImageUrl)) return null;
+    return { id: finalId, label: labelStr, icon: iconStr, imageUrl: finalImageUrl };
   }
 
   function getBadgeLookup(){
@@ -895,7 +896,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const addBadge = (badge) => {
       if (!badge) return;
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.iconUrl, badge.imageUrl]
+      const composite = [badge.label, badge.icon, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1005,7 +1006,7 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.iconUrl, badge.imageUrl]
+      const composite = [badge.label, badge.icon, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1023,12 +1024,12 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     const nodes = [];
     uniqueBadges.forEach(badge => {
       const iconChar = String(badge.icon || '').trim();
-      const iconUrl = String(badge.iconUrl || '').trim();
+      const imageUrl = String(badge.imageUrl || '').trim();
       const label = String(badge.label || '').trim();
       const bits = [];
-      if (iconUrl) {
+      if (imageUrl) {
         bits.push(h('span', { class: 'badge-icon badge-icon--image', 'aria-hidden': 'true' }, [
-          h('img', { src: iconUrl, alt: '' })
+          h('img', { src: imageUrl, alt: '' })
         ]));
       } else {
         const glyph = iconChar || defaultIcon;

@@ -52,10 +52,7 @@ function getBadgeLibrary(){
     const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
       : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
     const imageUrl = String(imageUrlRaw || '').trim();
-    const presetRaw = typeof entry.presetKey === 'string' ? entry.presetKey
-      : (typeof entry.preset === 'string' ? entry.preset : '');
-    const presetKey = String(presetRaw || '').trim();
-    out.push({ id, icon, label, imageUrl, iconUrl: imageUrl, presetKey: presetKey || null });
+    out.push({ id, icon, label, imageUrl });
     seen.add(id);
   });
   return out;
@@ -134,7 +131,7 @@ function renderBadgePicker(selectedIds = []){
       selectedBadges.forEach(entry => {
         const chip = document.createElement('span');
         chip.className = 'badge-picker-chip';
-        const imageUrl = (entry.imageUrl || entry.iconUrl || '').trim();
+        const imageUrl = (entry.imageUrl || '').trim();
         const iconText = (entry.icon || '').trim();
         if (imageUrl || iconText){
           const media = document.createElement('span');
@@ -196,7 +193,7 @@ function renderBadgePicker(selectedIds = []){
     label.textContent = badge.label || badge.id;
 
     option.appendChild(input);
-    const imageUrl = (badge.imageUrl || badge.iconUrl || '').trim();
+    const imageUrl = (badge.imageUrl || '').trim();
     const iconText = (badge.icon || '').trim();
     if (imageUrl || iconText){
       const media = document.createElement('span');

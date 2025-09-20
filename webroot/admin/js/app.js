@@ -44,16 +44,11 @@ function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback } = {})
     const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
       : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
     const imageUrl = String(imageUrlRaw || '').trim();
-    const presetRaw = typeof entry.presetKey === 'string' ? entry.presetKey
-      : (typeof entry.preset === 'string' ? entry.preset : '');
-    const presetKey = String(presetRaw || '').trim();
     const record = {
       id,
       icon,
       label,
-      imageUrl,
-      iconUrl: imageUrl,
-      presetKey: presetKey || null
+      imageUrl
     };
     normalized.push(record);
     seen.add(id);
@@ -376,8 +371,8 @@ function normalizeContextBadge(source){
     const trimmed = source.trim();
     if (!trimmed) return null;
     const isUrl = /^(?:https?:)?\//i.test(trimmed) || /^data:/i.test(trimmed);
-    if (isUrl) return { icon:'', imageUrl: trimmed, iconUrl: trimmed, presetKey: null, label:'' };
-    return { icon: trimmed, imageUrl:'', iconUrl:'', presetKey: null, label:'' };
+    if (isUrl) return { icon:'', imageUrl: trimmed, label:'' };
+    return { icon: trimmed, imageUrl:'', label:'' };
   }
   if (typeof source !== 'object') return null;
   const icon = typeof source.icon === 'string'
@@ -386,12 +381,9 @@ function normalizeContextBadge(source){
   const imageUrlRaw = typeof source.imageUrl === 'string' ? source.imageUrl
     : (typeof source.iconUrl === 'string' ? source.iconUrl : '');
   const imageUrl = String(imageUrlRaw || '').trim();
-  const presetRaw = typeof source.presetKey === 'string' ? source.presetKey
-    : (typeof source.preset === 'string' ? source.preset : '');
-  const presetKey = String(presetRaw || '').trim();
   const label = typeof source.label === 'string' ? source.label.trim() : '';
   if (!icon && !imageUrl) return null;
-  return { icon, imageUrl, iconUrl: imageUrl, presetKey: presetKey || null, label };
+  return { icon, imageUrl, label };
 }
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
@@ -469,7 +461,7 @@ function renderContextBadge(){
   const badge = currentDeviceBadgeMeta;
   if (mediaWrap && mediaImage && mediaIcon){
     const iconText = (badge?.icon || '').trim();
-    const imageUrl = (badge?.imageUrl || badge?.iconUrl || '').trim();
+    const imageUrl = (badge?.imageUrl || '').trim();
     if (badge && (iconText || imageUrl)){
       if (imageUrl){
         mediaImage.src = imageUrl;
