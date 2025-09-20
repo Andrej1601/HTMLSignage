@@ -78,6 +78,7 @@ document.body?.classList.toggle('devices-pinned', devicesPinned);
 const unsavedBadge = document.getElementById('unsavedBadge');
 let hasUnsavedChanges = false;
 let _unsavedIndicatorTimer = 0;
+let _unsavedInputListener = null;
 
 function setUnsavedState(state){
   const next = !!state;
@@ -96,6 +97,18 @@ function markUnsavedSoon(){
   if (hasUnsavedChanges) return;
   clearTimeout(_unsavedIndicatorTimer);
   _unsavedIndicatorTimer = setTimeout(()=> setUnsavedState(true), 180);
+}
+
+function ensureUnsavedChangeListener(){
+  if (_unsavedInputListener) return;
+  _unsavedInputListener = (ev)=>{
+    if (!ev?.isTrusted) return;
+    if (ev?.target?.type === 'file') return;
+    markUnsavedSoon();
+    dockPushDebounced();
+  };
+  document.addEventListener('input',  _unsavedInputListener, true);
+  document.addEventListener('change', _unsavedInputListener, true);
 }
 
 try {
@@ -717,11 +730,15 @@ $('#btnSave')?.addEventListener('click', async ()=>{
 
 // --- Dock ----------------------------------------------------------
 let _dockTimer = 0;
-let _dockInputListener = null;
+let dockLiveActive = false;
 
 function dockPushDebounced(){
+  if (!dockLiveActive) return;
   clearTimeout(_dockTimer);
-  _dockTimer = setTimeout(()=> dockSend(false), 250);
+  _dockTimer = setTimeout(()=>{
+    if (!dockLiveActive) return;
+    dockSend(false);
+  }, 250);
 }
 window.dockPushDebounced = dockPushDebounced;
 function dockSend(reload){
@@ -736,23 +753,14 @@ function dockSend(reload){
   try { frame.contentWindow.postMessage({type:'preview', payload}, SLIDESHOW_ORIGIN); } catch {}
 }
 function attachDockLivePush(){
-  if (_dockInputListener) return;
-  _dockInputListener = (ev)=>{
-    if (!ev?.isTrusted) return;
-    if (ev?.target?.type === 'file') return;
-    markUnsavedSoon();
-    dockPushDebounced();
-  };
-  document.addEventListener('input',  _dockInputListener, true);
-  document.addEventListener('change', _dockInputListener, true);
+  dockLiveActive = true;
 }
 function detachDockLivePush(){
-  if (!_dockInputListener) return;
-  document.removeEventListener('input',  _dockInputListener, true);
-  document.removeEventListener('change', _dockInputListener, true);
-  _dockInputListener = null;
+  dockLiveActive = false;
   clearTimeout(_dockTimer);
 }
+
+ensureUnsavedChangeListener();
 
 
 // --- Devices: Claim ----------------------------------------------------------
