@@ -1799,7 +1799,7 @@ function normalizeLegacyRichSection(entry) {
 }
 
 function convertLegacyStory(story, base = {}) {
-  const heading = base.heading || String(story.title || '').trim() || 'Saunen & Aufgüsse erklärt';
+  const heading = base.heading || String(story.title || '').trim();
   const subheading = base.subheading || String(story.subtitle || '').trim();
   const heroRaw = story.hero || { url: story.heroUrl, alt: story.heroAlt, caption: story.heroCaption };
   const hero = normalizeStoryImageEntry(heroRaw);
@@ -1862,7 +1862,7 @@ function normalizeStoryForRender(story = {}) {
     const columns = story.columns.map(normalizeStoryColumn).filter(col => col.sections.length);
     const layout = normalizeStoryLayout(story.layout) || (columns.length > 1 ? 'double' : 'single');
     return {
-      heading: headingRaw || 'Saunen & Aufgüsse erklärt',
+      heading: headingRaw,
       subheading: subheadingRaw,
       layout,
       columns,
@@ -1918,7 +1918,7 @@ function renderStorySlide(story = {}, region = 'left') {
   const normalized = normalizeStoryForRender(story || {});
   const layoutClass = normalized.layout === 'double' ? 'story-layout-double' : 'story-layout-single';
   const container = h('div', { class: `container story-slide fade show ${layoutClass}`.trim() });
-  const headingText = String(normalized.heading || '').trim() || 'Saunen & Aufgüsse erklärt';
+  const headingText = String(normalized.heading || '').trim();
   container.appendChild(h('h1', { class: 'story-heading' }, headingText));
   if (normalized.subheading) {
     container.appendChild(h('p', { class: 'story-subheading' }, normalized.subheading));
