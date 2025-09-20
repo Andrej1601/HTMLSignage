@@ -2224,14 +2224,26 @@ export function renderSlidesMaster(){
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
   const componentFlags = ensureEnabledComponents(settings);
-  maybeMigrateCardIcons(settings);
+  const cardIconMap = maybeMigrateCardIcons(settings) || {};
   const showIcons = settings.slides?.showIcons !== false;
+
+  const iconSection = $('#boxSaunaIcons');
+  if (iconSection instanceof HTMLDetailsElement){
+    if (!iconSection.dataset.initOpen){
+      const shouldOpen = showIcons || Object.keys(cardIconMap).length > 0;
+      iconSection.open = shouldOpen;
+      iconSection.dataset.initOpen = '1';
+    }
+  }
 
   const iconToggle = $('#toggleCardIcons');
   if (iconToggle instanceof HTMLInputElement){
     iconToggle.checked = showIcons;
     iconToggle.onchange = () => {
       (settings.slides ||= {}).showIcons = !!iconToggle.checked;
+      if (iconSection instanceof HTMLDetailsElement && iconToggle.checked){
+        iconSection.open = true;
+      }
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
   }
