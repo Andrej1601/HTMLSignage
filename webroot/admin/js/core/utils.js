@@ -20,7 +20,7 @@ export const parseTime = (s) => {
 };
 
 // kurze IDs für Fußnoten etc.
-export const genId = () => 'fn_' + Math.random().toString(36).slice(2, 9);
+export const genId = (prefix = 'fn_') => String(prefix ?? 'fn_') + Math.random().toString(36).slice(2, 9);
 
 // HTML escapen für Option-Labels etc.
 export function escapeHtml(str) {

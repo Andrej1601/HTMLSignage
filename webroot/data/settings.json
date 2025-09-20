@@ -43,9 +43,12 @@
     "tileWidthPercent": 45,
     "tileMinScale": 0.25,
     "tileMaxScale": 0.57,
-    "aromaItalic": false,
     "infobadgeColor": "#5C3101",
-    "infobadgeIcon": "ℹ️",
+    "badgeLibrary": [
+      { "id": "bdg_classic", "icon": "🌿", "label": "Klassisch" },
+      { "id": "bdg_event", "icon": "⭐", "label": "Event" },
+      { "id": "bdg_ritual", "icon": "🔥", "label": "Ritual" }
+    ],
     "loop": true,
     "waitForVideo": false,
     "order": ["overview","Aufgusssauna","Finnische Sauna","Kelosauna","Dampfbad","Fenster zur Welt"],
@@ -93,9 +96,12 @@
           "flameGapScale": 0.14
         },
         "slides": {
-          "aromaItalic": false,
           "infobadgeColor": "#5C3101",
-          "infobadgeIcon": "ℹ️"
+          "badgeLibrary": [
+            { "id": "bdg_classic", "icon": "🌿", "label": "Klassisch" },
+            { "id": "bdg_event", "icon": "⭐", "label": "Event" },
+            { "id": "bdg_ritual", "icon": "🔥", "label": "Ritual" }
+          ]
         }
       },
       "fresh": {
@@ -135,9 +141,12 @@
           "flameGapScale": 0.16
         },
         "slides": {
-          "aromaItalic": true,
           "infobadgeColor": "#4EA8DE",
-          "infobadgeIcon": "🌿"
+          "badgeLibrary": [
+            { "id": "bdg_classic", "icon": "🌿", "label": "Klassisch" },
+            { "id": "bdg_event", "icon": "⭐", "label": "Event" },
+            { "id": "bdg_ritual", "icon": "🔥", "label": "Ritual" }
+          ]
         }
       }
     },
