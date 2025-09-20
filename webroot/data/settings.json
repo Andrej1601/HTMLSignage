@@ -30,6 +30,9 @@
     "tileWidthPercent": 45,
     "tileMinScale": 0.25,
     "tileMaxScale": 0.57,
+    "aromaItalic": false,
+    "infobadgeColor": "#5C3101",
+    "infobadgeIcon": "ℹ️",
     "loop": true,
     "waitForVideo": false,
     "order": ["overview","Aufgusssauna","Finnische Sauna","Kelosauna","Dampfbad","Fenster zur Welt"]

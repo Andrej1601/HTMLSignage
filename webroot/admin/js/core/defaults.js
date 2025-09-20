@@ -2,7 +2,17 @@
 // DEFAULTS + Wochentags-Helfer als Single Source of Truth
 
 export const DEFAULTS = {
-  slides:{ overviewDurationSec:10, saunaDurationSec:6, transitionMs:500, tileWidthPercent:45, tileMinScale:0.25, tileMaxScale:0.57 },
+  slides:{
+    overviewDurationSec:10,
+    saunaDurationSec:6,
+    transitionMs:500,
+    tileWidthPercent:45,
+    tileMinScale:0.25,
+    tileMaxScale:0.57,
+    aromaItalic:false,
+    infobadgeColor:'#5C3101',
+    infobadgeIcon:'ℹ️'
+  },
   display:{ fit:'auto', baseW:1920, baseH:1080, rightWidthPercent:38, cutTopPercent:28, cutBottomPercent:12 },
   theme:{
     bg:'#E8DEBD', fg:'#5C3101', accent:'#5C3101',

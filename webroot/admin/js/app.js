@@ -533,6 +533,10 @@ function renderSlidesBox(){
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
+  setC('#aromaItalic',   !!settings.slides?.aromaItalic);
+  const badgeColor = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor;
+  setV('#badgeColor', badgeColor);
+  setV('#badgeIcon', settings.slides?.infobadgeIcon ?? DEFAULTS.slides.infobadgeIcon ?? '');
 
   // Bildspalte / Schrägschnitt
   setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
@@ -565,6 +569,9 @@ function renderSlidesBox(){
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
+    setC('#aromaItalic',   DEFAULTS.slides.aromaItalic);
+    setV('#badgeIcon',     DEFAULTS.slides.infobadgeIcon);
+    setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
 
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
     setV('#cutTop',   DEFAULTS.display.cutTopPercent);
@@ -820,11 +827,20 @@ function collectSettings(){
         tileWidthPercent:+($('#tilePct')?.value || 45),
         tileMinScale:+($('#tileMin')?.value || 0.25),
         tileMaxScale:+($('#tileMax')?.value || 0.57),
+        aromaItalic: !!document.getElementById('aromaItalic')?.checked,
+        infobadgeIcon: document.getElementById('badgeIcon')?.value || '',
+        infobadgeColor:(() => {
+          const el = document.getElementById('badgeColor');
+          const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
+          const current = (typeof fallback === 'string' ? fallback.toUpperCase() : '#5C3101');
+          const raw = el?.value || '';
+          return /^#([0-9A-F]{6})$/i.test(raw) ? raw.toUpperCase() : current;
+        })(),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
-  	const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
-  	const fallback = settings?.slides?.overviewDurationSec ?? (DEFAULTS?.slides?.overviewDurationSec ?? 10);
-  	const v = el?.value;
+        const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
+        const fallback = settings?.slides?.overviewDurationSec ?? (DEFAULTS?.slides?.overviewDurationSec ?? 10);
+        const v = el?.value;
   	const n = Number(v);
   	return Number.isFinite(n) ? Math.max(1, Math.min(120, n)) : fallback;
 	})(),

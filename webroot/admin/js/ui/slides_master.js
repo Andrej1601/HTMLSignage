@@ -1065,6 +1065,40 @@ export function renderSlidesMaster(){
     waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
   }
 
+  const aromaItalicEl = $('#aromaItalic');
+  if (aromaItalicEl){
+    aromaItalicEl.checked = !!settings.slides?.aromaItalic;
+    aromaItalicEl.onchange = () => { (settings.slides ||= {}).aromaItalic = !!aromaItalicEl.checked; };
+  }
+
+  const badgeIconEl = $('#badgeIcon');
+  if (badgeIconEl){
+    const iconVal = settings.slides?.infobadgeIcon ?? DEFAULTS.slides.infobadgeIcon ?? '';
+    const options = Array.from(badgeIconEl.options || []);
+    if (iconVal && !options.some(opt => opt.value === iconVal)){
+      const opt = document.createElement('option');
+      opt.value = iconVal;
+      opt.textContent = iconVal;
+      badgeIconEl.appendChild(opt);
+    }
+    badgeIconEl.value = iconVal;
+    badgeIconEl.onchange = () => { (settings.slides ||= {}).infobadgeIcon = badgeIconEl.value; };
+  }
+
+  const badgeColorEl = $('#badgeColor');
+  if (badgeColorEl){
+    const rawInit = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
+    const initial = (typeof rawInit === 'string' ? rawInit.toUpperCase() : '#5C3101');
+    badgeColorEl.value = initial;
+    badgeColorEl.onchange = () => {
+      const raw = badgeColorEl.value || '';
+      const prev = settings.slides?.infobadgeColor || initial;
+      const next = /^#([0-9A-F]{6})$/i.test(raw) ? raw.toUpperCase() : prev;
+      (settings.slides ||= {}).infobadgeColor = next;
+      badgeColorEl.value = next;
+    };
+  }
+
 // === Dauer-Modus (Uniform vs. Individuell) ===
 const perMode = (settings.slides?.durationMode === 'per');
 
