@@ -49,7 +49,13 @@ function getBadgeLibrary(){
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon : '';
     const label = typeof entry.label === 'string' ? entry.label : '';
-    out.push({ id, icon, label });
+    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
+      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
+    const imageUrl = String(imageUrlRaw || '').trim();
+    const presetRaw = typeof entry.presetKey === 'string' ? entry.presetKey
+      : (typeof entry.preset === 'string' ? entry.preset : '');
+    const presetKey = String(presetRaw || '').trim();
+    out.push({ id, icon, label, imageUrl, iconUrl: imageUrl, presetKey: presetKey || null });
     seen.add(id);
   });
   return out;
@@ -128,11 +134,27 @@ function renderBadgePicker(selectedIds = []){
       selectedBadges.forEach(entry => {
         const chip = document.createElement('span');
         chip.className = 'badge-picker-chip';
-        if (entry.icon){
-          const icon = document.createElement('span');
-          icon.className = 'badge-picker-chip-icon';
-          icon.textContent = entry.icon;
-          chip.appendChild(icon);
+        const imageUrl = (entry.imageUrl || entry.iconUrl || '').trim();
+        const iconText = (entry.icon || '').trim();
+        if (imageUrl || iconText){
+          const media = document.createElement('span');
+          media.className = 'badge-picker-chip-media';
+          if (imageUrl){
+            const img = document.createElement('img');
+            img.className = 'badge-picker-chip-image';
+            img.src = imageUrl;
+            img.alt = '';
+            img.loading = 'lazy';
+            media.appendChild(img);
+            chip.classList.add('has-image');
+          } else if (iconText){
+            const iconEl = document.createElement('span');
+            iconEl.className = 'badge-picker-chip-icon';
+            iconEl.textContent = iconText;
+            media.appendChild(iconEl);
+            chip.classList.add('has-icon');
+          }
+          chip.appendChild(media);
         }
         const label = document.createElement('span');
         label.textContent = entry.label || entry.id;
@@ -169,20 +191,33 @@ function renderBadgePicker(selectedIds = []){
       updateSummary();
     });
 
-    const icon = document.createElement('span');
-    icon.className = 'badge-picker-option-icon';
-    if (badge.icon){
-      icon.textContent = badge.icon;
-    } else {
-      icon.hidden = true;
-    }
-
     const label = document.createElement('span');
     label.className = 'badge-picker-option-label';
     label.textContent = badge.label || badge.id;
 
     option.appendChild(input);
-    if (badge.icon) option.appendChild(icon);
+    const imageUrl = (badge.imageUrl || badge.iconUrl || '').trim();
+    const iconText = (badge.icon || '').trim();
+    if (imageUrl || iconText){
+      const media = document.createElement('span');
+      media.className = 'badge-picker-option-media';
+      if (imageUrl){
+        const img = document.createElement('img');
+        img.className = 'badge-picker-option-image';
+        img.src = imageUrl;
+        img.alt = '';
+        img.loading = 'lazy';
+        media.appendChild(img);
+        option.classList.add('has-image');
+      } else if (iconText){
+        const iconEl = document.createElement('span');
+        iconEl.className = 'badge-picker-option-icon';
+        iconEl.textContent = iconText;
+        media.appendChild(iconEl);
+        option.classList.add('has-icon');
+      }
+      option.appendChild(media);
+    }
     option.appendChild(label);
     option.classList.toggle('is-checked', input.checked);
 

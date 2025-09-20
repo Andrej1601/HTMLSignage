@@ -33,6 +33,14 @@ const STYLE_THEME_KEYS = [
 const STYLE_FONT_KEYS = ['family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale'];
 const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary'];
 
+const BADGE_ICON_PRESETS = [
+  { key:'classic', label:'🌿 Klassisch', icon:'🌿' },
+  { key:'event', label:'⭐ Event', icon:'⭐' },
+  { key:'ritual', label:'🔥 Ritual', icon:'🔥' },
+  { key:'steam', label:'💨 Dampf', icon:'💨' },
+  { key:'flame-image', label:'Flamme (Bild)', imageUrl:'/assets/img/flame_test.svg' }
+];
+
 const cloneValue = (value) => {
   if (value == null) return value;
   if (typeof value === 'object') return JSON.parse(JSON.stringify(value));
@@ -115,9 +123,22 @@ function ensureBadgeLibrary(settings){
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = typeof entry.icon === 'string' ? entry.icon : '';
-    const label = typeof entry.label === 'string' ? entry.label : '';
-    normalized.push({ id, icon, label });
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
+      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
+    const imageUrl = String(imageUrlRaw || '').trim();
+    const presetRaw = typeof entry.presetKey === 'string' ? entry.presetKey
+      : (typeof entry.preset === 'string' ? entry.preset : '');
+    const presetKey = String(presetRaw || '').trim();
+    normalized.push({
+      id,
+      icon,
+      label,
+      imageUrl,
+      iconUrl: imageUrl,
+      presetKey: presetKey || null
+    });
     seen.add(id);
   };
 
@@ -172,43 +193,6 @@ function applyStyleSet(settings, id){
   }
   settings.slides.activeStyleSet = id;
   return true;
-}
-
-function ensureCardIconMap(settings){
-  settings.slides ||= {};
-  const raw = settings.slides.cardIcons;
-  const clean = {};
-  if (raw && typeof raw === 'object'){
-    Object.entries(raw).forEach(([key, value]) => {
-      const safeKey = String(key ?? '');
-      if (!safeKey) return;
-      const url = (typeof value === 'string') ? value.trim() : '';
-      if (url) clean[safeKey] = url;
-    });
-  }
-  settings.slides.cardIcons = clean;
-  return clean;
-}
-
-function maybeMigrateCardIcons(settings){
-  settings.slides ||= {};
-  if (settings.slides.cardIconsMigrated === true){
-    return ensureCardIconMap(settings);
-  }
-  const map = ensureCardIconMap(settings);
-  if (!Object.keys(map).length){
-    const legacy = settings.assets?.rightImages;
-    if (legacy && typeof legacy === 'object'){
-      Object.entries(legacy).forEach(([key, value]) => {
-        const safeKey = String(key ?? '');
-        if (!safeKey) return;
-        const url = (typeof value === 'string') ? value.trim() : '';
-        if (url) map[safeKey] = url;
-      });
-    }
-  }
-  settings.slides.cardIconsMigrated = true;
-  return map;
 }
 
 // ============================================================================
@@ -334,10 +318,6 @@ function deleteSaunaEverywhere(name){
     delete settings.assets.rightImages[name];
   }
 
-  // 4b) Karten-Icons
-  const iconMap = ensureCardIconMap(settings);
-  delete iconMap[name];
-
   // 5) Per-Sauna-Dauern
   if (settings.slides?.saunaDurations && settings.slides.saunaDurations[name] != null){
     delete settings.slides.saunaDurations[name];
@@ -377,12 +357,6 @@ function renameSaunaEverywhere(oldName, newName){
     const val = settings.assets.rightImages[oldName];
     delete settings.assets.rightImages[oldName];
     settings.assets.rightImages[newName] = val;
-  }
-
-  const iconMap = ensureCardIconMap(settings);
-  if (Object.prototype.hasOwnProperty.call(iconMap, oldName)){
-    iconMap[newName] = iconMap[oldName];
-    delete iconMap[oldName];
   }
 
   // Per-Sauna-Dauern
@@ -649,15 +623,6 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
         const newUrl = (typeof p === 'string') ? p.trim() : '';
         settings.assets.rightImages[name] = newUrl;
 
-        const iconMap = ensureCardIconMap(settings);
-        const prevIcon = (iconMap[name] || '').trim();
-        if (!prevIcon || (prevRight && prevIcon === prevRight)){
-          if (newUrl) iconMap[name] = newUrl;
-          else delete iconMap[name];
-        }
-
-        settings.slides ||= {};
-        settings.slides.cardIconsMigrated = true;
         const previewUrl = newUrl || p;
         preloadImg(previewUrl).then(r => {
           if (r.ok && previewUrl) { $img.src = previewUrl; $img.title = `${r.w}×${r.h}`; }
@@ -734,138 +699,6 @@ if ($name && mode === 'normal') {
 
 const saunaExtraRow = (name, dayLabels) =>
   saunaRow({ name, mode:'extra', dayLabels: dayLabels || [] });
-
-function cardIconFallbackLabel(name){
-  const trimmed = (name || '').trim();
-  if (trimmed.length >= 2) return trimmed.slice(0, 2).toUpperCase();
-  if (trimmed.length === 1) return trimmed.toUpperCase();
-  return '–';
-}
-
-function cardIconRow(name){
-  const settings = ctx.getSettings();
-  const iconMap = ensureCardIconMap(settings);
-  const iconUrl = iconMap[name] || '';
-  const rightImage = settings.assets?.rightImages?.[name] || '';
-  const suggestion = (!iconUrl && rightImage) ? rightImage : '';
-  const isLegacyIcon = !!iconUrl && rightImage && iconUrl === rightImage;
-
-  const row = document.createElement('div');
-  row.className = 'iconrow';
-  if (iconUrl) row.classList.add('has-icon');
-  else if (suggestion) row.classList.add('has-suggestion');
-
-  const nameEl = document.createElement('div');
-  nameEl.className = 'iconrow-name';
-  nameEl.textContent = String(name || '');
-  row.appendChild(nameEl);
-
-  const preview = document.createElement('div');
-  preview.className = 'iconrow-preview';
-  row.appendChild(preview);
-
-  const actions = document.createElement('div');
-  actions.className = 'iconrow-actions';
-  row.appendChild(actions);
-
-  const updatePreview = (src) => {
-    preview.innerHTML = '';
-    preview.title = '';
-    if (src){
-      const img = document.createElement('img');
-      img.src = src;
-      img.alt = '';
-      preview.appendChild(img);
-      preloadImg(src).then(r => {
-        if (r.ok) preview.title = `${r.w}×${r.h}`;
-      });
-    } else {
-      const span = document.createElement('span');
-      span.className = 'iconrow-placeholder';
-      span.textContent = cardIconFallbackLabel(name);
-      preview.appendChild(span);
-    }
-  };
-
-  if (iconUrl) updatePreview(iconUrl);
-  else if (suggestion) updatePreview(suggestion);
-  else updatePreview('');
-
-  const rerender = () => {
-    renderSlidesMaster();
-    if (typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
-  };
-
-  if (suggestion){
-    const adoptBtn = document.createElement('button');
-    adoptBtn.type = 'button';
-    adoptBtn.className = 'btn sm ghost';
-    adoptBtn.textContent = 'Übernehmen';
-    adoptBtn.onclick = () => {
-      iconMap[name] = suggestion;
-      rerender();
-    };
-    actions.appendChild(adoptBtn);
-  }
-
-  const uploadBtn = document.createElement('button');
-  uploadBtn.type = 'button';
-  uploadBtn.className = 'btn sm ghost';
-  uploadBtn.textContent = iconUrl ? 'Ersetzen' : 'Hochladen';
-  uploadBtn.onclick = () => {
-    const fi = document.createElement('input');
-    fi.type = 'file';
-    fi.accept = 'image/*';
-    fi.onchange = () => uploadGeneric(fi, (p) => {
-      if (!p) return;
-      iconMap[name] = p;
-      rerender();
-    });
-    fi.click();
-  };
-  actions.appendChild(uploadBtn);
-
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'btn sm ghost';
-  removeBtn.textContent = 'Entfernen';
-  removeBtn.disabled = !iconUrl;
-  removeBtn.onclick = () => {
-    if (!iconMap[name]) return;
-    delete iconMap[name];
-    rerender();
-  };
-  actions.appendChild(removeBtn);
-
-  if (!iconUrl && suggestion){
-    const note = document.createElement('div');
-    note.className = 'iconrow-note';
-    note.textContent = 'Vorschlag aus „Bild rechts“.';
-    row.appendChild(note);
-  } else if (isLegacyIcon){
-    const note = document.createElement('div');
-    note.className = 'iconrow-note';
-    note.textContent = 'Aus „Bild rechts“ übernommen.';
-    row.appendChild(note);
-  }
-
-  return row;
-}
-
-function renderSaunaIconList(){
-  const host = $('#saunaIconList');
-  if (!host) return;
-  host.innerHTML = '';
-  const all = getAllSaunas();
-  if (!all.length){
-    const empty = document.createElement('div');
-    empty.className = 'mut';
-    empty.textContent = 'Keine Saunen im Inventar.';
-    host.appendChild(empty);
-    return;
-  }
-  all.forEach(name => host.appendChild(cardIconRow(name)));
-}
 
 // ============================================================================
 // 4) Drag & Drop
@@ -2224,30 +2057,6 @@ export function renderSlidesMaster(){
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
   const componentFlags = ensureEnabledComponents(settings);
-  const cardIconMap = maybeMigrateCardIcons(settings) || {};
-  const showIcons = settings.slides?.showIcons !== false;
-
-  const iconSection = $('#boxSaunaIcons');
-  if (iconSection instanceof HTMLDetailsElement){
-    if (!iconSection.dataset.initOpen){
-      const shouldOpen = showIcons || Object.keys(cardIconMap).length > 0;
-      iconSection.open = shouldOpen;
-      iconSection.dataset.initOpen = '1';
-    }
-  }
-
-  const iconToggle = $('#toggleCardIcons');
-  if (iconToggle instanceof HTMLInputElement){
-    iconToggle.checked = showIcons;
-    iconToggle.onchange = () => {
-      (settings.slides ||= {}).showIcons = !!iconToggle.checked;
-      if (iconSection instanceof HTMLDetailsElement && iconToggle.checked){
-        iconSection.open = true;
-      }
-      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
-    };
-  }
-
   // Transition
   const transEl = $('#transMs2');
   if (transEl){
@@ -2412,6 +2221,21 @@ export function renderSlidesMaster(){
 
     badgeSection?.classList.toggle('has-items', true);
 
+    const makeField = (labelText, control) => {
+      const field = document.createElement('div');
+      field.className = 'badge-lib-field';
+      const lbl = document.createElement('span');
+      lbl.className = 'badge-lib-field-label';
+      lbl.textContent = labelText;
+      field.appendChild(lbl);
+      field.appendChild(control);
+      return field;
+    };
+
+    const notifyChange = () => {
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+
     list.forEach((badge, index) => {
       const row = document.createElement('div');
       row.className = 'badge-lib-row';
@@ -2422,13 +2246,24 @@ export function renderSlidesMaster(){
       const chip = document.createElement('span');
       chip.className = 'badge-lib-chip';
 
+      const chipMedia = document.createElement('span');
+      chipMedia.className = 'badge-lib-chip-media';
+
+      const chipImage = document.createElement('img');
+      chipImage.className = 'badge-lib-chip-image';
+      chipImage.alt = '';
+      chipImage.loading = 'lazy';
+
       const chipIcon = document.createElement('span');
       chipIcon.className = 'badge-lib-chip-icon';
+
+      chipMedia.appendChild(chipImage);
+      chipMedia.appendChild(chipIcon);
 
       const chipLabel = document.createElement('span');
       chipLabel.className = 'badge-lib-chip-label';
 
-      chip.appendChild(chipIcon);
+      chip.appendChild(chipMedia);
       chip.appendChild(chipLabel);
       preview.appendChild(chip);
 
@@ -2440,63 +2275,191 @@ export function renderSlidesMaster(){
       const editWrap = document.createElement('div');
       editWrap.className = 'badge-lib-edit';
 
+      const fieldsMain = document.createElement('div');
+      fieldsMain.className = 'badge-lib-fields badge-lib-fields-main';
+
+      const fieldsSecondary = document.createElement('div');
+      fieldsSecondary.className = 'badge-lib-fields badge-lib-fields-secondary';
+
+      const actions = document.createElement('div');
+      actions.className = 'badge-lib-actions';
+
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.className = 'input badge-lib-input badge-lib-label';
+      labelInput.value = badge.label || '';
+      labelInput.placeholder = 'Label';
+      labelInput.setAttribute('aria-label', 'Badge-Label');
+
       const iconInput = document.createElement('input');
       iconInput.type = 'text';
-      iconInput.className = 'input badge-lib-icon';
+      iconInput.className = 'input badge-lib-input badge-lib-icon';
       iconInput.value = badge.icon || '';
-      iconInput.placeholder = 'Icon';
+      iconInput.placeholder = 'Emoji';
       iconInput.maxLength = 6;
+      iconInput.setAttribute('aria-label', 'Badge-Emoji');
 
-      const textInput = document.createElement('input');
-      textInput.type = 'text';
-      textInput.className = 'input badge-lib-label';
-      textInput.value = badge.label || '';
-      textInput.placeholder = 'Label';
+      const presetSelect = document.createElement('select');
+      presetSelect.className = 'badge-lib-select';
+      presetSelect.setAttribute('aria-label', 'Icon-Preset');
+      const optNone = document.createElement('option');
+      optNone.value = '';
+      optNone.textContent = 'Kein Preset';
+      presetSelect.appendChild(optNone);
+      BADGE_ICON_PRESETS.forEach(preset => {
+        const option = document.createElement('option');
+        option.value = preset.key;
+        option.textContent = preset.label;
+        presetSelect.appendChild(option);
+      });
+
+      const imagePreview = document.createElement('img');
+      imagePreview.className = 'badge-lib-upload-preview';
+      imagePreview.alt = '';
+      imagePreview.loading = 'lazy';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.type = 'button';
+      uploadBtn.className = 'btn sm ghost badge-lib-action';
+      uploadBtn.textContent = 'Bild wählen';
+
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'btn sm ghost badge-lib-action';
+      clearBtn.textContent = 'Bild entfernen';
+
+      const uploadControls = document.createElement('div');
+      uploadControls.className = 'badge-lib-upload-controls';
+      uploadControls.appendChild(uploadBtn);
+      uploadControls.appendChild(clearBtn);
+
+      const imageWrap = document.createElement('div');
+      imageWrap.className = 'badge-lib-upload';
+      imageWrap.appendChild(imagePreview);
+      imageWrap.appendChild(uploadControls);
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn sm ghost badge-lib-remove';
-      removeBtn.textContent = '✕';
+      removeBtn.textContent = 'Badge löschen';
       removeBtn.title = 'Badge entfernen';
+
+      fieldsMain.appendChild(makeField('Label', labelInput));
+      fieldsMain.appendChild(makeField('Emoji', iconInput));
+      fieldsMain.appendChild(makeField('Preset', presetSelect));
+
+      fieldsSecondary.appendChild(makeField('Bild', imageWrap));
+
+      actions.appendChild(removeBtn);
+
+      editWrap.appendChild(fieldsMain);
+      editWrap.appendChild(fieldsSecondary);
+      editWrap.appendChild(actions);
+
+      const applyPreset = (key) => {
+        const preset = BADGE_ICON_PRESETS.find(p => p.key === key) || null;
+        badge.presetKey = key || null;
+        if (preset){
+          const presetIcon = typeof preset.icon === 'string' ? preset.icon : '';
+          badge.icon = presetIcon;
+          iconInput.value = presetIcon;
+          const presetImage = typeof preset.imageUrl === 'string' ? preset.imageUrl : '';
+          badge.imageUrl = presetImage || '';
+          badge.iconUrl = badge.imageUrl;
+        }
+      };
 
       const updatePreview = () => {
         const iconValue = iconInput.value.trim();
-        const labelValue = textInput.value.trim();
-        chipIcon.textContent = iconValue;
-        chipIcon.hidden = !iconValue;
+        const labelValue = labelInput.value.trim();
+        const imageValue = (badge.imageUrl || '').trim();
         chipLabel.textContent = labelValue || badge.id;
-        row.classList.toggle('has-icon', !!iconValue);
+        chipIcon.textContent = iconValue;
+        chipIcon.hidden = !!imageValue || !iconValue;
+        if (imageValue){
+          chipImage.src = imageValue;
+          chipImage.hidden = false;
+          imagePreview.src = imageValue;
+          imagePreview.hidden = false;
+        } else {
+          chipImage.removeAttribute('src');
+          chipImage.hidden = true;
+          imagePreview.removeAttribute('src');
+          imagePreview.hidden = true;
+        }
+        row.classList.toggle('has-icon', !!iconValue && !imageValue);
+        row.classList.toggle('has-image', !!imageValue);
+        row.classList.toggle('has-media', !!imageValue || !!iconValue);
+        clearBtn.disabled = !imageValue;
+        uploadBtn.textContent = imageValue ? 'Bild ersetzen' : 'Bild wählen';
+        presetSelect.value = badge.presetKey || '';
       };
 
-      iconInput.addEventListener('input', updatePreview);
-      textInput.addEventListener('input', updatePreview);
-
-      iconInput.addEventListener('change', () => {
-        badge.icon = iconInput.value || '';
+      labelInput.addEventListener('input', updatePreview);
+      labelInput.addEventListener('change', () => {
+        badge.label = labelInput.value.trim();
+        labelInput.value = badge.label;
         updatePreview();
-        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+        notifyChange();
       });
-      textInput.addEventListener('change', () => {
-        badge.label = textInput.value || '';
+
+      iconInput.addEventListener('input', updatePreview);
+      iconInput.addEventListener('change', () => {
+        badge.icon = iconInput.value.trim();
+        iconInput.value = badge.icon;
+        badge.presetKey = null;
         updatePreview();
-        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+        notifyChange();
+      });
+
+      presetSelect.addEventListener('change', () => {
+        const key = presetSelect.value || '';
+        if (key){
+          applyPreset(key);
+        } else {
+          badge.presetKey = null;
+        }
+        updatePreview();
+        notifyChange();
+      });
+
+      uploadBtn.addEventListener('click', () => {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = 'image/*';
+        fi.onchange = () => uploadGeneric(fi, (p) => {
+          if (!p) return;
+          const url = typeof p === 'string' ? p : '';
+          badge.imageUrl = url;
+          badge.iconUrl = url;
+          badge.presetKey = null;
+          updatePreview();
+          notifyChange();
+        });
+        fi.click();
+      });
+
+      clearBtn.addEventListener('click', () => {
+        if (!badge.imageUrl) return;
+        badge.imageUrl = '';
+        badge.iconUrl = '';
+        badge.presetKey = null;
+        updatePreview();
+        notifyChange();
       });
 
       removeBtn.addEventListener('click', () => {
         const listRef = ensureBadgeLibrary(settings);
         listRef.splice(index, 1);
         renderBadgeLibraryRows();
-        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+        notifyChange();
       });
-
-      editWrap.appendChild(iconInput);
-      editWrap.appendChild(textInput);
-      editWrap.appendChild(removeBtn);
 
       row.appendChild(preview);
       row.appendChild(editWrap);
       badgeListHost.appendChild(row);
 
+      presetSelect.value = badge.presetKey || '';
       updatePreview();
     });
   };
@@ -2504,7 +2467,7 @@ export function renderSlidesMaster(){
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
       const list = ensureBadgeLibrary(settings);
-      list.push({ id: genId('bdg_'), icon:'', label:'' });
+      list.push({ id: genId('bdg_'), icon:'', label:'', imageUrl:'', iconUrl:'', presetKey:null });
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -2678,7 +2641,6 @@ if (sHost){
 // --- „Kein Aufguss“ + Drag&Drop ---
 renderSaunaOffList();
 applyDnD();
-renderSaunaIconList();
 
 // --- Sichtbarkeit der Dauer-Inputs gezielt steuern ---
 // Per-Sauna-Dauer (nur im PER-Modus)
@@ -2773,9 +2735,6 @@ if (durPer) durPer.onchange = () => {
     settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaDurations = {};
-    settings.slides.showIcons = true;
-    settings.slides.cardIcons = {};
-    settings.slides.cardIconsMigrated = true;
     renderSlidesMaster();
   };
 
