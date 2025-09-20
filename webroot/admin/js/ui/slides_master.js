@@ -645,11 +645,26 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
       const fi = document.createElement('input'); fi.type='file'; fi.accept='image/*';
       fi.onchange = () => uploadGeneric(fi, (p) => {
         settings.assets ||= {}; settings.assets.rightImages ||= {};
-        settings.assets.rightImages[name] = p;
-        preloadImg(p).then(r => {
-          if (r.ok) { $img.src = p; $img.title = `${r.w}×${r.h}`; }
+        const prevRight = (settings.assets.rightImages[name] || '').trim();
+        const newUrl = (typeof p === 'string') ? p.trim() : '';
+        settings.assets.rightImages[name] = newUrl;
+
+        const iconMap = ensureCardIconMap(settings);
+        const prevIcon = (iconMap[name] || '').trim();
+        if (!prevIcon || (prevRight && prevIcon === prevRight)){
+          if (newUrl) iconMap[name] = newUrl;
+          else delete iconMap[name];
+        }
+
+        settings.slides ||= {};
+        settings.slides.cardIconsMigrated = true;
+        const previewUrl = newUrl || p;
+        preloadImg(previewUrl).then(r => {
+          if (r.ok && previewUrl) { $img.src = previewUrl; $img.title = `${r.w}×${r.h}`; }
           else { $img.removeAttribute('src'); $img.removeAttribute('title'); }
         });
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+        if (ctx && typeof ctx.refreshSlidesBox === 'function') ctx.refreshSlidesBox();
       });
       fi.click();
     };
