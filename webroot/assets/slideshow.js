@@ -735,10 +735,11 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
     return merged;
   }
 
-  function renderComponentNodes(flags, defs, fallbackFactory){
+  function renderComponentNodes(flags, defs, fallbackFactory, onNode){
     const enabled = flags || {};
     const anyEnabled = Object.values(enabled).some(Boolean);
     const nodes = [];
+    let appendedCount = 0;
     defs.forEach(def => {
       if (!def) return;
       const { key } = def;
@@ -746,11 +747,35 @@ document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
       if (enabled[key] === false) return;
       const node = def.node ?? (typeof def.render === 'function' ? def.render() : null);
       if (!node) return;
-      nodes.push(node);
+      if (typeof onNode === 'function') {
+        const res = onNode(node, def);
+        if (res === undefined) {
+          appendedCount++;
+        } else if (res && res !== false) {
+          nodes.push(res);
+          appendedCount++;
+        }
+      } else {
+        nodes.push(node);
+        appendedCount++;
+      }
     });
-    if (!nodes.length && typeof fallbackFactory === 'function'){
+    if (appendedCount === 0 && typeof fallbackFactory === 'function'){
       const fallbackNode = fallbackFactory(anyEnabled);
-      if (fallbackNode) nodes.push(fallbackNode);
+      if (fallbackNode) {
+        if (typeof onNode === 'function') {
+          const res = onNode(fallbackNode, null);
+          if (res === undefined) {
+            appendedCount++;
+          } else if (res && res !== false) {
+            nodes.push(res);
+            appendedCount++;
+          }
+        } else {
+          nodes.push(fallbackNode);
+          appendedCount++;
+        }
+      }
     }
     return nodes;
   }
@@ -1903,8 +1928,6 @@ function renderStorySlide(story = {}, region = 'left') {
       }
 
       const titleNode = h('div', { class: 'title' });
-      const timeNode = h('span', { class: 'time' }, it.time + ' Uhr');
-      const sepNode = h('span', { class: 'sep', 'aria-hidden': 'true' }, '–');
       const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
       if (supNote) {
@@ -1913,8 +1936,6 @@ function renderStorySlide(story = {}, region = 'left') {
       } else if (hasStar) {
         labelNode.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
       }
-      titleNode.appendChild(timeNode);
-      titleNode.appendChild(sepNode);
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
@@ -1925,15 +1946,39 @@ function renderStorySlide(story = {}, region = 'left') {
         ? stripeSource.map(entry => ({ ...entry }))
         : [];
       const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
-      const contentBlock = h('div', { class: 'card-content' });
-      renderComponentNodes(componentFlags, [
-        { key: 'title', node: titleNode },
-        { key: 'description', render: () => createDescriptionNode(it.description, 'description') },
-        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list') },
-        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip') },
-        { key: 'badges', render: () => badgeRowNode }
-      ], (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'))
-        .forEach(node => contentBlock.appendChild(node));
+      const metaColumn = h('div', { class: 'card-meta' });
+      if (it.time) {
+        metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
+        metaColumn.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
+      }
+
+      const mainColumn = h('div', { class: 'card-main' });
+      const contentChildren = [];
+      let hasMetaColumn = false;
+      if (metaColumn.childNodes.length) {
+        contentChildren.push(metaColumn);
+        hasMetaColumn = true;
+      }
+      contentChildren.push(mainColumn);
+      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
+      if (hasMetaColumn) contentBlock.classList.add('card-content--with-meta');
+
+      const componentDefs = [
+        { key: 'title', node: titleNode, target: 'main' },
+        { key: 'description', render: () => createDescriptionNode(it.description, 'description'), target: 'main' },
+        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list'), target: 'main' },
+        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip'), target: 'main' },
+        { key: 'badges', render: () => badgeRowNode, target: 'main' }
+      ];
+      renderComponentNodes(
+        componentFlags,
+        componentDefs,
+        (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'),
+        (node, def) => {
+          const target = (def && def.target === 'meta') ? metaColumn : mainColumn;
+          target.appendChild(node);
+        }
+      );
 
       const tileChildren = [];
       let stripeNode = null;
