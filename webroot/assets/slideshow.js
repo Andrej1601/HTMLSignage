@@ -1864,6 +1864,7 @@ function renderStorySlide(story = {}, region = 'left') {
     }
 
     const items = [];
+    let hasStripeInSauna = false;
     for (const row of (schedule.rows || [])) {
       const cell = (row.entries || [])[colIdx];
       if (cell && cell.title) {
@@ -1893,7 +1894,6 @@ function renderStorySlide(story = {}, region = 'left') {
       const tileClasses = ['tile'];
       if (hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) tileClasses.push('highlight');
       if (it.hidden || hiddenSaunas.has(name)) tileClasses.push('is-hidden');
-      if (!iconsEnabled) tileClasses.push('tile--compact');
       let iconVariant = 'default';
       if (iconsEnabled) {
         iconVariant = resolveIconVariant(it.iconVariant);
@@ -1937,15 +1937,17 @@ function renderStorySlide(story = {}, region = 'left') {
 
       const tileChildren = [];
       let stripeNode = null;
-      if (iconsEnabled && hasAnyBadgeImage && badgeStripeSource.length) {
-        const iconUrl = it.icon || defaultIconForSauna || legacyIconFallback || '';
+      if (hasAnyBadgeImage && badgeStripeSource.length) {
+        const allowStripeFallback = iconsEnabled;
+        const iconUrl = allowStripeFallback ? (it.icon || defaultIconForSauna || legacyIconFallback || '') : '';
         const fallbackLabel = (() => {
+          if (!allowStripeFallback) return '';
           if (typeof name === 'string') {
             const trimmed = name.trim();
             if (trimmed.length >= 2) return trimmed.slice(0, 2);
             if (trimmed.length === 1) return trimmed;
           }
-          return '?';
+          return allowStripeFallback ? '?' : '';
         })();
         stripeNode = (() => {
           const stripe = h('div', { class: 'tile-badge-stripe' });
@@ -1963,6 +1965,7 @@ function renderStorySlide(story = {}, region = 'left') {
               segment.classList.add('is-fallback');
             }
             const fallback = (() => {
+              if (!allowStripeFallback) return null;
               const box = h('div', { class: 'tile-badge-stripe__fallback' });
               let hasContent = false;
               if (iconUrl) {
@@ -1988,6 +1991,7 @@ function renderStorySlide(story = {}, region = 'left') {
           stripe.appendChild(inner);
           return stripe;
         })();
+        if (stripeNode) hasStripeInSauna = true;
       }
       if (!stripeNode) {
         if (!tileClasses.includes('tile--compact')) tileClasses.push('tile--compact');
@@ -2011,6 +2015,8 @@ function renderStorySlide(story = {}, region = 'left') {
     body.appendChild(list);
     c.appendChild(body);
 
+    c.classList.toggle('has-badge-stripe', hasStripeInSauna);
+
     const footNodes = [];
     const order = (settings?.footnotes || []).map(fn => fn.id);
     for (const id of order) {
@@ -2032,7 +2038,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
-    const recalc = () => applyTileSizing(c, { useIcons: iconsEnabled });
+    const recalc = () => applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
     setTimeout(recalc, 0);
     setResizeHandler(region, recalc);
 
