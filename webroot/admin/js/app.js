@@ -75,6 +75,60 @@ let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
 let devicesPinned = (lsGet('devicesPinned') === '1');
 document.body?.classList.toggle('devices-pinned', devicesPinned);
 
+const unsavedBadge = document.getElementById('unsavedBadge');
+let hasUnsavedChanges = false;
+let _unsavedIndicatorTimer = 0;
+
+function setUnsavedState(state){
+  const next = !!state;
+  hasUnsavedChanges = next;
+  if (unsavedBadge){
+    unsavedBadge.hidden = !next;
+    unsavedBadge.setAttribute('aria-hidden', next ? 'false' : 'true');
+  }
+  document.body?.classList.toggle('has-unsaved-changes', next);
+  if (!next){
+    clearTimeout(_unsavedIndicatorTimer);
+  }
+}
+
+function markUnsavedSoon(){
+  if (hasUnsavedChanges) return;
+  clearTimeout(_unsavedIndicatorTimer);
+  _unsavedIndicatorTimer = setTimeout(()=> setUnsavedState(true), 180);
+}
+
+try {
+  const nativeSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function patchedSetItem(key, value){
+    let result;
+    try {
+      result = nativeSetItem.apply(this, arguments);
+      return result;
+    } finally {
+      const store = (typeof globalThis !== 'undefined' && globalThis.localStorage) ? globalThis.localStorage : null;
+      if (store && this === store && (key === 'scheduleDraft' || key === 'settingsDraft')){
+        markUnsavedSoon();
+      }
+    }
+  };
+} catch (err) {
+  console.warn('[admin] Unsaved badge: Storage patch failed', err);
+}
+
+const globalScope = (typeof globalThis === 'object') ? globalThis : (typeof window === 'object' ? window : undefined);
+if (globalScope){
+  globalScope.__markUnsaved = ()=> setUnsavedState(true);
+  globalScope.__queueUnsaved = markUnsavedSoon;
+  globalScope.__clearUnsaved = ()=> setUnsavedState(false);
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', ()=> setUnsavedState(hasUnsavedChanges));
+} else {
+  setUnsavedState(hasUnsavedChanges);
+}
+
 
 // --- Kontext-Badge (Header) im Modul-Scope ---
 function renderContextBadge(){
@@ -186,6 +240,7 @@ function exitDeviceContext(){
 // 1) Bootstrap: Laden + Initialisieren
 // ============================================================================
 async function loadAll(){
+  let unsavedFromDraft = false;
   const [s, cfg] = await Promise.all([
     fetch('/admin/api/load.php').then(r=>r.json()),
     fetch('/admin/api/load_settings.php').then(r=>r.json())
@@ -197,7 +252,10 @@ async function loadAll(){
 
   try {
     const draft = lsGet('scheduleDraft');
-    if (draft) schedule = JSON.parse(draft);
+    if (draft) {
+      schedule = JSON.parse(draft);
+      unsavedFromDraft = true;
+    }
   } catch {}
 
   try {
@@ -214,6 +272,7 @@ async function loadAll(){
           }
         }
       })(settings, parsed);
+      unsavedFromDraft = true;
     }
   } catch {}
 
@@ -236,6 +295,8 @@ async function loadAll(){
       }))
     : [];
   settings.presets       = settings.presets || {};
+
+  setUnsavedState(unsavedFromDraft);
 
   // --- UI-Module initialisieren ---------------------------------------------
   initGridUI({
@@ -637,6 +698,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
         baseSettings = deepClone(body.settings);
         lsRemove('scheduleDraft');
         lsRemove('settingsDraft');
+        setUnsavedState(false);
       }
       alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
     } else {
@@ -647,6 +709,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       if (j.ok) {
         lsRemove('scheduleDraft');
         lsRemove('settingsDraft');
+        setUnsavedState(false);
       }
       alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
     }
@@ -675,7 +738,9 @@ function dockSend(reload){
 function attachDockLivePush(){
   if (_dockInputListener) return;
   _dockInputListener = (ev)=>{
+    if (!ev?.isTrusted) return;
     if (ev?.target?.type === 'file') return;
+    markUnsavedSoon();
     dockPushDebounced();
   };
   document.addEventListener('input',  _dockInputListener, true);
