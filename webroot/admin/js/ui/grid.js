@@ -10,8 +10,61 @@ let inited = false;
 let undoStack = [];
 let redoStack = [];
 
+function cloneCell(cell){
+  if (!cell) return null;
+  if (typeof structuredClone === 'function'){
+    try { return structuredClone(cell); }
+    catch {}
+  }
+  return JSON.parse(JSON.stringify(cell));
+}
+
 function cloneRows(rows){
-  return rows.map(r=>({ time:r.time, entries:r.entries.map(c=> c ? { ...c } : null) }));
+  return (rows || []).map(r=>({
+    time: r.time,
+    entries: (r.entries || []).map(cloneCell)
+  }));
+}
+
+function parseList(str){
+  return String(str || '')
+    .split(/[\n\r;,|•·]+/)
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeText(value){
+  if (value == null) return '';
+  if (Array.isArray(value)){
+    return value.map(v => normalizeText(v)).filter(Boolean).join('\n');
+  }
+  if (typeof value === 'object'){
+    const nested = value.text ?? value.label ?? value.value ?? value.name;
+    return normalizeText(nested);
+  }
+  return String(value);
+}
+
+function gatherListForInput(...values){
+  const out = [];
+  const walk = (value) => {
+    if (value == null) return;
+    if (Array.isArray(value)){
+      value.forEach(walk);
+      return;
+    }
+    if (typeof value === 'object'){
+      walk(value.text ?? value.label ?? value.value ?? value.name);
+      return;
+    }
+    const str = String(value);
+    str.split(/[\n\r;,|•·]+/).forEach(part => {
+      const trimmed = part.trim();
+      if (trimmed) out.push(trimmed);
+    });
+  };
+  values.forEach(walk);
+  return out.join('\n');
 }
 
 function pushHistory(){
@@ -129,6 +182,10 @@ export function renderGrid(){
       $('#m_time').value  = sc2.rows[curRow].time;
       $('#m_title').value = cell.title || '';
       $('#m_flames').value= cell.flames || '';
+      $('#m_description').value = normalizeText(cell.description ?? cell.detail ?? cell.subtitle ?? cell.text ?? cell.extra ?? '');
+      $('#m_aromas').value = gatherListForInput(cell.aromas, cell.aromaList, cell.aroma, cell.scent, cell.scents);
+      $('#m_facts').value = gatherListForInput(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
+      $('#m_type').value = normalizeText(cell.type ?? '');
 
       populateNoteSelect();
       const has = !!cell.noteId;
@@ -163,11 +220,21 @@ function initOnce(){
     const newTime = parseTime($('#m_time').value);
     const hasNote = $('#m_hasNote').checked;
     const noteId  = hasNote ? $('#m_note').value : null;
+    const description = $('#m_description').value.trim();
+    const aromas = parseList($('#m_aromas').value);
+    const facts = parseList($('#m_facts').value);
+    const type = $('#m_type').value.trim();
 
     if (!newTime && title) { alert('Bitte Zeit HH:MM'); return; }
 
     const newCell = title ? { title, flames } : null;
     if (newCell && hasNote) newCell.noteId = noteId;
+    if (newCell){
+      if (description) newCell.description = description;
+      if (aromas.length) newCell.aromas = aromas;
+      if (facts.length) newCell.facts = facts;
+      if (type) newCell.type = type;
+    }
 
     pushHistory();
 
