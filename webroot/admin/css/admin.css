@@ -211,6 +211,9 @@ details[open] .chev{ transform: rotate(90deg); }
 .btn.icon{ width:28px; height:28px; padding:0; display:grid; place-items:center; }
 .btn.has-meta{ position:relative; padding-right:38px; }
 .btn.sm.has-meta{ padding-right:34px; }
+.btn.icon-label{ gap:8px; }
+.btn.icon-label .icon{ display:inline-flex; align-items:center; justify-content:center; }
+.btn.icon-label .icon svg{ width:16px; height:16px; }
 .btn.has-meta .meta{
   position:absolute;
   top:50%;
@@ -242,6 +245,40 @@ details[open] .chev{ transform: rotate(90deg); }
 /* Ghost (grau) */
 .btn.ghost{
   background:var(--ghost-bg); color:var(--ghost-fg); border:1px solid var(--ghost-border);
+}
+
+/* ---------- System-Section ---------- */
+.sys-grid{
+  display:grid;
+  grid-template-columns:minmax(0, max-content) minmax(0, 1fr);
+  gap:10px 16px;
+  align-items:start;
+}
+.sys-action{ display:flex; align-items:center; justify-content:flex-start; }
+.sys-options{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.sys-toggle{ gap:6px; font-weight:600; }
+.sys-toggle input{
+  flex:0 0 auto;
+  margin:0;
+}
+.sys-file-btn{ position:relative; overflow:hidden; }
+.sys-file-btn input{
+  position:absolute;
+  inset:0;
+  opacity:0;
+  cursor:pointer;
+}
+.sys-cleanup{ margin-top:12px; }
+
+@media (max-width: 520px){
+  .sys-grid{ gap:8px 12px; }
+  .sys-options{ gap:6px; }
+  .btn.icon-label{ gap:6px; }
 }
 
 /* ---------- Hilfe-Overlay & Tooltips ---------- */
