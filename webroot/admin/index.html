@@ -230,17 +230,10 @@
         <button class="badge-lib-toggle" type="button" id="badgeLibraryToggle" aria-expanded="false" aria-controls="badgeLibraryBody">Badge-Bibliothek</button>
         <button class="btn sm" id="badgeAdd" type="button">Badge hinzufügen</button>
       </div>
-        <div class="badge-lib-body" id="badgeLibraryBody" aria-hidden="true">
+      <div class="badge-lib-body" id="badgeLibraryBody" aria-hidden="true">
         <div class="badge-lib-body-inner">
-          <div class="badge-emoji-library-block" id="badgeEmojiLibraryWrap">
-            <div class="badge-emoji-library-head">
-              <div class="badge-emoji-library-title">Eigene Emoji-Auswahl</div>
-              <div class="badge-emoji-library-help">Füge Emojis über das Eingabefeld hinzu, verwalte die Liste hier und entferne sie bei Bedarf wieder.</div>
-            </div>
-            <div id="badgeEmojiLibrary" class="badge-emoji-library" role="list"></div>
-          </div>
           <div id="badgeLibraryList" class="badge-library-list"></div>
-          <div class="help">Verwalte Text, Emoji und Badge-Bild der auswählbaren Badges für Aufgüsse.</div>
+          <div class="help">Verwalte Icon und Label der auswählbaren Badges für Aufgüsse. Wähle Emojis aus der Liste, ergänze eigene Emojis oder hinterlege ein Badge-Bild.</div>
         </div>
       </div>
     </div>
@@ -398,8 +391,6 @@
                 <div class="kv"><label>Badge-Farbe</label>
                   <input id="badgeColor" class="input" type="color" value="#5C3101" title="Badge-Farbe">
                 </div>
-                <div class="kv"><label>Badge-Scale</label><input id="tileBadgeScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
-                <div class="kv"><label>Beschreibung-Scale</label><input id="tileDescriptionScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
                 <div class="kv"><label>Farbverlauf anzeigen</label><input id="tileOverlayEnabled" type="checkbox" checked></div>
                 <div class="kv"><label>Farbverlauf-Stärke (%)</label><input id="tileOverlayStrength" class="input" type="number" step="5" min="0" max="200" value="100"></div>
                 <div class="kv">
