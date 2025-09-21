@@ -35,9 +35,9 @@ const DEFAULT_ENABLED_COMPONENTS = {
 };
 
 const DEFAULT_BADGE_LIBRARY = [
-  { id:'bdg_classic', icon:'🌿', label:'Klassisch', imageUrl:'' },
-  { id:'bdg_event', icon:'⭐', label:'Event', imageUrl:'' },
-  { id:'bdg_ritual', icon:'🔥', label:'Ritual', imageUrl:'' }
+  { id:'bdg_classic', icon:'🌿', label:'Klassisch' },
+  { id:'bdg_event', icon:'⭐', label:'Event' },
+  { id:'bdg_ritual', icon:'🔥', label:'Ritual' }
 ];
 
 const DEFAULT_STYLE_SETS = {

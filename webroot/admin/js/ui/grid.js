@@ -49,10 +49,7 @@ function getBadgeLibrary(){
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon : '';
     const label = typeof entry.label === 'string' ? entry.label : '';
-    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
-      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
-    const imageUrl = String(imageUrlRaw || '').trim();
-    out.push({ id, icon, label, imageUrl });
+    out.push({ id, icon, label });
     seen.add(id);
   });
   return out;
@@ -131,26 +128,14 @@ function renderBadgePicker(selectedIds = []){
       selectedBadges.forEach(entry => {
         const chip = document.createElement('span');
         chip.className = 'badge-picker-chip';
-        const imageUrl = (entry.imageUrl || '').trim();
         const iconText = (entry.icon || '').trim();
-        if (imageUrl || iconText){
+        if (iconText){
           const media = document.createElement('span');
           media.className = 'badge-picker-chip-media';
-          if (imageUrl){
-            const img = document.createElement('img');
-            img.className = 'badge-picker-chip-image';
-            img.src = imageUrl;
-            img.alt = '';
-            img.loading = 'lazy';
-            media.appendChild(img);
-            chip.classList.add('has-image');
-          } else if (iconText){
-            const iconEl = document.createElement('span');
-            iconEl.className = 'badge-picker-chip-icon';
-            iconEl.textContent = iconText;
-            media.appendChild(iconEl);
-            chip.classList.add('has-icon');
-          }
+          const iconEl = document.createElement('span');
+          iconEl.className = 'badge-picker-chip-icon';
+          iconEl.textContent = iconText;
+          media.appendChild(iconEl);
           chip.appendChild(media);
         }
         const label = document.createElement('span');
@@ -193,26 +178,14 @@ function renderBadgePicker(selectedIds = []){
     label.textContent = badge.label || badge.id;
 
     option.appendChild(input);
-    const imageUrl = (badge.imageUrl || '').trim();
     const iconText = (badge.icon || '').trim();
-    if (imageUrl || iconText){
+    if (iconText){
       const media = document.createElement('span');
       media.className = 'badge-picker-option-media';
-      if (imageUrl){
-        const img = document.createElement('img');
-        img.className = 'badge-picker-option-image';
-        img.src = imageUrl;
-        img.alt = '';
-        img.loading = 'lazy';
-        media.appendChild(img);
-        option.classList.add('has-image');
-      } else if (iconText){
-        const iconEl = document.createElement('span');
-        iconEl.className = 'badge-picker-option-icon';
-        iconEl.textContent = iconText;
-        media.appendChild(iconEl);
-        option.classList.add('has-icon');
-      }
+      const iconEl = document.createElement('span');
+      iconEl.className = 'badge-picker-option-icon';
+      iconEl.textContent = iconText;
+      media.appendChild(iconEl);
       option.appendChild(media);
     }
     option.appendChild(label);

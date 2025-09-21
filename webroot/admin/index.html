@@ -299,6 +299,71 @@
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
         </summary>
         <div class="content">
+          <div class="layout-display-block">
+            <details class="layout-display-fold" id="displayLayoutFold" open>
+              <summary class="layout-display-summary">
+                <span class="layout-display-summary-text">
+                  <span class="layout-display-summary-title">Darstellung &amp; Seiten</span>
+                  <span class="layout-display-summary-sub">Einspaltig oder Zweispaltig konfigurieren</span>
+                </span>
+                <span class="layout-display-chev" aria-hidden="true">▾</span>
+              </summary>
+              <div class="layout-display-body">
+                <div class="kv">
+                  <label>Darstellung</label>
+                  <select id="layoutMode" class="input">
+                    <option value="single">Einspaltig</option>
+                    <option value="split">Zweispaltig</option>
+                  </select>
+                </div>
+                <div class="layout-display-columns">
+                  <div class="fieldset layout-page" id="layoutLeft">
+                    <div class="legend">Linke Seite</div>
+                    <div class="kv">
+                      <label>Quelle</label>
+                      <select id="pageLeftSource" class="input">
+                        <option value="master">Alle Inhalte</option>
+                        <option value="schedule">Aufgussplan</option>
+                        <option value="media">Medien</option>
+                        <option value="story">Erklärungen</option>
+                      </select>
+                    </div>
+                    <div class="kv">
+                      <label>Timer (Sekunden)</label>
+                      <input id="pageLeftTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+                    </div>
+                    <div class="kv">
+                      <label>Playlist</label>
+                      <div class="playlist-selector" id="pageLeftPlaylist"></div>
+                      <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge. Eine leere Playlist nutzt den Standardfilter.</div>
+                    </div>
+                  </div>
+                  <div class="fieldset layout-page" id="layoutRight">
+                    <div class="legend">Rechte Seite</div>
+                    <div class="kv">
+                      <label>Quelle</label>
+                      <select id="pageRightSource" class="input">
+                        <option value="media">Medien</option>
+                        <option value="master">Alle Inhalte</option>
+                        <option value="schedule">Aufgussplan</option>
+                        <option value="story">Erklärungen</option>
+                      </select>
+                    </div>
+                    <div class="kv">
+                      <label>Timer (Sekunden)</label>
+                      <input id="pageRightTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+                    </div>
+                    <div class="kv">
+                      <label>Playlist</label>
+                      <div class="playlist-selector" id="pageRightPlaylist"></div>
+                      <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge.</div>
+                    </div>
+                    <div class="help">Wird verwendet, wenn das Zweispalten-Layout aktiv ist.</div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
           <div class="settings-grid two-col">
             <div class="settings-card">
               <div class="settings-card-head">
@@ -381,7 +446,7 @@
               </div>
             </div>
 
-            <div class="settings-card span-2">
+            <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Saunafolien &amp; Komponenten</div>
               </div>
@@ -436,7 +501,7 @@
               </div>
             </div>
 
-            <div class="settings-card span-2">
+            <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Bildspalte &amp; Layout</div>
               </div>
@@ -445,60 +510,10 @@
                 <div class="kv"><label>Schnitt oben (%)</label><input id="cutTop" class="input" type="number" min="0" max="100" value="28"></div>
                 <div class="kv"><label>Schnitt unten (%)</label><input id="cutBottom" class="input" type="number" min="0" max="100" value="12"></div>
                 <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
-                <div class="kv">
-                  <label>Darstellung</label>
-                  <select id="layoutMode" class="input">
-                    <option value="single">Einspaltig</option>
-                    <option value="split">Zweispaltig</option>
-                  </select>
-                </div>
-                <div class="fieldset layout-page" id="layoutLeft">
-                  <div class="legend">Linke Seite</div>
-                  <div class="kv">
-                    <label>Quelle</label>
-                    <select id="pageLeftSource" class="input">
-                      <option value="master">Alle Inhalte</option>
-                      <option value="schedule">Aufgussplan</option>
-                      <option value="media">Medien</option>
-                      <option value="story">Erklärungen</option>
-                    </select>
-                  </div>
-                  <div class="kv">
-                    <label>Timer (Sekunden)</label>
-                    <input id="pageLeftTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
-                  </div>
-                  <div class="kv">
-                    <label>Playlist</label>
-                    <div class="playlist-selector" id="pageLeftPlaylist"></div>
-                    <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge. Eine leere Playlist nutzt den Standardfilter.</div>
-                  </div>
-                </div>
-                <div class="fieldset layout-page" id="layoutRight">
-                  <div class="legend">Rechte Seite</div>
-                  <div class="kv">
-                    <label>Quelle</label>
-                    <select id="pageRightSource" class="input">
-                      <option value="media">Medien</option>
-                      <option value="master">Alle Inhalte</option>
-                      <option value="schedule">Aufgussplan</option>
-                      <option value="story">Erklärungen</option>
-                    </select>
-                  </div>
-                  <div class="kv">
-                    <label>Timer (Sekunden)</label>
-                    <input id="pageRightTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
-                  </div>
-                  <div class="kv">
-                    <label>Playlist</label>
-                    <div class="playlist-selector" id="pageRightPlaylist"></div>
-                    <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge.</div>
-                  </div>
-                  <div class="help">Wird verwendet, wenn das Zweispalten-Layout aktiv ist.</div>
-                </div>
               </div>
             </div>
 
-            <div class="settings-card span-2">
+            <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Flammen / Hervorhebungen</div>
               </div>
