@@ -6,6 +6,20 @@
 import { DEFAULTS } from './defaults.js';
 import { deepClone, genId } from './utils.js';
 
+const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
+
+function sanitizeEmojiList(list){
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  list.forEach(entry => {
+    if (typeof entry !== 'string') return;
+    const value = entry.trim();
+    if (!value || out.includes(value)) return;
+    out.push(value);
+  });
+  return out;
+}
+
 export const PAGE_CONTENT_TYPES = [
   ['overview', 'Übersicht'],
   ['sauna', 'Saunen'],
@@ -209,6 +223,17 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
     assignMissingIds,
     fallback: hasBadgeArray ? undefined : DEFAULTS.slides?.badgeLibrary
   });
+  const defaultBadgeScale = DEFAULTS.slides?.badgeScale ?? 1;
+  const defaultBadgeDescScale = DEFAULTS.slides?.badgeDescriptionScale ?? 1;
+  const badgeScaleRaw = Number(src.slides?.badgeScale);
+  src.slides.badgeScale = Number.isFinite(badgeScaleRaw)
+    ? clamp(0.3, badgeScaleRaw, 3)
+    : defaultBadgeScale;
+  const badgeDescRaw = Number(src.slides?.badgeDescriptionScale);
+  src.slides.badgeDescriptionScale = Number.isFinite(badgeDescRaw)
+    ? clamp(0.3, badgeDescRaw, 3)
+    : defaultBadgeDescScale;
+  src.slides.customBadgeEmojis = sanitizeEmojiList(src.slides?.customBadgeEmojis);
   return src;
 }
 

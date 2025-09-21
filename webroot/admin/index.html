@@ -79,8 +79,9 @@
     </section>
 
     <aside class="rightbar">
+      <div class="rightbar-columns">
 <!-- Slides – Masterbox -->
-<details class="ac" open id="slidesMaster">
+<details class="ac full" open id="slidesMaster">
   <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
     <div class="actions">
@@ -232,8 +233,21 @@
       </div>
       <div class="badge-lib-body" id="badgeLibraryBody" aria-hidden="true">
         <div class="badge-lib-body-inner">
+          <div class="badge-lib-tools" id="badgeEmojiTools">
+            <div class="badge-lib-tools-head">
+              <div class="badge-lib-tools-title">Emoji-Auswahl</div>
+              <div class="badge-lib-tools-text">Wähle ein Emoji aus der Liste oder ergänze eigene Favoriten für die Badges.</div>
+            </div>
+            <div class="badge-lib-tools-body">
+              <div class="badge-lib-emoji-add">
+                <input id="badgeEmojiInput" class="input" type="text" maxlength="8" placeholder="Emoji einfügen" aria-label="Eigenes Emoji">
+                <button class="btn sm" id="badgeEmojiAdd" type="button" disabled>Emoji hinzufügen</button>
+              </div>
+              <div class="badge-lib-emoji-list" id="badgeEmojiCustom" aria-live="polite"></div>
+            </div>
+          </div>
           <div id="badgeLibraryList" class="badge-library-list"></div>
-          <div class="help">Verwalte Icon und Label der auswählbaren Badges für Aufgüsse.</div>
+          <div class="help">Verwalte Emoji, Bild und Label der auswählbaren Badges für Aufgüsse.</div>
         </div>
       </div>
     </div>
@@ -279,7 +293,7 @@
   </div>
 </details>
 
- <details class="ac" id="boxSlidesText">
+ <details class="ac full" id="boxSlidesText">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
@@ -383,6 +397,8 @@
                   </select>
                 </div>
                 <div class="kv"><label>Uhrzeit Scale</label><input id="tileTimeScale" class="input" type="number" step="0.05" min="0.5" max="2" value="1"></div>
+                <div class="kv"><label>Badge-Scale (Faktor)</label><input id="badgeScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
+                <div class="kv"><label>Beschreibung-Scale (Faktor)</label><input id="badgeDescriptionScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
                 <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
                 <div class="kv"><label>Kachel‑Breite min (Faktor)</label><input id="tileMin" class="input" type="number" min="0" max="1" step="0.01" value="0.25"></div>
                 <div class="kv"><label>Kachel‑Breite max (Faktor)</label><input id="tileMax" class="input" type="number" min="0" max="1" step="0.01" value="0.57"></div>
@@ -505,11 +521,11 @@
         </div>
 </details>
 
-        <details class="ac">
-          <summary>
-            <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
-            <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
-          </summary>
+      <details class="ac full">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
+          <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
+        </summary>
         <div class="content color-cols" id="colorList"></div>
       </details>
 
@@ -575,6 +591,8 @@
           <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
         </div>
       </details>
+
+      </div>
 
     </aside>
   </main>
