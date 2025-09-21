@@ -1845,8 +1845,30 @@ function normalizeLegacyRichSection(entry) {
     text,
     list: tips.length ? tips : null,
     image,
-    mediaPosition: normalizeMediaPosition(entry.layout)
+    mediaPosition: normalizeMediaPosition(entry.mediaPosition || entry.layout)
   };
+}
+
+function normalizeStoryColumnRole(value, fallback = 'left') {
+  const norm = String(value || '').trim().toLowerCase();
+  if (norm === 'right') return 'right';
+  if (norm === 'left') return 'left';
+  return fallback === 'right' ? 'right' : 'left';
+}
+
+function convertModernBuilderSection(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const builderKeys = [
+    'body', 'image', 'imageUrl', 'mediaUrl', 'mediaPosition', 'column', 'side',
+    'imageAlt', 'paragraphs', 'badges', 'list', 'items', 'kicker', 'overline',
+    'subheading'
+  ];
+  const hasBuilderFields = builderKeys.some(key => entry[key] != null);
+  if (!hasBuilderFields) return null;
+  const normalized = normalizeStorySection(entry);
+  if (!normalized) return null;
+  const column = normalizeStoryColumnRole(entry.column || entry.side || '');
+  return { column, section: normalized };
 }
 
 function convertLegacyStory(story, base = {}) {
@@ -1856,6 +1878,8 @@ function convertLegacyStory(story, base = {}) {
   const hero = normalizeStoryImageEntry(heroRaw);
   const sections = [];
   const pushSection = (section) => { if (section) sections.push(section); };
+  const builderColumns = { left: [], right: [] };
+  let hasBuilderSections = false;
 
   const createSimpleCard = ({ heading: cardHeading, subheading: cardSubheading, text, image, mediaPosition }) => {
     const headingText = String(cardHeading || '').trim();
@@ -1896,6 +1920,14 @@ function convertLegacyStory(story, base = {}) {
   else if (Array.isArray(story.content)) legacyEntries.push(...story.content);
 
   legacyEntries.forEach(entry => {
+    if (entry == null) return;
+    const builder = convertModernBuilderSection(entry);
+    if (builder) {
+      hasBuilderSections = true;
+      if (builder.column === 'right') builderColumns.right.push(builder.section);
+      else builderColumns.left.push(builder.section);
+      return;
+    }
     const section = convertLegacyRichSection(entry);
     if (section) pushSection(section);
   });
@@ -1941,20 +1973,49 @@ function convertLegacyStory(story, base = {}) {
     addExtra(createSimpleCard({ heading: 'Heute verfügbar', text: saunaTargets.join(', ') }));
   }
 
-  extras.forEach(pushSection);
+  if (hasBuilderSections && sections.length) {
+    builderColumns.left.push(...sections);
+    sections.length = 0;
+  }
 
-  if (!sections.length) {
+  if (hasBuilderSections) {
+    extras.forEach(section => {
+      if (!section) return;
+      const target = builderColumns.left.length <= builderColumns.right.length
+        ? builderColumns.left
+        : builderColumns.right;
+      target.push(section);
+    });
+  } else {
+    extras.forEach(pushSection);
+  }
+
+  const totalSectionCount = hasBuilderSections
+    ? builderColumns.left.length + builderColumns.right.length
+    : sections.length;
+
+  if (!totalSectionCount) {
     const fallbackText = normalizeParagraphString(story.text || story.body || story.description);
     const fallbackSection = createSimpleCard({ text: fallbackText });
-    if (fallbackSection) pushSection(fallbackSection);
+    if (fallbackSection) {
+      if (hasBuilderSections) builderColumns.left.push(fallbackSection);
+      else pushSection(fallbackSection);
+    }
   }
 
   const columns = [];
-  if (sections.length) columns.push({ sections });
-  if (hero.url) {
-    columns.push({ sections: [{ type: 'image', image: hero, variant: 'hero', className: 'story-image-block--hero' }] });
+  if (hasBuilderSections) {
+    const leftSections = builderColumns.left.filter(Boolean);
+    const rightSections = builderColumns.right.filter(Boolean);
+    if (leftSections.length) columns.push({ role: 'left', sections: leftSections });
+    if (rightSections.length) columns.push({ role: 'right', sections: rightSections });
+  } else if (sections.length) {
+    columns.push({ sections });
   }
-  const layout = hero.url ? 'double' : 'single';
+  if (hero.url) {
+    columns.push({ role: 'hero', sections: [{ type: 'image', image: hero, variant: 'hero', className: 'story-image-block--hero' }] });
+  }
+  const layout = columns.length > 1 ? 'double' : 'single';
   return {
     heading,
     subheading,
@@ -2039,6 +2100,46 @@ function collectStoryImageUrls(story, limit = 3) {
 }
 
 
+
+function autoScaleStorySlide(container) {
+  if (!container) return;
+  const base = Number(container.dataset.storyBaseScale);
+  if (!Number.isFinite(base) || base <= 0) return;
+  const parent = container.parentElement;
+  const available = parent ? parent.clientHeight : container.clientHeight;
+  if (!available) return;
+
+  const applyScale = (factor) => {
+    const clamped = Math.max(0.35, Math.min(1, Number(factor) || 0));
+    container.style.setProperty('--story-section-scale', (base * clamped).toFixed(3));
+    container.dataset.storyAutoScale = clamped.toFixed(3);
+    container.classList.toggle('story-slide--scaled', clamped < 0.999);
+  };
+
+  applyScale(1);
+
+  const measure = () => container.getBoundingClientRect().height;
+  let total = measure();
+  if (total <= available) return;
+
+  let lo = 0.35;
+  let hi = 1;
+  let best = lo;
+
+  for (let i = 0; i < 6; i++) {
+    const mid = (lo + hi) / 2;
+    applyScale(mid);
+    total = measure();
+    if (total > available) {
+      hi = mid;
+    } else {
+      best = mid;
+      lo = mid;
+    }
+  }
+
+  applyScale(best);
+}
 
 function renderStorySlide(story = {}, region = 'left') {
   const normalized = normalizeStoryForRender(story || {});
@@ -2135,6 +2236,21 @@ function renderStorySlide(story = {}, region = 'left') {
   const baseScale = columnCount > 1 ? 0.92 : 1;
   const scale = Math.max(0.6, baseScale - Math.max(density - 1, 0) * 0.08);
   container.style.setProperty('--story-section-scale', scale.toFixed(3));
+  container.dataset.storyBaseScale = scale.toFixed(3);
+  container.dataset.storyAutoScale = '1';
+
+  const recalc = () => autoScaleStorySlide(container);
+  setTimeout(recalc, 0);
+  requestAnimationFrame(recalc);
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(recalc).catch(() => {});
+  }
+  container.querySelectorAll('img').forEach(img => {
+    img.addEventListener('load', recalc);
+    img.addEventListener('error', recalc);
+  });
+  setResizeHandler(region, recalc);
+
   return container;
 
   function buildStorySectionNode(section, ctx) {

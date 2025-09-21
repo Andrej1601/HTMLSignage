@@ -824,7 +824,7 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 .story-section-media{
   flex:0 0 auto;
   width:100%;
-  max-height:var(--story-section-media-height);
+  max-height:calc(var(--story-section-media-height) * var(--story-section-scale));
   display:flex;
   flex-direction:column;
 }
