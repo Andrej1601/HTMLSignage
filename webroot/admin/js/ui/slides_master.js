@@ -34,7 +34,28 @@ const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
   'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
 ];
-const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary','tileHeightScale','tileOverlayEnabled','tileOverlayStrength'];
+const STYLE_SLIDE_KEYS = [
+  'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
+  'tileHeightScale','tileOverlayEnabled','tileOverlayStrength'
+];
+
+const SUGGESTED_BADGE_EMOJIS = [
+  { value:'🌿', label:'Kräuter & Natur' },
+  { value:'🔥', label:'Feuer & Hitze' },
+  { value:'💧', label:'Wasser & Dampf' },
+  { value:'❄️', label:'Eis & Frische' },
+  { value:'🌸', label:'Blüten & Duft' },
+  { value:'🍋', label:'Zitrus & Frucht' },
+  { value:'🍯', label:'Honig' },
+  { value:'🧘', label:'Entspannung' },
+  { value:'🎉', label:'Event & Special' },
+  { value:'⭐', label:'Highlight' },
+  { value:'🌙', label:'Abend' },
+  { value:'🎵', label:'Musik' },
+  { value:'⚡', label:'Energie' },
+  { value:'🌲', label:'Wald & Holz' },
+  { value:'🧊', label:'Eisaufguss' }
+];
 
 const cloneValue = (value) => {
   if (value == null) return value;
@@ -146,6 +167,21 @@ function ensureBadgeLibrary(settings){
 
   settings.slides.badgeLibrary = normalized;
   return normalized;
+}
+
+function ensureCustomBadgeEmojis(settings){
+  settings.slides ||= {};
+  const raw = settings.slides.customBadgeEmojis;
+  const list = Array.isArray(raw) ? raw : [];
+  const filtered = [];
+  list.forEach(entry => {
+    if (typeof entry !== 'string') return;
+    const value = entry.trim();
+    if (!value || filtered.includes(value)) return;
+    filtered.push(value);
+  });
+  settings.slides.customBadgeEmojis = filtered;
+  return filtered;
 }
 
 function snapshotStyleSet(settings){
@@ -2160,7 +2196,88 @@ export function renderSlidesMaster(){
 
   const renderBadgeLibraryRows = () => {
     const list = ensureBadgeLibrary(settings);
+    const customEmojis = ensureCustomBadgeEmojis(settings);
     if (!badgeListHost) return;
+
+    const notifyChange = () => {
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+
+    const emojiInput = $('#badgeEmojiInput');
+    const emojiAddBtn = $('#badgeEmojiAdd');
+    const emojiCustomList = $('#badgeEmojiCustom');
+
+    const updateEmojiAddState = () => {
+      if (!emojiAddBtn) return;
+      const value = (emojiInput?.value || '').trim();
+      emojiAddBtn.disabled = !value || customEmojis.includes(value);
+    };
+
+    const renderEmojiChips = () => {
+      if (!emojiCustomList) return;
+      emojiCustomList.innerHTML = '';
+      if (!customEmojis.length){
+        const empty = document.createElement('div');
+        empty.className = 'badge-lib-emoji-empty';
+        empty.textContent = 'Keine eigenen Emojis gespeichert.';
+        emojiCustomList.appendChild(empty);
+        return;
+      }
+      customEmojis.forEach(value => {
+        const chip = document.createElement('span');
+        chip.className = 'badge-lib-emoji-chip';
+        chip.textContent = value;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'badge-lib-emoji-remove';
+        removeBtn.title = `${value} entfernen`;
+        removeBtn.setAttribute('aria-label', `Emoji ${value} entfernen`);
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', () => {
+          const idx = customEmojis.indexOf(value);
+          if (idx >= 0) customEmojis.splice(idx, 1);
+          renderBadgeLibraryRows();
+          notifyChange();
+        });
+        chip.appendChild(removeBtn);
+        emojiCustomList.appendChild(chip);
+      });
+    };
+
+    const addCustomEmoji = (rawValue) => {
+      const value = (rawValue || '').trim();
+      if (!value) return;
+      if (!customEmojis.includes(value)){
+        customEmojis.push(value);
+        renderBadgeLibraryRows();
+        notifyChange();
+      }
+      if (emojiInput){
+        emojiInput.value = '';
+      }
+      updateEmojiAddState();
+    };
+
+    if (emojiAddBtn && !emojiAddBtn.dataset.bound){
+      emojiAddBtn.addEventListener('click', () => addCustomEmoji(emojiInput?.value));
+      emojiAddBtn.dataset.bound = '1';
+    }
+    if (emojiInput && !emojiInput.dataset.bound){
+      emojiInput.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter'){
+          ev.preventDefault();
+          addCustomEmoji(emojiInput.value);
+        }
+      });
+      emojiInput.addEventListener('input', updateEmojiAddState);
+      emojiInput.dataset.bound = '1';
+    }
+
+    updateEmojiAddState();
+    renderEmojiChips();
+
     badgeListHost.innerHTML = '';
     if (!list.length){
       const empty = document.createElement('div');
@@ -2185,10 +2302,56 @@ export function renderSlidesMaster(){
       return field;
     };
 
-    const notifyChange = () => {
-      window.__queueUnsaved?.();
-      window.__markUnsaved?.();
-      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    const usedIcons = Array.from(new Set(list
+      .map(entry => (entry && typeof entry === 'object') ? String(entry.icon || '').trim() : '')
+      .filter(Boolean)));
+
+    const populateEmojiOptions = (selectEl, currentValue) => {
+      if (!selectEl) return;
+      const current = (currentValue || '').trim();
+      selectEl.innerHTML = '';
+      const added = new Set();
+      const appendOption = (value, labelText, groupNode) => {
+        const normalized = (value || '').trim();
+        if (!normalized || added.has(normalized)) return;
+        const option = document.createElement('option');
+        option.value = normalized;
+        option.textContent = labelText || normalized;
+        if (normalized === current) option.selected = true;
+        (groupNode || selectEl).appendChild(option);
+        added.add(normalized);
+      };
+
+      const noneOption = document.createElement('option');
+      noneOption.value = '';
+      noneOption.textContent = '— Kein Emoji —';
+      if (!current) noneOption.selected = true;
+      selectEl.appendChild(noneOption);
+
+      const addGroup = (label, entries, mapper) => {
+        if (!entries.length) return;
+        const group = document.createElement('optgroup');
+        group.label = label;
+        entries.forEach(entry => {
+          const raw = mapper ? mapper(entry) : entry;
+          const normalized = (typeof raw === 'string') ? raw.trim() : '';
+          if (!normalized) return;
+          const display = typeof entry === 'object'
+            ? `${entry.value} ${entry.label}`
+            : normalized;
+          appendOption(normalized, display, group);
+        });
+        if (group.children.length) selectEl.appendChild(group);
+      };
+
+      addGroup('Empfohlen', SUGGESTED_BADGE_EMOJIS, (entry) => entry.value);
+      addGroup('Eigene Emojis', customEmojis, (entry) => entry);
+      const otherIcons = usedIcons.filter(value => !added.has(value));
+      addGroup('Verwendet', otherIcons, (entry) => entry);
+
+      if (current && !added.has(current)){
+        appendOption(current, `${current} (aktuell)`);
+      }
     };
 
     list.forEach((badge, index) => {
@@ -2233,13 +2396,18 @@ export function renderSlidesMaster(){
       const actions = document.createElement('div');
       actions.className = 'badge-lib-actions';
 
-      const iconInput = document.createElement('input');
-      iconInput.type = 'text';
-      iconInput.className = 'input badge-lib-input badge-lib-icon';
-      iconInput.value = badge.icon || '';
-      iconInput.placeholder = 'Emoji';
-      iconInput.maxLength = 6;
-      iconInput.setAttribute('aria-label', 'Badge-Emoji');
+      const labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.className = 'input badge-lib-input badge-lib-label';
+      labelInput.value = badge.label || '';
+      labelInput.placeholder = 'Badge-Text';
+      labelInput.maxLength = 80;
+      labelInput.setAttribute('aria-label', 'Badge-Text');
+
+      const emojiSelect = document.createElement('select');
+      emojiSelect.className = 'input badge-lib-input badge-lib-emoji-select';
+      emojiSelect.setAttribute('aria-label', 'Badge-Emoji');
+      populateEmojiOptions(emojiSelect, badge.icon || '');
 
       const imagePreview = document.createElement('img');
       imagePreview.className = 'badge-lib-upload-preview';
@@ -2274,7 +2442,8 @@ export function renderSlidesMaster(){
 
       const fields = document.createElement('div');
       fields.className = 'badge-lib-fields';
-      fields.appendChild(makeField('Emoji', iconInput));
+      fields.appendChild(makeField('Badge-Text', labelInput));
+      fields.appendChild(makeField('Emoji', emojiSelect));
       fields.appendChild(makeField('Bild', imageWrap));
 
       actions.appendChild(removeBtn);
@@ -2283,9 +2452,9 @@ export function renderSlidesMaster(){
       editWrap.appendChild(actions);
 
       const updatePreview = () => {
-        const iconValue = iconInput.value.trim();
+        const iconValue = (emojiSelect.value || '').trim();
         const imageValue = (badge.imageUrl || '').trim();
-        const labelValue = (badge.label || '').trim();
+        const labelValue = labelInput.value.trim();
         chipLabel.textContent = labelValue || badge.id;
         chipIcon.textContent = iconValue;
         chipIcon.hidden = !!imageValue || !iconValue;
@@ -2307,10 +2476,17 @@ export function renderSlidesMaster(){
         uploadBtn.textContent = imageValue ? 'Bild ersetzen' : 'Bild wählen';
       };
 
-      iconInput.addEventListener('input', updatePreview);
-      iconInput.addEventListener('change', () => {
-        badge.icon = iconInput.value.trim();
-        iconInput.value = badge.icon;
+      emojiSelect.addEventListener('input', updatePreview);
+      emojiSelect.addEventListener('change', () => {
+        badge.icon = emojiSelect.value.trim();
+        updatePreview();
+        notifyChange();
+      });
+
+      labelInput.addEventListener('input', updatePreview);
+      labelInput.addEventListener('change', () => {
+        badge.label = labelInput.value.trim();
+        labelInput.value = badge.label;
         updatePreview();
         notifyChange();
       });

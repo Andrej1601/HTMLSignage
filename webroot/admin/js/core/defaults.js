@@ -58,7 +58,10 @@ const DEFAULT_STYLE_SETS = {
     },
     slides:{
       infobadgeColor:'#5C3101',
-      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY))
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+      badgeScale:1,
+      badgeDescriptionScale:1,
+      customBadgeEmojis:[]
     }
   },
   fresh:{
@@ -91,7 +94,10 @@ const DEFAULT_STYLE_SETS = {
     },
     slides:{
       infobadgeColor:'#4EA8DE',
-      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY))
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+      badgeScale:1,
+      badgeDescriptionScale:1,
+      customBadgeEmojis:[]
     }
   }
 };
@@ -109,6 +115,9 @@ export const DEFAULTS = {
     tileOverlayStrength:1,
     infobadgeColor:'#5C3101',
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+    badgeScale:1,
+    badgeDescriptionScale:1,
+    customBadgeEmojis:[],
     heroEnabled:false,
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,

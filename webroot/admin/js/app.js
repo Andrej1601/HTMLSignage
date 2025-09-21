@@ -905,6 +905,8 @@ function renderSlidesBox(){
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
+  setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
+  setV('#badgeDescriptionScale', settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1);
   const overlayCheckbox = document.getElementById('tileOverlayEnabled');
   const overlayInput = document.getElementById('tileOverlayStrength');
   const overlayEnabled = (settings.slides?.tileOverlayEnabled !== false);
@@ -994,6 +996,8 @@ function renderSlidesBox(){
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
+    setV('#badgeScale',    DEFAULTS.slides.badgeScale);
+    setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
     setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
@@ -1309,6 +1313,16 @@ function collectSettings(){
           if (!Number.isFinite(raw)) return settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1;
           return clamp(0.5, raw, 2);
         })(),
+        badgeScale:(() => {
+          const raw = Number($('#badgeScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1;
+          return clamp(0.3, raw, 3);
+        })(),
+        badgeDescriptionScale:(() => {
+          const raw = Number($('#badgeDescriptionScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1;
+          return clamp(0.3, raw, 3);
+        })(),
         infobadgeColor:(() => {
           const el = document.getElementById('badgeColor');
           const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
@@ -1326,6 +1340,19 @@ function collectSettings(){
           const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
           (settings.slides ||= {}).badgeLibrary = sanitized;
           return sanitized;
+        })(),
+        customBadgeEmojis:(() => {
+          const list = Array.isArray(settings.slides?.customBadgeEmojis)
+            ? settings.slides.customBadgeEmojis
+            : [];
+          const out = [];
+          list.forEach(entry => {
+            if (typeof entry !== 'string') return;
+            const value = entry.trim();
+            if (!value || out.includes(value)) return;
+            out.push(value);
+          });
+          return out;
         })(),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
