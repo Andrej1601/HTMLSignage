@@ -80,8 +80,8 @@
 
     <aside class="rightbar">
       <div class="rightbar-columns">
-<!-- Slides – Masterbox -->
-<details class="ac full" open id="slidesMaster">
+        <!-- Slides – Masterbox -->
+        <details class="ac full" open id="slidesMaster">
   <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
     <div class="actions">
@@ -89,7 +89,7 @@
     </div>
   </summary>
   <div class="content">
-    <div class="settings-stack">
+    <div class="settings-grid two-col slides-master-top">
       <div class="settings-card" id="slidesFlowCard">
         <div class="settings-card-head">
           <div class="settings-card-title">Ablauf &amp; Zeitsteuerung</div>
@@ -170,8 +170,9 @@
       </div>
     </div>
 
-    <!-- Unterbox 1: Saunen & Übersicht -->
-    <details class="ac sub" open id="boxSaunas">
+    <div class="slides-master-columns">
+      <!-- Unterbox 1: Saunen & Übersicht -->
+      <details class="ac sub span-2" open id="boxSaunas">
       <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
  <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
 </summary>      
@@ -210,7 +211,7 @@
     </details>
 
     <!-- Unterbox 2: Fußnoten & Badges -->
-    <details class="ac sub" id="boxFootnotes">
+      <details class="ac sub" id="boxFootnotes">
   <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Fußnoten &amp; Badges</div>
     <div class="actions"><button class="btn sm" id="fnAdd">Fußnote hinzufügen</button></div>
@@ -252,10 +253,10 @@
       </div>
     </div>
   </div>
-</details>
+        </details>
 
     <!-- Unterbox 4: Story-Slides -->
-    <details class="ac sub" id="boxStories">
+      <details class="ac sub" id="boxStories">
       <summary>
         <div class="ttl">▶<span class="chev">⮞</span> Informationen</div>
         <div class="actions"><button class="btn sm" id="btnStoryAdd">Information hinzufügen</button></div>
@@ -270,7 +271,7 @@
     </details>
 
     <!-- Unterbox 4: Medien-Slides -->
-    <details class="ac sub" id="boxImages">
+      <details class="ac sub span-2" id="boxImages">
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
     <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button><button class="btn sm" id="btnSortSlides">Slides sortieren</button></div>
@@ -288,12 +289,13 @@
   </div>
     <div id="interList2"></div>
   </div>
-</details>
+      </details>
+    </div>
 
   </div>
 </details>
 
- <details class="ac full" id="boxSlidesText">
+        <details class="ac full" id="boxSlidesText">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
@@ -521,7 +523,7 @@
         </div>
 </details>
 
-      <details class="ac full">
+        <details class="ac">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
@@ -529,7 +531,7 @@
         <div class="content color-cols" id="colorList"></div>
       </details>
 
-      <details class="ac">
+        <details class="ac">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> System</div>
         </summary>
