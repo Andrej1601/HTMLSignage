@@ -1349,6 +1349,7 @@ function storyEditor(story, idx){
 
   const sectionsHelp = document.createElement('div');
   sectionsHelp.className = 'help';
+
   sectionsHelp.textContent = 'Füge Abschnitte mit Bild und Text hinzu. Bilder können links oder rechts neben dem Text stehen. Im zweispaltigen Layout weist du jede Info einer Bildschirmseite zu. Je mehr Abschnitte hinterlegt sind, desto kleiner werden Bilder und Abstände automatisch.';
   wrap.appendChild(sectionsHelp);
 
@@ -1359,7 +1360,6 @@ function storyEditor(story, idx){
   const sectionsList = document.createElement('div');
   sectionsList.className = 'story-section-list';
   sectionsEditor.appendChild(sectionsList);
-
   const renderSections = () => {
     sectionsList.innerHTML = '';
     const sections = Array.isArray(story.sections) ? story.sections : [];
@@ -1449,7 +1449,6 @@ function storyEditor(story, idx){
       const mediaBtns = document.createElement('div');
       mediaBtns.className = 'row';
       mediaBtns.style.gap = '6px';
-
       const uploadBtn = document.createElement('button');
       uploadBtn.type = 'button';
       uploadBtn.className = 'btn sm ghost';
@@ -1587,7 +1586,6 @@ function storyEditor(story, idx){
       bodyWrap.appendChild(bodyLabel);
       bodyWrap.appendChild(bodyArea);
       card.appendChild(bodyWrap);
-
       sectionsList.appendChild(card);
     });
   };
