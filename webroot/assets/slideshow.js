@@ -374,6 +374,7 @@ async function loadDeviceResolved(id){
     });
     document.body.dataset.chipOverflow = fonts.chipOverflowMode || 'scale';
 
+
     ensureFontFamily();
   }
 
