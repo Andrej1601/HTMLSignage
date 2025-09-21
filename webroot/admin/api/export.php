@@ -7,6 +7,28 @@ function get_flag(string $name, int $default=1): int {
   return in_array($v, ['1','true','yes','on'], true) ? 1 : 0;
 }
 
+function gather_asset_paths($source): array {
+  $paths = [];
+  $stack = [$source];
+  while (!empty($stack)) {
+    $current = array_pop($stack);
+    if (is_array($current)) {
+      foreach ($current as $value) {
+        $stack[] = $value;
+      }
+      continue;
+    }
+    if (!is_string($current)) continue;
+    if (strpos($current, '/assets/') === false) continue;
+    if (preg_match_all('~(/assets/[A-Za-z0-9_./\-]+)~', $current, $matches)) {
+      foreach ($matches[1] as $rel) {
+        $paths[$rel] = true;
+      }
+    }
+  }
+  return array_keys($paths);
+}
+
 $settingsFile = '/var/www/signage/data/settings.json';
 $scheduleFile = '/var/www/signage/data/schedule.json';
 if (!is_file($settingsFile) || !is_file($scheduleFile)) {
@@ -29,32 +51,32 @@ $out = [
 if ($incSettings) $out['settings'] = $settings;
 if ($incSchedule) $out['schedule'] = $schedule;
 
-if ($include && $incSettings) {
-  $paths = [];
-  if (!empty($settings['assets']['flameImage'])) $paths[] = $settings['assets']['flameImage'];
-  if (!empty($settings['assets']['rightImages']) && is_array($settings['assets']['rightImages'])) {
-    foreach ($settings['assets']['rightImages'] as $p) if ($p) $paths[] = $p;
-  }
-  if (!empty($settings['interstitials']) && is_array($settings['interstitials'])) {
-    foreach ($settings['interstitials'] as $it) {
-      if (!is_array($it)) continue;
-      foreach ($it as $v) {
-        if (is_string($v) && str_starts_with($v, '/assets/')) $paths[] = $v;
-      }
+if ($include) {
+  $pathSet = [];
+  if ($incSettings && is_array($settings)) {
+    foreach (gather_asset_paths($settings) as $rel) {
+      $pathSet[$rel] = true;
     }
   }
-  $paths = array_values(array_unique(array_filter($paths, fn($p)=>is_string($p) && str_starts_with($p,'/assets/'))));
-  $blobs = [];
-  $base = '/var/www/signage';
-  $fi = new finfo(FILEINFO_MIME_TYPE);
-  foreach ($paths as $rel) {
-    $abs = $base . $rel;
-    if (!is_file($abs)) continue;
-    $mime = $fi->file($abs) ?: 'application/octet-stream';
-    $b64  = base64_encode(file_get_contents($abs));
-    $blobs[$rel] = ['mime'=>$mime, 'b64'=>$b64, 'name'=>basename($abs), 'rel'=>$rel];
+  if ($incSchedule && is_array($schedule)) {
+    foreach (gather_asset_paths($schedule) as $rel) {
+      $pathSet[$rel] = true;
+    }
   }
-  $out['blobs'] = $blobs;
+  if (!empty($pathSet)) {
+    $blobs = [];
+    $base = '/var/www/signage';
+    $fi = new finfo(FILEINFO_MIME_TYPE);
+    foreach (array_keys($pathSet) as $rel) {
+      if (!is_string($rel) || !str_starts_with($rel, '/assets/')) continue;
+      $abs = $base . $rel;
+      if (!is_file($abs)) continue;
+      $mime = $fi->file($abs) ?: 'application/octet-stream';
+      $b64  = base64_encode(file_get_contents($abs));
+      $blobs[$rel] = ['mime'=>$mime, 'b64'=>$b64, 'name'=>basename($abs), 'rel'=>$rel];
+    }
+    if (!empty($blobs)) $out['blobs'] = $blobs;
+  }
 }
 
 $name = isset($_GET['name']) ? preg_replace('/[^A-Za-z0-9_.-]/','_', $_GET['name']) : ('signage_export_'.date('Ymd'));
