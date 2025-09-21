@@ -905,6 +905,7 @@ function renderSlidesBox(){
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
+  setV('#tilePaddingScale', settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75);
   setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
   setV('#badgeDescriptionScale', settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1);
   const overlayCheckbox = document.getElementById('tileOverlayEnabled');
@@ -996,6 +997,7 @@ function renderSlidesBox(){
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
+    setV('#tilePaddingScale', DEFAULTS.slides.tilePaddingScale);
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
     setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
@@ -1312,6 +1314,11 @@ function collectSettings(){
           const raw = Number($('#tileHeightScale')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1;
           return clamp(0.5, raw, 2);
+        })(),
+        tilePaddingScale:(() => {
+          const raw = Number($('#tilePaddingScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75;
+          return clamp(0.25, raw, 1.5);
         })(),
         badgeScale:(() => {
           const raw = Number($('#badgeScale')?.value);
