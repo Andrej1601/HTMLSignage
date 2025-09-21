@@ -2090,6 +2090,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
   function collectListItems(value) {
     const items = [];
+    let hasStripeInSauna = false;
     const push = (entry) => {
       if (entry == null) return;
       if (Array.isArray(entry)) { entry.forEach(push); return; }
@@ -2729,13 +2730,7 @@ function renderStorySlide(story = {}, region = 'left') {
       }
 
       const titleNode = h('div', { class: 'title' });
-      if (it.time) {
-        titleNode.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
-        titleNode.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
-      }
-      const labelNode = h('span', { class: 'label' }, [
-        h('span', { class: 'label-text' }, baseTitle)
-      ]);
+      const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
       if (supNote) {
         labelNode.appendChild(h('span', { class: 'notewrap' }, [supNote]));
@@ -2746,16 +2741,29 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
+      const stripeSource = Array.isArray(badgeRowNode?.__badgeList)
+        ? badgeRowNode.__badgeList
+        : collectUniqueBadges(it.badges);
+      const badgeStripeSource = Array.isArray(stripeSource)
+        ? stripeSource.map(entry => ({ ...entry }))
+        : [];
+      const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
+      const metaColumn = h('div', { class: 'card-meta' });
+      if (it.time) {
+        metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
+        metaColumn.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
+      }
+
       const mainColumn = h('div', { class: 'card-main' });
-      const contentBlock = h('div', { class: 'card-content' }, [mainColumn]);
-      let metaColumn = null;
-      const ensureMetaColumn = () => {
-        if (metaColumn) return metaColumn;
-        metaColumn = h('div', { class: 'card-meta' });
-        contentBlock.insertBefore(metaColumn, mainColumn);
-        contentBlock.classList.add('card-content--with-meta');
-        return metaColumn;
-      };
+      const contentChildren = [];
+      let hasMetaColumn = false;
+      if (metaColumn.childNodes.length) {
+        contentChildren.push(metaColumn);
+        hasMetaColumn = true;
+      }
+      contentChildren.push(mainColumn);
+      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
+      if (hasMetaColumn) contentBlock.classList.add('card-content--with-meta');
 
       const componentDefs = [
         { key: 'title', node: titleNode, target: 'main' },
@@ -2769,15 +2777,74 @@ function renderStorySlide(story = {}, region = 'left') {
         componentDefs,
         (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'),
         (node, def) => {
-          if (def && def.target === 'meta') {
-            ensureMetaColumn().appendChild(node);
-          } else {
-            mainColumn.appendChild(node);
-          }
+          const target = (def && def.target === 'meta') ? metaColumn : mainColumn;
+          target.appendChild(node);
         }
       );
 
       const tileChildren = [];
+      let stripeNode = null;
+      if (hasAnyBadgeImage && badgeStripeSource.length) {
+        const allowStripeFallback = iconsEnabled;
+        const iconUrl = allowStripeFallback ? (it.icon || defaultIconForSauna || legacyIconFallback || '') : '';
+        const fallbackLabel = (() => {
+          if (!allowStripeFallback) return '';
+          if (typeof name === 'string') {
+            const trimmed = name.trim();
+            if (trimmed.length >= 2) return trimmed.slice(0, 2);
+            if (trimmed.length === 1) return trimmed;
+          }
+          return allowStripeFallback ? '?' : '';
+        })();
+        stripeNode = (() => {
+          const stripe = h('div', { class: 'tile-badge-stripe' });
+          const inner = h('div', { class: 'tile-badge-stripe__inner' });
+          badgeStripeSource.forEach((badge, idx) => {
+            const segment = h('div', { class: 'tile-badge-stripe__segment' });
+            segment.style.setProperty('--segment-index', String(idx));
+            segment.style.setProperty('--segment-count', String(badgeStripeSource.length));
+            if (badge.imageUrl) {
+              const img = h('img', { class: 'tile-badge-stripe__img', src: badge.imageUrl, alt: '' });
+              img.addEventListener('load', () => segment.classList.remove('is-fallback'));
+              img.addEventListener('error', () => segment.classList.add('is-fallback'));
+              segment.appendChild(img);
+            } else {
+              segment.classList.add('is-fallback');
+            }
+            const fallback = (() => {
+              if (!allowStripeFallback) return null;
+              const box = h('div', { class: 'tile-badge-stripe__fallback' });
+              let hasContent = false;
+              if (iconUrl) {
+                const fbImg = h('img', { class: 'tile-badge-stripe__fallback-img', src: iconUrl, alt: '' });
+                fbImg.addEventListener('error', () => {
+                  fbImg.remove();
+                  if (!hasContent && fallbackLabel) {
+                    box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
+                  }
+                });
+                box.appendChild(fbImg);
+                hasContent = true;
+              }
+              if (!hasContent && fallbackLabel) {
+                box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
+                hasContent = true;
+              }
+              return hasContent ? box : null;
+            })();
+            if (fallback) segment.appendChild(fallback);
+            inner.appendChild(segment);
+          });
+          stripe.appendChild(inner);
+          return stripe;
+        })();
+        if (stripeNode) hasStripeInSauna = true;
+      }
+      if (!stripeNode) {
+        if (!tileClasses.includes('tile--compact')) tileClasses.push('tile--compact');
+      } else {
+        tileChildren.push(stripeNode);
+      }
       tileChildren.push(contentBlock);
       tileChildren.push(flamesWrap(it.flames));
 
@@ -2794,6 +2861,8 @@ function renderStorySlide(story = {}, region = 'left') {
 
     body.appendChild(list);
     c.appendChild(body);
+
+    c.classList.toggle('has-badge-stripe', hasStripeInSauna);
 
     const footNodes = [];
     const order = (settings?.footnotes || []).map(fn => fn.id);
@@ -2822,7 +2891,7 @@ function renderStorySlide(story = {}, region = 'left') {
     };
 
     const recalc = () => {
-      applyTileSizing(c, { useIcons: iconsEnabled });
+      applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
       if (pager) pager.scheduleUpdate({ container: c, body, region, saunaName: name });
     };
     setTimeout(recalc, 0);
