@@ -1016,6 +1016,124 @@ function renderInterstitialsPanel(hostId='interList2'){
 // ============================================================================
 
 const FALLBACK_HERO = '/assets/img/thumb_fallback.svg';
+
+function storyEnsureSectionId() {
+  return 'story_sec_' + Math.random().toString(36).slice(2, 9);
+}
+
+function normalizeStoryBuilderSection(section = {}, { defaultPosition = 'left', defaultColumn = 'left' } = {}) {
+  const src = (section && typeof section === 'object') ? section : {};
+  let id = src.id != null ? String(src.id) : '';
+  if (!id) id = storyEnsureSectionId();
+
+  const headingRaw = typeof src.heading === 'string'
+    ? src.heading
+    : (typeof src.title === 'string' ? src.title : '');
+  const bodyRaw = typeof src.body === 'string'
+    ? src.body
+    : (typeof src.text === 'string' ? src.text : '');
+
+  let imageUrl = '';
+  if (typeof src.imageUrl === 'string') imageUrl = src.imageUrl;
+  else if (typeof src.url === 'string') imageUrl = src.url;
+  else if (typeof src.mediaUrl === 'string') imageUrl = src.mediaUrl;
+  else if (src.image && typeof src.image === 'string') imageUrl = src.image;
+  else if (src.image && typeof src.image.url === 'string') imageUrl = src.image.url;
+  else if (src.media && typeof src.media.url === 'string') imageUrl = src.media.url;
+
+  let imageAlt = '';
+  if (typeof src.imageAlt === 'string') imageAlt = src.imageAlt;
+  else if (typeof src.alt === 'string') imageAlt = src.alt;
+  else if (src.image && typeof src.image.alt === 'string') imageAlt = src.image.alt;
+  else if (src.media && typeof src.media.alt === 'string') imageAlt = src.media.alt;
+
+  let mediaPosition = '';
+  if (typeof src.mediaPosition === 'string') mediaPosition = src.mediaPosition;
+  else if (typeof src.imagePosition === 'string') mediaPosition = src.imagePosition;
+  else if (typeof src.layout === 'string') mediaPosition = src.layout;
+  else if (typeof src.position === 'string') mediaPosition = src.position;
+  mediaPosition = String(mediaPosition || '').trim().toLowerCase();
+  if (['right', 'end', 'media-right'].includes(mediaPosition)) mediaPosition = 'right';
+  else if (!mediaPosition && defaultPosition === 'right') mediaPosition = 'right';
+  else mediaPosition = 'left';
+
+  let column = '';
+  if (typeof src.column === 'string') column = src.column;
+  else if (typeof src.side === 'string') column = src.side;
+  column = String(column || '').trim().toLowerCase();
+  if (column === 'right') column = 'right';
+  else if (defaultColumn === 'right') column = 'right';
+  else column = 'left';
+
+  return {
+    id,
+    heading: String(headingRaw || '').trim(),
+    body: String(bodyRaw || '').trim(),
+    imageUrl: String(imageUrl || '').trim(),
+    imageAlt: String(imageAlt || '').trim(),
+    mediaPosition,
+    column
+  };
+}
+
+function storySectionToCard(section) {
+  const card = {
+    type: 'card',
+    id: section.id,
+    heading: section.heading,
+    text: section.body,
+    mediaPosition: section.mediaPosition === 'right' ? 'right' : 'left',
+    className: 'story-card--info'
+  };
+  if (section.imageUrl) {
+    card.image = { url: section.imageUrl, alt: section.imageAlt };
+  }
+  return card;
+}
+
+function syncStoryBuilderStructure(story) {
+  if (!story || typeof story !== 'object') return;
+  const rawSections = Array.isArray(story.sections) ? story.sections : [];
+  const sections = rawSections.map(entry => normalizeStoryBuilderSection(entry));
+  story.sections = sections;
+
+  let layout = typeof story.layout === 'string' ? story.layout.trim().toLowerCase() : '';
+  layout = (layout === 'double') ? 'double' : 'single';
+  story.layout = layout;
+
+  const cards = sections.map(storySectionToCard);
+  if (layout === 'double') {
+    const leftCards = [];
+    const rightCards = [];
+    cards.forEach((card, idx) => {
+      const section = sections[idx];
+      if (section && section.column === 'right') rightCards.push(card);
+      else leftCards.push(card);
+    });
+    story.columns = [
+      { role: 'left', sections: leftCards },
+      { role: 'right', sections: rightCards }
+    ];
+  } else {
+    story.columns = cards.length ? [{ sections: cards }] : [];
+  }
+
+  const primary = sections.find(section => section.imageUrl);
+  story.heroUrl = primary ? primary.imageUrl : '';
+  story.heroAlt = primary ? (primary.imageAlt || sectionHeadingFallback(primary)) : '';
+  story.title = story.heading || story.title || '';
+
+  function sectionHeadingFallback(section) {
+    return section.heading || section.body || '';
+  }
+}
+
+function createStorySectionDefaults(position = 'left', column = 'left') {
+  return normalizeStoryBuilderSection({ id: storyEnsureSectionId(), mediaPosition: position, column }, {
+    defaultPosition: position,
+    defaultColumn: column
+  });
+}
 const stripCacheSimple = (u = '') => u.split('?')[0];
 
 function ensureStorySlides(settings){
@@ -1030,127 +1148,70 @@ function ensureStorySlides(settings){
     }
     if (!Array.isArray(story.saunas)) story.saunas = [];
     story.enabled = (story.enabled === false) ? false : true;
-    story.heroUrl = typeof story.heroUrl === 'string' ? story.heroUrl : '';
-    story.heroAlt = typeof story.heroAlt === 'string' ? story.heroAlt : '';
-    story.intro = typeof story.intro === 'string' ? story.intro : '';
-    story.ritual = typeof story.ritual === 'string' ? story.ritual : '';
-    story.tips = typeof story.tips === 'string' ? story.tips : '';
 
-    const ensureSectionId = () => 'story_sec_' + Math.random().toString(36).slice(2, 9);
-    const normalizeSection = (section = {}, { defaultFullImage = false } = {}) => {
-      if (section && typeof section === 'string') {
-        return {
-          id: ensureSectionId(),
-          heading: '',
-          body: String(section || '').trim(),
-          imageUrl: '',
-          imageAlt: '',
-          fullImage: !!defaultFullImage
-        };
-      }
-      const src = (section && typeof section === 'object') ? section : {};
-      let id = src.id != null ? String(src.id) : '';
-      if (!id) id = ensureSectionId();
-      const heading = typeof src.heading === 'string'
-        ? src.heading
-        : (typeof src.title === 'string' ? src.title : '');
-      const body = typeof src.body === 'string'
-        ? src.body
-        : (typeof src.text === 'string' ? src.text : '');
-      let imageUrl = typeof src.imageUrl === 'string'
-        ? src.imageUrl
-        : (typeof src.url === 'string' ? src.url
-          : (typeof src.mediaUrl === 'string' ? src.mediaUrl : ''));
-      if (!imageUrl && src.image && typeof src.image === 'string') {
-        imageUrl = src.image;
-      } else if (!imageUrl && src.image && typeof src.image.url === 'string') {
-        imageUrl = src.image.url;
-      }
-      let imageAlt = typeof src.imageAlt === 'string'
-        ? src.imageAlt
-        : (typeof src.alt === 'string' ? src.alt : '');
-      if (!imageAlt && src.image && typeof src.image.alt === 'string') {
-        imageAlt = src.image.alt;
-      }
-      const fullImage = src.fullImage === true
-        || src.full === true
-        || src.onlyImage === true
-        || src.layout === 'full'
-        || (!!defaultFullImage && src.fullImage !== false);
-      return {
-        id,
-        heading: String(heading || '').trim(),
-        body: String(body || '').trim(),
-        imageUrl: String(imageUrl || '').trim(),
-        imageAlt: String(imageAlt || '').trim(),
-        fullImage: !!fullImage
-      };
+    const normalizedSections = [];
+    const pushNormalized = (section, options = {}) => {
+      const normalized = normalizeStoryBuilderSection(section, options);
+      normalizedSections.push(normalized);
     };
 
-    const columnsSrc = (story.columns && typeof story.columns === 'object') ? story.columns : {};
-    let left = Array.isArray(columnsSrc.left) ? columnsSrc.left.map(entry => normalizeSection(entry)) : [];
-    let right = Array.isArray(columnsSrc.right) ? columnsSrc.right.map(entry => normalizeSection(entry)) : [];
-
-    if (!left.length) {
-      const legacySections = Array.isArray(story.sections) ? story.sections : [];
-      left = legacySections.map(entry => normalizeSection({ ...entry }));
+    if (Array.isArray(story.sections) && story.sections.length) {
+      story.sections.forEach(section => pushNormalized(section));
     }
 
-    if (!right.length) {
-      const legacyGallery = Array.isArray(story.gallery) ? story.gallery : [];
-      right = legacyGallery
-        .map(entry => {
-          if (!entry) return null;
-          if (typeof entry === 'string') {
-            return normalizeSection({ imageUrl: entry }, { defaultFullImage: true });
-          }
-          const imageUrl = entry.url ?? entry.imageUrl ?? '';
-          const imageAlt = entry.alt ?? entry.imageAlt ?? '';
-          const heading = entry.caption ?? entry.title ?? '';
-          return normalizeSection({
-            id: entry.id,
-            heading,
-            body: '',
-            imageUrl,
-            imageAlt,
-            fullImage: true
-          }, { defaultFullImage: true });
-        })
-        .filter(Boolean);
+    if (!normalizedSections.length) {
+      const columnsSrc = (story.columns && typeof story.columns === 'object') ? story.columns : {};
+      if (Array.isArray(columnsSrc.left)) {
+        columnsSrc.left.forEach(entry => pushNormalized(entry, { defaultPosition: 'left', defaultColumn: 'left' }));
+      }
+      if (Array.isArray(columnsSrc.right)) {
+        columnsSrc.right.forEach(entry => pushNormalized(entry, { defaultPosition: 'right', defaultColumn: 'right' }));
+      }
     }
 
-    story.columns = {
-      left,
-      right
-    };
+    if (!normalizedSections.length && Array.isArray(story.gallery)) {
+      story.gallery.forEach(entry => {
+        if (!entry) return;
+        if (typeof entry === 'string') {
+          pushNormalized({ imageUrl: entry, mediaPosition: 'right' }, { defaultPosition: 'right', defaultColumn: 'right' });
+          return;
+        }
+        const imageUrl = entry.url ?? entry.imageUrl ?? '';
+        if (!imageUrl) return;
+        pushNormalized({
+          id: entry.id,
+          heading: entry.caption ?? entry.title ?? '',
+          body: '',
+          imageUrl,
+          imageAlt: entry.alt ?? entry.imageAlt ?? '',
+          mediaPosition: 'right'
+        }, { defaultPosition: 'right', defaultColumn: 'right' });
+      });
+    }
 
-    const layoutRaw = typeof story.layout === 'string' ? story.layout : '';
-    let layout = (layoutRaw === 'double') ? 'double' : 'single';
-    if (layout !== 'double' && right.length) layout = 'double';
-    story.layout = layout;
+    if (!normalizedSections.length) {
+      const fallbackText = typeof story.body === 'string'
+        ? story.body
+        : (typeof story.text === 'string' ? story.text : '');
+      const fallbackImage = typeof story.heroUrl === 'string' ? story.heroUrl : '';
+      const fallbackAlt = typeof story.heroAlt === 'string' ? story.heroAlt : '';
+      if (fallbackText || fallbackImage) {
+        pushNormalized({
+          heading: story.heading || story.title || '',
+          body: fallbackText,
+          imageUrl: fallbackImage,
+          imageAlt: fallbackAlt
+        }, { defaultColumn: 'left' });
+      }
+    }
 
     story.heading = typeof story.heading === 'string' ? story.heading.trim() : '';
     const legacyTitle = typeof story.title === 'string' ? story.title.trim() : '';
     if (!story.heading && legacyTitle) story.heading = legacyTitle;
     story.title = story.heading || legacyTitle;
 
-    story.sections = left.map(section => ({
-      id: section.id,
-      title: section.heading,
-      text: section.body,
-      imageUrl: section.imageUrl,
-      imageAlt: section.imageAlt,
-      imageCaption: section.fullImage ? section.heading || '' : ''
-    }));
-
-    story.gallery = right
-      .filter(section => section.imageUrl)
-      .map(section => ({
-        id: section.id,
-        url: section.imageUrl,
-        alt: section.imageAlt,
-        caption: section.heading || section.body || ''
-      }));
+    story.sections = normalizedSections;
+    syncStoryBuilderStructure(story);
   });
   settings.slides.storySlides = list;
   return settings.slides.storySlides;
@@ -1162,7 +1223,7 @@ function storyDefaults(){
     heading: '',
     title: '',
     layout: 'single',
-    columns: { left: [], right: [] },
+    columns: [],
     heroUrl: '',
     heroAlt: '',
     saunas: [],
@@ -1178,6 +1239,12 @@ function storyDefaults(){
 
 function storyEditor(story, idx){
   const settings = ctx.getSettings();
+  syncStoryBuilderStructure(story);
+  const commitStoryChange = () => {
+    syncStoryBuilderStructure(story);
+    renderSlidesMaster();
+  };
+
   const wrap = document.createElement('div');
   wrap.className = 'story-editor fieldset';
 
@@ -1202,7 +1269,7 @@ function storyEditor(story, idx){
     const value = headingInput.value.trim();
     story.heading = value;
     story.title = value;
-    renderSlidesMaster();
+    commitStoryChange();
   };
   header.appendChild(headingInput);
 
@@ -1226,7 +1293,17 @@ function storyEditor(story, idx){
     btn.onclick = () => {
       if (story.layout === option.value) return;
       story.layout = option.value;
-      renderSlidesMaster();
+      if (story.layout === 'double') {
+        const base = Array.isArray(story.sections) ? story.sections : [];
+        const hasRight = base.some(section => section && section.column === 'right');
+        if (!hasRight) {
+          base.forEach((section, idx) => {
+            if (!section) return;
+            section.column = idx % 2 === 0 ? 'left' : 'right';
+          });
+        }
+      }
+      commitStoryChange();
     };
     layoutWrap.appendChild(btn);
   });
@@ -1265,410 +1342,278 @@ function storyEditor(story, idx){
 
   wrap.appendChild(header);
 
-  const heroSection = document.createElement('div');
-  heroSection.className = 'story-hero-editor';
-  heroSection.style.display = 'grid';
-  heroSection.style.gap = '8px';
+  const sectionsHeader = document.createElement('div');
+  sectionsHeader.className = 'subh';
+  sectionsHeader.textContent = 'Abschnitte';
+  wrap.appendChild(sectionsHeader);
 
-  const heroRow = document.createElement('div');
-  heroRow.className = 'row';
-  heroRow.style.gap = '12px';
-  heroRow.style.flexWrap = 'wrap';
-  heroRow.style.alignItems = 'center';
+  const sectionsHelp = document.createElement('div');
+  sectionsHelp.className = 'help';
+  sectionsHelp.textContent = 'Füge Abschnitte mit Bild und Text hinzu. Bilder können links oder rechts neben dem Text stehen. Im zweispaltigen Layout weist du jede Info einer Bildschirmseite zu. Je mehr Abschnitte hinterlegt sind, desto kleiner werden Bilder und Abstände automatisch.';
+  wrap.appendChild(sectionsHelp);
 
-  const heroPreview = document.createElement('img');
-  heroPreview.className = 'story-hero-preview';
-  heroPreview.style.maxWidth = '160px';
-  heroPreview.style.height = '100px';
-  heroPreview.style.objectFit = 'cover';
-  heroPreview.style.borderRadius = '8px';
-  heroPreview.alt = story.heroAlt || '';
+  const sectionsEditor = document.createElement('div');
+  sectionsEditor.className = 'story-sections-editor';
+  wrap.appendChild(sectionsEditor);
 
-  const updateHeroPreview = () => {
-    if (story.heroUrl) {
-      heroPreview.src = story.heroUrl;
-      heroPreview.title = stripCacheSimple(story.heroUrl);
-    } else {
-      heroPreview.src = FALLBACK_HERO;
-      heroPreview.title = 'Kein Bild ausgewählt';
+  const sectionsList = document.createElement('div');
+  sectionsList.className = 'story-section-list';
+  sectionsEditor.appendChild(sectionsList);
+
+  const renderSections = () => {
+    sectionsList.innerHTML = '';
+    const sections = Array.isArray(story.sections) ? story.sections : [];
+    if (!sections.length) {
+      const empty = document.createElement('div');
+      empty.className = 'story-column-empty';
+      empty.textContent = 'Noch keine Abschnitte angelegt.';
+      sectionsList.appendChild(empty);
+      return;
     }
-  };
 
-  const heroBtnWrap = document.createElement('div');
-  heroBtnWrap.className = 'row';
-  heroBtnWrap.style.gap = '6px';
+    sections.forEach((section, sectionIdx) => {
+      const card = document.createElement('div');
+      card.className = 'story-section-card';
+      const currentColumn = section.column === 'right' ? 'right' : 'left';
+      card.dataset.column = currentColumn;
 
-  const uploadBtn = document.createElement('button');
-  uploadBtn.type = 'button';
-  uploadBtn.className = 'btn sm ghost';
-  uploadBtn.textContent = 'Bild hochladen';
-  uploadBtn.onclick = () => {
-    const fi = document.createElement('input');
-    fi.type = 'file';
-    fi.accept = 'image/*';
-    fi.onchange = () => uploadGeneric(fi, (url) => {
-      const clean = stripCacheSimple(url || '');
-      story.heroUrl = clean
-        ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
-        : '';
-      renderSlidesMaster();
-    });
-    fi.click();
-  };
-  heroBtnWrap.appendChild(uploadBtn);
+      const head = document.createElement('div');
+      head.className = 'row story-section-card-head';
+      head.style.alignItems = 'center';
+      head.style.gap = '6px';
 
-  const removeBtn = document.createElement('button');
-  removeBtn.type = 'button';
-  removeBtn.className = 'btn sm ghost';
-  removeBtn.textContent = 'Bild entfernen';
-  removeBtn.onclick = () => { story.heroUrl = ''; renderSlidesMaster(); };
-  heroBtnWrap.appendChild(removeBtn);
+      const title = document.createElement('strong');
+      title.className = 'story-section-card-title';
+      title.textContent = section.heading?.trim() ? section.heading.trim() : `Abschnitt ${sectionIdx + 1}`;
+      head.appendChild(title);
 
-  heroRow.appendChild(heroPreview);
-  heroRow.appendChild(heroBtnWrap);
-  heroSection.appendChild(heroRow);
+      const controls = document.createElement('div');
+      controls.className = 'row story-section-card-controls';
+      controls.style.gap = '4px';
 
-  const altWrap = document.createElement('div');
-  altWrap.className = 'kv';
-  const altLabel = document.createElement('label');
-  altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
-  const altInput = document.createElement('input');
-  altInput.type = 'text';
-  altInput.className = 'input';
-  altInput.placeholder = 'Optional für Screenreader';
-  altInput.value = story.heroAlt || '';
-  altInput.onchange = () => { story.heroAlt = altInput.value.trim(); renderSlidesMaster(); };
-  altWrap.appendChild(altLabel);
-  altWrap.appendChild(altInput);
-  heroSection.appendChild(altWrap);
-
-  wrap.appendChild(heroSection);
-  updateHeroPreview();
-
-  const saunaWrap = document.createElement('div');
-  saunaWrap.className = 'kv story-sauna-select';
-  const saunaLabel = document.createElement('label');
-  saunaLabel.textContent = 'Zugehörige Saunen';
-  saunaWrap.appendChild(saunaLabel);
-  const saunaList = document.createElement('div');
-  saunaList.className = 'story-sauna-options';
-  saunaList.style.display = 'flex';
-  saunaList.style.flexWrap = 'wrap';
-  saunaList.style.gap = '6px';
-
-  const selected = new Set(Array.isArray(story.saunas) ? story.saunas : []);
-  const saunas = getAllSaunas();
-  if (saunas.length) {
-    saunas.forEach(name => {
-      const option = document.createElement('label');
-      option.className = 'btn sm ghost story-sauna-option';
-      option.style.gap = '4px';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = selected.has(name);
-      cb.onchange = () => {
-        const base = Array.isArray(story.saunas) ? story.saunas.slice() : [];
-        const idxSel = base.indexOf(name);
-        if (cb.checked && idxSel === -1) base.push(name);
-        if (!cb.checked && idxSel !== -1) base.splice(idxSel, 1);
-        story.saunas = base.sort((a, b) => a.localeCompare(b, 'de'));
-        renderSlidesMaster();
+      const makeBtn = (labelTxt, titleTxt) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn sm ghost icon';
+        btn.textContent = labelTxt;
+        btn.title = titleTxt;
+        return btn;
       };
-      option.appendChild(cb);
-      option.appendChild(document.createTextNode(name));
-      saunaList.appendChild(option);
-    });
-  } else {
-    const empty = document.createElement('div');
-    empty.className = 'mut';
-    empty.textContent = 'Noch keine Saunen im Inventar.';
-    saunaList.appendChild(empty);
-  }
-  saunaWrap.appendChild(saunaList);
-  wrap.appendChild(saunaWrap);
 
-  const makeTextarea = (label, prop, rows = 3, placeholder = '') => {
-    const kv = document.createElement('div');
-    kv.className = 'kv';
-    const lbl = document.createElement('label');
-    lbl.textContent = label;
-    const ta = document.createElement('textarea');
-    ta.className = 'input';
-    ta.rows = rows;
-    ta.placeholder = placeholder || label;
-    ta.value = story[prop] || '';
-    ta.onchange = () => { story[prop] = ta.value.trim(); renderSlidesMaster(); };
-    kv.appendChild(lbl);
-    kv.appendChild(ta);
-    return kv;
-  };
-
-  wrap.appendChild(makeTextarea('Einführung', 'intro', 3, 'Hintergrund & Wirkung'));
-  wrap.appendChild(makeTextarea('Ritual', 'ritual', 3, 'Ablauf oder Besonderheiten'));
-  wrap.appendChild(makeTextarea('Tipps (je Zeile ein Tipp)', 'tips', 3, 'Tipps oder Hinweise'));
-
-  const layoutHeader = document.createElement('div');
-  layoutHeader.className = 'subh';
-  layoutHeader.textContent = 'Abschnitte & Spalten';
-  wrap.appendChild(layoutHeader);
-
-  const layoutHelp = document.createElement('div');
-  layoutHelp.className = 'help';
-  layoutHelp.textContent = 'Spalten individuell mit Texten, Bildern und Specials befüllen.';
-  wrap.appendChild(layoutHelp);
-
-  const columnsWrap = document.createElement('div');
-  columnsWrap.className = 'story-columns-editor';
-  wrap.appendChild(columnsWrap);
-
-  const ensureColumns = () => {
-    if (!story.columns || typeof story.columns !== 'object') {
-      story.columns = { left: [], right: [] };
-    }
-    if (!Array.isArray(story.columns.left)) story.columns.left = [];
-    if (!Array.isArray(story.columns.right)) story.columns.right = [];
-    return story.columns;
-  };
-
-  const createSectionDefaults = (_columnKey) => ({
-    id: 'story_sec_' + Math.random().toString(36).slice(2, 9),
-    heading: '',
-    body: '',
-    imageUrl: '',
-    imageAlt: '',
-    fullImage: false
-  });
-
-  const renderColumns = () => {
-    const columns = ensureColumns();
-    columnsWrap.innerHTML = '';
-
-    const makeColumn = (columnKey, labelText) => {
-      const columnWrap = document.createElement('div');
-      columnWrap.className = 'story-column-card';
-      columnWrap.dataset.column = columnKey;
-      const isRight = columnKey === 'right';
-      const isCollapsed = isRight && story.layout !== 'double';
-      columnWrap.classList.toggle('is-collapsed', isCollapsed);
-
-      const headRow = document.createElement('div');
-      headRow.className = 'story-column-head';
-      const title = document.createElement('div');
-      title.className = 'story-column-title';
-      title.textContent = labelText;
-      headRow.appendChild(title);
-
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'btn sm ghost';
-      addBtn.textContent = 'Abschnitt hinzufügen';
-      addBtn.onclick = () => {
-        columns[columnKey].push(createSectionDefaults(columnKey));
-        renderSlidesMaster();
+      const move = (delta) => {
+        const base = Array.isArray(story.sections) ? story.sections : [];
+        const nextIdx = sectionIdx + delta;
+        if (nextIdx < 0 || nextIdx >= base.length) return;
+        const [item] = base.splice(sectionIdx, 1);
+        base.splice(nextIdx, 0, item);
+        commitStoryChange();
       };
-      headRow.appendChild(addBtn);
-      columnWrap.appendChild(headRow);
 
-      if (isCollapsed) {
-        const note = document.createElement('div');
-        note.className = 'story-column-placeholder';
-        const count = columns[columnKey].length;
-        note.textContent = count
-          ? `Im einspaltigen Layout ausgeblendet (${count} Abschnitt${count === 1 ? '' : 'e'} hinterlegt).`
-          : 'Im einspaltigen Layout ausgeblendet. Wechsle zu „Zweispaltig“, um Inhalte hinzuzufügen.';
-        columnWrap.appendChild(note);
-      }
+      const upBtn = makeBtn('↑', 'Nach oben verschieben');
+      upBtn.onclick = () => move(-1);
+      controls.appendChild(upBtn);
 
-      const list = document.createElement('div');
-      list.className = 'story-section-list';
-      columnWrap.appendChild(list);
+      const downBtn = makeBtn('↓', 'Nach unten verschieben');
+      downBtn.onclick = () => move(1);
+      controls.appendChild(downBtn);
 
-      const arr = columns[columnKey];
-      if (!arr.length) {
-        const empty = document.createElement('div');
-        empty.className = 'story-column-empty';
-        empty.textContent = 'Noch keine Abschnitte angelegt.';
-        list.appendChild(empty);
+      const removeBtn = makeBtn('✕', 'Abschnitt entfernen');
+      removeBtn.onclick = () => {
+        const base = Array.isArray(story.sections) ? story.sections : [];
+        base.splice(sectionIdx, 1);
+        commitStoryChange();
+      };
+      controls.appendChild(removeBtn);
+
+      head.appendChild(controls);
+      card.appendChild(head);
+
+      const mediaRow = document.createElement('div');
+      mediaRow.className = 'row story-section-card-media';
+      mediaRow.style.gap = '12px';
+      mediaRow.style.flexWrap = 'wrap';
+      mediaRow.style.alignItems = 'center';
+
+      const preview = document.createElement('img');
+      preview.className = 'story-section-card-preview';
+      preview.alt = section.imageAlt || '';
+      if (section.imageUrl) {
+        preview.src = section.imageUrl;
+        preview.title = stripCacheSimple(section.imageUrl);
       } else {
-        arr.forEach((section, sectionIdx) => {
-          const card = document.createElement('div');
-          card.className = 'story-section-card';
-          card.classList.toggle('is-full-image', section.fullImage);
+        preview.src = FALLBACK_HERO;
+        preview.title = 'Kein Bild ausgewählt';
+      }
+      mediaRow.appendChild(preview);
 
-          const head = document.createElement('div');
-          head.className = 'row story-section-card-head';
-          head.style.alignItems = 'center';
-          head.style.gap = '6px';
+      const mediaBtns = document.createElement('div');
+      mediaBtns.className = 'row';
+      mediaBtns.style.gap = '6px';
 
-          const label = document.createElement('strong');
-          label.className = 'story-section-card-title';
-          label.textContent = section.heading?.trim() ? section.heading.trim() : `Abschnitt ${sectionIdx + 1}`;
-          head.appendChild(label);
-
-          const controls = document.createElement('div');
-          controls.className = 'row story-section-card-controls';
-          controls.style.gap = '4px';
-
-          const move = (delta) => {
-            const base = columns[columnKey];
-            const nextIdx = sectionIdx + delta;
-            if (nextIdx < 0 || nextIdx >= base.length) return;
-            const [item] = base.splice(sectionIdx, 1);
-            base.splice(nextIdx, 0, item);
-            renderSlidesMaster();
-          };
-
-          const makeBtn = (labelTxt, titleTxt) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn sm ghost icon';
-            btn.textContent = labelTxt;
-            btn.title = titleTxt;
-            return btn;
-          };
-
-          const upBtn = makeBtn('↑', 'Nach oben verschieben');
-          upBtn.onclick = () => move(-1);
-          controls.appendChild(upBtn);
-
-          const downBtn = makeBtn('↓', 'Nach unten verschieben');
-          downBtn.onclick = () => move(1);
-          controls.appendChild(downBtn);
-
-          const removeBtn = makeBtn('✕', 'Abschnitt entfernen');
-          removeBtn.onclick = () => {
-            const base = columns[columnKey];
-            base.splice(sectionIdx, 1);
-            renderSlidesMaster();
-          };
-          controls.appendChild(removeBtn);
-
-          head.appendChild(controls);
-          card.appendChild(head);
-
-          const mediaRow = document.createElement('div');
-          mediaRow.className = 'row story-section-card-media';
-          mediaRow.style.gap = '12px';
-          mediaRow.style.flexWrap = 'wrap';
-          mediaRow.style.alignItems = 'center';
-
-          const preview = document.createElement('img');
-          preview.className = 'story-section-card-preview';
-          preview.alt = section.imageAlt || '';
-          if (section.imageUrl) {
-            preview.src = section.imageUrl;
-            preview.title = stripCacheSimple(section.imageUrl);
-          } else {
-            preview.src = FALLBACK_HERO;
-            preview.title = 'Kein Bild ausgewählt';
-          }
-          mediaRow.appendChild(preview);
-
-          const mediaBtns = document.createElement('div');
-          mediaBtns.className = 'row';
-          mediaBtns.style.gap = '6px';
-
-          const uploadBtn = document.createElement('button');
-          uploadBtn.type = 'button';
-          uploadBtn.className = 'btn sm ghost';
-          uploadBtn.textContent = 'Bild hochladen';
-          uploadBtn.onclick = () => {
-            const fi = document.createElement('input');
-            fi.type = 'file';
-            fi.accept = 'image/*';
-            fi.onchange = () => uploadGeneric(fi, (url) => {
-              const clean = stripCacheSimple(url || '');
-              section.imageUrl = clean
-                ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
-                : '';
-              renderSlidesMaster();
-            });
-            fi.click();
-          };
-          mediaBtns.appendChild(uploadBtn);
-
-          const clearBtn = document.createElement('button');
-          clearBtn.type = 'button';
-          clearBtn.className = 'btn sm ghost';
-          clearBtn.textContent = 'Bild entfernen';
-          clearBtn.onclick = () => { section.imageUrl = ''; renderSlidesMaster(); };
-          mediaBtns.appendChild(clearBtn);
-
-          mediaRow.appendChild(mediaBtns);
-          card.appendChild(mediaRow);
-
-          const altWrap = document.createElement('div');
-          altWrap.className = 'kv';
-          const altLabel = document.createElement('label');
-          altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
-          const altInput = document.createElement('input');
-          altInput.type = 'text';
-          altInput.className = 'input';
-          altInput.placeholder = 'Optional für Screenreader';
-          altInput.value = section.imageAlt || '';
-          altInput.onchange = () => { section.imageAlt = altInput.value.trim(); renderSlidesMaster(); };
-          altWrap.appendChild(altLabel);
-          altWrap.appendChild(altInput);
-          card.appendChild(altWrap);
-
-          const headingWrap = document.createElement('div');
-          headingWrap.className = 'kv';
-          const headingLabel = document.createElement('label');
-          headingLabel.textContent = 'Überschrift';
-          const headingField = document.createElement('input');
-          headingField.type = 'text';
-          headingField.className = 'input';
-          headingField.placeholder = columnKey === 'right' ? 'Optionale Überschrift' : 'Abschnittstitel';
-          headingField.value = section.heading || '';
-          headingField.disabled = (columnKey === 'right' && section.fullImage);
-          headingField.onchange = () => { section.heading = headingField.value.trim(); renderSlidesMaster(); };
-          headingWrap.appendChild(headingLabel);
-          headingWrap.appendChild(headingField);
-          card.appendChild(headingWrap);
-
-          const bodyWrap = document.createElement('div');
-          bodyWrap.className = 'kv';
-          const bodyLabel = document.createElement('label');
-          bodyLabel.textContent = 'Text';
-          const bodyArea = document.createElement('textarea');
-          bodyArea.className = 'input';
-          bodyArea.rows = 3;
-          bodyArea.placeholder = 'Inhalt';
-          bodyArea.value = section.body || '';
-          bodyArea.disabled = (columnKey === 'right' && section.fullImage);
-          bodyArea.onchange = () => { section.body = bodyArea.value.trim(); renderSlidesMaster(); };
-          bodyWrap.appendChild(bodyLabel);
-          bodyWrap.appendChild(bodyArea);
-          card.appendChild(bodyWrap);
-
-          if (columnKey === 'right') {
-            const toggleWrap = document.createElement('label');
-            toggleWrap.className = 'story-fullimage-toggle';
-            const toggle = document.createElement('input');
-            toggle.type = 'checkbox';
-            toggle.checked = !!section.fullImage;
-            toggle.onchange = () => {
-              section.fullImage = !!toggle.checked;
-              renderSlidesMaster();
-            };
-            const toggleText = document.createElement('span');
-            toggleText.textContent = 'Nur großes Bild';
-            toggleWrap.appendChild(toggle);
-            toggleWrap.appendChild(toggleText);
-            card.appendChild(toggleWrap);
-          }
-
-          list.appendChild(card);
+      const uploadBtn = document.createElement('button');
+      uploadBtn.type = 'button';
+      uploadBtn.className = 'btn sm ghost';
+      uploadBtn.textContent = 'Bild hochladen';
+      uploadBtn.onclick = () => {
+        const fi = document.createElement('input');
+        fi.type = 'file';
+        fi.accept = 'image/*';
+        fi.onchange = () => uploadGeneric(fi, (url) => {
+          const clean = stripCacheSimple(url || '');
+          section.imageUrl = clean
+            ? clean + (clean.includes('?') ? '&' : '?') + 'v=' + Date.now()
+            : '';
+          commitStoryChange();
         });
+        fi.click();
+      };
+      mediaBtns.appendChild(uploadBtn);
+
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'btn sm ghost';
+      clearBtn.textContent = 'Bild entfernen';
+      clearBtn.onclick = () => { section.imageUrl = ''; commitStoryChange(); };
+      mediaBtns.appendChild(clearBtn);
+
+      mediaRow.appendChild(mediaBtns);
+      card.appendChild(mediaRow);
+
+      const altWrap = document.createElement('div');
+      altWrap.className = 'kv';
+      const altLabel = document.createElement('label');
+      altLabel.textContent = 'Bildbeschreibung (Alt-Text)';
+      const altInput = document.createElement('input');
+      altInput.type = 'text';
+      altInput.className = 'input';
+      altInput.placeholder = 'Optional für Screenreader';
+      altInput.value = section.imageAlt || '';
+      altInput.onchange = () => {
+        section.imageAlt = altInput.value.trim();
+        commitStoryChange();
+      };
+      altWrap.appendChild(altLabel);
+      altWrap.appendChild(altInput);
+      card.appendChild(altWrap);
+
+      const alignWrap = document.createElement('div');
+      alignWrap.className = 'kv story-section-align';
+      const alignLabel = document.createElement('label');
+      alignLabel.textContent = 'Bildposition';
+      const alignBtns = document.createElement('div');
+      alignBtns.className = 'story-align-toggle';
+      const positions = [
+        { value: 'left', label: 'Links vom Text' },
+        { value: 'right', label: 'Rechts vom Text' }
+      ];
+      positions.forEach(option => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn sm ghost';
+        btn.textContent = option.label;
+        const current = section.mediaPosition === 'right' ? 'right' : 'left';
+        if (current === option.value) btn.classList.add('is-active');
+        btn.onclick = () => {
+          if (section.mediaPosition === option.value) return;
+          section.mediaPosition = option.value;
+          commitStoryChange();
+        };
+        alignBtns.appendChild(btn);
+      });
+      alignWrap.appendChild(alignLabel);
+      alignWrap.appendChild(alignBtns);
+      card.appendChild(alignWrap);
+
+      if (story.layout === 'double') {
+        const columnWrap = document.createElement('div');
+        columnWrap.className = 'kv story-section-column';
+        const columnLabel = document.createElement('label');
+        columnLabel.textContent = 'Spalte';
+        const columnBtns = document.createElement('div');
+        columnBtns.className = 'story-column-toggle';
+        const columnOptions = [
+          { value: 'left', label: 'Linke Seite' },
+          { value: 'right', label: 'Rechte Seite' }
+        ];
+        columnOptions.forEach(option => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn sm ghost';
+          btn.textContent = option.label;
+          const isActive = currentColumn === option.value;
+          if (isActive) btn.classList.add('is-active');
+          btn.onclick = () => {
+            if (section.column === option.value) return;
+            section.column = option.value;
+            commitStoryChange();
+          };
+          columnBtns.appendChild(btn);
+        });
+        columnWrap.appendChild(columnLabel);
+        columnWrap.appendChild(columnBtns);
+        card.appendChild(columnWrap);
       }
 
-      return columnWrap;
-    };
+      const headingWrap = document.createElement('div');
+      headingWrap.className = 'kv';
+      const headingLabel = document.createElement('label');
+      headingLabel.textContent = 'Überschrift';
+      const headingField = document.createElement('input');
+      headingField.type = 'text';
+      headingField.className = 'input';
+      headingField.placeholder = 'Abschnittstitel';
+      headingField.value = section.heading || '';
+      headingField.onchange = () => {
+        section.heading = headingField.value.trim();
+        commitStoryChange();
+      };
+      headingWrap.appendChild(headingLabel);
+      headingWrap.appendChild(headingField);
+      card.appendChild(headingWrap);
 
-    columnsWrap.appendChild(makeColumn('left', 'Linke Spalte'));
-    columnsWrap.appendChild(makeColumn('right', 'Rechte Spalte'));
+      const bodyWrap = document.createElement('div');
+      bodyWrap.className = 'kv';
+      const bodyLabel = document.createElement('label');
+      bodyLabel.textContent = 'Text';
+      const bodyArea = document.createElement('textarea');
+      bodyArea.className = 'input';
+      bodyArea.rows = 3;
+      bodyArea.placeholder = 'Inhalt';
+      bodyArea.value = section.body || '';
+      bodyArea.onchange = () => {
+        section.body = bodyArea.value.trim();
+        commitStoryChange();
+      };
+      bodyWrap.appendChild(bodyLabel);
+      bodyWrap.appendChild(bodyArea);
+      card.appendChild(bodyWrap);
+
+      sectionsList.appendChild(card);
+    });
   };
-  renderColumns();
+
+  renderSections();
+
+  const addSectionBtn = document.createElement('button');
+  addSectionBtn.type = 'button';
+  addSectionBtn.className = 'btn ghost';
+  addSectionBtn.textContent = 'Abschnitt hinzufügen';
+  addSectionBtn.onclick = () => {
+    if (!Array.isArray(story.sections)) story.sections = [];
+    const sections = story.sections;
+    const position = sections.length % 2 === 0 ? 'left' : 'right';
+    let column = 'left';
+    if (story.layout === 'double') {
+      const leftCount = sections.filter(entry => entry && entry.column !== 'right').length;
+      const rightCount = sections.filter(entry => entry && entry.column === 'right').length;
+      if (leftCount > rightCount) column = 'right';
+      else if (rightCount > leftCount) column = 'left';
+      else column = position === 'right' ? 'right' : 'left';
+    }
+    sections.push(createStorySectionDefaults(position, column));
+    commitStoryChange();
+  };
+  sectionsEditor.appendChild(addSectionBtn);
 
   const faqHeader = document.createElement('div');
   faqHeader.className = 'subh';
