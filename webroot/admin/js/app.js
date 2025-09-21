@@ -25,6 +25,7 @@ import {
   playlistKeyFromSanitizedEntry,
   sanitizePagePlaylist,
   sanitizeBadgeLibrary,
+  sanitizeBadgeEmojiList,
   normalizeSettings,
   sanitizeScheduleForCompare,
   sanitizeSettingsForCompare
@@ -883,7 +884,19 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
-  setV('#ovTimeWidth',  f.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10);
+  const defaultTimeWidthCh = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
+    ? +DEFAULTS.fonts.overviewTimeWidthCh
+    : 10;
+  const resolvedTimeScale = (() => {
+    const rawScale = Number(f.overviewTimeScale);
+    if (Number.isFinite(rawScale) && rawScale > 0) return Math.min(Math.max(rawScale, 0.4), 3);
+    const legacyWidth = Number(f.overviewTimeWidthCh);
+    if (Number.isFinite(legacyWidth) && legacyWidth > 0 && defaultTimeWidthCh > 0) {
+      return Math.min(Math.max(legacyWidth / defaultTimeWidthCh, 0.4), 3);
+    }
+    return Math.min(Math.max(Number(DEFAULTS.fonts?.overviewTimeScale) || 1, 0.4), 3);
+  })();
+  setV('#ovTimeWidth', Number(resolvedTimeScale.toFixed(2)));
   setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
   const overviewFlamesToggle = document.getElementById('overviewFlames');
   const overviewFlameControls = ['#flamePct', '#flameGap'].map(sel => document.querySelector(sel));
@@ -980,7 +993,7 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
-    setV('#ovTimeWidth',  DEFAULTS.fonts.overviewTimeWidthCh);
+    setV('#ovTimeWidth',  Number((DEFAULTS.fonts.overviewTimeScale ?? 1).toFixed(2)));
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
@@ -1276,10 +1289,19 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
-        overviewTimeWidthCh:(() => {
+        overviewTimeScale:(() => {
           const raw = Number($('#ovTimeWidth')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10;
-          return clamp(6, raw, 24);
+          if (Number.isFinite(raw)) return clamp(0.4, raw, 3);
+          const fallback = Number(settings.fonts?.overviewTimeScale);
+          if (Number.isFinite(fallback)) return clamp(0.4, fallback, 3);
+          const legacyWidth = Number(settings.fonts?.overviewTimeWidthCh);
+          if (Number.isFinite(legacyWidth)) {
+            const base = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
+              ? +DEFAULTS.fonts.overviewTimeWidthCh
+              : 10;
+            if (base > 0) return clamp(0.4, legacyWidth / base, 3);
+          }
+          return clamp(0.4, DEFAULTS.fonts?.overviewTimeScale ?? 1, 3);
         })(),
         chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
@@ -1327,6 +1349,7 @@ function collectSettings(){
           (settings.slides ||= {}).badgeLibrary = sanitized;
           return sanitized;
         })(),
+        customBadgeEmoji: sanitizeBadgeEmojiList(settings.slides?.customBadgeEmoji),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
         const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');

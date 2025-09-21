@@ -1,4 +1,5 @@
 (() => {
+  const OVERVIEW_TIME_BASE_CH = 10;
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
@@ -306,9 +307,15 @@ async function loadDeviceResolved(id){
       const num = Number.isFinite(+value) ? Math.max(0, +value) : fallback;
       return (Number.isFinite(num) ? num : fallback) + 'ms';
     };
-    const overviewTimeWidth = Number.isFinite(+fonts.overviewTimeWidthCh)
-      ? clamp(6, +fonts.overviewTimeWidthCh, 30)
-      : 10;
+    const overviewTimeScale = (() => {
+      const rawScale = Number(fonts.overviewTimeScale);
+      if (Number.isFinite(rawScale)) return clamp(0.4, rawScale, 3);
+      const legacyWidth = Number(fonts.overviewTimeWidthCh);
+      if (Number.isFinite(legacyWidth) && OVERVIEW_TIME_BASE_CH > 0) {
+        return clamp(0.4, legacyWidth / OVERVIEW_TIME_BASE_CH, 3);
+      }
+      return 1;
+    })();
     const overlayEnabled = slidesCfg.tileOverlayEnabled !== false;
     const overlayStrength = overlayEnabled
       ? clamp(0, Number(slidesCfg.tileOverlayStrength ?? 1), 3)
@@ -339,7 +346,8 @@ async function loadDeviceResolved(id){
       '--ovTitleScale': fonts.overviewTitleScale || 1,
       '--ovHeadScale': fonts.overviewHeadScale || 0.9,
       '--ovCellScale': fonts.overviewCellScale || 0.8,
-      '--ovTimeWidth': `${overviewTimeWidth}ch`,
+      '--ovTimeWidthBase': `${OVERVIEW_TIME_BASE_CH}ch`,
+      '--ovTimeWidthScale': overviewTimeScale.toFixed(3),
       '--tileTextScale': fonts.tileTextScale || 0.8,
       '--tileWeight': fonts.tileWeight || 600,
       '--chipHScale': fonts.chipHeight || 1,
@@ -365,6 +373,7 @@ async function loadDeviceResolved(id){
       '--chipFlameGapScale': Math.max(0, (fonts.flameGapScale ?? 0.14))
     });
     document.body.dataset.chipOverflow = fonts.chipOverflowMode || 'scale';
+
 
     ensureFontFamily();
   }
