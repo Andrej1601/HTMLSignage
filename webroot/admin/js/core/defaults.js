@@ -61,6 +61,7 @@ const DEFAULT_STYLE_SETS = {
       badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
       badgeScale:1,
       badgeDescriptionScale:1,
+      tilePaddingScale:0.85,
       customBadgeEmojis:[]
     }
   },
@@ -97,6 +98,7 @@ const DEFAULT_STYLE_SETS = {
       badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
       badgeScale:1,
       badgeDescriptionScale:1,
+      tilePaddingScale:0.85,
       customBadgeEmojis:[]
     }
   }
@@ -111,6 +113,7 @@ export const DEFAULTS = {
     tileMinScale:0.25,
     tileMaxScale:0.57,
     tileHeightScale:1,
+    tilePaddingScale:0.85,
     tileOverlayEnabled:true,
     tileOverlayStrength:1,
     infobadgeColor:'#5C3101',
