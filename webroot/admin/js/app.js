@@ -10,13 +10,14 @@
 'use strict';
 
 // === Modular imports =========================================================
-import { $, $$, preloadImg, genId, deepClone, deepEqual } from './core/utils.js';
+import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 import { createSafeLocalStorage } from './core/safe_storage.js';
+import { createUnsavedTracker } from './core/unsaved_state.js';
 import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
@@ -51,8 +52,6 @@ let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
 let deviceBaseSchedule = null;      // Basis für Geräte-Kontext
 let deviceBaseSettings = null;
-let baselineSchedule = null;        // Vergleichsbasis für Unsaved-Indikator
-let baselineSettings = null;
 let currentDeviceCtx = null;        // z.B. "dev_abc..."
 let currentDeviceName = null;
 let currentDeviceBadgeMeta = null;
@@ -65,93 +64,46 @@ let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
 let devicesPinned = (lsGet('devicesPinned') === '1');
 document.body?.classList.toggle('devices-pinned', devicesPinned);
 
-const unsavedBadge = document.getElementById('unsavedBadge');
-let hasUnsavedChanges = false;
-let _unsavedIndicatorTimer = 0;
-let _unsavedInputListener = null;
-let _unsavedBlurListener = null;
-let _unsavedEvalTimer = 0;
-
-function updateBaseline(scheduleSrc, settingsSrc) {
-  baselineSchedule = sanitizeScheduleForCompare(scheduleSrc);
-  baselineSettings = sanitizeSettingsForCompare(settingsSrc);
-}
-
-function getActiveBaselineSources(){
-  if (currentDeviceCtx && deviceBaseSchedule && deviceBaseSettings){
-    return { schedule: deviceBaseSchedule, settings: deviceBaseSettings };
-  }
-  return { schedule: baseSchedule, settings: baseSettings };
-}
-
-function matchesBaseline() {
-  if (!baselineSchedule || !baselineSettings) return false;
-  const currentSchedule = sanitizeScheduleForCompare(schedule);
-  const currentSettings = sanitizeSettingsForCompare(settings);
-  return deepEqual(currentSchedule, baselineSchedule) && deepEqual(currentSettings, baselineSettings);
-}
-
 function clearDraftsIfPresent() {
   lsRemove('scheduleDraft');
   lsRemove('settingsDraft');
 }
 
-function evaluateUnsavedState({ immediate = false } = {}) {
-  if (!baselineSchedule || !baselineSettings) return;
-  clearTimeout(_unsavedIndicatorTimer);
-  if (matchesBaseline()) {
-    clearTimeout(_unsavedEvalTimer);
-    clearDraftsIfPresent();
-    setUnsavedState(false);
-    return;
-  }
-  if (immediate) {
-    setUnsavedState(true);
-  } else {
-    _unsavedIndicatorTimer = setTimeout(() => setUnsavedState(true), 180);
-  }
-}
-
-function queueUnsavedEvaluation(options) {
-  clearTimeout(_unsavedEvalTimer);
-  _unsavedEvalTimer = setTimeout(() => {
-    _unsavedEvalTimer = 0;
-    evaluateUnsavedState(options || {});
-  }, 60);
-}
-
-function setUnsavedState(state){
-  const next = !!state;
-  hasUnsavedChanges = next;
-  if (unsavedBadge){
-    unsavedBadge.hidden = !next;
-    unsavedBadge.setAttribute('aria-hidden', next ? 'false' : 'true');
-  }
-  document.body?.classList.toggle('has-unsaved-changes', next);
-  if (!next){
-    clearTimeout(_unsavedIndicatorTimer);
-    clearTimeout(_unsavedEvalTimer);
-  }
-}
-
-function restoreFromBaseline(){
-  const { schedule: baseSched, settings: baseSet } = getActiveBaselineSources();
-  if (!baseSched || !baseSet) return;
-
-  schedule = deepClone(baseSched);
-  settings = normalizeSettings(deepClone(baseSet), { assignMissingIds: false });
-
+function rerenderAfterBaselineRestore() {
   try { renderGridUI(); } catch (err) { console.warn('[admin] Grid re-render failed after reset', err); }
   try { renderSlidesBox(); } catch (err) { console.warn('[admin] Slides box re-render failed after reset', err); }
   try { renderHighlightBox(); } catch (err) { console.warn('[admin] Highlight box re-render failed after reset', err); }
   try { renderColors(); } catch (err) { console.warn('[admin] Colors re-render failed after reset', err); }
   try { renderFootnotes(); } catch (err) { console.warn('[admin] Footnotes re-render failed after reset', err); }
   try { renderSlidesMaster(); } catch (err) { console.warn('[admin] Slides master re-render failed after reset', err); }
-
-  clearDraftsIfPresent();
-  updateBaseline(baseSched, baseSet);
-  setUnsavedState(false);
 }
+
+const unsavedBadge = document.getElementById('unsavedBadge');
+const globalScope = (typeof globalThis === 'object') ? globalThis : (typeof window === 'object' ? window : undefined);
+
+const unsavedTracker = createUnsavedTracker({
+  document,
+  window: globalScope,
+  unsavedBadge,
+  getSchedule: () => schedule,
+  getSettings: () => settings,
+  setSchedule: (next) => { schedule = next; },
+  setSettings: (next) => { settings = next; },
+  sanitizeSchedule: sanitizeScheduleForCompare,
+  sanitizeSettings: sanitizeSettingsForCompare,
+  normalizeSettings: (value) => normalizeSettings(value, { assignMissingIds: false }),
+  clearDrafts: clearDraftsIfPresent,
+  onDirty: () => {
+    try { dockPushDebounced(); } catch {}
+  },
+  onRestore: rerenderAfterBaselineRestore
+});
+
+const updateBaseline = unsavedTracker.setBaseline;
+const evaluateUnsavedState = unsavedTracker.evaluate;
+const setUnsavedState = (state, options) => unsavedTracker.setUnsavedState(state, options);
+const restoreFromBaseline = unsavedTracker.restoreBaseline;
+const ensureUnsavedChangeListener = unsavedTracker.ensureListeners;
 
 const unsavedBadgeResetBtn = document.getElementById('unsavedBadgeReset');
 if (unsavedBadgeResetBtn){
@@ -160,59 +112,6 @@ if (unsavedBadgeResetBtn){
     restoreFromBaseline();
   });
 }
-
-function markUnsavedSoon(){
-  queueUnsavedEvaluation();
-}
-
-function ensureUnsavedChangeListener(){
-  if (!_unsavedInputListener){
-    _unsavedInputListener = (ev)=>{
-      if (!ev?.isTrusted) return;
-      if (ev?.target?.type === 'file') return;
-      markUnsavedSoon();
-      dockPushDebounced();
-    };
-    document.addEventListener('input',  _unsavedInputListener, true);
-    document.addEventListener('change', _unsavedInputListener, true);
-  }
-  if (!_unsavedBlurListener){
-    _unsavedBlurListener = ()=> queueUnsavedEvaluation();
-    document.addEventListener('focusout', _unsavedBlurListener, true);
-  }
-}
-
-try {
-  const nativeSetItem = Storage.prototype.setItem;
-  Storage.prototype.setItem = function patchedSetItem(key, value){
-    let result;
-    try {
-      result = nativeSetItem.apply(this, arguments);
-      return result;
-    } finally {
-      const store = (typeof globalThis !== 'undefined' && globalThis.localStorage) ? globalThis.localStorage : null;
-      if (store && this === store && (key === 'scheduleDraft' || key === 'settingsDraft')){
-        markUnsavedSoon();
-      }
-    }
-  };
-} catch (err) {
-  console.warn('[admin] Unsaved badge: Storage patch failed', err);
-}
-
-const globalScope = (typeof globalThis === 'object') ? globalThis : (typeof window === 'object' ? window : undefined);
-if (globalScope){
-  globalScope.__markUnsaved = ()=> evaluateUnsavedState({ immediate: true });
-  globalScope.__queueUnsaved = ()=> queueUnsavedEvaluation();
-  globalScope.__clearUnsaved = ()=> setUnsavedState(false);
-}
-
-if (document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', ()=> setUnsavedState(hasUnsavedChanges));
-} else {
-  setUnsavedState(hasUnsavedChanges);
-}
-
 
 function normalizeContextBadge(source){
   if (!source) return null;
@@ -468,7 +367,7 @@ async function loadAll(){
   } catch {}
   settings = normalizeSettings(settings, { assignMissingIds: false });
 
-  setUnsavedState(unsavedFromDraft);
+  setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
 
   // --- UI-Module initialisieren ---------------------------------------------
   initGridUI({
