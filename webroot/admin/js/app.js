@@ -21,7 +21,6 @@ import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
   PAGE_SOURCE_KEYS,
-  SOURCE_PLAYLIST_LIMITS,
   playlistKeyFromSanitizedEntry,
   sanitizePagePlaylist,
   sanitizeBadgeLibrary,
@@ -529,8 +528,6 @@ function renderSlidesBox(){
     const { entries: baseEntries, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: false });
     const showOverview = settings?.slides?.showOverview !== false;
     const heroEnabled = !!(settings?.slides?.heroEnabled);
-    const allowedSetRaw = source && SOURCE_PLAYLIST_LIMITS[source] ? SOURCE_PLAYLIST_LIMITS[source] : (SOURCE_PLAYLIST_LIMITS[pageState.source] || null);
-    const allowedSet = allowedSetRaw instanceof Set ? allowedSetRaw : null;
 
     const entryList = [];
     const entryMap = new Map();
@@ -595,15 +592,6 @@ function renderSlidesBox(){
           disabled: entry.item?.enabled === false,
           statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
         });
-      }
-    });
-
-    entryList.forEach(entry => {
-      if (!allowedSet) return;
-      const typeKey = entry.kind;
-      if (!allowedSet.has(typeKey)) {
-        entry.disabled = true;
-        entry.statusText = entry.statusText || 'Nicht verfügbar (Quelle)';
       }
     });
 
@@ -870,6 +858,7 @@ function renderSlidesBox(){
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#tileTimeScale', f.tileMetaScale ?? 1);
+  setC('#saunaFlames', (settings.slides?.showSaunaFlames !== false));
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
   setV('#flameGap',         f.flameGapScale    ?? 0.14);
@@ -1000,6 +989,7 @@ function renderSlidesBox(){
     setV('#tilePaddingScale', DEFAULTS.slides.tilePaddingScale);
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
     setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
+    setC('#saunaFlames', DEFAULTS.slides.showSaunaFlames !== false);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
     setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
@@ -1343,6 +1333,7 @@ function collectSettings(){
           if (!Number.isFinite(raw)) return settings.slides?.tileOverlayStrength ?? DEFAULTS.slides.tileOverlayStrength ?? 1;
           return clamp(0, raw, 200) / 100;
         })(),
+        showSaunaFlames: !!$('#saunaFlames')?.checked,
         badgeLibrary: (() => {
           const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
           (settings.slides ||= {}).badgeLibrary = sanitized;
