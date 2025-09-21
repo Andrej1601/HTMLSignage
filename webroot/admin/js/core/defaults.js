@@ -19,7 +19,10 @@ const DEFAULT_FONTS = {
   family:"system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
   scale:1, h1Scale:1, h2Scale:1,
   overviewTitleScale:1, overviewHeadScale:0.9, overviewCellScale:0.8,
+  overviewTimeWidthCh:10,
+  overviewShowFlames:true,
   tileTextScale:0.8, tileWeight:600, chipHeight:1,
+  tileMetaScale:1,
   chipOverflowMode:'scale', flamePct:55, flameGapScale:0.14
 };
 
@@ -46,7 +49,10 @@ const DEFAULT_STYLE_SETS = {
       tileTextScale:DEFAULT_FONTS.tileTextScale,
       tileWeight:DEFAULT_FONTS.tileWeight,
       chipHeight:DEFAULT_FONTS.chipHeight,
+      tileMetaScale:DEFAULT_FONTS.tileMetaScale,
       chipOverflowMode:DEFAULT_FONTS.chipOverflowMode,
+      overviewTimeWidthCh:DEFAULT_FONTS.overviewTimeWidthCh,
+      overviewShowFlames:DEFAULT_FONTS.overviewShowFlames,
       flamePct:DEFAULT_FONTS.flamePct,
       flameGapScale:DEFAULT_FONTS.flameGapScale
     },
@@ -76,6 +82,9 @@ const DEFAULT_STYLE_SETS = {
       tileTextScale:0.86,
       tileWeight:600,
       chipHeight:1.05,
+      tileMetaScale:DEFAULT_FONTS.tileMetaScale,
+      overviewTimeWidthCh:DEFAULT_FONTS.overviewTimeWidthCh,
+      overviewShowFlames:DEFAULT_FONTS.overviewShowFlames,
       chipOverflowMode:'scale',
       flamePct:60,
       flameGapScale:0.16
@@ -95,6 +104,9 @@ export const DEFAULTS = {
     tileWidthPercent:45,
     tileMinScale:0.25,
     tileMaxScale:0.57,
+    tileHeightScale:1,
+    tileOverlayEnabled:true,
+    tileOverlayStrength:1,
     infobadgeColor:'#5C3101',
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
     heroEnabled:false,

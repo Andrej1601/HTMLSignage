@@ -24,6 +24,7 @@
   --chipFlameGapScale:0.14; /* Anteil der Chip-Höhe als Abstand */
   --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapScale));
   --ovAuto:1; /* overview-only autoscale factor */
+  --ovTimeWidth:10ch;
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
@@ -44,6 +45,9 @@
   --tileMetaScale:1;
   --tileMinHeightPx:calc(120px*var(--vwScale));
   --tileIconHeightScale:.9;
+  --tileOverlayOpacity:.9;
+  --tileOverlayLight:.12;
+  --tileOverlayShadow:.42;
   --badgeBg:var(--accent);
   --badgeFg:var(--boxfg);
   --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
@@ -325,10 +329,12 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 
 /* overview table */
 .grid{width:100%;max-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
-.grid th,.grid td{border:var(--gridTableW) solid var(--gridTable);white-space:nowrap}
-.grid col.c_time{width:10ch}
+.grid th,.grid td{border:var(--gridTableW) solid var(--gridTable);white-space:nowrap;max-width:100%;}
+.grid col.c_time{width:var(--ovTimeWidth,10ch)}
 .grid col.c_auto{width:auto}
 .grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
+.grid thead th{white-space:normal;word-break:break-word;hyphens:auto;overflow-wrap:anywhere;}
+.grid thead th.timecol{white-space:nowrap;}
 .overview .grid thead th{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
 
@@ -340,8 +346,8 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 
 .grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale))}
 .overview .grid td{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
-.grid th.timecol, .grid td.timecol{width:10ch}
-.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:10ch;color:var(--fg)}
+.grid th.timecol, .grid td.timecol{width:var(--ovTimeWidth,10ch)}
+.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidth,10ch);color:var(--fg)}
 
 /* equal chips */
 .cellwrap{display:block;width:100%;min-width:0}
@@ -368,7 +374,7 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 }
 
 /* Flammen rechts, kompakt und nie über dem Text */
-.chip-flames{
+.chip-flames{ 
   flex:0 0 auto; display:inline-flex; margin-left:.6em;
 }
 .chip-flames .flames{ display:inline-flex; gap:var(--chipFlameGap); }
@@ -376,6 +382,8 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   height:calc(var(--chipH) * var(--chipFlamePct));
   width:auto;
 }
+
+body.overview-hide-flames .overview .chip-flames{display:none;}
 
 /* overview wrapper */
 .ovwrap{transform-origin:top left; width:100%; will-change:contents}
@@ -413,8 +421,8 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
   content:"";
   position:absolute;
   inset:0;
-  background:linear-gradient(135deg, rgba(255,255,255,.12) 0%, rgba(0,0,0,.42) 100%);
-  opacity:.9;
+  background:linear-gradient(135deg, rgba(255,255,255,var(--tileOverlayLight, .12)) 0%, rgba(0,0,0,var(--tileOverlayShadow, .42)) 100%);
+  opacity:var(--tileOverlayOpacity, .9);
   pointer-events:none;
   border-radius:inherit;
 }

@@ -30,8 +30,11 @@ const STYLE_THEME_KEYS = [
   'chipBorder','chipBorderW','flame','saunaColor'
 ];
 
-const STYLE_FONT_KEYS = ['family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale'];
-const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary'];
+const STYLE_FONT_KEYS = [
+  'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
+];
+const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary','tileHeightScale','tileOverlayEnabled','tileOverlayStrength'];
 
 const cloneValue = (value) => {
   if (value == null) return value;
