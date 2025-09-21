@@ -1,4 +1,5 @@
 (() => {
+  const OVERVIEW_TIME_BASE_CH = 10;
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
@@ -299,10 +300,30 @@ async function loadDeviceResolved(id){
 
   function applyTheme() {
     const t = settings?.theme || {};
+    const fonts = settings?.fonts || {};
+    const slidesCfg = settings?.slides || {};
+    const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
     const msVar = (value, fallback) => {
       const num = Number.isFinite(+value) ? Math.max(0, +value) : fallback;
       return (Number.isFinite(num) ? num : fallback) + 'ms';
     };
+    const overviewTimeScale = (() => {
+      const rawScale = Number(fonts.overviewTimeScale);
+      if (Number.isFinite(rawScale)) return clamp(0.4, rawScale, 3);
+      const legacyWidth = Number(fonts.overviewTimeWidthCh);
+      if (Number.isFinite(legacyWidth) && OVERVIEW_TIME_BASE_CH > 0) {
+        return clamp(0.4, legacyWidth / OVERVIEW_TIME_BASE_CH, 3);
+      }
+      return 1;
+    })();
+    const overlayEnabled = slidesCfg.tileOverlayEnabled !== false;
+    const overlayStrength = overlayEnabled
+      ? clamp(0, Number(slidesCfg.tileOverlayStrength ?? 1), 3)
+      : 0;
+    const overlayOpacity = overlayEnabled ? clamp(0, 0.9 * overlayStrength, 1) : 0;
+    const overlayLight = overlayEnabled ? clamp(0, 0.12 * overlayStrength, 1) : 0;
+    const overlayShadow = overlayEnabled ? clamp(0, 0.42 * overlayStrength, 1) : 0;
+
     setVars({
       '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
       '--grid': t.gridBorder, '--cell': t.cellBg, '--boxfg': t.boxFg,
@@ -318,35 +339,42 @@ async function loadDeviceResolved(id){
       '--headBg': t.headRowBg || t.timeColBg || '#E8DEBD', '--headFg': t.headRowFg || t.fg || '#5C3101',
       '--cornerBg': t.cornerBg || t.headRowBg || '#E8DEBD', '--cornerFg': t.cornerFg || t.headRowFg || '#5C3101',
       '--hlColor': (settings?.highlightNext?.color || '#FFDD66'),
-      '--baseScale': settings?.fonts?.scale || 1,
+      '--baseScale': fonts.scale || 1,
       '--scale': 'calc(var(--baseScale)*var(--vwScale))',
-      '--h1Scale': settings?.fonts?.h1Scale || 1,
-      '--h2Scale': settings?.fonts?.h2Scale || 1,
-      '--ovHeadScale': settings?.fonts?.overviewHeadScale || 0.9,
-      '--ovCellScale': settings?.fonts?.overviewCellScale || 0.8,
-      '--tileTextScale': settings?.fonts?.tileTextScale || 0.8,
-      '--tileWeight': settings?.fonts?.tileWeight || 600,
-      '--chipHScale': (settings?.fonts?.chipHeight || 1),
-      '--badgeBg': settings?.slides?.infobadgeColor || t.accent || '#5C3101',
+      '--h1Scale': fonts.h1Scale || 1,
+      '--h2Scale': fonts.h2Scale || 1,
+      '--ovTitleScale': fonts.overviewTitleScale || 1,
+      '--ovHeadScale': fonts.overviewHeadScale || 0.9,
+      '--ovCellScale': fonts.overviewCellScale || 0.8,
+      '--ovTimeWidthBase': `${OVERVIEW_TIME_BASE_CH}ch`,
+      '--ovTimeWidthScale': overviewTimeScale.toFixed(3),
+      '--tileTextScale': fonts.tileTextScale || 0.8,
+      '--tileWeight': fonts.tileWeight || 600,
+      '--chipHScale': fonts.chipHeight || 1,
+      '--badgeBg': slidesCfg.infobadgeColor || t.accent || '#5C3101',
       '--badgeFg': t.boxFg || '#FFFFFF',
-      '--tileEnterDuration': msVar(settings?.slides?.tileEnterMs, 600),
-      '--tileEnterDelay': msVar(settings?.slides?.tileStaggerMs, 80),
-      '--heroTimelineItemMs': msVar(settings?.slides?.heroTimelineItemMs, 500),
-      '--heroTimelineItemDelay': msVar(settings?.slides?.heroTimelineItemDelayMs, 140),
-      '--heroTimelineFillMs': msVar(settings?.slides?.heroTimelineFillMs, 8000),
-      '--heroTimelineDelayMs': msVar(settings?.slides?.heroTimelineDelayMs, 400)
+      '--tileOverlayOpacity': overlayOpacity.toFixed(3),
+      '--tileOverlayLight': overlayLight.toFixed(3),
+      '--tileOverlayShadow': overlayShadow.toFixed(3),
+      '--tileEnterDuration': msVar(slidesCfg.tileEnterMs, 600),
+      '--tileEnterDelay': msVar(slidesCfg.tileStaggerMs, 80),
+      '--heroTimelineItemMs': msVar(slidesCfg.heroTimelineItemMs, 500),
+      '--heroTimelineItemDelay': msVar(slidesCfg.heroTimelineItemDelayMs, 140),
+      '--heroTimelineFillMs': msVar(slidesCfg.heroTimelineFillMs, 8000),
+      '--heroTimelineDelayMs': msVar(slidesCfg.heroTimelineDelayMs, 400)
     });
-    if (settings?.fonts?.family) document.documentElement.style.setProperty('--font', settings.fonts.family);
-// Chip-Optionen (Übersicht): Größen & Overflow-Modus aus den Settings
-  const f = settings?.fonts || {};
-  setVars({
-  '--chipFlamePct': Math.max(0.3, Math.min(1, (f.flamePct || 55) / 100)),
-  '--chipFlameGapScale': Math.max(0, (f.flameGapScale ?? 0.14))
-});
-// 'scale' = Text automatisch verkleinern, 'ellipsis' = auf „…“ kürzen
-document.body.dataset.chipOverflow = f.chipOverflowMode || 'scale';
+    if (fonts.family) document.documentElement.style.setProperty('--font', fonts.family);
 
- ensureFontFamily();
+    const showOverviewFlames = fonts.overviewShowFlames !== false;
+    document.body.classList.toggle('overview-hide-flames', !showOverviewFlames);
+
+    setVars({
+      '--chipFlamePct': Math.max(0.3, Math.min(1, (fonts.flamePct || 55) / 100)),
+      '--chipFlameGapScale': Math.max(0, (fonts.flameGapScale ?? 0.14))
+    });
+    document.body.dataset.chipOverflow = fonts.chipOverflowMode || 'scale';
+
+    ensureFontFamily();
   }
 
   function applyDisplay() {
@@ -1229,6 +1257,7 @@ function tableGrid(hlMap) {
   }
 
   const notes = footnoteMap();
+  const showFlames = (settings?.fonts?.overviewShowFlames !== false);
   const t = h('table', { class: 'grid' });
   const colg = h('colgroup');
   colg.appendChild(h('col', { class: 'c_time' }));
@@ -1258,11 +1287,12 @@ if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', {c
 const supNote = noteSup(cell, notes);
 if (supNote) { txt.appendChild(h('span', { class: 'notewrap' }, [supNote])); usedSet.add(cell.noteId); }
 
-// Flammen kompakt rechts
-const flamesBox = h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]);
-
 // Chip-Container (Flex: Text links, Flammen rechts)
-const chip = h('div', { class: 'chip' + (hlMap?.byCell?.[key] ? ' highlight' : '') }, [txt, flamesBox]);
+const chipChildren = [txt];
+if (showFlames) {
+  chipChildren.push(h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]));
+}
+const chip = h('div', { class: 'chip' + (hlMap?.byCell?.[key] ? ' highlight' : '') }, chipChildren);
 const wrap = h('div', { class: 'cellwrap' }, [chip]);
           td.appendChild(wrap);
         } else {
@@ -2420,6 +2450,12 @@ function renderStorySlide(story = {}, region = 'left') {
     const badgeOffset = useIcons ? clamp(10, t * 0.02, 28) : clamp(8, t * 0.018, 22);
     const radius = useIcons ? clamp(18, t * 0.06, 48) : clamp(16, t * 0.05, 44);
     const metaScale = useIcons ? clamp(0.72, t / 720, 1.12) : clamp(0.78, t / 820, 1.08);
+    const userMetaScale = Number.isFinite(+settings?.fonts?.tileMetaScale)
+      ? clamp(0.5, +settings.fonts.tileMetaScale, 2)
+      : 1;
+    const heightScale = Number.isFinite(+settings?.slides?.tileHeightScale)
+      ? clamp(0.5, +settings.slides.tileHeightScale, 2)
+      : 1;
     const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
     const iconColumn = useIcons ? clamp(44, iconSize * 0.78, iconSize * 1.52) : 0;
     const tileMinHeight = useIcons
@@ -2437,10 +2473,11 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileChipGapPx', chipGap.toFixed(2) + 'px');
     container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
     container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
-    container.style.setProperty('--tileMetaScale', metaScale.toFixed(3));
+    container.style.setProperty('--tileMetaScale', (metaScale * userMetaScale).toFixed(3));
     container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
     container.style.setProperty('--tileIconColumnPx', useIcons ? (iconColumn.toFixed(2) + 'px') : '0px');
-    container.style.setProperty('--tileMinHeightPx', tileMinHeight.toFixed(2) + 'px');
+    container.style.setProperty('--tileHeightScale', heightScale.toFixed(3));
+    container.style.setProperty('--tileMinHeightPx', (tileMinHeight * heightScale).toFixed(2) + 'px');
     container.style.setProperty('--tileIconHeightScale', iconHeightScale.toFixed(3));
   }
 

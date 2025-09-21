@@ -25,6 +25,7 @@ import {
   playlistKeyFromSanitizedEntry,
   sanitizePagePlaylist,
   sanitizeBadgeLibrary,
+  sanitizeBadgeEmojiList,
   normalizeSettings,
   sanitizeScheduleForCompare,
   sanitizeSettingsForCompare
@@ -869,6 +870,7 @@ function renderSlidesBox(){
   setV('#fontScale',  f.scale  ?? 1);
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
+  setV('#tileTimeScale', f.tileMetaScale ?? 1);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
   setV('#flameGap',         f.flameGapScale    ?? 0.14);
@@ -882,7 +884,32 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
+  const defaultTimeWidthCh = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
+    ? +DEFAULTS.fonts.overviewTimeWidthCh
+    : 10;
+  const resolvedTimeScale = (() => {
+    const rawScale = Number(f.overviewTimeScale);
+    if (Number.isFinite(rawScale) && rawScale > 0) return Math.min(Math.max(rawScale, 0.4), 3);
+    const legacyWidth = Number(f.overviewTimeWidthCh);
+    if (Number.isFinite(legacyWidth) && legacyWidth > 0 && defaultTimeWidthCh > 0) {
+      return Math.min(Math.max(legacyWidth / defaultTimeWidthCh, 0.4), 3);
+    }
+    return Math.min(Math.max(Number(DEFAULTS.fonts?.overviewTimeScale) || 1, 0.4), 3);
+  })();
+  setV('#ovTimeWidth', Number(resolvedTimeScale.toFixed(2)));
   setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
+  const overviewFlamesToggle = document.getElementById('overviewFlames');
+  const overviewFlameControls = ['#flamePct', '#flameGap'].map(sel => document.querySelector(sel));
+  const applyOverviewFlameState = (enabled) => {
+    overviewFlameControls.forEach(el => { if (el) el.disabled = !enabled; });
+  };
+  const overviewFlamesEnabled = (f.overviewShowFlames !== false);
+  setC('#overviewFlames', overviewFlamesEnabled);
+  applyOverviewFlameState(overviewFlamesEnabled);
+  if (overviewFlamesToggle && !overviewFlamesToggle.dataset.bound){
+    overviewFlamesToggle.addEventListener('change', () => applyOverviewFlameState(overviewFlamesToggle.checked));
+    overviewFlamesToggle.dataset.bound = '1';
+  }
 
   // Saunafolien (Kacheln)
   setV('#tileTextScale', f.tileTextScale ?? 0.8);
@@ -890,6 +917,23 @@ function renderSlidesBox(){
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
+  setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
+  const overlayCheckbox = document.getElementById('tileOverlayEnabled');
+  const overlayInput = document.getElementById('tileOverlayStrength');
+  const overlayEnabled = (settings.slides?.tileOverlayEnabled !== false);
+  setC('#tileOverlayEnabled', overlayEnabled);
+  const overlayPct = (() => {
+    const raw = settings.slides?.tileOverlayStrength;
+    if (!Number.isFinite(+raw)) return 100;
+    return Math.round(Math.max(0, +raw) * 100);
+  })();
+  setV('#tileOverlayStrength', overlayPct);
+  const applyOverlayState = (enabled) => { if (overlayInput) overlayInput.disabled = !enabled; };
+  applyOverlayState(overlayEnabled);
+  if (overlayCheckbox && !overlayCheckbox.dataset.bound) {
+    overlayCheckbox.addEventListener('change', () => applyOverlayState(overlayCheckbox.checked));
+    overlayCheckbox.dataset.bound = '1';
+  }
   const badgeColor = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor;
   setV('#badgeColor', badgeColor);
 
@@ -940,6 +984,7 @@ function renderSlidesBox(){
     setV('#fontScale', 1);
     setV('#h1Scale', 1);
     setV('#h2Scale', 1);
+    setV('#tileTimeScale', DEFAULTS.fonts.tileMetaScale);
 
     setV('#h2Mode', DEFAULTS.h2.mode);
     setV('#h2Text', DEFAULTS.h2.text);
@@ -948,17 +993,24 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
+    setV('#ovTimeWidth',  Number((DEFAULTS.fonts.overviewTimeScale ?? 1).toFixed(2)));
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
     setV('#flameGap',         DEFAULTS.fonts.flameGapScale);
+    setC('#overviewFlames',   DEFAULTS.fonts.overviewShowFlames);
+    applyOverviewFlameState(DEFAULTS.fonts.overviewShowFlames);
 
     setV('#tileTextScale', DEFAULTS.fonts.tileTextScale);
     setV('#tileWeight',    DEFAULTS.fonts.tileWeight);
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
+    setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
+    setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
+    setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
+    applyOverlayState(DEFAULTS.slides.tileOverlayEnabled !== false);
 
     setV('#rightW',   DEFAULTS.display.rightWidthPercent);
     setV('#cutTop',   DEFAULTS.display.cutTopPercent);
@@ -1206,6 +1258,7 @@ function collectSettings(){
     const num = Number(val);
     return Number.isFinite(num) && num > 0 ? Math.max(1, Math.round(num)) : null;
   };
+  const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
   const getSourceValue = (id, fallback) => {
     const el = document.getElementById(id);
     const val = el?.value || fallback;
@@ -1236,12 +1289,32 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
+        overviewTimeScale:(() => {
+          const raw = Number($('#ovTimeWidth')?.value);
+          if (Number.isFinite(raw)) return clamp(0.4, raw, 3);
+          const fallback = Number(settings.fonts?.overviewTimeScale);
+          if (Number.isFinite(fallback)) return clamp(0.4, fallback, 3);
+          const legacyWidth = Number(settings.fonts?.overviewTimeWidthCh);
+          if (Number.isFinite(legacyWidth)) {
+            const base = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
+              ? +DEFAULTS.fonts.overviewTimeWidthCh
+              : 10;
+            if (base > 0) return clamp(0.4, legacyWidth / base, 3);
+          }
+          return clamp(0.4, DEFAULTS.fonts?.overviewTimeScale ?? 1, 3);
+        })(),
         chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
         flamePct:   +($('#flamePct')?.value || 55),
         flameGapScale:+($('#flameGap')?.value || 0.14),
+        overviewShowFlames: !!$('#overviewFlames')?.checked,
         tileTextScale:+($('#tileTextScale').value||0.8),
-        tileWeight:+($('#tileWeight').value||600)
+        tileWeight:+($('#tileWeight').value||600),
+        tileMetaScale:(() => {
+          const raw = Number($('#tileTimeScale')?.value);
+          if (!Number.isFinite(raw)) return settings.fonts?.tileMetaScale ?? DEFAULTS.fonts.tileMetaScale ?? 1;
+          return clamp(0.5, raw, 2);
+        })()
       },
       h2:{
         mode: $('#h2Mode').value || 'text',
@@ -1253,6 +1326,11 @@ function collectSettings(){
         tileWidthPercent:+($('#tilePct')?.value || 45),
         tileMinScale:+($('#tileMin')?.value || 0.25),
         tileMaxScale:+($('#tileMax')?.value || 0.57),
+        tileHeightScale:(() => {
+          const raw = Number($('#tileHeightScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1;
+          return clamp(0.5, raw, 2);
+        })(),
         infobadgeColor:(() => {
           const el = document.getElementById('badgeColor');
           const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
@@ -1260,11 +1338,18 @@ function collectSettings(){
           const raw = el?.value || '';
           return /^#([0-9A-F]{6})$/i.test(raw) ? raw.toUpperCase() : current;
         })(),
+        tileOverlayEnabled: !!$('#tileOverlayEnabled')?.checked,
+        tileOverlayStrength:(() => {
+          const raw = Number($('#tileOverlayStrength')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileOverlayStrength ?? DEFAULTS.slides.tileOverlayStrength ?? 1;
+          return clamp(0, raw, 200) / 100;
+        })(),
         badgeLibrary: (() => {
           const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
           (settings.slides ||= {}).badgeLibrary = sanitized;
           return sanitized;
         })(),
+        customBadgeEmoji: sanitizeBadgeEmojiList(settings.slides?.customBadgeEmoji),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
         const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
