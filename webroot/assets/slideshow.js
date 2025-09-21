@@ -2090,6 +2090,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
   function collectListItems(value) {
     const items = [];
+    let hasStripeInSauna = false;
     const push = (entry) => {
       if (entry == null) return;
       if (Array.isArray(entry)) { entry.forEach(push); return; }
