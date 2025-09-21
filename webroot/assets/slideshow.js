@@ -932,19 +932,6 @@ async function loadDeviceResolved(id){
     if (!visible) return null;
     const label = entry ? firstText(entry.label, entry.text, entry.title, entry.name, entry.value) : firstText(descriptor);
     const icon = entry ? firstText(entry.icon, entry.symbol, entry.glyph, entry.emoji) : '';
-    const iconUrl = entry ? firstText(entry.iconUrl, entry.image, entry.url, entry.href, entry.src) : '';
-    let imageUrl = '';
-    if (entry) {
-      const nestedImage = (entry.image && typeof entry.image === 'object') ? entry.image : null;
-      imageUrl = firstText(
-        entry.imageUrl,
-        entry.badgeImage,
-        entry.mediaUrl,
-        nestedImage?.url,
-        nestedImage?.src,
-        entry.image
-      );
-    }
     const fallbackStr = (typeof fallbackId === 'string' || typeof fallbackId === 'number' || typeof fallbackId === 'boolean')
       ? String(fallbackId).trim()
       : '';
@@ -959,13 +946,10 @@ async function loadDeviceResolved(id){
     }
     const labelStr = String(label || '').trim();
     const iconStr = String(icon || '').trim();
-    const iconUrlStr = String(iconUrl || '').trim();
-    const imageUrlStr = String(imageUrl || '').trim();
-    const finalImageUrl = imageUrlStr || iconUrlStr;
     const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
-    const finalId = preferLabelId ? (labelStr || iconStr || finalImageUrl || id) : (id || labelStr || iconStr || finalImageUrl);
-    if (!finalId || (!labelStr && !iconStr && !finalImageUrl)) return null;
-    return { id: finalId, label: labelStr, icon: iconStr, imageUrl: finalImageUrl };
+    const finalId = preferLabelId ? (labelStr || iconStr || id) : (id || labelStr || iconStr);
+    if (!finalId || (!labelStr && !iconStr)) return null;
+    return { id: finalId, label: labelStr, icon: iconStr };
   }
 
   function getBadgeLookup(){
@@ -1012,7 +996,7 @@ async function loadDeviceResolved(id){
     const addBadge = (badge) => {
       if (!badge) return;
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.imageUrl]
+      const composite = [badge.label, badge.icon]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1122,13 +1106,13 @@ async function loadDeviceResolved(id){
     const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.imageUrl]
+      const composite = [badge.label, badge.icon]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
       if (!dedupeKey || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
-      uniqueBadges.push({ ...badge, imageUrl: String(badge.imageUrl || '').trim() });
+      uniqueBadges.push({ ...badge });
     });
     return uniqueBadges;
   }
@@ -1140,17 +1124,10 @@ async function loadDeviceResolved(id){
     const nodes = [];
     uniqueBadges.forEach(badge => {
       const iconChar = String(badge.icon || '').trim();
-      const imageUrl = String(badge.imageUrl || '').trim();
       const label = String(badge.label || '').trim();
       const bits = [];
-      if (imageUrl) {
-        bits.push(h('span', { class: 'badge-icon badge-icon--image', 'aria-hidden': 'true' }, [
-          h('img', { src: imageUrl, alt: '' })
-        ]));
-      } else {
-        const glyph = iconChar || defaultIcon;
-        if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
-      }
+      const glyph = iconChar || defaultIcon;
+      if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
       if (label) bits.push(h('span', { class: 'badge-label' }, label));
       if (!bits.length) return;
       const attrs = { class: 'badge' };
@@ -2835,6 +2812,24 @@ function renderStorySlide(story = {}, region = 'left') {
     ]);
   }
 
+  function cleanupNode(node) {
+    if (!node) return;
+    if (typeof node.__cleanup === 'function') {
+      try {
+        node.__cleanup();
+      } catch (err) {
+        console.error('Cleanup error:', err);
+      }
+    }
+    const children = node.childNodes ? Array.from(node.childNodes) : [];
+    for (const child of children) cleanupNode(child);
+  }
+
+  function cleanupChildNodes(target) {
+    if (!target || !target.childNodes) return;
+    Array.from(target.childNodes).forEach(cleanupNode);
+  }
+
   function createStageController(id, element){
     let queue = [];
     let index = 0;
@@ -2878,6 +2873,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
     function show(node){
       if (!element) return;
+      cleanupChildNodes(element);
       element.innerHTML = '';
       if (!node) return;
       element.appendChild(node);
@@ -2997,6 +2993,7 @@ function renderStorySlide(story = {}, region = 'left') {
       hasCustomContent = false;
       if (element) {
         element.classList.remove('stage-area--custom');
+        cleanupChildNodes(element);
         element.innerHTML = '';
       }
       setResizeHandler(id, null);
@@ -3013,6 +3010,7 @@ function renderStorySlide(story = {}, region = 'left') {
       setResizeHandler(id, null);
       if (element) {
         element.classList.toggle('stage-area--custom', hasCustomContent);
+        cleanupChildNodes(element);
         element.innerHTML = '';
         if (node) {
           element.appendChild(node);

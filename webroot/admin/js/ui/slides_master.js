@@ -54,7 +54,17 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🎵', label:'Musik' },
   { value:'⚡', label:'Energie' },
   { value:'🌲', label:'Wald & Holz' },
-  { value:'🧊', label:'Eisaufguss' }
+  { value:'🧊', label:'Eisaufguss' },
+  { value:'🧖', label:'Sauna & Wellness' },
+  { value:'🪵', label:'Rituale & Räucherwerk' },
+  { value:'🧴', label:'Peeling & Pflege' },
+  { value:'🧂', label:'Salz & Sole' },
+  { value:'🍫', label:'Schokolade' },
+  { value:'🫧', label:'Schaum & Pflege' },
+  { value:'🌊', label:'Meer & Gischt' },
+  { value:'🌞', label:'Sonne & Wärme' },
+  { value:'🌅', label:'Morgenstimmung' },
+  { value:'🍀', label:'Glück & Wohlbefinden' }
 ];
 
 const cloneValue = (value) => {
@@ -141,14 +151,10 @@ function ensureBadgeLibrary(settings){
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
-    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
-      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
-    const imageUrl = String(imageUrlRaw || '').trim();
     normalized.push({
       id,
       icon,
-      label,
-      imageUrl
+      label
     });
     seen.add(id);
   };
@@ -2197,6 +2203,11 @@ export function renderSlidesMaster(){
   const renderBadgeLibraryRows = () => {
     const list = ensureBadgeLibrary(settings);
     const customEmojis = ensureCustomBadgeEmojis(settings);
+    const getCustomEmojiList = () => {
+      settings.slides ||= {};
+      if (!Array.isArray(settings.slides.customBadgeEmojis)) settings.slides.customBadgeEmojis = [];
+      return settings.slides.customBadgeEmojis;
+    };
     if (!badgeListHost) return;
 
     const notifyChange = () => {
@@ -2212,20 +2223,22 @@ export function renderSlidesMaster(){
     const updateEmojiAddState = () => {
       if (!emojiAddBtn) return;
       const value = (emojiInput?.value || '').trim();
-      emojiAddBtn.disabled = !value || customEmojis.includes(value);
+      const listRef = getCustomEmojiList();
+      emojiAddBtn.disabled = !value || listRef.includes(value);
     };
 
     const renderEmojiChips = () => {
       if (!emojiCustomList) return;
       emojiCustomList.innerHTML = '';
-      if (!customEmojis.length){
+      const listRef = getCustomEmojiList();
+      if (!listRef.length){
         const empty = document.createElement('div');
         empty.className = 'badge-lib-emoji-empty';
         empty.textContent = 'Keine eigenen Emojis gespeichert.';
         emojiCustomList.appendChild(empty);
         return;
       }
-      customEmojis.forEach(value => {
+      listRef.forEach(value => {
         const chip = document.createElement('span');
         chip.className = 'badge-lib-emoji-chip';
         chip.textContent = value;
@@ -2236,8 +2249,9 @@ export function renderSlidesMaster(){
         removeBtn.setAttribute('aria-label', `Emoji ${value} entfernen`);
         removeBtn.textContent = '✕';
         removeBtn.addEventListener('click', () => {
-          const idx = customEmojis.indexOf(value);
-          if (idx >= 0) customEmojis.splice(idx, 1);
+          const list = getCustomEmojiList();
+          const idx = list.indexOf(value);
+          if (idx >= 0) list.splice(idx, 1);
           renderBadgeLibraryRows();
           notifyChange();
         });
@@ -2249,15 +2263,14 @@ export function renderSlidesMaster(){
     const addCustomEmoji = (rawValue) => {
       const value = (rawValue || '').trim();
       if (!value) return;
-      if (!customEmojis.includes(value)){
-        customEmojis.push(value);
-        renderBadgeLibraryRows();
-        notifyChange();
-      }
+      const listRef = getCustomEmojiList();
+      if (listRef.includes(value)) return;
+      listRef.push(value);
       if (emojiInput){
         emojiInput.value = '';
       }
-      updateEmojiAddState();
+      renderBadgeLibraryRows();
+      notifyChange();
     };
 
     if (emojiAddBtn && !emojiAddBtn.dataset.bound){
@@ -2364,24 +2377,13 @@ export function renderSlidesMaster(){
       const chip = document.createElement('span');
       chip.className = 'badge-lib-chip';
 
-      const chipMedia = document.createElement('span');
-      chipMedia.className = 'badge-lib-chip-media';
-
-      const chipImage = document.createElement('img');
-      chipImage.className = 'badge-lib-chip-image';
-      chipImage.alt = '';
-      chipImage.loading = 'lazy';
-
       const chipIcon = document.createElement('span');
       chipIcon.className = 'badge-lib-chip-icon';
-
-      chipMedia.appendChild(chipImage);
-      chipMedia.appendChild(chipIcon);
 
       const chipLabel = document.createElement('span');
       chipLabel.className = 'badge-lib-chip-label';
 
-      chip.appendChild(chipMedia);
+      chip.appendChild(chipIcon);
       chip.appendChild(chipLabel);
       preview.appendChild(chip);
 
@@ -2409,31 +2411,6 @@ export function renderSlidesMaster(){
       emojiSelect.setAttribute('aria-label', 'Badge-Emoji');
       populateEmojiOptions(emojiSelect, badge.icon || '');
 
-      const imagePreview = document.createElement('img');
-      imagePreview.className = 'badge-lib-upload-preview';
-      imagePreview.alt = '';
-      imagePreview.loading = 'lazy';
-
-      const uploadBtn = document.createElement('button');
-      uploadBtn.type = 'button';
-      uploadBtn.className = 'btn sm ghost badge-lib-action';
-      uploadBtn.textContent = 'Bild wählen';
-
-      const clearBtn = document.createElement('button');
-      clearBtn.type = 'button';
-      clearBtn.className = 'btn sm ghost badge-lib-action';
-      clearBtn.textContent = 'Bild entfernen';
-
-      const uploadControls = document.createElement('div');
-      uploadControls.className = 'badge-lib-upload-controls';
-      uploadControls.appendChild(uploadBtn);
-      uploadControls.appendChild(clearBtn);
-
-      const imageWrap = document.createElement('div');
-      imageWrap.className = 'badge-lib-upload';
-      imageWrap.appendChild(imagePreview);
-      imageWrap.appendChild(uploadControls);
-
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'btn sm ghost badge-lib-remove';
@@ -2444,7 +2421,6 @@ export function renderSlidesMaster(){
       fields.className = 'badge-lib-fields';
       fields.appendChild(makeField('Badge-Text', labelInput));
       fields.appendChild(makeField('Emoji', emojiSelect));
-      fields.appendChild(makeField('Bild', imageWrap));
 
       actions.appendChild(removeBtn);
 
@@ -2453,27 +2429,12 @@ export function renderSlidesMaster(){
 
       const updatePreview = () => {
         const iconValue = (emojiSelect.value || '').trim();
-        const imageValue = (badge.imageUrl || '').trim();
         const labelValue = labelInput.value.trim();
         chipLabel.textContent = labelValue || badge.id;
-        chipIcon.textContent = iconValue;
-        chipIcon.hidden = !!imageValue || !iconValue;
-        if (imageValue){
-          chipImage.src = imageValue;
-          chipImage.hidden = false;
-          imagePreview.src = imageValue;
-          imagePreview.hidden = false;
-        } else {
-          chipImage.removeAttribute('src');
-          chipImage.hidden = true;
-          imagePreview.removeAttribute('src');
-          imagePreview.hidden = true;
-        }
-        row.classList.toggle('has-icon', !!iconValue && !imageValue);
-        row.classList.toggle('has-image', !!imageValue);
-        row.classList.toggle('has-media', !!imageValue || !!iconValue);
-        clearBtn.disabled = !imageValue;
-        uploadBtn.textContent = imageValue ? 'Bild ersetzen' : 'Bild wählen';
+        chipIcon.textContent = iconValue || '';
+        chipIcon.hidden = !iconValue;
+        row.classList.toggle('has-icon', !!iconValue);
+        row.classList.toggle('is-empty', !iconValue && !labelValue);
       };
 
       emojiSelect.addEventListener('input', updatePreview);
@@ -2487,27 +2448,6 @@ export function renderSlidesMaster(){
       labelInput.addEventListener('change', () => {
         badge.label = labelInput.value.trim();
         labelInput.value = badge.label;
-        updatePreview();
-        notifyChange();
-      });
-
-      uploadBtn.addEventListener('click', () => {
-        const fi = document.createElement('input');
-        fi.type = 'file';
-        fi.accept = 'image/*';
-        fi.onchange = () => uploadGeneric(fi, (p) => {
-          if (!p) return;
-          const url = typeof p === 'string' ? p : '';
-          badge.imageUrl = url;
-          updatePreview();
-          notifyChange();
-        });
-        fi.click();
-      });
-
-      clearBtn.addEventListener('click', () => {
-        if (!badge.imageUrl) return;
-        badge.imageUrl = '';
         updatePreview();
         notifyChange();
       });
@@ -2530,7 +2470,7 @@ export function renderSlidesMaster(){
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
       const list = ensureBadgeLibrary(settings);
-      list.push({ id: genId('bdg_'), icon:'', label:'', imageUrl:'' });
+      list.push({ id: genId('bdg_'), icon:'', label:'' });
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
       window.__queueUnsaved?.();
