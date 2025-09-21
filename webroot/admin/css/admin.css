@@ -42,8 +42,8 @@
 
   /* Größen */
   --fs:14px;
-  --input-min-h:30px;          /* kompakt wie früher */
-  --input-pad:4px 8px;
+  --input-min-h:36px;          /* kompakt wie früher */
+  --input-pad:6px 10px;
   --btn-pad:9px 12px;
   --btn-sm-pad:6px 10px;
   --radius:12px; --radius-sm:10px;
@@ -315,9 +315,13 @@ details[open] .chev{ transform: rotate(90deg); }
 .rightbar .input,
 .rightbar select,
 .rightbar textarea{
-  width: calc(100% - var(--edge-gap));
-  margin-right: var(--edge-gap);
-  min-height:30px; padding:4px 8px; border-radius:10px; font-size:14px; line-height:1.2;
+  width:100%;
+  margin-right:0;
+  min-height:var(--input-min-h);
+  padding:var(--input-pad);
+  border-radius:10px;
+  font-size:15px;
+  line-height:1.3;
 }
 
 /* spezielle kompakte Inputs */

@@ -348,6 +348,7 @@
                 <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
                 <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
                 <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+                <div class="kv"><label>Zeitspaltenbreite (ch)</label><input id="ovTimeWidth" class="input" type="number" step="0.5" min="6" max="24" value="10"></div>
                 <div class="kv"><label>Chip‑Höhe (%)</label><input id="chipH" class="input" type="number" min="50" max="200" value="100"></div>
                 <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
                 <div class="kv"><label>Textüberlänge</label>
@@ -356,6 +357,7 @@
                     <option value="ellipsis">Mit „…“ kürzen</option>
                   </select>
                 </div>
+                <div class="kv"><label>Flammen anzeigen</label><input id="overviewFlames" type="checkbox" checked></div>
                 <div class="kv"><label>Flammen-Größe (% der Chip-Höhe)</label>
                   <input id="flamePct" class="input" type="number" min="30" max="100" value="55">
                 </div>
@@ -380,12 +382,16 @@
                     <option value="800">Extra Bold (800)</option>
                   </select>
                 </div>
+                <div class="kv"><label>Uhrzeit Scale</label><input id="tileTimeScale" class="input" type="number" step="0.05" min="0.5" max="2" value="1"></div>
                 <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
                 <div class="kv"><label>Kachel‑Breite min (Faktor)</label><input id="tileMin" class="input" type="number" min="0" max="1" step="0.01" value="0.25"></div>
                 <div class="kv"><label>Kachel‑Breite max (Faktor)</label><input id="tileMax" class="input" type="number" min="0" max="1" step="0.01" value="0.57"></div>
+                <div class="kv"><label>Kachel-Höhen-Scale</label><input id="tileHeightScale" class="input" type="number" step="0.05" min="0.5" max="2" value="1"></div>
                 <div class="kv"><label>Badge-Farbe</label>
                   <input id="badgeColor" class="input" type="color" value="#5C3101" title="Badge-Farbe">
                 </div>
+                <div class="kv"><label>Farbverlauf anzeigen</label><input id="tileOverlayEnabled" type="checkbox" checked></div>
+                <div class="kv"><label>Farbverlauf-Stärke (%)</label><input id="tileOverlayStrength" class="input" type="number" step="5" min="0" max="200" value="100"></div>
                 <div class="kv">
                   <label>Komponenten auf Slides</label>
                   <div id="componentToggleWrap" class="component-toggle-wrap">
