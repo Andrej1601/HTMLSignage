@@ -2409,18 +2409,10 @@ function renderStorySlide(story = {}, region = 'left') {
     const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
     const iconSize = clamp(56, t * 0.16, 200);
-    const basePadY = useIcons ? clamp(12, t * 0.04, 40) : clamp(9, t * 0.032, 28);
-    const basePadX = useIcons
-      ? Math.max(clamp(18, t * 0.062, 64), basePadY + 6)
-      : Math.max(clamp(16, t * 0.055, 44), basePadY + 4);
-    const padScale = Number.isFinite(+settings?.slides?.tilePaddingScale)
-      ? clamp(0.4, +settings.slides.tilePaddingScale, 1.6)
-      : 0.85;
-    const padY = clamp(6, basePadY * padScale, basePadY * 1.6);
-    const padX = Math.max(
-      clamp(10, basePadX * padScale, basePadX * 1.6),
-      padY + (useIcons ? 6 : 4)
-    );
+    const padY = useIcons ? clamp(14, t * 0.045, 44) : clamp(10, t * 0.035, 32);
+    const padX = useIcons
+      ? Math.max(clamp(20, t * 0.07, 68), padY + 6)
+      : Math.max(clamp(18, t * 0.06, 48), padY + 4);
     const gap = useIcons ? clamp(16, t * 0.05, 38) : clamp(12, t * 0.04, 30);
     const contentGap = useIcons ? clamp(8, t * 0.03, 26) : clamp(6, t * 0.022, 18);
     const chipGap = useIcons ? clamp(6, t * 0.022, 22) : clamp(4, t * 0.018, 16);
@@ -2442,8 +2434,8 @@ function renderStorySlide(story = {}, region = 'left') {
     const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
     const iconColumn = useIcons ? clamp(44, iconSize * 0.78, iconSize * 1.52) : 0;
     const tileMinHeight = useIcons
-      ? clamp(78, iconSize * 0.9, iconSize * 1.12)
-      : clamp(66, padY * 3.1, 120);
+      ? clamp(92, iconSize * 0.9, iconSize * 1.18)
+      : clamp(80, padY * 3.4, 132);
     const iconHeightScale = useIcons
       ? clamp(0.72, tileMinHeight / Math.max(iconSize, 1), 1.05)
       : 0;
@@ -2729,10 +2721,6 @@ function renderStorySlide(story = {}, region = 'left') {
       }
 
       const titleNode = h('div', { class: 'title' });
-      if (it.time) {
-        titleNode.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
-        titleNode.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
-      }
       const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
       if (supNote) {
@@ -2744,16 +2732,22 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
+      const metaColumn = h('div', { class: 'card-meta' });
+      if (it.time) {
+        metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
+        metaColumn.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
+      }
+
       const mainColumn = h('div', { class: 'card-main' });
-      const contentBlock = h('div', { class: 'card-content' }, [mainColumn]);
-      let metaColumn = null;
-      const ensureMetaColumn = () => {
-        if (metaColumn) return metaColumn;
-        metaColumn = h('div', { class: 'card-meta' });
-        contentBlock.insertBefore(metaColumn, mainColumn);
-        contentBlock.classList.add('card-content--with-meta');
-        return metaColumn;
-      };
+      const contentChildren = [];
+      let hasMetaColumn = false;
+      if (metaColumn.childNodes.length) {
+        contentChildren.push(metaColumn);
+        hasMetaColumn = true;
+      }
+      contentChildren.push(mainColumn);
+      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
+      if (hasMetaColumn) contentBlock.classList.add('card-content--with-meta');
 
       const componentDefs = [
         { key: 'title', node: titleNode, target: 'main' },
@@ -2767,11 +2761,8 @@ function renderStorySlide(story = {}, region = 'left') {
         componentDefs,
         (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'),
         (node, def) => {
-          if (def && def.target === 'meta') {
-            ensureMetaColumn().appendChild(node);
-          } else {
-            mainColumn.appendChild(node);
-          }
+          const target = (def && def.target === 'meta') ? metaColumn : mainColumn;
+          target.appendChild(node);
         }
       );
 
