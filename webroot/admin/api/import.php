@@ -3,6 +3,31 @@ header('Content-Type: application/json; charset=UTF-8');
 
 function fail($m,$c=400){ http_response_code($c); echo json_encode(['ok'=>false,'error'=>$m]); exit; }
 
+function remap_asset_paths(&$value, array $map): void {
+  if (empty($map)) return;
+  if (is_array($value)) {
+    foreach ($value as &$item) {
+      remap_asset_paths($item, $map);
+    }
+    unset($item);
+    return;
+  }
+  if (!is_string($value)) return;
+  $trimmed = trim($value);
+  if ($trimmed === '') return;
+  if (isset($map[$trimmed])) {
+    $value = $map[$trimmed];
+    return;
+  }
+  if (preg_match('~^(/assets/[A-Za-z0-9_./\-]+)(\?[^\s]*)?$~', $trimmed, $m)) {
+    $path = $m[1];
+    if (isset($map[$path])) {
+      $suffix = $m[2] ?? '';
+      $value = $map[$path] . $suffix;
+    }
+  }
+}
+
 $raw = '';
 if (!empty($_FILES['file']['tmp_name'])) {
   $raw = file_get_contents($_FILES['file']['tmp_name']);
@@ -54,24 +79,9 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
     $pathMap[$rel] = $outRel;
   }
 
-  // remap settings asset paths to the newly written files (if present)
-  if (!empty($settings['assets']['flameImage']) && isset($pathMap[$settings['assets']['flameImage']])) {
-    $settings['assets']['flameImage'] = $pathMap[$settings['assets']['flameImage']];
-  }
-  if (!empty($settings['assets']['rightImages']) && is_array($settings['assets']['rightImages'])) {
-    foreach ($settings['assets']['rightImages'] as $k=>$p) {
-      if (isset($pathMap[$p])) $settings['assets']['rightImages'][$k] = $pathMap[$p];
-    }
-  }
-  if (!empty($settings['interstitials']) && is_array($settings['interstitials'])) {
-    foreach ($settings['interstitials'] as $i=>$it) {
-      if (!is_array($it)) continue;
-      foreach ($it as $k=>$v) {
-        if (is_string($v) && isset($pathMap[$v])) {
-          $settings['interstitials'][$i][$k] = $pathMap[$v];
-        }
-      }
-    }
+  if (!empty($pathMap)) {
+    if (is_array($settings)) remap_asset_paths($settings, $pathMap);
+    if (is_array($schedule)) remap_asset_paths($schedule, $pathMap);
   }
 }
 

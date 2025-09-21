@@ -784,15 +784,65 @@ async function loadDeviceResolved(id){
       default: return base;
     }
   }
- function flameNode() {
+  function flameNode() {
     const url = settings?.assets?.flameImage || '/assets/img/flame_test.svg';
     const box = h('div', { class: 'flame' });
-    if (url) { const img = h('img', { src: url, alt: '' }); img.addEventListener('error', () => { box.innerHTML = ''; box.appendChild(inlineFlameSVG()); }); box.appendChild(img); return box; }
-    box.appendChild(inlineFlameSVG()); return box;
+    if (url) {
+      const img = h('img', { src: url, alt: '' });
+      img.addEventListener('error', () => {
+        box.innerHTML = '';
+        box.appendChild(inlineFlameSVG());
+      });
+      box.appendChild(img);
+      return box;
+    }
+    box.appendChild(inlineFlameSVG());
+    return box;
   }
+
+  function normalizeFlameSpec(spec) {
+    if (spec == null) return '';
+    let str = '';
+    if (typeof spec === 'number' && Number.isFinite(spec)) {
+      str = String(Math.round(spec));
+    } else if (typeof spec === 'string') {
+      str = spec;
+    } else {
+      str = String(spec);
+    }
+    str = str.trim();
+    if (!str) return '';
+    return str
+      .replace(/to/gi, '-')
+      .replace(/[–—−]/g, '-')
+      .replace(/\//g, '-')
+      .replace(/[,_;]+/g, '-')
+      .replace(/\s+/g, '')
+      .toLowerCase();
+  }
+
+  function parseFlameSpec(spec) {
+    const norm = normalizeFlameSpec(spec);
+    if (norm === '1' || norm === '2' || norm === '3') {
+      const count = Math.max(0, Math.min(3, parseInt(norm, 10) || 0));
+      return { count, approx: false };
+    }
+    const approxMap = {
+      '1-2': 2,
+      '2-3': 3,
+      '1-3': 3,
+      '12': 2,
+      '23': 3,
+      '13': 3
+    };
+    if (Object.prototype.hasOwnProperty.call(approxMap, norm)) {
+      return { count: approxMap[norm], approx: true };
+    }
+    return { count: 0, approx: false };
+  }
+
   function flamesWrap(spec) {
-    let count = 0, approx = false;
-    if (!spec) count = 0; else if (spec === '1') count = 1; else if (spec === '2') count = 2; else if (spec === '3') count = 3; else if (spec === '1-2') { count = 2; approx = true; } else if (spec === '2-3' || spec === '1-3') { count = 3; approx = true; }
+    const { count, approx } = parseFlameSpec(spec);
     const wrap = h('div', { class: 'flames' + (approx ? ' approx' : '') });
     wrap.appendChild(count >= 1 ? flameNode() : h('span'));
     wrap.appendChild(count >= 2 ? flameNode() : h('span'));
