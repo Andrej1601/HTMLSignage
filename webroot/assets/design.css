@@ -687,9 +687,20 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   text-transform:uppercase;
   letter-spacing:.08em;
 }
-.tile.is-hidden{filter:saturate(.25) brightness(.93);} 
+.tile.is-hidden{filter:saturate(.25) brightness(.93);}
 .tile.is-hidden .card-chip--status{filter:none;}
-.flames{display:flex;gap:10px;align-items:center;justify-self:end;align-self:center}
+.flames{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-end;
+  justify-self:end;
+  align-self:center;
+  grid-column:3;
+  min-width:0;
+}
+.tile.tile--compact .flames{grid-column:2;}
+ 
 .flame{width:calc(var(--flameSizePx)*1px*var(--scale)); height:calc(var(--flameSizePx)*1px*var(--scale))}
 .flame img,.flame svg{width:100%;height:100%;object-fit:contain}
 .flame svg path{fill:var(--flame)}
