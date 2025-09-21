@@ -43,6 +43,8 @@
   --tileRadiusPx:calc(22px*var(--vwScale));
   --tileBadgeOffsetPx:calc(12px*var(--vwScale));
   --tileMetaScale:1;
+  --tileBadgeScale:1;
+  --tileDescriptionScale:1;
   --tileMinHeightPx:calc(120px*var(--vwScale));
   --tileIconHeightScale:.9;
   --tileOverlayOpacity:.9;
@@ -571,7 +573,7 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .tile .title .label .notewrap{flex:0 0 auto;}
 .card-content .description{
   display:block;
-  font-size:calc(22px*var(--scale)*var(--tileMetaScale,1));
+  font-size:calc(22px*var(--scale)*var(--tileDescriptionScale, var(--tileMetaScale,1)));
   font-weight:500;
   letter-spacing:.02em;
   opacity:.9;
@@ -610,7 +612,7 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   border-radius:999px;
   background:var(--badgeBg, var(--accent));
   color:var(--badgeFg, var(--boxfg));
-  font-size:calc(20px*var(--scale)*var(--tileMetaScale,1));
+  font-size:calc(20px*var(--scale)*var(--tileBadgeScale, var(--tileMetaScale,1)));
   font-weight:600;
   letter-spacing:.08em;
   line-height:1.1;

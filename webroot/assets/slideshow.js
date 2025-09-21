@@ -2445,6 +2445,12 @@ function renderStorySlide(story = {}, region = 'left') {
     const userMetaScale = Number.isFinite(+settings?.fonts?.tileMetaScale)
       ? clamp(0.5, +settings.fonts.tileMetaScale, 2)
       : 1;
+    const userBadgeScale = Number.isFinite(+settings?.slides?.badgeScale)
+      ? clamp(0.3, +settings.slides.badgeScale, 3)
+      : 1;
+    const userBadgeDescriptionScale = Number.isFinite(+settings?.slides?.badgeDescriptionScale)
+      ? clamp(0.3, +settings.slides.badgeDescriptionScale, 3)
+      : 1;
     const heightScale = Number.isFinite(+settings?.slides?.tileHeightScale)
       ? clamp(0.5, +settings.slides.tileHeightScale, 2)
       : 1;
@@ -2465,7 +2471,10 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileChipGapPx', chipGap.toFixed(2) + 'px');
     container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
     container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
-    container.style.setProperty('--tileMetaScale', (metaScale * userMetaScale).toFixed(3));
+    const combinedMeta = metaScale * userMetaScale;
+    container.style.setProperty('--tileMetaScale', combinedMeta.toFixed(3));
+    container.style.setProperty('--tileBadgeScale', (combinedMeta * userBadgeScale).toFixed(3));
+    container.style.setProperty('--tileDescriptionScale', (combinedMeta * userBadgeDescriptionScale).toFixed(3));
     container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
     container.style.setProperty('--tileIconColumnPx', useIcons ? (iconColumn.toFixed(2) + 'px') : '0px');
     container.style.setProperty('--tileHeightScale', heightScale.toFixed(3));

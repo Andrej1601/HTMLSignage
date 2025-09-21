@@ -45,6 +45,185 @@ const lsGet = (key) => safeStorage.getItem(key);
 const lsSet = (key, value) => safeStorage.setItem(key, value);
 const lsRemove = (key) => safeStorage.removeItem(key);
 
+function initSidebarResizer(){
+  const layout = document.querySelector('main.layout');
+  const resizer = document.getElementById('sidebarResizer');
+  const rightbar = document.getElementById('adminSidebar') || document.querySelector('.rightbar');
+  const columnsHost = rightbar?.querySelector('.rightbar-columns') || null;
+  if (!layout || !resizer || !rightbar) return;
+
+  const root = document.documentElement;
+  const parsePx = (value, fallback) => {
+    const parsed = Number(String(value || '').replace(/[^0-9.\-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  let minWidth = 320;
+  let maxWidth = 920;
+
+  const refreshBounds = () => {
+    const styles = getComputedStyle(root);
+    minWidth = parsePx(styles.getPropertyValue('--sidebar-min'), 320);
+    maxWidth = parsePx(styles.getPropertyValue('--sidebar-max'), 920);
+    if (maxWidth < minWidth) {
+      const tmp = maxWidth;
+      maxWidth = minWidth;
+      minWidth = tmp;
+    }
+  };
+
+  const clampWidth = (value) => {
+    const next = Number.isFinite(value) ? value : minWidth;
+    return Math.min(Math.max(next, minWidth), maxWidth);
+  };
+
+  const applyColumnDensity = (widthHint) => {
+    if (!columnsHost) return;
+    const actual = Number.isFinite(widthHint)
+      ? widthHint
+      : rightbar.getBoundingClientRect().width;
+    columnsHost.classList.toggle('is-narrow', actual < 720);
+  };
+
+  refreshBounds();
+
+  let currentWidth = clampWidth(rightbar.getBoundingClientRect().width);
+
+  const updateAria = (width) => {
+    resizer.setAttribute('aria-valuemin', String(Math.round(minWidth)));
+    resizer.setAttribute('aria-valuemax', String(Math.round(maxWidth)));
+    resizer.setAttribute('aria-valuenow', String(Math.round(width)));
+  };
+
+  const setSize = (width, { persist = false } = {}) => {
+    refreshBounds();
+    const clamped = clampWidth(width);
+    currentWidth = clamped;
+    root.style.setProperty('--sidebar-size', `${Math.round(clamped)}px`);
+    applyColumnDensity(clamped);
+    updateAria(clamped);
+    if (persist) {
+      lsSet('sidebarWidth', String(Math.round(clamped)));
+    }
+  };
+
+  const stored = Number(lsGet('sidebarWidth'));
+  if (Number.isFinite(stored)) {
+    setSize(stored);
+  } else {
+    updateAria(currentWidth);
+    applyColumnDensity(currentWidth);
+  }
+
+  let pointerId = null;
+  let startX = 0;
+  let startWidth = currentWidth;
+
+  const endResize = (commit = true) => {
+    if (pointerId == null) return;
+    if (pointerId >= 0) {
+      resizer.releasePointerCapture?.(pointerId);
+    }
+    pointerId = null;
+    document.body.classList.remove('is-resizing-sidebar');
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    resizer.classList.remove('is-active');
+    if (commit) {
+      setSize(currentWidth, { persist: true });
+    }
+  };
+
+  const onMove = (ev) => {
+    if (pointerId == null) return;
+    const delta = ev.clientX - startX;
+    const next = clampWidth(startWidth + delta);
+    setSize(next);
+    resizer.classList.add('is-active');
+  };
+
+  const onUp = (ev) => {
+    if (pointerId == null) return;
+    if (pointerId >= 0 && typeof ev.pointerId === 'number' && ev.pointerId !== pointerId) return;
+    endResize(true);
+  };
+
+  const onCancel = () => endResize(false);
+
+  resizer.addEventListener('pointerdown', (ev) => {
+    if (ev.button != null && ev.button !== 0) return;
+    pointerId = typeof ev.pointerId === 'number' ? ev.pointerId : -1;
+    startX = ev.clientX;
+    startWidth = currentWidth;
+    document.body.classList.add('is-resizing-sidebar');
+    if (pointerId >= 0) {
+      resizer.setPointerCapture?.(pointerId);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    ev.preventDefault();
+  });
+
+  resizer.addEventListener('dblclick', () => {
+    root.style.removeProperty('--sidebar-size');
+    lsRemove('sidebarWidth');
+    requestAnimationFrame(() => {
+      refreshBounds();
+      currentWidth = clampWidth(rightbar.getBoundingClientRect().width);
+      updateAria(currentWidth);
+      applyColumnDensity(currentWidth);
+    });
+  });
+
+  resizer.addEventListener('keydown', (ev) => {
+    const step = ev.shiftKey ? 40 : 16;
+    let handled = false;
+    if (ev.key === 'ArrowLeft') {
+      setSize(currentWidth - step, { persist: true });
+      handled = true;
+    } else if (ev.key === 'ArrowRight') {
+      setSize(currentWidth + step, { persist: true });
+      handled = true;
+    } else if (ev.key === 'Home') {
+      setSize(minWidth, { persist: true });
+      handled = true;
+    } else if (ev.key === 'End') {
+      setSize(maxWidth, { persist: true });
+      handled = true;
+    }
+    if (handled) {
+      ev.preventDefault();
+    }
+  });
+
+  resizer.addEventListener('pointerup', onUp);
+  resizer.addEventListener('pointercancel', onCancel);
+
+  if (columnsHost) {
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const width = entry.contentBoxSize
+            ? (Array.isArray(entry.contentBoxSize)
+              ? entry.contentBoxSize[0]?.inlineSize
+              : entry.contentBoxSize.inlineSize)
+            : entry.contentRect.width;
+          applyColumnDensity(width);
+        }
+      });
+      observer.observe(rightbar);
+    } else {
+      const apply = () => applyColumnDensity(rightbar.getBoundingClientRect().width);
+      window.addEventListener('resize', apply);
+      apply();
+    }
+  }
+}
+
+initSidebarResizer();
+
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
@@ -905,6 +1084,8 @@ function renderSlidesBox(){
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
+  setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
+  setV('#badgeDescriptionScale', settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1);
   const overlayCheckbox = document.getElementById('tileOverlayEnabled');
   const overlayInput = document.getElementById('tileOverlayStrength');
   const overlayEnabled = (settings.slides?.tileOverlayEnabled !== false);
@@ -994,6 +1175,8 @@ function renderSlidesBox(){
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
+    setV('#badgeScale',    DEFAULTS.slides.badgeScale);
+    setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
     setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
@@ -1309,6 +1492,16 @@ function collectSettings(){
           if (!Number.isFinite(raw)) return settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1;
           return clamp(0.5, raw, 2);
         })(),
+        badgeScale:(() => {
+          const raw = Number($('#badgeScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1;
+          return clamp(0.3, raw, 3);
+        })(),
+        badgeDescriptionScale:(() => {
+          const raw = Number($('#badgeDescriptionScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1;
+          return clamp(0.3, raw, 3);
+        })(),
         infobadgeColor:(() => {
           const el = document.getElementById('badgeColor');
           const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
@@ -1326,6 +1519,19 @@ function collectSettings(){
           const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
           (settings.slides ||= {}).badgeLibrary = sanitized;
           return sanitized;
+        })(),
+        customBadgeEmojis:(() => {
+          const list = Array.isArray(settings.slides?.customBadgeEmojis)
+            ? settings.slides.customBadgeEmojis
+            : [];
+          const out = [];
+          list.forEach(entry => {
+            if (typeof entry !== 'string') return;
+            const value = entry.trim();
+            if (!value || out.includes(value)) return;
+            out.push(value);
+          });
+          return out;
         })(),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
