@@ -1220,6 +1220,22 @@ body.mode-uniform #ovSec{ display:none !important; }
   flex-wrap:wrap;
   gap:6px;
 }
+.story-align-toggle .btn.is-active,
+.story-column-toggle .btn.is-active{
+  border-color:color-mix(in oklab, var(--btn-accent) 60%, var(--ghost-border));
+  background:color-mix(in oklab, var(--btn-accent) 14%, var(--panel));
+  color:color-mix(in oklab, var(--btn-accent) 70%, var(--fg));
+}
+.story-section-column{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.story-column-toggle{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
 .story-fullimage-toggle{
   display:inline-flex;
   align-items:center;

@@ -1971,8 +1971,22 @@ function normalizeStoryForRender(story = {}) {
   const headingRaw = String(story.heading || story.title || '').trim();
   const subheadingRaw = String(story.subheading || story.subtitle || '').trim();
   if (Array.isArray(story.columns)) {
-    const columns = story.columns.map(normalizeStoryColumn).filter(col => col.sections.length);
-    const layout = normalizeStoryLayout(story.layout) || (columns.length > 1 ? 'double' : 'single');
+    const rawColumns = story.columns.map(normalizeStoryColumn);
+    const layoutNormalized = normalizeStoryLayout(story.layout);
+    let columns;
+    if (layoutNormalized === 'double') {
+      const findByRole = (role) => rawColumns.find(col => (col.role || '').toLowerCase() === role);
+      const left = findByRole('left') || { role: 'left', sections: [] };
+      const right = findByRole('right') || { role: 'right', sections: [] };
+      const extras = rawColumns.filter(col => {
+        const role = (col.role || '').toLowerCase();
+        return role !== 'left' && role !== 'right' && col.sections.length;
+      });
+      columns = [left, right, ...extras];
+    } else {
+      columns = rawColumns.filter(col => col.sections.length);
+    }
+    const layout = layoutNormalized || (columns.length > 1 ? 'double' : 'single');
     return {
       heading: headingRaw,
       subheading: subheadingRaw,
@@ -2035,33 +2049,64 @@ function renderStorySlide(story = {}, region = 'left') {
 
   const sectionsWrap = h('div', { class: 'story-sections' });
   let sectionCount = 0;
-  const appendSectionNode = (section, context) => {
+  const columnSectionCounts = [];
+  const appendSectionNode = (section, context, parent) => {
     const node = buildStorySectionNode(section, context);
-    if (node) {
-      sectionCount += 1;
-      if (context && context.columnIndex != null) {
-        node.dataset.columnIndex = String(context.columnIndex);
-      }
-      if (context && context.sectionIndex != null) {
-        node.dataset.sectionIndex = String(context.sectionIndex);
-      }
-      sectionsWrap.appendChild(node);
+    if (!node) return false;
+    sectionCount += 1;
+    if (context && context.columnIndex != null) {
+      node.dataset.columnIndex = String(context.columnIndex);
     }
+    if (context && context.sectionIndex != null) {
+      node.dataset.sectionIndex = String(context.sectionIndex);
+    }
+    (parent || sectionsWrap).appendChild(node);
+    return true;
   };
 
-  (normalized.columns || []).forEach((column, columnIndex) => {
-    (column.sections || []).forEach((section, sectionIndex) => {
-      appendSectionNode(section, {
-        columnIndex,
-        sectionIndex,
-        normalizedStory: normalized,
-        rawStory: normalized.raw,
-        legacyStory: normalized.legacy
+  const columnsList = Array.isArray(normalized.columns) ? normalized.columns : [];
+  if (normalized.layout === 'double') {
+    sectionsWrap.classList.add('story-sections--double');
+    columnsList.forEach((column, columnIndex) => {
+      const columnEl = h('div', { class: 'story-column' });
+      columnEl.dataset.columnIndex = String(columnIndex);
+      if (column.role) columnEl.dataset.columnRole = String(column.role);
+      let columnCount = 0;
+      (column.sections || []).forEach((section, sectionIndex) => {
+        if (appendSectionNode(section, {
+          columnIndex,
+          sectionIndex,
+          normalizedStory: normalized,
+          rawStory: normalized.raw,
+          legacyStory: normalized.legacy
+        }, columnEl)) {
+          columnCount += 1;
+        }
       });
+      columnSectionCounts.push(columnCount);
+      if (!columnCount) columnEl.classList.add('story-column--empty');
+      sectionsWrap.appendChild(columnEl);
     });
-  });
+  } else {
+    columnsList.forEach((column, columnIndex) => {
+      let columnCount = 0;
+      (column.sections || []).forEach((section, sectionIndex) => {
+        if (appendSectionNode(section, {
+          columnIndex,
+          sectionIndex,
+          normalizedStory: normalized,
+          rawStory: normalized.raw,
+          legacyStory: normalized.legacy
+        })) {
+          columnCount += 1;
+        }
+      });
+      if (columnCount) columnSectionCounts.push(columnCount);
+    });
+  }
 
-  if (!sectionsWrap.childNodes.length) {
+  if (!sectionCount) {
+    sectionsWrap.innerHTML = '';
     sectionsWrap.appendChild(
       h('section', { class: 'story-section story-section--empty' }, [
         h('p', { class: 'story-section-empty' }, 'Keine Inhalte verfügbar.')
@@ -2072,6 +2117,24 @@ function renderStorySlide(story = {}, region = 'left') {
   container.appendChild(sectionsWrap);
   container.dataset.storySectionCount = String(sectionCount);
   container.style.setProperty('--story-section-count', String(Math.max(sectionCount, 1)));
+  const rawColumnCount = columnsList.length;
+  const columnCount = normalized.layout === 'double' ? Math.max(rawColumnCount || 0, 2) : Math.max(rawColumnCount || 0, 1);
+  container.dataset.storyColumnCount = String(columnCount);
+  container.style.setProperty('--story-column-count', String(columnCount));
+  const maxPerColumnRaw = columnSectionCounts.reduce((max, value) => Math.max(max, value || 0), 0);
+  const singleDensity = Math.max(sectionCount, 1);
+  const maxPerColumnCount = normalized.layout === 'double'
+    ? Math.max(maxPerColumnRaw, 1)
+    : singleDensity;
+  container.dataset.storyMaxPerColumn = String(maxPerColumnCount);
+  container.style.setProperty('--story-section-max-per-column', String(maxPerColumnCount));
+  const density = normalized.layout === 'double' ? maxPerColumnCount : singleDensity;
+  const baseWidth = columnCount > 1 ? 40 : 48;
+  const mediaWidth = Math.max(18, baseWidth - Math.max(density - 1, 0) * 4);
+  container.style.setProperty('--story-section-media-basis', mediaWidth.toFixed(2) + '%');
+  const baseScale = columnCount > 1 ? 0.92 : 1;
+  const scale = Math.max(0.6, baseScale - Math.max(density - 1, 0) * 0.08);
+  container.style.setProperty('--story-section-scale', scale.toFixed(3));
   return container;
 
   function buildStorySectionNode(section, ctx) {

@@ -748,32 +748,58 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 /* story slides */
 .story-slide{
   --story-section-count:1;
-  --story-section-media-basis:clamp(24%, calc(48% - (var(--story-section-count, 1) - 1) * 4%), 48%);
+  --story-column-count:1;
+  --story-section-max-per-column:1;
+  --story-section-scale:1;
+  --story-section-media-basis:42%;
+  --story-section-media-height:clamp(160px, calc(68vh / var(--story-section-max-per-column, 1)), 520px);
   padding:clamp(20px, 4vw, 48px);
   display:flex;
   flex-direction:column;
-  gap:clamp(24px, 4vh, 40px);
+  gap:calc(clamp(24px, 4vh, 40px) * var(--story-section-scale));
 }
 
 .story-slide .story-heading{
   margin:0;
-  font-size:calc(64px*var(--scale));
+  font-size:calc(64px*var(--scale)*clamp(.72, var(--story-section-scale) + .25, 1.08));
   font-weight:800;
   line-height:1.05;
   letter-spacing:.01em;
 }
 
 .story-slide .story-sections{
+  width:100%;
+}
+
+.story-layout-single .story-sections{
   display:flex;
   flex-direction:column;
-  gap:clamp(24px, 3vh, 40px);
-  width:100%;
+  gap:calc(clamp(24px, 3vh, 40px) * var(--story-section-scale));
+}
+
+.story-sections--double{
+  display:grid;
+  grid-template-columns:repeat(var(--story-column-count, 2), minmax(0, 1fr));
+  gap:calc(clamp(24px, 4vw, 48px) * var(--story-section-scale));
+}
+
+.story-column{
+  display:flex;
+  flex-direction:column;
+  gap:calc(clamp(20px, 3vh, 36px) * var(--story-section-scale));
+  min-width:0;
+}
+
+.story-column--empty{ display:none; }
+
+.story-layout-double .story-section{
+  height:100%;
 }
 
 .story-section{
   display:flex;
   flex-direction:column;
-  gap:clamp(16px, 2vh, 24px);
+  gap:calc(clamp(16px, 2vh, 24px) * var(--story-section-scale));
   min-width:0;
 }
 
@@ -785,22 +811,30 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
   align-items:flex-start;
 }
 
+.story-section--media-full .story-section-media{
+  max-height:none;
+}
+
 .story-section-empty{
   margin:0;
-  font-size:calc(24px*var(--scale));
+  font-size:calc(24px*var(--scale)*var(--story-section-scale));
   opacity:.7;
 }
 
 .story-section-media{
   flex:0 0 auto;
   width:100%;
+  max-height:var(--story-section-media-height);
+  display:flex;
+  flex-direction:column;
 }
 
 .story-section-figure{
   margin:0;
   width:100%;
-  height:100%;
-  display:block;
+  height:auto;
+  display:flex;
+  flex-direction:column;
   border-radius:clamp(18px, 2.4vw, 30px);
   overflow:hidden;
   background:rgba(255,255,255,.08);
@@ -810,8 +844,10 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 .story-section-figure img{
   display:block;
   width:100%;
-  height:100%;
+  height:auto;
+  max-height:100%;
   object-fit:cover;
+  flex:1 1 auto;
 }
 
 .story-section-figure figcaption{
@@ -819,7 +855,7 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
   padding:.75em 1.1em;
   background:rgba(0,0,0,.62);
   color:#fff;
-  font-size:calc(20px*var(--scale));
+  font-size:calc(20px*var(--scale)*var(--story-section-scale));
   line-height:1.35;
 }
 
@@ -830,7 +866,7 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
   min-height:160px;
   padding:1.4em;
   text-align:center;
-  font-size:calc(22px*var(--scale));
+  font-size:calc(22px*var(--scale)*var(--story-section-scale));
   line-height:1.4;
   color:rgba(255,255,255,.82);
 }
@@ -838,14 +874,14 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 .story-section-content{
   display:flex;
   flex-direction:column;
-  gap:clamp(12px, 1.8vh, 20px);
-  font-size:calc(24px*var(--scale));
+  gap:calc(clamp(12px, 1.8vh, 20px) * var(--story-section-scale));
+  font-size:calc(24px*var(--scale)*var(--story-section-scale));
   line-height:1.45;
 }
 
 .story-section-kicker{
   margin:0;
-  font-size:calc(22px*var(--scale));
+  font-size:calc(22px*var(--scale)*var(--story-section-scale));
   font-weight:600;
   letter-spacing:.08em;
   text-transform:uppercase;
@@ -854,14 +890,14 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 
 .story-section-heading{
   margin:0;
-  font-size:calc(42px*var(--scale));
+  font-size:calc(42px*var(--scale)*var(--story-section-scale));
   font-weight:700;
   line-height:1.12;
 }
 
 .story-section-subheading{
   margin:0;
-  font-size:calc(26px*var(--scale));
+  font-size:calc(26px*var(--scale)*var(--story-section-scale));
   opacity:.85;
 }
 
@@ -1069,14 +1105,13 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
     max-width:var(--story-section-media-basis);
   }
   .story-section--media-right{
-    flex-direction:row-reverse;
   }
   .story-section--media-right .story-section-media{
-    margin-left:clamp(16px, 2vw, 32px);
+    margin-left:calc(clamp(16px, 2vw, 32px) * var(--story-section-scale));
     margin-right:0;
   }
   .story-section--media-left .story-section-media{
-    margin-right:clamp(16px, 2vw, 32px);
+    margin-right:calc(clamp(16px, 2vw, 32px) * var(--story-section-scale));
   }
   .story-section--media-bottom{
     flex-direction:column;

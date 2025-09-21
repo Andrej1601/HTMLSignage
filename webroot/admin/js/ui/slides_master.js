@@ -1021,7 +1021,7 @@ function storyEnsureSectionId() {
   return 'story_sec_' + Math.random().toString(36).slice(2, 9);
 }
 
-function normalizeStoryBuilderSection(section = {}, { defaultPosition = 'left' } = {}) {
+function normalizeStoryBuilderSection(section = {}, { defaultPosition = 'left', defaultColumn = 'left' } = {}) {
   const src = (section && typeof section === 'object') ? section : {};
   let id = src.id != null ? String(src.id) : '';
   if (!id) id = storyEnsureSectionId();
@@ -1057,13 +1057,22 @@ function normalizeStoryBuilderSection(section = {}, { defaultPosition = 'left' }
   else if (!mediaPosition && defaultPosition === 'right') mediaPosition = 'right';
   else mediaPosition = 'left';
 
+  let column = '';
+  if (typeof src.column === 'string') column = src.column;
+  else if (typeof src.side === 'string') column = src.side;
+  column = String(column || '').trim().toLowerCase();
+  if (column === 'right') column = 'right';
+  else if (defaultColumn === 'right') column = 'right';
+  else column = 'left';
+
   return {
     id,
     heading: String(headingRaw || '').trim(),
     body: String(bodyRaw || '').trim(),
     imageUrl: String(imageUrl || '').trim(),
     imageAlt: String(imageAlt || '').trim(),
-    mediaPosition
+    mediaPosition,
+    column
   };
 }
 
@@ -1087,8 +1096,28 @@ function syncStoryBuilderStructure(story) {
   const rawSections = Array.isArray(story.sections) ? story.sections : [];
   const sections = rawSections.map(entry => normalizeStoryBuilderSection(entry));
   story.sections = sections;
-  story.columns = sections.length ? [{ sections: sections.map(storySectionToCard) }] : [];
-  story.layout = 'single';
+
+  let layout = typeof story.layout === 'string' ? story.layout.trim().toLowerCase() : '';
+  layout = (layout === 'double') ? 'double' : 'single';
+  story.layout = layout;
+
+  const cards = sections.map(storySectionToCard);
+  if (layout === 'double') {
+    const leftCards = [];
+    const rightCards = [];
+    cards.forEach((card, idx) => {
+      const section = sections[idx];
+      if (section && section.column === 'right') rightCards.push(card);
+      else leftCards.push(card);
+    });
+    story.columns = [
+      { role: 'left', sections: leftCards },
+      { role: 'right', sections: rightCards }
+    ];
+  } else {
+    story.columns = cards.length ? [{ sections: cards }] : [];
+  }
+
   const primary = sections.find(section => section.imageUrl);
   story.heroUrl = primary ? primary.imageUrl : '';
   story.heroAlt = primary ? (primary.imageAlt || sectionHeadingFallback(primary)) : '';
@@ -1099,8 +1128,11 @@ function syncStoryBuilderStructure(story) {
   }
 }
 
-function createStorySectionDefaults(position = 'left') {
-  return normalizeStoryBuilderSection({ id: storyEnsureSectionId(), mediaPosition: position });
+function createStorySectionDefaults(position = 'left', column = 'left') {
+  return normalizeStoryBuilderSection({ id: storyEnsureSectionId(), mediaPosition: position, column }, {
+    defaultPosition: position,
+    defaultColumn: column
+  });
 }
 const stripCacheSimple = (u = '') => u.split('?')[0];
 
@@ -1118,7 +1150,7 @@ function ensureStorySlides(settings){
     story.enabled = (story.enabled === false) ? false : true;
 
     const normalizedSections = [];
-    const pushNormalized = (section, options) => {
+    const pushNormalized = (section, options = {}) => {
       const normalized = normalizeStoryBuilderSection(section, options);
       normalizedSections.push(normalized);
     };
@@ -1130,10 +1162,10 @@ function ensureStorySlides(settings){
     if (!normalizedSections.length) {
       const columnsSrc = (story.columns && typeof story.columns === 'object') ? story.columns : {};
       if (Array.isArray(columnsSrc.left)) {
-        columnsSrc.left.forEach(entry => pushNormalized(entry, { defaultPosition: 'left' }));
+        columnsSrc.left.forEach(entry => pushNormalized(entry, { defaultPosition: 'left', defaultColumn: 'left' }));
       }
       if (Array.isArray(columnsSrc.right)) {
-        columnsSrc.right.forEach(entry => pushNormalized(entry, { defaultPosition: 'right' }));
+        columnsSrc.right.forEach(entry => pushNormalized(entry, { defaultPosition: 'right', defaultColumn: 'right' }));
       }
     }
 
@@ -1141,7 +1173,7 @@ function ensureStorySlides(settings){
       story.gallery.forEach(entry => {
         if (!entry) return;
         if (typeof entry === 'string') {
-          pushNormalized({ imageUrl: entry, mediaPosition: 'right' }, { defaultPosition: 'right' });
+          pushNormalized({ imageUrl: entry, mediaPosition: 'right' }, { defaultPosition: 'right', defaultColumn: 'right' });
           return;
         }
         const imageUrl = entry.url ?? entry.imageUrl ?? '';
@@ -1153,7 +1185,7 @@ function ensureStorySlides(settings){
           imageUrl,
           imageAlt: entry.alt ?? entry.imageAlt ?? '',
           mediaPosition: 'right'
-        }, { defaultPosition: 'right' });
+        }, { defaultPosition: 'right', defaultColumn: 'right' });
       });
     }
 
@@ -1169,7 +1201,7 @@ function ensureStorySlides(settings){
           body: fallbackText,
           imageUrl: fallbackImage,
           imageAlt: fallbackAlt
-        });
+        }, { defaultColumn: 'left' });
       }
     }
 
@@ -1241,6 +1273,42 @@ function storyEditor(story, idx){
   };
   header.appendChild(headingInput);
 
+  const layoutWrap = document.createElement('div');
+  layoutWrap.className = 'row story-layout-toggle';
+  layoutWrap.style.gap = '6px';
+  const layoutLabel = document.createElement('span');
+  layoutLabel.className = 'mut';
+  layoutLabel.textContent = 'Layout';
+  layoutWrap.appendChild(layoutLabel);
+  const layoutOptions = [
+    { value: 'single', label: 'Einspaltig' },
+    { value: 'double', label: 'Zweispaltig' }
+  ];
+  layoutOptions.forEach(option => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn sm ghost';
+    btn.textContent = option.label;
+    btn.classList.toggle('is-active', story.layout === option.value);
+    btn.onclick = () => {
+      if (story.layout === option.value) return;
+      story.layout = option.value;
+      if (story.layout === 'double') {
+        const base = Array.isArray(story.sections) ? story.sections : [];
+        const hasRight = base.some(section => section && section.column === 'right');
+        if (!hasRight) {
+          base.forEach((section, idx) => {
+            if (!section) return;
+            section.column = idx % 2 === 0 ? 'left' : 'right';
+          });
+        }
+      }
+      commitStoryChange();
+    };
+    layoutWrap.appendChild(btn);
+  });
+  header.appendChild(layoutWrap);
+
   const enabledLabel = document.createElement('label');
   enabledLabel.className = 'btn sm ghost';
   enabledLabel.style.gap = '6px';
@@ -1281,7 +1349,8 @@ function storyEditor(story, idx){
 
   const sectionsHelp = document.createElement('div');
   sectionsHelp.className = 'help';
-  sectionsHelp.textContent = 'Füge Abschnitte mit Bild und Text hinzu. Bilder können links oder rechts neben dem Text stehen. Je mehr Abschnitte hinterlegt sind, desto kleiner werden die Bilder automatisch.';
+
+  sectionsHelp.textContent = 'Füge Abschnitte mit Bild und Text hinzu. Bilder können links oder rechts neben dem Text stehen. Im zweispaltigen Layout weist du jede Info einer Bildschirmseite zu. Je mehr Abschnitte hinterlegt sind, desto kleiner werden Bilder und Abstände automatisch.';
   wrap.appendChild(sectionsHelp);
 
   const sectionsEditor = document.createElement('div');
@@ -1291,7 +1360,6 @@ function storyEditor(story, idx){
   const sectionsList = document.createElement('div');
   sectionsList.className = 'story-section-list';
   sectionsEditor.appendChild(sectionsList);
-
   const renderSections = () => {
     sectionsList.innerHTML = '';
     const sections = Array.isArray(story.sections) ? story.sections : [];
@@ -1306,6 +1374,8 @@ function storyEditor(story, idx){
     sections.forEach((section, sectionIdx) => {
       const card = document.createElement('div');
       card.className = 'story-section-card';
+      const currentColumn = section.column === 'right' ? 'right' : 'left';
+      card.dataset.column = currentColumn;
 
       const head = document.createElement('div');
       head.className = 'row story-section-card-head';
@@ -1379,7 +1449,6 @@ function storyEditor(story, idx){
       const mediaBtns = document.createElement('div');
       mediaBtns.className = 'row';
       mediaBtns.style.gap = '6px';
-
       const uploadBtn = document.createElement('button');
       uploadBtn.type = 'button';
       uploadBtn.className = 'btn sm ghost';
@@ -1454,6 +1523,36 @@ function storyEditor(story, idx){
       alignWrap.appendChild(alignBtns);
       card.appendChild(alignWrap);
 
+      if (story.layout === 'double') {
+        const columnWrap = document.createElement('div');
+        columnWrap.className = 'kv story-section-column';
+        const columnLabel = document.createElement('label');
+        columnLabel.textContent = 'Spalte';
+        const columnBtns = document.createElement('div');
+        columnBtns.className = 'story-column-toggle';
+        const columnOptions = [
+          { value: 'left', label: 'Linke Seite' },
+          { value: 'right', label: 'Rechte Seite' }
+        ];
+        columnOptions.forEach(option => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn sm ghost';
+          btn.textContent = option.label;
+          const isActive = currentColumn === option.value;
+          if (isActive) btn.classList.add('is-active');
+          btn.onclick = () => {
+            if (section.column === option.value) return;
+            section.column = option.value;
+            commitStoryChange();
+          };
+          columnBtns.appendChild(btn);
+        });
+        columnWrap.appendChild(columnLabel);
+        columnWrap.appendChild(columnBtns);
+        card.appendChild(columnWrap);
+      }
+
       const headingWrap = document.createElement('div');
       headingWrap.className = 'kv';
       const headingLabel = document.createElement('label');
@@ -1487,7 +1586,6 @@ function storyEditor(story, idx){
       bodyWrap.appendChild(bodyLabel);
       bodyWrap.appendChild(bodyArea);
       card.appendChild(bodyWrap);
-
       sectionsList.appendChild(card);
     });
   };
@@ -1500,8 +1598,17 @@ function storyEditor(story, idx){
   addSectionBtn.textContent = 'Abschnitt hinzufügen';
   addSectionBtn.onclick = () => {
     if (!Array.isArray(story.sections)) story.sections = [];
-    const position = story.sections.length % 2 === 0 ? 'left' : 'right';
-    story.sections.push(createStorySectionDefaults(position));
+    const sections = story.sections;
+    const position = sections.length % 2 === 0 ? 'left' : 'right';
+    let column = 'left';
+    if (story.layout === 'double') {
+      const leftCount = sections.filter(entry => entry && entry.column !== 'right').length;
+      const rightCount = sections.filter(entry => entry && entry.column === 'right').length;
+      if (leftCount > rightCount) column = 'right';
+      else if (rightCount > leftCount) column = 'left';
+      else column = position === 'right' ? 'right' : 'left';
+    }
+    sections.push(createStorySectionDefaults(position, column));
     commitStoryChange();
   };
   sectionsEditor.appendChild(addSectionBtn);
