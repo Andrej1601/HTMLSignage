@@ -24,14 +24,7 @@
   --chipFlameGapScale:0.14; /* Anteil der Chip-Höhe als Abstand */
   --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapScale));
   --ovAuto:1; /* overview-only autoscale factor */
-  --ovTimeWidthBase:10ch;
-  --ovTimeWidthScale:1;
-  --ovTimeWidth:calc(var(--ovTimeWidthBase,10ch)*var(--ovTimeWidthScale,1));
-  --tileTimeBg:color-mix(in srgb, var(--accent) 55%, rgba(0,0,0,.25));
-  --tileTimeFg:var(--boxfg);
-  --tileTimeShadow:rgba(0,0,0,.28);
-  --tileTimeOutline:color-mix(in srgb, var(--tileTimeBg) 58%, rgba(255,255,255,.45));
-  --tileTimeGlow:color-mix(in srgb, var(--tileTimeBg) 40%, rgba(0,0,0,.5));
+  --ovTimeWidth:10ch;
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
@@ -546,52 +539,23 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 }
 .card-meta{
   display:flex;
-  align-items:center;
-  gap:.55em;
+  align-items:baseline;
+  gap:.5em;
   font-size:calc(40px*var(--scale)*var(--tileTextScale));
   font-weight:var(--tileWeight);
   line-height:1.05;
   white-space:nowrap;
 }
 .card-meta .time{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:.35em;
-  font-size:calc(.68em*var(--tileMetaScale,1));
-  letter-spacing:.16em;
+  font-size:calc(.65em*var(--tileMetaScale,1));
+  letter-spacing:.12em;
   text-transform:uppercase;
-  font-weight:700;
-  font-variant-numeric:tabular-nums;
-  color:var(--tileTimeFg, var(--boxfg));
-  background:linear-gradient(135deg,
-    color-mix(in srgb, var(--tileTimeBg, color-mix(in srgb, var(--accent) 55%, rgba(0,0,0,.25))) 88%, rgba(255,255,255,.08)) 0%,
-    color-mix(in srgb, var(--tileTimeBg, color-mix(in srgb, var(--accent) 55%, rgba(0,0,0,.25))) 72%, rgba(0,0,0,.28)) 100%
-  );
-  padding:calc(.26em*var(--tileMetaScale,1)) calc(.95em*var(--tileMetaScale,1));
-  border-radius:999px;
-  border:calc(1.4px*var(--vwScale)) solid var(--tileTimeOutline, rgba(255,255,255,.35));
-  box-shadow:
-    0 12px 28px var(--tileTimeShadow, rgba(0,0,0,.28)),
-    0 0 calc(18px*var(--vwScale)) color-mix(in srgb, var(--tileTimeGlow, rgba(0,0,0,.38)) 70%, transparent);
+  opacity:.8;
   white-space:nowrap;
-  position:relative;
-  text-shadow:0 1px 2px rgba(0,0,0,.35);
-  line-height:1.05;
-}
-.card-meta .time::before{
-  content:'⏱';
-  font-size:1.05em;
-  opacity:.9;
-  letter-spacing:0;
 }
 .card-meta .sep{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  opacity:.65;
-  font-size:.78em;
-  transform:translateY(-1px);
+  opacity:.7;
+  font-size:.8em;
 }
 .tile .title{
   display:flex;

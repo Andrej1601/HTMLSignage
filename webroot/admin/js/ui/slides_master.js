@@ -17,7 +17,6 @@ import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
-import { BADGE_EMOJI_MAX_LENGTH, normalizeBadgeEmoji } from '../core/config.js';
 
 // App-Context (Getter/Setter aus app.js)
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
@@ -33,33 +32,9 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','overviewTimeScale','overviewShowFlames'
+  'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
 ];
-const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary','customBadgeEmoji','tileHeightScale','tileOverlayEnabled','tileOverlayStrength'];
-
-const BADGE_EMOJI_SUGGESTIONS = [
-  ['🔥','Heiß / Intensiv'],
-  ['💧','Wasser / Abkühlung'],
-  ['❄️','Kalt / Eis'],
-  ['🧊','Eisaufguss'],
-  ['🌿','Kräuter'],
-  ['🍯','Honig / Pflege'],
-  ['🌸','Duft / Frühling'],
-  ['🍋','Zitrus'],
-  ['🌬️','Frischluft'],
-  ['🌊','Meer / Salz'],
-  ['🧖','Ritual'],
-  ['🧖‍♀️','Ladies / Wellness'],
-  ['🪵','Holz / Tradition'],
-  ['⭐','Event'],
-  ['🎶','Musik'],
-  ['⚡','Power'],
-  ['🌙','Abend'],
-  ['🌞','Morgen'],
-  ['💎','Premium'],
-  ['🥥','Exotisch'],
-  ['🌋','Vulkanisch / Intensiv']
-];
+const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary','tileHeightScale','tileOverlayEnabled','tileOverlayStrength'];
 
 const cloneValue = (value) => {
   if (value == null) return value;
@@ -97,17 +72,6 @@ function sanitizeStyleSetEntry(entry = {}){
     fonts: cloneSubset(entry.fonts, STYLE_FONT_KEYS),
     slides: cloneSubset(entry.slides, STYLE_SLIDE_KEYS)
   };
-  if (clean.fonts && Object.prototype.hasOwnProperty.call(clean.fonts, 'overviewTimeWidthCh')){
-    const base = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
-      ? +DEFAULTS.fonts.overviewTimeWidthCh
-      : 10;
-    const legacy = Number(clean.fonts.overviewTimeWidthCh);
-    if (!clean.fonts.overviewTimeScale && Number.isFinite(legacy) && base > 0){
-      const scale = Math.min(Math.max(legacy / base, 0.4), 3);
-      clean.fonts.overviewTimeScale = scale;
-    }
-    delete clean.fonts.overviewTimeWidthCh;
-  }
   if (!clean.label) clean.label = null;
   return clean;
 }
@@ -145,36 +109,6 @@ function ensureStyleSets(settings){
   return cleaned;
 }
 
-function ensureCustomBadgeEmoji(settings){
-  settings.slides ||= {};
-  const raw = settings.slides.customBadgeEmoji;
-  const seen = new Set();
-  const normalized = [];
-  if (Array.isArray(raw)){
-    raw.forEach(entry => {
-      const emoji = normalizeBadgeEmoji(entry);
-      if (emoji && !seen.has(emoji)){
-        seen.add(emoji);
-        normalized.push(emoji);
-      }
-    });
-  }
-  normalized.sort((a, b) => a.localeCompare(b, 'de'));
-  settings.slides.customBadgeEmoji = normalized;
-  return normalized;
-}
-
-function addCustomBadgeEmoji(settings, emoji){
-  const normalized = normalizeBadgeEmoji(emoji);
-  if (!normalized) return null;
-  const list = ensureCustomBadgeEmoji(settings);
-  if (!list.includes(normalized)){
-    list.push(normalized);
-    list.sort((a, b) => a.localeCompare(b, 'de'));
-  }
-  return normalized;
-}
-
 function ensureBadgeLibrary(settings){
   settings.slides ||= {};
   const seen = new Set();
@@ -184,7 +118,7 @@ function ensureBadgeLibrary(settings){
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = normalizeBadgeEmoji(entry.icon);
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
     const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
       : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
@@ -2239,55 +2173,16 @@ export function renderSlidesMaster(){
     }
 
     badgeSection?.classList.toggle('has-items', true);
-    const customEmojiList = ensureCustomBadgeEmoji(settings);
 
-    const makeField = (labelText, control, extraClass = '') => {
+    const makeField = (labelText, control) => {
       const field = document.createElement('div');
-      field.className = 'badge-lib-field' + (extraClass ? ' ' + extraClass : '');
+      field.className = 'badge-lib-field';
       const lbl = document.createElement('span');
       lbl.className = 'badge-lib-field-label';
       lbl.textContent = labelText;
       field.appendChild(lbl);
       field.appendChild(control);
       return field;
-    };
-
-    const buildEmojiOptions = (select, currentValue) => {
-      select.innerHTML = '';
-      const none = document.createElement('option');
-      none.value = '';
-      none.textContent = 'Kein Emoji';
-      select.appendChild(none);
-
-      const addGroup = (label, entries) => {
-        if (!entries.length) return;
-        const group = document.createElement('optgroup');
-        group.label = label;
-        entries.forEach(([value, description]) => {
-          const opt = document.createElement('option');
-          opt.value = value;
-          opt.textContent = description ? value + ' ' + description : value;
-          group.appendChild(opt);
-        });
-        select.appendChild(group);
-      };
-
-      addGroup('Vorschläge', BADGE_EMOJI_SUGGESTIONS);
-      if (customEmojiList.length){
-        addGroup('Eigene', customEmojiList.map(emoji => [emoji, '']));
-      }
-
-      const customOption = document.createElement('option');
-      customOption.value = '__custom__';
-      customOption.textContent = 'Eigenes Emoji';
-      select.appendChild(customOption);
-
-      if (currentValue){
-        const match = Array.from(select.options).find(opt => opt.value === currentValue);
-        select.value = match ? currentValue : '__custom__';
-      } else {
-        select.value = '';
-      }
     };
 
     const notifyChange = () => {
@@ -2338,34 +2233,13 @@ export function renderSlidesMaster(){
       const actions = document.createElement('div');
       actions.className = 'badge-lib-actions';
 
-      const labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.className = 'input badge-lib-input badge-lib-label';
-      labelInput.value = badge.label || '';
-      labelInput.placeholder = 'Badge-Text';
-
-      const emojiSelect = document.createElement('select');
-      emojiSelect.className = 'input badge-lib-select';
-      emojiSelect.setAttribute('aria-label', 'Emoji auswählen');
-
-      const emojiInput = document.createElement('input');
-      emojiInput.type = 'text';
-      emojiInput.className = 'input badge-lib-input badge-lib-icon';
-      emojiInput.value = badge.icon || '';
-      emojiInput.placeholder = 'Emoji';
-      emojiInput.maxLength = BADGE_EMOJI_MAX_LENGTH;
-
-      const emojiAddBtn = document.createElement('button');
-      emojiAddBtn.type = 'button';
-      emojiAddBtn.className = 'btn sm ghost badge-lib-emoji-add';
-      emojiAddBtn.textContent = 'Zu Liste';
-      emojiAddBtn.title = 'Eigenes Emoji zur Auswahl hinzufügen';
-
-      const emojiControls = document.createElement('div');
-      emojiControls.className = 'badge-lib-emoji-controls';
-      emojiControls.appendChild(emojiSelect);
-      emojiControls.appendChild(emojiInput);
-      emojiControls.appendChild(emojiAddBtn);
+      const iconInput = document.createElement('input');
+      iconInput.type = 'text';
+      iconInput.className = 'input badge-lib-input badge-lib-icon';
+      iconInput.value = badge.icon || '';
+      iconInput.placeholder = 'Emoji';
+      iconInput.maxLength = 6;
+      iconInput.setAttribute('aria-label', 'Badge-Emoji');
 
       const imagePreview = document.createElement('img');
       imagePreview.className = 'badge-lib-upload-preview';
@@ -2400,8 +2274,7 @@ export function renderSlidesMaster(){
 
       const fields = document.createElement('div');
       fields.className = 'badge-lib-fields';
-      fields.appendChild(makeField('Text', labelInput, 'badge-lib-field--text'));
-      fields.appendChild(makeField('Emoji', emojiControls, 'badge-lib-field--emoji'));
+      fields.appendChild(makeField('Emoji', iconInput));
       fields.appendChild(makeField('Bild', imageWrap));
 
       actions.appendChild(removeBtn);
@@ -2409,22 +2282,10 @@ export function renderSlidesMaster(){
       editWrap.appendChild(fields);
       editWrap.appendChild(actions);
 
-      const syncSelectValue = () => {
-        const normalized = normalizeBadgeEmoji(emojiInput.value);
-        const match = Array.from(emojiSelect.options).find(opt => opt.value === normalized);
-        if (normalized && match){
-          emojiSelect.value = normalized;
-        } else if (!normalized){
-          emojiSelect.value = '';
-        } else {
-          emojiSelect.value = '__custom__';
-        }
-      };
-
       const updatePreview = () => {
-        const iconValue = normalizeBadgeEmoji(emojiInput.value);
+        const iconValue = iconInput.value.trim();
         const imageValue = (badge.imageUrl || '').trim();
-        const labelValue = labelInput.value.trim();
+        const labelValue = (badge.label || '').trim();
         chipLabel.textContent = labelValue || badge.id;
         chipIcon.textContent = iconValue;
         chipIcon.hidden = !!imageValue || !iconValue;
@@ -2446,53 +2307,12 @@ export function renderSlidesMaster(){
         uploadBtn.textContent = imageValue ? 'Bild ersetzen' : 'Bild wählen';
       };
 
-      buildEmojiOptions(emojiSelect, normalizeBadgeEmoji(badge.icon));
-      syncSelectValue();
-      updatePreview();
-
-      labelInput.addEventListener('input', updatePreview);
-      labelInput.addEventListener('change', () => {
-        badge.label = labelInput.value.trim();
+      iconInput.addEventListener('input', updatePreview);
+      iconInput.addEventListener('change', () => {
+        badge.icon = iconInput.value.trim();
+        iconInput.value = badge.icon;
         updatePreview();
         notifyChange();
-      });
-
-      emojiInput.addEventListener('input', () => {
-        updatePreview();
-        syncSelectValue();
-      });
-      emojiInput.addEventListener('change', () => {
-        const normalized = normalizeBadgeEmoji(emojiInput.value);
-        badge.icon = normalized;
-        emojiInput.value = normalized;
-        syncSelectValue();
-        updatePreview();
-        notifyChange();
-      });
-
-      emojiSelect.addEventListener('change', () => {
-        if (emojiSelect.value === '__custom__'){
-          emojiInput.focus();
-          syncSelectValue();
-          updatePreview();
-          return;
-        }
-        badge.icon = emojiSelect.value;
-        emojiInput.value = badge.icon;
-        syncSelectValue();
-        updatePreview();
-        notifyChange();
-      });
-
-      emojiAddBtn.addEventListener('click', () => {
-        const normalized = normalizeBadgeEmoji(emojiInput.value || badge.icon || '');
-        if (!normalized) return;
-        addCustomBadgeEmoji(settings, normalized);
-        badge.icon = normalized;
-        emojiInput.value = normalized;
-        notifyChange();
-        setBadgeSectionExpanded(true);
-        renderBadgeLibraryRows();
       });
 
       uploadBtn.addEventListener('click', () => {
@@ -2526,8 +2346,11 @@ export function renderSlidesMaster(){
       row.appendChild(preview);
       row.appendChild(editWrap);
       badgeListHost.appendChild(row);
+
+      updatePreview();
     });
   };
+
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
       const list = ensureBadgeLibrary(settings);
