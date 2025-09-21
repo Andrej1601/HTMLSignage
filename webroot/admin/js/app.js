@@ -918,8 +918,6 @@ function renderSlidesBox(){
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
-  setV('#tileBadgeScale', f.tileBadgeScale ?? DEFAULTS.fonts.tileBadgeScale ?? 1);
-  setV('#tileDescriptionScale', f.tileDescriptionScale ?? DEFAULTS.fonts.tileDescriptionScale ?? 1);
   const overlayCheckbox = document.getElementById('tileOverlayEnabled');
   const overlayInput = document.getElementById('tileOverlayStrength');
   const overlayEnabled = (settings.slides?.tileOverlayEnabled !== false);
@@ -1009,8 +1007,6 @@ function renderSlidesBox(){
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
-    setV('#tileBadgeScale', DEFAULTS.fonts.tileBadgeScale);
-    setV('#tileDescriptionScale', DEFAULTS.fonts.tileDescriptionScale);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
     setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
@@ -1318,16 +1314,6 @@ function collectSettings(){
           const raw = Number($('#tileTimeScale')?.value);
           if (!Number.isFinite(raw)) return settings.fonts?.tileMetaScale ?? DEFAULTS.fonts.tileMetaScale ?? 1;
           return clamp(0.5, raw, 2);
-        })(),
-        tileBadgeScale:(() => {
-          const raw = Number($('#tileBadgeScale')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.tileBadgeScale ?? DEFAULTS.fonts.tileBadgeScale ?? 1;
-          return clamp(0.3, raw, 3);
-        })(),
-        tileDescriptionScale:(() => {
-          const raw = Number($('#tileDescriptionScale')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.tileDescriptionScale ?? DEFAULTS.fonts.tileDescriptionScale ?? 1;
-          return clamp(0.3, raw, 3);
         })()
       },
       h2:{
