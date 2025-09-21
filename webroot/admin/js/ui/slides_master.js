@@ -33,7 +33,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','overviewTimeScale','overviewShowFlames'
+  'tileMetaScale','tileBadgeScale','tileDescriptionScale','overviewTimeScale','overviewShowFlames'
 ];
 const STYLE_SLIDE_KEYS = ['infobadgeColor','badgeLibrary','customBadgeEmoji','tileHeightScale','tileOverlayEnabled','tileOverlayStrength'];
 
@@ -42,8 +42,10 @@ const BADGE_EMOJI_SUGGESTIONS = [
   ['💧','Wasser / Abkühlung'],
   ['❄️','Kalt / Eis'],
   ['🧊','Eisaufguss'],
-  ['🌿','Kräuter'],
+  ['🌿','Kräuter / Natur'],
   ['🍯','Honig / Pflege'],
+  ['🪷','Meditation / Achtsamkeit'],
+  ['🧘','Entspannung'],
   ['🌸','Duft / Frühling'],
   ['🍋','Zitrus'],
   ['🌬️','Frischluft'],
@@ -51,14 +53,21 @@ const BADGE_EMOJI_SUGGESTIONS = [
   ['🧖','Ritual'],
   ['🧖‍♀️','Ladies / Wellness'],
   ['🪵','Holz / Tradition'],
+  ['🌾','Natur / Land'],
   ['⭐','Event'],
   ['🎶','Musik'],
+  ['🌈','Farben / Vielfalt'],
   ['⚡','Power'],
   ['🌙','Abend'],
   ['🌞','Morgen'],
   ['💎','Premium'],
   ['🥥','Exotisch'],
-  ['🌋','Vulkanisch / Intensiv']
+  ['🍫','Schokolade'],
+  ['🍷','Genuss'],
+  ['🌋','Vulkanisch / Intensiv'],
+  ['🌶️','Würzig'],
+  ['🧴','Pflege / Lotion'],
+  ['🧂','Salz']
 ];
 
 const cloneValue = (value) => {
@@ -173,6 +182,16 @@ function addCustomBadgeEmoji(settings, emoji){
     list.sort((a, b) => a.localeCompare(b, 'de'));
   }
   return normalized;
+}
+
+function removeCustomBadgeEmoji(settings, emoji){
+  const normalized = normalizeBadgeEmoji(emoji);
+  if (!normalized) return false;
+  const list = ensureCustomBadgeEmoji(settings);
+  const idx = list.indexOf(normalized);
+  if (idx === -1) return false;
+  list.splice(idx, 1);
+  return true;
 }
 
 function ensureBadgeLibrary(settings){
@@ -2195,6 +2214,8 @@ export function renderSlidesMaster(){
   }
 
   const badgeListHost = $('#badgeLibraryList');
+  const badgeEmojiHost = $('#badgeEmojiLibrary');
+  const badgeEmojiWrap = $('#badgeEmojiLibraryWrap');
   const badgeAddBtn = $('#badgeAdd');
   const badgeSection = $('#badgeLibrarySection');
   const badgeToggle = $('#badgeLibraryToggle');
@@ -2225,21 +2246,68 @@ export function renderSlidesMaster(){
   }
 
   const renderBadgeLibraryRows = () => {
-    const list = ensureBadgeLibrary(settings);
     if (!badgeListHost) return;
+    const list = ensureBadgeLibrary(settings);
+    const customEmojiList = ensureCustomBadgeEmoji(settings);
+
+    const notifyChange = () => {
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+
+    const renderCustomEmojiList = () => {
+      if (!badgeEmojiHost) return;
+      badgeEmojiHost.innerHTML = '';
+      badgeEmojiWrap?.classList.toggle('has-items', customEmojiList.length > 0);
+      if (!customEmojiList.length){
+        const emptyEmoji = document.createElement('div');
+        emptyEmoji.className = 'badge-emoji-empty';
+        emptyEmoji.textContent = 'Noch keine eigenen Emojis gespeichert.';
+        badgeEmojiHost.appendChild(emptyEmoji);
+        return;
+      }
+      customEmojiList.forEach(emoji => {
+        const chip = document.createElement('span');
+        chip.className = 'badge-emoji-chip';
+        chip.setAttribute('role', 'listitem');
+
+        const icon = document.createElement('span');
+        icon.className = 'badge-emoji-chip-icon';
+        icon.textContent = emoji;
+        chip.appendChild(icon);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'badge-emoji-chip-remove';
+        remove.textContent = '✕';
+        remove.title = 'Emoji löschen';
+        remove.setAttribute('aria-label', `Emoji ${emoji} entfernen`);
+        remove.addEventListener('click', () => {
+          if (!removeCustomBadgeEmoji(settings, emoji)) return;
+          notifyChange();
+          renderBadgeLibraryRows();
+        });
+        chip.appendChild(remove);
+
+        badgeEmojiHost.appendChild(chip);
+      });
+    };
+
+    renderCustomEmojiList();
+
     badgeListHost.innerHTML = '';
-    if (!list.length){
+    const hasBadges = list.length > 0;
+    const hasCustomEmoji = customEmojiList.length > 0;
+    badgeSection?.classList.toggle('has-items', hasBadges || hasCustomEmoji);
+    if (!hasBadges){
       const empty = document.createElement('div');
       empty.className = 'mut';
       empty.textContent = 'Noch keine Badges angelegt.';
       badgeListHost.appendChild(empty);
-      setBadgeSectionExpanded(false);
-      badgeSection?.classList.toggle('has-items', false);
+      if (!hasCustomEmoji) setBadgeSectionExpanded(false);
       return;
     }
-
-    badgeSection?.classList.toggle('has-items', true);
-    const customEmojiList = ensureCustomBadgeEmoji(settings);
 
     const makeField = (labelText, control, extraClass = '') => {
       const field = document.createElement('div');
@@ -2288,12 +2356,6 @@ export function renderSlidesMaster(){
       } else {
         select.value = '';
       }
-    };
-
-    const notifyChange = () => {
-      window.__queueUnsaved?.();
-      window.__markUnsaved?.();
-      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
 
     list.forEach((badge, index) => {
@@ -2358,8 +2420,8 @@ export function renderSlidesMaster(){
       const emojiAddBtn = document.createElement('button');
       emojiAddBtn.type = 'button';
       emojiAddBtn.className = 'btn sm ghost badge-lib-emoji-add';
-      emojiAddBtn.textContent = 'Zu Liste';
-      emojiAddBtn.title = 'Eigenes Emoji zur Auswahl hinzufügen';
+      emojiAddBtn.textContent = 'Emoji speichern';
+      emojiAddBtn.title = 'Emoji zur persönlichen Auswahl hinzufügen';
 
       const emojiControls = document.createElement('div');
       emojiControls.className = 'badge-lib-emoji-controls';
