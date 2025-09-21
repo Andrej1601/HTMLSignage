@@ -359,6 +359,8 @@ async function loadDeviceResolved(id){
 
     const showOverviewFlames = fonts.overviewShowFlames !== false;
     document.body.classList.toggle('overview-hide-flames', !showOverviewFlames);
+    const showSaunaFlames = slidesCfg.showSaunaFlames !== false;
+    document.body.classList.toggle('sauna-hide-flames', !showSaunaFlames);
 
     setVars({
       '--chipFlamePct': Math.max(0.3, Math.min(1, (fonts.flamePct || 55) / 100)),
@@ -2710,6 +2712,7 @@ function renderStorySlide(story = {}, region = 'left') {
     const colIdx = (schedule.saunas || []).indexOf(name);
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
     const componentFlags = getSlideComponentFlags();
+    const showSaunaFlames = settings?.slides?.showSaunaFlames !== false;
     const iconVariantMap = (settings?.slides?.iconVariants && typeof settings.slides.iconVariants === 'object')
       ? settings.slides.iconVariants
       : null;
@@ -2897,7 +2900,11 @@ function renderStorySlide(story = {}, region = 'left') {
         tileChildren.push(stripeNode);
       }
       tileChildren.push(contentBlock);
-      tileChildren.push(flamesWrap(it.flames));
+      if (showSaunaFlames) {
+        tileChildren.push(flamesWrap(it.flames));
+      } else {
+        tileClasses.push('tile--no-flames');
+      }
 
       const tile = h('div', { class: tileClasses.join(' '), 'data-time': it.time }, tileChildren);
       tile.style.setProperty('--tile-index', String(list.children.length));
