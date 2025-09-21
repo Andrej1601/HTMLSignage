@@ -2442,8 +2442,8 @@ function renderStorySlide(story = {}, region = 'left') {
     const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
     const iconColumn = useIcons ? clamp(40, iconSize * 0.75, iconSize * 1.45) : 0;
     const tileMinHeight = useIcons
-      ? clamp(64, iconSize * 0.82, iconSize * 1.08)
-      : clamp(54, padY * 2.6, 108);
+      ? clamp(54, iconSize * 0.72, iconSize * 1.02)
+      : clamp(46, padY * 2.2, 96);
     const iconHeightScale = useIcons
       ? clamp(0.68, tileMinHeight / Math.max(iconSize, 1), 1.02)
       : 0;
