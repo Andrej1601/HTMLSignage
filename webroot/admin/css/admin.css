@@ -1174,6 +1174,11 @@ body.mode-uniform #ovSec{ display:none !important; }
   color:var(--muted);
   font-style:italic;
 }
+.story-sections-editor{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
 .story-section-list{
   display:flex;
   flex-direction:column;
@@ -1204,6 +1209,16 @@ body.mode-uniform #ovSec{ display:none !important; }
   border-radius:8px;
   box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--border) 70%, transparent);
   background:color-mix(in oklab, var(--panel) 85%, transparent);
+}
+.story-section-align{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.story-align-toggle{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
 }
 .story-fullimage-toggle{
   display:inline-flex;

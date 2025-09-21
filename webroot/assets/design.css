@@ -747,6 +747,8 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
 
 /* story slides */
 .story-slide{
+  --story-section-count:1;
+  --story-section-media-basis:clamp(24%, calc(48% - (var(--story-section-count, 1) - 1) * 4%), 48%);
   padding:clamp(20px, 4vw, 48px);
   display:flex;
   flex-direction:column;
@@ -1063,8 +1065,8 @@ body.sauna-hide-flames .tile.tile--compact{grid-template-columns:minmax(0,1fr);}
     flex:1 1 0;
   }
   .story-section-media{
-    flex:0 0 40%;
-    max-width:40%;
+    flex:0 0 var(--story-section-media-basis);
+    max-width:var(--story-section-media-basis);
   }
   .story-section--media-right{
     flex-direction:row-reverse;

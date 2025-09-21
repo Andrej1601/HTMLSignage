@@ -2034,9 +2034,11 @@ function renderStorySlide(story = {}, region = 'left') {
   container.appendChild(h('h1', { class: 'story-heading' }, headingText));
 
   const sectionsWrap = h('div', { class: 'story-sections' });
+  let sectionCount = 0;
   const appendSectionNode = (section, context) => {
     const node = buildStorySectionNode(section, context);
     if (node) {
+      sectionCount += 1;
       if (context && context.columnIndex != null) {
         node.dataset.columnIndex = String(context.columnIndex);
       }
@@ -2068,6 +2070,8 @@ function renderStorySlide(story = {}, region = 'left') {
   }
 
   container.appendChild(sectionsWrap);
+  container.dataset.storySectionCount = String(sectionCount);
+  container.style.setProperty('--story-section-count', String(Math.max(sectionCount, 1)));
   return container;
 
   function buildStorySectionNode(section, ctx) {
