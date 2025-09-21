@@ -2636,6 +2636,7 @@ function renderStorySlide(story = {}, region = 'left') {
     const hlMap = getHighlightMap();
     const rightUrl = settings?.assets?.rightImages?.[name] || '';
     const iconsEnabled = settings?.slides?.showIcons !== false;
+    let hasStripeInSauna = false;
     const cardIconMap = (iconsEnabled && settings?.slides?.cardIcons && typeof settings.slides.cardIcons === 'object')
       ? settings.slides.cardIcons
       : null;
