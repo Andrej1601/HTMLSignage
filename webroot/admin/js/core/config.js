@@ -111,22 +111,6 @@ export function sanitizePagePlaylist(list = []) {
   return normalized;
 }
 
-function clampScale(value, { min = 0.4, max = 3 } = {}) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return null;
-  return Math.min(Math.max(num, min), max);
-}
-
-export const BADGE_EMOJI_MAX_LENGTH = 6;
-
-export function normalizeBadgeEmoji(value){
-  if (value == null) return '';
-  const source = typeof value === 'string' ? value : String(value?.icon || value?.emoji || '');
-  const trimmed = source.trim();
-  if (!trimmed) return '';
-  return Array.from(trimmed).slice(0, BADGE_EMOJI_MAX_LENGTH).join('').trim();
-}
-
 export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback } = {}) {
   const seen = new Set();
   const normalized = [];
@@ -136,7 +120,7 @@ export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback 
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = normalizeBadgeEmoji(entry.icon);
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
     const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
       : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
@@ -162,39 +146,12 @@ export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback 
   return normalized;
 }
 
-export function sanitizeBadgeEmojiList(list) {
-  if (!Array.isArray(list)) return [];
-  const seen = new Set();
-  const normalized = [];
-  list.forEach(entry => {
-    const emoji = normalizeBadgeEmoji(entry);
-    if (!emoji || seen.has(emoji)) return;
-    seen.add(emoji);
-    normalized.push(emoji);
-  });
-  return normalized;
-}
-
 export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   const src = source ? deepClone(source) : {};
   src.slides = { ...DEFAULTS.slides, ...(src.slides || {}) };
   src.display = { ...DEFAULTS.display, ...(src.display || {}) };
   src.theme = { ...DEFAULTS.theme, ...(src.theme || {}) };
   src.fonts = { ...DEFAULTS.fonts, ...(src.fonts || {}) };
-  const defaultTimeCh = Number.isFinite(+DEFAULTS.fonts?.overviewTimeWidthCh)
-    ? +DEFAULTS.fonts.overviewTimeWidthCh
-    : 10;
-  const rawScale = clampScale(src.fonts.overviewTimeScale, { min: 0.4, max: 3 });
-  if (rawScale != null) {
-    src.fonts.overviewTimeScale = rawScale;
-  } else {
-    const fallbackWidth = clampScale(src.fonts.overviewTimeWidthCh, { min: 4, max: 40 });
-    const normalized = (fallbackWidth != null && defaultTimeCh > 0)
-      ? clampScale(fallbackWidth / defaultTimeCh, { min: 0.4, max: 3 })
-      : clampScale(DEFAULTS.fonts?.overviewTimeScale, { min: 0.4, max: 3 }) || 1;
-    src.fonts.overviewTimeScale = normalized ?? 1;
-  }
-  delete src.fonts.overviewTimeWidthCh;
   src.assets = { ...DEFAULTS.assets, ...(src.assets || {}) };
   src.h2 = { ...DEFAULTS.h2, ...(src.h2 || {}) };
   src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
@@ -252,7 +209,6 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
     assignMissingIds,
     fallback: hasBadgeArray ? undefined : DEFAULTS.slides?.badgeLibrary
   });
-  src.slides.customBadgeEmoji = sanitizeBadgeEmojiList(src.slides.customBadgeEmoji);
   return src;
 }
 
