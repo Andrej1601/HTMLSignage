@@ -71,6 +71,16 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 
+@keyframes tilePagerEnter{
+  from{opacity:0;transform:translateY(18px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
+@keyframes tilePagerExit{
+  from{opacity:1;transform:translateY(0) scale(1)}
+  to{opacity:0;transform:translateY(-18px) scale(.98)}
+}
+
 @keyframes heroItemFade{
   from{opacity:0;transform:translateY(18px) scale(.97)}
   to{opacity:1;transform:translateY(0) scale(1)}
@@ -318,7 +328,8 @@ body[data-layout='split'] .stage-area .rightPanel{display:none;}
 
 /* content area under headings is vertically centered */
 .body{flex:1; display:flex}
-.list{display:flex;flex-direction:column;gap:calc(18px*var(--vwScale));width:100%;align-items:flex-start;justify-content:center}
+.list{display:flex;flex-direction:column;gap:calc(18px*var(--vwScale));width:100%;align-items:flex-start;justify-content:center;position:relative}
+.list.is-paged{--tileEnterDelay:0ms}
 
 /* right image panel */
 .rightPanel{
@@ -429,92 +440,23 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   border-radius:inherit;
 }
 .tile > *{position:relative; z-index:1;}
-.tile-badge-stripe{
-  position:relative;
-  align-self:stretch;
-  width:var(--tileIconSizePx, calc(84px*var(--vwScale)));
-  height:100%;
-  display:flex;
-  align-items:stretch;
-  justify-content:stretch;
-  border-radius:calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .3);
-  background:color-mix(in srgb, var(--fg) 42%, transparent);
-  box-shadow:0 12px 30px rgba(0,0,0,.28);
-  overflow:hidden;
-  isolation:isolate;
-  clip-path:polygon(0 0, 100% 0, 82% 100%, 0% 100%);
+.tile.tile-pager-enter{
+  animation:tilePagerEnter 320ms cubic-bezier(.22,.61,.36,1) forwards;
+  animation-delay:0ms;
 }
-.tile-badge-stripe::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(0,0,0,.35));
-  mix-blend-mode:soft-light;
-  pointer-events:none;
+.tile.tile-pager-exit{
+  animation:tilePagerExit 220ms cubic-bezier(.22,.61,.36,1) forwards;
+  animation-delay:0ms;
 }
-.tile-badge-stripe__inner{
-  position:relative;
-  display:flex;
-  width:100%;
-  height:100%;
-}
-.tile-badge-stripe__segment{
-  position:relative;
-  flex:1 1 0%;
-  overflow:hidden;
-  background:rgba(0,0,0,.3);
-}
-.tile-badge-stripe__segment:not(:last-child)::after{
-  content:"";
-  position:absolute;
-  top:-20%;
-  bottom:-20%;
-  right:-12%;
-  width:clamp(6px, calc(var(--tileIconSizePx, calc(84px*var(--vwScale))) * .18), 26px);
-  background:linear-gradient(180deg, rgba(0,0,0,.45), rgba(255,255,255,.18));
-  transform:skewX(-18deg);
-  opacity:.55;
-  pointer-events:none;
-}
-.tile-badge-stripe__img{
-  display:block;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  transition:opacity .25s ease;
-}
-.tile-badge-stripe__fallback{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,.52);
-  opacity:0;
-  transition:opacity .25s ease;
-  color:rgba(255,255,255,.86);
-  font-size:calc(32px*var(--scale));
-  font-weight:700;
-  letter-spacing:.12em;
-  text-transform:uppercase;
-}
-.tile-badge-stripe__fallback-img{
-  width:68%;
-  height:68%;
-  object-fit:contain;
-  filter:drop-shadow(0 6px 12px rgba(0,0,0,.25));
-}
-.tile-badge-stripe__fallback-text{display:block;}
-.tile-badge-stripe__segment.is-fallback .tile-badge-stripe__img{opacity:0;}
-.tile-badge-stripe__segment.is-fallback .tile-badge-stripe__fallback{opacity:1;}
-.container.no-card-icons:not(.has-badge-stripe){ --tileIconSizePx:0px; }
-.container.no-card-icons:not(.has-badge-stripe){ --tileIconColumnPx:0px; }
 .tile.tile--compact{
   grid-template-columns:minmax(0,1fr) auto;
   min-height:auto;
 }
-.tile.tile--compact .tile-badge-stripe{ display:none; }
-.container.no-card-icons:not(.has-badge-stripe) .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
+.container.no-card-icons{
+  --tileIconSizePx:0px;
+  --tileIconColumnPx:0px;
+}
+.container.no-card-icons .list{ gap:var(--tileGapPx, calc(14px*var(--vwScale))); }
 .card-content{
   width:100%;
   min-width:0;

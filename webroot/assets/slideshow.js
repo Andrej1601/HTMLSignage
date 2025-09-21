@@ -932,19 +932,6 @@ async function loadDeviceResolved(id){
     if (!visible) return null;
     const label = entry ? firstText(entry.label, entry.text, entry.title, entry.name, entry.value) : firstText(descriptor);
     const icon = entry ? firstText(entry.icon, entry.symbol, entry.glyph, entry.emoji) : '';
-    const iconUrl = entry ? firstText(entry.iconUrl, entry.image, entry.url, entry.href, entry.src) : '';
-    let imageUrl = '';
-    if (entry) {
-      const nestedImage = (entry.image && typeof entry.image === 'object') ? entry.image : null;
-      imageUrl = firstText(
-        entry.imageUrl,
-        entry.badgeImage,
-        entry.mediaUrl,
-        nestedImage?.url,
-        nestedImage?.src,
-        entry.image
-      );
-    }
     const fallbackStr = (typeof fallbackId === 'string' || typeof fallbackId === 'number' || typeof fallbackId === 'boolean')
       ? String(fallbackId).trim()
       : '';
@@ -959,13 +946,10 @@ async function loadDeviceResolved(id){
     }
     const labelStr = String(label || '').trim();
     const iconStr = String(icon || '').trim();
-    const iconUrlStr = String(iconUrl || '').trim();
-    const imageUrlStr = String(imageUrl || '').trim();
-    const finalImageUrl = imageUrlStr || iconUrlStr;
     const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
-    const finalId = preferLabelId ? (labelStr || iconStr || finalImageUrl || id) : (id || labelStr || iconStr || finalImageUrl);
-    if (!finalId || (!labelStr && !iconStr && !finalImageUrl)) return null;
-    return { id: finalId, label: labelStr, icon: iconStr, imageUrl: finalImageUrl };
+    const finalId = preferLabelId ? (labelStr || iconStr || id) : (id || labelStr || iconStr);
+    if (!finalId || (!labelStr && !iconStr)) return null;
+    return { id: finalId, label: labelStr, icon: iconStr };
   }
 
   function getBadgeLookup(){
@@ -1012,7 +996,7 @@ async function loadDeviceResolved(id){
     const addBadge = (badge) => {
       if (!badge) return;
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.imageUrl]
+      const composite = [badge.label, badge.icon]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1122,13 +1106,13 @@ async function loadDeviceResolved(id){
     const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon, badge.imageUrl]
+      const composite = [badge.label, badge.icon]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
       if (!dedupeKey || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
-      uniqueBadges.push({ ...badge, imageUrl: String(badge.imageUrl || '').trim() });
+      uniqueBadges.push({ ...badge });
     });
     return uniqueBadges;
   }
@@ -1140,17 +1124,10 @@ async function loadDeviceResolved(id){
     const nodes = [];
     uniqueBadges.forEach(badge => {
       const iconChar = String(badge.icon || '').trim();
-      const imageUrl = String(badge.imageUrl || '').trim();
       const label = String(badge.label || '').trim();
       const bits = [];
-      if (imageUrl) {
-        bits.push(h('span', { class: 'badge-icon badge-icon--image', 'aria-hidden': 'true' }, [
-          h('img', { src: imageUrl, alt: '' })
-        ]));
-      } else {
-        const glyph = iconChar || defaultIcon;
-        if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
-      }
+      const glyph = iconChar || defaultIcon;
+      if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
       if (label) bits.push(h('span', { class: 'badge-label' }, label));
       if (!bits.length) return;
       const attrs = { class: 'badge' };
@@ -2482,6 +2459,169 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileIconHeightScale', iconHeightScale.toFixed(3));
   }
 
+  function createTilePager(list) {
+    let timer = 0;
+    let frame = 0;
+    let pages = [];
+    let index = 0;
+    let opts = null;
+
+    const clearTimer = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = 0;
+      }
+    };
+
+    const showAll = () => {
+      const tiles = Array.from(list.querySelectorAll('.tile'));
+      tiles.forEach(tile => {
+        tile.hidden = false;
+        tile.classList.remove('tile-pager-exit', 'tile-pager-enter');
+        tile.style.removeProperty('animation');
+      });
+      list.classList.remove('is-paged');
+      delete list.dataset.tilePages;
+      delete list.dataset.tilePage;
+    };
+
+    const showPage = (nextIndex) => {
+      const prevTiles = pages[index] || [];
+      const nextTiles = pages[nextIndex] || [];
+      if (nextIndex === index && nextTiles.every(tile => !tile.hidden)) return;
+      prevTiles.forEach(tile => {
+        tile.classList.remove('tile-pager-enter');
+        tile.classList.add('tile-pager-exit');
+        setTimeout(() => {
+          tile.hidden = true;
+          tile.classList.remove('tile-pager-exit');
+        }, 220);
+      });
+      nextTiles.forEach(tile => {
+        tile.hidden = false;
+        tile.classList.remove('tile-pager-exit');
+        tile.classList.add('tile-pager-enter');
+        tile.style.animation = 'none';
+        void tile.offsetWidth;
+        tile.style.removeProperty('animation');
+        tile.addEventListener('animationend', () => tile.classList.remove('tile-pager-enter'), { once: true });
+      });
+      index = nextIndex;
+      list.dataset.tilePage = String(nextIndex + 1);
+      list.dataset.tilePages = String(pages.length);
+    };
+
+    const recompute = () => {
+      const current = opts;
+      if (!current || !current.body || !current.container) {
+        clearTimer();
+        pages = [];
+        index = 0;
+        showAll();
+        return;
+      }
+      const body = current.body;
+      const tiles = Array.from(list.querySelectorAll('.tile'));
+      if (!tiles.length) {
+        clearTimer();
+        pages = [];
+        index = 0;
+        showAll();
+        return;
+      }
+      const available = body.clientHeight;
+      if (available <= 0) {
+        clearTimer();
+        pages = [];
+        index = 0;
+        showAll();
+        return;
+      }
+
+      tiles.forEach(tile => {
+        tile.hidden = false;
+        tile.classList.remove('tile-pager-exit', 'tile-pager-enter');
+        tile.style.removeProperty('animation');
+      });
+
+      const style = getComputedStyle(list);
+      const gap = parseFloat(style.rowGap || style.gap || '0') || 0;
+
+      const pagesNew = [];
+      let currentPage = [];
+      let currentHeight = 0;
+      tiles.forEach(tile => {
+        const rect = tile.getBoundingClientRect();
+        const height = rect.height;
+        const extra = currentPage.length ? gap : 0;
+        if (currentPage.length && (currentHeight + extra + height) > available + 1) {
+          pagesNew.push(currentPage);
+          currentPage = [tile];
+          currentHeight = height;
+        } else {
+          currentPage.push(tile);
+          currentHeight += extra + height;
+        }
+      });
+      if (currentPage.length) pagesNew.push(currentPage);
+
+      if (pagesNew.length <= 1) {
+        clearTimer();
+        pages = pagesNew;
+        index = 0;
+        showAll();
+        return;
+      }
+
+      pages = pagesNew;
+      list.classList.add('is-paged');
+      if (index >= pages.length) index = 0;
+
+      const pageConfig = typeof getPageConfig === 'function' ? getPageConfig(current.region || 'left') : null;
+      const dwellMs = Math.max(4000, dwellMsForItem({ type: 'sauna', sauna: current.saunaName || '' }, pageConfig));
+      const duration = Math.min(Math.max(Math.floor(dwellMs / pages.length), 2200), 12000);
+
+      showPage(index);
+
+      clearTimer();
+      timer = setInterval(() => {
+        showPage((index + 1) % pages.length);
+      }, duration);
+    };
+
+    const scheduleUpdate = (nextOpts = {}) => {
+      opts = { ...opts, ...nextOpts };
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        recompute();
+      });
+    };
+
+    const destroy = () => {
+      clearTimer();
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      pages = [];
+      index = 0;
+      opts = null;
+      showAll();
+      delete list.__tilePager;
+    };
+
+    return { scheduleUpdate, destroy };
+  }
+
+  function ensureTilePager(list) {
+    if (!list) return null;
+    if (list.__tilePager) return list.__tilePager;
+    const pager = createTilePager(list);
+    list.__tilePager = pager;
+    return pager;
+  }
+
   // ---------- Sauna slide ----------
   function renderSauna(name, region = 'left') {
     const hlMap = getHighlightMap();
@@ -2543,7 +2683,6 @@ function renderStorySlide(story = {}, region = 'left') {
     }
 
     const items = [];
-    let hasStripeInSauna = false;
     for (const row of (schedule.rows || [])) {
       const cell = (row.entries || [])[colIdx];
       if (cell && cell.title) {
@@ -2593,13 +2732,6 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
-      const stripeSource = Array.isArray(badgeRowNode?.__badgeList)
-        ? badgeRowNode.__badgeList
-        : collectUniqueBadges(it.badges);
-      const badgeStripeSource = Array.isArray(stripeSource)
-        ? stripeSource.map(entry => ({ ...entry }))
-        : [];
-      const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
       const metaColumn = h('div', { class: 'card-meta' });
       if (it.time) {
         metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
@@ -2635,68 +2767,6 @@ function renderStorySlide(story = {}, region = 'left') {
       );
 
       const tileChildren = [];
-      let stripeNode = null;
-      if (hasAnyBadgeImage && badgeStripeSource.length) {
-        const allowStripeFallback = iconsEnabled;
-        const iconUrl = allowStripeFallback ? (it.icon || defaultIconForSauna || legacyIconFallback || '') : '';
-        const fallbackLabel = (() => {
-          if (!allowStripeFallback) return '';
-          if (typeof name === 'string') {
-            const trimmed = name.trim();
-            if (trimmed.length >= 2) return trimmed.slice(0, 2);
-            if (trimmed.length === 1) return trimmed;
-          }
-          return allowStripeFallback ? '?' : '';
-        })();
-        stripeNode = (() => {
-          const stripe = h('div', { class: 'tile-badge-stripe' });
-          const inner = h('div', { class: 'tile-badge-stripe__inner' });
-          badgeStripeSource.forEach((badge, idx) => {
-            const segment = h('div', { class: 'tile-badge-stripe__segment' });
-            segment.style.setProperty('--segment-index', String(idx));
-            segment.style.setProperty('--segment-count', String(badgeStripeSource.length));
-            if (badge.imageUrl) {
-              const img = h('img', { class: 'tile-badge-stripe__img', src: badge.imageUrl, alt: '' });
-              img.addEventListener('load', () => segment.classList.remove('is-fallback'));
-              img.addEventListener('error', () => segment.classList.add('is-fallback'));
-              segment.appendChild(img);
-            } else {
-              segment.classList.add('is-fallback');
-            }
-            const fallback = (() => {
-              if (!allowStripeFallback) return null;
-              const box = h('div', { class: 'tile-badge-stripe__fallback' });
-              let hasContent = false;
-              if (iconUrl) {
-                const fbImg = h('img', { class: 'tile-badge-stripe__fallback-img', src: iconUrl, alt: '' });
-                fbImg.addEventListener('error', () => {
-                  fbImg.remove();
-                  if (!hasContent && fallbackLabel) {
-                    box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
-                  }
-                });
-                box.appendChild(fbImg);
-                hasContent = true;
-              }
-              if (!hasContent && fallbackLabel) {
-                box.appendChild(h('span', { class: 'tile-badge-stripe__fallback-text' }, fallbackLabel));
-                hasContent = true;
-              }
-              return hasContent ? box : null;
-            })();
-            if (fallback) segment.appendChild(fallback);
-            inner.appendChild(segment);
-          });
-          stripe.appendChild(inner);
-          return stripe;
-        })();
-        if (stripeNode) hasStripeInSauna = true;
-      }
-      if (!stripeNode) {
-        if (!tileClasses.includes('tile--compact')) tileClasses.push('tile--compact');
-      } else {
-        tileChildren.push(stripeNode);
-      }
       tileChildren.push(contentBlock);
       tileChildren.push(flamesWrap(it.flames));
 
@@ -2713,8 +2783,6 @@ function renderStorySlide(story = {}, region = 'left') {
 
     body.appendChild(list);
     c.appendChild(body);
-
-    c.classList.toggle('has-badge-stripe', hasStripeInSauna);
 
     const footNodes = [];
     const order = (settings?.footnotes || []).map(fn => fn.id);
@@ -2737,7 +2805,15 @@ function renderStorySlide(story = {}, region = 'left') {
 
     c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
-    const recalc = () => applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
+    const pager = ensureTilePager(list);
+    c.__cleanup = () => {
+      if (pager && typeof pager.destroy === 'function') pager.destroy();
+    };
+
+    const recalc = () => {
+      applyTileSizing(c, { useIcons: iconsEnabled });
+      if (pager) pager.scheduleUpdate({ container: c, body, region, saunaName: name });
+    };
     setTimeout(recalc, 0);
     setResizeHandler(region, recalc);
 
@@ -2835,6 +2911,24 @@ function renderStorySlide(story = {}, region = 'left') {
     ]);
   }
 
+  function cleanupNode(node) {
+    if (!node) return;
+    if (typeof node.__cleanup === 'function') {
+      try {
+        node.__cleanup();
+      } catch (err) {
+        console.error('Cleanup error:', err);
+      }
+    }
+    const children = node.childNodes ? Array.from(node.childNodes) : [];
+    for (const child of children) cleanupNode(child);
+  }
+
+  function cleanupChildNodes(target) {
+    if (!target || !target.childNodes) return;
+    Array.from(target.childNodes).forEach(cleanupNode);
+  }
+
   function createStageController(id, element){
     let queue = [];
     let index = 0;
@@ -2878,6 +2972,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
     function show(node){
       if (!element) return;
+      cleanupChildNodes(element);
       element.innerHTML = '';
       if (!node) return;
       element.appendChild(node);
@@ -2997,6 +3092,7 @@ function renderStorySlide(story = {}, region = 'left') {
       hasCustomContent = false;
       if (element) {
         element.classList.remove('stage-area--custom');
+        cleanupChildNodes(element);
         element.innerHTML = '';
       }
       setResizeHandler(id, null);
@@ -3013,6 +3109,7 @@ function renderStorySlide(story = {}, region = 'left') {
       setResizeHandler(id, null);
       if (element) {
         element.classList.toggle('stage-area--custom', hasCustomContent);
+        cleanupChildNodes(element);
         element.innerHTML = '';
         if (node) {
           element.appendChild(node);

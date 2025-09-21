@@ -136,14 +136,10 @@ export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback 
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
-    const imageUrlRaw = typeof entry.imageUrl === 'string' ? entry.imageUrl
-      : (typeof entry.iconUrl === 'string' ? entry.iconUrl : '');
-    const imageUrl = String(imageUrlRaw || '').trim();
     const record = {
       id,
       icon,
-      label,
-      imageUrl
+      label
     };
     normalized.push(record);
     seen.add(id);
