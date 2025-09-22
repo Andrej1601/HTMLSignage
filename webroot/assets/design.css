@@ -689,10 +689,10 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .flames{
   display:flex;
   gap:10px;
-  align-items:flex-start;
+  align-items:center;
   justify-content:flex-end;
   justify-self:end;
-  align-self:flex-start;
+  align-self:center;
   grid-column:3;
   min-width:0;
 }
