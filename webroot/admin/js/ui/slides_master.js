@@ -64,7 +64,14 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🌊', label:'Meer & Gischt' },
   { value:'🌞', label:'Sonne & Wärme' },
   { value:'🌅', label:'Morgenstimmung' },
-  { value:'🍀', label:'Glück & Wohlbefinden' }
+  { value:'🍀', label:'Glück & Wohlbefinden' },
+  { value:'🌋', label:'Vulkan & Hitze' },
+  { value:'🌪️', label:'Wirbel & Intensität' },
+  { value:'🌬️', label:'Luft & Brise' },
+  { value:'🏔️', label:'Berg & Kristalle' },
+  { value:'🏝️', label:'Tropen & Urlaub' },
+  { value:'🪨', label:'Steine & Mineralien' },
+  { value:'🪷', label:'Lotus & Ruhe' }
 ];
 
 const cloneValue = (value) => {

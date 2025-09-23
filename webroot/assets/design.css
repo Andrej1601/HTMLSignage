@@ -559,17 +559,10 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .card-content{
   width:100%;
   min-width:0;
-}
-.card-content--with-meta{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  column-gap:var(--tileContentGapPx, calc(10px*var(--vwScale)));
-  align-items:center;
-}
-.card-content--with-meta .card-meta{
-  justify-self:flex-end;
-  justify-content:flex-end;
-  text-align:right;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
 }
 .card-badges{
   display:flex;
@@ -579,12 +572,6 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .card-badges--inline{
   align-self:stretch;
 }
-.card-content:not(.card-content--with-meta){
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:flex-start;
-}
 .card-main{
   display:flex;
   flex-direction:column;
@@ -593,35 +580,39 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   align-items:flex-start;
   min-width:0;
 }
-.card-meta{
-  display:flex;
-  align-items:baseline;
-  gap:.5em;
+.tile .title{
   font-size:calc(40px*var(--scale)*var(--tileTextScale));
   font-weight:var(--tileWeight);
   line-height:1.05;
-  white-space:nowrap;
+  min-width:0;
 }
-.card-meta .time{
+.tile .title:not(.title--with-time){
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  gap:.5em;
+}
+.tile .title.title--with-time{
+  display:grid;
+  grid-template-columns:max-content max-content minmax(0,1fr);
+  column-gap:calc(0.35em + 2px*var(--vwScale));
+  align-items:baseline;
+}
+.tile .title .time{
+  display:inline-block;
+  min-width:calc(var(--tileTimeWidthCh, 9) * 1ch);
   font-size:calc(.65em*var(--tileMetaScale,1));
   letter-spacing:.12em;
   text-transform:uppercase;
   opacity:.8;
   white-space:nowrap;
+  font-variant-numeric:tabular-nums;
 }
-.card-meta .sep{
+.tile .title .sep{
   opacity:.7;
   font-size:.8em;
-}
-.tile .title{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:baseline;
-  gap:.5em;
-  font-size:calc(40px*var(--scale)*var(--tileTextScale));
-  font-weight:var(--tileWeight);
-  line-height:1.05;
-  min-width:0;
+  min-width:calc(1.5ch);
+  text-align:center;
 }
 .tile .title .label{
   display:flex;
