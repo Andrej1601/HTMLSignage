@@ -1224,12 +1224,40 @@ function ensureColorTools(){
 // ============================================================================
 function renderFootnotes(){
   const host=$('#fnList'); if (!host) return;
+  const section = $('#footnoteSection');
+  const toggle = $('#footnoteToggle');
+  const body = $('#footnoteBody');
+
+  const getExpanded = () => !!(toggle && toggle.getAttribute('aria-expanded') === 'true');
+  const setExpanded = (expanded) => {
+    const isExpanded = !!expanded;
+    if (toggle){ toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false'); }
+    if (body){ body.setAttribute('aria-hidden', isExpanded ? 'false' : 'true'); }
+    if (section){ section.classList.toggle('is-open', isExpanded); }
+  };
+
+  if (toggle && !toggle.dataset.bound){
+    toggle.dataset.bound = '1';
+    toggle.addEventListener('click', () => {
+      setExpanded(!getExpanded());
+    });
+  }
+
+  const forceOpen = (body && body.dataset.forceOpen === '1');
+  if (body) delete body.dataset.forceOpen;
+  setExpanded(forceOpen ? true : getExpanded());
+
   host.innerHTML='';
   const layoutSel = document.getElementById('footnoteLayout');
   if (layoutSel){ layoutSel.value = settings.footnoteLayout || 'one-line'; layoutSel.onchange = ()=>{ settings.footnoteLayout = layoutSel.value; }; }
   const list = settings.footnotes || [];
+  if (section) section.classList.toggle('has-items', list.length > 0);
   list.forEach((fn,i)=> host.appendChild(fnRow(fn,i)));
-  $('#fnAdd').onclick=()=>{ (settings.footnotes ||= []).push({id:genId(), label:'*', text:''}); renderFootnotes(); };
+  $('#fnAdd').onclick=()=>{
+    (settings.footnotes ||= []).push({id:genId(), label:'*', text:''});
+    if (body) body.dataset.forceOpen = '1';
+    renderFootnotes();
+  };
 }
 
 function fnRow(fn,i){

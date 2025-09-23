@@ -217,7 +217,16 @@
     <div class="actions"><button class="btn sm" id="fnAdd">Fußnote hinzufügen</button></div>
   </summary>
   <div class="content">
-    <div id="fnList"></div>
+    <div class="footnote-section" id="footnoteSection">
+      <div class="footnote-header">
+        <button class="footnote-toggle" type="button" id="footnoteToggle" aria-expanded="false" aria-controls="footnoteBody">Fußnoten verwalten</button>
+      </div>
+      <div class="footnote-body" id="footnoteBody" aria-hidden="true">
+        <div class="footnote-body-inner">
+          <div id="fnList"></div>
+        </div>
+      </div>
+    </div>
     <div class="subh">Darstellung</div>
     <div class="kv">
       <label>Fußnoten-Layout <span class="tip" title="Legt fest, wie mehrere Fußnoten dargestellt werden.">❔</span></label>
