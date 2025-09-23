@@ -1314,7 +1314,8 @@ function tableGrid(hlMap) {
   const tb = h('tbody');
   (schedule?.rows ?? []).forEach((row, ri) => {
     const trr = h('tr');
-    trr.appendChild(h('td', { class: 'timecol' }, row?.time || ''));
+    const timeText = formatTimeLabel(row?.time || '');
+    trr.appendChild(h('td', { class: 'timecol' }, timeText));
     (row?.entries ?? []).forEach((cell, ci) => {
       const td = h('td', {}, []);
       const key = 'r' + ri + 'c' + ci;
@@ -1417,6 +1418,20 @@ return h('div', {}, [ t ]);
     return c;
   }
 
+  function formatTimeLabel(rawTime) {
+    const input = typeof rawTime === 'string' ? rawTime.trim() : String(rawTime || '').trim();
+    if (!input) return '';
+    const cleaned = input.replace(/\s*uhr$/i, '').trim();
+    if (!cleaned) return '';
+    return settings?.slides?.appendTimeSuffix ? cleaned + ' Uhr' : cleaned;
+  }
+
+  function shouldUseFullHeadingWidth() {
+    const raw = settings?.slides?.saunaTitleMaxWidthPercent;
+    const num = Number(raw);
+    return Number.isFinite(num) && num >= 100;
+  }
+
   function renderHeroTimeline(region = 'left') {
     const data = (heroTimeline.length ? heroTimeline : collectHeroTimelineData()).slice();
     const headingWrap = h('div', { class: 'headings hero-headings' }, [
@@ -1437,7 +1452,10 @@ return h('div', {}, [ t ]);
           item.style.setProperty('--hero-duration-ratio', String(row.durationRatio));
         }
 
-        item.appendChild(h('div', { class: 'timeline-time' }, row.time + ' Uhr'));
+        const timeLabel = formatTimeLabel(row.time);
+        if (timeLabel) {
+          item.appendChild(h('div', { class: 'timeline-time' }, timeLabel));
+        }
 
         const details = h('div', { class: 'timeline-details' });
         row.entries.forEach(entry => {
@@ -2523,6 +2541,7 @@ function renderStorySlide(story = {}, region = 'left') {
     (schedule.rows || []).forEach(row => {
       const time = row && row.time ? row.time : '';
       const minutes = parseHM(time);
+      const displayTime = formatTimeLabel(time);
       indices.forEach(({ name, idx }) => {
         const cell = row && Array.isArray(row.entries) ? row.entries[idx] : null;
         if (cell && cell.title) {
@@ -2530,7 +2549,7 @@ function renderStorySlide(story = {}, region = 'left') {
           items.push({
             sauna: name,
             title: cell.title,
-            time,
+            time: displayTime,
             minutes,
             isUpcoming: minutes != null ? minutes >= now : false,
             description: details.description,
@@ -2915,6 +2934,7 @@ function renderStorySlide(story = {}, region = 'left') {
       h('div', { class: 'rightPanel', style: rightUrl ? ('background-image:url(' + JSON.stringify(rightUrl) + ')') : 'display:none;' }),
       headingWrap
     ]);
+    if (shouldUseFullHeadingWidth()) c.classList.add('full-heading');
     if (iconsEnabled) c.classList.add('has-card-icons'); else c.classList.add('no-card-icons');
 
     const body = h('div', { class: 'body' });
@@ -3009,7 +3029,8 @@ function renderStorySlide(story = {}, region = 'left') {
       }
       titleNode.appendChild(labelNode);
 
-      const timeNode = it.time ? h('span', { class: 'time' }, it.time + ' Uhr') : null;
+      const timeLabel = formatTimeLabel(it.time);
+      const timeNode = timeLabel ? h('span', { class: 'time' }, timeLabel) : null;
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
       if (badgeRowNode && inlineBadgeColumn) badgeRowNode.classList.add('badge-row--stacked');
