@@ -62,7 +62,10 @@
   }
 
   async function preloadSlideImages(){
-    await preloadNextImages();
+    await Promise.all([
+      preloadRightImages(),
+      preloadNextImages()
+    ]);
   }
 
   function setResizeHandler(region, handler){
@@ -264,7 +267,7 @@ async function loadDeviceResolved(id){
   badgeLookupCache = null;
   applyTheme(); applyDisplay(); maybeApplyPreset();
   refreshStageQueues({ resetIndex:true, autoplay:false });
-  await Promise.all([preloadRightImages(), preloadSlideImages()]);
+  await preloadSlideImages();
 }
 
 
@@ -281,7 +284,7 @@ async function loadDeviceResolved(id){
     applyDisplay();
     maybeApplyPreset();
     refreshStageQueues({ resetIndex:true, autoplay:false });
-    await Promise.all([preloadRightImages(), preloadSlideImages()]);
+    await preloadSlideImages();
   }
 
   // ---------- Theme & Display ----------
@@ -377,8 +380,20 @@ async function loadDeviceResolved(id){
     const layoutMode = (d.layoutMode === 'split') ? 'split' : 'single';
     updateLayoutModeAttr(layoutMode);
     if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
-    if (typeof d.cutTopPercent === 'number')     document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
-    if (typeof d.cutBottomPercent === 'number')  document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
+    if (typeof d.cutTopPercent === 'number') {
+      document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
+      const topRatio = Math.max(0, Math.min(1, d.cutTopPercent / 100));
+      document.documentElement.style.setProperty('--cutTopRatio', String(topRatio));
+    } else {
+      document.documentElement.style.removeProperty('--cutTopRatio');
+    }
+    if (typeof d.cutBottomPercent === 'number') {
+      document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
+      const bottomRatio = Math.max(0, Math.min(1, d.cutBottomPercent / 100));
+      document.documentElement.style.setProperty('--cutBottomRatio', String(bottomRatio));
+    } else {
+      document.documentElement.style.removeProperty('--cutBottomRatio');
+    }
 
     const baseW = d.baseW || 1920;
     document.documentElement.style.setProperty('--baseW', baseW + 'px');
@@ -3597,9 +3612,12 @@ function renderStorySlide(story = {}, region = 'left') {
     const rawTypes = Array.isArray(raw.contentTypes) ? raw.contentTypes : defaults.contentTypes;
     const filtered = rawTypes.filter(type => VALID_CONTENT_TYPES.includes(type));
     const contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaults.contentTypes;
+    const normalizedContentTypes = (source === 'master')
+      ? VALID_CONTENT_TYPES.slice()
+      : contentTypes;
     const rawPlaylist = Array.isArray(raw.playlist) ? raw.playlist : defaults.playlist;
     const playlist = sanitizePlaylistConfig(rawPlaylist);
-    return { id, enabled, source, timerSec, contentTypes, playlist };
+    return { id, enabled, source, timerSec, contentTypes: normalizedContentTypes, playlist };
   }
 
   async function preloadUpcomingForStage(controller, { offset = 0 } = {}){
@@ -3617,6 +3635,12 @@ function renderStorySlide(story = {}, region = 'left') {
       let url = null;
       if (item.type === 'image') {
         url = item.src;
+      } else if (item.type === 'sauna') {
+        const saunaName = item.sauna || item.name;
+        if (saunaName) {
+          const saunaUrl = settings?.assets?.rightImages?.[saunaName];
+          if (saunaUrl) urls.push(saunaUrl);
+        }
       } else if (item.type === 'story') {
         const storyUrls = collectStoryImageUrls(item.story, 4);
         storyUrls.forEach(u => { if (u) urls.push(u); });
