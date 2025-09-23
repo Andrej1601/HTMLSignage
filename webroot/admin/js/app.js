@@ -113,6 +113,129 @@ if (unsavedBadgeResetBtn){
   });
 }
 
+function initSidebarResize(){
+  const resizer = document.getElementById('layoutResizer');
+  const rightbar = document.querySelector('.rightbar');
+  if (!resizer || !rightbar) return;
+
+  const root = document.documentElement;
+  const getNumberVar = (name, fallback) => {
+    const raw = getComputedStyle(root).getPropertyValue(name);
+    const num = Number.parseFloat(raw);
+    return Number.isFinite(num) ? num : fallback;
+  };
+
+  let minPx = getNumberVar('--sidebar-min', 280);
+  let maxPx = getNumberVar('--sidebar-max', 920);
+  const clampWidth = (value) => Math.min(maxPx, Math.max(minPx, value));
+  const media = window.matchMedia('(orientation: portrait),(max-width: 900px)');
+
+  const readStoredWidth = () => {
+    const stored = Number.parseFloat(lsGet('sidebarWidthPx'));
+    return Number.isFinite(stored) ? clampWidth(stored) : null;
+  };
+
+  const updateAria = (width) => {
+    const current = Number.isFinite(width) ? width : rightbar.getBoundingClientRect().width;
+    resizer.setAttribute('aria-valuemin', String(Math.round(minPx)));
+    resizer.setAttribute('aria-valuemax', String(Math.round(maxPx)));
+    resizer.setAttribute('aria-valuenow', String(Math.round(current)));
+  };
+
+  const applyWidth = (width, { store = true } = {}) => {
+    const clamped = clampWidth(width);
+    root.style.setProperty('--sidebar-size', `${clamped}px`);
+    updateAria(clamped);
+    if (store) lsSet('sidebarWidthPx', String(Math.round(clamped)));
+  };
+
+  const resetWidth = () => {
+    root.style.removeProperty('--sidebar-size');
+    updateAria();
+  };
+
+  const isCollapsed = () => media.matches;
+
+  const syncState = () => {
+    if (isCollapsed()) {
+      resizer.setAttribute('aria-hidden', 'true');
+      resizer.setAttribute('tabindex', '-1');
+      resizer.classList.remove('is-active');
+      resetWidth();
+      return;
+    }
+    resizer.setAttribute('aria-hidden', 'false');
+    resizer.setAttribute('tabindex', '0');
+    const stored = readStoredWidth();
+    if (stored != null) {
+      applyWidth(stored, { store: false });
+    } else {
+      resetWidth();
+    }
+  };
+
+  media.addEventListener('change', syncState);
+  window.addEventListener('resize', () => { if (!isCollapsed()) updateAria(); });
+
+  const dragState = { active: false, pointerId: null, startX: 0, startWidth: 0 };
+
+  resizer.addEventListener('pointerdown', (ev) => {
+    if (!ev.isPrimary || isCollapsed()) return;
+    dragState.active = true;
+    dragState.pointerId = ev.pointerId;
+    dragState.startX = ev.clientX;
+    dragState.startWidth = rightbar.getBoundingClientRect().width;
+    try { resizer.setPointerCapture(ev.pointerId); } catch {}
+    resizer.classList.add('is-active');
+    ev.preventDefault();
+  });
+
+  resizer.addEventListener('pointermove', (ev) => {
+    if (!dragState.active || ev.pointerId !== dragState.pointerId) return;
+    const delta = ev.clientX - dragState.startX;
+    applyWidth(dragState.startWidth + delta, { store: false });
+  });
+
+  const finishDrag = (store = true) => {
+    if (!dragState.active) return;
+    dragState.active = false;
+    const width = rightbar.getBoundingClientRect().width;
+    if (store) applyWidth(width);
+    try {
+      if (dragState.pointerId !== null) resizer.releasePointerCapture(dragState.pointerId);
+    } catch {}
+    dragState.pointerId = null;
+    resizer.classList.remove('is-active');
+  };
+
+  resizer.addEventListener('pointerup', (ev) => {
+    if (ev.pointerId === dragState.pointerId) finishDrag(true);
+  });
+  resizer.addEventListener('pointercancel', () => finishDrag(false));
+  resizer.addEventListener('lostpointercapture', () => finishDrag(false));
+
+  resizer.addEventListener('keydown', (ev) => {
+    if (isCollapsed()) return;
+    const baseWidth = rightbar.getBoundingClientRect().width;
+    const step = ev.shiftKey ? 48 : 24;
+    if (ev.key === 'ArrowLeft') {
+      ev.preventDefault();
+      applyWidth(baseWidth - step);
+    } else if (ev.key === 'ArrowRight') {
+      ev.preventDefault();
+      applyWidth(baseWidth + step);
+    } else if (ev.key === 'Home') {
+      ev.preventDefault();
+      applyWidth(minPx);
+    } else if (ev.key === 'End') {
+      ev.preventDefault();
+      applyWidth(maxPx);
+    }
+  });
+
+  syncState();
+}
+
 function normalizeContextBadge(source){
   if (!source) return null;
   if (typeof source === 'string'){
@@ -402,6 +525,7 @@ async function loadAll(){
   initBackupButtons();
   initCleanupInSystem();
   initViewMenu();
+  initSidebarResize();
 }
 
 // ============================================================================

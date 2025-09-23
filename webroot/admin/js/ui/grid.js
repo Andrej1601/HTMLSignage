@@ -68,12 +68,20 @@ function renderBadgePicker(selectedIds = []){
   }
   host.classList.remove('is-open');
   const library = getBadgeLibrary();
-  const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(id => String(id ?? '')).filter(Boolean));
+  const normalized = Array.isArray(selectedIds) ? selectedIds : [];
+  const selectedList = [];
+  normalized.forEach(id => {
+    const value = String(id ?? '').trim();
+    if (value && !selectedList.includes(value)) selectedList.push(value);
+  });
+  const selected = new Set(selectedList);
+  host._badgeSelectedOrder = selectedList.slice();
   host.innerHTML = '';
   host.classList.remove('is-open', 'is-disabled');
   host.classList.add('badge-picker');
 
   if (!library.length){
+    host._badgeSelectedOrder = [];
     host.classList.add('is-disabled');
     const empty = document.createElement('div');
     empty.className = 'badge-picker-empty';
@@ -112,10 +120,26 @@ function renderBadgePicker(selectedIds = []){
   optionList.className = 'badge-picker-options';
   popup.appendChild(optionList);
 
+  const hint = document.createElement('div');
+  hint.className = 'badge-picker-hint';
+  hint.hidden = true;
+  wrapper.insertBefore(hint, popup);
+
+  const moveBadge = (fromIdx, toIdx) => {
+    if (toIdx < 0 || toIdx >= selectedList.length || fromIdx === toIdx) return false;
+    const [id] = selectedList.splice(fromIdx, 1);
+    selectedList.splice(toIdx, 0, id);
+    return true;
+  };
+
+  let pendingFocus = null;
+
   const updateSummary = () => {
-    const selectedBadges = library.filter(entry => selected.has(entry.id));
-    toggleLabel.textContent = selectedBadges.length
-      ? `${selectedBadges.length} ausgewählt`
+    const selectedBadges = selectedList
+      .map(id => library.find(entry => entry.id === id))
+      .filter(Boolean);
+    toggleLabel.textContent = selectedList.length
+      ? `${selectedList.length} ausgewählt`
       : 'Badges wählen';
 
     chips.innerHTML = '';
@@ -125,9 +149,10 @@ function renderBadgePicker(selectedIds = []){
       placeholder.textContent = 'Keine Badges ausgewählt.';
       chips.appendChild(placeholder);
     } else {
-      selectedBadges.forEach(entry => {
+      selectedBadges.forEach((entry, idx) => {
         const chip = document.createElement('span');
         chip.className = 'badge-picker-chip';
+        chip.dataset.badgeId = entry.id;
         const iconText = (entry.icon || '').trim();
         if (iconText){
           const media = document.createElement('span');
@@ -141,16 +166,76 @@ function renderBadgePicker(selectedIds = []){
         const label = document.createElement('span');
         label.textContent = entry.label || entry.id;
         chip.appendChild(label);
+
+        if (selectedBadges.length > 1){
+          const controls = document.createElement('span');
+          controls.className = 'badge-picker-chip-controls';
+
+          const btnLeft = document.createElement('button');
+          btnLeft.type = 'button';
+          btnLeft.className = 'badge-picker-chip-move';
+          btnLeft.dataset.dir = 'left';
+          btnLeft.innerHTML = '◀';
+          btnLeft.title = 'Badge nach links verschieben';
+          btnLeft.disabled = (idx === 0);
+          btnLeft.addEventListener('click', () => {
+            pendingFocus = { id: entry.id, dir: 'left' };
+            if (moveBadge(idx, idx - 1)) updateSummary();
+          });
+
+          const btnRight = document.createElement('button');
+          btnRight.type = 'button';
+          btnRight.className = 'badge-picker-chip-move';
+          btnRight.dataset.dir = 'right';
+          btnRight.innerHTML = '▶';
+          btnRight.title = 'Badge nach rechts verschieben';
+          btnRight.disabled = (idx === selectedBadges.length - 1);
+          btnRight.addEventListener('click', () => {
+            pendingFocus = { id: entry.id, dir: 'right' };
+            if (moveBadge(idx, idx + 1)) updateSummary();
+          });
+
+          controls.appendChild(btnLeft);
+          controls.appendChild(btnRight);
+          chip.appendChild(controls);
+        }
+
         chips.appendChild(chip);
       });
     }
 
-    const missing = Array.from(selected).filter(id => !library.some(b => b.id === id));
+    const missing = selectedList.filter(id => !library.some(b => b.id === id));
     if (missing.length){
       const note = document.createElement('div');
       note.className = 'badge-picker-missing';
       note.textContent = `Nicht verfügbar: ${missing.join(', ')}`;
       chips.appendChild(note);
+    }
+
+    if (selectedBadges.length > 1){
+      hint.hidden = false;
+      hint.textContent = 'Reihenfolge über die Pfeile anpassen.';
+    } else {
+      hint.hidden = true;
+      hint.textContent = '';
+    }
+
+    host._badgeSelectedOrder = selectedList.slice();
+
+    if (pendingFocus){
+      requestAnimationFrame(() => {
+        const chip = chips.querySelector(`[data-badge-id="${pendingFocus.id}"]`);
+        if (!chip) { pendingFocus = null; return; }
+        let target = null;
+        if (pendingFocus.dir === 'left') {
+          target = chip.querySelector('button[data-dir="left"]');
+        } else if (pendingFocus.dir === 'right') {
+          target = chip.querySelector('button[data-dir="right"]');
+        }
+        if (!target || target.disabled) target = chip.querySelector('button');
+        if (target) target.focus();
+        pendingFocus = null;
+      });
     }
   };
 
@@ -164,10 +249,14 @@ function renderBadgePicker(selectedIds = []){
     input.checked = selected.has(badge.id);
     input.tabIndex = -1;
     input.addEventListener('change', () => {
+      const id = badge.id;
       if (input.checked){
-        selected.add(badge.id);
+        selected.add(id);
+        if (!selectedList.includes(id)) selectedList.push(id);
       } else {
-        selected.delete(badge.id);
+        selected.delete(id);
+        const idx = selectedList.indexOf(id);
+        if (idx !== -1) selectedList.splice(idx, 1);
       }
       option.classList.toggle('is-checked', input.checked);
       updateSummary();
@@ -220,25 +309,16 @@ function renderBadgePicker(selectedIds = []){
       toggle.setAttribute('aria-expanded', 'false');
       popup.setAttribute('aria-hidden', 'true');
       optionList.querySelectorAll('input[type="checkbox"]').forEach(inp => { inp.tabIndex = -1; });
-      if (pointerHandler){
-        document.removeEventListener('pointerdown', pointerHandler);
-        if (host._badgePointerHandler === pointerHandler) delete host._badgePointerHandler;
-        pointerHandler = null;
-      }
-      if (keyHandler){
-        document.removeEventListener('keydown', keyHandler);
-        if (host._badgeKeyHandler === keyHandler) delete host._badgeKeyHandler;
-        keyHandler = null;
-      }
+      if (pointerHandler) document.removeEventListener('pointerdown', pointerHandler);
+      if (keyHandler) document.removeEventListener('keydown', keyHandler);
+      delete host._badgePointerHandler;
+      delete host._badgeKeyHandler;
     }
   };
 
-  toggle.addEventListener('click', () => {
-    setOpen(!host.classList.contains('is-open'));
-  });
+  toggle.addEventListener('click', () => setOpen(!host.classList.contains('is-open')));
 
   updateSummary();
-  setOpen(false);
 }
 
 function pushHistory(){
@@ -404,13 +484,29 @@ function initOnce(){
     const badgeIds = (() => {
       const host = $('#m_badgeList');
       if (!host) return [];
+      const ordered = Array.isArray(host._badgeSelectedOrder) ? host._badgeSelectedOrder : null;
+      if (ordered && ordered.length){
+        const unique = new Set();
+        const list = [];
+        ordered.forEach(id => {
+          const value = String(id ?? '').trim();
+          if (!value || unique.has(value)) return;
+          unique.add(value);
+          list.push(value);
+        });
+        if (list.length) return list;
+      }
+
       const checked = Array.from(host.querySelectorAll('input[type=checkbox]:checked'));
       const unique = new Set();
+      const list = [];
       checked.forEach(inp => {
         const value = String(inp.value ?? '').trim();
-        if (value) unique.add(value);
+        if (!value || unique.has(value)) return;
+        unique.add(value);
+        list.push(value);
       });
-      return Array.from(unique);
+      return list;
     })();
 
     if (!newTime && title) { alert('Bitte Zeit HH:MM'); return; }

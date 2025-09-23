@@ -3010,15 +3010,17 @@ function renderStorySlide(story = {}, region = 'left') {
       }
 
       const mainColumn = h('div', { class: 'card-main' });
-      const contentChildren = [];
-      let hasMetaColumn = false;
-      if (metaColumn.childNodes.length) {
-        contentChildren.push(metaColumn);
-        hasMetaColumn = true;
-      }
-      contentChildren.push(mainColumn);
+      let hasMetaColumn = metaColumn.childNodes.length > 0;
+      const contentChildren = [mainColumn];
+      if (hasMetaColumn) contentChildren.push(metaColumn);
       const contentBlock = h('div', { class: 'card-content' }, contentChildren);
       if (hasMetaColumn) contentBlock.classList.add('card-content--with-meta');
+      const ensureMetaColumn = () => {
+        if (hasMetaColumn) return;
+        contentBlock.appendChild(metaColumn);
+        contentBlock.classList.add('card-content--with-meta');
+        hasMetaColumn = true;
+      };
 
       const componentDefs = [
         { key: 'title', node: titleNode, target: 'main' },
@@ -3034,6 +3036,7 @@ function renderStorySlide(story = {}, region = 'left') {
         (node, def) => {
           const targetKey = def?.target;
           if (targetKey === 'meta') {
+            ensureMetaColumn();
             metaColumn.appendChild(node);
             return;
           }
