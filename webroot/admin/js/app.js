@@ -881,7 +881,18 @@ function renderSlidesBox(){
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#tileTimeScale', f.tileMetaScale ?? 1);
-  setC('#saunaFlames', (settings.slides?.showSaunaFlames !== false));
+  setV('#tileFlameSizeScale', settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1);
+  setV('#tileFlameGapScale', settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1);
+  const saunaFlameControls = ['#tileFlameSizeScale', '#tileFlameGapScale'].map(sel => document.querySelector(sel));
+  const saunaFlamesToggle = document.getElementById('saunaFlames');
+  const saunaFlamesEnabled = (settings.slides?.showSaunaFlames !== false);
+  setC('#saunaFlames', saunaFlamesEnabled);
+  const applySaunaFlameState = (enabled) => { saunaFlameControls.forEach(el => { if (el) el.disabled = !enabled; }); };
+  applySaunaFlameState(saunaFlamesEnabled);
+  if (saunaFlamesToggle && !saunaFlamesToggle.dataset.bound) {
+    saunaFlamesToggle.addEventListener('change', () => applySaunaFlameState(saunaFlamesToggle.checked));
+    saunaFlamesToggle.dataset.bound = '1';
+  }
   setC('#badgeInlineColumn', settings.slides?.badgeInlineColumn === true);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
@@ -917,6 +928,7 @@ function renderSlidesBox(){
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
+  setV('#saunaHeadingWidth', settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
   setV('#tilePaddingScale', settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75);
   setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
@@ -1009,11 +1021,15 @@ function renderSlidesBox(){
     setV('#tilePct',       DEFAULTS.slides.tileWidthPercent);
     setV('#tileMin',       DEFAULTS.slides.tileMinScale);
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
+    setV('#tileFlameSizeScale', DEFAULTS.slides.tileFlameSizeScale);
+    setV('#tileFlameGapScale', DEFAULTS.slides.tileFlameGapScale);
+    setV('#saunaHeadingWidth', DEFAULTS.slides.saunaTitleMaxWidthPercent);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
     setV('#tilePaddingScale', DEFAULTS.slides.tilePaddingScale);
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
     setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setC('#saunaFlames', DEFAULTS.slides.showSaunaFlames !== false);
+    applySaunaFlameState(DEFAULTS.slides.showSaunaFlames !== false);
     setC('#badgeInlineColumn', DEFAULTS.slides.badgeInlineColumn === true);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
@@ -1353,6 +1369,16 @@ function collectSettings(){
         tileWidthPercent:+($('#tilePct')?.value || 45),
         tileMinScale:+($('#tileMin')?.value || 0.25),
         tileMaxScale:+($('#tileMax')?.value || 0.57),
+        tileFlameSizeScale:(() => {
+          const raw = Number($('#tileFlameSizeScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1;
+          return clamp(0.4, raw, 3);
+        })(),
+        tileFlameGapScale:(() => {
+          const raw = Number($('#tileFlameGapScale')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1;
+          return clamp(0, raw, 3);
+        })(),
         tileHeightScale:(() => {
           const raw = Number($('#tileHeightScale')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1;
@@ -1362,6 +1388,11 @@ function collectSettings(){
           const raw = Number($('#tilePaddingScale')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75;
           return clamp(0.25, raw, 1.5);
+        })(),
+        saunaTitleMaxWidthPercent:(() => {
+          const raw = Number($('#saunaHeadingWidth')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100;
+          return clamp(10, raw, 100);
         })(),
         badgeScale:(() => {
           const raw = Number($('#badgeScale')?.value);

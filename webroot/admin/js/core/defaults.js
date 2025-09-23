@@ -62,7 +62,10 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      customBadgeEmojis:[]
+      customBadgeEmojis:[],
+      tileFlameSizeScale:1,
+      tileFlameGapScale:1,
+      saunaTitleMaxWidthPercent:100
     }
   },
   fresh:{
@@ -99,7 +102,10 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      customBadgeEmojis:[]
+      customBadgeEmojis:[],
+      tileFlameSizeScale:1,
+      tileFlameGapScale:1,
+      saunaTitleMaxWidthPercent:100
     }
   }
 };
@@ -114,6 +120,9 @@ export const DEFAULTS = {
     tileMaxScale:0.57,
     tileHeightScale:1,
     tilePaddingScale:0.75,
+    tileFlameSizeScale:1,
+    tileFlameGapScale:1,
+    saunaTitleMaxWidthPercent:100,
     tileOverlayEnabled:true,
     tileOverlayStrength:1,
     showSaunaFlames:true,

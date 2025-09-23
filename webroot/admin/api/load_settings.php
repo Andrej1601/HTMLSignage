@@ -27,8 +27,10 @@ echo json_encode([
   'slides'=>[
     'overviewDurationSec'=>10,'saunaDurationSec'=>6,'transitionMs'=>500,
     'tileWidthPercent'=>45,'tileMinScale'=>0.25,'tileMaxScale'=>0.57,
+    'tileFlameSizeScale'=>1,'tileFlameGapScale'=>1,
     'durationMode'=>'uniform','globalDwellSec'=>6,'loop'=>true,
-    'order'=>['overview']
+    'order'=>['overview'],
+    'saunaTitleMaxWidthPercent'=>100
   ],
   'assets'=>['rightImages'=>[], 'flameImage'=>'/assets/img/flame_test.svg'],
   'footnotes'=>[ ['id'=>'star','label'=>'*','text'=>'Nur am Fr und Sa'] ],
