@@ -120,6 +120,7 @@ export const DEFAULTS = {
     tileMaxScale:0.57,
     tileHeightScale:1,
     tilePaddingScale:0.75,
+    appendTimeSuffix:false,
     tileFlameSizeScale:1,
     tileFlameGapScale:1,
     saunaTitleMaxWidthPercent:100,

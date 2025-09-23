@@ -37,7 +37,7 @@ const STYLE_FONT_KEYS = [
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
   'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
-  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent'
+  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
 ];
 
 const SUGGESTED_BADGE_EMOJIS = [

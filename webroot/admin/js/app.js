@@ -881,6 +881,7 @@ function renderSlidesBox(){
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#tileTimeScale', f.tileMetaScale ?? 1);
+  setC('#timeSuffixToggle', settings.slides?.appendTimeSuffix === true);
   setV('#tileFlameSizeScale', settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1);
   setV('#tileFlameGapScale', settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1);
   const saunaFlameControls = ['#tileFlameSizeScale', '#tileFlameGapScale'].map(sel => document.querySelector(sel));
@@ -1389,6 +1390,7 @@ function collectSettings(){
           if (!Number.isFinite(raw)) return settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75;
           return clamp(0.25, raw, 1.5);
         })(),
+        appendTimeSuffix: !!document.getElementById('timeSuffixToggle')?.checked,
         saunaTitleMaxWidthPercent:(() => {
           const raw = Number($('#saunaHeadingWidth')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100;

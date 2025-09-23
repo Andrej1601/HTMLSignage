@@ -144,6 +144,9 @@ body[data-layout='single'] #stage-right{display:none;}
   position:relative;
   z-index:1;
 }
+.container.has-right.full-heading .headings{
+  max-width:var(--saunaHeadingMaxWidth, 100%);
+}
 .h1{font-weight:800;letter-spacing:.02em;line-height:1.1;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px;hyphens:auto;overflow-wrap:break-word;word-break:normal;}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
 .overview .h1{line-height:1.1;font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
