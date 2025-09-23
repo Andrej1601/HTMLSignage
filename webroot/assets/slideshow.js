@@ -2690,17 +2690,7 @@ function renderStorySlide(story = {}, region = 'left') {
     const heightScale = Number.isFinite(+settings?.slides?.tileHeightScale)
       ? clamp(0.5, +settings.slides.tileHeightScale, 2)
       : 1;
-    const userTileFlameSizeScale = Number.isFinite(+settings?.slides?.tileFlameSizeScale)
-      ? clamp(0.25, +settings.slides.tileFlameSizeScale, 3)
-      : 1;
-    const userTileFlameGapScale = Number.isFinite(+settings?.slides?.tileFlameGapScale)
-      ? clamp(0, +settings.slides.tileFlameGapScale, 4)
-      : 1;
-    const flameSizeBase = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
-    const flameSize = flameSizeBase * userTileFlameSizeScale;
-    const flameGapBase = useIcons ? clamp(6, t * 0.02, 22) : clamp(4, t * 0.018, 18);
-    const flameGap = Math.max(0, flameGapBase * userTileFlameGapScale);
-    const flameColumn = Math.max(0, (flameSize * 3) + (flameGap * 2));
+    const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
     const iconColumn = useIcons ? clamp(40, iconSize * 0.75, iconSize * 1.45) : 0;
     const tileMinHeight = useIcons
       ? clamp(64, iconSize * 0.82, iconSize * 1.08)
@@ -2722,8 +2712,6 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileBadgeScale', (combinedMeta * userBadgeScale).toFixed(3));
     container.style.setProperty('--tileDescriptionScale', (combinedMeta * userBadgeDescriptionScale).toFixed(3));
     container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
-    container.style.setProperty('--tileFlameGapPx', flameGap.toFixed(2) + 'px');
-    container.style.setProperty('--flamesColW', flameColumn.toFixed(2) + 'px');
     container.style.setProperty('--tileIconColumnPx', useIcons ? (iconColumn.toFixed(2) + 'px') : '0px');
     container.style.setProperty('--tileHeightScale', heightScale.toFixed(3));
     container.style.setProperty('--tileMinHeightPx', (tileMinHeight * heightScale).toFixed(2) + 'px');

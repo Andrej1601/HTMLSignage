@@ -229,16 +229,6 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.slides.badgeDescriptionScale = Number.isFinite(badgeDescRaw)
     ? clamp(0.3, badgeDescRaw, 3)
     : defaultBadgeDescScale;
-  const defaultTileFlameSizeScale = DEFAULTS.slides?.tileFlameSizeScale ?? 1;
-  const defaultTileFlameGapScale = DEFAULTS.slides?.tileFlameGapScale ?? 1;
-  const tileFlameSizeRaw = Number(src.slides?.tileFlameSizeScale);
-  src.slides.tileFlameSizeScale = Number.isFinite(tileFlameSizeRaw)
-    ? clamp(0.25, tileFlameSizeRaw, 3)
-    : defaultTileFlameSizeScale;
-  const tileFlameGapRaw = Number(src.slides?.tileFlameGapScale);
-  src.slides.tileFlameGapScale = Number.isFinite(tileFlameGapRaw)
-    ? clamp(0, tileFlameGapRaw, 4)
-    : defaultTileFlameGapScale;
   src.slides.customBadgeEmojis = sanitizeEmojiList(src.slides?.customBadgeEmojis);
   return src;
 }
