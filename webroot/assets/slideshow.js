@@ -2991,6 +2991,11 @@ function renderStorySlide(story = {}, region = 'left') {
       } else if (hasStar) {
         labelNode.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
       }
+      if (it.time) {
+        titleNode.classList.add('title--with-time');
+        titleNode.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
+        titleNode.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
+      }
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
@@ -3002,25 +3007,10 @@ function renderStorySlide(story = {}, region = 'left') {
         ? stripeSource.map(entry => ({ ...entry }))
         : [];
       const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
-      const metaColumn = h('div', { class: 'card-meta' });
       const badgeColumn = inlineBadgeColumn ? h('div', { class: 'card-badges card-badges--inline' }) : null;
-      if (it.time) {
-        metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
-        metaColumn.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
-      }
 
       const mainColumn = h('div', { class: 'card-main' });
-      let hasMetaColumn = metaColumn.childNodes.length > 0;
-      const contentChildren = [mainColumn];
-      if (hasMetaColumn) contentChildren.push(metaColumn);
-      const contentBlock = h('div', { class: 'card-content' }, contentChildren);
-      if (hasMetaColumn) contentBlock.classList.add('card-content--with-meta');
-      const ensureMetaColumn = () => {
-        if (hasMetaColumn) return;
-        contentBlock.appendChild(metaColumn);
-        contentBlock.classList.add('card-content--with-meta');
-        hasMetaColumn = true;
-      };
+      const contentBlock = h('div', { class: 'card-content' }, [mainColumn]);
 
       const componentDefs = [
         { key: 'title', node: titleNode, target: 'main' },
@@ -3035,11 +3025,6 @@ function renderStorySlide(story = {}, region = 'left') {
         (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'),
         (node, def) => {
           const targetKey = def?.target;
-          if (targetKey === 'meta') {
-            ensureMetaColumn();
-            metaColumn.appendChild(node);
-            return;
-          }
           if (targetKey === 'badge' && badgeColumn) {
             badgeColumn.appendChild(node);
             return;
