@@ -117,6 +117,7 @@ export const DEFAULTS = {
     tileOverlayEnabled:true,
     tileOverlayStrength:1,
     showSaunaFlames:true,
+    badgeInlineColumn:false,
     infobadgeColor:'#5C3101',
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
     badgeScale:1,

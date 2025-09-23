@@ -2911,6 +2911,7 @@ function renderStorySlide(story = {}, region = 'left') {
     const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
     const componentFlags = getSlideComponentFlags();
     const showSaunaFlames = settings?.slides?.showSaunaFlames !== false;
+    const inlineBadgeColumn = settings?.slides?.badgeInlineColumn === true;
     const iconVariantMap = (settings?.slides?.iconVariants && typeof settings.slides.iconVariants === 'object')
       ? settings.slides.iconVariants
       : null;
@@ -2993,6 +2994,7 @@ function renderStorySlide(story = {}, region = 'left') {
       titleNode.appendChild(labelNode);
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
+      if (badgeRowNode && inlineBadgeColumn) badgeRowNode.classList.add('badge-row--stacked');
       const stripeSource = Array.isArray(badgeRowNode?.__badgeList)
         ? badgeRowNode.__badgeList
         : collectUniqueBadges(it.badges);
@@ -3001,6 +3003,7 @@ function renderStorySlide(story = {}, region = 'left') {
         : [];
       const hasAnyBadgeImage = badgeStripeSource.some(entry => entry.imageUrl);
       const metaColumn = h('div', { class: 'card-meta' });
+      const badgeColumn = inlineBadgeColumn ? h('div', { class: 'card-badges card-badges--inline' }) : null;
       if (it.time) {
         metaColumn.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
         metaColumn.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
@@ -3022,17 +3025,27 @@ function renderStorySlide(story = {}, region = 'left') {
         { key: 'description', render: () => createDescriptionNode(it.description, 'description'), target: 'main' },
         { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list'), target: 'main' },
         { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip'), target: 'main' },
-        { key: 'badges', render: () => badgeRowNode, target: 'main' }
+        { key: 'badges', render: () => badgeRowNode, target: inlineBadgeColumn ? 'badge' : 'main' }
       ];
       renderComponentNodes(
         componentFlags,
         componentDefs,
         (anyEnabled) => h('div', { class: 'card-empty' }, anyEnabled ? 'Keine Details hinterlegt.' : 'Alle Komponenten deaktiviert.'),
         (node, def) => {
-          const target = (def && def.target === 'meta') ? metaColumn : mainColumn;
-          target.appendChild(node);
+          const targetKey = def?.target;
+          if (targetKey === 'meta') {
+            metaColumn.appendChild(node);
+            return;
+          }
+          if (targetKey === 'badge' && badgeColumn) {
+            badgeColumn.appendChild(node);
+            return;
+          }
+          mainColumn.appendChild(node);
         }
       );
+
+      const hasBadgeColumn = !!(badgeColumn && badgeColumn.childNodes.length);
 
       const tileChildren = [];
       let stripeNode = null;
@@ -3098,6 +3111,10 @@ function renderStorySlide(story = {}, region = 'left') {
         tileChildren.push(stripeNode);
       }
       tileChildren.push(contentBlock);
+      if (hasBadgeColumn && badgeColumn) {
+        tileChildren.push(badgeColumn);
+        if (!tileClasses.includes('tile--badge-column')) tileClasses.push('tile--badge-column');
+      }
       if (showSaunaFlames) {
         tileChildren.push(flamesWrap(it.flames));
       } else {

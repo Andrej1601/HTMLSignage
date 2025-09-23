@@ -36,7 +36,7 @@ const STYLE_FONT_KEYS = [
 ];
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
-  'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength'
+  'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn'
 ];
 
 const SUGGESTED_BADGE_EMOJIS = [
