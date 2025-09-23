@@ -758,6 +758,7 @@ function renderSlidesBox(){
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#tileTimeScale', f.tileMetaScale ?? 1);
   setC('#saunaFlames', (settings.slides?.showSaunaFlames !== false));
+  setC('#badgeInlineColumn', settings.slides?.badgeInlineColumn === true);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
   setV('#flameGap',         f.flameGapScale    ?? 0.14);
@@ -889,6 +890,7 @@ function renderSlidesBox(){
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
     setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setC('#saunaFlames', DEFAULTS.slides.showSaunaFlames !== false);
+    setC('#badgeInlineColumn', DEFAULTS.slides.badgeInlineColumn === true);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
     setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
@@ -1219,6 +1221,7 @@ function collectSettings(){
           if (!Number.isFinite(raw)) return settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1;
           return clamp(0.3, raw, 3);
         })(),
+        badgeInlineColumn: !!document.getElementById('badgeInlineColumn')?.checked,
         infobadgeColor:(() => {
           const el = document.getElementById('badgeColor');
           const fallback = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';
