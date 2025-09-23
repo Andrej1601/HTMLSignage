@@ -881,7 +881,6 @@ function renderSlidesBox(){
   setV('#h1Scale',    f.h1Scale ?? 1);
   setV('#h2Scale',    f.h2Scale ?? 1);
   setV('#tileTimeScale', f.tileMetaScale ?? 1);
-  setC('#saunaFlames', (settings.slides?.showSaunaFlames !== false));
   setC('#badgeInlineColumn', settings.slides?.badgeInlineColumn === true);
   setV('#chipOverflowMode', f.chipOverflowMode ?? 'scale');
   setV('#flamePct',         f.flamePct         ?? 55);
@@ -919,6 +918,8 @@ function renderSlidesBox(){
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
   setV('#tilePaddingScale', settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75);
+  setV('#tileFlameSize', settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1);
+  setV('#tileFlameGap', settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1);
   setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
   setV('#badgeDescriptionScale', settings.slides?.badgeDescriptionScale ?? DEFAULTS.slides.badgeDescriptionScale ?? 1);
   const overlayCheckbox = document.getElementById('tileOverlayEnabled');
@@ -936,6 +937,18 @@ function renderSlidesBox(){
   if (overlayCheckbox && !overlayCheckbox.dataset.bound) {
     overlayCheckbox.addEventListener('change', () => applyOverlayState(overlayCheckbox.checked));
     overlayCheckbox.dataset.bound = '1';
+  }
+  const saunaFlameToggle = document.getElementById('saunaFlames');
+  const saunaFlameControls = ['#tileFlameSize', '#tileFlameGap'].map(sel => document.querySelector(sel));
+  const applySaunaFlameState = (enabled) => {
+    saunaFlameControls.forEach(el => { if (el) el.disabled = !enabled; });
+  };
+  const saunaFlamesEnabled = (settings.slides?.showSaunaFlames !== false);
+  setC('#saunaFlames', saunaFlamesEnabled);
+  applySaunaFlameState(saunaFlamesEnabled);
+  if (saunaFlameToggle && !saunaFlameToggle.dataset.bound) {
+    saunaFlameToggle.addEventListener('change', () => applySaunaFlameState(saunaFlameToggle.checked));
+    saunaFlameToggle.dataset.bound = '1';
   }
   const badgeColor = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor;
   setV('#badgeColor', badgeColor);
@@ -1011,9 +1024,12 @@ function renderSlidesBox(){
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
     setV('#tilePaddingScale', DEFAULTS.slides.tilePaddingScale);
+    setV('#tileFlameSize', DEFAULTS.slides.tileFlameSizeScale);
+    setV('#tileFlameGap', DEFAULTS.slides.tileFlameGapScale);
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
     setV('#badgeDescriptionScale', DEFAULTS.slides.badgeDescriptionScale);
     setC('#saunaFlames', DEFAULTS.slides.showSaunaFlames !== false);
+    applySaunaFlameState(DEFAULTS.slides.showSaunaFlames !== false);
     setC('#badgeInlineColumn', DEFAULTS.slides.badgeInlineColumn === true);
     setV('#badgeColor',    DEFAULTS.slides.infobadgeColor);
     setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
@@ -1362,6 +1378,16 @@ function collectSettings(){
           const raw = Number($('#tilePaddingScale')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75;
           return clamp(0.25, raw, 1.5);
+        })(),
+        tileFlameSizeScale:(() => {
+          const raw = Number($('#tileFlameSize')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1;
+          return clamp(0.25, raw, 3);
+        })(),
+        tileFlameGapScale:(() => {
+          const raw = Number($('#tileFlameGap')?.value);
+          if (!Number.isFinite(raw)) return settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1;
+          return clamp(0, raw, 4);
         })(),
         badgeScale:(() => {
           const raw = Number($('#badgeScale')?.value);
