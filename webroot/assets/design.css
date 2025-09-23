@@ -28,6 +28,7 @@
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
+  --cutTopRatio:0.28; --cutBottomRatio:0.12;
 
   /* sauna tile clamp (JS sets --tileTargetPx and baseW) */
   --baseW:1920px;
@@ -133,8 +134,13 @@ body[data-layout='single'] #stage-right{display:none;}
 .container.has-right{padding-right:calc(var(--rightW) + 32px)}
 .container.overview{padding-right:32px}
 .headings{width:100%;}
-.container.has-right .headings{max-width:calc(100% - var(--rightW));}
-.h1{font-weight:800;letter-spacing:.02em;line-height:1.1;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px}
+.container.has-right .headings{
+  max-width:calc(100% - (var(--rightW) * (1 - var(--cutTopRatio))));
+  padding-right:calc(16px * var(--vwScale));
+  position:relative;
+  z-index:1;
+}
+.h1{font-weight:800;letter-spacing:.02em;line-height:1.1;font-size:calc(56px*var(--scale)*var(--h1Scale));margin:0 0 10px;hyphens:auto;overflow-wrap:anywhere;}
 .h2{font-weight:700;letter-spacing:.01em;opacity:.95;font-size:calc(36px*var(--scale)*var(--h2Scale));margin:0 0 14px}
 .overview .h1{line-height:1.1;font-size:calc(56px*var(--scale)*var(--h1Scale)*var(--ovAuto))}
 .overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}

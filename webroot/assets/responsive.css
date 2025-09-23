@@ -5,6 +5,8 @@
     --rightW:30%;
     --cutTop:40%;
     --cutBottom:20%;
+    --cutTopRatio:0.40;
+    --cutBottomRatio:0.20;
   }
   body[data-layout='split'] .stage{
     flex-direction:column;
@@ -17,6 +19,8 @@
     --rightW:24%;
     --cutTop:45%;
     --cutBottom:25%;
+    --cutTopRatio:0.45;
+    --cutBottomRatio:0.25;
   }
   body[data-layout='split'] .stage{
     gap:calc(10px*var(--vwScale));
