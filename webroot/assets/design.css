@@ -25,6 +25,8 @@
   --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapScale));
   --ovAuto:1; /* overview-only autoscale factor */
   --ovTimeWidth:10ch;
+  --tileFlameGapPx:calc(10px*var(--vwScale));
+  --saunaHeadingMaxWidth:100%;
 
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
@@ -55,7 +57,6 @@
   --badgeFg:var(--boxfg);
   --flameSizePxOv:18; /* kleine Flames in Übersicht-Chips */
   --ovTitleScale:1; /* nur H1 der Übersicht */
-  --flamesColW: calc(var(--flameSizePx)*1px*var(--scale)*3 + 24px);
   --tileEnterDuration:600ms;
   --tileEnterDelay:80ms;
   --heroTimelineItemMs:500ms;
@@ -135,7 +136,10 @@ body[data-layout='single'] #stage-right{display:none;}
 .container.overview{padding-right:32px}
 .headings{width:100%;}
 .container.has-right .headings{
-  max-width:calc(100% - (var(--rightW) * (1 - var(--cutTopRatio))));
+  max-width:min(
+    calc(100% - (var(--rightW) * (1 - var(--cutTopRatio)))),
+    var(--saunaHeadingMaxWidth, 100%)
+  );
   padding-right:calc(16px * var(--vwScale));
   position:relative;
   z-index:1;
@@ -593,10 +597,13 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   font-weight:var(--tileWeight);
   line-height:1.05;
   min-width:0;
+  width:100%;
+  max-width:100%;
   display:flex;
   flex-wrap:wrap;
   align-items:baseline;
   gap:.35em;
+  overflow-wrap:anywhere;
 }
 .tile .title .label{
   display:flex;
@@ -604,6 +611,8 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   gap:.35em;
   flex-wrap:wrap;
   min-width:0;
+  flex:1 1 auto;
+  overflow-wrap:anywhere;
 }
 .tile .title .label .notewrap{flex:0 0 auto;}
 .tile.tile--has-time .card-main{
@@ -611,14 +620,17 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   grid-template-columns:max-content minmax(0,1fr);
   column-gap:calc(0.35em + 2px*var(--vwScale));
   row-gap:var(--tileContentGapPx, calc(10px*var(--vwScale)));
-  align-items:start;
+  align-items:center;
   justify-content:flex-start;
   align-content:center;
 }
 .tile.tile--has-time .card-main > .time{
   grid-column:1;
   grid-row:1;
-  display:inline-block;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:calc(0.35em + 2px*var(--vwScale));
   min-width:calc(var(--tileTimeWidthCh, 9) * 1ch);
   font-size:calc(.65em*var(--tileMetaScale,1));
   letter-spacing:.12em;
@@ -627,6 +639,13 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   white-space:nowrap;
   font-variant-numeric:tabular-nums;
 }
+.tile.tile--has-time .card-main > .time::after{
+  content:'–';
+  display:inline-flex;
+  align-items:center;
+  opacity:.7;
+  font-size:.8em;
+}
 .tile.tile--has-time .card-main__content{
   grid-column:2;
   grid-row:auto;
@@ -634,12 +653,7 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .tile.tile--has-time .title{
   grid-column:2;
   grid-row:1;
-}
-.tile.tile--has-time .title::before{
-  content:'–';
-  opacity:.7;
-  font-size:.8em;
-  margin-right:calc(0.35em + 2px*var(--vwScale));
+  align-self:center;
 }
 .card-content .description{
   display:block;
@@ -746,13 +760,18 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
 .tile.is-hidden .card-chip--status{filter:none;}
 .flames{
   display:flex;
-  gap:10px;
+  gap:var(--tileFlameGapPx, calc(10px*var(--vwScale)));
   align-items:center;
   justify-content:flex-end;
   justify-self:end;
   align-self:center;
   grid-column:3;
   min-width:0;
+}
+.flames > span{
+  display:block;
+  width:calc(var(--flameSizePx)*1px*var(--scale));
+  height:calc(var(--flameSizePx)*1px*var(--scale));
 }
 .tile.tile--badge-column .flames{grid-column:4;}
 .tile.tile--badge-column.tile--compact .flames{grid-column:3;}

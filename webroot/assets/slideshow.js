@@ -319,6 +319,9 @@ async function loadDeviceResolved(id){
     const overlayOpacity = overlayEnabled ? clamp(0, 0.9 * overlayStrength, 1) : 0;
     const overlayLight = overlayEnabled ? clamp(0, 0.12 * overlayStrength, 1) : 0;
     const overlayShadow = overlayEnabled ? clamp(0, 0.42 * overlayStrength, 1) : 0;
+    const headingWidthPct = Number.isFinite(+slidesCfg.saunaTitleMaxWidthPercent)
+      ? clamp(10, +slidesCfg.saunaTitleMaxWidthPercent, 100)
+      : 100;
 
     setVars({
       '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
@@ -356,7 +359,8 @@ async function loadDeviceResolved(id){
       '--heroTimelineItemMs': msVar(slidesCfg.heroTimelineItemMs, 500),
       '--heroTimelineItemDelay': msVar(slidesCfg.heroTimelineItemDelayMs, 140),
       '--heroTimelineFillMs': msVar(slidesCfg.heroTimelineFillMs, 8000),
-      '--heroTimelineDelayMs': msVar(slidesCfg.heroTimelineDelayMs, 400)
+      '--heroTimelineDelayMs': msVar(slidesCfg.heroTimelineDelayMs, 400),
+      '--saunaHeadingMaxWidth': headingWidthPct + '%'
     });
     if (fonts.family) document.documentElement.style.setProperty('--font', fonts.family);
 
@@ -2690,7 +2694,16 @@ function renderStorySlide(story = {}, region = 'left') {
     const heightScale = Number.isFinite(+settings?.slides?.tileHeightScale)
       ? clamp(0.5, +settings.slides.tileHeightScale, 2)
       : 1;
-    const flameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
+    const userFlameSizeScale = Number.isFinite(+settings?.slides?.tileFlameSizeScale)
+      ? clamp(0.4, +settings.slides.tileFlameSizeScale, 3)
+      : 1;
+    const userFlameGapScale = Number.isFinite(+settings?.slides?.tileFlameGapScale)
+      ? clamp(0, +settings.slides.tileFlameGapScale, 3)
+      : 1;
+    const baseFlameSize = useIcons ? clamp(22, t * 0.03, 42) : clamp(18, t * 0.026, 32);
+    const baseFlameGap = useIcons ? clamp(6, t * 0.016, 22) : clamp(5, t * 0.014, 20);
+    const flameSize = baseFlameSize * userFlameSizeScale;
+    const flameGap = Math.max(0, baseFlameGap * userFlameGapScale);
     const iconColumn = useIcons ? clamp(40, iconSize * 0.75, iconSize * 1.45) : 0;
     const tileMinHeight = useIcons
       ? clamp(64, iconSize * 0.82, iconSize * 1.08)
@@ -2712,6 +2725,7 @@ function renderStorySlide(story = {}, region = 'left') {
     container.style.setProperty('--tileBadgeScale', (combinedMeta * userBadgeScale).toFixed(3));
     container.style.setProperty('--tileDescriptionScale', (combinedMeta * userBadgeDescriptionScale).toFixed(3));
     container.style.setProperty('--flameSizePx', flameSize.toFixed(2));
+    container.style.setProperty('--tileFlameGapPx', flameGap.toFixed(2) + 'px');
     container.style.setProperty('--tileIconColumnPx', useIcons ? (iconColumn.toFixed(2) + 'px') : '0px');
     container.style.setProperty('--tileHeightScale', heightScale.toFixed(3));
     container.style.setProperty('--tileMinHeightPx', (tileMinHeight * heightScale).toFixed(2) + 'px');
