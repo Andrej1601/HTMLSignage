@@ -62,8 +62,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      tileFlameSizeScale:1,
-      tileFlameGapScale:1,
       customBadgeEmojis:[]
     }
   },
@@ -101,8 +99,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      tileFlameSizeScale:1,
-      tileFlameGapScale:1,
       customBadgeEmojis:[]
     }
   }
@@ -118,8 +114,6 @@ export const DEFAULTS = {
     tileMaxScale:0.57,
     tileHeightScale:1,
     tilePaddingScale:0.75,
-    tileFlameSizeScale:1,
-    tileFlameGapScale:1,
     tileOverlayEnabled:true,
     tileOverlayStrength:1,
     showSaunaFlames:true,
