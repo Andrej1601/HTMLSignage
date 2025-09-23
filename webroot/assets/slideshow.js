@@ -2982,6 +2982,8 @@ function renderStorySlide(story = {}, region = 'left') {
         if (iconVariant === 'overlay') tileClasses.push('tile--icon-overlay');
       }
 
+      if (it.time) tileClasses.push('tile--has-time');
+
       const titleNode = h('div', { class: 'title' });
       const labelNode = h('span', { class: 'label' }, baseTitle);
       const supNote = noteSup(it, notes);
@@ -2991,12 +2993,9 @@ function renderStorySlide(story = {}, region = 'left') {
       } else if (hasStar) {
         labelNode.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
       }
-      if (it.time) {
-        titleNode.classList.add('title--with-time');
-        titleNode.appendChild(h('span', { class: 'time' }, it.time + ' Uhr'));
-        titleNode.appendChild(h('span', { class: 'sep', 'aria-hidden': 'true' }, '–'));
-      }
       titleNode.appendChild(labelNode);
+
+      const timeNode = it.time ? h('span', { class: 'time' }, it.time + ' Uhr') : null;
 
       const badgeRowNode = createBadgeRow(it.badges, 'badge-row');
       if (badgeRowNode && inlineBadgeColumn) badgeRowNode.classList.add('badge-row--stacked');
@@ -3010,6 +3009,9 @@ function renderStorySlide(story = {}, region = 'left') {
       const badgeColumn = inlineBadgeColumn ? h('div', { class: 'card-badges card-badges--inline' }) : null;
 
       const mainColumn = h('div', { class: 'card-main' });
+      const mainContent = h('div', { class: 'card-main__content' });
+      if (timeNode) mainColumn.appendChild(timeNode);
+      mainColumn.appendChild(mainContent);
       const contentBlock = h('div', { class: 'card-content' }, [mainColumn]);
 
       const componentDefs = [
@@ -3029,9 +3031,17 @@ function renderStorySlide(story = {}, region = 'left') {
             badgeColumn.appendChild(node);
             return;
           }
-          mainColumn.appendChild(node);
+          if (def?.key === 'title') {
+            mainColumn.insertBefore(node, mainContent);
+            return;
+          }
+          mainContent.appendChild(node);
         }
       );
+
+      if (!mainContent.childNodes.length) {
+        mainContent.remove();
+      }
 
       const hasBadgeColumn = !!(badgeColumn && badgeColumn.childNodes.length);
 

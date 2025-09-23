@@ -1169,6 +1169,74 @@ body.mode-uniform #ovSec{ display:none !important; }
 .badge-lib-row.has-icon .badge-lib-chip{ font-weight:500; }
 .badge-lib-chip-icon{ font-size:16px; line-height:1; }
 
+/* ---------- Fußnoten-Editor ---------- */
+.footnote-section{
+  margin-top:16px;
+  padding-top:12px;
+  border-top:1px solid var(--inbr);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.footnote-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.footnote-toggle{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border-radius:999px;
+  border:1px solid var(--ghost-border);
+  background:var(--panel);
+  color:var(--ghost-fg);
+  padding:4px 12px;
+  font-size:13px;
+  cursor:pointer;
+  transition:background .18s ease, border-color .18s ease, color .18s ease;
+}
+.footnote-toggle::after{
+  content:'▾';
+  font-size:12px;
+  transition:transform .2s ease;
+}
+.footnote-toggle:hover,
+.footnote-toggle:focus-visible{
+  border-color:var(--btn-accent);
+  color:var(--btn-accent);
+}
+.footnote-toggle:focus-visible{
+  outline:2px solid var(--btn-accent);
+  outline-offset:2px;
+}
+.footnote-section.is-open .footnote-toggle::after{ transform:rotate(180deg); }
+.footnote-body{
+  overflow:hidden;
+  max-height:0;
+  opacity:0;
+  pointer-events:none;
+  transition:max-height .26s ease, opacity .2s ease;
+  will-change:max-height;
+}
+.footnote-section.is-open .footnote-body{
+  max-height:min(60vh, 420px);
+  opacity:1;
+  pointer-events:auto;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.footnote-body-inner{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:2px 0;
+}
+.footnote-body-inner .kv{ margin:0; }
+
 /* ---------- Story Builder ---------- */
 .story-builder-pane{
   display:flex;
