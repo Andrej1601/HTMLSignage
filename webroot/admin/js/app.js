@@ -29,6 +29,16 @@ import {
   sanitizeScheduleForCompare,
   sanitizeSettingsForCompare
 } from './core/config.js';
+import {
+  loadDeviceSnapshots,
+  loadDeviceById,
+  claimDevice,
+  setDeviceMode,
+  unpairDevice,
+  renameDevice,
+  cleanupDevices,
+  resolveNowSeconds
+} from './core/device_service.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
@@ -64,18 +74,81 @@ let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
 let devicesPinned = (lsGet('devicesPinned') === '1');
 document.body?.classList.toggle('devices-pinned', devicesPinned);
 
+const stateAccess = {
+  getSchedule: () => schedule,
+  getSettings: () => settings,
+  setSchedule: (next) => { schedule = next; },
+  setSettings: (next) => { settings = next; }
+};
+
+function createGridContext() {
+  return {
+    getSchedule: stateAccess.getSchedule,
+    getSettings: stateAccess.getSettings,
+    setSchedule: stateAccess.setSchedule
+  };
+}
+
+function createSlidesMasterContext() {
+  return {
+    getSchedule: stateAccess.getSchedule,
+    getSettings: stateAccess.getSettings,
+    setSchedule: stateAccess.setSchedule,
+    setSettings: stateAccess.setSettings,
+    refreshSlidesBox: renderSlidesBox,
+    refreshColors: renderColors
+  };
+}
+
+function initSlidesMaster() {
+  initSlidesMasterUI(createSlidesMasterContext());
+}
+
+function refreshSidebarPanels() {
+  renderSlidesBox();
+  renderHighlightBox();
+  renderColors();
+  renderFootnotes();
+}
+
+function refreshDevicesPane(options = {}) {
+  const handler = window.__refreshDevicesPane;
+  if (typeof handler !== 'function') return undefined;
+  const { bypassCache = false, ...rest } = options || {};
+  return handler({ bypassCache, ...rest });
+}
+
+function refreshAllUi({ reinitSlidesMaster = true } = {}) {
+  refreshSidebarPanels();
+  if (reinitSlidesMaster) {
+    initSlidesMaster();
+  } else {
+    renderSlidesMaster();
+  }
+  renderContextBadge();
+  refreshDevicesPane();
+}
+
+function safeInvoke(label, fn) {
+  try {
+    fn();
+  } catch (error) {
+    console.warn(label, error);
+  }
+}
+
 function clearDraftsIfPresent() {
   lsRemove('scheduleDraft');
   lsRemove('settingsDraft');
 }
 
 function rerenderAfterBaselineRestore() {
-  try { renderGridUI(); } catch (err) { console.warn('[admin] Grid re-render failed after reset', err); }
-  try { renderSlidesBox(); } catch (err) { console.warn('[admin] Slides box re-render failed after reset', err); }
-  try { renderHighlightBox(); } catch (err) { console.warn('[admin] Highlight box re-render failed after reset', err); }
-  try { renderColors(); } catch (err) { console.warn('[admin] Colors re-render failed after reset', err); }
-  try { renderFootnotes(); } catch (err) { console.warn('[admin] Footnotes re-render failed after reset', err); }
-  try { renderSlidesMaster(); } catch (err) { console.warn('[admin] Slides master re-render failed after reset', err); }
+  safeInvoke('[admin] Grid re-render failed after reset', renderGridUI);
+  safeInvoke('[admin] Slides box re-render failed after reset', renderSlidesBox);
+  safeInvoke('[admin] Highlight box re-render failed after reset', renderHighlightBox);
+  safeInvoke('[admin] Colors re-render failed after reset', renderColors);
+  safeInvoke('[admin] Footnotes re-render failed after reset', renderFootnotes);
+  safeInvoke('[admin] Slides master re-render failed after reset', renderSlidesMaster);
 }
 
 const unsavedBadge = document.getElementById('unsavedBadge');
@@ -405,33 +478,35 @@ function renderContextBadge(){
 }
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
-async function enterDeviceContext(id, name){
-  let deviceData;
-  try {
-    deviceData = await fetchJson('/admin/api/devices_list.php', {
-      cache: 'no-store',
-      okPredicate: (data) => data?.ok !== false
-    });
-  } catch (error) {
-    console.error('[admin] Geräte-Kontext konnte nicht geladen werden', error);
-    alert('Geräte konnten nicht geladen werden: ' + error.message);
-    return;
-  }
-
-  const dev = (deviceData?.devices || []).find(d => d.id === id);
-  if (!dev) {
+async function enterDeviceContext(deviceLike, fallbackName){
+  const provided = (deviceLike && typeof deviceLike === 'object') ? deviceLike : null;
+  const rawId = provided?.id ?? deviceLike;
+  const deviceId = typeof rawId === 'string' ? rawId : String(rawId ?? '');
+  if (!deviceId) {
     alert('Gerät wurde nicht gefunden.');
     return;
   }
 
-  const overrides = dev?.overrides?.settings || {};
+  let device = provided;
+  if (!device?.overrides?.settings) {
+    try {
+      device = await loadDeviceById(deviceId);
+    } catch (error) {
+      console.error('[admin] Geräte-Kontext konnte nicht geladen werden', error);
+      alert('Gerät konnte nicht geladen werden: ' + error.message);
+      return;
+    }
+  }
 
-  currentDeviceCtx = id;
-  currentDeviceName = name || dev.name || id;
+  const overrides = (device?.overrides?.settings && typeof device.overrides.settings === 'object')
+    ? device.overrides.settings
+    : {};
+  const badgeSource = device?.badgeSource ?? device?.badge ?? device?.badgeInfo ?? null;
+
+  currentDeviceCtx = deviceId;
+  currentDeviceName = device?.name || fallbackName || deviceId;
   document.body.classList.add('device-mode');
-  currentDeviceBadgeMeta = normalizeContextBadge(
-    dev?.contextBadge ?? dev?.badge ?? dev?.badgeInfo ?? null
-  );
+  currentDeviceBadgeMeta = normalizeContextBadge(badgeSource);
 
   // globale Settings als Basis + Overrides mergen
   settings = mergeDeep(deepClone(baseSettings), overrides);
@@ -441,24 +516,10 @@ async function enterDeviceContext(id, name){
   updateBaseline(deviceBaseSchedule, deviceBaseSettings);
   setUnsavedState(false);
 
-  // UI neu zeichnen
-  renderSlidesBox();
-  renderHighlightBox();
-  renderColors();
-  renderFootnotes();
-  initSlidesMasterUI({
-    getSchedule:()=>schedule,
-    getSettings:()=>settings,
-    setSchedule:(s)=>{schedule=s;},
-    setSettings:(cs)=>{settings=cs;},
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
-  });
-  renderContextBadge();
-  window.__refreshDevicesPane?.();
+  refreshAllUi();
 
   // in den Grid-Modus springen (falls du showView hast)
-if (typeof showView==='function') showView('grid');
+  if (typeof showView==='function') showView('grid');
 }
 
 function exitDeviceContext(){
@@ -473,20 +534,7 @@ function exitDeviceContext(){
   updateBaseline(baseSchedule, baseSettings);
   evaluateUnsavedState({ immediate: true });
 
-  renderSlidesBox();
-  renderHighlightBox();
-  renderColors();
-  renderFootnotes();
-  initSlidesMasterUI({
-    getSchedule:()=>schedule,
-    getSettings:()=>settings,
-    setSchedule:(s)=>{schedule=s;},
-    setSettings:(cs)=>{settings=cs;},
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
-  });
-  renderContextBadge();
-  window.__refreshDevicesPane?.();
+  refreshAllUi();
 }
 
 
@@ -537,32 +585,14 @@ async function loadAll(){
   setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
 
   // --- UI-Module initialisieren ---------------------------------------------
-  initGridUI({
-    getSchedule : () => schedule,
-    getSettings : () => settings,
-    setSchedule : (s) => { schedule = s; }   // wichtig für Grid-Operationen
-  });
-
-  initSlidesMasterUI({
-    getSchedule : () => schedule,
-    getSettings : () => settings,
-    setSchedule : (s)  => { schedule = s; },
-    setSettings : (cs) => { settings = cs; },
-    refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
-  });
-
-  initGridDayLoader({
-    getSchedule : () => schedule,
-    getSettings : () => settings,
-    setSchedule : (s) => { schedule = s; }
-  });
+  const gridContext = createGridContext();
+  initGridUI(gridContext);
+  initSlidesMaster();
+  initGridDayLoader(gridContext);
 
   // --- Seitenboxen rendern ---------------------------------------------------
-  renderSlidesBox();
-  renderHighlightBox();
-  renderColors();
-  renderFootnotes();
+  refreshSidebarPanels();
+  renderContextBadge();
 
   // --- globale UI-Schalter (Theme/Backup/Cleanup) ---------------------------
   initThemeToggle();
@@ -1673,12 +1703,7 @@ async function claim(codeFromUI, nameFromUI) {
   }
   let response;
   try {
-    response = await fetchJson('/admin/api/devices_claim.php', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ code, name }),
-      expectOk: true
-    });
+    response = await claimDevice(code, name);
   } catch (error) {
     console.error('[admin] Pairing fehlgeschlagen', error);
     alert('Fehler: ' + error.message);
@@ -1691,7 +1716,7 @@ async function claim(codeFromUI, nameFromUI) {
     console.log('Gepaart:', response.deviceId, url);
   }
   // Pane neu laden (siehe createDevicesPane -> render)
-  if (typeof window.__refreshDevicesPane === 'function') await window.__refreshDevicesPane();
+  await refreshDevicesPane({ bypassCache: true });
   alert('Gerät gekoppelt' + (response.already ? ' (war bereits gekoppelt)' : '') + '.');
 }
 
@@ -1726,267 +1751,205 @@ async function createDevicesPane(){
 
   host?.insertBefore(card, host.firstChild);
 
-  // --- API-Adapter: devices_list.php (wenn vorhanden) oder Fallback auf devices.json
-  const normalizeSeconds = (value)=>{
-    if (value === null || value === undefined) return 0;
-    const num = Number(value);
-    if (!Number.isFinite(num) || num <= 0) return 0;
-    if (num > 1e12) return Math.floor(num / 1000);
-    if (num > 1e10) return Math.floor(num / 1000);
-    return Math.floor(num);
-  };
+  async function render(options = {}) {
+    const { bypassCache = false } = options || {};
+    const snapshot = await loadDeviceSnapshots({ bypassCache });
+    const nowSeconds = resolveNowSeconds(snapshot?.now);
 
-  const resolveNow = (value)=>{
-    if (value === undefined || value === null) return normalizeSeconds(Date.now());
-    return normalizeSeconds(value);
-  };
-
-  const OFFLINE_AFTER_MIN = 2;
-
-  async function fetchDevicesStatus(){
-    try {
-      const apiData = await fetchJson('/admin/api/devices_list.php', {
-        cache:'no-store',
-        okPredicate: (data) => data?.ok !== false
-      });
-      const now = resolveNow(apiData?.now);
-      const pairings = apiData?.pairings || [];
-      const devices = (apiData?.devices || []).map(d => {
-        const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
-        const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
-        return {
-          id: d.id,
-          name: d.name || '',
-          lastSeenAt,
-          offline,
-          useOverrides: !!d.useOverrides
-        };
-      });
-      return { ok:true, now, pairings, devices };
-    } catch (error) {
-      console.warn('[admin] Geräte-API nicht erreichbar', error);
-    }
-    try {
-      const fallbackData = await fetchJson('/data/devices.json?t=' + Date.now(), { cache:'no-store' });
-      const pairings = Object.values(fallbackData.pairings || {})
-        .filter(p => !p.deviceId)
-        .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
-      const now = resolveNow(fallbackData.now);
-      const devices = Object.values(fallbackData.devices || {}).map(d => {
-        const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
-        const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
-        return {
-          id: d.id,
-          name: d.name || '',
-          lastSeenAt,
-          offline,
-          useOverrides: !!d.useOverrides
-        };
-      });
-      return { ok:true, now, pairings, devices };
-    } catch (error) {
-      console.warn('[admin] Geräte-Fallback-Datei nicht verfügbar', error);
-    }
-    console.warn('[admin] konnte Geräte-Status weder über API noch Datei laden');
-    return { ok:false, pairings:[], devices:[] };
-  }
-
-  async function render(){
-    const j = await fetchDevicesStatus();
-    const now = resolveNow(j.now);
-
-    // Pending
-    const P = document.getElementById('devPendingList');
-    P.innerHTML = '';
-    const pend = (j.pairings || []).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-    if (!pend.length) {
-      P.innerHTML = '<div class="mut">Keine offenen Pairings.</div>';
-    } else {
-      pend.forEach(d=>{
-        const row = document.createElement('div'); row.className='pend-item';
-        const ts = d.createdAt ? new Date(d.createdAt*1000).toLocaleString('de-DE') : '—';
-        row.innerHTML = `
-          <div class="pill">Code: <b>${d.code}</b></div>
-          <div class="mut">seit ${ts}</div>
-          <button class="btn sm" data-code>Pairen…</button>
-        `;
-        row.querySelector('[data-code]').onclick = async ()=>{
-          const name = prompt('Name des Geräts (z. B. „Foyer TV“):','') || '';
-          await claim(d.code, name);
-        };
-        P.appendChild(row);
-      });
+    const pendingHost = document.getElementById('devPendingList');
+    if (pendingHost) {
+      pendingHost.innerHTML = '';
+      const pendings = Array.isArray(snapshot?.pairings)
+        ? snapshot.pairings.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        : [];
+      if (!pendings.length) {
+        pendingHost.innerHTML = '<div class="mut">Keine offenen Pairings.</div>';
+      } else {
+        pendings.forEach((entry) => {
+          const row = document.createElement('div');
+          row.className = 'pend-item';
+          const createdAt = Number(entry.createdAt) || 0;
+          const createdText = createdAt
+            ? new Date(createdAt * 1000).toLocaleString('de-DE')
+            : '—';
+          row.innerHTML = `
+            <div class="pill">Code: <b>${entry.code}</b></div>
+            <div class="mut">seit ${createdText}</div>
+            <button class="btn sm" data-code>Pairen…</button>
+          `;
+          row.querySelector('[data-code]')?.addEventListener('click', async () => {
+            const name = prompt('Name des Geräts (z. B. „Foyer TV“):', '') || '';
+            await claim(entry.code, name);
+          });
+          pendingHost.appendChild(row);
+        });
+      }
     }
 
-    // Paired
-    const L = document.getElementById('devPairedList');
-    L.innerHTML = '';
-    const paired = (j.devices || []);
-    if (!paired.length) {
-      L.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
-    } else {
-      const table = document.createElement('table');
-      const tbody = document.createElement('tbody');
-      table.appendChild(tbody);
-      L.appendChild(table);
-      const selectRow = (tr)=>{
-        tr.parentElement.querySelectorAll('tr').forEach(r=>r.classList.remove('selected'));
-        tr.classList.add('selected');
-      };
-      paired.forEach(d=>{
-        const lastSeenAt = Number(d.lastSeenAt) || 0;
-        const seen = lastSeenAt ? new Date(lastSeenAt*1000).toLocaleString('de-DE') : '—';
-        const offline = typeof d.offline === 'boolean'
-          ? d.offline
-          : (!lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60);
-        const useInd = d.useOverrides;
-        const modeLbl = useInd ? 'Individuell' : 'Global';
-        const tr = document.createElement('tr');
-        if (currentDeviceCtx===d.id) tr.classList.add('current');
-        if (useInd) tr.classList.add('ind');
-        if (offline) tr.classList.add('offline');
-        const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seen}</small>` : '';
-        const statusCell = offline
-          ? `<td class="status offline">offline${lastSeenHtml}</td>`
-          : `<td class="status online">online${lastSeenHtml}</td>`;
-        tr.innerHTML = `
-          <td><span class="dev-name" title="${d.id}">${d.name || d.id}</span></td>
-          <td><button class="btn sm" data-view>Ansehen</button></td>
-          <td><label class="toggle${useInd?' ind-active':''}" data-mode-wrap>
-            <input type="checkbox" ${useInd?'checked':''} data-mode>
-            <span data-mode-label>${modeLbl}</span>
-          </label></td>
-          <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
-          <td><button class="btn sm" data-rename>Umbenennen</button></td>
-          <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
-          <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
-          ${statusCell}
-        `;
-
-        const modeInput = tr.querySelector('[data-mode]');
-        const modeLabel = tr.querySelector('[data-mode-label]');
-        const modeWrap = tr.querySelector('[data-mode-wrap]');
-        modeInput.onchange = async ()=>{
-          const desiredMode = modeInput.checked;
-          const mode = desiredMode ? 'device' : 'global';
-          modeLabel.textContent = desiredMode ? 'Individuell' : 'Global';
-          tr.classList.toggle('ind', desiredMode);
-          modeWrap.classList.toggle('ind-active', desiredMode);
-          try {
-            await fetchJson('/admin/api/devices_set_mode.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ device: d.id, mode }),
-              expectOk: true
-            });
-          } catch (error) {
-            console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
-            alert('Fehler: ' + error.message);
-            modeInput.checked = !desiredMode;
-            const rollbackMode = modeInput.checked;
-            modeLabel.textContent = rollbackMode ? 'Individuell' : 'Global';
-            tr.classList.toggle('ind', rollbackMode);
-            modeWrap.classList.toggle('ind-active', rollbackMode);
-          }
+    const pairedHost = document.getElementById('devPairedList');
+    if (pairedHost) {
+      pairedHost.innerHTML = '';
+      const devices = Array.isArray(snapshot?.devices) ? snapshot.devices : [];
+      if (!devices.length) {
+        pairedHost.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
+      } else {
+        const table = document.createElement('table');
+        const tbody = document.createElement('tbody');
+        table.appendChild(tbody);
+        pairedHost.appendChild(table);
+        const selectRow = (tr) => {
+          tr.parentElement.querySelectorAll('tr').forEach((row) => row.classList.remove('selected'));
+          tr.classList.add('selected');
         };
 
-        tr.querySelector('[data-unpair]').onclick = async ()=>{
-          if (!/^dev_/.test(String(d.id))) {
-            alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
-            return;
-          }
-          const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
-          if ((check||'').trim().toLowerCase() !== 'ja') return;
+        devices.forEach((device) => {
+          const lastSeenAt = Number(device.lastSeenAt) || 0;
+          const seenText = lastSeenAt
+            ? new Date(lastSeenAt * 1000).toLocaleString('de-DE')
+            : '—';
+          const offline = !!device.offline;
+          const useOverrides = !!device.useOverrides;
+          const modeLabelText = useOverrides ? 'Individuell' : 'Global';
 
-          try {
-            await fetchJson('/admin/api/devices_unpair.php', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ device: d.id, purge: 1 }),
-              expectOk: true
-            });
-            alert('Gerät getrennt.');
-            render();
-          } catch (error) {
-            console.error('[admin] Gerät trennen fehlgeschlagen', error);
-            alert('Fehler: ' + error.message);
-          }
-        };
+          const row = document.createElement('tr');
+          if (currentDeviceCtx === device.id) row.classList.add('current');
+          if (useOverrides) row.classList.add('ind');
+          if (offline) row.classList.add('offline');
+          const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seenText}</small>` : '';
+          const statusCell = offline
+            ? `<td class="status offline">offline${lastSeenHtml}</td>`
+            : `<td class="status online">online${lastSeenHtml}</td>`;
 
-        tr.querySelector('[data-view]').onclick = ()=>{
-          selectRow(tr);
-          openDevicePreview(d.id, d.name || d.id);
-        };
-        tr.querySelector('[data-url]').onclick = async ()=>{
-          const url = SLIDESHOW_ORIGIN + '/?device=' + d.id;
-          try { await navigator.clipboard.writeText(url); alert('URL kopiert:\n'+url); }
-          catch { prompt('URL kopieren:', url); }
-        };
-        tr.querySelector('[data-edit]').onclick = ()=>{
-          selectRow(tr);
-          enterDeviceContext(d.id, d.name || d.id);
-        };
-        tr.querySelector('[data-rename]').onclick = async ()=>{
-          const newName = prompt('Neuer Gerätename:', d.name || '');
-          if (newName === null) return;
-          try {
-            await fetchJson('/admin/api/devices_rename.php', {
-              method:'POST',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ device: d.id, name: newName }),
-              expectOk: true
-            });
-            alert('Name gespeichert.');
-            render();
-          } catch (error) {
-            console.error('[admin] Gerät umbenennen fehlgeschlagen', error);
-            alert('Fehler: ' + error.message);
-          }
-        };
-        tbody.appendChild(tr);
-      });
+          row.innerHTML = `
+            <td><span class="dev-name" title="${device.id}">${device.name || device.id}</span></td>
+            <td><button class="btn sm" data-view>Ansehen</button></td>
+            <td><label class="toggle${useOverrides ? ' ind-active' : ''}" data-mode-wrap>
+              <input type="checkbox" ${useOverrides ? 'checked' : ''} data-mode>
+              <span data-mode-label>${modeLabelText}</span>
+            </label></td>
+            <td><button class="btn sm" data-edit>Im Editor bearbeiten</button></td>
+            <td><button class="btn sm" data-rename>Umbenennen</button></td>
+            <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
+            <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
+            ${statusCell}
+          `;
+
+          const modeInput = row.querySelector('[data-mode]');
+          const modeLabel = row.querySelector('[data-mode-label]');
+          const modeWrap = row.querySelector('[data-mode-wrap]');
+          modeInput?.addEventListener('change', async () => {
+            const desiredMode = !!modeInput.checked;
+            const mode = desiredMode ? 'device' : 'global';
+            modeLabel.textContent = desiredMode ? 'Individuell' : 'Global';
+            row.classList.toggle('ind', desiredMode);
+            modeWrap.classList.toggle('ind-active', desiredMode);
+            try {
+              await setDeviceMode(device.id, mode);
+            } catch (error) {
+              console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
+              alert('Fehler: ' + error.message);
+              modeInput.checked = !desiredMode;
+              const rollback = !!modeInput.checked;
+              modeLabel.textContent = rollback ? 'Individuell' : 'Global';
+              row.classList.toggle('ind', rollback);
+              modeWrap.classList.toggle('ind-active', rollback);
+            }
+          });
+
+          row.querySelector('[data-unpair]')?.addEventListener('click', async () => {
+            if (!/^dev_/.test(String(device.id))) {
+              alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
+              return;
+            }
+            const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+            if ((check || '').trim().toLowerCase() !== 'ja') return;
+            try {
+              await unpairDevice(device.id, { purge: true });
+              alert('Gerät getrennt.');
+              await render({ bypassCache: true });
+            } catch (error) {
+              console.error('[admin] Gerät trennen fehlgeschlagen', error);
+              alert('Fehler: ' + error.message);
+            }
+          });
+
+          row.querySelector('[data-view]')?.addEventListener('click', () => {
+            selectRow(row);
+            openDevicePreview(device.id, device.name || device.id);
+          });
+          row.querySelector('[data-url]')?.addEventListener('click', async () => {
+            const url = SLIDESHOW_ORIGIN + '/?device=' + device.id;
+            try {
+              await navigator.clipboard.writeText(url);
+              alert('URL kopiert:\n' + url);
+            } catch {
+              prompt('URL kopieren:', url);
+            }
+          });
+          row.querySelector('[data-edit]')?.addEventListener('click', () => {
+            selectRow(row);
+            enterDeviceContext(device);
+          });
+          row.querySelector('[data-rename]')?.addEventListener('click', async () => {
+            const newName = prompt('Neuer Gerätename:', device.name || '');
+            if (newName === null) return;
+            try {
+              await renameDevice(device.id, newName);
+              alert('Name gespeichert.');
+              await render({ bypassCache: true });
+            } catch (error) {
+              console.error('[admin] Gerät umbenennen fehlgeschlagen', error);
+              alert('Fehler: ' + error.message);
+            }
+          });
+          tbody.appendChild(row);
+        });
+      }
     }
+
     const ts = card.querySelector('#devLastUpdate');
     if (ts) {
-      const fallbackNow = normalizeSeconds(Date.now());
-      const tsSeconds = now || fallbackNow;
+      const tsSeconds = nowSeconds || resolveNowSeconds(Date.now());
       const tsDate = new Date(tsSeconds * 1000);
       ts.textContent = tsDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       ts.title = 'Stand: ' + tsDate.toLocaleString('de-DE');
     }
   }
 
-  // oben rechts: „Code eingeben…“
-  card.querySelector('#devPairManual').onclick = async ()=>{
-    const code = prompt('Pairing-Code (6 Zeichen):','');
+  card.querySelector('#devPairManual')?.addEventListener('click', async () => {
+    const code = prompt('Pairing-Code (6 Zeichen):', '');
     if (!code) return;
-    const name = prompt('Gerätename (optional):','') || '';
+    const name = prompt('Gerätename (optional):', '') || '';
     await claim(code, name);
+  });
+
+  const triggerRender = (options) => render(options);
+  card.querySelector('#devRefresh')?.addEventListener('click', () => triggerRender({ bypassCache: true }));
+  await triggerRender({ bypassCache: true });
+  card.__refreshInterval = setInterval(() => {
+    triggerRender({ bypassCache: true });
+  }, 60_000);
+
+  card.querySelector('#devGc')?.addEventListener('click', async () => {
+    const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
+    if ((conf || '').trim().toLowerCase() !== 'ja') return;
+    try {
+      const result = await cleanupDevices();
+      const deletedDevices = result?.deletedDevices ?? '?';
+      const deletedPairings = result?.deletedPairings ?? '?';
+      alert(`Bereinigt: ${deletedDevices} Geräte, ${deletedPairings} Pairing-Codes.`);
+      await triggerRender({ bypassCache: true });
+    } catch (error) {
+      console.error('[admin] Gerätebereinigung fehlgeschlagen', error);
+      alert('Fehler: ' + error.message);
+    }
+  });
+
+  window.__refreshDevicesPane = (options = {}) => {
+    const payload = options && typeof options === 'object' ? options : {};
+    const { bypassCache = true, ...rest } = payload;
+    return render({ bypassCache, ...rest });
   };
-
-  // Refresh & einmalig laden
-  card.querySelector('#devRefresh').onclick = render;
-  await render();
-  card.__refreshInterval = setInterval(render, 60_000);
-
-card.querySelector('#devGc').onclick = async ()=>{
-  const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
-  if ((conf||'').trim().toLowerCase() !== 'ja') return;
-  try {
-    const result = await fetchJson('/admin/api/devices_gc.php', { method:'POST', expectOk: true });
-    const deletedDevices = result.deletedDevices ?? '?';
-    const deletedPairings = result.deletedPairings ?? '?';
-    alert(`Bereinigt: ${deletedDevices} Geräte, ${deletedPairings} Pairing-Codes.`);
-    card.querySelector('#devRefresh').click();
-  } catch (error) {
-    console.error('[admin] Gerätebereinigung fehlgeschlagen', error);
-    alert('Fehler: ' + error.message);
-  }
-};
-
-
-  // globaler Hook, damit claim() nach erfolgreichem Pairen neu laden kann
-  window.__refreshDevicesPane = render;
 
   return card;
 }
@@ -2074,9 +2037,7 @@ async function applyDevicesPaneState(){
       devicesPane = await createDevicesPane();
     } else {
       devicesPane.style.display = '';
-      if (typeof window.__refreshDevicesPane === 'function'){
-        await window.__refreshDevicesPane();
-      }
+      await refreshDevicesPane({ bypassCache: true });
     }
   } else {
     destroyDevicesPane();
