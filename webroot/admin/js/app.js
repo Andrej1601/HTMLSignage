@@ -732,6 +732,32 @@ function renderSlidesBox(){
       const prevStr = JSON.stringify(Array.isArray(pageState.playlist) ? pageState.playlist : []);
       const nextStr = JSON.stringify(next);
       pageState.playlist = next;
+      if (normalizedKey === 'left') {
+        const layoutSelect = document.getElementById('layoutMode');
+        const layoutModeValue = layoutSelect?.value === 'split' ? 'split' : 'single';
+        if (layoutModeValue !== 'split') {
+          const sortOrder = [];
+          next.forEach(entry => {
+            if (!entry || typeof entry !== 'object') return;
+            if (entry.type === 'sauna' && entry.name) {
+              sortOrder.push({ type: 'sauna', name: entry.name });
+            } else if (entry.type === 'media' && entry.id != null) {
+              sortOrder.push({ type: 'media', id: entry.id });
+            } else if (entry.type === 'story' && entry.id != null) {
+              sortOrder.push({ type: 'story', id: entry.id });
+            }
+          });
+          const prevSortStr = JSON.stringify(Array.isArray(settings.slides?.sortOrder) ? settings.slides.sortOrder : []);
+          settings.slides ||= {};
+          if (sortOrder.length) settings.slides.sortOrder = sortOrder;
+          else delete settings.slides.sortOrder;
+          const nextSortStr = JSON.stringify(sortOrder);
+          if (prevSortStr !== nextSortStr && prevStr === nextStr) {
+            setUnsavedState(true);
+            if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+          }
+        }
+      }
       if (prevStr !== nextStr) {
         setUnsavedState(true);
         if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -917,6 +943,12 @@ function renderSlidesBox(){
     }
 
     renderTiles();
+    if (normalizedKey === 'left') {
+      const layoutSelect = document.getElementById('layoutMode');
+      if ((layoutSelect?.value === 'split' ? 'split' : 'single') !== 'split') {
+        commitPlaylist();
+      }
+    }
   };
 
   // Schrift

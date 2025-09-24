@@ -22,7 +22,7 @@ import { DEFAULTS } from '../core/defaults.js';
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
 
-const COMPONENT_KEYS = ['title','description','aromas','facts','badges'];
+const COMPONENT_KEYS = ['title','description','badges'];
 
 const STYLE_THEME_KEYS = [
   'bg','fg','accent','gridBorder','gridTable','gridTableW','cellBg','boxFg','headRowBg','headRowFg',
@@ -2742,26 +2742,6 @@ if (durPer) durPer.onchange = () => {
 
   // Medien-Slides
   renderInterstitialsPanel('interList2');
-
-  const sortBtn = $('#btnSortSlides');
-  const orderOverlay = $('#slideOrderOverlay');
-  const closeOrder = $('#slideOrderClose');
-  if (sortBtn) sortBtn.onclick = () => {
-    if (orderOverlay) {
-      orderOverlay.hidden = false;
-      renderSlideOrderView();
-    }
-  };
-  if (closeOrder) closeOrder.onclick = () => {
-    if (orderOverlay) orderOverlay.hidden = true;
-    renderSlidesMaster();
-  };
-  if (orderOverlay) orderOverlay.addEventListener('click', e => {
-    if (e.target === orderOverlay) {
-      orderOverlay.hidden = true;
-      renderSlidesMaster();
-    }
-  });
 
   // Reset & Add Sauna
   const rs = $('#resetTiming');

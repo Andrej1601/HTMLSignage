@@ -29,8 +29,6 @@ const DEFAULT_FONTS = {
 const DEFAULT_ENABLED_COMPONENTS = {
   title:true,
   description:true,
-  aromas:true,
-  facts:true,
   badges:true
 };
 
