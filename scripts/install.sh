@@ -129,7 +129,10 @@ deploy_application() {
     rm -rf "$app_dir/webroot"
   fi
 
-  rsync -a --delete --delete-delay --exclude 'data/*.json' webroot/ "$app_dir"/
+  rsync -a --delete --delete-delay \
+    --filter='P .git/' \
+    --exclude 'data/*.json' \
+    webroot/ "$app_dir"/
 
   while IFS= read -r -d '' json; do
     local target="$app_dir/data/$(basename "$json")"
