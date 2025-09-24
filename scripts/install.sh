@@ -3,6 +3,11 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+readonly SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+readonly REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd -P)
+readonly WEBROOT_SOURCE="${REPO_ROOT}/webroot"
+readonly NGINX_CONFIG_SOURCE="${REPO_ROOT}/config/nginx"
+
 log()   { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
 error() { printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
@@ -116,10 +121,23 @@ install_packages() {
 }
 
 deploy_application() {
-  local app_dir=$1
+  local source_dir=$1
+  local app_dir=$2
   log "Deploying application files"
+  if [[ ! -d $source_dir ]]; then
+    error "Source directory not found: $source_dir"
+    exit 1
+  fi
   install -d "$app_dir"
-  rsync -a --delete webroot/ "$app_dir"/
+  local source_real
+  local target_real
+  source_real=$(readlink -f "$source_dir")
+  target_real=$(readlink -f "$app_dir")
+  if [[ $source_real == "$target_real" ]]; then
+    warn "Source and destination are identical (${source_real}). Skipping file sync."
+  else
+    rsync -a --delete "$source_dir"/ "$app_dir"/
+  fi
   chown -R www-data:www-data "$app_dir"
   find "$app_dir" -type d -print0 | xargs -0 chmod 2755
   find "$app_dir" -type f -print0 | xargs -0 chmod 0644
@@ -130,13 +148,18 @@ configure_nginx() {
   local public_port=$2
   local admin_port=$3
   local app_dir=$4
+  local config_dir=$5
 
   log "Deploying nginx configuration"
+  if [[ ! -d $config_dir ]]; then
+    error "nginx configuration directory not found: $config_dir"
+    exit 1
+  fi
   install -d /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/snippets
 
-  install -m 0644 config/nginx/signage-slideshow.conf /etc/nginx/sites-available/signage-slideshow.conf
-  install -m 0644 config/nginx/signage-admin.conf /etc/nginx/sites-available/signage-admin.conf
-  install -m 0644 config/nginx/snippets/signage-pairing.conf /etc/nginx/snippets/signage-pairing.conf
+  install -m 0644 "${config_dir}/signage-slideshow.conf" /etc/nginx/sites-available/signage-slideshow.conf
+  install -m 0644 "${config_dir}/signage-admin.conf" /etc/nginx/sites-available/signage-admin.conf
+  install -m 0644 "${config_dir}/snippets/signage-pairing.conf" /etc/nginx/snippets/signage-pairing.conf
 
   replace_placeholders "$app_dir/admin/index.html" "__PUBLIC_PORT__=${public_port}"
   replace_placeholders /etc/nginx/sites-available/signage-slideshow.conf \
@@ -309,8 +332,8 @@ main() {
   fi
 
   install_packages "$php_version"
-  deploy_application "$app_dir"
-  configure_nginx "$php_sock" "$public_port" "$admin_port" "$app_dir"
+  deploy_application "$WEBROOT_SOURCE" "$app_dir"
+  configure_nginx "$php_sock" "$public_port" "$admin_port" "$app_dir" "$NGINX_CONFIG_SOURCE"
   configure_php "$php_version"
   configure_basic_auth "$admin_user" "$admin_pass"
   reload_services "$php_service"
