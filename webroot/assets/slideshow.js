@@ -213,6 +213,63 @@
     };
   }
 
+  function sanitizeBadgeLibrary(list){
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    const normalized = [];
+    list.forEach(entry => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+      const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+      const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      const candidates = [
+        entry.id,
+        entry.key,
+        entry.code,
+        entry.slug,
+        entry.uid,
+        entry.value,
+        entry.name,
+        entry.title,
+        entry.text,
+        entry.label,
+        entry.icon
+      ];
+      let id = '';
+      for (const candidate of candidates){
+        if (candidate == null) continue;
+        const value = String(candidate).trim();
+        if (value){
+          id = value;
+          break;
+        }
+      }
+      if (!id || seen.has(id)) return;
+      normalized.push({ id, icon, label });
+      seen.add(id);
+    });
+    return normalized;
+  }
+
+  function sanitizeCustomEmojiList(list){
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    list.forEach(entry => {
+      if (typeof entry !== 'string') return;
+      const value = entry.trim();
+      if (!value || out.includes(value)) return;
+      out.push(value);
+    });
+    return out;
+  }
+
+  function sanitizeSettingsPayload(payload){
+    const cfg = (payload && typeof payload === 'object') ? payload : {};
+    const slides = (cfg.slides && typeof cfg.slides === 'object') ? cfg.slides : (cfg.slides = {});
+    slides.badgeLibrary = sanitizeBadgeLibrary(slides.badgeLibrary);
+    slides.customBadgeEmojis = sanitizeCustomEmojiList(slides.customBadgeEmojis);
+    return cfg;
+  }
+
   function createResizeRegistry() {
     const handlers = new Map();
     return {
@@ -263,7 +320,7 @@ async function loadDeviceResolved(id){
     throw new Error('device_resolve payload invalid');
   }
   schedule = j.schedule;
-  settings = j.settings;
+  settings = sanitizeSettingsPayload(j.settings);
   badgeLookupCache = null;
   applyTheme(); applyDisplay(); maybeApplyPreset();
   refreshStageQueues({ resetIndex:true, autoplay:false });
@@ -278,7 +335,7 @@ async function loadDeviceResolved(id){
       loadJSON('/data/schedule.json'),
       loadJSON('/data/settings.json')
     ]);
-    schedule = s; settings = cfg;
+    schedule = s; settings = sanitizeSettingsPayload(cfg);
     badgeLookupCache = null;
     applyTheme();
     applyDisplay();
@@ -3213,6 +3270,7 @@ function renderStorySlide(story = {}, region = 'left') {
   };
 
   const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story'];
+  const MEDIA_TYPES = ['image','video','url'];
   const PAGE_DEFAULTS = {
     left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'], playlist:[] },
     right:{ source:'media',  timerSec:null, contentTypes:['image','video','url'], playlist:[] }
@@ -3220,7 +3278,7 @@ function renderStorySlide(story = {}, region = 'left') {
   const SOURCE_FILTERS = {
     master: null,
     schedule: ['overview','sauna','hero-timeline'],
-    media: ['image','video','url'],
+    media: MEDIA_TYPES,
     story: ['story']
   };
 
@@ -3601,6 +3659,22 @@ function renderStorySlide(story = {}, region = 'left') {
     return normalized;
   }
 
+  function collectPlaylistTypes(list){
+    const types = new Set();
+    if (!Array.isArray(list)) return types;
+    list.forEach(entry => {
+      if (!entry || typeof entry !== 'object') return;
+      const type = String(entry.type || '').trim();
+      if (!type) return;
+      if (type === 'media') {
+        MEDIA_TYPES.forEach(t => types.add(t));
+      } else if (VALID_CONTENT_TYPES.includes(type)) {
+        types.add(type);
+      }
+    });
+    return types;
+  }
+
   function playlistKeyForQueueItem(item){
     if (!item) return null;
     if (item.type === 'overview') return 'overview';
@@ -3621,8 +3695,17 @@ function renderStorySlide(story = {}, region = 'left') {
   }
 
   function filterQueueForPage(masterQueue, pageConfig){
-    const base = baseQueueForSource(masterQueue, pageConfig?.source || 'master');
+    const sourceKey = pageConfig?.source || 'master';
     const playlist = Array.isArray(pageConfig?.playlist) ? sanitizePlaylistConfig(pageConfig.playlist) : [];
+    const playlistTypes = collectPlaylistTypes(playlist);
+    const baseFilter = SOURCE_FILTERS[sourceKey] || null;
+    let allowedTypes = null;
+    if (baseFilter) allowedTypes = new Set(baseFilter);
+    if (playlistTypes.size){
+      if (!allowedTypes) allowedTypes = new Set();
+      playlistTypes.forEach(type => allowedTypes.add(type));
+    }
+    const base = allowedTypes ? masterQueue.filter(item => allowedTypes.has(item.type)) : masterQueue.slice();
     if (playlist.length){
       const buckets = new Map();
       base.forEach(item => {
@@ -3645,6 +3728,15 @@ function renderStorySlide(story = {}, region = 'left') {
     const types = Array.isArray(pageConfig?.contentTypes) && pageConfig.contentTypes.length
       ? new Set(pageConfig.contentTypes)
       : null;
+    if (types){
+      if (types.has('media')){
+        types.delete('media');
+        MEDIA_TYPES.forEach(t => types.add(t));
+      }
+      if (playlistTypes.size){
+        playlistTypes.forEach(type => types.add(type));
+      }
+    }
     if (!types) return base;
     return base.filter(item => types.has(item.type));
   }
@@ -3660,13 +3752,25 @@ function renderStorySlide(story = {}, region = 'left') {
     const timerNum = Number(raw.timerSec);
     const timerSec = Number.isFinite(timerNum) && timerNum > 0 ? Math.max(1, Math.round(timerNum)) : null;
     const rawTypes = Array.isArray(raw.contentTypes) ? raw.contentTypes : defaults.contentTypes;
-    const filtered = rawTypes.filter(type => VALID_CONTENT_TYPES.includes(type));
-    const contentTypes = filtered.length ? Array.from(new Set(filtered)) : defaults.contentTypes;
-    const normalizedContentTypes = (source === 'master')
-      ? VALID_CONTENT_TYPES.slice()
-      : contentTypes;
+    const filtered = rawTypes.filter(type => VALID_CONTENT_TYPES.includes(type) || type === 'media');
+    const baseContentTypes = filtered.length ? Array.from(new Set(filtered)) : defaults.contentTypes;
     const rawPlaylist = Array.isArray(raw.playlist) ? raw.playlist : defaults.playlist;
     const playlist = sanitizePlaylistConfig(rawPlaylist);
+    const playlistTypes = collectPlaylistTypes(playlist);
+    const normalizedContentTypes = (() => {
+      const baseList = (source === 'master')
+        ? VALID_CONTENT_TYPES.slice()
+        : Array.from(new Set(baseContentTypes));
+      const merged = new Set();
+      baseList.forEach(type => {
+        if (type === 'media') MEDIA_TYPES.forEach(t => merged.add(t));
+        else if (VALID_CONTENT_TYPES.includes(type)) merged.add(type);
+      });
+      if (playlistTypes.size){
+        playlistTypes.forEach(type => merged.add(type));
+      }
+      return Array.from(merged);
+    })();
     return { id, enabled, source, timerSec, contentTypes: normalizedContentTypes, playlist };
   }
 
@@ -3824,7 +3928,7 @@ async function bootstrap(){
   try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
   const p = d.payload || {};
   if (p.schedule) schedule = p.schedule;
-  if (p.settings) { settings = p.settings; badgeLookupCache = null; }
+  if (p.settings) { settings = sanitizeSettingsPayload(p.settings); badgeLookupCache = null; }
   applyTheme();
   applyDisplay();
   maybeApplyPreset();
@@ -3922,7 +4026,7 @@ console.error('[bootstrap] resolve failed:', e);
           const newSetVer   = j.settings?.version || 0;
 
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
-            schedule = j.schedule; settings = j.settings;
+            schedule = j.schedule; settings = sanitizeSettingsPayload(j.settings);
             badgeLookupCache = null;
             lastSchedVer = newSchedVer; lastSetVer = newSetVer;
             applyTheme();
