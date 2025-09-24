@@ -33,6 +33,41 @@
   let heartbeatTimer = null;
   let pollTimer = null;
   let badgeLookupCache = null;
+  const displayListeners = {
+    resizeHandler: null,
+    resizeObserver: null,
+    resizeRaf: null,
+    cancelFrame: null
+  };
+
+  function cleanupDisplayListeners(){
+    if (displayListeners.resizeHandler) {
+      window.removeEventListener('resize', displayListeners.resizeHandler);
+      window.removeEventListener('orientationchange', displayListeners.resizeHandler);
+      displayListeners.resizeHandler = null;
+    }
+    if (displayListeners.resizeObserver) {
+      try {
+        displayListeners.resizeObserver.disconnect();
+      } catch (error) {
+        console.warn('[slideshow] resize observer cleanup failed', error);
+      }
+      displayListeners.resizeObserver = null;
+    }
+    if (displayListeners.resizeRaf !== null && typeof displayListeners.cancelFrame === 'function') {
+      displayListeners.cancelFrame(displayListeners.resizeRaf);
+    }
+    displayListeners.resizeRaf = null;
+    displayListeners.cancelFrame = null;
+  }
+
+  function toFiniteNumber(value){
+    if (value == null) return null;
+    const normalized = typeof value === 'string' ? value.trim() : value;
+    if (normalized === '') return null;
+    const num = Number(normalized);
+    return Number.isFinite(num) ? num : null;
+  }
 
   window.addEventListener('beforeunload', () => {
     if (heartbeatTimer) {
@@ -43,6 +78,7 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
+    cleanupDisplayListeners();
   });
 
   const imagePreloader = createImagePreloader({ maxParallel: 3 });
@@ -437,56 +473,92 @@ async function loadDeviceResolved(id){
 
   function applyDisplay() {
     cachedDisp = null;
+    cleanupDisplayListeners();
+
+    const docEl = document.documentElement;
+    const docStyle = docEl.style;
     const d = settings?.display || {};
     const layoutMode = (d.layoutMode === 'split') ? 'split' : 'single';
     updateLayoutModeAttr(layoutMode);
-    if (typeof d.rightWidthPercent === 'number') document.documentElement.style.setProperty('--rightW', d.rightWidthPercent + '%');
-    if (typeof d.cutTopPercent === 'number') {
-      document.documentElement.style.setProperty('--cutTop', d.cutTopPercent + '%');
-      const topRatio = Math.max(0, Math.min(1, d.cutTopPercent / 100));
-      document.documentElement.style.setProperty('--cutTopRatio', String(topRatio));
+
+    const setPercentProperty = (name, raw) => {
+      const value = toFiniteNumber(raw);
+      if (value !== null) docStyle.setProperty(name, `${value}%`);
+      else docStyle.removeProperty(name);
+    };
+
+    setPercentProperty('--rightW', d.rightWidthPercent);
+
+    const topPercent = toFiniteNumber(d.cutTopPercent);
+    if (topPercent !== null) {
+      docStyle.setProperty('--cutTop', `${topPercent}%`);
+      const topRatio = Math.max(0, Math.min(1, topPercent / 100));
+      docStyle.setProperty('--cutTopRatio', String(topRatio));
     } else {
-      document.documentElement.style.removeProperty('--cutTopRatio');
-    }
-    if (typeof d.cutBottomPercent === 'number') {
-      document.documentElement.style.setProperty('--cutBottom', d.cutBottomPercent + '%');
-      const bottomRatio = Math.max(0, Math.min(1, d.cutBottomPercent / 100));
-      document.documentElement.style.setProperty('--cutBottomRatio', String(bottomRatio));
-    } else {
-      document.documentElement.style.removeProperty('--cutBottomRatio');
+      docStyle.removeProperty('--cutTop');
+      docStyle.removeProperty('--cutTopRatio');
     }
 
-    const baseW = d.baseW || 1920;
-    document.documentElement.style.setProperty('--baseW', baseW + 'px');
+    const bottomPercent = toFiniteNumber(d.cutBottomPercent);
+    if (bottomPercent !== null) {
+      docStyle.setProperty('--cutBottom', `${bottomPercent}%`);
+      const bottomRatio = Math.max(0, Math.min(1, bottomPercent / 100));
+      docStyle.setProperty('--cutBottomRatio', String(bottomRatio));
+    } else {
+      docStyle.removeProperty('--cutBottom');
+      docStyle.removeProperty('--cutBottomRatio');
+    }
+
+    const parsedBaseW = toFiniteNumber(d.baseW);
+    const baseW = parsedBaseW !== null && parsedBaseW > 0 ? parsedBaseW : 1920;
+    docStyle.setProperty('--baseW', `${baseW}px`);
     const updateVwScale = () => {
-      const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
-      const s = Math.max(0.25, vw / baseW); // untere Schranke gegen Ultra-Klein
-      document.documentElement.style.setProperty('--vwScale', String(s));
+      const vw = Math.max(docEl.clientWidth, window.innerWidth || 0);
+      const scale = Math.max(0.25, vw / baseW);
+      docStyle.setProperty('--vwScale', String(scale));
     };
     updateVwScale();
 
-    let resizeRaf = null;
+    const requestFrame = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (cb) => setTimeout(cb, 16);
+    const cancelFrame = typeof cancelAnimationFrame === 'function'
+      ? cancelAnimationFrame
+      : clearTimeout;
+    displayListeners.cancelFrame = cancelFrame;
+
     const onResize = () => {
-      if (resizeRaf !== null) cancelAnimationFrame(resizeRaf);
-      resizeRaf = requestAnimationFrame(() => {
-        resizeRaf = null;
+      if (displayListeners.resizeRaf !== null && typeof displayListeners.cancelFrame === 'function') {
+        displayListeners.cancelFrame(displayListeners.resizeRaf);
+      }
+      displayListeners.resizeRaf = requestFrame(() => {
+        displayListeners.resizeRaf = null;
         updateVwScale();
       });
     };
 
     window.addEventListener('resize', onResize, { passive:true });
     window.addEventListener('orientationchange', onResize);
+    displayListeners.resizeHandler = onResize;
 
     if ('ResizeObserver' in window) {
-      new ResizeObserver(onResize).observe(document.documentElement);
+      try {
+        displayListeners.resizeObserver = new ResizeObserver(onResize);
+        displayListeners.resizeObserver.observe(docEl);
+      } catch (error) {
+        console.warn('[slideshow] resize observer init failed', error);
+        displayListeners.resizeObserver = null;
+      }
     }
   }
 
   function getDisplayRatio() {
     if (cachedDisp !== null) return cachedDisp;
     const d = settings?.display || {};
-    const baseW = d.baseW || 1920;
-    const baseH = d.baseH || 1080;
+    const parsedBaseW = toFiniteNumber(d.baseW);
+    const parsedBaseH = toFiniteNumber(d.baseH);
+    const baseW = parsedBaseW !== null && parsedBaseW > 0 ? parsedBaseW : 1920;
+    const baseH = parsedBaseH !== null && parsedBaseH > 0 ? parsedBaseH : 1080;
     cachedDisp = baseW / baseH;
     return cachedDisp;
   }
