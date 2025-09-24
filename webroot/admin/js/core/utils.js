@@ -59,3 +59,78 @@ export function deepEqual(a, b) {
   if (Number.isNaN(a) && Number.isNaN(b)) return true;
   return false;
 }
+
+function createApiError(message, { status, payload, cause } = {}) {
+  const error = new Error(message || 'Unbekannter Fehler');
+  if (status) error.status = status;
+  if (payload !== undefined) error.payload = payload;
+  if (cause) error.cause = cause;
+  return error;
+}
+
+export async function fetchJson(url, options = {}) {
+  const {
+    expectOk = false,
+    okPredicate,
+    errorMessage,
+    ...fetchOptions
+  } = options || {};
+
+  let response;
+  try {
+    response = await fetch(url, fetchOptions);
+  } catch (cause) {
+    throw createApiError(errorMessage || 'Netzwerkfehler: Anfrage fehlgeschlagen.', { cause });
+  }
+
+  let payload = null;
+  let text = '';
+  try {
+    text = await response.text();
+    const trimmed = text.trim();
+    if (trimmed) payload = JSON.parse(trimmed);
+  } catch (cause) {
+    throw createApiError(errorMessage || 'Server-Antwort ist kein gültiges JSON.', {
+      status: response.status,
+      payload: text,
+      cause
+    });
+  }
+
+  if (!response.ok) {
+    const message = (payload && typeof payload.error === 'string' && payload.error.trim())
+      ? payload.error.trim()
+      : errorMessage || `Server-Fehler (${response.status})`;
+    throw createApiError(message, { status: response.status, payload });
+  }
+
+  const predicate = typeof okPredicate === 'function'
+    ? okPredicate
+    : (data) => (expectOk ? !!(data && data.ok) : true);
+
+  if (!predicate(payload)) {
+    const message = (payload && typeof payload.error === 'string' && payload.error.trim())
+      ? payload.error.trim()
+      : errorMessage || 'Server meldete einen Fehler.';
+    throw createApiError(message, { status: response.status, payload });
+  }
+
+  return payload;
+}
+
+export function mergeDeep(target, source) {
+  if (!source || typeof source !== 'object') return target || {};
+  const output = (target && typeof target === 'object') ? target : {};
+  for (const key of Object.keys(source)) {
+    const value = source[key];
+    if (!Array.isArray(value) && value && typeof value === 'object') {
+      const base = (output[key] && typeof output[key] === 'object' && !Array.isArray(output[key]))
+        ? { ...output[key] }
+        : {};
+      output[key] = mergeDeep(base, value);
+    } else if (value !== undefined) {
+      output[key] = value;
+    }
+  }
+  return output;
+}
