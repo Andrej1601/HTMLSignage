@@ -3,6 +3,7 @@
 // Abhängigkeiten: utils ($,$$,parseTime) + Zugriff auf schedule/settings via init(ctx).
 
 import { $, $$, parseTime } from '../core/utils.js';
+import { sanitizeBadgeLibrary } from '../core/config.js';
 
 let ctx = null;           // { getSchedule, getSettings }
 let curRow = 0, curCol = 0;
@@ -40,7 +41,7 @@ function normalizeText(value){
 
 function getBadgeLibrary(){
   const settings = ctx?.getSettings?.();
-  const list = Array.isArray(settings?.slides?.badgeLibrary) ? settings.slides.badgeLibrary : [];
+  const list = sanitizeBadgeLibrary(settings?.slides?.badgeLibrary, { assignMissingIds: false }) || [];
   const seen = new Set();
   const out = [];
   list.forEach(entry => {

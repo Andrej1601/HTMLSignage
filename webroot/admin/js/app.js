@@ -535,7 +535,7 @@ function renderSlidesBox(){
   const f = settings.fonts || {};
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
-  const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left', source } = {}) => {
+  const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left' } = {}) => {
     const host = document.getElementById(hostId);
     if (!host) return;
     const normalizedKey = pageKey === 'right' ? 'right' : 'left';
@@ -964,12 +964,10 @@ function renderSlidesBox(){
   const rightCfg = pages.right || {};
   const layoutMode = (display.layoutMode === 'split') ? 'split' : 'single';
   setV('#layoutMode', layoutMode);
-  setV('#pageLeftSource', PAGE_SOURCE_KEYS.includes(leftCfg.source) ? leftCfg.source : 'master');
-  setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(rightCfg.source) ? rightCfg.source : 'media');
   setV('#pageLeftTimer', leftCfg.timerSec ?? '');
   setV('#pageRightTimer', rightCfg.timerSec ?? '');
-  renderPagePlaylist('pageLeftPlaylist', leftCfg.playlist, { pageKey: 'left', source: leftCfg.source });
-  renderPagePlaylist('pageRightPlaylist', rightCfg.playlist, { pageKey: 'right', source: rightCfg.source });
+  renderPagePlaylist('pageLeftPlaylist', leftCfg.playlist, { pageKey: 'left' });
+  renderPagePlaylist('pageRightPlaylist', rightCfg.playlist, { pageKey: 'right' });
   const layoutModeSelect = document.getElementById('layoutMode');
   const applyLayoutVisibility = (mode) => {
     const rightWrap = document.getElementById('layoutRight');
@@ -979,18 +977,6 @@ function renderSlidesBox(){
   if (layoutModeSelect) {
     layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
   }
-
-  const bindPlaylistSource = (selectId, pageKey, hostId) => {
-    const el = document.getElementById(selectId);
-    if (!el || el.dataset.playlistBound === '1') return;
-    el.addEventListener('change', () => {
-      const pageCfg = ((settings.display || {}).pages || {})[pageKey] || {};
-      renderPagePlaylist(hostId, pageCfg.playlist, { pageKey, source: el.value });
-    });
-    el.dataset.playlistBound = '1';
-  };
-  bindPlaylistSource('pageLeftSource', 'left', 'pageLeftPlaylist');
-  bindPlaylistSource('pageRightSource', 'right', 'pageRightPlaylist');
 
   // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');
@@ -1043,8 +1029,6 @@ function renderSlidesBox(){
     setV('#layoutMode', DEFAULTS.display.layoutMode || 'single');
     const defLeft = DEFAULTS.display.pages?.left || {};
     const defRight = DEFAULTS.display.pages?.right || {};
-    setV('#pageLeftSource', PAGE_SOURCE_KEYS.includes(defLeft.source) ? defLeft.source : 'master');
-    setV('#pageRightSource', PAGE_SOURCE_KEYS.includes(defRight.source) ? defRight.source : 'media');
     setV('#pageLeftTimer', defLeft.timerSec ?? '');
     setV('#pageRightTimer', defRight.timerSec ?? '');
     const defLeftPlaylist = sanitizePagePlaylist(defLeft.playlist);
@@ -1057,8 +1041,8 @@ function renderSlidesBox(){
     rightState.contentTypes = Array.isArray(defRight.contentTypes) ? defRight.contentTypes.slice() : [];
     leftState.playlist = defLeftPlaylist;
     rightState.playlist = defRightPlaylist;
-    renderPagePlaylist('pageLeftPlaylist', defLeftPlaylist, { pageKey: 'left', source: defLeft.source });
-    renderPagePlaylist('pageRightPlaylist', defRightPlaylist, { pageKey: 'right', source: defRight.source });
+    renderPagePlaylist('pageLeftPlaylist', defLeftPlaylist, { pageKey: 'left' });
+    renderPagePlaylist('pageRightPlaylist', defRightPlaylist, { pageKey: 'right' });
     applyLayoutVisibility(DEFAULTS.display.layoutMode || 'single');
   };
 }
@@ -1312,10 +1296,10 @@ function collectSettings(){
     return Number.isFinite(num) && num > 0 ? Math.max(1, Math.round(num)) : null;
   };
   const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
-  const getSourceValue = (id, fallback) => {
-    const el = document.getElementById(id);
-    const val = el?.value || fallback;
-    return PAGE_SOURCE_KEYS.includes(val) ? val : fallback;
+  const getExistingSource = (pageState, fallback) => {
+    const raw = pageState?.source;
+    if (raw && PAGE_SOURCE_KEYS.includes(raw)) return raw;
+    return PAGE_SOURCE_KEYS.includes(fallback) ? fallback : 'master';
   };
   const collectPlaylist = (pageState) => {
     const sanitized = sanitizePagePlaylist(pageState?.playlist);
@@ -1495,14 +1479,14 @@ function collectSettings(){
         pages:{
           left:{
             ...(((settings.display||{}).pages||{}).left||{}),
-            source:getSourceValue('pageLeftSource', 'master'),
+            source:getExistingSource(((settings.display||{}).pages||{}).left, DEFAULTS.display?.pages?.left?.source || 'master'),
             timerSec:sanitizeTimer(document.getElementById('pageLeftTimer')?.value),
             contentTypes:getContentTypes(((settings.display||{}).pages||{}).left, DEFAULTS.display?.pages?.left),
             playlist:collectPlaylist(((settings.display||{}).pages||{}).left)
           },
           right:{
             ...(((settings.display||{}).pages||{}).right||{}),
-            source:getSourceValue('pageRightSource', 'media'),
+            source:getExistingSource(((settings.display||{}).pages||{}).right, DEFAULTS.display?.pages?.right?.source || 'media'),
             timerSec:sanitizeTimer(document.getElementById('pageRightTimer')?.value),
             contentTypes:getContentTypes(((settings.display||{}).pages||{}).right, DEFAULTS.display?.pages?.right),
             playlist:collectPlaylist(((settings.display||{}).pages||{}).right)
