@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/storage.php';
+
 header('Content-Type: application/json; charset=UTF-8');
 
 function get_flag(string $name, int $default=1): int {
@@ -29,18 +31,23 @@ function gather_asset_paths($source): array {
   return array_keys($paths);
 }
 
-$settingsFile = '/var/www/signage/data/settings.json';
-$scheduleFile = '/var/www/signage/data/schedule.json';
-if (!is_file($settingsFile) || !is_file($scheduleFile)) {
-  http_response_code(404);
-  echo json_encode(['ok'=>false,'error'=>'missing-data']); exit;
-}
-
-$settings = json_decode(file_get_contents($settingsFile), true);
-$schedule = json_decode(file_get_contents($scheduleFile), true);
+$settingsFile = signage_data_path('settings.json');
+$scheduleFile = signage_data_path('schedule.json');
 $include     = get_flag('include', 0);  // Bilder
 $incSettings = get_flag('settings', 1);
 $incSchedule = get_flag('schedule', 1);
+
+if (($incSettings || $include) && !is_file($settingsFile)) {
+  http_response_code(404);
+  echo json_encode(['ok'=>false,'error'=>'missing-settings']); exit;
+}
+if (($incSchedule || $include) && !is_file($scheduleFile)) {
+  http_response_code(404);
+  echo json_encode(['ok'=>false,'error'=>'missing-schedule']); exit;
+}
+
+$settings = ($incSettings || $include) ? signage_read_json('settings.json') : null;
+$schedule = ($incSchedule || $include) ? signage_read_json('schedule.json') : null;
 
 $out = [
   'kind'       => 'signage-export',
@@ -65,11 +72,10 @@ if ($include) {
   }
   if (!empty($pathSet)) {
     $blobs = [];
-    $base = '/var/www/signage';
     $fi = new finfo(FILEINFO_MIME_TYPE);
     foreach (array_keys($pathSet) as $rel) {
       if (!is_string($rel) || !str_starts_with($rel, '/assets/')) continue;
-      $abs = $base . $rel;
+      $abs = signage_absolute_path($rel);
       if (!is_file($abs)) continue;
       $mime = $fi->file($abs) ?: 'application/octet-stream';
       $b64  = base64_encode(file_get_contents($abs));
@@ -81,4 +87,4 @@ if ($include) {
 
 $name = isset($_GET['name']) ? preg_replace('/[^A-Za-z0-9_.-]/','_', $_GET['name']) : ('signage_export_'.date('Ymd'));
 header('Content-Disposition: attachment; filename="'.$name.($include?'_with-images':'').'.json"');
-echo json_encode($out, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT);
+echo json_encode($out, SIGNAGE_JSON_FLAGS);

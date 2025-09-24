@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/storage.php';
+
 /**
  * File: /var/www/signage/admin/api/device_resolve.php
  * Zweck: Liefert aufgelöste Einstellungen (global + Geräte-Overrides) und Zeitplan.
@@ -22,14 +24,6 @@ function merge_r($a, $b) {
       : $v;
   }
   return $a;
-}
-
-/** JSON sicher lesen; bei defekten/fehlenden Dateien leere Defaults liefern. */
-function read_json_file($absPath) {
-  if (!is_file($absPath)) return [];
-  $raw = @file_get_contents($absPath);
-  $j = json_decode($raw, true);
-  return is_array($j) ? $j : [];
 }
 
 /** Aktueller Tag als Kurzschlüssel (Sun,Mon,...). */
@@ -64,14 +58,8 @@ if (!$dev) {
 
 // --- Pfade & Basiskonfiguration --------------------------------------------
 
-$docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/');
-if ($docRoot === '' || !is_dir($docRoot)) {
-  // Fallback, falls PHP-FPM nicht mit korrektem DOCUMENT_ROOT läuft
-  $docRoot = rtrim(realpath(__DIR__ . '/../../'), '/');
-}
-
-$baseSettings = read_json_file($docRoot . '/data/settings.json');
-$baseSchedule = read_json_file($docRoot . '/data/schedule.json');
+$baseSettings = signage_read_json('settings.json');
+$baseSchedule = signage_read_json('schedule.json');
 $baseScheduleVersion = intval($baseSchedule['version'] ?? 0);
 
 $overSettings = $dev['overrides']['settings'] ?? [];
@@ -140,4 +128,4 @@ $out = [
   'now'      => time(),
 ];
 
-echo json_encode($out, JSON_UNESCAPED_SLASHES);
+echo json_encode($out, SIGNAGE_JSON_FLAGS);

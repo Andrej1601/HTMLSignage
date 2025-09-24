@@ -1,6 +1,8 @@
 <?php
+require_once __DIR__ . '/storage.php';
+
 header('Content-Type: application/json; charset=UTF-8');
-$fn = '/var/www/signage/data/settings.json';
+$fn = signage_data_path('settings.json');
 if(!is_file($fn)){
 echo json_encode([
   'version'=>1,
@@ -37,7 +39,13 @@ echo json_encode([
   'interstitials'=>[],
   'presets'=>[],
   'presetAuto'=>false
-]);
+], SIGNAGE_JSON_FLAGS);
 exit;
 }
-echo file_get_contents($fn);
+$raw = file_get_contents($fn);
+if ($raw === false) {
+  http_response_code(500);
+  echo json_encode(['error'=>'read-failed']);
+  exit;
+}
+echo $raw;
