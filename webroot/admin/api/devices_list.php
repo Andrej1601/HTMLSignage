@@ -25,28 +25,31 @@ foreach (($db['pairings'] ?? []) as $code => $row) {
 usort($pairings, fn($a,$b)=>($b['createdAt']??0)-($a['createdAt']??0));
 
 $devices = [];
-foreach (($db['devices'] ?? []) as $key => $d) {
-
-  $id = $key;
-  if (is_int($key) || (is_string($key) && ctype_digit($key))) {
-    $id = $d['id'] ?? (string)$key;
+foreach (($db['devices'] ?? []) as $id => $d) {
+  if (!is_array($d)) {
+    continue;
+  }
+  $deviceId = is_string($id) ? $id : ($d['id'] ?? '');
+  if (!devices_is_valid_id($deviceId)) {
+    continue;
   }
 
   $last = isset($d['lastSeenAt']) ? (int)$d['lastSeenAt'] : (int)($d['lastSeen'] ?? 0);
   $offline = !$last || ($now - $last) > OFFLINE_AFTER_MIN * 60;
 
+  $overrides = isset($d['overrides']) && is_array($d['overrides']) ? $d['overrides'] : [];
+
   $devices[] = [
-    'id' => $id,
-    'name' => $d['name'] ?? $id,
+    'id' => $deviceId,
+    'name' => isset($d['name']) && is_string($d['name']) ? $d['name'] : $deviceId,
     'lastSeenAt' => $last ?: null,
     'offline' => $offline,
     'useOverrides' => !empty($d['useOverrides']),
     'overrides' => [
-      'settings' => $d['overrides']['settings'] ?? (object)[],
-      'schedule' => $d['overrides']['schedule'] ?? (object)[]
+      'settings' => $overrides['settings'] ?? (object)[],
+      'schedule' => $overrides['schedule'] ?? (object)[]
     ]
   ];
-
 }
 
 echo json_encode([

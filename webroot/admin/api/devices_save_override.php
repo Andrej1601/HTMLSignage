@@ -8,7 +8,10 @@ $in  = json_decode($raw, true);
 if (!$in || !isset($in['device']) || !is_array($in['settings'])) {
   echo json_encode(['ok'=>false, 'error'=>'missing']); exit;
 }
-$devId = $in['device'];
+$devId = devices_normalize_device_id($in['device']);
+if ($devId === '') {
+  echo json_encode(['ok'=>false, 'error'=>'invalid-device']); exit;
+}
 $set   = $in['settings'];
 $sch   = isset($in['schedule']) && is_array($in['schedule']) ? $in['schedule'] : null;
 
