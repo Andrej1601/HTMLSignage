@@ -5,10 +5,16 @@ header('Cache-Control: no-store');
 
 $raw = file_get_contents('php://input');
 $in  = json_decode($raw, true);
-$devId = isset($in['device']) ? trim($in['device']) : '';
+$rawDevice = isset($in['device']) ? trim((string)$in['device']) : '';
+$devId = devices_normalize_device_id($rawDevice);
 $mode  = isset($in['mode']) ? trim($in['mode']) : '';
-if ($devId === '' || !in_array($mode, ['global','device'], true)) {
+if ($rawDevice === '' || !in_array($mode, ['global','device'], true)) {
   echo json_encode(['ok'=>false, 'error'=>'invalid']);
+  exit;
+}
+
+if ($devId === '') {
+  echo json_encode(['ok'=>false, 'error'=>'invalid-device']);
   exit;
 }
 

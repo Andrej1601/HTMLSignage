@@ -4,11 +4,16 @@ header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
 $body = json_decode(file_get_contents('php://input'), true) ?: [];
-$devIn = trim((string)($body['device'] ?? ''));
+$devIn = devices_normalize_device_id($body['device'] ?? '');
 $name  = trim((string)($body['name'] ?? ''));
 
-if ($devIn === '') {
+if (($body['device'] ?? '') === '') {
   echo json_encode(['ok'=>false, 'error'=>'missing-device']);
+  exit;
+}
+
+if ($devIn === '') {
+  echo json_encode(['ok'=>false, 'error'=>'invalid-device']);
   exit;
 }
 
@@ -18,22 +23,12 @@ if (!$db) {
   exit;
 }
 
-// exakte Übereinstimmung (neues Format) …
-$foundKey = isset($db['devices'][$devIn]) ? $devIn : null;
-// … oder Legacy: numerische Schlüssel als String ("0","1",…)
-if ($foundKey === null) {
-  $legacyKey = (string)intval($devIn);
-  if (isset($db['devices'][$legacyKey])) {
-    $foundKey = $legacyKey;
-  }
-}
-
-if ($foundKey === null) {
+if (!isset($db['devices'][$devIn])) {
   echo json_encode(['ok'=>false, 'error'=>'unknown-device']);
   exit;
 }
 
-$db['devices'][$foundKey]['name'] = $name;
+$db['devices'][$devIn]['name'] = $name;
 
 try {
   devices_save($db);
@@ -42,4 +37,4 @@ try {
   exit;
 }
 
-echo json_encode(['ok'=>true, 'device'=>$foundKey, 'name'=>$name]);
+echo json_encode(['ok'=>true, 'device'=>$devIn, 'name'=>$name]);

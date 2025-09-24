@@ -33,14 +33,15 @@ function day_key() {
 
 // --- Input ------------------------------------------------------------------
 
-$devId = isset($_GET['device']) ? trim($_GET['device']) : '';
-if ($devId === '') {
+$rawDevice = $_GET['device'] ?? '';
+$rawDevice = is_string($rawDevice) ? trim($rawDevice) : '';
+$devId = devices_normalize_device_id($rawDevice);
+if ($rawDevice === '') {
   http_response_code(400);
   echo json_encode(['ok'=>false, 'error'=>'missing-device'], JSON_UNESCAPED_SLASHES);
   exit;
 }
-if (!preg_match('/^dev_[a-f0-9]{12}$/i', $devId)) {
-  // Schützt vor Karteileichen/Fehlformaten
+if ($devId === '') {
   http_response_code(400);
   echo json_encode(['ok'=>false, 'error'=>'invalid-device-format'], JSON_UNESCAPED_SLASHES);
   exit;
