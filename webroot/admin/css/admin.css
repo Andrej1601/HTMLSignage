@@ -309,6 +309,9 @@ main.layout{
   touch-action:none;
   z-index:5;
 }
+.rightbar.resize-hover{
+  cursor:col-resize;
+}
 .rightbar .layout-resizer::before{
   content:"";
   display:block;
