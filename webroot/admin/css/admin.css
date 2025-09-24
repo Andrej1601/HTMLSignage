@@ -303,7 +303,7 @@ main.layout{
   left:calc(var(--sidebar-resizer-hit, 18px) / -2);
   width:var(--sidebar-resizer-hit, 18px);
   display:flex;
-  align-items:center;
+  align-items:stretch;
   justify-content:center;
   cursor:col-resize;
   touch-action:none;
@@ -313,7 +313,8 @@ main.layout{
   content:"";
   display:block;
   width:3px;
-  height:48px;
+  height:100%;
+  min-height:48px;
   border-radius:999px;
   background:color-mix(in oklab, var(--btn-accent) 45%, transparent);
   opacity:0.55;
@@ -517,25 +518,20 @@ details[open] .chev{ transform: rotate(90deg); }
 @layer overlays{
 .tip{ cursor:help; color:var(--muted); margin-left:4px; }
 
-#helpOverlay,
-#slideOrderOverlay{
+#helpOverlay{
   position:fixed; inset:0; z-index:100;
   background:rgba(0,0,0,.6);
   display:flex; align-items:center; justify-content:center;
 }
-#helpOverlay[hidden],
-#slideOrderOverlay[hidden]{ display:none; }
-#helpOverlay .panel,
-#slideOrderOverlay .panel{
+#helpOverlay[hidden]{ display:none; }
+#helpOverlay .panel{
   background:var(--panel); color:var(--fg);
   border:1px solid var(--border); border-radius:16px;
   padding:24px; max-width:700px; width:90%;
   position:relative;
 }
-#helpOverlay .panel h2,
-#slideOrderOverlay .panel h2{ margin-top:0; }
-#helpClose,
-#slideOrderClose{ position:absolute; top:8px; right:8px; }
+#helpOverlay .panel h2{ margin-top:0; }
+#helpClose{ position:absolute; top:8px; right:8px; }
 .btn.ghost:hover{ background: color-mix(in oklab, var(--ghost-fg) 6%, transparent); }
 }
 
@@ -544,185 +540,6 @@ details[open] .chev{ transform: rotate(90deg); }
   display:flex;
   flex-direction:column;
   gap:8px;
-}
-
-.slide-order-grid{
-  display:grid;
-  gap:12px;
-  grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
-  margin-top:16px;
-}
-
-.slide-order-tile{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:8px;
-  background:var(--panel);
-  cursor:grab;
-  gap:6px;
-  position:relative;
-}
-
-.slide-order-tile.is-disabled{
-  background:color-mix(in oklab, var(--panel) 70%, transparent);
-  border-color:color-mix(in oklab, var(--border) 55%, transparent);
-  box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--border) 35%, transparent);
-}
-
-.slide-order-tile.is-unselected{
-  opacity:0.6;
-  cursor:pointer;
-}
-
-.slide-order-tile.is-unselected:hover{
-  opacity:0.85;
-}
-
-.slide-order-tile.is-unselected.is-disabled{
-  cursor:not-allowed;
-}
-
-.slide-order-tile.is-disabled img{
-  filter:saturate(0) brightness(0.82);
-  opacity:0.55;
-}
-
-.slide-order-tile.is-disabled .title{
-  color:color-mix(in oklab, var(--muted) 82%, var(--fg));
-}
-
-.slide-order-tile.dragging{
-  opacity:0.6;
-  cursor:grabbing;
-  box-shadow:0 12px 24px rgba(15, 23, 42, 0.25);
-}
-
-.slide-order-tile:is(.drop-before, .drop-after){
-  position:relative;
-  box-shadow:0 0 0 2px rgba(124, 58, 237, 0.25);
-}
-
-.slide-order-tile:is(.drop-before, .drop-after)::after{
-  content:'';
-  position:absolute;
-  left:12px;
-  right:12px;
-  height:4px;
-  border-radius:999px;
-  background:var(--btn-accent);
-}
-
-.slide-order-tile.drop-before::after{ top:-6px; }
-.slide-order-tile.drop-after::after{ bottom:-6px; }
-
-.slide-order-tile:is(.drop-before, .drop-after)::before{
-  content:'';
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  border:6px solid transparent;
-}
-
-.slide-order-tile.drop-before::before{
-  top:-13px;
-  border-bottom-color:var(--btn-accent);
-}
-
-.slide-order-tile.drop-after::before{
-  bottom:-13px;
-  border-top-color:var(--btn-accent);
-}
-
-.slide-order-tile img{
-  width:100%;
-  height:80px;
-  object-fit:cover;
-  border-radius:8px;
-}
-
-.slide-order-tile .title{
-  font-weight:600;
-  margin-bottom:2px;
-  text-align:center;
-}
-
-.slide-order-tile .slide-status{
-  font-size:12px;
-  font-weight:600;
-  line-height:1.3;
-  padding:4px 8px;
-  border-radius:999px;
-  text-align:center;
-  width:100%;
-  border-color:color-mix(in oklab, var(--btn-accent) 45%, var(--border));
-  color:color-mix(in oklab, var(--btn-accent) 70%, var(--fg));
-  background:color-mix(in oklab, var(--btn-accent) 18%, var(--panel));
-}
-
-.slide-order-tile .reorder-controls{
-  display:flex;
-  justify-content:center;
-  gap:8px;
-  margin-top:8px;
-  width:100%;
-}
-
-.slide-order-tile .playlist-state{
-  position:absolute;
-  top:8px;
-  left:8px;
-  font-size:11px;
-  font-weight:600;
-  padding:2px 8px;
-  border-radius:999px;
-  background:color-mix(in oklab, var(--btn-accent) 15%, var(--panel));
-  color:color-mix(in oklab, var(--btn-accent) 80%, var(--fg));
-  border:1px solid color-mix(in oklab, var(--btn-accent) 35%, var(--border));
-}
-
-.slide-order-tile.is-unselected .playlist-state{
-  background:color-mix(in oklab, var(--panel) 92%, transparent);
-  color:var(--muted);
-  border-color:color-mix(in oklab, var(--border) 65%, transparent);
-}
-
-.slide-order-tile .reorder-btn{
-  --btn-size:28px;
-  flex:0 0 auto;
-  inline-size:var(--btn-size);
-  block-size:var(--btn-size);
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:999px;
-  border:1px solid var(--ghost-border);
-  background:var(--ghost-bg);
-  color:var(--fg);
-  cursor:pointer;
-  padding:0;
-  transition:background-color .2s ease, border-color .2s ease, box-shadow .2s ease;
-}
-
-.slide-order-tile .reorder-btn svg{
-  width:16px;
-  height:16px;
-  fill:currentColor;
-  pointer-events:none;
-}
-
-.slide-order-tile .reorder-btn span{ pointer-events:none; }
-
-.slide-order-tile .reorder-btn:focus-visible{
-  outline:0;
-  box-shadow:0 0 0 3px color-mix(in oklab, var(--input-focus) 30%, transparent);
-  border-color:var(--input-focus);
-}
-
-.slide-order-tile .reorder-btn:active{
-  background: color-mix(in oklab, var(--ghost-fg, var(--fg)) 6%, transparent);
 }
 
 /* Toggle */
