@@ -193,7 +193,7 @@ function initSidebarResize(){
   resizer.addEventListener('pointermove', (ev) => {
     if (!dragState.active || ev.pointerId !== dragState.pointerId) return;
     const delta = ev.clientX - dragState.startX;
-    applyWidth(dragState.startWidth - delta, { store: false });
+    applyWidth(dragState.startWidth + delta, { store: false });
   });
 
   const finishDrag = (store = true) => {
@@ -220,16 +220,16 @@ function initSidebarResize(){
     const step = ev.shiftKey ? 48 : 24;
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
-      applyWidth(baseWidth + step);
+      applyWidth(baseWidth - step);
     } else if (ev.key === 'ArrowRight') {
       ev.preventDefault();
-      applyWidth(baseWidth - step);
+      applyWidth(baseWidth + step);
     } else if (ev.key === 'Home') {
       ev.preventDefault();
-      applyWidth(maxPx);
+      applyWidth(minPx);
     } else if (ev.key === 'End') {
       ev.preventDefault();
-      applyWidth(minPx);
+      applyWidth(maxPx);
     }
   });
 
@@ -970,19 +970,8 @@ function renderSlidesBox(){
   renderPagePlaylist('pageRightPlaylist', rightCfg.playlist, { pageKey: 'right' });
   const layoutModeSelect = document.getElementById('layoutMode');
   const applyLayoutVisibility = (mode) => {
-    const isSplit = (mode === 'split');
     const rightWrap = document.getElementById('layoutRight');
-    if (rightWrap) rightWrap.hidden = !isSplit;
-    const leftLegend = document.querySelector('#layoutLeft .legend');
-    if (leftLegend) {
-      if (isSplit) {
-        leftLegend.textContent = 'Linke Seite';
-        leftLegend.hidden = false;
-      } else {
-        leftLegend.textContent = '';
-        leftLegend.hidden = true;
-      }
-    }
+    if (rightWrap) rightWrap.hidden = (mode !== 'split');
   };
   applyLayoutVisibility(layoutMode);
   if (layoutModeSelect) {

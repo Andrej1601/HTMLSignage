@@ -283,7 +283,7 @@
     <details class="ac sub" id="boxImages">
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
-    <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button></div>
+    <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button><button class="btn sm" id="btnSortSlides">Slides sortieren</button></div>
   </summary>
 <small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
   <div class="content">
@@ -660,6 +660,14 @@
     <small class="mut" style="display:block;margin-top:8px">
       Live-Ansicht des ausgewählten Geräts (nur Lesen; kein Pairing, keine Speicherung).
     </small>
+  </div>
+</div>
+
+<div id="slideOrderOverlay" hidden>
+  <div class="panel">
+    <button id="slideOrderClose" class="btn icon" aria-label="Schließen">✕</button>
+    <h2>Slides sortieren</h2>
+    <div id="slideOrderGrid" class="slide-order-grid"></div>
   </div>
 </div>
 

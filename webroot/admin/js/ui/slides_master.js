@@ -1711,7 +1711,7 @@ function renderStorySlidesPanel(hostId='storyList'){
 }
 
 // ============================================================================
-// 6b) Slide Order Stream
+// 6b) Slide Order View
 // ============================================================================
 export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   const settings = ctx.getSettings();
@@ -1766,6 +1766,232 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   };
 }
 
+export function renderSlideOrderView(){
+  const settings = ctx.getSettings();
+  const host = document.getElementById('slideOrderGrid');
+  if (!host) return;
+
+  const { entries: combinedRaw, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: true });
+  let combined = combinedRaw.slice();
+
+  host.innerHTML = '';
+  combined.forEach((entry, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'slide-order-tile';
+    tile.draggable = true;
+    tile.dataset.idx = idx;
+    tile.dataset.type = entry.kind;
+
+    const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
+    const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
+    const isDisabledStory = entry.kind === 'story' && entry.item?.enabled === false;
+    if (isHiddenSauna) tile.classList.add('is-hidden');
+    if (isHiddenSauna || isDisabledMedia || isDisabledStory) tile.classList.add('is-disabled');
+
+    const title = document.createElement('div');
+    title.className = 'title';
+    let statusEl = null;
+    if (isHiddenSauna || isDisabledMedia || isDisabledStory){
+      statusEl = document.createElement('div');
+      statusEl.className = 'slide-status';
+      statusEl.dataset.state = 'hidden';
+      statusEl.textContent = 'Ausgeblendet';
+    }
+    if (entry.kind === 'sauna'){
+      tile.dataset.name = entry.name;
+      title.textContent = entry.name;
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const imgSrc = settings.assets?.rightImages?.[entry.name] || '';
+      if (imgSrc){
+        const img = document.createElement('img');
+        img.src = imgSrc;
+        img.alt = entry.name || '';
+        tile.appendChild(img);
+      }
+    } else if (entry.kind === 'media') {
+      tile.dataset.id = entry.item.id;
+      title.textContent = entry.item.name || '(unbenannt)';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const img = document.createElement('img');
+      img.src = entry.item.thumb || entry.item.url || '';
+      img.alt = entry.item.name || '';
+      tile.appendChild(img);
+    } else {
+      tile.dataset.storyId = entry.item?.id || entry.key || '';
+      title.textContent = entry.item?.title || 'Story-Slide';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const img = document.createElement('img');
+      img.src = entry.item?.heroUrl || FALLBACK_HERO;
+      img.alt = entry.item?.heroAlt || '';
+      tile.appendChild(img);
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'reorder-controls';
+
+    const stopDragPropagation = ev => {
+      ev.stopPropagation();
+    };
+
+    const preventDragStart = ev => {
+      ev.preventDefault();
+    };
+
+    const makeCtrlButton = (dir, label) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `reorder-btn ${dir > 0 ? 'reorder-down' : 'reorder-up'}`;
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+      const iconMarkup = dir < 0
+        ? '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="M8 3.5 12.5 8l-.7.7L8 4.9 4.2 8.7l-.7-.7Z"/></svg>'
+        : '<svg aria-hidden="true" viewBox="0 0 16 16" focusable="false"><path d="m8 12.5-4.5-4.5.7-.7L8 11.1l3.8-3.8.7.7Z"/></svg>';
+      btn.innerHTML = iconMarkup;
+      btn.draggable = false;
+      btn.addEventListener('pointerdown', stopDragPropagation);
+      btn.addEventListener('mousedown', stopDragPropagation);
+      btn.addEventListener('touchstart', stopDragPropagation);
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        let moved = false;
+        if (dir < 0){
+          const prev = tile.previousElementSibling;
+          if (prev){
+            prev.before(tile);
+            moved = true;
+          }
+        } else {
+          const next = tile.nextElementSibling;
+          if (next){
+            next.after(tile);
+            moved = true;
+          }
+        }
+        if (!moved) return;
+        clearDropIndicators();
+        commitReorder();
+        window.__queueUnsaved?.();
+        window.dockPushDebounced?.();
+      });
+      btn.addEventListener('dragstart', preventDragStart);
+      return btn;
+    };
+
+    controls.appendChild(makeCtrlButton(-1, 'Nach oben verschieben'));
+    controls.appendChild(makeCtrlButton(1, 'Nach unten verschieben'));
+    tile.appendChild(controls);
+
+    host.appendChild(tile);
+  });
+
+  let dragged = null;
+  const DROP_BEFORE = 'drop-before';
+  const DROP_AFTER = 'drop-after';
+
+  const clearDropIndicators = () => {
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+  };
+
+  const commitReorder = () => {
+    const tiles = Array.from(host.children);
+    const reordered = tiles.map(el => combined[+el.dataset.idx]);
+    combined = reordered;
+    tiles.forEach((el, i) => { el.dataset.idx = i; });
+
+    const newSaunas = [];
+    const newMedia = [];
+    const newStories = [];
+    const sortOrder = [];
+    for (const entry of reordered){
+      if (entry.kind === 'sauna'){
+        newSaunas.push(entry.name);
+        sortOrder.push({ type:'sauna', name: entry.name });
+      } else if (entry.kind === 'media') {
+        newMedia.push(entry.item);
+        sortOrder.push({ type:'media', id: entry.item.id });
+      } else if (entry.kind === 'story') {
+        newStories.push(entry.item);
+        sortOrder.push({ type:'story', id: entry.item?.id ?? entry.key });
+      }
+    }
+    schedule.saunas = newSaunas;
+    settings.interstitials = newMedia;
+    settings.slides.storySlides = newStories;
+    settings.slides ||= {};
+    settings.slides.sortOrder = sortOrder;
+    window.__queueUnsaved?.();
+    window.dockPushDebounced?.();
+  };
+
+  const updateDropIndicator = (target, before) => {
+    if (!target || target === dragged) return;
+    host.querySelectorAll('.slide-order-tile').forEach(el => {
+      if (el !== target) el.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    target.classList.remove(DROP_BEFORE, DROP_AFTER);
+    target.classList.add(before ? DROP_BEFORE : DROP_AFTER);
+  };
+
+  const isBeforeTarget = (event, target) => {
+    const rect = target.getBoundingClientRect();
+    const horizontal = rect.width > rect.height;
+    return horizontal
+      ? (event.clientX < rect.left + rect.width / 2)
+      : (event.clientY < rect.top + rect.height / 2);
+  };
+
+  host.querySelectorAll('.slide-order-tile').forEach(tile => {
+    tile.addEventListener('dragstart', e => {
+      dragged = tile;
+      tile.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    tile.addEventListener('dragenter', e => {
+      if (!dragged || tile === dragged) return;
+      e.preventDefault();
+      const before = isBeforeTarget(e, tile);
+      updateDropIndicator(tile, before);
+    });
+    tile.addEventListener('dragover', e => {
+      e.preventDefault();
+      const target = tile;
+      if (target === dragged) return;
+      const before = isBeforeTarget(e, target);
+      updateDropIndicator(target, before);
+      if (before) target.before(dragged);
+      else target.after(dragged);
+    });
+    tile.addEventListener('dragleave', e => {
+      if (tile.contains(e.relatedTarget)) return;
+      tile.classList.remove(DROP_BEFORE, DROP_AFTER);
+    });
+    tile.addEventListener('drop', e => {
+      e.preventDefault();
+      clearDropIndicators();
+    });
+    tile.addEventListener('dragend', () => {
+      clearDropIndicators();
+      tile.classList.remove('dragging');
+      commitReorder();
+      dragged = null;
+    });
+  });
+
+  host.addEventListener('drop', e => {
+    e.preventDefault();
+    clearDropIndicators();
+    if (dragged) dragged.classList.remove('dragging');
+  });
+
+  host.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
+}
 
 // ============================================================================
 // 7) Haupt-Renderer
@@ -2169,18 +2395,12 @@ export function renderSlidesMaster(){
         notifyChange();
       });
 
-      labelInput.addEventListener('input', () => {
-        badge.label = labelInput.value;
-        updatePreview();
-        notifyChange();
-      });
+      labelInput.addEventListener('input', updatePreview);
       labelInput.addEventListener('change', () => {
-        const trimmed = labelInput.value.trim();
-        const prev = badge.label;
-        badge.label = trimmed;
+        badge.label = labelInput.value.trim();
         labelInput.value = badge.label;
         updatePreview();
-        if (prev !== trimmed) notifyChange();
+        notifyChange();
       });
 
       removeBtn.addEventListener('click', () => {
@@ -2457,6 +2677,25 @@ if (durPer) durPer.onchange = () => {
   // Medien-Slides
   renderInterstitialsPanel('interList2');
 
+  const sortBtn = $('#btnSortSlides');
+  const orderOverlay = $('#slideOrderOverlay');
+  const closeOrder = $('#slideOrderClose');
+  if (sortBtn) sortBtn.onclick = () => {
+    if (orderOverlay) {
+      orderOverlay.hidden = false;
+      renderSlideOrderView();
+    }
+  };
+  if (closeOrder) closeOrder.onclick = () => {
+    if (orderOverlay) orderOverlay.hidden = true;
+    renderSlidesMaster();
+  };
+  if (orderOverlay) orderOverlay.addEventListener('click', e => {
+    if (e.target === orderOverlay) {
+      orderOverlay.hidden = true;
+      renderSlidesMaster();
+    }
+  });
 
   // Reset & Add Sauna
   const rs = $('#resetTiming');
