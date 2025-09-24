@@ -10,7 +10,7 @@
 'use strict';
 
 // === Modular imports =========================================================
-import { $, $$, preloadImg, genId, deepClone } from './core/utils.js';
+import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
@@ -406,34 +406,35 @@ function renderContextBadge(){
 
 // --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
 async function enterDeviceContext(id, name){
-  // aktuelle Geräte-Daten holen, Overrides herausziehen
-  const r = await fetch('/admin/api/devices_list.php');
-  const j = await r.json();
-  const dev = (j.devices||[]).find(d=>d.id===id);
-  const ov  = dev?.overrides?.settings || {};
+  let deviceData;
+  try {
+    deviceData = await fetchJson('/admin/api/devices_list.php', {
+      cache: 'no-store',
+      okPredicate: (data) => data?.ok !== false
+    });
+  } catch (error) {
+    console.error('[admin] Geräte-Kontext konnte nicht geladen werden', error);
+    alert('Geräte konnten nicht geladen werden: ' + error.message);
+    return;
+  }
+
+  const dev = (deviceData?.devices || []).find(d => d.id === id);
+  if (!dev) {
+    alert('Gerät wurde nicht gefunden.');
+    return;
+  }
+
+  const overrides = dev?.overrides?.settings || {};
 
   currentDeviceCtx = id;
-  currentDeviceName = name || id;
+  currentDeviceName = name || dev.name || id;
   document.body.classList.add('device-mode');
   currentDeviceBadgeMeta = normalizeContextBadge(
     dev?.contextBadge ?? dev?.badge ?? dev?.badgeInfo ?? null
   );
 
-  // globale Settings als Basis
-  settings = deepClone(baseSettings);
-
-  // Overrides mergen (flach genug für unsere Struktur)
-  (function merge(t, s){
-    for (const k of Object.keys(s)){
-      if (s[k] && typeof s[k]==='object' && !Array.isArray(s[k])){
-        t[k] = t[k] && typeof t[k]==='object' ? deepClone(t[k]) : {};
-        merge(t[k], s[k]);
-      } else {
-        t[k] = s[k];
-      }
-    }
-  })(settings, ov);
-
+  // globale Settings als Basis + Overrides mergen
+  settings = mergeDeep(deepClone(baseSettings), overrides);
   settings = normalizeSettings(settings, { assignMissingIds: false });
   deviceBaseSchedule = deepClone(schedule);
   deviceBaseSettings = deepClone(settings);
@@ -494,10 +495,18 @@ function exitDeviceContext(){
 // ============================================================================
 async function loadAll(){
   let unsavedFromDraft = false;
-  const [s, cfg] = await Promise.all([
-    fetch('/admin/api/load.php').then(r=>r.json()),
-    fetch('/admin/api/load_settings.php').then(r=>r.json())
-  ]);
+  let s;
+  let cfg;
+  try {
+    [s, cfg] = await Promise.all([
+      fetchJson('/admin/api/load.php', { cache: 'no-store' }),
+      fetchJson('/admin/api/load_settings.php', { cache: 'no-store' })
+    ]);
+  } catch (error) {
+    console.error('[admin] Laden der Basisdaten fehlgeschlagen', error);
+    alert('Fehler beim Laden der Daten: ' + error.message);
+    return;
+  }
 
   schedule = deepClone(s || {});
   settings = normalizeSettings(cfg || {}, { assignMissingIds: true });
@@ -519,16 +528,7 @@ async function loadAll(){
     const draft = lsGet('settingsDraft');
     if (draft) {
       const parsed = JSON.parse(draft);
-      (function merge(t, s) {
-        for (const k of Object.keys(s)) {
-          if (s[k] && typeof s[k] === 'object' && !Array.isArray(s[k])) {
-            t[k] = t[k] && typeof t[k] === 'object' ? t[k] : {};
-            merge(t[k], s[k]);
-          } else {
-            t[k] = s[k];
-          }
-        }
-      })(settings, parsed);
+      settings = mergeDeep(settings, parsed);
       unsavedFromDraft = true;
     }
   } catch {}
@@ -1587,32 +1587,46 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     // Global speichern
     body.schedule.version = (Date.now()/1000|0);
     body.settings.version = (Date.now()/1000|0);
-    const r=await fetch('/admin/api/save.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    const j=await r.json().catch(()=>({ok:false}));
-      if (j.ok){
-        baseSchedule = deepClone(schedule);
-        baseSettings = deepClone(settings);
-        deviceBaseSchedule = null;
-        deviceBaseSettings = null;
-        updateBaseline(baseSchedule, baseSettings);
-        clearDraftsIfPresent();
-        setUnsavedState(false);
-      }
-      alert(j.ok ? 'Gespeichert (Global).' : ('Fehler: '+(j.error||'unbekannt')));
-    } else {
-      // Geräte-Override speichern
-      const payload = { device: currentDeviceCtx, settings: body.settings, schedule: body.schedule };
-      const r=await fetch('/admin/api/devices_save_override.php',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-      const j=await r.json().catch(()=>({ok:false}));
-      if (j.ok) {
-        deviceBaseSchedule = deepClone(schedule);
-        deviceBaseSettings = deepClone(settings);
-        updateBaseline(deviceBaseSchedule, deviceBaseSettings);
-        clearDraftsIfPresent();
-        setUnsavedState(false);
-      }
-      alert(j.ok ? ('Gespeichert für Gerät: '+currentDeviceName) : ('Fehler: '+(j.error||'unbekannt')));
+    try {
+      await fetchJson('/admin/api/save.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body),
+        expectOk: true
+      });
+      baseSchedule = deepClone(schedule);
+      baseSettings = deepClone(settings);
+      deviceBaseSchedule = null;
+      deviceBaseSettings = null;
+      updateBaseline(baseSchedule, baseSettings);
+      clearDraftsIfPresent();
+      setUnsavedState(false);
+      alert('Gespeichert (Global).');
+    } catch (error) {
+      console.error('[admin] Speichern (global) fehlgeschlagen', error);
+      alert('Fehler: ' + error.message);
     }
+  } else {
+    // Geräte-Override speichern
+    const payload = { device: currentDeviceCtx, settings: body.settings, schedule: body.schedule };
+    try {
+      await fetchJson('/admin/api/devices_save_override.php', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),
+        expectOk: true
+      });
+      deviceBaseSchedule = deepClone(schedule);
+      deviceBaseSettings = deepClone(settings);
+      updateBaseline(deviceBaseSchedule, deviceBaseSettings);
+      clearDraftsIfPresent();
+      setUnsavedState(false);
+      alert('Gespeichert für Gerät: ' + (currentDeviceName || currentDeviceCtx));
+    } catch (error) {
+      console.error('[admin] Speichern (Gerät) fehlgeschlagen', error);
+      alert('Fehler: ' + error.message);
+    }
+  }
   });
 
 // --- Dock ----------------------------------------------------------
@@ -1657,22 +1671,28 @@ async function claim(codeFromUI, nameFromUI) {
   if (!/^[A-Z0-9]{6}$/.test(code)) {
     alert('Bitte einen 6-stelligen Code eingeben.'); return;
   }
-  const r = await fetch('/admin/api/devices_claim.php', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ code, name })
-  });
-  const j = await r.json().catch(()=>({ok:false}));
-  if (!j.ok) { alert('Fehler: ' + (j.error || 'unbekannt')); return; }
+  let response;
+  try {
+    response = await fetchJson('/admin/api/devices_claim.php', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ code, name }),
+      expectOk: true
+    });
+  } catch (error) {
+    console.error('[admin] Pairing fehlgeschlagen', error);
+    alert('Fehler: ' + error.message);
+    return;
+  }
 
   // kleine Quality-of-life Info:
-  if (j.deviceId) {
-    const url = SLIDESHOW_ORIGIN + '/?device=' + j.deviceId;
-    console.log('Gepaart:', j.deviceId, url);
+  if (response.deviceId) {
+    const url = SLIDESHOW_ORIGIN + '/?device=' + response.deviceId;
+    console.log('Gepaart:', response.deviceId, url);
   }
   // Pane neu laden (siehe createDevicesPane -> render)
   if (typeof window.__refreshDevicesPane === 'function') await window.__refreshDevicesPane();
-  alert('Gerät gekoppelt' + (j.already ? ' (war bereits gekoppelt)' : '') + '.');
+  alert('Gerät gekoppelt' + (response.already ? ' (war bereits gekoppelt)' : '') + '.');
 }
 
 async function createDevicesPane(){
@@ -1725,47 +1745,48 @@ async function createDevicesPane(){
 
   async function fetchDevicesStatus(){
     try {
-      const r = await fetch('/admin/api/devices_list.php', {cache:'no-store'});
-      if (r.ok) {
-        const j = await r.json();
-        const now = resolveNow(j.now);
-        const pairings = j.pairings || [];
-        const devices = (j.devices || []).map(d => {
-          const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
-          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
-          return {
-            id: d.id,
-            name: d.name || '',
-            lastSeenAt,
-            offline,
-            useOverrides: !!d.useOverrides
-          };
-        });
-        return { ok:true, now, pairings, devices };
-      }
-    } catch(e){}
+      const apiData = await fetchJson('/admin/api/devices_list.php', {
+        cache:'no-store',
+        okPredicate: (data) => data?.ok !== false
+      });
+      const now = resolveNow(apiData?.now);
+      const pairings = apiData?.pairings || [];
+      const devices = (apiData?.devices || []).map(d => {
+        const lastSeenAt = normalizeSeconds(d.lastSeenAt ?? d.lastSeen ?? 0);
+        const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+        return {
+          id: d.id,
+          name: d.name || '',
+          lastSeenAt,
+          offline,
+          useOverrides: !!d.useOverrides
+        };
+      });
+      return { ok:true, now, pairings, devices };
+    } catch (error) {
+      console.warn('[admin] Geräte-API nicht erreichbar', error);
+    }
     try {
-      const r2 = await fetch('/data/devices.json?t='+Date.now(), {cache:'no-store'});
-      if (r2.ok){
-        const j2 = await r2.json();
-        const pairings = Object.values(j2.pairings || {})
-          .filter(p => !p.deviceId)
-          .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
-        const now = resolveNow(j2.now);
-        const devices = Object.values(j2.devices || {}).map(d => {
-          const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
-          const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
-          return {
-            id: d.id,
-            name: d.name || '',
-            lastSeenAt,
-            offline,
-            useOverrides: !!d.useOverrides
-          };
-        });
-        return { ok:true, now, pairings, devices };
-      }
-    } catch(e){}
+      const fallbackData = await fetchJson('/data/devices.json?t=' + Date.now(), { cache:'no-store' });
+      const pairings = Object.values(fallbackData.pairings || {})
+        .filter(p => !p.deviceId)
+        .map(p => ({ code: p.code, createdAt: normalizeSeconds(p.created) }));
+      const now = resolveNow(fallbackData.now);
+      const devices = Object.values(fallbackData.devices || {}).map(d => {
+        const lastSeenAt = normalizeSeconds(d.lastSeen || d.lastSeenAt || 0);
+        const offline = !lastSeenAt || (now - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
+        return {
+          id: d.id,
+          name: d.name || '',
+          lastSeenAt,
+          offline,
+          useOverrides: !!d.useOverrides
+        };
+      });
+      return { ok:true, now, pairings, devices };
+    } catch (error) {
+      console.warn('[admin] Geräte-Fallback-Datei nicht verfügbar', error);
+    }
     console.warn('[admin] konnte Geräte-Status weder über API noch Datei laden');
     return { ok:false, pairings:[], devices:[] };
   }
@@ -1846,17 +1867,27 @@ async function createDevicesPane(){
         const modeLabel = tr.querySelector('[data-mode-label]');
         const modeWrap = tr.querySelector('[data-mode-wrap]');
         modeInput.onchange = async ()=>{
-          const mode = modeInput.checked ? 'device' : 'global';
-          modeLabel.textContent = modeInput.checked ? 'Individuell' : 'Global';
-          tr.classList.toggle('ind', modeInput.checked);
-          modeWrap.classList.toggle('ind-active', modeInput.checked);
-          const r = await fetch('/admin/api/devices_set_mode.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ device: d.id, mode })
-          });
-          const jj = await r.json().catch(()=>({ok:false}));
-          if (!jj.ok) alert('Fehler: '+(jj.error||'unbekannt'));
+          const desiredMode = modeInput.checked;
+          const mode = desiredMode ? 'device' : 'global';
+          modeLabel.textContent = desiredMode ? 'Individuell' : 'Global';
+          tr.classList.toggle('ind', desiredMode);
+          modeWrap.classList.toggle('ind-active', desiredMode);
+          try {
+            await fetchJson('/admin/api/devices_set_mode.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ device: d.id, mode }),
+              expectOk: true
+            });
+          } catch (error) {
+            console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
+            alert('Fehler: ' + error.message);
+            modeInput.checked = !desiredMode;
+            const rollbackMode = modeInput.checked;
+            modeLabel.textContent = rollbackMode ? 'Individuell' : 'Global';
+            tr.classList.toggle('ind', rollbackMode);
+            modeWrap.classList.toggle('ind-active', rollbackMode);
+          }
         };
 
         tr.querySelector('[data-unpair]').onclick = async ()=>{
@@ -1867,15 +1898,19 @@ async function createDevicesPane(){
           const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
           if ((check||'').trim().toLowerCase() !== 'ja') return;
 
-          const r = await fetch('/admin/api/devices_unpair.php', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ device: d.id, purge: 1 })
-          });
-          const jj = await r.json().catch(()=>({ok:false}));
-          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
-          alert('Gerät getrennt.');
-          render();
+          try {
+            await fetchJson('/admin/api/devices_unpair.php', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ device: d.id, purge: 1 }),
+              expectOk: true
+            });
+            alert('Gerät getrennt.');
+            render();
+          } catch (error) {
+            console.error('[admin] Gerät trennen fehlgeschlagen', error);
+            alert('Fehler: ' + error.message);
+          }
         };
 
         tr.querySelector('[data-view]').onclick = ()=>{
@@ -1894,15 +1929,19 @@ async function createDevicesPane(){
         tr.querySelector('[data-rename]').onclick = async ()=>{
           const newName = prompt('Neuer Gerätename:', d.name || '');
           if (newName === null) return;
-          const r = await fetch('/admin/api/devices_rename.php', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ device: d.id, name: newName })
-          });
-          const jj = await r.json().catch(()=>({ok:false}));
-          if (!jj.ok) { alert('Fehler: '+(jj.error||'unbekannt')); return; }
-          alert('Name gespeichert.');
-          render();
+          try {
+            await fetchJson('/admin/api/devices_rename.php', {
+              method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ device: d.id, name: newName }),
+              expectOk: true
+            });
+            alert('Name gespeichert.');
+            render();
+          } catch (error) {
+            console.error('[admin] Gerät umbenennen fehlgeschlagen', error);
+            alert('Fehler: ' + error.message);
+          }
         };
         tbody.appendChild(tr);
       });
@@ -1933,11 +1972,16 @@ async function createDevicesPane(){
 card.querySelector('#devGc').onclick = async ()=>{
   const conf = prompt('Geräte/Pairings aufräumen? Tippe „Ja“ zum Bestätigen:');
   if ((conf||'').trim().toLowerCase() !== 'ja') return;
-  const r = await fetch('/admin/api/devices_gc.php', { method:'POST' });
-  const j = await r.json().catch(()=>({ok:false}));
-  if (!j.ok){ alert('Fehler: '+(j.error||'unbekannt')); return; }
-  alert(`Bereinigt: ${j.deletedDevices} Geräte, ${j.deletedPairings} Pairing-Codes.`);
-  card.querySelector('#devRefresh').click();
+  try {
+    const result = await fetchJson('/admin/api/devices_gc.php', { method:'POST', expectOk: true });
+    const deletedDevices = result.deletedDevices ?? '?';
+    const deletedPairings = result.deletedPairings ?? '?';
+    alert(`Bereinigt: ${deletedDevices} Geräte, ${deletedPairings} Pairing-Codes.`);
+    card.querySelector('#devRefresh').click();
+  } catch (error) {
+    console.error('[admin] Gerätebereinigung fehlgeschlagen', error);
+    alert('Fehler: ' + error.message);
+  }
 };
 
 
@@ -2151,10 +2195,21 @@ function initBackupButtons(){
     fd.append('writeAssets', (impWrite?.checked ? '1' : '0'));
     fd.append('writeSettings', document.getElementById('impWriteSettings')?.checked ? '1' : '0');
     fd.append('writeSchedule', document.getElementById('impWriteSchedule')?.checked ? '1' : '0');
-    const res = await fetch('/admin/api/import.php',{ method:'POST', body: fd });
-    let j=null; try{ j=await res.json(); }catch{}
-    alert(j?.ok ? 'Import erfolgreich.' : ('Fehler: '+(j?.error||'unbekannt')));
-    if(j?.ok) location.reload();
+    try {
+      await fetchJson('/admin/api/import.php', {
+        method:'POST',
+        body: fd,
+        expectOk: true,
+        errorMessage: 'Import fehlgeschlagen.'
+      });
+      alert('Import erfolgreich.');
+      location.reload();
+    } catch (error) {
+      console.error('[admin] Import fehlgeschlagen', error);
+      alert('Fehler: ' + error.message);
+    } finally {
+      try { impFile.value = ''; } catch {}
+    }
   };
 }
 
@@ -2194,9 +2249,17 @@ function initCleanupInSystem(){
       inter: delInter ? '1' : '0',
       flame: delFlame ? '1' : '0'
     });
-    const r = await fetch('/admin/api/cleanup_assets.php?'+qs.toString());
-    const j = await r.json().catch(()=>({ok:false}));
-    alert(j.ok ? (`Bereinigt: ${j.removed||'?'} Dateien entfernt.`) : ('Fehler: '+(j.error||'')));
+    try {
+      const result = await fetchJson('/admin/api/cleanup_assets.php?' + qs.toString(), {
+        okPredicate: (data) => data?.ok !== false,
+        errorMessage: 'Bereinigung fehlgeschlagen.'
+      });
+      const removed = result?.removed ?? '?';
+      alert(`Bereinigt: ${removed} Dateien entfernt.`);
+    } catch (error) {
+      console.error('[admin] Asset-Bereinigung fehlgeschlagen', error);
+      alert('Fehler: ' + error.message);
+    }
   };
 }
 
