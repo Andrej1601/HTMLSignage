@@ -119,7 +119,25 @@ deploy_application() {
   local app_dir=$1
   log "Deploying application files"
   install -d "$app_dir"
-  rsync -a --delete webroot/ "$app_dir"/
+  if [[ -d "$app_dir/webroot" ]]; then
+    warn "Removing legacy webroot directory from prior releases"
+    if [[ -d "$app_dir/webroot/data" ]]; then
+      warn "Migrating data directory from legacy layout"
+      install -d "$app_dir/data"
+      rsync -a "$app_dir/webroot/data/" "$app_dir/data/"
+    fi
+    rm -rf "$app_dir/webroot"
+  fi
+
+  rsync -a --delete --delete-delay --exclude 'data/*.json' webroot/ "$app_dir"/
+
+  while IFS= read -r -d '' json; do
+    local target="$app_dir/data/$(basename "$json")"
+    if [[ ! -e $target ]]; then
+      install -D -m 0644 "$json" "$target"
+    fi
+  done < <(find webroot/data -maxdepth 1 -type f -name '*.json' -print0)
+
   chown -R www-data:www-data "$app_dir"
   find "$app_dir" -type d -print0 | xargs -0 chmod 2755
   find "$app_dir" -type f -print0 | xargs -0 chmod 0644
