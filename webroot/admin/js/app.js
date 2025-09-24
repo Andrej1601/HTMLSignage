@@ -125,10 +125,18 @@ function initSidebarResize(){
     return Number.isFinite(num) ? num : fallback;
   };
 
-  let minPx = getNumberVar('--sidebar-min', 280);
-  let maxPx = getNumberVar('--sidebar-max', 920);
+  let minPx = 0;
+  let maxPx = 0;
+  let hitPx = 0;
   const clampWidth = (value) => Math.min(maxPx, Math.max(minPx, value));
   const media = window.matchMedia('(orientation: portrait),(max-width: 900px)');
+
+  const refreshBounds = () => {
+    minPx = getNumberVar('--sidebar-min', 280);
+    maxPx = getNumberVar('--sidebar-max', 920);
+    hitPx = Math.max(4, getNumberVar('--sidebar-resizer-hit', 18));
+  };
+  refreshBounds();
 
   const readStoredWidth = () => {
     const stored = Number.parseFloat(lsGet('sidebarWidthPx'));
@@ -161,11 +169,13 @@ function initSidebarResize(){
       resizer.setAttribute('aria-hidden', 'true');
       resizer.setAttribute('tabindex', '-1');
       resizer.classList.remove('is-active');
+      rightbar.classList.remove('resize-hover');
       resetWidth();
       return;
     }
     resizer.setAttribute('aria-hidden', 'false');
     resizer.setAttribute('tabindex', '0');
+    refreshBounds();
     const stored = readStoredWidth();
     if (stored != null) {
       applyWidth(stored, { store: false });
@@ -175,44 +185,78 @@ function initSidebarResize(){
   };
 
   media.addEventListener('change', syncState);
-  window.addEventListener('resize', () => { if (!isCollapsed()) updateAria(); });
-
-  const dragState = { active: false, pointerId: null, startX: 0, startWidth: 0 };
-
-  resizer.addEventListener('pointerdown', (ev) => {
-    if (!ev.isPrimary || isCollapsed()) return;
-    dragState.active = true;
-    dragState.pointerId = ev.pointerId;
-    dragState.startX = ev.clientX;
-    dragState.startWidth = rightbar.getBoundingClientRect().width;
-    try { resizer.setPointerCapture(ev.pointerId); } catch {}
-    resizer.classList.add('is-active');
-    ev.preventDefault();
+  window.addEventListener('resize', () => {
+    refreshBounds();
+    if (!isCollapsed()) updateAria();
   });
 
-  resizer.addEventListener('pointermove', (ev) => {
+  const dragState = { active: false, pointerId: null, startX: 0, startWidth: 0, captureTarget: null };
+
+  const handlePointerMove = (ev) => {
     if (!dragState.active || ev.pointerId !== dragState.pointerId) return;
     const delta = ev.clientX - dragState.startX;
-    applyWidth(dragState.startWidth + delta, { store: false });
-  });
+    applyWidth(dragState.startWidth - delta, { store: false });
+  };
 
   const finishDrag = (store = true) => {
     if (!dragState.active) return;
     dragState.active = false;
     const width = rightbar.getBoundingClientRect().width;
     if (store) applyWidth(width);
+    const target = dragState.captureTarget;
+    dragState.captureTarget = null;
     try {
-      if (dragState.pointerId !== null) resizer.releasePointerCapture(dragState.pointerId);
+      if (target && dragState.pointerId !== null) target.releasePointerCapture(dragState.pointerId);
     } catch {}
     dragState.pointerId = null;
     resizer.classList.remove('is-active');
+    rightbar.classList.remove('resize-hover');
   };
 
-  resizer.addEventListener('pointerup', (ev) => {
+  const tryStartDrag = (target, ev) => {
+    if (!ev.isPrimary || isCollapsed()) return false;
+    dragState.active = true;
+    dragState.pointerId = ev.pointerId;
+    dragState.startX = ev.clientX;
+    dragState.startWidth = rightbar.getBoundingClientRect().width;
+    dragState.captureTarget = target;
+    try { target.setPointerCapture(ev.pointerId); } catch {}
+    resizer.classList.add('is-active');
+    ev.preventDefault();
+    ev.stopPropagation();
+    return true;
+  };
+
+  resizer.addEventListener('pointerdown', (ev) => {
+    tryStartDrag(resizer, ev);
+  });
+
+  rightbar.addEventListener('pointerdown', (ev) => {
+    if (dragState.active || !ev.isPrimary || isCollapsed()) return;
+    const rect = rightbar.getBoundingClientRect();
+    if ((ev.clientX - rect.left) > hitPx) return;
+    tryStartDrag(rightbar, ev);
+  });
+
+  rightbar.addEventListener('pointermove', (ev) => {
+    if (dragState.active || isCollapsed()) return;
+    const rect = rightbar.getBoundingClientRect();
+    const nearEdge = (ev.clientX - rect.left) <= hitPx;
+    rightbar.classList.toggle('resize-hover', nearEdge);
+  });
+  rightbar.addEventListener('pointerleave', () => {
+    if (!dragState.active) rightbar.classList.remove('resize-hover');
+  });
+
+  window.addEventListener('pointermove', handlePointerMove);
+  window.addEventListener('pointerup', (ev) => {
     if (ev.pointerId === dragState.pointerId) finishDrag(true);
   });
-  resizer.addEventListener('pointercancel', () => finishDrag(false));
+  window.addEventListener('pointercancel', (ev) => {
+    if (ev.pointerId === dragState.pointerId) finishDrag(false);
+  });
   resizer.addEventListener('lostpointercapture', () => finishDrag(false));
+  rightbar.addEventListener('lostpointercapture', () => finishDrag(false));
 
   resizer.addEventListener('keydown', (ev) => {
     if (isCollapsed()) return;
@@ -220,10 +264,10 @@ function initSidebarResize(){
     const step = ev.shiftKey ? 48 : 24;
     if (ev.key === 'ArrowLeft') {
       ev.preventDefault();
-      applyWidth(baseWidth - step);
+      applyWidth(baseWidth + step);
     } else if (ev.key === 'ArrowRight') {
       ev.preventDefault();
-      applyWidth(baseWidth + step);
+      applyWidth(baseWidth - step);
     } else if (ev.key === 'Home') {
       ev.preventDefault();
       applyWidth(minPx);

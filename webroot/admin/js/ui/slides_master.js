@@ -183,6 +183,60 @@ function ensureBadgeLibrary(settings){
   return normalized;
 }
 
+function syncActiveStyleSetBadgeSettings(settings){
+  if (!settings || typeof settings !== 'object') return;
+  settings.slides ||= {};
+  const styleSets = settings.slides.styleSets;
+  const activeId = settings.slides.activeStyleSet;
+  if (!styleSets || typeof styleSets !== 'object' || !activeId) return;
+  const entry = styleSets[activeId];
+  if (!entry || typeof entry !== 'object') return;
+  const targetSlides = entry.slides = (entry.slides && typeof entry.slides === 'object')
+    ? entry.slides
+    : {};
+
+  const library = Array.isArray(settings.slides.badgeLibrary)
+    ? settings.slides.badgeLibrary
+    : [];
+  const clonedLibrary = [];
+  library.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const id = String(item.id ?? '').trim();
+    if (!id) return;
+    const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
+    const label = typeof item.label === 'string' ? item.label.trim() : '';
+    clonedLibrary.push({ id, icon, label });
+  });
+  targetSlides.badgeLibrary = clonedLibrary;
+
+  const emojiList = Array.isArray(settings.slides.customBadgeEmojis)
+    ? settings.slides.customBadgeEmojis
+    : [];
+  const clonedEmojis = [];
+  emojiList.forEach((value) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed || clonedEmojis.includes(trimmed)) return;
+    clonedEmojis.push(trimmed);
+  });
+  targetSlides.customBadgeEmojis = clonedEmojis;
+}
+
+function markBadgeLibraryChanged(settings){
+  syncActiveStyleSetBadgeSettings(settings);
+  if (ctx && typeof ctx.refreshSlidesBox === 'function') {
+    try { ctx.refreshSlidesBox(); }
+    catch (err) { console.warn('[admin] Slides box refresh failed after badge update', err); }
+  }
+  try { renderGridUI(); }
+  catch (err) { console.warn('[admin] Grid refresh failed after badge update', err); }
+  if (typeof window !== 'undefined'){
+    window.__queueUnsaved?.();
+    window.__markUnsaved?.();
+    if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+  }
+}
+
 function ensureCustomBadgeEmojis(settings){
   settings.slides ||= {};
   const raw = settings.slides.customBadgeEmojis;
@@ -2161,12 +2215,6 @@ export function renderSlidesMaster(){
     };
     if (!badgeListHost) return;
 
-    const notifyChange = () => {
-      window.__queueUnsaved?.();
-      window.__markUnsaved?.();
-      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
-    };
-
     const emojiInput = $('#badgeEmojiInput');
     const emojiAddBtn = $('#badgeEmojiAdd');
     const emojiCustomList = $('#badgeEmojiCustom');
@@ -2204,7 +2252,7 @@ export function renderSlidesMaster(){
           const idx = list.indexOf(value);
           if (idx >= 0) list.splice(idx, 1);
           renderBadgeLibraryRows();
-          notifyChange();
+          markBadgeLibraryChanged(settings);
         });
         chip.appendChild(removeBtn);
         emojiCustomList.appendChild(chip);
@@ -2221,7 +2269,7 @@ export function renderSlidesMaster(){
         emojiInput.value = '';
       }
       renderBadgeLibraryRows();
-      notifyChange();
+      markBadgeLibraryChanged(settings);
     };
 
     if (emojiAddBtn && !emojiAddBtn.dataset.bound){
@@ -2392,22 +2440,42 @@ export function renderSlidesMaster(){
       emojiSelect.addEventListener('change', () => {
         badge.icon = emojiSelect.value.trim();
         updatePreview();
-        notifyChange();
+        markBadgeLibraryChanged(settings);
       });
 
-      labelInput.addEventListener('input', updatePreview);
-      labelInput.addEventListener('change', () => {
-        badge.label = labelInput.value.trim();
-        labelInput.value = badge.label;
+      const commitLabel = (rawValue, { finalize = false } = {}) => {
+        const base = typeof rawValue === 'string' ? rawValue : '';
+        const next = finalize ? base.trim() : base;
+        if (badge.label === next) {
+          if (finalize && labelInput.value !== next) labelInput.value = next;
+          return;
+        }
+        badge.label = next;
+        if (finalize && labelInput.value !== next) labelInput.value = next;
         updatePreview();
-        notifyChange();
+        if (finalize) {
+          markBadgeLibraryChanged(settings);
+        } else {
+          syncActiveStyleSetBadgeSettings(settings);
+          if (typeof window !== 'undefined'){
+            window.__queueUnsaved?.();
+            if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+          }
+        }
+      };
+
+      labelInput.addEventListener('input', () => {
+        commitLabel(labelInput.value);
+      });
+      labelInput.addEventListener('blur', () => {
+        commitLabel(labelInput.value, { finalize: true });
       });
 
       removeBtn.addEventListener('click', () => {
         const listRef = ensureBadgeLibrary(settings);
         listRef.splice(index, 1);
         renderBadgeLibraryRows();
-        notifyChange();
+        markBadgeLibraryChanged(settings);
       });
 
       row.appendChild(preview);
@@ -2424,9 +2492,7 @@ export function renderSlidesMaster(){
       list.push({ id: genId('bdg_'), icon:'', label:'' });
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
-      window.__queueUnsaved?.();
-      window.__markUnsaved?.();
-      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      markBadgeLibraryChanged(settings);
     };
   }
   renderBadgeLibraryRows();
