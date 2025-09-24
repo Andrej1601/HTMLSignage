@@ -224,6 +224,12 @@ function syncActiveStyleSetBadgeSettings(settings){
 
 function markBadgeLibraryChanged(settings){
   syncActiveStyleSetBadgeSettings(settings);
+  if (ctx && typeof ctx.refreshSlidesBox === 'function') {
+    try { ctx.refreshSlidesBox(); }
+    catch (err) { console.warn('[admin] Slides box refresh failed after badge update', err); }
+  }
+  try { renderGridUI(); }
+  catch (err) { console.warn('[admin] Grid refresh failed after badge update', err); }
   if (typeof window !== 'undefined'){
     window.__queueUnsaved?.();
     window.__markUnsaved?.();
@@ -2437,12 +2443,32 @@ export function renderSlidesMaster(){
         markBadgeLibraryChanged(settings);
       });
 
-      labelInput.addEventListener('input', updatePreview);
-      labelInput.addEventListener('change', () => {
-        badge.label = labelInput.value.trim();
-        labelInput.value = badge.label;
+      const commitLabel = (rawValue, { finalize = false } = {}) => {
+        const base = typeof rawValue === 'string' ? rawValue : '';
+        const next = finalize ? base.trim() : base;
+        if (badge.label === next) {
+          if (finalize && labelInput.value !== next) labelInput.value = next;
+          return;
+        }
+        badge.label = next;
+        if (finalize && labelInput.value !== next) labelInput.value = next;
         updatePreview();
-        markBadgeLibraryChanged(settings);
+        if (finalize) {
+          markBadgeLibraryChanged(settings);
+        } else {
+          syncActiveStyleSetBadgeSettings(settings);
+          if (typeof window !== 'undefined'){
+            window.__queueUnsaved?.();
+            if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+          }
+        }
+      };
+
+      labelInput.addEventListener('input', () => {
+        commitLabel(labelInput.value);
+      });
+      labelInput.addEventListener('blur', () => {
+        commitLabel(labelInput.value, { finalize: true });
       });
 
       removeBtn.addEventListener('click', () => {
