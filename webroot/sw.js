@@ -1,47 +1,82 @@
-const CACHE_NAME = 'signage-static-v1';
+const CACHE_NAME = 'signage-static-v2';
 const OFFLINE_URL = '/offline.html';
-const PRECACHE = [
+const PRECACHE_URLS = [
   '/assets/design.css',
   '/assets/responsive.css',
   '/assets/slideshow.js',
   OFFLINE_URL
 ];
 
-self.addEventListener('install', evt => {
-  evt.waitUntil(
-    caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE))
-  );
+const STATIC_DESTINATIONS = new Set(['style', 'script', 'image', 'font', 'video', 'audio']);
+
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(PRECACHE_URLS);
+  })());
   self.skipWaiting();
 });
 
-self.addEventListener('activate', evt => {
-  evt.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', evt => {
-  const req = evt.request;
-  if (req.mode === 'navigate') {
-    evt.respondWith(
-      fetch(req).catch(() => caches.match(OFFLINE_URL))
-    );
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  if (request.method !== 'GET') {
     return;
   }
-  const dest = req.destination;
-  if (['style','script','image','font','video','audio'].includes(dest)) {
-    evt.respondWith(
-      caches.match(req).then(cached => {
-        if (cached) return cached;
-        return fetch(req).then(resp => {
-          const copy = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(req, copy));
-          return resp;
-        });
-      })
-    );
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
   }
+
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          return response;
+        }
+      } catch (error) {
+        // ignore and fall through to cache lookup
+      }
+      const cache = await caches.open(CACHE_NAME);
+      const offline = await cache.match(OFFLINE_URL);
+      return offline || Response.error();
+    })());
+    return;
+  }
+
+  const destination = request.destination;
+  if (!STATIC_DESTINATIONS.has(destination)) {
+    return;
+  }
+
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      const response = await fetch(request);
+      if (!response || !response.ok) {
+        return response;
+      }
+      await cache.put(request, response.clone());
+      return response;
+    } catch (error) {
+      if (cached) {
+        return cached;
+      }
+      throw error;
+    }
+  })());
 });
