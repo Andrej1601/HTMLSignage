@@ -1,7 +1,9 @@
 <?php
+require_once __DIR__ . '/storage.php';
+
 header('Content-Type: application/json; charset=UTF-8');
-$assetsDir = '/var/www/signage/assets/media';
-$settingsFile = '/var/www/signage/data/settings.json';
+$assetsDir = signage_assets_path('media');
+$settingsFile = signage_data_path('settings.json');
 
 if (!is_dir($assetsDir)) { echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit; }
 $cfg = is_file($settingsFile) ? json_decode(file_get_contents($settingsFile), true) : [];
@@ -85,7 +87,9 @@ foreach ($keep as $p) {
     $keepMap[$clean] = true;
   }
 }
-$keepReal = array_map(function($p){ return '/var/www/signage'. $p; }, array_keys($keepMap));
+$keepReal = array_map(function($p){ return signage_absolute_path($p); }, array_keys($keepMap));
+
+$basePath = signage_base_path();
 
 $removed = [];
 $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($assetsDir, FilesystemIterator::SKIP_DOTS));
@@ -94,7 +98,11 @@ foreach ($it as $f){
   $full = $f->getPathname();
   if (!in_array($full, $keepReal, true)){
     @unlink($full);
-    if(!file_exists($full)) $removed[] = str_replace('/var/www/signage','', $full);
+    if(!file_exists($full)) {
+      $removed[] = str_starts_with($full, $basePath)
+        ? substr($full, strlen($basePath))
+        : $full;
+    }
   }
 }
 

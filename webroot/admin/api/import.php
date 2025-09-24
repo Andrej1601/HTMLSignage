@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/storage.php';
+
 header('Content-Type: application/json; charset=UTF-8');
 
 function fail($m,$c=400){ http_response_code($c); echo json_encode(['ok'=>false,'error'=>$m]); exit; }
@@ -47,8 +49,7 @@ $hasSettings = array_key_exists('settings', $j);
 $hasSchedule = array_key_exists('schedule', $j);
 if (!$hasSettings && !$hasSchedule) fail('missing-sections');
 
-$base = '/var/www/signage';
-$assetsDir = $base.'/assets/img';
+$assetsDir = signage_assets_path('img');
 @mkdir($assetsDir, 02775, true);
 
 $pathMap = []; // original rel path => new rel path
@@ -67,7 +68,7 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
     };
     $name = pathinfo($info['name'] ?? basename($rel), PATHINFO_FILENAME);
     $outRel = '/assets/img/import_'.date('Ymd_His').'_'.($i++).'.'.$ext;
-    $outAbs = $base.$outRel;
+    $outAbs = signage_absolute_path($outRel);
     error_clear_last();
     $res = file_put_contents($outAbs, base64_decode($b64));
     if ($res === false) {
@@ -91,22 +92,16 @@ if ($writeSchedule && is_array($schedule)) $schedule['version'] = time();
 
 $ok1 = true; $ok2 = true;
 if ($writeSettings && is_array($settings)) {
-  $settingsFile = $base.'/data/settings.json';
-  error_clear_last();
-  $res = file_put_contents($settingsFile, json_encode($settings, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
-  if ($res === false) {
-    $err = error_get_last();
-    error_log("file_put_contents failed for $settingsFile: ".($err['message'] ?? 'unknown error'));
+  $err = null;
+  if (!signage_write_json('settings.json', $settings, $err)) {
+    if ($err) error_log("file_put_contents failed for settings.json: $err");
     $ok1 = false;
   }
 }
 if ($writeSchedule && is_array($schedule)) {
-  $scheduleFile = $base.'/data/schedule.json';
-  error_clear_last();
-  $res = file_put_contents($scheduleFile, json_encode($schedule, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));
-  if ($res === false) {
-    $err = error_get_last();
-    error_log("file_put_contents failed for $scheduleFile: ".($err['message'] ?? 'unknown error'));
+  $err = null;
+  if (!signage_write_json('schedule.json', $schedule, $err)) {
+    if ($err) error_log("file_put_contents failed for schedule.json: $err");
     $ok2 = false;
   }
 }

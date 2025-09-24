@@ -3,10 +3,13 @@
 // Wird von Heartbeat- und Admin-APIs genutzt. Pfade werden zentral über
 // devices_path() bestimmt, um harte Pfadangaben zu vermeiden.
 
+require_once __DIR__ . '/storage.php';
+
 function devices_path() {
+  $custom = getenv('DEVICES_PATH');
+  if (is_string($custom) && $custom !== '') return $custom;
   if (!empty($_ENV['DEVICES_PATH'])) return $_ENV['DEVICES_PATH'];
-  $root = $_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 2);
-  return rtrim($root, '/') . '/data/devices.json';
+  return signage_data_path('devices.json');
 }
 
 function devices_load(){
@@ -19,7 +22,7 @@ function devices_load(){
 function devices_save($db){
   $p = devices_path();
   @mkdir(dirname($p), 02775, true);
-  $json = json_encode($db, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT);
+  $json = json_encode($db, SIGNAGE_JSON_FLAGS);
   $bytes = @file_put_contents($p, $json, LOCK_EX);
   if ($bytes === false) {
     throw new RuntimeException('Unable to write device database');

@@ -1,6 +1,6 @@
-
 <?php
-// file: /var/www/signage/admin/api/upload.php
+require_once __DIR__ . '/storage.php';
+
 // Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos)
 // Hinweise: Nginx client_max_body_size & PHP upload_max_filesize/post_max_size müssen groß genug sein.
 
@@ -46,7 +46,7 @@ $orig = preg_replace('/[^A-Za-z0-9._-]/','_', $u['name']);
 if (!$orig) $orig = 'upload.' . $ext;
 if (!preg_match('/\\.' . preg_quote($ext,'/') . '$/i', $orig)) $orig .= '.' . $ext;
 
-$baseDir = '/var/www/signage/assets/media/'.$subDir.'/';
+$baseDir = rtrim(signage_assets_path('media/'.$subDir), '/') . '/';
 if (!is_dir($baseDir)) { @mkdir($baseDir, 02775, true); @chown($baseDir,'www-data'); @chgrp($baseDir,'www-data'); }
 
 $dest = $baseDir . $orig;
@@ -83,7 +83,7 @@ if ($subDir === 'img'){
   $torig = preg_replace('/[^A-Za-z0-9._-]/','_', $tu['name']);
   if (!$torig) $torig = 'thumb.'.$text;
   if (!preg_match('/\\.' . preg_quote($text,'/') . '$/i', $torig)) $torig .= '.' . $text;
-  $tbase = '/var/www/signage/assets/media/img/';
+  $tbase = rtrim(signage_assets_path('media/img'), '/') . '/';
   if (!is_dir($tbase)) { @mkdir($tbase, 02775, true); @chown($tbase,'www-data'); @chgrp($tbase,'www-data'); }
   $tdest = $tbase . $torig;
   $tpi = pathinfo($tdest);
