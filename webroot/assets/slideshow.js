@@ -3550,19 +3550,36 @@ function renderStorySlide(story = {}, region = 'left') {
       updateActiveState();
     }
 
-    function step(){
+    function showFallback(){
+      show(renderStageFallback(id));
+      updateActiveState();
+    }
+
+    function guardPlayback(onEmpty = showFallback){
       clearTimers();
       if (!config.enabled) {
         clear();
-        return;
+        return false;
       }
       if (!queue.length) {
-        show(renderStageFallback(id));
-        updateActiveState();
-        return;
+        if (typeof onEmpty === 'function') onEmpty();
+        return false;
       }
+      return true;
+    }
+
+    function normalizeIndex(){
+      if (!queue.length) return;
       if (index < 0 || index >= queue.length) {
         index = ((index % queue.length) + queue.length) % queue.length;
+      }
+    }
+
+    function displayCurrent(){
+      normalizeIndex();
+      if (!queue.length) {
+        showFallback();
+        return;
       }
       let item = queue[index];
       let key = slideKey(item);
@@ -3590,34 +3607,16 @@ function renderStorySlide(story = {}, region = 'left') {
     }
 
     function advance(){
-      clearTimers();
-      if (!config.enabled) {
-        clear();
-        return;
-      }
-      if (!queue.length) {
-        show(renderStageFallback(id));
-        updateActiveState();
-        return;
-      }
+      if (!guardPlayback()) return;
       hide(() => {
         index = (index + 1) % queue.length;
-        step();
+        displayCurrent();
       });
     }
 
     function play(){
-      clearTimers();
-      if (!config.enabled) {
-        clear();
-        return;
-      }
-      if (!queue.length) {
-        show(renderStageFallback(id));
-        updateActiveState();
-        return;
-      }
-      step();
+      if (!guardPlayback()) return;
+      displayCurrent();
     }
 
     function clear(){
