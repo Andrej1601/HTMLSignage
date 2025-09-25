@@ -519,12 +519,12 @@ async function loadDeviceResolved(id){
     };
     updateVwScale();
 
-    const requestFrame = typeof requestAnimationFrame === 'function'
-      ? requestAnimationFrame
+    const requestFrame = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
       : (cb) => setTimeout(cb, 16);
-    const cancelFrame = typeof cancelAnimationFrame === 'function'
-      ? cancelAnimationFrame
-      : clearTimeout;
+    const cancelFrame = typeof window.cancelAnimationFrame === 'function'
+      ? window.cancelAnimationFrame.bind(window)
+      : (id) => clearTimeout(id);
     displayListeners.cancelFrame = cancelFrame;
 
     const onResize = () => {
