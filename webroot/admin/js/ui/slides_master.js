@@ -237,6 +237,60 @@ function markBadgeLibraryChanged(settings){
   }
 }
 
+const scheduleBadgeLibraryChanged = (() => {
+  let handle = null;
+  let isAnimationFrame = false;
+
+  const getRaf = () => {
+    if (typeof requestAnimationFrame === 'function') return requestAnimationFrame;
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      return window.requestAnimationFrame.bind(window);
+    }
+    return null;
+  };
+
+  const getCancelRaf = () => {
+    if (typeof cancelAnimationFrame === 'function') return cancelAnimationFrame;
+    if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
+      return window.cancelAnimationFrame.bind(window);
+    }
+    return null;
+  };
+
+  const clear = () => {
+    if (handle == null) return;
+    if (isAnimationFrame){
+      const cancel = getCancelRaf();
+      if (cancel) {
+        cancel(handle);
+      }
+    } else {
+      clearTimeout(handle);
+    }
+    handle = null;
+    isAnimationFrame = false;
+  };
+
+  const schedule = (settings) => {
+    clear();
+    const raf = getRaf();
+    const run = () => {
+      handle = null;
+      isAnimationFrame = false;
+      markBadgeLibraryChanged(settings);
+    };
+    if (raf){
+      isAnimationFrame = true;
+      handle = raf(run);
+    } else {
+      handle = setTimeout(run, 0);
+    }
+  };
+
+  schedule.cancel = clear;
+  return schedule;
+})();
+
 function ensureCustomBadgeEmojis(settings){
   settings.slides ||= {};
   const raw = settings.slides.customBadgeEmojis;
@@ -2454,9 +2508,11 @@ export function renderSlidesMaster(){
         if (finalize && labelInput.value !== next) labelInput.value = next;
         updatePreview();
         if (finalize) {
+          scheduleBadgeLibraryChanged.cancel?.();
           markBadgeLibraryChanged(settings);
         } else {
           syncActiveStyleSetBadgeSettings(settings);
+          scheduleBadgeLibraryChanged(settings);
           if (typeof window !== 'undefined'){
             window.__queueUnsaved?.();
             if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
