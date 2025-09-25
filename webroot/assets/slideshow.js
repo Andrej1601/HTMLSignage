@@ -306,6 +306,37 @@
     return cfg;
   }
 
+  async function applyResolvedState(nextSchedule, nextSettings, options = {}){
+    const {
+      resetIndex = true,
+      autoplay = true,
+      waitForPreload = false
+    } = options || {};
+
+    if (!nextSchedule || typeof nextSchedule !== 'object') {
+      throw new Error('Plan-Daten fehlen oder sind ungültig.');
+    }
+    if (!nextSettings || typeof nextSettings !== 'object') {
+      throw new Error('Einstellungen fehlen oder sind ungültig.');
+    }
+
+    schedule = nextSchedule;
+    settings = sanitizeSettingsPayload(nextSettings);
+    badgeLookupCache = null;
+
+    applyTheme();
+    applyDisplay();
+    maybeApplyPreset();
+    refreshStageQueues({ resetIndex, autoplay });
+
+    const preloadPromise = preloadSlideImages();
+    if (waitForPreload) {
+      await preloadPromise;
+    } else {
+      preloadPromise.catch((error) => console.warn('[slideshow] preload failed', error));
+    }
+  }
+
   function createResizeRegistry() {
     const handlers = new Map();
     return {
@@ -349,36 +380,22 @@
 
 // -----------DeviceLoader -------
 async function loadDeviceResolved(id){
-  const r = await fetch(`/pair/resolve?device=${encodeURIComponent(id)}&t=${Date.now()}`, {cache:'no-store'});
-  if (!r.ok) throw new Error('device_resolve http '+r.status);
-  const j = await r.json();
-  if (!j || j.ok === false || !j.settings || !j.schedule) {
+  const response = await fetch(`/pair/resolve?device=${encodeURIComponent(id)}&t=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('device_resolve http ' + response.status);
+  const payload = await response.json();
+  if (!payload || payload.ok === false || !payload.settings || !payload.schedule) {
     throw new Error('device_resolve payload invalid');
   }
-  schedule = j.schedule;
-  settings = sanitizeSettingsPayload(j.settings);
-  badgeLookupCache = null;
-  applyTheme(); applyDisplay(); maybeApplyPreset();
-  refreshStageQueues({ resetIndex:true, autoplay:false });
-  await preloadSlideImages();
+  await applyResolvedState(payload.schedule, payload.settings, {
+    resetIndex: true,
+    autoplay: false,
+    waitForPreload: true
+  });
 }
 
 
   // ---------- IO ----------
   async function loadJSON(u) { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u); return await r.json(); }
-  async function loadAll() {
-    const [s, cfg] = await Promise.all([
-      loadJSON('/data/schedule.json'),
-      loadJSON('/data/settings.json')
-    ]);
-    schedule = s; settings = sanitizeSettingsPayload(cfg);
-    badgeLookupCache = null;
-    applyTheme();
-    applyDisplay();
-    maybeApplyPreset();
-    refreshStageQueues({ resetIndex:true, autoplay:false });
-    await preloadSlideImages();
-  }
 
   // ---------- Theme & Display ----------
   function ensureFontFamily() {
@@ -3994,77 +4011,84 @@ function showPairing(){
 async function bootstrap(){
 // Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
  window.addEventListener('message', (ev) => {
-  const d = ev?.data || {};
-  if (d?.type !== 'preview') return;
+  const data = ev?.data || {};
+  if (data?.type !== 'preview') return;
   previewMode = true;
   try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
-  const p = d.payload || {};
-  if (p.schedule) schedule = p.schedule;
-  if (p.settings) { settings = sanitizeSettingsPayload(p.settings); badgeLookupCache = null; }
-  applyTheme();
-  applyDisplay();
-  maybeApplyPreset();
-  refreshStageQueues({ resetIndex:true });
-  preloadSlideImages();
+  const payload = data.payload || {};
+  const nextSchedule = payload.schedule || schedule;
+  const nextSettings = payload.settings || settings;
+  if (!nextSchedule || !nextSettings) return;
+  applyResolvedState(nextSchedule, nextSettings, { resetIndex: true })
+    .catch((error) => console.error('[preview] state apply failed', error));
 });
   const deviceMode = !!DEVICE_ID;
 
   if (!previewMode) {
     if (deviceMode) {
-try {
-    await loadDeviceResolved(DEVICE_ID);
-    // Heartbeat: sofort + alle 30s
-    const sendHeartbeat = () => {
-      const payload = JSON.stringify({ device: DEVICE_ID });
-      const blob = new Blob([payload], { type: 'application/json' });
-      let sent = false;
-      if (navigator.sendBeacon) {
-        try {
-          sent = navigator.sendBeacon('/api/heartbeat.php', blob);
-        } catch (e) {
-          console.error('[heartbeat] beacon failed', e);
+      try {
+        await loadDeviceResolved(DEVICE_ID);
+      } catch (error) {
+        console.error('[bootstrap] resolve failed:', error);
+        showPairing();
+        return; // HIER abbrechen, sonst bleibt die Stage leer
+      }
+
+      const heartbeatPayload = JSON.stringify({ device: DEVICE_ID });
+      const heartbeatHeaders = { 'Content-Type': 'application/json' };
+      let heartbeatBlob = null;
+
+      const sendHeartbeat = () => {
+        let sent = false;
+        if (navigator.sendBeacon) {
+          try {
+            if (!heartbeatBlob) {
+              heartbeatBlob = new Blob([heartbeatPayload], { type: 'application/json' });
+            }
+            sent = navigator.sendBeacon('/api/heartbeat.php', heartbeatBlob);
+          } catch (error) {
+            console.error('[heartbeat] beacon failed', error);
+          }
         }
+        if (!sent) {
+          fetch('/api/heartbeat.php', {
+            method: 'POST',
+            headers: heartbeatHeaders,
+            body: heartbeatPayload
+          }).then((response) => {
+            if (!response.ok) throw new Error('heartbeat http ' + response.status);
+          }).catch((error) => console.error('[heartbeat] failed', error));
+        }
+      };
+
+      sendHeartbeat();
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(sendHeartbeat, 30 * 1000);
+    } else {
+      if (IS_PREVIEW) {
+        const info = document.createElement('div');
+        info.className = 'container fade show empty';
+        const inner = document.createElement('div');
+        inner.className = 'empty-message';
+        inner.textContent = 'Vorschau lädt…';
+        info.appendChild(inner);
+        stopAllStages();
+        updateLayoutModeAttr('single');
+        if (stageLeftController) stageLeftController.showCustom(info);
+        if (stageRightController) stageRightController.showCustom(null);
+        return; // kein Pairing im Admin-Dock
       }
-      if (!sent) {
-        fetch('/api/heartbeat.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload
-        }).then(r => {
-          if (!r.ok) throw new Error('heartbeat http ' + r.status);
-        }).catch(e => console.error('[heartbeat] failed', e));
-      }
-    };
-    sendHeartbeat();
-    if (heartbeatTimer) clearInterval(heartbeatTimer);
-    heartbeatTimer = setInterval(sendHeartbeat, 30 * 1000);
- } catch (e) {
-console.error('[bootstrap] resolve failed:', e);
- showPairing();
- return; // HIER abbrechen, sonst bleibt die Stage leer
-      }
-} else {
-  if (IS_PREVIEW) {
-    const info = document.createElement('div');
-    info.className = 'container fade show empty';
-    const inner = document.createElement('div');
-    inner.className = 'empty-message';
-    inner.textContent = 'Vorschau lädt…';
-    info.appendChild(inner);
-    stopAllStages();
-    updateLayoutModeAttr('single');
-    if (stageLeftController) stageLeftController.showCustom(info);
-    if (stageRightController) stageRightController.showCustom(null);
-    return; // kein Pairing im Admin-Dock
-  }
-  showPairing();
-  return;
-}
+      showPairing();
+      return;
+    }
   }
 
-  // Erst hier starten wir die Slideshow
-  refreshStageQueues({ resetIndex:true });
-  preloadSlideImages();
+  if (schedule && settings) {
+    stageControllers.forEach((ctrl) => ctrl.play());
+  } else {
+    refreshStageQueues({ resetIndex:true });
+    preloadSlideImages();
+  }
 
   // Live-Reload: bei Device NUR resolve pollen
   // Polling beibehalten, da Versionsänderungen zuverlässig erkannt werden
@@ -4076,52 +4100,47 @@ console.error('[bootstrap] resolve failed:', e);
     pollTimer = setInterval(async () => {
       try {
         if (deviceMode) {
-          const r = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, {cache:'no-store'});
-          if (r.status === 404) {
+          const response = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, { cache: 'no-store' });
+          if (response.status === 404) {
             clearInterval(pollTimer);
             pollTimer = null;
             stopAllStages();
             showPairing();
             return;
           }
-          if (!r.ok) {
-            console.warn('[poll] http', r.status);
+          if (!response.ok) {
+            console.warn('[poll] http', response.status);
             return;
           }
-          const j = await r.json();
-          if (!j || j.ok === false) {
+          const payload = await response.json();
+          if (!payload || payload.ok === false || !payload.schedule || !payload.settings) {
             console.warn('[poll] payload invalid');
             return;
           }
 
-          const newSchedVer = j.schedule?.version || 0;
-          const newSetVer   = j.settings?.version || 0;
+          const newSchedVer = payload.schedule?.version || 0;
+          const newSetVer   = payload.settings?.version || 0;
 
           if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
-            schedule = j.schedule; settings = sanitizeSettingsPayload(j.settings);
-            badgeLookupCache = null;
-            lastSchedVer = newSchedVer; lastSetVer = newSetVer;
-            applyTheme();
-            applyDisplay();
-            maybeApplyPreset();
-            refreshStageQueues({ resetIndex:true });
-            preloadSlideImages();
+            await applyResolvedState(payload.schedule, payload.settings, { resetIndex: true });
+            lastSchedVer = newSchedVer;
+            lastSetVer = newSetVer;
           }
         } else {
-          const s  = await loadJSON('/data/schedule.json');
-          const cf = await loadJSON('/data/settings.json');
-          if (s.version !== lastSchedVer || cf.version !== lastSetVer) {
-            schedule=s; settings=cf; lastSchedVer=s.version; lastSetVer=cf.version;
-            badgeLookupCache = null;
-            applyTheme();
-            applyDisplay();
-            maybeApplyPreset();
-            refreshStageQueues({ resetIndex:true });
-            preloadSlideImages();
+          const [nextSchedule, nextSettings] = await Promise.all([
+            loadJSON('/data/schedule.json'),
+            loadJSON('/data/settings.json')
+          ]);
+          const newSchedVer = nextSchedule?.version || 0;
+          const newSetVer = nextSettings?.version || 0;
+          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
+            await applyResolvedState(nextSchedule, nextSettings, { resetIndex: true });
+            lastSchedVer = newSchedVer;
+            lastSetVer = newSetVer;
           }
         }
-      } catch(e) {
-        console.warn('[poll] failed:', e);
+      } catch(error) {
+        console.warn('[poll] failed:', error);
       }
     }, 3000);
   }
