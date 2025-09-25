@@ -37,7 +37,8 @@ import {
   unpairDevice,
   renameDevice,
   cleanupDevices,
-  resolveNowSeconds
+  resolveNowSeconds,
+  OFFLINE_AFTER_MIN
 } from './core/device_service.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
@@ -609,6 +610,610 @@ function renderSlidesBox(){
   const f = settings.fonts || {};
   const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
   const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
+  const notifySettingsChanged = () => {
+    window.__queueUnsaved?.();
+    window.__markUnsaved?.();
+    if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+  };
+
+  const normalizeTime = (value) => {
+    if (typeof value !== 'string') return null;
+    const match = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(value);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    let minute = Number(match[2] ?? '0');
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    hour = Math.max(0, Math.min(23, hour));
+    minute = Math.max(0, Math.min(59, minute));
+    return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  };
+
+  const ensureStyleAutomationState = () => {
+    settings.slides ||= {};
+    const styleSets = (settings.slides.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
+    const available = Object.keys(styleSets);
+    const defaults = DEFAULTS.slides?.styleAutomation || {};
+    const current = (settings.slides.styleAutomation && typeof settings.slides.styleAutomation === 'object')
+      ? deepClone(settings.slides.styleAutomation)
+      : {};
+
+    const normalized = {
+      enabled: current.enabled !== false,
+      fallbackStyle: '',
+      timeSlots: [],
+      eventStyle: {}
+    };
+
+    const fallbackCandidate = current.fallbackStyle || defaults.fallbackStyle || settings.slides.activeStyleSet || available[0] || '';
+    normalized.fallbackStyle = available.includes(fallbackCandidate) ? fallbackCandidate : (available[0] || '');
+
+    const slotSource = Array.isArray(current.timeSlots) && current.timeSlots.length
+      ? current.timeSlots
+      : (Array.isArray(defaults.timeSlots) ? deepClone(defaults.timeSlots) : []);
+
+    const seen = new Set();
+    slotSource.forEach((slot) => {
+      if (!slot || typeof slot !== 'object') return;
+      let id = slot.id ? String(slot.id).trim() : '';
+      if (!id) id = genId('sty_');
+      if (seen.has(id)) return;
+      let start = normalizeTime(slot.start);
+      if (!start) start = normalizeTime(defaults.timeSlots?.[0]?.start) || '06:00';
+      const label = typeof slot.label === 'string' ? slot.label.trim() : '';
+      const style = available.includes(slot.style) ? slot.style : normalized.fallbackStyle;
+      normalized.timeSlots.push({ id, start, label, style });
+      seen.add(id);
+    });
+    if (!normalized.timeSlots.length && Array.isArray(defaults.timeSlots)) {
+      defaults.timeSlots.forEach((slot) => {
+        if (!slot || typeof slot !== 'object') return;
+        const id = genId('sty_');
+        const start = normalizeTime(slot.start) || '06:00';
+        const label = typeof slot.label === 'string' ? slot.label.trim() : '';
+        const style = available.includes(slot.style) ? slot.style : normalized.fallbackStyle;
+        normalized.timeSlots.push({ id, start, label, style });
+      });
+    }
+    normalized.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+
+    const defaultEvent = defaults.eventStyle || {};
+    const eventCurrent = current.eventStyle && typeof current.eventStyle === 'object' ? current.eventStyle : {};
+    const defaultEnabled = defaultEvent.enabled !== false;
+    const eventStyle = available.includes(eventCurrent.style)
+      ? eventCurrent.style
+      : (available.includes(defaultEvent.style) ? defaultEvent.style : normalized.fallbackStyle);
+    const lookahead = Number.isFinite(+eventCurrent.lookaheadMinutes)
+      ? Math.max(1, Math.round(+eventCurrent.lookaheadMinutes))
+      : Number.isFinite(+defaultEvent.lookaheadMinutes)
+        ? Math.max(1, Math.round(+defaultEvent.lookaheadMinutes))
+        : 60;
+    normalized.eventStyle = {
+      enabled: defaultEnabled ? (eventCurrent.enabled !== false) : false,
+      lookaheadMinutes: lookahead,
+      style: eventStyle
+    };
+
+    settings.slides.styleAutomation = normalized;
+    return normalized;
+  };
+
+  const ensureExtrasState = () => {
+    const defaults = DEFAULTS.extras || {};
+    const extras = settings.extras = (settings.extras && typeof settings.extras === 'object') ? settings.extras : {};
+
+    const sanitizeList = (list, fallback, mapper) => {
+      const source = Array.isArray(list) && list.length ? list : (Array.isArray(fallback) ? deepClone(fallback) : []);
+      const normalized = [];
+      const seen = new Set();
+      source.forEach((entry) => {
+        if (!entry || typeof entry !== 'object') return;
+        const mapped = mapper(entry);
+        if (!mapped) return;
+        let id = mapped.id ? String(mapped.id).trim() : '';
+        if (!id) id = genId('ext_');
+        if (seen.has(id)) return;
+        mapped.id = id;
+        normalized.push(mapped);
+        seen.add(id);
+      });
+      return normalized;
+    };
+
+    extras.wellnessTips = sanitizeList(extras.wellnessTips, defaults.wellnessTips, (entry) => ({
+      id: entry.id,
+      icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
+      title: typeof entry.title === 'string' ? entry.title.trim() : '',
+      text: typeof entry.text === 'string' ? entry.text.trim() : ''
+    }));
+
+    extras.eventCountdowns = sanitizeList(extras.eventCountdowns, defaults.eventCountdowns, (entry) => {
+      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
+      let target = rawTarget;
+      if (rawTarget) {
+        const parsed = new Date(rawTarget);
+        if (Number.isFinite(parsed.getTime())) target = parsed.toISOString();
+      }
+      return {
+        id: entry.id,
+        title: typeof entry.title === 'string' ? entry.title.trim() : '',
+        subtitle: typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '',
+        target,
+        style: typeof entry.style === 'string' ? entry.style.trim() : ''
+      };
+    });
+
+    extras.gastronomyHighlights = sanitizeList(extras.gastronomyHighlights, defaults.gastronomyHighlights, (entry) => {
+      const items = Array.isArray(entry.items)
+        ? entry.items.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+        : [];
+      const textLines = Array.isArray(entry.textLines)
+        ? entry.textLines.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+        : [];
+      return {
+        id: entry.id,
+        title: typeof entry.title === 'string' ? entry.title.trim() : '',
+        description: typeof entry.description === 'string' ? entry.description.trim() : '',
+        icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
+        items,
+        textLines
+      };
+    });
+
+    return extras;
+  };
+
+  const renderStyleAutomationControls = () => {
+    const automation = ensureStyleAutomationState();
+    const styleSets = (settings.slides?.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
+    const styleOptions = Object.entries(styleSets).map(([id, value]) => ({ id, label: value?.label || id }));
+
+    const enabledInput = document.getElementById('styleAutoEnabled');
+    if (enabledInput) {
+      enabledInput.checked = automation.enabled !== false;
+      enabledInput.onchange = () => {
+        automation.enabled = !!enabledInput.checked;
+        notifySettingsChanged();
+      };
+    }
+
+    const fallbackSelect = document.getElementById('styleAutoFallback');
+    if (fallbackSelect) {
+      fallbackSelect.innerHTML = '';
+      styleOptions.forEach(({ id, label }) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = label;
+        fallbackSelect.appendChild(opt);
+      });
+      if (!automation.fallbackStyle && styleOptions.length) {
+        automation.fallbackStyle = styleOptions[0].id;
+      }
+      if (automation.fallbackStyle && !styleOptions.some(opt => opt.id === automation.fallbackStyle) && styleOptions.length) {
+        automation.fallbackStyle = styleOptions[0].id;
+      }
+      if (automation.fallbackStyle) {
+        fallbackSelect.value = automation.fallbackStyle;
+      }
+      fallbackSelect.onchange = () => {
+        automation.fallbackStyle = fallbackSelect.value || '';
+        automation.timeSlots.forEach(slot => {
+          if (!styleOptions.some(opt => opt.id === slot.style)) {
+            slot.style = automation.fallbackStyle;
+          }
+        });
+        renderStyleAutomationControls();
+        notifySettingsChanged();
+      };
+    }
+
+    const listHost = document.getElementById('styleAutoList');
+    if (listHost) {
+      listHost.innerHTML = '';
+      automation.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+      automation.timeSlots.forEach((slot, index) => {
+        const row = document.createElement('div');
+        row.className = 'style-auto-slot';
+
+        const timeWrap = document.createElement('div');
+        timeWrap.className = 'style-auto-field';
+        const timeLabel = document.createElement('label');
+        timeLabel.textContent = 'Startzeit';
+        const timeInput = document.createElement('input');
+        timeInput.type = 'time';
+        timeInput.value = slot.start || '06:00';
+        timeInput.onchange = () => {
+          const next = normalizeTime(timeInput.value);
+          if (next) {
+            slot.start = next;
+            automation.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+            renderStyleAutomationControls();
+            notifySettingsChanged();
+          } else {
+            timeInput.value = slot.start || '06:00';
+          }
+        };
+        timeWrap.append(timeLabel, timeInput);
+
+        const styleWrap = document.createElement('div');
+        styleWrap.className = 'style-auto-field';
+        const styleLabel = document.createElement('label');
+        styleLabel.textContent = 'Stil';
+        const styleSelect = document.createElement('select');
+        styleSelect.className = 'input';
+        styleOptions.forEach(({ id, label }) => {
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = label;
+          styleSelect.appendChild(opt);
+        });
+        if (slot.style && styleOptions.some(opt => opt.id === slot.style)) {
+          styleSelect.value = slot.style;
+        } else if (automation.fallbackStyle) {
+          slot.style = automation.fallbackStyle;
+          styleSelect.value = automation.fallbackStyle;
+        }
+        styleSelect.onchange = () => {
+          slot.style = styleSelect.value || automation.fallbackStyle;
+          notifySettingsChanged();
+        };
+        styleWrap.append(styleLabel, styleSelect);
+
+        const labelWrap = document.createElement('div');
+        labelWrap.className = 'style-auto-field';
+        const labelLabel = document.createElement('label');
+        labelLabel.textContent = 'Label';
+        const labelInput = document.createElement('input');
+        labelInput.className = 'input';
+        labelInput.placeholder = 'z. B. Abend';
+        labelInput.value = slot.label || '';
+        labelInput.oninput = () => {
+          slot.label = labelInput.value.trim();
+          notifySettingsChanged();
+        };
+        labelWrap.append(labelLabel, labelInput);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn sm ghost';
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Entfernen';
+        removeBtn.onclick = () => {
+          automation.timeSlots.splice(index, 1);
+          renderStyleAutomationControls();
+          notifySettingsChanged();
+        };
+
+        row.append(timeWrap, styleWrap, labelWrap, removeBtn);
+        listHost.appendChild(row);
+      });
+    }
+
+    const addBtn = document.getElementById('styleAutoAdd');
+    if (addBtn && !addBtn.dataset.bound) {
+      addBtn.dataset.bound = '1';
+      addBtn.addEventListener('click', () => {
+        const state = ensureStyleAutomationState();
+        const start = state.timeSlots.length ? state.timeSlots[state.timeSlots.length - 1].start : '06:00';
+        state.timeSlots.push({ id: genId('sty_'), start, label: '', style: state.fallbackStyle });
+        state.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+        renderStyleAutomationControls();
+        notifySettingsChanged();
+      });
+    }
+
+    const eventEnabled = document.getElementById('styleEventEnabled');
+    if (eventEnabled) {
+      eventEnabled.checked = automation.eventStyle?.enabled !== false;
+      eventEnabled.onchange = () => {
+        automation.eventStyle.enabled = !!eventEnabled.checked;
+        notifySettingsChanged();
+      };
+    }
+
+    const eventLookahead = document.getElementById('styleEventLookahead');
+    if (eventLookahead) {
+      eventLookahead.value = automation.eventStyle?.lookaheadMinutes ?? 60;
+      eventLookahead.onchange = () => {
+        const next = Number(eventLookahead.value);
+        if (Number.isFinite(next) && next > 0) {
+          automation.eventStyle.lookaheadMinutes = Math.max(1, Math.round(next));
+          notifySettingsChanged();
+        }
+      };
+    }
+
+    const eventStyleSelect = document.getElementById('styleEventStyle');
+    if (eventStyleSelect) {
+      eventStyleSelect.innerHTML = '';
+      const baseOpt = document.createElement('option');
+      baseOpt.value = '';
+      baseOpt.textContent = 'Fallback verwenden';
+      eventStyleSelect.appendChild(baseOpt);
+      styleOptions.forEach(({ id, label }) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = label;
+        eventStyleSelect.appendChild(opt);
+      });
+      const currentStyle = automation.eventStyle?.style && styleOptions.some(opt => opt.id === automation.eventStyle.style)
+        ? automation.eventStyle.style
+        : '';
+      eventStyleSelect.value = currentStyle;
+      eventStyleSelect.onchange = () => {
+        const value = eventStyleSelect.value || '';
+        automation.eventStyle.style = value;
+        notifySettingsChanged();
+      };
+    }
+  };
+
+  const toDatetimeLocal = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const offset = date.getTimezoneOffset();
+    const local = new Date(date.getTime() - offset * 60 * 1000);
+    return local.toISOString().slice(0, 16);
+  };
+
+  const fromDatetimeLocal = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return date.toISOString();
+  };
+
+  const renderExtrasEditor = () => {
+    const extras = ensureExtrasState();
+    const styleSets = (settings.slides?.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
+    const styleOptions = Object.entries(styleSets).map(([id, value]) => ({ id, label: value?.label || id }));
+
+    const wellnessHost = document.getElementById('extrasWellnessList');
+    if (wellnessHost) {
+      wellnessHost.innerHTML = '';
+      extras.wellnessTips.forEach((tip, index) => {
+        const row = document.createElement('div');
+        row.className = 'extras-item';
+
+        const header = document.createElement('div');
+        header.className = 'extras-item-header extras-inline';
+
+        const iconInput = document.createElement('input');
+        iconInput.className = 'input';
+        iconInput.placeholder = 'Emoji/Icon';
+        iconInput.maxLength = 6;
+        iconInput.value = tip.icon || '';
+        iconInput.oninput = () => {
+          tip.icon = iconInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        const titleInput = document.createElement('input');
+        titleInput.className = 'input';
+        titleInput.placeholder = 'Titel';
+        titleInput.value = tip.title || '';
+        titleInput.oninput = () => {
+          tip.title = titleInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        header.append(iconInput, titleInput);
+
+        const body = document.createElement('div');
+        body.className = 'extras-item-body';
+        const textArea = document.createElement('textarea');
+        textArea.className = 'input';
+        textArea.placeholder = 'Beschreibung oder Tipptext';
+        textArea.value = tip.text || '';
+        textArea.oninput = () => {
+          tip.text = textArea.value.trim();
+          notifySettingsChanged();
+        };
+        body.appendChild(textArea);
+
+        const actions = document.createElement('div');
+        actions.className = 'extras-item-actions';
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn sm ghost';
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Entfernen';
+        removeBtn.onclick = () => {
+          extras.wellnessTips.splice(index, 1);
+          renderExtrasEditor();
+          notifySettingsChanged();
+        };
+        actions.appendChild(removeBtn);
+
+        row.append(header, body, actions);
+        wellnessHost.appendChild(row);
+      });
+    }
+
+    const addWellness = document.getElementById('extrasWellnessAdd');
+    if (addWellness && !addWellness.dataset.bound) {
+      addWellness.dataset.bound = '1';
+      addWellness.addEventListener('click', () => {
+        extras.wellnessTips.push({ id: genId('well_'), icon: '', title: '', text: '' });
+        renderExtrasEditor();
+        notifySettingsChanged();
+      });
+    }
+
+    const eventHost = document.getElementById('extrasEventList');
+    if (eventHost) {
+      eventHost.innerHTML = '';
+      extras.eventCountdowns.forEach((event, index) => {
+        const row = document.createElement('div');
+        row.className = 'extras-item';
+
+        const header = document.createElement('div');
+        header.className = 'extras-item-header extras-inline';
+
+        const titleInput = document.createElement('input');
+        titleInput.className = 'input';
+        titleInput.placeholder = 'Eventtitel';
+        titleInput.value = event.title || '';
+        titleInput.oninput = () => {
+          event.title = titleInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        const subtitleInput = document.createElement('input');
+        subtitleInput.className = 'input';
+        subtitleInput.placeholder = 'Untertitel (optional)';
+        subtitleInput.value = event.subtitle || '';
+        subtitleInput.oninput = () => {
+          event.subtitle = subtitleInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        header.append(titleInput, subtitleInput);
+
+        const body = document.createElement('div');
+        body.className = 'extras-item-body';
+
+        const timeRow = document.createElement('div');
+        timeRow.className = 'extras-inline';
+        const timeInput = document.createElement('input');
+        timeInput.type = 'datetime-local';
+        timeInput.className = 'input';
+        timeInput.value = toDatetimeLocal(event.target);
+        timeInput.onchange = () => {
+          event.target = fromDatetimeLocal(timeInput.value);
+          notifySettingsChanged();
+        };
+
+        const styleSelect = document.createElement('select');
+        styleSelect.className = 'input';
+        const baseOpt = document.createElement('option');
+        baseOpt.value = '';
+        baseOpt.textContent = 'Style-Automation folgen';
+        styleSelect.appendChild(baseOpt);
+        styleOptions.forEach(({ id, label }) => {
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = label;
+          styleSelect.appendChild(opt);
+        });
+        if (event.style && styleOptions.some(opt => opt.id === event.style)) {
+          styleSelect.value = event.style;
+        }
+        styleSelect.onchange = () => {
+          event.style = styleSelect.value || '';
+          notifySettingsChanged();
+        };
+
+        timeRow.append(timeInput, styleSelect);
+        body.append(timeRow);
+
+        const actions = document.createElement('div');
+        actions.className = 'extras-item-actions';
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn sm ghost';
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Entfernen';
+        removeBtn.onclick = () => {
+          extras.eventCountdowns.splice(index, 1);
+          renderExtrasEditor();
+          notifySettingsChanged();
+        };
+        actions.appendChild(removeBtn);
+
+        row.append(header, body, actions);
+        eventHost.appendChild(row);
+      });
+    }
+
+    const addEventBtn = document.getElementById('extrasEventAdd');
+    if (addEventBtn && !addEventBtn.dataset.bound) {
+      addEventBtn.dataset.bound = '1';
+      addEventBtn.addEventListener('click', () => {
+        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '' });
+        renderExtrasEditor();
+        notifySettingsChanged();
+      });
+    }
+
+    const gastroHost = document.getElementById('extrasGastroList');
+    if (gastroHost) {
+      gastroHost.innerHTML = '';
+      extras.gastronomyHighlights.forEach((entry, index) => {
+        const row = document.createElement('div');
+        row.className = 'extras-item';
+
+        const header = document.createElement('div');
+        header.className = 'extras-item-header extras-inline';
+
+        const iconInput = document.createElement('input');
+        iconInput.className = 'input';
+        iconInput.placeholder = 'Icon (optional)';
+        iconInput.value = entry.icon || '';
+        iconInput.oninput = () => {
+          entry.icon = iconInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        const titleInput = document.createElement('input');
+        titleInput.className = 'input';
+        titleInput.placeholder = 'Titel';
+        titleInput.value = entry.title || '';
+        titleInput.oninput = () => {
+          entry.title = titleInput.value.trim();
+          notifySettingsChanged();
+        };
+
+        header.append(iconInput, titleInput);
+
+        const body = document.createElement('div');
+        body.className = 'extras-item-body';
+
+        const descArea = document.createElement('textarea');
+        descArea.className = 'input';
+        descArea.placeholder = 'Beschreibung';
+        descArea.value = entry.description || '';
+        descArea.oninput = () => {
+          entry.description = descArea.value.trim();
+          notifySettingsChanged();
+        };
+
+        const itemsArea = document.createElement('textarea');
+        itemsArea.className = 'input';
+        itemsArea.placeholder = 'Bullet-Points (jede Zeile ein Punkt)';
+        itemsArea.value = (entry.items || []).join('\n');
+        itemsArea.oninput = () => {
+          entry.items = itemsArea.value.split('\n').map(line => line.trim()).filter(Boolean);
+          notifySettingsChanged();
+        };
+
+        body.append(descArea, itemsArea);
+
+        const actions = document.createElement('div');
+        actions.className = 'extras-item-actions';
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn sm ghost';
+        removeBtn.type = 'button';
+        removeBtn.textContent = 'Entfernen';
+        removeBtn.onclick = () => {
+          extras.gastronomyHighlights.splice(index, 1);
+          renderExtrasEditor();
+          notifySettingsChanged();
+        };
+        actions.appendChild(removeBtn);
+
+        row.append(header, body, actions);
+        gastroHost.appendChild(row);
+      });
+    }
+
+    const addGastroBtn = document.getElementById('extrasGastroAdd');
+    if (addGastroBtn && !addGastroBtn.dataset.bound) {
+      addGastroBtn.dataset.bound = '1';
+      addGastroBtn.addEventListener('click', () => {
+        extras.gastronomyHighlights.push({ id: genId('gas_'), title: '', description: '', icon: '', items: [], textLines: [] });
+        renderExtrasEditor();
+        notifySettingsChanged();
+      });
+    }
+  };
   const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left' } = {}) => {
     const host = document.getElementById(hostId);
     if (!host) return;
@@ -689,6 +1294,44 @@ function renderSlidesBox(){
           disabled: entry.item?.enabled === false,
           statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
         });
+      } else if (entry.kind === 'wellness-tip') {
+        const tipId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
+        if (!tipId) return;
+        const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
+        pushEntry({
+          key: 'wellness:' + tipId,
+          kind: 'wellness-tip',
+          id: tipId,
+          label: icon + (entry.item?.title || 'Wellness-Tipp'),
+          thumb: '',
+          disabled: false,
+          statusText: null
+        });
+      } else if (entry.kind === 'event-countdown') {
+        const eventId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
+        if (!eventId) return;
+        pushEntry({
+          key: 'event:' + eventId,
+          kind: 'event-countdown',
+          id: eventId,
+          label: entry.item?.title || 'Event',
+          thumb: '',
+          disabled: false,
+          statusText: null
+        });
+      } else if (entry.kind === 'gastronomy-highlight') {
+        const gastroId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
+        if (!gastroId) return;
+        const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
+        pushEntry({
+          key: 'gastro:' + gastroId,
+          kind: 'gastronomy-highlight',
+          id: gastroId,
+          label: icon + (entry.item?.title || 'Gastronomie'),
+          thumb: '',
+          disabled: false,
+          statusText: null
+        });
       }
     });
 
@@ -754,6 +1397,15 @@ function renderSlidesBox(){
             break;
           case 'story':
             next.push({ type: 'story', id: entry.id });
+            break;
+          case 'wellness-tip':
+            next.push({ type: 'wellness-tip', id: entry.id });
+            break;
+          case 'event-countdown':
+            next.push({ type: 'event-countdown', id: entry.id });
+            break;
+          case 'gastronomy-highlight':
+            next.push({ type: 'gastronomy-highlight', id: entry.id });
             break;
           default:
             break;
@@ -1083,6 +1735,20 @@ function renderSlidesBox(){
   if (layoutModeSelect) {
     layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
   }
+
+  const layoutProfileSelect = document.getElementById('layoutProfile');
+  if (layoutProfileSelect) {
+    const profile = settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape';
+    layoutProfileSelect.value = profile;
+    layoutProfileSelect.onchange = () => {
+      settings.display = settings.display || {};
+      settings.display.layoutProfile = layoutProfileSelect.value;
+      notifySettingsChanged();
+    };
+  }
+
+  renderStyleAutomationControls();
+  renderExtrasEditor();
 
   // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');
@@ -1529,6 +2195,7 @@ function collectSettings(){
           });
           return out;
         })(),
+        styleAutomation: deepClone(settings.slides?.styleAutomation || {}),
         showOverview: !!document.getElementById('ovShow')?.checked,
         overviewDurationSec: (() => {
         const el = document.getElementById('ovSec') || document.getElementById('ovSecGlobal');
@@ -1582,6 +2249,7 @@ function collectSettings(){
         cutTopPercent:+($('#cutTop').value||28),
         cutBottomPercent:+($('#cutBottom').value||12),
         layoutMode:(document.getElementById('layoutMode')?.value === 'split') ? 'split' : 'single',
+        layoutProfile: document.getElementById('layoutProfile')?.value || settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape',
         pages:{
           left:{
             ...(((settings.display||{}).pages||{}).left||{}),
@@ -1600,6 +2268,7 @@ function collectSettings(){
         }
       },
       footnotes: settings.footnotes,
+      extras: deepClone(settings.extras || {}),
       interstitials: (settings.interstitials || []).map(({after, afterRef, ...rest}) => rest),
       presets: settings.presets || {},
       presetAuto: !!document.getElementById('presetAuto')?.checked
@@ -1810,15 +2479,28 @@ async function createDevicesPane(){
           const offline = !!device.offline;
           const useOverrides = !!device.useOverrides;
           const modeLabelText = useOverrides ? 'Individuell' : 'Global';
+          const secondsAgo = (nowSeconds && lastSeenAt) ? Math.max(0, nowSeconds - lastSeenAt) : null;
+          const heartbeatState = (() => {
+            if (!Number.isFinite(secondsAgo)) return 'unknown';
+            if (secondsAgo <= OFFLINE_AFTER_MIN * 60) return 'ok';
+            if (secondsAgo <= OFFLINE_AFTER_MIN * 180) return 'warn';
+            return 'crit';
+          })();
+          const relativeText = (() => {
+            if (!Number.isFinite(secondsAgo)) return 'unbekannt';
+            if (secondsAgo < 45) return 'vor Sekunden';
+            if (secondsAgo < 3600) return `vor ${Math.round(secondsAgo / 60)} min`;
+            if (secondsAgo < 86400) return `vor ${Math.round(secondsAgo / 3600)} h`;
+            return `vor ${Math.round(secondsAgo / 86400)} Tagen`;
+          })();
+          const heartbeatHtml = `<div class="dev-heartbeat" data-state="${heartbeatState}"><span class="dev-heartbeat-dot"></span><span>${offline ? 'offline' : 'online'}</span>${Number.isFinite(secondsAgo) && lastSeenAt ? `<time datetime="${new Date(lastSeenAt * 1000).toISOString()}">${relativeText}</time>` : ''}</div>`;
 
           const row = document.createElement('tr');
           if (currentDeviceCtx === device.id) row.classList.add('current');
           if (useOverrides) row.classList.add('ind');
           if (offline) row.classList.add('offline');
           const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seenText}</small>` : '';
-          const statusCell = offline
-            ? `<td class="status offline">offline${lastSeenHtml}</td>`
-            : `<td class="status online">online${lastSeenHtml}</td>`;
+          const statusCell = `<td class="status ${offline ? 'offline' : 'online'}">${heartbeatHtml}${lastSeenHtml}</td>`;
 
           row.innerHTML = `
             <td><span class="dev-name" title="${device.id}">${device.name || device.id}</span></td>

@@ -141,6 +141,66 @@
             <input id="presetAuto" type="checkbox">
           </div>
           <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+          <div class="divider"></div>
+          <div class="kv">
+            <label>Style-Automation aktiv</label>
+            <input id="styleAutoEnabled" type="checkbox">
+          </div>
+          <div class="kv">
+            <label>Fallback-Stil</label>
+            <select id="styleAutoFallback" class="input"></select>
+          </div>
+          <div class="style-auto-list" id="styleAutoList"></div>
+          <div class="row style-auto-actions">
+            <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
+          </div>
+          <div class="fieldset" id="styleAutoEventBox">
+            <div class="legend">Event-Trigger</div>
+            <div class="kv">
+              <label>Aktiv</label>
+              <input id="styleEventEnabled" type="checkbox">
+            </div>
+            <div class="kv">
+              <label>Vorwarnzeit (Minuten)</label>
+              <input id="styleEventLookahead" class="input num3" type="number" min="5" max="360" step="5">
+            </div>
+            <div class="kv">
+              <label>Style für Events</label>
+              <select id="styleEventStyle" class="input"></select>
+            </div>
+            <div class="help">Liegt ein Countdown-Event innerhalb des Vorwarnfensters, wird automatisch dieser Stil aktiviert.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card" id="extraContentCard">
+        <div class="settings-card-head">
+          <div class="settings-card-title">Zusatzinhalte</div>
+          <p class="settings-card-description">Pflege Wellness-Tipps, Event-Countdowns und Gastronomiehinweise für linke oder rechte Bildschirmhälfte.</p>
+        </div>
+        <div class="settings-card-body extras-card-body">
+          <div class="extras-group" id="extrasWellness">
+            <div class="extras-group-head">
+              <div class="extras-group-title">Wellness-Tipps</div>
+              <button class="btn sm" id="extrasWellnessAdd">Tipp hinzufügen</button>
+            </div>
+            <div class="extras-group-list" id="extrasWellnessList"></div>
+          </div>
+          <div class="extras-group" id="extrasEvents">
+            <div class="extras-group-head">
+              <div class="extras-group-title">Event-Countdowns</div>
+              <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
+            </div>
+            <div class="extras-group-list" id="extrasEventList"></div>
+            <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
+          </div>
+          <div class="extras-group" id="extrasGastro">
+            <div class="extras-group-head">
+              <div class="extras-group-title">Gastronomie-Highlights</div>
+              <button class="btn sm" id="extrasGastroAdd">Highlight hinzufügen</button>
+            </div>
+            <div class="extras-group-list" id="extrasGastroList"></div>
+          </div>
         </div>
       </div>
 
@@ -324,6 +384,16 @@
                   <select id="layoutMode" class="input">
                     <option value="single">Einspaltig</option>
                     <option value="split">Zweispaltig</option>
+                  </select>
+                </div>
+                <div class="kv">
+                  <label>Layout-Profil</label>
+                  <select id="layoutProfile" class="input">
+                    <option value="landscape">Standard (16:9)</option>
+                    <option value="portrait">Portrait – Einzel</option>
+                    <option value="portrait-split">Portrait – geteilte Bereiche</option>
+                    <option value="triple">Triple-Column</option>
+                    <option value="asymmetric">Asymmetrisch</option>
                   </select>
                 </div>
                 <div class="layout-display-columns">
