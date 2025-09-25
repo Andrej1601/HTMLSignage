@@ -105,6 +105,126 @@ const DEFAULT_STYLE_SETS = {
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
     }
+  },
+  sunset:{
+    label:'Sunset Glow',
+    theme:{
+      bg:'#2B1A3F', fg:'#FFE7D9', accent:'#FF914D',
+      gridBorder:'#3D2556',
+      gridTable:'#3D2556', gridTableW:2,
+      cellBg:'#3F285B', boxFg:'#FFE7D9',
+      headRowBg:'#341F4B', headRowFg:'#FFE7D9',
+      timeColBg:'#2F1C46', timeZebra1:'#3B2555', timeZebra2:'#27163B',
+      zebra1:'#462C63', zebra2:'#2E1A42',
+      cornerBg:'#2F1C46', cornerFg:'#FFE7D9',
+      tileBorder:'#FF914D', tileBorderW:3,
+      chipBorder:'#FF914D', chipBorderW:2,
+      flame:'#FFB347',
+      saunaColor:'#FF914D'
+    },
+    fonts:{
+      family:"'Poppins', 'Montserrat', system-ui, sans-serif",
+      tileTextScale:0.84,
+      tileWeight:600,
+      chipHeight:1.05,
+      tileMetaScale:DEFAULT_FONTS.tileMetaScale,
+      overviewTimeWidthCh:DEFAULT_FONTS.overviewTimeWidthCh,
+      overviewShowFlames:true,
+      chipOverflowMode:'scale',
+      flamePct:58,
+      flameGapScale:0.15
+    },
+    slides:{
+      infobadgeColor:'#FF914D',
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+      badgeScale:1,
+      badgeDescriptionScale:1,
+      tilePaddingScale:0.78,
+      customBadgeEmojis:[],
+      tileFlameSizeScale:1.05,
+      tileFlameGapScale:1,
+      saunaTitleMaxWidthPercent:100
+    }
+  },
+  midnight:{
+    label:'Midnight Calm',
+    theme:{
+      bg:'#050913', fg:'#E6F1FF', accent:'#4F7BFF',
+      gridBorder:'#0F1A33',
+      gridTable:'#101B37', gridTableW:2,
+      cellBg:'#0E172C', boxFg:'#E6F1FF',
+      headRowBg:'#0B1324', headRowFg:'#E6F1FF',
+      timeColBg:'#0B1324', timeZebra1:'#101A31', timeZebra2:'#09101F',
+      zebra1:'#0F1B33', zebra2:'#091327',
+      cornerBg:'#0B1324', cornerFg:'#E6F1FF',
+      tileBorder:'#4F7BFF', tileBorderW:3,
+      chipBorder:'#4F7BFF', chipBorderW:2,
+      flame:'#7CB8FF',
+      saunaColor:'#4F7BFF'
+    },
+    fonts:{
+      family:"'IBM Plex Sans', system-ui, sans-serif",
+      tileTextScale:0.88,
+      tileWeight:500,
+      chipHeight:1,
+      tileMetaScale:0.95,
+      overviewTimeWidthCh:DEFAULT_FONTS.overviewTimeWidthCh,
+      overviewShowFlames:false,
+      chipOverflowMode:'scale',
+      flamePct:64,
+      flameGapScale:0.18
+    },
+    slides:{
+      infobadgeColor:'#4F7BFF',
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+      badgeScale:1,
+      badgeDescriptionScale:1,
+      tilePaddingScale:0.72,
+      customBadgeEmojis:[],
+      tileFlameSizeScale:0.92,
+      tileFlameGapScale:1,
+      saunaTitleMaxWidthPercent:90
+    }
+  },
+  celebration:{
+    label:'Event Highlight',
+    theme:{
+      bg:'#1A1A1A', fg:'#FDF6E3', accent:'#FFCD3C',
+      gridBorder:'#2A2A2A',
+      gridTable:'#2A2A2A', gridTableW:3,
+      cellBg:'#222222', boxFg:'#FDF6E3',
+      headRowBg:'#101010', headRowFg:'#FFCD3C',
+      timeColBg:'#101010', timeZebra1:'#1C1C1C', timeZebra2:'#121212',
+      zebra1:'#252525', zebra2:'#1B1B1B',
+      cornerBg:'#101010', cornerFg:'#FFCD3C',
+      tileBorder:'#FFCD3C', tileBorderW:4,
+      chipBorder:'#FFCD3C', chipBorderW:3,
+      flame:'#FF6B3C',
+      saunaColor:'#FFCD3C'
+    },
+    fonts:{
+      family:"'Source Sans Pro', system-ui, sans-serif",
+      tileTextScale:0.9,
+      tileWeight:700,
+      chipHeight:1.12,
+      tileMetaScale:1,
+      overviewTimeWidthCh:11,
+      overviewShowFlames:true,
+      chipOverflowMode:'scroll',
+      flamePct:70,
+      flameGapScale:0.2
+    },
+    slides:{
+      infobadgeColor:'#FFCD3C',
+      badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
+      badgeScale:1.05,
+      badgeDescriptionScale:1.05,
+      tilePaddingScale:0.82,
+      customBadgeEmojis:['🎉','✨','🎶'],
+      tileFlameSizeScale:1.1,
+      tileFlameGapScale:1.05,
+      saunaTitleMaxWidthPercent:100
+    }
   }
 };
 
@@ -137,7 +257,21 @@ export const DEFAULTS = {
     heroTimelineMaxEntries:null,
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
-    activeStyleSet:'classic'
+    activeStyleSet:'classic',
+    styleAutomation:{
+      enabled:true,
+      fallbackStyle:'classic',
+      timeSlots:[
+        { id:'morning', label:'Vormittag', start:'06:00', style:'classic' },
+        { id:'evening', label:'Abend', start:'18:00', style:'sunset' },
+        { id:'night', label:'Nacht', start:'21:30', style:'midnight' }
+      ],
+      eventStyle:{
+        enabled:true,
+        lookaheadMinutes:90,
+        style:'celebration'
+      }
+    }
   },
   display:{
     fit:'auto',
@@ -147,17 +281,18 @@ export const DEFAULTS = {
     cutTopPercent:28,
     cutBottomPercent:12,
     layoutMode:'single',
+    layoutProfile:'landscape',
     pages:{
       left:{
         source:'master',
         timerSec:null,
-        contentTypes:['overview','sauna','hero-timeline','story','image','video','url'],
+        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','image','video','url'],
         playlist:[]
       },
       right:{
         source:'media',
         timerSec:null,
-        contentTypes:['image','video','url'],
+        contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','image','video','url'],
         playlist:[]
       }
     }
@@ -167,7 +302,19 @@ export const DEFAULTS = {
   fonts:{ ...DEFAULT_FONTS },
   h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
   assets:{ flameImage:'/assets/img/flame_test.svg' },
-  footnotes:[ { id:'star', label:'*', text:'Nur am Fr und Sa' } ]
+  footnotes:[ { id:'star', label:'*', text:'Nur am Fr und Sa' } ],
+  extras:{
+    wellnessTips:[
+      { id:'wellness_hydrate', icon:'💧', title:'Hydration', text:'Vor und nach dem Saunagang ausreichend Wasser trinken.' },
+      { id:'wellness_cooldown', icon:'❄️', title:'Abkühlen', text:'Zwischen den Gängen an die frische Luft gehen und kalt abduschen.' }
+    ],
+    eventCountdowns:[
+      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00:00+01:00' }
+    ],
+    gastronomyHighlights:[
+      { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.' }
+    ]
+  }
 };
 
 // Wochentage + Labels (+ „Opt“ als manueller Tag)

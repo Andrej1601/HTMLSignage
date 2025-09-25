@@ -1833,6 +1833,17 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     item,
     key: item?.id != null ? String(item.id) : 'story_idx_' + i
   }));
+  const extrasRaw = (settings.extras && typeof settings.extras === 'object') ? settings.extras : {};
+  const wellness = Array.isArray(extrasRaw.wellnessTips)
+    ? extrasRaw.wellnessTips.map((item, idx) => ({ kind: 'wellness-tip', item, key: item?.id != null ? String(item.id) : 'well_' + idx }))
+    : [];
+  const events = Array.isArray(extrasRaw.eventCountdowns)
+    ? extrasRaw.eventCountdowns.map((item, idx) => ({ kind: 'event-countdown', item, key: item?.id != null ? String(item.id) : 'evt_' + idx }))
+    : [];
+  const gastronomy = Array.isArray(extrasRaw.gastronomyHighlights)
+    ? extrasRaw.gastronomyHighlights.map((item, idx) => ({ kind: 'gastronomy-highlight', item, key: item?.id != null ? String(item.id) : 'gas_' + idx }))
+    : [];
+  const extrasCombined = wellness.concat(events, gastronomy);
   const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
 
   let combined = [];
@@ -1853,16 +1864,18 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
         mapStory.delete(String(o.id));
       }
     }
-    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()), Array.from(mapStory.values()));
+    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()), Array.from(mapStory.values()), extrasCombined);
     if (normalizeSortOrder){
-      settings.slides.sortOrder = combined.map(e => {
-        if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
-        if (e.kind === 'media') return { type: 'media', id: e.item.id };
-        return { type: 'story', id: e.item?.id ?? e.key };
-      });
+      settings.slides.sortOrder = combined
+        .filter(e => e && (e.kind === 'sauna' || e.kind === 'media' || e.kind === 'story'))
+        .map(e => {
+          if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
+          if (e.kind === 'media') return { type: 'media', id: e.item.id };
+          return { type: 'story', id: e.item?.id ?? e.key };
+        });
     }
   } else {
-    combined = saunas.concat(media, stories);
+    combined = saunas.concat(media, stories, extrasCombined);
   }
 
   return {
@@ -1870,6 +1883,11 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     saunas,
     media,
     stories,
+    extras: {
+      wellness,
+      events,
+      gastronomy
+    },
     hiddenSaunas
   };
 }
@@ -1926,6 +1944,29 @@ export function renderSlideOrderView(){
       img.src = entry.item.thumb || entry.item.url || '';
       img.alt = entry.item.name || '';
       tile.appendChild(img);
+    } else if (entry.kind === 'wellness-tip') {
+      tile.dataset.extraId = entry.item?.id || entry.key || '';
+      const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
+      title.textContent = icon + (entry.item?.title || 'Wellness-Tipp');
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+    } else if (entry.kind === 'event-countdown') {
+      tile.dataset.extraId = entry.item?.id || entry.key || '';
+      title.textContent = entry.item?.title || 'Event';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      if (entry.item?.target) {
+        const info = document.createElement('div');
+        info.className = 'tile-meta';
+        info.textContent = new Date(entry.item.target).toLocaleString('de-DE');
+        tile.appendChild(info);
+      }
+    } else if (entry.kind === 'gastronomy-highlight') {
+      tile.dataset.extraId = entry.item?.id || entry.key || '';
+      const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
+      title.textContent = icon + (entry.item?.title || 'Gastronomie');
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
     } else {
       tile.dataset.storyId = entry.item?.id || entry.key || '';
       title.textContent = entry.item?.title || 'Story-Slide';

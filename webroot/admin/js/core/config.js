@@ -25,6 +25,9 @@ export const PAGE_CONTENT_TYPES = [
   ['sauna', 'Saunen'],
   ['hero-timeline', 'Hero-Timeline'],
   ['story', 'Erklärungen'],
+  ['wellness-tip', 'Wellness-Tipps'],
+  ['event-countdown', 'Event-Countdown'],
+  ['gastronomy-highlight', 'Gastronomie'],
   ['image', 'Bilder'],
   ['video', 'Videos'],
   ['url', 'Webseiten']
@@ -53,6 +56,12 @@ export function playlistKeyFromSanitizedEntry(entry) {
       return entry.id != null ? 'story:' + String(entry.id) : null;
     case 'media':
       return entry.id != null ? 'media:' + String(entry.id) : null;
+    case 'wellness-tip':
+      return entry.id != null ? 'wellness:' + String(entry.id) : null;
+    case 'event-countdown':
+      return entry.id != null ? 'event:' + String(entry.id) : null;
+    case 'gastronomy-highlight':
+      return entry.id != null ? 'gastro:' + String(entry.id) : null;
     default:
       return null;
   }
@@ -80,6 +89,18 @@ function playlistEntryKey(entry) {
     case 'media': {
       const rawId = entry.id ?? entry.mediaId ?? entry.__id ?? entry.slug;
       return rawId != null ? 'media:' + String(rawId) : null;
+    }
+    case 'wellness-tip': {
+      const rawId = entry.id ?? entry.tipId;
+      return rawId != null ? 'wellness:' + String(rawId) : null;
+    }
+    case 'event-countdown': {
+      const rawId = entry.id ?? entry.eventId;
+      return rawId != null ? 'event:' + String(rawId) : null;
+    }
+    case 'gastronomy-highlight': {
+      const rawId = entry.id ?? entry.highlightId;
+      return rawId != null ? 'gastro:' + String(rawId) : null;
     }
     default:
       return null;
@@ -115,6 +136,24 @@ export function sanitizePagePlaylist(list = []) {
       case 'media':
         if (rest) {
           normalized.push({ type: 'media', id: rest });
+          seen.add(key);
+        }
+        break;
+      case 'wellness':
+        if (rest) {
+          normalized.push({ type: 'wellness-tip', id: rest });
+          seen.add(key);
+        }
+        break;
+      case 'event':
+        if (rest) {
+          normalized.push({ type: 'event-countdown', id: rest });
+          seen.add(key);
+        }
+        break;
+      case 'gastro':
+        if (rest) {
+          normalized.push({ type: 'gastronomy-highlight', id: rest });
           seen.add(key);
         }
         break;
@@ -166,6 +205,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.h2 = { ...DEFAULTS.h2, ...(src.h2 || {}) };
   src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
+  src.extras = sanitizeExtras(src.extras, DEFAULTS.extras);
   src.interstitials = Array.isArray(src.interstitials)
     ? src.interstitials.map((it) => {
         const next = {
@@ -209,10 +249,15 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
 
   const pagesRaw = src.display?.pages || {};
   src.display.layoutMode = (src.display.layoutMode === 'split') ? 'split' : 'single';
+  const allowedProfiles = new Set(['landscape','portrait','portrait-split','triple','asymmetric']);
+  const rawProfile = typeof src.display.layoutProfile === 'string' ? src.display.layoutProfile : 'landscape';
+  src.display.layoutProfile = allowedProfiles.has(rawProfile) ? rawProfile : 'landscape';
   src.display.pages = {
     left: sanitizePageConfig(pagesRaw.left, defaultDisplayPages.left),
     right: sanitizePageConfig(pagesRaw.right, defaultDisplayPages.right)
   };
+
+  sanitizeStyleAutomation(src);
 
   const hasBadgeArray = Array.isArray(src.slides?.badgeLibrary);
   src.slides.badgeLibrary = sanitizeBadgeLibrary(src.slides.badgeLibrary, {
@@ -239,4 +284,134 @@ export function sanitizeScheduleForCompare(src) {
 
 export function sanitizeSettingsForCompare(src) {
   return normalizeSettings(src || {}, { assignMissingIds: false });
+}
+
+function sanitizeExtras(extras, defaults){
+  const fallback = (defaults && typeof defaults === 'object') ? defaults : {};
+  const src = (extras && typeof extras === 'object') ? extras : {};
+  return {
+    wellnessTips: sanitizeWellnessTips(src.wellnessTips, fallback.wellnessTips),
+    eventCountdowns: sanitizeEventCountdowns(src.eventCountdowns, fallback.eventCountdowns),
+    gastronomyHighlights: sanitizeGastronomyHighlights(src.gastronomyHighlights, fallback.gastronomyHighlights)
+  };
+}
+
+function sanitizeWellnessTips(list, fallback){
+  const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
+  const normalized = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = entry.id != null ? String(entry.id).trim() : '';
+    if (!id) id = genId('well_');
+    if (seen.has(id)) return;
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    normalized.push({ id, icon, title, text });
+    seen.add(id);
+  });
+  return normalized;
+}
+
+function sanitizeEventCountdowns(list, fallback){
+  const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
+  const normalized = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = entry.id != null ? String(entry.id).trim() : '';
+    if (!id) id = genId('evt_');
+    if (seen.has(id)) return;
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+    const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
+    const target = rawTarget || '';
+    const style = typeof entry.style === 'string' ? entry.style.trim() : '';
+    normalized.push({ id, title, subtitle, target, style });
+    seen.add(id);
+  });
+  return normalized;
+}
+
+function sanitizeGastronomyHighlights(list, fallback){
+  const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
+  const normalized = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = entry.id != null ? String(entry.id).trim() : '';
+    if (!id) id = genId('gas_');
+    if (seen.has(id)) return;
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const description = typeof entry.description === 'string' ? entry.description.trim() : '';
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const details = Array.isArray(entry.items)
+      ? entry.items.map((it) => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+      : [];
+    const textList = Array.isArray(entry.textLines)
+      ? entry.textLines.map((it) => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+      : [];
+    normalized.push({ id, title, description, icon, items: details, textLines: textList });
+    seen.add(id);
+  });
+  return normalized;
+}
+
+function normalizeTimeString(raw){
+  if (typeof raw !== 'string') return null;
+  const match = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(raw);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  let minute = Number(match[2] ?? '0');
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  hour = Math.max(0, Math.min(23, hour));
+  minute = Math.max(0, Math.min(59, minute));
+  return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
+
+function sanitizeStyleAutomation(settings){
+  const slides = settings?.slides || {};
+  const styleSets = slides.styleSets && typeof slides.styleSets === 'object' ? slides.styleSets : {};
+  const availableStyles = new Set(Object.keys(styleSets));
+  const defaults = DEFAULTS.slides?.styleAutomation || {};
+  const raw = slides.styleAutomation && typeof slides.styleAutomation === 'object'
+    ? slides.styleAutomation
+    : {};
+
+  const normalized = {
+    enabled: raw.enabled !== false,
+    fallbackStyle: availableStyles.has(raw.fallbackStyle)
+      ? raw.fallbackStyle
+      : (availableStyles.has(defaults.fallbackStyle) ? defaults.fallbackStyle : Array.from(availableStyles)[0] || ''),
+    timeSlots: [],
+    eventStyle: {
+      enabled: raw.eventStyle?.enabled !== false && defaults?.eventStyle?.enabled !== false,
+      lookaheadMinutes: Number.isFinite(+raw.eventStyle?.lookaheadMinutes)
+        ? Math.max(1, Math.round(+raw.eventStyle.lookaheadMinutes))
+        : (defaults.eventStyle?.lookaheadMinutes ?? 60),
+      style: availableStyles.has(raw.eventStyle?.style)
+        ? raw.eventStyle.style
+        : (availableStyles.has(defaults.eventStyle?.style) ? defaults.eventStyle.style : '')
+    }
+  };
+
+  const slotSource = Array.isArray(raw.timeSlots) && raw.timeSlots.length
+    ? raw.timeSlots
+    : (Array.isArray(defaults.timeSlots) ? defaults.timeSlots : []);
+  const seen = new Set();
+  slotSource.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const id = entry.id ? String(entry.id).trim() : genId('style_');
+    if (seen.has(id)) return;
+    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    const style = availableStyles.has(entry.style) ? entry.style : normalized.fallbackStyle;
+    const start = normalizeTimeString(entry.start);
+    if (!start) return;
+    normalized.timeSlots.push({ id, label, start, style });
+    seen.add(id);
+  });
+  normalized.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+  slides.styleAutomation = normalized;
+  return normalized;
 }

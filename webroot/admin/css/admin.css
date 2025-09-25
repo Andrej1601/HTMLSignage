@@ -381,6 +381,28 @@ body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
 .settings-card-body .kv{ margin-bottom:0; }
 .settings-card-body .help{ margin:0; }
 .settings-card-body .fieldset{ margin:6px 0; }
+.settings-card-body .divider{ height:1px; background:color-mix(in srgb, var(--border) 85%, transparent); margin:4px 0; border-radius:1px; }
+.style-auto-list{ display:flex; flex-direction:column; gap:8px; }
+.style-auto-slot{ display:grid; grid-template-columns:minmax(0,120px) minmax(0,150px) minmax(0,1fr) auto; gap:8px; align-items:center; padding:10px 12px; border:1px solid color-mix(in srgb, var(--border) 85%, var(--fg) 5%); border-radius:12px; background:color-mix(in srgb, var(--panel) 92%, var(--fg) 4%); }
+.style-auto-slot label{ font-size:12px; font-weight:600; color:var(--muted); }
+.style-auto-slot .style-auto-field{ display:flex; flex-direction:column; gap:4px; }
+.style-auto-slot button{ align-self:flex-start; }
+.style-auto-actions{ justify-content:flex-start; }
+#styleAutoEventBox{ gap:10px; background:color-mix(in srgb, var(--panel) 96%, var(--fg) 4%); border:1px dashed color-mix(in srgb, var(--border) 70%, var(--fg) 8%); }
+.extras-card-body{ display:flex; flex-direction:column; gap:14px; }
+.extras-group{ display:flex; flex-direction:column; gap:10px; padding:12px; border:1px dashed color-mix(in srgb, var(--border) 70%, var(--fg) 6%); border-radius:14px; background:color-mix(in srgb, var(--panel) 94%, var(--fg) 3%); }
+.extras-group-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.extras-group-title{ font-weight:700; font-size:13px; letter-spacing:.01em; }
+.extras-group-list{ display:flex; flex-direction:column; gap:10px; }
+.extras-item{ border:1px solid color-mix(in srgb, var(--border) 80%, var(--fg) 6%); border-radius:12px; background:color-mix(in srgb, var(--panel) 96%, var(--fg) 2%); padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
+.extras-item-header{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.extras-item-header .input{ flex:1 1 160px; min-width:120px; }
+.extras-item-body{ display:flex; flex-direction:column; gap:8px; }
+.extras-item textarea{ min-height:72px; resize:vertical; }
+.extras-item-actions{ display:flex; justify-content:flex-end; }
+.extras-inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.extras-inline .input{ flex:1 1 160px; min-width:120px; }
+.extras-item small.help{ color:var(--muted); font-size:12px; }
 .content > details.ac.sub{ margin-top:12px; }
 .card .content, .content{ padding:12px 14px; }
 summary{
@@ -912,9 +934,16 @@ body.device-mode #devPairedList tr.selected{
   #devPairedList td{ flex:0 1 auto; }
   #devPairedList td:first-child{ flex:1 1 220px; font-weight:700; min-width:180px; }
   #devPairedList td.status{ margin-left:auto; font-weight:700; }
-  #devPairedList td.status.offline,
-  #devPairedList td.status.online{ order:99; flex-basis:100%; margin-left:0; }
-  #devPairedList td.status small{ display:block; }
+#devPairedList td.status.offline,
+#devPairedList td.status.online{ order:99; flex-basis:100%; margin-left:0; }
+#devPairedList td.status small{ display:block; }
+#devPairedList .dev-heartbeat{ display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+#devPairedList .dev-heartbeat .dev-heartbeat-dot{ width:10px; height:10px; border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,.08); }
+#devPairedList .dev-heartbeat[data-state="ok"] .dev-heartbeat-dot{ background:#10B981; box-shadow:0 0 0 3px rgba(16,185,129,.22); }
+#devPairedList .dev-heartbeat[data-state="warn"] .dev-heartbeat-dot{ background:#F59E0B; box-shadow:0 0 0 3px rgba(245,158,11,.26); }
+#devPairedList .dev-heartbeat[data-state="crit"] .dev-heartbeat-dot{ background:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,.26); }
+#devPairedList .dev-heartbeat[data-state="unknown"] .dev-heartbeat-dot{ background:#9CA3AF; box-shadow:0 0 0 3px rgba(156,163,175,.22); }
+#devPairedList .dev-heartbeat time{ font-size:12px; font-weight:500; color:var(--muted); }
   #devPairedList tr.ind{ border-left:none; border-inline-start:4px solid var(--btn-accent); padding-left:8px; }
   body.device-mode #devPairedList tr.ind{ border-inline-start-color:var(--btn-primary); }
   #devPairedList tr.selected{ outline-offset:2px; }

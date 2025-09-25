@@ -33,6 +33,30 @@
   let heartbeatTimer = null;
   let pollTimer = null;
   let badgeLookupCache = null;
+  let styleAutomationTimer = null;
+  const STYLE_THEME_KEYS = [
+    'bg','fg','accent','gridBorder','gridTable','gridTableW','cellBg','boxFg','headRowBg','headRowFg',
+    'timeColBg','timeZebra1','timeZebra2','zebra1','zebra2','cornerBg','cornerFg','tileBorder','tileBorderW',
+    'chipBorder','chipBorderW','flame','saunaColor'
+  ];
+  const STYLE_FONT_KEYS = [
+    'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+    'tileMetaScale','overviewTimeWidthCh','overviewShowFlames','overviewTitleScale','overviewHeadScale',
+    'overviewCellScale','h1Scale','h2Scale'
+  ];
+  const STYLE_SLIDE_KEYS = [
+    'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
+    'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
+    'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix','heroTimelineItemMs',
+    'heroTimelineItemDelayMs','heroTimelineFillMs','heroTimelineDelayMs','tileEnterMs','tileStaggerMs','showSaunaFlames'
+  ];
+  const styleAutomationState = {
+    baseTheme: null,
+    baseFonts: null,
+    baseSlides: null,
+    activeStyle: null
+  };
+  const LAYOUT_PROFILES = new Set(['landscape', 'portrait', 'portrait-split', 'triple', 'asymmetric']);
   const displayListeners = {
     resizeHandler: null,
     resizeObserver: null,
@@ -78,6 +102,7 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
+    stopStyleAutomationTimer();
     cleanupDisplayListeners();
   });
 
@@ -249,6 +274,33 @@
     };
   }
 
+  function deepClone(value) {
+    if (value == null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(item => deepClone(item));
+    const cloned = {};
+    for (const [key, val] of Object.entries(value)) {
+      cloned[key] = deepClone(val);
+    }
+    return cloned;
+  }
+
+  function cloneSubset(src = {}, keys = []) {
+    const out = {};
+    keys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(src, key)) {
+        out[key] = deepClone(src[key]);
+      }
+    });
+    return out;
+  }
+
+  function assignSubset(target = {}, subset = {}) {
+    Object.entries(subset || {}).forEach(([key, value]) => {
+      target[key] = deepClone(value);
+    });
+    return target;
+  }
+
   function sanitizeBadgeLibrary(list){
     if (!Array.isArray(list)) return [];
     const seen = new Set();
@@ -324,10 +376,15 @@
     settings = sanitizeSettingsPayload(nextSettings);
     badgeLookupCache = null;
 
+    snapshotStyleAutomationBase();
+    stopStyleAutomationTimer();
+    applyStyleAutomation();
+
     applyTheme();
     applyDisplay();
     maybeApplyPreset();
     refreshStageQueues({ resetIndex, autoplay });
+    startStyleAutomationTimer();
 
     const preloadPromise = preloadSlideImages();
     if (waitForPreload) {
@@ -376,6 +433,173 @@
     if (preset && preset.saunas && Array.isArray(preset.rows)) {
       schedule = preset; // gleiche Struktur wie schedule.json erwartet
     }
+  }
+
+  function snapshotStyleAutomationBase() {
+    styleAutomationState.baseTheme = cloneSubset(settings?.theme || {}, STYLE_THEME_KEYS);
+    styleAutomationState.baseFonts = cloneSubset(settings?.fonts || {}, STYLE_FONT_KEYS);
+    styleAutomationState.baseSlides = cloneSubset(settings?.slides || {}, STYLE_SLIDE_KEYS);
+    styleAutomationState.activeStyle = settings?.slides?.activeStyleSet || null;
+  }
+
+  function getStyleSets() {
+    const raw = settings?.slides?.styleSets;
+    return (raw && typeof raw === 'object') ? raw : {};
+  }
+
+  function getAutomationConfig() {
+    const cfg = settings?.slides?.styleAutomation;
+    return (cfg && typeof cfg === 'object') ? cfg : null;
+  }
+
+  function resolveTimeSlotStyle(styleSets, automation) {
+    if (!automation || automation.enabled === false) return null;
+    const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
+    if (!slots.length) return null;
+    const valid = [];
+    slots.forEach((slot) => {
+      if (!slot || typeof slot !== 'object') return;
+      const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
+      if (!styleKey) return;
+      const minutes = parseHM(slot.start);
+      if (minutes === null) return;
+      valid.push({ minutes, style: styleKey });
+    });
+    if (!valid.length) return null;
+    valid.sort((a, b) => a.minutes - b.minutes);
+    const current = nowMinutes();
+    let selected = null;
+    for (const entry of valid) {
+      if (entry.minutes <= current) selected = entry;
+    }
+    if (!selected) {
+      selected = valid[valid.length - 1];
+    }
+    return selected ? selected.style : null;
+  }
+
+  function resolveEventStyle(styleSets, automation) {
+    if (!automation || automation.enabled === false) return null;
+    const eventCfg = automation.eventStyle || {};
+    if (eventCfg.enabled === false) return null;
+    const lookaheadRaw = Number(eventCfg.lookaheadMinutes);
+    const lookahead = Number.isFinite(lookaheadRaw) && lookaheadRaw > 0
+      ? Math.max(1, Math.round(lookaheadRaw))
+      : 60;
+    const events = Array.isArray(settings?.extras?.eventCountdowns)
+      ? settings.extras.eventCountdowns
+      : [];
+    const now = Date.now();
+    let best = null;
+    events.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
+      if (!rawTarget) return;
+      const targetDate = new Date(rawTarget);
+      if (!targetDate || Number.isNaN(targetDate.getTime())) return;
+      const diffMs = targetDate.getTime() - now;
+      if (diffMs < 0) return;
+      const diffMinutes = diffMs / 60000;
+      if (diffMinutes > lookahead) return;
+      if (!best || diffMs < best.diffMs) {
+        best = { diffMs, entry };
+      }
+    });
+    if (!best) return null;
+    const preferred = best.entry.style && styleSets[best.entry.style] ? best.entry.style : null;
+    const fallback = eventCfg.style && styleSets[eventCfg.style] ? eventCfg.style : null;
+    const style = preferred || fallback;
+    if (!style) return null;
+    return { style, event: best.entry };
+  }
+
+  function resolveAutomationStyle() {
+    const styleSets = getStyleSets();
+    const availableIds = Object.keys(styleSets);
+    if (!availableIds.length) return { style: null, reason: 'none' };
+    const slidesCfg = settings?.slides || {};
+    const automation = getAutomationConfig();
+    const savedActive = slidesCfg.activeStyleSet && styleSets[slidesCfg.activeStyleSet]
+      ? slidesCfg.activeStyleSet
+      : null;
+    const fallback = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
+      ? automation.fallbackStyle
+      : (savedActive || availableIds[0]);
+    if (!automation || automation.enabled === false) {
+      return { style: fallback, reason: 'disabled' };
+    }
+    const eventStyle = resolveEventStyle(styleSets, automation);
+    if (eventStyle && eventStyle.style) {
+      return { style: eventStyle.style, reason: 'event', event: eventStyle.event };
+    }
+    const slotStyle = resolveTimeSlotStyle(styleSets, automation);
+    if (slotStyle) {
+      return { style: slotStyle, reason: 'time' };
+    }
+    return { style: fallback, reason: 'fallback' };
+  }
+
+  function applyStyleAutomation() {
+    const styleSets = getStyleSets();
+    const availableIds = Object.keys(styleSets);
+    if (!availableIds.length) {
+      styleAutomationState.activeStyle = null;
+      return { changed: false, style: null };
+    }
+
+    if (!styleAutomationState.baseTheme || !styleAutomationState.baseFonts || !styleAutomationState.baseSlides) {
+      snapshotStyleAutomationBase();
+    }
+
+    const { style } = resolveAutomationStyle();
+    const styleId = style && styleSets[style] ? style : availableIds[0];
+    if (!styleId) {
+      styleAutomationState.activeStyle = null;
+      return { changed: false, style: null };
+    }
+
+    if (styleAutomationState.activeStyle === styleId) {
+      return { changed: false, style: styleId };
+    }
+
+    const entry = styleSets[styleId] || {};
+    const themeBase = styleAutomationState.baseTheme || {};
+    const fontsBase = styleAutomationState.baseFonts || {};
+    const slidesBase = styleAutomationState.baseSlides || {};
+
+    const nextTheme = assignSubset({ ...themeBase }, entry.theme || {});
+    const nextFonts = assignSubset({ ...fontsBase }, entry.fonts || {});
+    const nextSlideStyles = assignSubset({ ...deepClone(slidesBase) }, entry.slides || {});
+
+    const mergedTheme = assignSubset({ ...(settings?.theme || {}) }, nextTheme);
+    const mergedFonts = assignSubset({ ...(settings?.fonts || {}) }, nextFonts);
+    const slidesAll = { ...(settings?.slides || {}) };
+    assignSubset(slidesAll, nextSlideStyles);
+    slidesAll.activeStyleSet = styleId;
+    settings.theme = mergedTheme;
+    settings.fonts = mergedFonts;
+    settings.slides = slidesAll;
+    styleAutomationState.activeStyle = styleId;
+    return { changed: true, style: styleId };
+  }
+
+  function stopStyleAutomationTimer() {
+    if (styleAutomationTimer) {
+      clearInterval(styleAutomationTimer);
+      styleAutomationTimer = null;
+    }
+  }
+
+  function startStyleAutomationTimer() {
+    stopStyleAutomationTimer();
+    const tick = () => {
+      const result = applyStyleAutomation();
+      if (result.changed) {
+        applyTheme();
+        runResizeHandlers();
+      }
+    };
+    styleAutomationTimer = setInterval(tick, 60 * 1000);
   }
 
 // -----------DeviceLoader -------
@@ -497,6 +721,25 @@ async function loadDeviceResolved(id){
     const d = settings?.display || {};
     const layoutMode = (d.layoutMode === 'split') ? 'split' : 'single';
     updateLayoutModeAttr(layoutMode);
+    const rawProfile = typeof d.layoutProfile === 'string' ? d.layoutProfile : 'landscape';
+    const layoutProfile = LAYOUT_PROFILES.has(rawProfile) ? rawProfile : 'landscape';
+    updateLayoutProfileAttr(layoutProfile);
+
+    switch (layoutProfile) {
+      case 'portrait':
+        docStyle.setProperty('--stage-gap', 'calc(20px * var(--vwScale))');
+        break;
+      case 'portrait-split':
+        docStyle.setProperty('--stage-gap', 'calc(18px * var(--vwScale))');
+        break;
+      case 'triple':
+      case 'asymmetric':
+        docStyle.setProperty('--stage-gap', 'calc(24px * var(--vwScale))');
+        break;
+      default:
+        docStyle.removeProperty('--stage-gap');
+        break;
+    }
 
     const setPercentProperty = (name, raw) => {
       const value = toFiniteNumber(raw);
@@ -726,6 +969,84 @@ async function loadDeviceResolved(id){
   }
 
   // ---------- Slide queue ----------
+  function collectWellnessTips() {
+    const list = Array.isArray(settings?.extras?.wellnessTips) ? settings.extras.wellnessTips : [];
+    const normalized = [];
+    list.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = entry.id != null ? String(entry.id).trim() : '';
+      const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+      const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+      if (!title && !text) return;
+      normalized.push({
+        type: 'wellness-tip',
+        id: id || null,
+        icon,
+        title,
+        text,
+        dwellSec: Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null
+      });
+    });
+    return normalized;
+  }
+
+  function collectEventCountdowns() {
+    const list = Array.isArray(settings?.extras?.eventCountdowns) ? settings.extras.eventCountdowns : [];
+    const normalized = [];
+    list.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = entry.id != null ? String(entry.id).trim() : '';
+      const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+      const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
+      if (!title && !subtitle) return;
+      const targetDate = rawTarget ? new Date(rawTarget) : null;
+      const targetMs = targetDate && !Number.isNaN(targetDate.getTime()) ? targetDate.getTime() : null;
+      normalized.push({
+        type: 'event-countdown',
+        id: id || null,
+        title,
+        subtitle,
+        target: rawTarget,
+        targetMs,
+        styleKey: typeof entry.style === 'string' ? entry.style.trim() : '',
+        dwellSec: Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null
+      });
+    });
+    return normalized;
+  }
+
+  function collectGastronomyHighlights() {
+    const list = Array.isArray(settings?.extras?.gastronomyHighlights) ? settings.extras.gastronomyHighlights : [];
+    const normalized = [];
+    list.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = entry.id != null ? String(entry.id).trim() : '';
+      const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+      const description = typeof entry.description === 'string' ? entry.description.trim() : '';
+      const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      const items = Array.isArray(entry.items)
+        ? entry.items.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+        : [];
+      const textLines = Array.isArray(entry.textLines)
+        ? entry.textLines.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
+        : [];
+      if (!title && !description && !items.length && !textLines.length) return;
+      normalized.push({
+        type: 'gastronomy-highlight',
+        id: id || null,
+        title,
+        description,
+        icon,
+        items,
+        textLines,
+        dwellSec: Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null
+      });
+    });
+    return normalized;
+  }
+
   function buildMasterQueue() {
     maybeApplyPreset();
 
@@ -758,6 +1079,13 @@ async function loadDeviceResolved(id){
   const storyMapAll = new Map(storyEntriesAll.map(entry => [entry.key, entry.story]));
   const storyMapEnabled = new Map(storyEntriesEnabled.map(entry => [entry.key, entry.story]));
 
+  const wellnessTips = collectWellnessTips();
+  const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(it.id), it]));
+  const eventCountdowns = collectEventCountdowns();
+  const eventMap = new Map(eventCountdowns.filter(it => it.id).map(it => [String(it.id), it]));
+  const gastronomyHighlights = collectGastronomyHighlights();
+  const gastroMap = new Map(gastronomyHighlights.filter(it => it.id).map(it => [String(it.id), it]));
+
   if (sortOrder && sortOrder.length) {
     const queue = [];
     if (showOverview) queue.push({ type: 'overview' });
@@ -766,6 +1094,9 @@ async function loadDeviceResolved(id){
     const usedSaunas = new Set();
     const usedMedia = new Set();
     const usedStories = new Set();
+    const usedWellness = new Set();
+    const usedEvents = new Set();
+    const usedGastro = new Set();
     for (const entry of sortOrder) {
       if (entry.type === 'sauna') {
         const name = entry.name;
@@ -773,7 +1104,9 @@ async function loadDeviceResolved(id){
           queue.push({ type: 'sauna', sauna: name });
           usedSaunas.add(name);
         }
-      } else if (entry.type === 'media') {
+        continue;
+      }
+      if (entry.type === 'media') {
         const it = mediaMap.get(String(entry.id));
         if (it && it.enabled) {
           const dwell = Number.isFinite(+it.dwellSec)
@@ -786,12 +1119,41 @@ async function loadDeviceResolved(id){
           queue.push(node);
           usedMedia.add(String(it.id));
         }
-      } else if (entry.type === 'story') {
+        continue;
+      }
+      if (entry.type === 'story') {
         const key = String(entry.id ?? '');
         const story = storyMapEnabled.get(key);
         if (story) {
           queue.push({ type: 'story', story, storyId: key });
           usedStories.add(key);
+        }
+        continue;
+      }
+      if (entry.type === 'wellness-tip') {
+        const key = String(entry.id ?? '');
+        const tip = wellnessMap.get(key);
+        if (tip) {
+          queue.push({ ...tip, tipId: key });
+          usedWellness.add(key);
+        }
+        continue;
+      }
+      if (entry.type === 'event-countdown') {
+        const key = String(entry.id ?? '');
+        const event = eventMap.get(key);
+        if (event) {
+          queue.push({ ...event, eventId: key });
+          usedEvents.add(key);
+        }
+        continue;
+      }
+      if (entry.type === 'gastronomy-highlight') {
+        const key = String(entry.id ?? '');
+        const highlight = gastroMap.get(key);
+        if (highlight) {
+          queue.push({ ...highlight, highlightId: key });
+          usedGastro.add(key);
         }
       }
     }
@@ -816,6 +1178,24 @@ async function loadDeviceResolved(id){
         queue.push({ type: 'story', story: entry.story, storyId: entry.key });
       }
     }
+    for (const tip of wellnessTips) {
+      const key = tip.id != null ? String(tip.id) : null;
+      if (!key || !usedWellness.has(key)) {
+        queue.push({ ...tip, tipId: key });
+      }
+    }
+    for (const event of eventCountdowns) {
+      const key = event.id != null ? String(event.id) : null;
+      if (!key || !usedEvents.has(key)) {
+        queue.push({ ...event, eventId: key });
+      }
+    }
+    for (const highlight of gastronomyHighlights) {
+      const key = highlight.id != null ? String(highlight.id) : null;
+      if (!key || !usedGastro.has(key)) {
+        queue.push({ ...highlight, highlightId: key });
+      }
+    }
     const clean = [];
     for (const q of queue) {
       if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
@@ -823,6 +1203,15 @@ async function loadDeviceResolved(id){
       else if (q.type === 'story') {
         const id = q.storyId ?? (q.story?.id ?? null);
         if (id != null && storyMapAll.has(String(id))) clean.push({ type: 'story', id: String(id) });
+      } else if (q.type === 'wellness-tip') {
+        const id = q.tipId ?? q.id;
+        if (id != null && wellnessMap.has(String(id))) clean.push({ type: 'wellness-tip', id: String(id) });
+      } else if (q.type === 'event-countdown') {
+        const id = q.eventId ?? q.id;
+        if (id != null && eventMap.has(String(id))) clean.push({ type: 'event-countdown', id: String(id) });
+      } else if (q.type === 'gastronomy-highlight') {
+        const id = q.highlightId ?? q.id;
+        if (id != null && gastroMap.has(String(id))) clean.push({ type: 'gastronomy-highlight', id: String(id) });
       }
     }
     settings.slides.sortOrder = clean;
@@ -887,11 +1276,152 @@ async function loadDeviceResolved(id){
     queue.push({ type: 'story', story: entry.story, storyId: entry.key });
   }
 
+  wellnessTips.forEach((tip) => {
+    queue.push({ ...tip, tipId: tip.id != null ? String(tip.id) : null });
+  });
+  eventCountdowns.forEach((event) => {
+    queue.push({ ...event, eventId: event.id != null ? String(event.id) : null });
+  });
+  gastronomyHighlights.forEach((entry) => {
+    queue.push({ ...entry, highlightId: entry.id != null ? String(entry.id) : null });
+  });
+
   // Falls nichts bleibt, notfalls Übersicht zeigen
   if (!queue.length && showOverview) queue.push({ type: 'overview' });
 
   return withHero(queue);
 }
+
+  function renderWellnessTip(item = {}, region = 'left') {
+    const container = h('div', { class: 'container extra extra-wellness fade show' });
+    container.dataset.region = region;
+    if (item.id) container.dataset.extraId = String(item.id);
+
+    const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Wellness-Tipp');
+    const content = h('div', { class: 'extra-content' });
+
+    if (item.icon) {
+      content.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, item.icon));
+    }
+
+    const body = h('div', { class: 'extra-body-wrap' });
+    const titleText = typeof item.title === 'string' ? item.title.trim() : '';
+    if (titleText) body.appendChild(h('h2', { class: 'extra-title' }, titleText));
+    const text = typeof item.text === 'string' ? item.text.trim() : '';
+    if (text) body.appendChild(h('p', { class: 'extra-text' }, text));
+    content.appendChild(body);
+
+    container.appendChild(eyebrow);
+    container.appendChild(content);
+    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
+    return container;
+  }
+
+  function renderEventCountdown(item = {}, region = 'left') {
+    const container = h('div', { class: 'container extra extra-event fade show' });
+    container.dataset.region = region;
+    if (item.id) container.dataset.extraId = String(item.id);
+    if (item.styleKey) container.dataset.eventStyle = String(item.styleKey);
+
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    const subtitle = typeof item.subtitle === 'string' ? item.subtitle.trim() : '';
+    const targetMs = Number.isFinite(item.targetMs) ? item.targetMs : null;
+
+    const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Event-Countdown');
+    const headingWrap = h('div', { class: 'extra-heading-wrap' });
+    if (title) headingWrap.appendChild(h('h2', { class: 'extra-title' }, title));
+    if (subtitle) headingWrap.appendChild(h('p', { class: 'extra-subtitle' }, subtitle));
+
+    const countdownValue = h('div', { class: 'extra-countdown-value' }, '–');
+    const countdownLabel = h('div', { class: 'extra-countdown-label' }, 'Verbleibende Zeit');
+
+    const updateCountdown = () => {
+      if (!targetMs) {
+        countdownValue.textContent = 'bald';
+        countdownLabel.textContent = 'Termin wird angekündigt';
+        container.classList.remove('is-live', 'is-soon');
+        return;
+      }
+      const diff = targetMs - Date.now();
+      if (diff <= 0) {
+        countdownValue.textContent = 'Jetzt';
+        countdownLabel.textContent = 'Event läuft';
+        container.classList.add('is-live');
+        container.classList.remove('is-soon');
+        return;
+      }
+      container.classList.remove('is-live');
+      const minutesTotal = Math.floor(diff / 60000);
+      const days = Math.floor(minutesTotal / (60 * 24));
+      const hours = Math.floor((minutesTotal - days * 24 * 60) / 60);
+      const minutes = minutesTotal % 60;
+      let text = '';
+      if (days > 1) text = `${days} Tage`;
+      else if (days === 1) text = '1 Tag';
+      else if (hours >= 1) text = minutes > 0 ? `${hours} Std ${minutes} Min` : `${hours} Std`;
+      else text = `${Math.max(1, minutes)} Min`;
+      countdownValue.textContent = text;
+      container.classList.toggle('is-soon', diff < 60 * 60 * 1000);
+      const date = new Date(targetMs);
+      countdownLabel.textContent = `Start: ${date.toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    updateCountdown();
+    let timer = null;
+    if (targetMs) timer = setInterval(updateCountdown, 30000);
+    container.__cleanup = () => { if (timer) clearInterval(timer); };
+
+    const body = h('div', { class: 'extra-content extra-countdown' }, [
+      eyebrow,
+      headingWrap,
+      h('div', { class: 'extra-countdown-display' }, [countdownValue, countdownLabel])
+    ]);
+
+    container.appendChild(body);
+    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
+    return container;
+  }
+
+  function renderGastronomyHighlight(item = {}, region = 'left') {
+    const container = h('div', { class: 'container extra extra-gastro fade show' });
+    container.dataset.region = region;
+    if (item.id) container.dataset.extraId = String(item.id);
+
+    const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Gastronomie');
+    const content = h('div', { class: 'extra-content' });
+
+    if (item.icon) {
+      content.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, item.icon));
+    }
+
+    const body = h('div', { class: 'extra-body-wrap' });
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    if (title) body.appendChild(h('h2', { class: 'extra-title' }, title));
+    const description = typeof item.description === 'string' ? item.description.trim() : '';
+    if (description) body.appendChild(h('p', { class: 'extra-text' }, description));
+
+    const listItems = Array.isArray(item.items) ? item.items : [];
+    if (listItems.length) {
+      const list = h('ul', { class: 'extra-list' });
+      listItems.forEach((entryText) => {
+        if (!entryText) return;
+        list.appendChild(h('li', {}, entryText));
+      });
+      body.appendChild(list);
+    }
+
+    const textLines = Array.isArray(item.textLines) ? item.textLines : [];
+    textLines.forEach((line) => {
+      if (!line) return;
+      body.appendChild(h('p', { class: 'extra-textline' }, line));
+    });
+
+    content.appendChild(body);
+    container.appendChild(eyebrow);
+    container.appendChild(content);
+    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
+    return container;
+  }
 
   // ---------- DOM helpers ----------
   function h(tag, attrs = {}, children = []) {
@@ -3358,11 +3888,11 @@ function renderStorySlide(story = {}, region = 'left') {
     right: 'Keine Inhalte für rechte Seite definiert.'
   };
 
-  const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story'];
-  const MEDIA_TYPES = ['image','video','url'];
+  const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip','event-countdown','gastronomy-highlight'];
+  const MEDIA_TYPES = ['image','video','url','wellness-tip','event-countdown','gastronomy-highlight'];
   const PAGE_DEFAULTS = {
-    left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','image','video','url'], playlist:[] },
-    right:{ source:'media',  timerSec:null, contentTypes:['image','video','url'], playlist:[] }
+    left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','image','video','url'], playlist:[] },
+    right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','image','video','url'], playlist:[] }
   };
   const SOURCE_FILTERS = {
     master: null,
@@ -3375,6 +3905,13 @@ function renderStorySlide(story = {}, region = 'left') {
     const normalized = (mode === 'split') ? 'split' : 'single';
     if (document.body) document.body.setAttribute('data-layout', normalized);
     if (STAGE) STAGE.dataset.layout = normalized;
+  }
+
+  function updateLayoutProfileAttr(profile){
+    const normalized = LAYOUT_PROFILES.has(profile) ? profile : 'landscape';
+    if (document.body) document.body.setAttribute('data-layout-profile', normalized);
+    if (STAGE) STAGE.dataset.layoutProfile = normalized;
+    if (document.documentElement) document.documentElement.setAttribute('data-layout-profile', normalized);
   }
 
   function slideKey(item){
@@ -3433,6 +3970,18 @@ function renderStorySlide(story = {}, region = 'left') {
     if (item.type === 'hero-timeline') {
       const fallback = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
       return sec(fallback) * 1000;
+    }
+
+    if (item.type === 'wellness-tip' || item.type === 'gastronomy-highlight') {
+      const base = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
+      const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
+      return sec(v) * 1000;
+    }
+
+    if (item.type === 'event-countdown') {
+      const base = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
+      const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
+      return sec(v) * 1000;
     }
 
     return 6000;
@@ -3581,6 +4130,11 @@ function renderStorySlide(story = {}, region = 'left') {
         showFallback();
         return;
       }
+      const styleResult = applyStyleAutomation();
+      if (styleResult.changed) {
+        applyTheme();
+        runResizeHandlers();
+      }
       let item = queue[index];
       let key = slideKey(item);
       if (key === last && queue.length > 1) {
@@ -3670,6 +4224,12 @@ function renderStorySlide(story = {}, region = 'left') {
         return renderStorySlide(item.story, region);
       case 'hero-timeline':
         return renderHeroTimeline(region);
+      case 'wellness-tip':
+        return renderWellnessTip(item, region);
+      case 'event-countdown':
+        return renderEventCountdown(item, region);
+      case 'gastronomy-highlight':
+        return renderGastronomyHighlight(item, region);
       default:
         return renderImage(item.src || item.url || '', region, ctx);
     }
@@ -3702,6 +4262,18 @@ function renderStorySlide(story = {}, region = 'left') {
       case 'media': {
         const rawId = entry.id ?? entry.mediaId ?? entry.__id ?? entry.slug;
         return rawId != null ? 'media:' + String(rawId) : null;
+      }
+      case 'wellness-tip': {
+        const rawId = entry.id ?? entry.tipId;
+        return rawId != null ? 'wellness:' + String(rawId) : null;
+      }
+      case 'event-countdown': {
+        const rawId = entry.id ?? entry.eventId;
+        return rawId != null ? 'event:' + String(rawId) : null;
+      }
+      case 'gastronomy-highlight': {
+        const rawId = entry.id ?? entry.highlightId;
+        return rawId != null ? 'gastro:' + String(rawId) : null;
       }
       default:
         return null;
@@ -3737,6 +4309,24 @@ function renderStorySlide(story = {}, region = 'left') {
         case 'media':
           if (rest) {
             normalized.push({ type: 'media', id: rest });
+            seen.add(key);
+          }
+          break;
+        case 'wellness':
+          if (rest) {
+            normalized.push({ type: 'wellness-tip', id: rest });
+            seen.add(key);
+          }
+          break;
+        case 'event':
+          if (rest) {
+            normalized.push({ type: 'event-countdown', id: rest });
+            seen.add(key);
+          }
+          break;
+        case 'gastro':
+          if (rest) {
+            normalized.push({ type: 'gastronomy-highlight', id: rest });
             seen.add(key);
           }
           break;
@@ -3778,6 +4368,18 @@ function renderStorySlide(story = {}, region = 'left') {
     if (item.type === 'image' || item.type === 'video' || item.type === 'url') {
       const id = item.__id ?? item.id ?? null;
       return id != null ? 'media:' + String(id) : null;
+    }
+    if (item.type === 'wellness-tip') {
+      const id = item.tipId ?? item.id ?? null;
+      return id != null ? 'wellness:' + String(id) : null;
+    }
+    if (item.type === 'event-countdown') {
+      const id = item.eventId ?? item.id ?? null;
+      return id != null ? 'event:' + String(id) : null;
+    }
+    if (item.type === 'gastronomy-highlight') {
+      const id = item.highlightId ?? item.id ?? null;
+      return id != null ? 'gastro:' + String(id) : null;
     }
     return null;
   }

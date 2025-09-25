@@ -1,4 +1,5 @@
 const CACHE_NAME = 'signage-static-v2';
+const DATA_CACHE = 'signage-data-v1';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
   '/assets/design.css',
@@ -6,6 +7,8 @@ const PRECACHE_URLS = [
   '/assets/slideshow.js',
   OFFLINE_URL
 ];
+
+const DATA_URLS = new Set(['/data/schedule.json', '/data/settings.json']);
 
 const STATIC_DESTINATIONS = new Set(['style', 'script', 'image', 'font', 'video', 'audio']);
 
@@ -20,7 +23,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)));
+    await Promise.all(keys.filter(key => key !== CACHE_NAME && key !== DATA_CACHE).map(key => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -33,6 +36,25 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (DATA_URLS.has(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(DATA_CACHE);
+      try {
+        const response = await fetch(request, { cache: 'no-store' });
+        if (response && response.ok) {
+          await cache.put(request, response.clone());
+          return response;
+        }
+        throw new Error('bad response');
+      } catch (error) {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        throw error;
+      }
+    })());
     return;
   }
 
