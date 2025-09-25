@@ -5,6 +5,35 @@ set -euo pipefail
 log(){ printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 error(){ printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
 
+declare -a CONFIG_KEYS=(
+  SIGNAGE_PUBLIC_PORT
+  SIGNAGE_ADMIN_PORT
+  SIGNAGE_ADMIN_USER
+  SIGNAGE_ADMIN_PASS
+  PHP_SOCK
+  APP_DIR
+)
+
+declare -A CONFIG_DEFAULTS=(
+  [SIGNAGE_PUBLIC_PORT]=80
+  [SIGNAGE_ADMIN_PORT]=8888
+  [SIGNAGE_ADMIN_USER]=admin
+  [SIGNAGE_ADMIN_PASS]=admin
+  [PHP_SOCK]=/run/php/php8.3-fpm.sock
+  [APP_DIR]=/var/www/signage
+)
+
+declare -A CONFIG_PROMPTS=(
+  [SIGNAGE_PUBLIC_PORT]="Public port"
+  [SIGNAGE_ADMIN_PORT]="Admin port"
+  [SIGNAGE_ADMIN_USER]="Admin username"
+  [SIGNAGE_ADMIN_PASS]="Admin password"
+)
+
+declare -A CONFIG_SILENT_PROMPT=(
+  [SIGNAGE_ADMIN_PASS]=1
+)
+
 trap 'error "Installation failed (line $LINENO)."; exit 1' ERR
 
 require_root(){
@@ -26,6 +55,26 @@ prompt_for(){
   printf -v "$var" '%s' "${input:-$default}"
 }
 
+load_defaults(){
+  local key
+  for key in "${CONFIG_KEYS[@]}"; do
+    printf -v "$key" '%s' "${!key:-${CONFIG_DEFAULTS[$key]}}"
+  done
+}
+
+collect_settings(){
+  load_defaults
+  if [[ -t 0 ]]; then
+    local key prompt silent
+    for key in "${CONFIG_KEYS[@]}"; do
+      prompt=${CONFIG_PROMPTS[$key]:-}
+      [[ -z $prompt ]] && continue
+      silent=${CONFIG_SILENT_PROMPT[$key]:-0}
+      prompt_for "$key" "${!key}" "$prompt" "$silent"
+    done
+  fi
+}
+
 sed_escape(){
   printf '%s' "$1" | sed -e 's/[\\/|&]/\\&/g'
 }
@@ -34,6 +83,20 @@ replace_placeholder(){
   local file=$1 token=$2 value
   value=$(sed_escape "$3")
   sed -i "s|${token}|${value}|g" "$file"
+}
+
+replace_placeholders(){
+  local file=$1
+  shift
+  while (($#)); do
+    replace_placeholder "$file" "$1" "$2"
+    shift 2 || true
+  done
+}
+
+install_template(){
+  local src=$1 dest=$2 mode=${3:-0644}
+  install -m "$mode" "$src" "$dest"
 }
 
 install_packages(){
@@ -65,25 +128,28 @@ deploy_application(){
   chown -R www-data:www-data "$APP_DIR"
   find "$APP_DIR" -type d -exec chmod 2755 {} +
   find "$APP_DIR" -type f -exec chmod 0644 {} +
-  replace_placeholder "$APP_DIR/admin/index.html" "__PUBLIC_PORT__" "$SIGNAGE_PUBLIC_PORT"
+  replace_placeholders "$APP_DIR/admin/index.html" \
+    "__PUBLIC_PORT__" "$SIGNAGE_PUBLIC_PORT"
 }
 
 deploy_nginx(){
   log "Deploying nginx configuration"
   install -d /etc/nginx/sites-available /etc/nginx/sites-enabled /etc/nginx/snippets
-  install -m 0644 config/nginx/signage-slideshow.conf /etc/nginx/sites-available/signage-slideshow.conf
-  install -m 0644 config/nginx/signage-admin.conf /etc/nginx/sites-available/signage-admin.conf
-  install -m 0644 config/nginx/snippets/signage-pairing.conf /etc/nginx/snippets/signage-pairing.conf
-  replace_placeholder /etc/nginx/sites-available/signage-slideshow.conf "__PUBLIC_PORT__" "$SIGNAGE_PUBLIC_PORT"
-  replace_placeholder /etc/nginx/sites-available/signage-admin.conf "__ADMIN_PORT__" "$SIGNAGE_ADMIN_PORT"
-  local php_targets=(
-    /etc/nginx/sites-available/signage-admin.conf
-    /etc/nginx/sites-available/signage-slideshow.conf
-    /etc/nginx/snippets/signage-pairing.conf
-  )
-  for target in "${php_targets[@]}"; do
-    replace_placeholder "$target" "__PHP_SOCK__" "$PHP_SOCK"
-  done
+  install_template config/nginx/signage-slideshow.conf /etc/nginx/sites-available/signage-slideshow.conf
+  install_template config/nginx/signage-admin.conf /etc/nginx/sites-available/signage-admin.conf
+  install_template config/nginx/snippets/signage-pairing.conf /etc/nginx/snippets/signage-pairing.conf
+
+  replace_placeholders /etc/nginx/sites-available/signage-slideshow.conf \
+    "__PUBLIC_PORT__" "$SIGNAGE_PUBLIC_PORT" \
+    "__PHP_SOCK__" "$PHP_SOCK"
+
+  replace_placeholders /etc/nginx/sites-available/signage-admin.conf \
+    "__ADMIN_PORT__" "$SIGNAGE_ADMIN_PORT" \
+    "__PHP_SOCK__" "$PHP_SOCK"
+
+  replace_placeholders /etc/nginx/snippets/signage-pairing.conf \
+    "__PHP_SOCK__" "$PHP_SOCK"
+
   ln -sf /etc/nginx/sites-available/signage-slideshow.conf /etc/nginx/sites-enabled/signage-slideshow.conf
   ln -sf /etc/nginx/sites-available/signage-admin.conf /etc/nginx/sites-enabled/signage-admin.conf
   rm -f /etc/nginx/sites-enabled/default
@@ -142,19 +208,7 @@ main(){
   require_root
   umask 022
 
-  SIGNAGE_PUBLIC_PORT=${SIGNAGE_PUBLIC_PORT:-80}
-  SIGNAGE_ADMIN_PORT=${SIGNAGE_ADMIN_PORT:-8888}
-  SIGNAGE_ADMIN_USER=${SIGNAGE_ADMIN_USER:-admin}
-  SIGNAGE_ADMIN_PASS=${SIGNAGE_ADMIN_PASS:-admin}
-  PHP_SOCK=${PHP_SOCK:-/run/php/php8.3-fpm.sock}
-  APP_DIR=${APP_DIR:-/var/www/signage}
-
-  if [[ -t 0 ]]; then
-    prompt_for SIGNAGE_PUBLIC_PORT "$SIGNAGE_PUBLIC_PORT" "Public port"
-    prompt_for SIGNAGE_ADMIN_PORT "$SIGNAGE_ADMIN_PORT" "Admin port"
-    prompt_for SIGNAGE_ADMIN_USER "$SIGNAGE_ADMIN_USER" "Admin username"
-    prompt_for SIGNAGE_ADMIN_PASS "$SIGNAGE_ADMIN_PASS" "Admin password" 1
-  fi
+  collect_settings
 
   install_packages
   deploy_application
