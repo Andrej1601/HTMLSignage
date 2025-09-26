@@ -150,6 +150,45 @@ function ensureStyleSets(settings){
 
 function ensureBadgeLibrary(settings){
   settings.slides ||= {};
+
+  const readBadgeImage = (entry) => {
+    if (!entry || typeof entry !== 'object') return '';
+    if (typeof entry.imageUrl === 'string') return entry.imageUrl.trim();
+    if (typeof entry.iconUrl === 'string') return entry.iconUrl.trim();
+    if (typeof entry.image === 'string') return entry.image.trim();
+    if (entry.image && typeof entry.image.url === 'string') return entry.image.url.trim();
+    return '';
+  };
+
+  const resolveBadgeText = (value, fallback) => {
+    if (typeof value === 'string') return value.trim();
+    if (typeof fallback === 'string') return fallback.trim();
+    return '';
+  };
+
+  const resolveBadgeImage = (value, fallback) => {
+    if (typeof value === 'string') return value.trim();
+    if (typeof fallback === 'string') return fallback.trim();
+    return '';
+  };
+
+  const previousById = (() => {
+    const map = new Map();
+    const list = settings.slides.badgeLibrary;
+    if (!Array.isArray(list)) return map;
+    list.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+      if (!id || map.has(id)) return;
+      map.set(id, {
+        icon: typeof entry.icon === 'string' ? entry.icon : undefined,
+        label: typeof entry.label === 'string' ? entry.label : undefined,
+        imageUrl: readBadgeImage(entry)
+      });
+    });
+    return map;
+  })();
+
   const seen = new Set();
   const normalized = [];
   const pushEntry = (entry, assignId = false) => {
@@ -157,13 +196,10 @@ function ensureBadgeLibrary(settings){
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
-    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
-    let imageUrl = '';
-    if (typeof entry.imageUrl === 'string') imageUrl = entry.imageUrl.trim();
-    else if (typeof entry.iconUrl === 'string') imageUrl = entry.iconUrl.trim();
-    else if (typeof entry.image === 'string') imageUrl = entry.image.trim();
-    else if (entry.image && typeof entry.image.url === 'string') imageUrl = entry.image.url.trim();
+    const prev = previousById.get(id);
+    const icon = resolveBadgeText(prev?.icon, entry.icon);
+    const label = resolveBadgeText(prev?.label, entry.label);
+    const imageUrl = resolveBadgeImage(prev?.imageUrl, readBadgeImage(entry));
     const record = { id, icon, label };
     if (imageUrl) record.imageUrl = imageUrl;
     normalized.push(record);
