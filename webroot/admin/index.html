@@ -921,28 +921,47 @@
       return cockpit.offsetHeight;
     };
 
+    let devicesObserver = null;
+    let observedPane = null;
+
     const updateOffsets = () => {
       const headerHeight = header?.offsetHeight || 0;
       const pinned = cockpit.dataset.pinned === 'true';
       const cockpitHeight = pinned ? resolveCockpitHeight() : 0;
-      const workspaceOffset = Math.max(132, headerHeight + cockpitHeight + (pinned ? 28 : 24));
+      const cockpitStyle = pinned ? window.getComputedStyle(cockpit) : null;
+      const cockpitMarginBottom = pinned ? Number.parseFloat(cockpitStyle?.marginBottom || '0') || 0 : 0;
+      const workspaceGap = pinned ? Math.max(20, cockpitMarginBottom + 12) : 24;
+      const workspaceOffset = Math.max(132, headerHeight + cockpitHeight + workspaceGap);
       const stickTop = headerHeight + 12;
-      const devicesOffset = headerHeight + cockpitHeight + 12;
+      const baseDevicesOffset = headerHeight + 12;
+      const devicesOffset = Math.max(baseDevicesOffset, headerHeight + cockpitHeight + cockpitMarginBottom + 12);
 
       root?.style.setProperty('--workspace-offset', `${workspaceOffset}px`);
       root?.style.setProperty('--cockpit-stick-top', `${stickTop}px`);
       root?.style.setProperty('--devices-offset', `${devicesOffset}px`);
       root?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
       document.body?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
+
+      const pane = document.getElementById('devicesPane');
+      if (pane !== observedPane) {
+        devicesObserver?.disconnect();
+        devicesObserver = null;
+        observedPane = null;
+        if (pane && 'ResizeObserver' in window) {
+          devicesObserver = new ResizeObserver(() => scheduleUpdate());
+          devicesObserver.observe(pane);
+          observedPane = pane;
+        }
+      }
     };
 
-    const scheduleUpdate = () => {
+    function scheduleUpdate(){
       if ('requestAnimationFrame' in window) {
         window.requestAnimationFrame(updateOffsets);
       } else {
         updateOffsets();
       }
-    };
+    }
 
     if ('ResizeObserver' in window){
       const resizeObserver = new ResizeObserver(() => scheduleUpdate());
@@ -958,6 +977,11 @@
     }
 
     window.addEventListener('resize', scheduleUpdate, { passive:true });
+    window.addEventListener('beforeunload', () => {
+      devicesObserver?.disconnect();
+      devicesObserver = null;
+      observedPane = null;
+    }, { once:true });
 
     const pinBtn = cockpit.querySelector('[data-action="pin"]');
     const toggleBtn = cockpit.querySelector('[data-action="toggle"]');
