@@ -91,6 +91,7 @@ run_all() {
   check_permissions || status=1
 
   if [ "$status" -ne 0 ]; then
+
     fail "Preflight checks failed"
     exit 1
   fi

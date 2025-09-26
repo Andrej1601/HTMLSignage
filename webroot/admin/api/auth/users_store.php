@@ -10,6 +10,7 @@ const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
 const SIGNAGE_AUTH_ROLES = ['viewer', 'editor', 'admin'];
 
+
 function auth_users_public_payload(array $user): array
 {
     return [
@@ -18,6 +19,7 @@ function auth_users_public_payload(array $user): array
         'roles' => auth_user_roles($user),
     ];
 }
+
 
 function auth_users_path(): string
 {
@@ -185,6 +187,7 @@ function auth_users_count_admins(array $state, ?string $exclude = null): int
     }
     return $count;
 }
+
 
 function auth_user_roles(array $user): array
 {
