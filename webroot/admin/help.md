@@ -12,6 +12,11 @@
 
 Weitere Hinweise findest du direkt in der Anwendung.
 
+## Kontext-Hilfe & Tour
+- Kleine „?“ Buttons an wichtigen Bedienelementen öffnen eine kompakte Erklärung mit Tipps.
+- Beim ersten Start führt dich eine kurze Tour durch Cockpit, Ansichtswechsel, Gerätebereich und Speichern.
+- Du kannst die Hinweise jederzeit erneut aufrufen, indem du einen der „?“ Buttons anklickst.
+
 ## Speichern & Entwürfe
 - Sobald alle Änderungen gespeichert wurden oder du per Undo/Reset zum ursprünglichen Stand zurückkehrst,
   verschwindet der Hinweis-Badge „Änderungen noch nicht gespeichert“ automatisch.
