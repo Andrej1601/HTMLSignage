@@ -3,6 +3,7 @@
 set -euo pipefail
 
 log(){ printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
+warn(){ printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
 error(){ printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
 
 declare -a CONFIG_KEYS=(
@@ -40,6 +41,28 @@ require_root(){
   if [[ $EUID -ne 0 ]]; then
     error "Run as root"
     exit 1
+  fi
+}
+
+run_preflight(){
+  local skip=${SKIP_PREFLIGHT:-0}
+  for arg in "$@"; do
+    if [[ $arg == "--skip-preflight" ]]; then
+      skip=1
+    fi
+  done
+  if [[ $skip -eq 1 ]]; then
+    log "Skipping preflight checks"
+    return
+  fi
+  if [[ -x "$(dirname "$0")/preflight.sh" ]]; then
+    log "Running preflight checks"
+    if ! "$(dirname "$0")/preflight.sh"; then
+      error "Preflight checks failed"
+      exit 1
+    fi
+  else
+    warn "Preflight script not found; continuing"
   fi
 }
 
@@ -207,6 +230,8 @@ EOF
 main(){
   require_root
   umask 022
+
+  run_preflight "$@"
 
   collect_settings
 
