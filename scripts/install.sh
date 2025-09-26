@@ -170,7 +170,9 @@ deploy_nginx(){
 
   replace_placeholders /etc/nginx/sites-available/signage-admin.conf \
     "__ADMIN_PORT__" "$SIGNAGE_ADMIN_PORT" \
-    "__PHP_SOCK__" "$PHP_SOCK"
+    "__PHP_SOCK__" "$PHP_SOCK" \
+    "__APP_DIR__" "$APP_DIR" \
+    "__AUTH_FILE__" "$APP_DIR/data/.htpasswd"
 
   replace_placeholders /etc/nginx/snippets/signage-pairing.conf \
     "__PHP_SOCK__" "$PHP_SOCK"
@@ -195,11 +197,13 @@ EOPHP
 
 configure_basic_auth(){
   log "Configuring basic auth"
-  if [[ ! -f /etc/nginx/.signage_admin ]]; then
-    printf "%s:%s\n" "$SIGNAGE_ADMIN_USER" "$(openssl passwd -apr1 "$SIGNAGE_ADMIN_PASS")" > /etc/nginx/.signage_admin
+  local auth_file="$APP_DIR/data/.htpasswd"
+  install -d -m 2775 "$(dirname "$auth_file")"
+  if [[ ! -f "$auth_file" ]]; then
+    install -m 0640 /dev/null "$auth_file"
   fi
-  chown root:www-data /etc/nginx/.signage_admin
-  chmod 640 /etc/nginx/.signage_admin
+  chown www-data:www-data "$auth_file" 2>/dev/null || true
+  chmod 640 "$auth_file" 2>/dev/null || true
 }
 
 seed_admin_user(){
