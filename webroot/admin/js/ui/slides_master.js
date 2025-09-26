@@ -2310,6 +2310,17 @@ export function renderSlidesMaster(){
     };
     if (!badgeListHost) return;
 
+    const finalizeOpenEditors = () => {
+      if (!badgeListHost) return;
+      badgeListHost.querySelectorAll('.badge-lib-label').forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+          input.dispatchEvent(new Event('blur'));
+        }
+      });
+    };
+
+    finalizeOpenEditors();
+
     const emojiInput = $('#badgeEmojiInput');
     const emojiAddBtn = $('#badgeEmojiAdd');
     const emojiCustomList = $('#badgeEmojiCustom');
@@ -2569,6 +2580,7 @@ export function renderSlidesMaster(){
       });
 
       removeBtn.addEventListener('click', () => {
+        finalizeOpenEditors();
         const listRef = ensureBadgeLibrary(settings);
         listRef.splice(index, 1);
         renderBadgeLibraryRows();
@@ -2585,6 +2597,7 @@ export function renderSlidesMaster(){
 
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
+      finalizeOpenEditors();
       const list = ensureBadgeLibrary(settings);
       list.push({ id: genId('bdg_'), icon:'', label:'' });
       setBadgeSectionExpanded(true);
