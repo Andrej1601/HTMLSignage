@@ -59,6 +59,11 @@
   /* Preview-Größe */
   --prev-w:60px; --prev-h:42px;
 
+  /* Workspace Offsets */
+  --workspace-offset:132px;
+  --cockpit-stick-top:calc(64px + 12px);
+  --devices-offset:96px;
+
   /* Sidebar (rechte Spalte) */
   --sidebar-min:280px;
   --sidebar-max:920px;
@@ -102,6 +107,7 @@ html,body{height:100%}
 body{
   margin:0; background:var(--bg); color:var(--fg);
   font:var(--fs)/1.45 system-ui, Segoe UI, Roboto, Arial, sans-serif;
+  scroll-padding-top:var(--workspace-offset);
 }
 a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:none; }
 }
@@ -176,7 +182,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 }
 .workspace-overview[data-pinned="true"]{
   position:sticky;
-  top:calc(64px + 12px);
+  top:var(--cockpit-stick-top);
   z-index:40;
   box-shadow:0 22px 52px -28px rgba(15,23,42,.5);
   border-color:color-mix(in oklab, var(--btn-accent) 55%, var(--border));
@@ -373,10 +379,10 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   }
 }
 [data-jump-target]{
-  scroll-margin-block-start:132px;
+  scroll-margin-block-start:var(--workspace-offset);
 }
 details[data-jump-target] > summary{
-  scroll-margin-block-start:132px;
+  scroll-margin-block-start:var(--workspace-offset);
 }
 .jump-flash{
   outline:2px solid color-mix(in oklab, var(--btn-accent) 55%, transparent);
@@ -600,7 +606,15 @@ main.layout{
   .rightbar .layout-resizer{ display:none; }
 }
 
-body.devices-pinned #devicesPane{ position:sticky; top:0; z-index:40; }
+body.devices-pinned #devicesPane{
+  position:sticky;
+  top:var(--devices-offset);
+  z-index:40;
+}
+#devicesPane,
+#dockPane{
+  scroll-margin-block-start:var(--workspace-offset);
+}
 }
 
 /* ---------- Cards / Details ---------- */

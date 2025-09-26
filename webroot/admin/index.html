@@ -84,7 +84,7 @@
             </ul>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
+                <button type="button" class="workspace-card-btn primary" data-view="grid" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
               </div>
             </div>
           </article>
@@ -133,6 +133,30 @@
               <div class="workspace-card-branches" role="group" aria-label="Weitere Einstellungen">
                 <button type="button" class="workspace-branch-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
                 <button type="button" class="workspace-branch-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
+              <div>
+                <h3>Vorschau &amp; Geräte</h3>
+                <p>Slides live prüfen, Geräte verwalten und Anzeigen aktualisieren.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Slideshow in der Vorschau kontrollieren</li>
+              <li>Gerätestatus, Firmware und Pairings im Blick behalten</li>
+              <li>Displays neu laden oder Geräte koppeln</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
+                <button type="button" class="workspace-branch-btn" data-devices="open" data-highlight="devicesPane">Gerätebereich</button>
+                <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
               </div>
             </div>
           </article>
@@ -885,6 +909,56 @@
     const body = cockpit.querySelector('.workspace-body');
     if (!body) return;
 
+    const root = document.documentElement;
+    const header = document.querySelector('header');
+    const toolbar = cockpit.querySelector('.workspace-toolbar');
+
+    const resolveCockpitHeight = () => {
+      if (cockpit.dataset.pinned !== 'true') return 0;
+      if (cockpit.dataset.collapsed === 'true') {
+        return toolbar?.offsetHeight || cockpit.offsetHeight;
+      }
+      return cockpit.offsetHeight;
+    };
+
+    const updateOffsets = () => {
+      const headerHeight = header?.offsetHeight || 0;
+      const pinned = cockpit.dataset.pinned === 'true';
+      const cockpitHeight = pinned ? resolveCockpitHeight() : 0;
+      const workspaceOffset = Math.max(132, headerHeight + cockpitHeight + (pinned ? 28 : 24));
+      const stickTop = headerHeight + 12;
+      const devicesOffset = headerHeight + cockpitHeight + 12;
+
+      root?.style.setProperty('--workspace-offset', `${workspaceOffset}px`);
+      root?.style.setProperty('--cockpit-stick-top', `${stickTop}px`);
+      root?.style.setProperty('--devices-offset', `${devicesOffset}px`);
+      root?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
+      document.body?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
+    };
+
+    const scheduleUpdate = () => {
+      if ('requestAnimationFrame' in window) {
+        window.requestAnimationFrame(updateOffsets);
+      } else {
+        updateOffsets();
+      }
+    };
+
+    if ('ResizeObserver' in window){
+      const resizeObserver = new ResizeObserver(() => scheduleUpdate());
+      resizeObserver.observe(cockpit);
+      if (header) resizeObserver.observe(header);
+      window.addEventListener('beforeunload', () => resizeObserver.disconnect(), { once:true });
+    }
+
+    if ('MutationObserver' in window){
+      const bodyObserver = new MutationObserver(() => scheduleUpdate());
+      bodyObserver.observe(document.body, { attributes:true, attributeFilter:['class'] });
+      window.addEventListener('beforeunload', () => bodyObserver.disconnect(), { once:true });
+    }
+
+    window.addEventListener('resize', scheduleUpdate, { passive:true });
+
     const pinBtn = cockpit.querySelector('[data-action="pin"]');
     const toggleBtn = cockpit.querySelector('[data-action="toggle"]');
 
@@ -930,6 +1004,7 @@
         pinBtn.setAttribute('title', pinned ? 'Cockpit lösen' : 'Cockpit anheften');
       }
       save(PIN_KEY, pinned ? '1' : null);
+      scheduleUpdate();
     };
 
     const setCollapseState = (collapsed) => {
@@ -953,6 +1028,7 @@
         toggleBtn.setAttribute('title', collapsed ? 'Cockpit öffnen' : 'Cockpit minimieren');
       }
       save(COLLAPSE_KEY, collapsed ? '1' : null);
+      scheduleUpdate();
     };
 
     let pinned = load(PIN_KEY) === '1';
@@ -960,6 +1036,7 @@
 
     setPinState(pinned);
     setCollapseState(collapsed);
+    scheduleUpdate();
 
     pinBtn?.addEventListener('click', () => {
       pinned = !pinned;
@@ -1011,12 +1088,69 @@
       return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
     };
 
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const resolveTarget = (id) => {
+      if (!id) return null;
+      if (id.startsWith('#')) return document.querySelector(id);
+      return document.getElementById(id);
+    };
+
+    const waitForElement = async (id, attempts = 4) => {
+      if (!id) return null;
+      const existing = resolveTarget(id);
+      if (existing) return existing;
+      if (attempts <= 0) return null;
+      await sleep(120);
+      return waitForElement(id, attempts - 1);
+    };
+
     jumpButtons.forEach((button) => {
-      button.addEventListener('click', (event) => {
+      button.addEventListener('click', async (event) => {
         event.preventDefault();
+
+        const desiredView = button.dataset.view;
+        if (desiredView && typeof showView === 'function') {
+          try {
+            await showView(desiredView);
+          } catch (error) {
+            console.error('[admin] Ansicht konnte nicht gewechselt werden', error);
+          }
+        }
+
+        const devicesAction = button.dataset.devices;
+        if (devicesAction) {
+          const devicesBtn = document.getElementById('btnDevices');
+          const isActive = devicesBtn?.classList.contains('active');
+          if (devicesBtn) {
+            if ((devicesAction === 'open' || devicesAction === 'refresh') && !isActive) {
+              devicesBtn.click();
+            } else if (devicesAction === 'close' && isActive) {
+              devicesBtn.click();
+            } else if (devicesAction === 'toggle') {
+              devicesBtn.click();
+            }
+          }
+          if (devicesAction === 'refresh') {
+            const attemptRefresh = async (tries = 4) => {
+              if (typeof window.__refreshDevicesPane === 'function') {
+                return window.__refreshDevicesPane({ bypassCache: true });
+              }
+              if (tries <= 0) return null;
+              await sleep(120);
+              return attemptRefresh(tries - 1);
+            };
+            try {
+              await attemptRefresh();
+            } catch (error) {
+              console.error('[admin] Gerätebereich konnte nicht aktualisiert werden', error);
+            }
+          }
+        }
+
         const targetId = button.dataset.jump;
-        if (!targetId) return;
-        const target = document.getElementById(targetId);
+        const highlightId = button.dataset.highlight;
+        const target = await waitForElement(targetId) || await waitForElement(highlightId);
         if (!target) return;
 
         ensureDetailsOpen(target);
