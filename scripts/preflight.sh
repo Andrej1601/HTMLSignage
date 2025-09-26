@@ -1,4 +1,3 @@
-
 #!/bin/sh
 set -eu
 
@@ -21,6 +20,7 @@ check_commands() {
       ok "Found $cmd"
     fi
   done
+
   if command -v docker >/dev/null 2>&1; then
     if docker compose version >/dev/null 2>&1; then
       ok "Docker Compose plugin available"
@@ -58,7 +58,6 @@ check_ports() {
       ok "Port ${port} available"
     fi
   done
-
   [ "$busy" -eq 0 ]
 }
 

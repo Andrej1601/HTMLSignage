@@ -72,8 +72,14 @@ npm run lint
 
 ### User and role management
 
-The admin APIs now support role-based access control. Create and maintain user
-accounts via the CLI helper:
+The admin interface now exposes a “Benutzer” button in the header that opens a
+modal to create, edit and remove accounts as well as assign roles. New passwords
+can be set or rotated directly from the UI, and attempts to delete the final
+admin account are blocked to prevent lock-outs. All changes are persisted to
+`data/users.json` and logged in `data/audit.log` together with the acting user
+for auditing.
+
+The PHP helper is still available for automation or bootstrapping:
 
 ```bash
 php scripts/users.php add alice editor
@@ -81,7 +87,26 @@ php scripts/users.php list
 php scripts/users.php delete bob
 ```
 
-Available roles are `viewer`, `editor` and `admin`. When at least one user is
-defined the API requires HTTP Basic authentication. Accounts are stored in
-`data/users.json` and all write operations are logged to `data/audit.log` with
-the acting username and payload metadata.
+Available roles are `viewer`, `editor` and `admin`. Once at least one account
+exists the API requires HTTP Basic authentication.
+
+### Device telemetry
+
+Heartbeats can now include optional telemetry such as firmware, network quality
+or resource usage. Send JSON payloads to `/api/heartbeat.php` or
+`/admin/api/devices_touch.php`:
+
+```bash
+curl -X POST https://signage.example.com/api/heartbeat.php \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "device": "dev_abc123def456",
+        "status": {"firmware": "2.1.0", "ip": "192.0.2.41"},
+        "metrics": {"cpuLoad": 34, "memoryUsage": 67, "temperature": 48},
+        "network": {"type": "wifi", "ssid": "lobby", "signal": -54}
+      }'
+```
+
+The admin “Geräte” table renders the latest telemetry, highlights missing data
+with a hint and records a short heartbeat history so that outages are visible
+at a glance.

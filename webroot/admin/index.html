@@ -36,12 +36,13 @@
         <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
           Ansicht: <span id="viewMenuLabel">Grid</span> ▾
         </button>
-        <div class="dropdown" id="viewMenu" role="menu" hidden>
-          <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-          <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-        </div>
+      <div class="dropdown" id="viewMenu" role="menu" hidden>
+        <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+        <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
       </div>
+    </div>
       <button class="btn" id="btnHelp">Hilfe</button>
+      <button class="btn" id="btnUsers">Benutzer</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
       <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
@@ -887,6 +888,65 @@
     <small class="mut" style="display:block;margin-top:8px">
       Live-Ansicht des ausgewählten Geräts (nur Lesen; kein Pairing, keine Speicherung).
     </small>
+  </div>
+</div>
+
+<div id="userModal" class="modal">
+  <div class="box user-modal-box" role="dialog" aria-modal="true" aria-labelledby="userModalTitle">
+    <div class="user-modal-head">
+      <div>
+        <h2 id="userModalTitle">Benutzer &amp; Rollen</h2>
+        <p class="mut">Verwalte Konten, Zugriffsrechte und Passwörter für das Admin-Interface.</p>
+      </div>
+      <button type="button" class="btn sm ghost" data-user-close>Schließen</button>
+    </div>
+    <div class="user-modal-body">
+      <section class="user-list-section">
+        <div class="user-list-head">
+          <h3>Konten</h3>
+          <button type="button" class="btn sm" id="userCreateBtn">Neu</button>
+        </div>
+        <table class="user-table" aria-label="Benutzerliste">
+          <thead>
+            <tr>
+              <th scope="col">Benutzer</th>
+              <th scope="col">Rollen</th>
+              <th scope="col" class="user-actions-head">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody data-user-table></tbody>
+        </table>
+        <p class="mut user-empty" data-user-empty hidden>Keine Benutzer konfiguriert.</p>
+      </section>
+      <section class="user-form-section">
+        <form id="userForm" class="user-form">
+          <h3 data-user-form-title>Benutzer anlegen</h3>
+          <div class="user-status" data-user-status role="status" aria-live="polite"></div>
+          <label class="user-field">
+            <span>Benutzername</span>
+            <input type="text" id="userUsername" name="username" required autocomplete="username" pattern="[a-zA-Z0-9_.-]{3,}" placeholder="z.&nbsp;B. redaktion" />
+          </label>
+          <label class="user-field">
+            <span>Anzeigename</span>
+            <input type="text" id="userDisplay" name="displayName" autocomplete="name" placeholder="Optional" />
+          </label>
+          <fieldset class="user-field">
+            <legend>Rollen</legend>
+            <div class="user-role-options" data-role-options></div>
+          </fieldset>
+          <label class="user-field">
+            <span>Passwort</span>
+            <input type="password" id="userPassword" name="password" autocomplete="new-password" />
+            <span class="mut user-password-hint" data-user-password-hint>Passwort wird beim Speichern gesetzt.</span>
+          </label>
+          <div class="user-form-actions">
+            <button type="submit" class="btn primary">Speichern</button>
+            <button type="button" class="btn" data-user-cancel>Zurücksetzen</button>
+            <button type="button" class="btn ghost" data-user-close>Schließen</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </div>
 </div>
 

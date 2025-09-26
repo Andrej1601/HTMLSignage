@@ -1225,6 +1225,8 @@ body.device-mode #devPairedList tr.selected{
 .dev-telemetry-list dt{ font-weight:600; color:var(--muted-strong); }
 .dev-telemetry-list dd{ margin:0; }
 .dev-telemetry-list dd .mut{ color:var(--muted); }
+.dev-telemetry-empty{ display:block; font-size:12px; color:var(--muted); }
+
 .dev-error-list{ margin:0; padding-left:18px; }
 .dev-error-list li{ margin:0; }
 .dev-history{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -2061,6 +2063,38 @@ footer{ display:flex; justify-content:flex-end; padding:12px 16px; border-top:1p
   --modal-pad:clamp(16px, 2.4svh, 24px);
   min-width:min(340px,95vw); max-width:95vw; max-height:95svh; overflow-y:auto;
   padding:var(--modal-pad); scrollbar-gutter:stable; }
+.user-modal-box{ min-width:min(820px,95vw); max-width:min(960px,95vw); }
+.user-modal-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px; }
+.user-modal-head h2{ margin:0; font-size:20px; }
+.user-modal-body{ display:grid; gap:20px; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
+.user-list-section{ display:flex; flex-direction:column; gap:12px; }
+.user-list-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.user-table{ width:100%; border-collapse:collapse; border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:14px; background:color-mix(in oklab, var(--panel) 96%, transparent); }
+.user-table th,.user-table td{ padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+.user-table th{ background:color-mix(in oklab, var(--panel) 98%, transparent); font-weight:700; color:color-mix(in oklab, var(--fg) 84%, var(--muted)); }
+.user-table tr:last-child td{ border-bottom:none; }
+.user-actions-head{ text-align:right; }
+.user-actions{ display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap; }
+.user-empty{ margin-top:-4px; font-size:12px; color:var(--muted); }
+.user-form-section{ display:flex; }
+.user-form{ display:flex; flex-direction:column; gap:12px; width:100%; }
+.user-field{ display:flex; flex-direction:column; gap:6px; font-size:14px; }
+.user-field input,.user-field textarea{ width:100%; }
+.user-role-options{ display:flex; flex-direction:column; gap:8px; }
+.user-role-option{ display:flex; align-items:flex-start; gap:10px; padding:8px 10px; border:1px solid var(--border); border-radius:12px; background:color-mix(in oklab, var(--panel) 98%, transparent); cursor:pointer; transition:border-color .15s ease, background .15s ease; }
+.user-role-option:hover{ border-color:color-mix(in oklab, var(--btn-accent) 45%, var(--border)); }
+.user-role-option input{ margin:4px 0 0; }
+.user-role-option input:checked + .user-role-copy{ font-weight:600; color:color-mix(in oklab, var(--btn-accent) 70%, var(--fg)); }
+.user-role-option input:focus-visible + .user-role-copy{ outline:2px solid var(--btn-accent); outline-offset:2px; border-radius:8px; padding-inline:2px; }
+.user-role-copy{ display:flex; flex-direction:column; gap:2px; }
+.user-role-copy .role-title{ font-weight:700; }
+.user-role-copy .role-desc{ font-size:12px; color:var(--muted); }
+.user-status{ min-height:1.2em; font-size:13px; }
+.user-status[data-type="success"]{ color:color-mix(in oklab, var(--btn-accent) 70%, var(--fg)); }
+.user-status[data-type="error"]{ color:#dc2626; }
+.user-status[data-type="info"]{ color:var(--muted); }
+.user-form-actions{ display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; }
+.user-modal-box .btn.ghost{ background:transparent; border-color:var(--border); }
 .grid2{ display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; align-items:center;
   width:min(560px, calc(95vw - (var(--modal-pad,16px) * 2) - 4px)); margin:0 auto 12px; }
 .iframeWrap{ width:min(92vw,1600px); height:min(85svh,900px); border:1px solid var(--inbr); border-radius:14px; overflow:hidden; background:#000; }
@@ -2150,6 +2184,17 @@ tr.offline .dev-name{ color:#dc2626; }
 
 @media (max-width: 720px){
   .badge-lib-fields{ grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px){
+  #userModal .user-modal-body{ grid-template-columns:1fr; }
+  #userModal .user-form-section{ order:-1; }
+}
+
+@media (max-width: 600px){
+  #userModal .user-modal-box{ min-width:min(520px,95vw); }
+  #userModal .user-table th,
+  #userModal .user-table td{ padding:6px 8px; }
 }
 
 @media (orientation: portrait), (max-width: 900px){

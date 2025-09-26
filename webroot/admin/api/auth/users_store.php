@@ -10,6 +10,17 @@ const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
 const SIGNAGE_AUTH_ROLES = ['viewer', 'editor', 'admin'];
 
+
+function auth_users_public_payload(array $user): array
+{
+    return [
+        'username' => $user['username'] ?? '',
+        'displayName' => $user['displayName'] ?? null,
+        'roles' => auth_user_roles($user),
+    ];
+}
+
+
 function auth_users_path(): string
 {
     $custom = getenv('USERS_PATH');
@@ -162,6 +173,21 @@ function auth_users_remove(string $username): bool
     auth_users_save($state);
     return true;
 }
+
+function auth_users_count_admins(array $state, ?string $exclude = null): int
+{
+    $count = 0;
+    foreach ($state['users'] as $username => $user) {
+        if ($exclude !== null && $username === $exclude) {
+            continue;
+        }
+        if (auth_user_has_role($user, 'admin')) {
+            $count++;
+        }
+    }
+    return $count;
+}
+
 
 function auth_user_roles(array $user): array
 {

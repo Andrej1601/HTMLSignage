@@ -53,15 +53,39 @@ function devices_sanitize_network($value): array
     if ($ssid !== null) {
         $network['ssid'] = $ssid;
     }
-    if (isset($value['quality']) && is_numeric($value['quality'])) {
-        $quality = max(0, min(100, (int) round((float) $value['quality'])));
+
+    foreach (['quality', 'signalQuality', 'linkQuality', 'strength'] as $candidate) {
+        if (!isset($value[$candidate]) || !is_numeric($value[$candidate])) {
+            continue;
+        }
+        $quality = max(0, min(100, (int) round((float) $value[$candidate])));
         $network['quality'] = $quality;
+        break;
     }
-    if (isset($value['signal']) && is_numeric($value['signal'])) {
-        $network['signal'] = (float) $value['signal'];
+
+    $signalCaptured = false;
+    foreach (['signal', 'dbm', 'wifiSignal', 'strength', 'rssi'] as $candidate) {
+        if (!isset($value[$candidate]) || !is_numeric($value[$candidate])) {
+            continue;
+        }
+        $signal = (float) $value[$candidate];
+        $network['signal'] = $signal;
+        if ($candidate === 'rssi') {
+            $network['rssi'] = (int) round($signal);
+        }
+        $signalCaptured = true;
+        break;
     }
-    if (isset($value['rssi']) && is_numeric($value['rssi'])) {
+
+    if (!$signalCaptured && isset($value['rssi']) && is_numeric($value['rssi'])) {
+        $network['signal'] = (float) $value['rssi'];
         $network['rssi'] = (int) round((float) $value['rssi']);
+    } elseif (!isset($network['rssi']) && isset($value['rssi']) && is_numeric($value['rssi'])) {
+        $network['rssi'] = (int) round((float) $value['rssi']);
+    }
+
+    if (isset($value['latency']) && is_numeric($value['latency'])) {
+        $network['latency'] = max(0, (float) $value['latency']);
     }
 
     return $network;
@@ -114,13 +138,15 @@ function devices_sanitize_metrics($value): array
     }
     $metrics = [];
     $map = [
-        'cpuLoad' => ['cpuLoad', 'cpu', 'cpu_usage'],
-        'memoryUsage' => ['memoryUsage', 'memory', 'ram'],
-        'storageFree' => ['storageFree', 'storage_free', 'storageFreeMb'],
-        'storageUsed' => ['storageUsed', 'storage_used', 'storageUsedMb'],
-        'temperature' => ['temperature', 'temp'],
-        'uptime' => ['uptime', 'upTimeSeconds'],
-        'batteryLevel' => ['battery', 'batteryLevel']
+        'cpuLoad' => ['cpuLoad', 'cpu', 'cpu_usage', 'cpuPercent', 'cpuLoadPercent'],
+        'memoryUsage' => ['memoryUsage', 'memory', 'ram', 'memoryPercent', 'memUsage', 'ramUsage'],
+        'storageFree' => ['storageFree', 'storage_free', 'storageFreeMb', 'diskFree', 'diskFreeMb', 'freeStorage'],
+        'storageUsed' => ['storageUsed', 'storage_used', 'storageUsedMb', 'diskUsed', 'diskUsedMb', 'usedStorage'],
+        'temperature' => ['temperature', 'temp', 'temperatureC', 'tempC'],
+        'uptime' => ['uptime', 'upTimeSeconds', 'uptimeSeconds', 'uptimeSec'],
+        'batteryLevel' => ['battery', 'batteryLevel', 'batteryPercent', 'battery_level'],
+        'latency' => ['latency', 'ping']
+
     ];
 
     foreach ($map as $target => $candidates) {
@@ -267,7 +293,9 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     if (isset($telemetry['metrics']) && is_array($telemetry['metrics'])) {
         $metricsInput = $telemetry['metrics'];
     }
-    foreach (['cpuLoad', 'memoryUsage', 'storageFree', 'storageUsed', 'temperature', 'uptime', 'batteryLevel'] as $key) {
+
+    foreach (['cpuLoad', 'memoryUsage', 'storageFree', 'storageUsed', 'temperature', 'uptime', 'batteryLevel', 'latency'] as $key) {
+
         if (isset($telemetry[$key]) && !isset($metricsInput[$key])) {
             $metricsInput[$key] = $telemetry[$key];
         }
@@ -275,6 +303,8 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
 
     $status = devices_sanitize_status($statusInput);
     $metrics = devices_sanitize_metrics($metricsInput);
+    $offlineFlag = array_key_exists('offline', $telemetry) ? (bool) $telemetry['offline'] : false;
+
 
     if (!empty($status)) {
         $device['status'] = $status;
@@ -286,7 +316,8 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $history = devices_sanitize_history($device['heartbeatHistory']);
     $history[] = array_filter([
         'ts' => $timestamp,
-        'offline' => false,
+        'offline' => $offlineFlag,
+
         'status' => !empty($status) ? $status : null,
         'metrics' => !empty($metrics) ? $metrics : null,
     ], static function ($value) {
@@ -342,6 +373,13 @@ function devices_extract_telemetry_payload(array $payload): array
     } elseif (isset($payload['status']['errors']) && is_array($payload['status']['errors'])) {
         $telemetry['errors'] = $payload['status']['errors'];
     }
+
+    if (array_key_exists('offline', $payload)) {
+        $telemetry['offline'] = (bool) $payload['offline'];
+    } elseif (array_key_exists('online', $payload)) {
+        $telemetry['offline'] = !(bool) $payload['online'];
+    }
+
 
     return $telemetry;
 }
