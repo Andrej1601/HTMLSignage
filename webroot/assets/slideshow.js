@@ -1681,6 +1681,16 @@ async function loadDeviceResolved(id){
     return '';
   }
 
+  function extractImageUrl(source){
+    if (!source) return '';
+    if (typeof source === 'string') return source.trim();
+    if (typeof source === 'object') {
+      if (typeof source.url === 'string') return source.url.trim();
+      if (typeof source.src === 'string') return source.src.trim();
+    }
+    return '';
+  }
+
   function normalizeBadgeDescriptor(descriptor, fallbackId){
     if (descriptor == null) return null;
     const entry = (descriptor && typeof descriptor === 'object' && !Array.isArray(descriptor)) ? descriptor : null;
@@ -1688,6 +1698,14 @@ async function loadDeviceResolved(id){
     if (!visible) return null;
     const label = entry ? firstText(entry.label, entry.text, entry.title, entry.name, entry.value) : firstText(descriptor);
     const icon = entry ? firstText(entry.icon, entry.symbol, entry.glyph, entry.emoji) : '';
+    let imageUrl = '';
+    if (entry) {
+      imageUrl = extractImageUrl(entry.imageUrl)
+        || extractImageUrl(entry.iconUrl)
+        || extractImageUrl(entry.image)
+        || extractImageUrl(entry.media)
+        || extractImageUrl(entry.url);
+    }
     const fallbackStr = (typeof fallbackId === 'string' || typeof fallbackId === 'number' || typeof fallbackId === 'boolean')
       ? String(fallbackId).trim()
       : '';
@@ -1704,8 +1722,10 @@ async function loadDeviceResolved(id){
     const iconStr = String(icon || '').trim();
     const preferLabelId = (!entry || (fallbackStr && id === fallbackStr && /^(?:row:|idx:|cell:|legacy$)/i.test(fallbackStr)));
     const finalId = preferLabelId ? (labelStr || iconStr || id) : (id || labelStr || iconStr);
-    if (!finalId || (!labelStr && !iconStr)) return null;
-    return { id: finalId, label: labelStr, icon: iconStr };
+    if (!finalId || (!labelStr && !iconStr && !imageUrl)) return null;
+    const result = { id: finalId, label: labelStr, icon: iconStr };
+    if (imageUrl) result.imageUrl = imageUrl;
+    return result;
   }
 
   function getBadgeLookup(){
@@ -1752,7 +1772,7 @@ async function loadDeviceResolved(id){
     const addBadge = (badge) => {
       if (!badge) return;
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon]
+      const composite = [badge.label, badge.icon, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1862,7 +1882,7 @@ async function loadDeviceResolved(id){
     const uniqueBadges = [];
     list.forEach(badge => {
       const idKey = (typeof badge.id === 'string') ? badge.id.trim().toLowerCase() : '';
-      const composite = [badge.label, badge.icon]
+      const composite = [badge.label, badge.icon, badge.imageUrl]
         .map(v => String(v || '').trim().toLowerCase())
         .join('|');
       const dedupeKey = idKey || composite;
@@ -1881,9 +1901,16 @@ async function loadDeviceResolved(id){
     uniqueBadges.forEach(badge => {
       const iconChar = String(badge.icon || '').trim();
       const label = String(badge.label || '').trim();
+      const imageUrl = String(badge.imageUrl || '').trim();
       const bits = [];
       const glyph = iconChar || defaultIcon;
-      if (glyph) bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
+      if (imageUrl) {
+        bits.push(h('span', { class: 'badge-icon badge-icon--image' },
+          h('img', { src: imageUrl, alt: '' })
+        ));
+      } else if (glyph) {
+        bits.push(h('span', { class: 'badge-icon', 'aria-hidden': 'true' }, glyph));
+      }
       if (label) bits.push(h('span', { class: 'badge-label' }, label));
       if (!bits.length) return;
       const attrs = { class: 'badge' };

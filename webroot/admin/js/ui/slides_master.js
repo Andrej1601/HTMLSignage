@@ -159,11 +159,14 @@ function ensureBadgeLibrary(settings){
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
-    normalized.push({
-      id,
-      icon,
-      label
-    });
+    let imageUrl = '';
+    if (typeof entry.imageUrl === 'string') imageUrl = entry.imageUrl.trim();
+    else if (typeof entry.iconUrl === 'string') imageUrl = entry.iconUrl.trim();
+    else if (typeof entry.image === 'string') imageUrl = entry.image.trim();
+    else if (entry.image && typeof entry.image.url === 'string') imageUrl = entry.image.url.trim();
+    const record = { id, icon, label };
+    if (imageUrl) record.imageUrl = imageUrl;
+    normalized.push(record);
     seen.add(id);
   };
 
@@ -205,7 +208,14 @@ function syncActiveStyleSetBadgeSettings(settings){
     if (!id) return;
     const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
     const label = typeof item.label === 'string' ? item.label.trim() : '';
-    clonedLibrary.push({ id, icon, label });
+    let imageUrl = '';
+    if (typeof item.imageUrl === 'string') imageUrl = item.imageUrl.trim();
+    else if (typeof item.iconUrl === 'string') imageUrl = item.iconUrl.trim();
+    else if (typeof item.image === 'string') imageUrl = item.image.trim();
+    else if (item.image && typeof item.image.url === 'string') imageUrl = item.image.url.trim();
+    const record = { id, icon, label };
+    if (imageUrl) record.imageUrl = imageUrl;
+    clonedLibrary.push(record);
   });
   targetSlides.badgeLibrary = clonedLibrary;
 
@@ -2471,13 +2481,24 @@ export function renderSlidesMaster(){
       const chip = document.createElement('span');
       chip.className = 'badge-lib-chip';
 
+      const chipMedia = document.createElement('span');
+      chipMedia.className = 'badge-lib-chip-media';
+
+      const chipImage = document.createElement('img');
+      chipImage.className = 'badge-lib-chip-image';
+      chipImage.alt = '';
+      chipImage.hidden = true;
+
       const chipIcon = document.createElement('span');
       chipIcon.className = 'badge-lib-chip-icon';
+      chipIcon.hidden = true;
+
+      chipMedia.appendChild(chipImage);
+      chipMedia.appendChild(chipIcon);
+      chip.appendChild(chipMedia);
 
       const chipLabel = document.createElement('span');
       chipLabel.className = 'badge-lib-chip-label';
-
-      chip.appendChild(chipIcon);
       chip.appendChild(chipLabel);
       preview.appendChild(chip);
 
@@ -2524,11 +2545,22 @@ export function renderSlidesMaster(){
       const updatePreview = () => {
         const iconValue = (emojiSelect.value || '').trim();
         const labelValue = labelInput.value.trim();
+        const imageValue = typeof badge.imageUrl === 'string' ? badge.imageUrl.trim() : '';
         chipLabel.textContent = labelValue || badge.id;
-        chipIcon.textContent = iconValue || '';
-        chipIcon.hidden = !iconValue;
-        row.classList.toggle('has-icon', !!iconValue);
-        row.classList.toggle('is-empty', !iconValue && !labelValue);
+        if (imageValue) {
+          chipImage.src = imageValue;
+          chipImage.hidden = false;
+          chipIcon.hidden = true;
+          chipIcon.textContent = '';
+        } else {
+          chipImage.hidden = true;
+          chipImage.removeAttribute('src');
+          chipIcon.textContent = iconValue || '';
+          chipIcon.hidden = !iconValue;
+        }
+        row.classList.toggle('has-image', !!imageValue);
+        row.classList.toggle('has-icon', !!iconValue || !!imageValue);
+        row.classList.toggle('is-empty', !iconValue && !labelValue && !imageValue);
       };
 
       emojiSelect.addEventListener('input', updatePreview);
