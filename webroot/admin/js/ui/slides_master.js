@@ -170,18 +170,37 @@ function ensureBadgeLibrary(settings){
     seen.add(id);
   };
 
+  const collectFromList = (list, assignIds = false) => {
+    if (!Array.isArray(list)) return false;
+    const before = normalized.length;
+    list.forEach((entry) => pushEntry(entry, assignIds));
+    return normalized.length > before;
+  };
+
   const raw = settings.slides.badgeLibrary;
-  const hadArray = Array.isArray(raw);
-  const hadEntries = hadArray && raw.some(entry => entry && typeof entry === 'object');
-  if (hadArray){
-    raw.forEach(entry => pushEntry(entry, true));
+  const hadSettingsEntries = collectFromList(raw, true);
+
+  if (!hadSettingsEntries) {
+    const styleSets = settings.slides?.styleSets;
+    if (styleSets && typeof styleSets === 'object') {
+      const activeId = settings.slides?.activeStyleSet;
+      const tryUseBadgeList = (candidate) => collectFromList(candidate, true);
+      let loaded = false;
+      if (activeId && styleSets[activeId]?.slides) {
+        loaded = tryUseBadgeList(styleSets[activeId].slides.badgeLibrary);
+      }
+      if (!loaded) {
+        Object.values(styleSets).some((entry) => {
+          if (!entry || typeof entry !== 'object') return false;
+          return tryUseBadgeList(entry.slides?.badgeLibrary);
+        });
+      }
+    }
   }
 
-
-  const shouldUseFallback = !normalized.length && !hadArray;
-  if (shouldUseFallback){
+  if (!normalized.length) {
     const fallback = DEFAULTS.slides?.badgeLibrary || [];
-    if (Array.isArray(fallback)) fallback.forEach(entry => pushEntry(entry, true));
+    if (Array.isArray(fallback)) collectFromList(fallback, true);
   }
 
   settings.slides.badgeLibrary = normalized;
