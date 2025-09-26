@@ -175,11 +175,17 @@ export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback 
     if (!id || seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    let imageUrl = '';
+    if (typeof entry.imageUrl === 'string') imageUrl = entry.imageUrl.trim();
+    else if (typeof entry.iconUrl === 'string') imageUrl = entry.iconUrl.trim();
+    else if (typeof entry.image === 'string') imageUrl = entry.image.trim();
+    else if (entry.image && typeof entry.image.url === 'string') imageUrl = entry.image.url.trim();
     const record = {
       id,
       icon,
       label
     };
+    if (imageUrl) record.imageUrl = imageUrl;
     normalized.push(record);
     seen.add(id);
   };
