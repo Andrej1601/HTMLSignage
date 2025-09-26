@@ -1,6 +1,9 @@
 <?php
 header('Content-Type: application/json; charset=UTF-8');
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
+
+auth_require_role('viewer');
 
 $raw = file_get_contents('php://input');
 $payload = json_decode($raw, true);
@@ -21,7 +24,8 @@ if ($deviceId === '') {
 }
 
 $db = devices_load();
-if (!devices_touch_entry($db, $deviceId)) {
+$telemetry = devices_extract_telemetry_payload($payload);
+if (!devices_touch_entry($db, $deviceId, null, $telemetry)) {
   echo json_encode(['ok' => false, 'error' => 'unknown-device']);
   exit;
 }

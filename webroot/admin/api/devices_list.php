@@ -3,7 +3,9 @@
 // Warum: Die Admin-UI erwartet dieses Format; gemischte Ausgabe verursachte
 // "undefined"-Einträge & fehlschlagendes Löschen.
 
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
+auth_require_role('viewer');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
@@ -48,7 +50,12 @@ foreach (($db['devices'] ?? []) as $id => $d) {
     'overrides' => [
       'settings' => $overrides['settings'] ?? (object)[],
       'schedule' => $overrides['schedule'] ?? (object)[]
-    ]
+    ],
+    'status' => isset($d['status']) && is_array($d['status']) ? $d['status'] : (object)[],
+    'metrics' => isset($d['metrics']) && is_array($d['metrics']) ? $d['metrics'] : (object)[],
+    'heartbeatHistory' => isset($d['heartbeatHistory']) && is_array($d['heartbeatHistory'])
+      ? array_slice(array_values($d['heartbeatHistory']), -10)
+      : []
   ];
 }
 

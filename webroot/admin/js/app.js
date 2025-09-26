@@ -10,7 +10,7 @@
 'use strict';
 
 // === Modular imports =========================================================
-import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson } from './core/utils.js';
+import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
@@ -40,6 +40,12 @@ import {
   resolveNowSeconds,
   OFFLINE_AFTER_MIN
 } from './core/device_service.js';
+import {
+  fetchUsers as fetchUserAccounts,
+  saveUser as saveUserAccount,
+  deleteUser as deleteUserAccount,
+  AVAILABLE_ROLES as AUTH_ROLES
+} from './core/auth_service.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
@@ -55,6 +61,21 @@ const safeStorage = createSafeLocalStorage({
 const lsGet = (key) => safeStorage.getItem(key);
 const lsSet = (key, value) => safeStorage.setItem(key, value);
 const lsRemove = (key) => safeStorage.removeItem(key);
+
+const ROLE_META = {
+  viewer: {
+    title: 'Viewer',
+    description: 'Lesender Zugriff auf Geräteübersicht und Inhalte.'
+  },
+  editor: {
+    title: 'Editor',
+    description: 'Darf Inhalte bearbeiten und Geräteaktionen ausführen.'
+  },
+  admin: {
+    title: 'Admin',
+    description: 'Voller Zugriff inklusive Benutzer- und Rollenkonfiguration.'
+  }
+};
 
 // === Global State ============================================================
 let schedule = null;
@@ -599,6 +620,7 @@ async function loadAll(){
   initThemeToggle();
   initBackupButtons();
   initCleanupInSystem();
+  initUserAdmin();
   initViewMenu();
   initSidebarResize();
 }
@@ -2725,6 +2747,129 @@ async function createDevicesPane(){
 
   host?.insertBefore(card, host.firstChild);
 
+  const formatRelativeSeconds = (seconds) => {
+    if (!Number.isFinite(seconds)) return 'unbekannt';
+    if (seconds < 45) return 'vor Sekunden';
+    if (seconds < 3600) return `vor ${Math.round(seconds / 60)} min`;
+    if (seconds < 86400) return `vor ${Math.round(seconds / 3600)} h`;
+    return `vor ${Math.round(seconds / 86400)} Tagen`;
+  };
+
+  const renderTelemetryCell = (cell, device) => {
+    if (!cell) return;
+    cell.innerHTML = '';
+    const status = device?.status && typeof device.status === 'object' ? device.status : {};
+    const metrics = device?.metrics && typeof device.metrics === 'object' ? device.metrics : {};
+    const history = Array.isArray(device?.heartbeatHistory) ? device.heartbeatHistory : [];
+
+    const list = document.createElement('dl');
+    list.className = 'dev-telemetry-list';
+    const addItem = (label, content) => {
+      if (!content) return;
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+      const dd = document.createElement('dd');
+      if (Array.isArray(content)) {
+        content.filter(Boolean).forEach((node) => dd.appendChild(node));
+      } else if (content instanceof Node) {
+        dd.appendChild(content);
+      } else {
+        dd.textContent = content;
+      }
+      if (!dd.textContent && !dd.children.length) return;
+      list.append(dt, dd);
+    };
+
+    const versionParts = [];
+    if (status.firmware) versionParts.push(`Firmware ${status.firmware}`);
+    if (status.appVersion) versionParts.push(`App ${status.appVersion}`);
+    addItem('Version', versionParts.join(' · '));
+
+    if (status.ip) {
+      addItem('IP', status.ip);
+    }
+
+    if (status.network && typeof status.network === 'object') {
+      const netParts = [];
+      if (status.network.type) netParts.push(status.network.type);
+      if (Number.isFinite(status.network.quality)) netParts.push(`${Math.round(status.network.quality)} %`);
+      if (Number.isFinite(status.network.signal)) netParts.push(`${Math.round(status.network.signal)} dBm`);
+      if (Number.isFinite(status.network.latency)) netParts.push(`${Math.round(status.network.latency)} ms`);
+      const netLabel = netParts.length ? netParts.join(' · ') : '—';
+      const span = document.createElement('span');
+      span.textContent = netLabel;
+      if (status.network.ssid) {
+        span.title = `SSID: ${status.network.ssid}`;
+      }
+      addItem('Netz', span);
+    }
+
+    const metricParts = [];
+    if (Number.isFinite(metrics.cpuLoad)) metricParts.push(`CPU ${Math.round(metrics.cpuLoad)} %`);
+    if (Number.isFinite(metrics.memoryUsage)) metricParts.push(`RAM ${Math.round(metrics.memoryUsage)} %`);
+    if (Number.isFinite(metrics.temperature)) metricParts.push(`${Math.round(metrics.temperature)} °C`);
+    if (Number.isFinite(metrics.batteryLevel)) metricParts.push(`Akku ${Math.round(metrics.batteryLevel)} %`);
+    if (Number.isFinite(metrics.latency)) metricParts.push(`Ping ${Math.round(metrics.latency)} ms`);
+    addItem('Leistung', metricParts.join(' · '));
+
+    if (status.notes) {
+      addItem('Hinweis', status.notes);
+    }
+
+    if (Array.isArray(status.errors) && status.errors.length) {
+      const errorList = document.createElement('ul');
+      errorList.className = 'dev-error-list';
+      status.errors.slice(0, 3).forEach((error) => {
+        const li = document.createElement('li');
+        const label = [error.code, error.message].filter(Boolean).join(': ');
+        li.textContent = label || 'Fehler';
+        if (error.ts) {
+          const date = new Date(error.ts * 1000);
+          li.title = date.toLocaleString('de-DE');
+        }
+        errorList.appendChild(li);
+      });
+      if (status.errors.length > 3) {
+        const li = document.createElement('li');
+        li.className = 'mut';
+        li.textContent = `+${status.errors.length - 3} weitere`;
+        errorList.appendChild(li);
+      }
+      addItem('Fehler', errorList);
+    }
+
+    if (history.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'dev-history';
+      history.slice(-4).reverse().forEach((entry) => {
+        const chip = document.createElement('span');
+        chip.className = 'dev-history-chip';
+        chip.dataset.state = entry.offline ? 'offline' : 'online';
+        const ts = Number(entry.ts);
+        if (ts) {
+          const date = new Date(ts * 1000);
+          chip.title = date.toLocaleString('de-DE');
+          const time = document.createElement('time');
+          time.dateTime = date.toISOString();
+          const relSeconds = Number(entry.ago);
+          time.textContent = Number.isFinite(relSeconds) ? formatRelativeSeconds(relSeconds) : date.toLocaleTimeString('de-DE');
+          chip.appendChild(time);
+        }
+        wrap.appendChild(chip);
+      });
+      addItem('Heartbeats', wrap);
+    }
+
+    if (!list.children.length) {
+      const empty = document.createElement('span');
+      empty.className = 'mut dev-telemetry-empty';
+      empty.textContent = 'Keine Telemetriedaten empfangen';
+      cell.appendChild(empty);
+    } else {
+      cell.appendChild(list);
+    }
+  };
+
   async function render(options = {}) {
     const { bypassCache = false } = options || {};
     const snapshot = await loadDeviceSnapshots({ bypassCache });
@@ -2791,13 +2936,7 @@ async function createDevicesPane(){
             if (secondsAgo <= OFFLINE_AFTER_MIN * 180) return 'warn';
             return 'crit';
           })();
-          const relativeText = (() => {
-            if (!Number.isFinite(secondsAgo)) return 'unbekannt';
-            if (secondsAgo < 45) return 'vor Sekunden';
-            if (secondsAgo < 3600) return `vor ${Math.round(secondsAgo / 60)} min`;
-            if (secondsAgo < 86400) return `vor ${Math.round(secondsAgo / 3600)} h`;
-            return `vor ${Math.round(secondsAgo / 86400)} Tagen`;
-          })();
+          const relativeText = formatRelativeSeconds(secondsAgo);
           const heartbeatHtml = `<div class="dev-heartbeat" data-state="${heartbeatState}"><span class="dev-heartbeat-dot"></span><span>${offline ? 'offline' : 'online'}</span>${Number.isFinite(secondsAgo) && lastSeenAt ? `<time datetime="${new Date(lastSeenAt * 1000).toISOString()}">${relativeText}</time>` : ''}</div>`;
 
           const row = document.createElement('tr');
@@ -2818,8 +2957,12 @@ async function createDevicesPane(){
             <td><button class="btn sm" data-rename>Umbenennen</button></td>
             <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
             <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
+            <td class="dev-telemetry" data-telemetry></td>
             ${statusCell}
           `;
+
+          const telemetryCell = row.querySelector('[data-telemetry]');
+          renderTelemetryCell(telemetryCell, device);
 
           const modeInput = row.querySelector('[data-mode]');
           const modeLabel = row.querySelector('[data-mode-label]');
@@ -3184,7 +3327,307 @@ function initThemeToggle(){
 }
 
 // ============================================================================
-// 8) System: Cleanup-Buttons (Assets aufräumen mit Auswahl)
+// 8) Benutzer & Rollen
+// ============================================================================
+function initUserAdmin(){
+  const openBtn = document.getElementById('btnUsers');
+  const modal = document.getElementById('userModal');
+  if (!openBtn || !modal) return;
+
+  modal.dataset.open = modal.dataset.open || '0';
+
+  const form = modal.querySelector('#userForm');
+  const title = modal.querySelector('[data-user-form-title]');
+  const status = modal.querySelector('[data-user-status]');
+  const passwordHint = modal.querySelector('[data-user-password-hint]');
+  const tableBody = modal.querySelector('[data-user-table]');
+  const emptyHint = modal.querySelector('[data-user-empty]');
+  const roleContainer = modal.querySelector('[data-role-options]');
+  const usernameInput = modal.querySelector('#userUsername');
+  const displayInput = modal.querySelector('#userDisplay');
+  const passwordInput = modal.querySelector('#userPassword');
+  const submitBtn = form?.querySelector('[type=submit]');
+  const createBtn = modal.querySelector('#userCreateBtn');
+  const cancelBtn = modal.querySelector('[data-user-cancel]');
+  const closeButtons = modal.querySelectorAll('[data-user-close]');
+
+  let users = [];
+  let roles = Array.isArray(AUTH_ROLES) && AUTH_ROLES.length ? AUTH_ROLES.slice() : ['viewer', 'editor', 'admin'];
+  let editing = null;
+  let isBusy = false;
+
+  const roleMetaFor = (role) => ROLE_META[role] || { title: role, description: '' };
+
+  const setStatus = (message, type = 'info') => {
+    if (!status) return;
+    status.textContent = message || '';
+    status.dataset.type = message ? type : '';
+  };
+
+  const setBusy = (value) => {
+    isBusy = !!value;
+    modal.classList.toggle('is-busy', isBusy);
+    if (submitBtn) submitBtn.disabled = isBusy;
+    if (createBtn) createBtn.disabled = isBusy;
+  };
+
+  const closeModal = () => {
+    modal.dataset.open = '0';
+    modal.style.display = 'none';
+  };
+
+  const focusInitial = () => {
+    const target = editing ? displayInput : usernameInput;
+    if (target) {
+      try {
+        target.focus();
+        if (typeof target.select === 'function') target.select();
+      } catch {}
+    }
+  };
+
+  const buildRoleOptions = (selectedRoles = []) => {
+    if (!roleContainer) return;
+    const selection = Array.isArray(selectedRoles)
+      ? selectedRoles.map((role) => String(role).toLowerCase())
+      : [];
+    roleContainer.innerHTML = '';
+    roles.forEach((role) => {
+      const roleName = String(role);
+      const meta = roleMetaFor(roleName);
+      const label = document.createElement('label');
+      label.className = 'user-role-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'roles';
+      checkbox.value = roleName;
+      checkbox.checked = selection.includes(roleName);
+      const copy = document.createElement('div');
+      copy.className = 'user-role-copy';
+      const titleEl = document.createElement('span');
+      titleEl.className = 'role-title';
+      titleEl.textContent = meta.title;
+      copy.appendChild(titleEl);
+      if (meta.description) {
+        const desc = document.createElement('span');
+        desc.className = 'role-desc';
+        desc.textContent = meta.description;
+        copy.appendChild(desc);
+      }
+      label.append(checkbox, copy);
+      roleContainer.appendChild(label);
+    });
+  };
+
+  function startCreate({ preserveStatus = false } = {}) {
+    editing = null;
+    if (title) title.textContent = 'Benutzer anlegen';
+    if (!preserveStatus) setStatus('');
+    if (usernameInput) {
+      usernameInput.disabled = false;
+      usernameInput.value = '';
+    }
+    if (displayInput) displayInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+    if (passwordHint) passwordHint.textContent = 'Passwort wird beim Speichern gesetzt.';
+    if (submitBtn) submitBtn.textContent = 'Speichern';
+    buildRoleOptions(['viewer']);
+    renderUserTable();
+    focusInitial();
+  }
+
+  function startEdit(user, { preserveStatus = false } = {}) {
+    if (!user) return;
+    const username = String(user.username ?? '').toLowerCase();
+    editing = {
+      username,
+      displayName: user.displayName ?? '',
+      roles: Array.isArray(user.roles) ? user.roles.slice() : []
+    };
+    if (title) title.textContent = `Benutzer „${user.username}“ bearbeiten`;
+    if (!preserveStatus) setStatus('');
+    if (usernameInput) {
+      usernameInput.disabled = true;
+      usernameInput.value = username;
+    }
+    if (displayInput) displayInput.value = user.displayName ?? '';
+    if (passwordInput) passwordInput.value = '';
+    if (passwordHint) passwordHint.textContent = 'Leer lassen, um das Passwort unverändert zu lassen.';
+    if (submitBtn) submitBtn.textContent = 'Änderungen speichern';
+    buildRoleOptions(editing.roles.length ? editing.roles : ['viewer']);
+    renderUserTable();
+    focusInitial();
+  }
+
+  async function handleDelete(user) {
+    const username = String(user?.username ?? '');
+    if (!username) return;
+    const confirmText = `Benutzer „${username}“ wirklich löschen?`;
+    if (!window.confirm(confirmText)) {
+      return;
+    }
+    try {
+      setBusy(true);
+      await deleteUserAccount(username);
+      setStatus('Benutzer gelöscht.', 'success');
+      if (editing && editing.username === username) {
+        editing = null;
+      }
+      await reloadUsers({ silent: true });
+      startCreate({ preserveStatus: true });
+    } catch (error) {
+      console.error('[admin] Benutzer löschen fehlgeschlagen', error);
+      setStatus(error.message || 'Benutzer konnte nicht gelöscht werden.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function renderUserTable() {
+    if (!tableBody || !emptyHint) return;
+    tableBody.innerHTML = '';
+    const sorted = users.slice().sort((a, b) => {
+      const nameA = String(a?.username ?? '').toLowerCase();
+      const nameB = String(b?.username ?? '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    if (!sorted.length) {
+      emptyHint.hidden = false;
+      return;
+    }
+    emptyHint.hidden = true;
+    sorted.forEach((user) => {
+      const username = String(user?.username ?? '');
+      const display = user?.displayName ? String(user.displayName) : '';
+      const rolesList = Array.isArray(user?.roles) ? user.roles : [];
+      const roleTitles = rolesList.map((role) => roleMetaFor(role).title).join(', ');
+      const roleHtml = roleTitles ? escapeHtml(roleTitles) : '—';
+      const displayHtml = display ? `<div class="mut">${escapeHtml(display)}</div>` : '';
+      const row = document.createElement('tr');
+      if (editing && editing.username === username) {
+        row.classList.add('is-editing');
+      }
+      row.innerHTML = `
+        <td>
+          <strong>${escapeHtml(username)}</strong>
+          ${displayHtml}
+        </td>
+        <td>${roleHtml}</td>
+        <td class="user-actions">
+          <button type="button" class="btn sm" data-user-edit>Bearbeiten</button>
+          <button type="button" class="btn sm danger" data-user-delete>Löschen</button>
+        </td>
+      `;
+      row.querySelector('[data-user-edit]')?.addEventListener('click', () => startEdit(user));
+      row.querySelector('[data-user-delete]')?.addEventListener('click', () => handleDelete(user));
+      tableBody.appendChild(row);
+    });
+  }
+
+  const collectSelectedRoles = () => Array.from(roleContainer?.querySelectorAll('input[type=checkbox]:checked') || []).map((input) => input.value);
+
+  async function reloadUsers({ preserveSelection = false, silent = false } = {}) {
+    if (!silent) setBusy(true);
+    try {
+      const data = await fetchUserAccounts();
+      users = Array.isArray(data?.users) ? data.users : [];
+      roles = Array.isArray(data?.roles) && data.roles.length ? data.roles : roles;
+      if (preserveSelection && editing) {
+        const match = users.find((entry) => entry?.username === editing.username);
+        renderUserTable();
+        if (match) {
+          startEdit(match, { preserveStatus: true });
+          return;
+        }
+      }
+      renderUserTable();
+      startCreate({ preserveStatus: true });
+    } catch (error) {
+      console.error('[admin] Benutzerliste laden fehlgeschlagen', error);
+      setStatus(error.message || 'Benutzerliste konnte nicht geladen werden.', 'error');
+    } finally {
+      if (!silent) setBusy(false);
+    }
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const username = (usernameInput?.value || '').trim().toLowerCase();
+      if (!username) {
+        setStatus('Benutzername angeben.', 'error');
+        focusInitial();
+        return;
+      }
+      const rolesSelection = collectSelectedRoles();
+      if (!rolesSelection.length) {
+        setStatus('Mindestens eine Rolle auswählen.', 'error');
+        return;
+      }
+      const payload = {
+        username,
+        displayName: (displayInput?.value || '').trim(),
+        roles: rolesSelection
+      };
+      const password = (passwordInput?.value || '').trim();
+      if (password) {
+        payload.password = password;
+      }
+      try {
+        setBusy(true);
+        await saveUserAccount(payload);
+        setStatus(editing ? 'Benutzer aktualisiert.' : 'Benutzer angelegt.', 'success');
+        if (passwordInput) passwordInput.value = '';
+        await reloadUsers({ preserveSelection: !!editing, silent: true });
+        if (!editing) {
+          startCreate({ preserveStatus: true });
+        }
+      } catch (error) {
+        console.error('[admin] Benutzer speichern fehlgeschlagen', error);
+        setStatus(error.message || 'Speichern fehlgeschlagen.', 'error');
+      } finally {
+        setBusy(false);
+      }
+    });
+  }
+
+  if (createBtn) {
+    createBtn.addEventListener('click', () => startCreate());
+  }
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => startCreate({ preserveStatus: true }));
+  }
+
+  closeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (!isBusy) closeModal();
+    });
+  });
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal && !isBusy) {
+      closeModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.dataset.open === '1') {
+      closeModal();
+    }
+  });
+
+  openBtn.addEventListener('click', async () => {
+    if (isBusy) return;
+    modal.dataset.open = '1';
+    modal.style.display = 'grid';
+    setStatus('');
+    await reloadUsers();
+    focusInitial();
+  });
+}
+
+// ============================================================================
+// 9) System: Cleanup-Buttons (Assets aufräumen mit Auswahl)
 // ============================================================================
 function initCleanupInSystem(){
   const btn = document.getElementById('btnCleanupSys');
@@ -3214,6 +3657,6 @@ function initCleanupInSystem(){
 }
 
 // ============================================================================
-// 9) Start
+// 10) Start
 // ============================================================================
 loadAll();
