@@ -135,100 +135,34 @@
           <div class="settings-card-title">Automatisierung</div>
           <p class="settings-card-description">Lädt zu Start oder Tab-Wechsel automatisch passende Voreinstellungen.</p>
         </div>
-        <div class="settings-card-body">
-          <div class="kv">
-            <label>Auto je Wochentag <span class="tip" title="Lädt beim Start automatisch das Preset des aktuellen Wochentags.">❔</span></label>
-            <input id="presetAuto" type="checkbox">
-          </div>
-          <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
-          <div class="divider"></div>
-          <div class="kv">
-            <label>Style-Automation aktiv</label>
-            <input id="styleAutoEnabled" type="checkbox">
-          </div>
-          <div class="kv">
-            <label>Fallback-Stil</label>
-            <select id="styleAutoFallback" class="input"></select>
-          </div>
-          <div class="style-auto-list" id="styleAutoList"></div>
-          <div class="row style-auto-actions">
-            <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
-          </div>
-          <div class="fieldset" id="styleAutoEventBox">
-            <div class="legend">Event-Trigger</div>
+        <details class="settings-card-body style-auto-fold" id="styleAutomationFold" open>
+          <summary class="style-auto-summary">
+            <span class="style-auto-summary-text">Automatisierung konfigurieren</span>
+            <span class="style-auto-summary-chev" aria-hidden="true">▾</span>
+          </summary>
+          <div class="style-auto-inner">
             <div class="kv">
-              <label>Aktiv</label>
-              <input id="styleEventEnabled" type="checkbox">
+              <label>Auto je Wochentag <span class="tip" title="Lädt beim Start automatisch das Preset des aktuellen Wochentags.">❔</span></label>
+              <input id="presetAuto" type="checkbox">
+            </div>
+            <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+            <div class="divider"></div>
+            <div class="kv">
+              <label>Style-Automation aktiv</label>
+              <input id="styleAutoEnabled" type="checkbox">
             </div>
             <div class="kv">
-              <label>Vorwarnzeit (Minuten)</label>
-              <input id="styleEventLookahead" class="input num3" type="number" min="5" max="360" step="5">
+              <label>Fallback-Stil</label>
+              <select id="styleAutoFallback" class="input"></select>
             </div>
-            <div class="kv">
-              <label>Style für Events</label>
-              <select id="styleEventStyle" class="input"></select>
+            <div class="style-auto-list" id="styleAutoList"></div>
+            <div class="row style-auto-actions">
+              <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
             </div>
-            <div class="help">Liegt ein Countdown-Event innerhalb des Vorwarnfensters, wird automatisch dieser Stil aktiviert.</div>
           </div>
-        </div>
+        </details>
       </div>
 
-      <div class="settings-card" id="extraContentCard">
-        <div class="settings-card-head">
-          <div class="settings-card-title">Zusatzinhalte</div>
-          <p class="settings-card-description">Pflege Wellness-Tipps, Event-Countdowns und Gastronomiehinweise für linke oder rechte Bildschirmhälfte.</p>
-        </div>
-        <div class="settings-card-body extras-card-body">
-          <div class="extras-group" id="extrasWellness">
-            <div class="extras-group-head">
-              <div class="extras-group-title">Wellness-Tipps</div>
-              <button class="btn sm" id="extrasWellnessAdd">Tipp hinzufügen</button>
-            </div>
-            <div class="extras-group-list" id="extrasWellnessList"></div>
-          </div>
-          <div class="extras-group" id="extrasEvents">
-            <div class="extras-group-head">
-              <div class="extras-group-title">Event-Countdowns</div>
-              <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
-            </div>
-            <div class="extras-group-list" id="extrasEventList"></div>
-            <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
-          </div>
-          <div class="extras-group" id="extrasGastro">
-            <div class="extras-group-head">
-              <div class="extras-group-title">Gastronomie-Highlights</div>
-              <button class="btn sm" id="extrasGastroAdd">Highlight hinzufügen</button>
-            </div>
-            <div class="extras-group-list" id="extrasGastroList"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="settings-card" id="heroTimelineBox">
-        <div class="settings-card-head">
-          <div class="settings-card-title">Hero-Timeline</div>
-          <p class="settings-card-description">Optionaler Zeitstrahl für kommende Aufgüsse im rechten Bereich.</p>
-        </div>
-        <div class="settings-card-body">
-          <div class="kv">
-            <label class="row" style="gap:8px;align-items:center">
-              <input id="heroTimelineEnabled" type="checkbox">
-              <span>Hero-Timeline anzeigen</span>
-            </label>
-          </div>
-          <div class="kv" id="heroTimelineSettings" hidden>
-            <label>Einstellungen</label>
-            <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-              <span class="mut">Dauer (s)</span>
-              <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="120" step="1">
-              <span class="mut">Basis-Minuten</span>
-              <input id="heroTimelineBase" class="input num3" type="number" min="1" max="120" step="1">
-              <span class="mut">Max. Einträge</span>
-              <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- Unterbox 1: Saunen & Übersicht -->
@@ -324,17 +258,85 @@
   </div>
 </details>
 
-    <!-- Unterbox 4: Story-Slides -->
+    <!-- Unterbox 4: Globale Zusatzinhalte & Informationen -->
     <details class="ac sub" id="boxStories">
       <summary>
-        <div class="ttl">▶<span class="chev">⮞</span> Informationen</div>
-        <div class="actions"><button class="btn sm" id="btnStoryAdd">Information hinzufügen</button></div>
+        <div class="ttl">▶<span class="chev">⮞</span> Global Zusatzinhalte &amp; Informationen</div>
       </summary>
-      <div class="content story-builder-pane">
-        <div class="subh">Informationen</div>
-        <div class="help">Pflege Texte, Bilder und Layout für erklärende Slides in einem flexiblen Spalten-Baukasten.</div>
-        <div class="story-builder" id="storyBuilder">
-          <div class="story-builder-list" id="storyList"></div>
+      <div class="content global-info-pane">
+        <div class="global-info-sections">
+          <details class="info-fold" id="infoWellness" open>
+            <summary>Wellness-Tipps</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasWellness">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Wellness-Tipps</div>
+                  <button class="btn sm" id="extrasWellnessAdd">Tipp hinzufügen</button>
+                </div>
+                <div class="extras-group-list" id="extrasWellnessList"></div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoEvents" open>
+            <summary>Event-Countdowns</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasEvents">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Event-Countdowns</div>
+                  <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
+                </div>
+                <div class="extras-group-list" id="extrasEventList"></div>
+                <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoGastro" open>
+            <summary>Gastro-Infos</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasGastro">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Gastronomie-Highlights</div>
+                  <button class="btn sm" id="extrasGastroAdd">Highlight hinzufügen</button>
+                </div>
+                <div class="extras-group-list" id="extrasGastroList"></div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoHero">
+            <summary>Hero-Timeline</summary>
+            <div class="info-fold-body hero-fold-body">
+              <div class="kv">
+                <label class="row" style="gap:8px;align-items:center">
+                  <input id="heroTimelineEnabled" type="checkbox">
+                  <span>Hero-Timeline anzeigen</span>
+                </label>
+              </div>
+              <div class="kv" id="heroTimelineSettings" hidden>
+                <label>Einstellungen</label>
+                <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                  <span class="mut">Dauer (s)</span>
+                  <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="120" step="1">
+                  <span class="mut">Basis-Minuten</span>
+                  <input id="heroTimelineBase" class="input num3" type="number" min="1" max="120" step="1">
+                  <span class="mut">Max. Einträge</span>
+                  <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
+                </div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoStories">
+            <summary>Story-Slides</summary>
+            <div class="info-fold-body story-fold-body">
+              <div class="info-fold-actions"><button class="btn sm" id="btnStoryAdd">Information hinzufügen</button></div>
+              <div class="story-builder-pane">
+                <div class="subh">Informationen</div>
+                <div class="help">Pflege Texte, Bilder und Layout für erklärende Slides in einem flexiblen Spalten-Baukasten.</div>
+                <div class="story-builder" id="storyBuilder">
+                  <div class="story-builder-list" id="storyList"></div>
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </details>

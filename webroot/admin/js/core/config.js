@@ -259,6 +259,23 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
 
   sanitizeStyleAutomation(src);
 
+  const slidesCfg = src.slides || {};
+  slidesCfg.heroEnabled = slidesCfg.heroEnabled === true;
+  const defaultHeroFill = Number(DEFAULTS.slides?.heroTimelineFillMs) || 8000;
+  const rawHeroFill = Number(slidesCfg.heroTimelineFillMs);
+  slidesCfg.heroTimelineFillMs = Number.isFinite(rawHeroFill) && rawHeroFill > 0
+    ? Math.max(1000, Math.round(rawHeroFill < 1000 ? rawHeroFill * 1000 : rawHeroFill))
+    : defaultHeroFill;
+  const defaultHeroBase = Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15;
+  const rawHeroBase = Number(slidesCfg.heroTimelineBaseMinutes);
+  slidesCfg.heroTimelineBaseMinutes = Number.isFinite(rawHeroBase) && rawHeroBase > 0
+    ? Math.max(1, Math.round(rawHeroBase))
+    : defaultHeroBase;
+  const rawHeroMax = Number(slidesCfg.heroTimelineMaxEntries);
+  slidesCfg.heroTimelineMaxEntries = Number.isFinite(rawHeroMax) && rawHeroMax > 0
+    ? Math.max(1, Math.round(rawHeroMax))
+    : null;
+
   const hasBadgeArray = Array.isArray(src.slides?.badgeLibrary);
   src.slides.badgeLibrary = sanitizeBadgeLibrary(src.slides.badgeLibrary, {
     assignMissingIds,
@@ -308,7 +325,10 @@ function sanitizeWellnessTips(list, fallback){
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const title = typeof entry.title === 'string' ? entry.title.trim() : '';
     const text = typeof entry.text === 'string' ? entry.text.trim() : '';
-    normalized.push({ id, icon, title, text });
+    const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
+    const record = { id, icon, title, text };
+    if (dwellSec != null) record.dwellSec = dwellSec;
+    normalized.push(record);
     seen.add(id);
   });
   return normalized;
@@ -328,7 +348,10 @@ function sanitizeEventCountdowns(list, fallback){
     const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
     const target = rawTarget || '';
     const style = typeof entry.style === 'string' ? entry.style.trim() : '';
-    normalized.push({ id, title, subtitle, target, style });
+    const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
+    const record = { id, title, subtitle, target, style };
+    if (dwellSec != null) record.dwellSec = dwellSec;
+    normalized.push(record);
     seen.add(id);
   });
   return normalized;
@@ -352,7 +375,10 @@ function sanitizeGastronomyHighlights(list, fallback){
     const textList = Array.isArray(entry.textLines)
       ? entry.textLines.map((it) => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
       : [];
-    normalized.push({ id, title, description, icon, items: details, textLines: textList });
+    const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
+    const record = { id, title, description, icon, items: details, textLines: textList };
+    if (dwellSec != null) record.dwellSec = dwellSec;
+    normalized.push(record);
     seen.add(id);
   });
   return normalized;
@@ -370,6 +396,34 @@ function normalizeTimeString(raw){
   return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 }
 
+function normalizeDateTimeLocal(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim().replace(/\s+/, 'T');
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (!Number.isFinite(year) || year < 1970 || year > 9999) return null;
+  if (!Number.isFinite(month) || month < 1 || month > 12) return null;
+  if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+  if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+  if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+  const iso = `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day
+    .toString().padStart(2, '0')}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+  const ms = new Date(year, month - 1, day, hour, minute).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return { iso, ms };
+}
+
+function sanitizeDwellSeconds(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return Math.max(1, Math.round(num));
+}
+
 function sanitizeStyleAutomation(settings){
   const slides = settings?.slides || {};
   const styleSets = slides.styleSets && typeof slides.styleSets === 'object' ? slides.styleSets : {};
@@ -384,16 +438,7 @@ function sanitizeStyleAutomation(settings){
     fallbackStyle: availableStyles.has(raw.fallbackStyle)
       ? raw.fallbackStyle
       : (availableStyles.has(defaults.fallbackStyle) ? defaults.fallbackStyle : Array.from(availableStyles)[0] || ''),
-    timeSlots: [],
-    eventStyle: {
-      enabled: raw.eventStyle?.enabled !== false && defaults?.eventStyle?.enabled !== false,
-      lookaheadMinutes: Number.isFinite(+raw.eventStyle?.lookaheadMinutes)
-        ? Math.max(1, Math.round(+raw.eventStyle.lookaheadMinutes))
-        : (defaults.eventStyle?.lookaheadMinutes ?? 60),
-      style: availableStyles.has(raw.eventStyle?.style)
-        ? raw.eventStyle.style
-        : (availableStyles.has(defaults.eventStyle?.style) ? defaults.eventStyle.style : '')
-    }
+    timeSlots: []
   };
 
   const slotSource = Array.isArray(raw.timeSlots) && raw.timeSlots.length
@@ -406,12 +451,37 @@ function sanitizeStyleAutomation(settings){
     if (seen.has(id)) return;
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
     const style = availableStyles.has(entry.style) ? entry.style : normalized.fallbackStyle;
-    const start = normalizeTimeString(entry.start);
-    if (!start) return;
-    normalized.timeSlots.push({ id, label, start, style });
+    const mode = entry.mode === 'range' || (entry.startDateTime && entry.endDateTime)
+      ? 'range'
+      : 'daily';
+    if (mode === 'range') {
+      const startInfo = normalizeDateTimeLocal(entry.startDateTime || entry.startDate || entry.start);
+      const endInfo = normalizeDateTimeLocal(entry.endDateTime || entry.endDate || entry.end);
+      if (!startInfo || !endInfo || endInfo.ms < startInfo.ms) return;
+      normalized.timeSlots.push({
+        id,
+        label,
+        style,
+        mode: 'range',
+        startDateTime: startInfo.iso,
+        endDateTime: endInfo.iso
+      });
+    } else {
+      const start = normalizeTimeString(entry.start || entry.startTime || '');
+      if (!start) return;
+      normalized.timeSlots.push({ id, label, start, style, mode: 'daily' });
+    }
     seen.add(id);
   });
-  normalized.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+  normalized.timeSlots.sort((a, b) => {
+    const groupA = a.mode === 'range' ? 0 : 1;
+    const groupB = b.mode === 'range' ? 0 : 1;
+    if (groupA !== groupB) return groupA - groupB;
+    if (groupA === 0) {
+      return (a.startDateTime || '').localeCompare(b.startDateTime || '');
+    }
+    return (a.start || '').localeCompare(b.start || '');
+  });
   slides.styleAutomation = normalized;
   return normalized;
 }
