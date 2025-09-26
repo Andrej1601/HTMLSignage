@@ -52,6 +52,80 @@
   </header>
 
   <main class="layout">
+    <section class="dashboard-intro" aria-labelledby="adminIntroTitle">
+      <div class="intro-head">
+        <div>
+          <h2 id="adminIntroTitle">Willkommen im Adminbereich</h2>
+          <p class="intro-text">
+            Hier steuerst du Tagespläne, Slideshows und Zusatzinformationen für die Anzeigen. Wähle einen Bereich über die Schnellnavigation oder starte direkt mit den wichtigsten Aufgaben.
+          </p>
+        </div>
+        <div class="intro-status" aria-live="polite">
+          <div class="status-indicator">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="introStatusText">Bereit zum Bearbeiten</span>
+          </div>
+          <div class="status-help">Nutze „Speichern“, sobald deine Änderungen fertig sind.</div>
+        </div>
+      </div>
+
+      <nav class="quick-nav" aria-label="Schnellnavigation">
+        <a class="quick-nav-item" href="#gridPane">
+          <span class="quick-nav-icon" aria-hidden="true">🗓️</span>
+          <span>
+            <span class="quick-nav-title">Tagesplan</span>
+            <span class="quick-nav-sub">Zeiten &amp; Wochenpläne</span>
+          </span>
+        </a>
+        <a class="quick-nav-item" href="#slidesMaster">
+          <span class="quick-nav-icon" aria-hidden="true">🎬</span>
+          <span>
+            <span class="quick-nav-title">Slides &amp; Steuerung</span>
+            <span class="quick-nav-sub">Ablauf &amp; Automationen</span>
+          </span>
+        </a>
+        <a class="quick-nav-item" href="#boxSaunas">
+          <span class="quick-nav-icon" aria-hidden="true">🔥</span>
+          <span>
+            <span class="quick-nav-title">Saunen &amp; Übersicht</span>
+            <span class="quick-nav-sub">Inhalte &amp; Presets</span>
+          </span>
+        </a>
+        <a class="quick-nav-item" href="#boxImages">
+          <span class="quick-nav-icon" aria-hidden="true">🖼️</span>
+          <span>
+            <span class="quick-nav-title">Medien-Slides</span>
+            <span class="quick-nav-sub">Fotos &amp; Videos verwalten</span>
+          </span>
+        </a>
+        <a class="quick-nav-item" href="#boxSlidesText">
+          <span class="quick-nav-icon" aria-hidden="true">🧩</span>
+          <span>
+            <span class="quick-nav-title">Slideshow &amp; Layout</span>
+            <span class="quick-nav-sub">Layouts &amp; Farben anpassen</span>
+          </span>
+        </a>
+      </nav>
+
+      <div class="overview-cards" aria-label="Kurzübersicht">
+        <article class="overview-card">
+          <h3>Tagesplanung</h3>
+          <p>Verwalte Aufgusszeiten, Wochentage und voreingestellte Presets direkt im Kalender.</p>
+          <a class="overview-link" href="#gridPane">Zum Plan</a>
+        </article>
+        <article class="overview-card">
+          <h3>Inhalte &amp; Medien</h3>
+          <p>Pflege Saunen, Zusatzinfos und Medien-Slides inklusive Vorschau und Sichtbarkeit.</p>
+          <a class="overview-link" href="#boxSaunas">Zu den Inhalten</a>
+        </article>
+        <article class="overview-card">
+          <h3>Design &amp; Automation</h3>
+          <p>Steuere Dauer, Layouts, Farben und Automatisierungen für einen konsistenten Auftritt.</p>
+          <a class="overview-link" href="#slidesMaster">Zu den Einstellungen</a>
+        </article>
+      </div>
+    </section>
+
     <section class="leftcol">
 <div class="card" id="gridPane">
         <div class="content" style="padding-bottom:0">
