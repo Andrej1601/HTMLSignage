@@ -1226,6 +1226,7 @@ body.device-mode #devPairedList tr.selected{
 .dev-telemetry-list dd{ margin:0; }
 .dev-telemetry-list dd .mut{ color:var(--muted); }
 .dev-telemetry-empty{ display:block; font-size:12px; color:var(--muted); }
+
 .dev-error-list{ margin:0; padding-left:18px; }
 .dev-error-list li{ margin:0; }
 .dev-history{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }

@@ -146,6 +146,7 @@ function devices_sanitize_metrics($value): array
         'uptime' => ['uptime', 'upTimeSeconds', 'uptimeSeconds', 'uptimeSec'],
         'batteryLevel' => ['battery', 'batteryLevel', 'batteryPercent', 'battery_level'],
         'latency' => ['latency', 'ping']
+
     ];
 
     foreach ($map as $target => $candidates) {
@@ -292,7 +293,9 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     if (isset($telemetry['metrics']) && is_array($telemetry['metrics'])) {
         $metricsInput = $telemetry['metrics'];
     }
+
     foreach (['cpuLoad', 'memoryUsage', 'storageFree', 'storageUsed', 'temperature', 'uptime', 'batteryLevel', 'latency'] as $key) {
+
         if (isset($telemetry[$key]) && !isset($metricsInput[$key])) {
             $metricsInput[$key] = $telemetry[$key];
         }
@@ -301,6 +304,7 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $status = devices_sanitize_status($statusInput);
     $metrics = devices_sanitize_metrics($metricsInput);
     $offlineFlag = array_key_exists('offline', $telemetry) ? (bool) $telemetry['offline'] : false;
+
 
     if (!empty($status)) {
         $device['status'] = $status;
@@ -313,6 +317,7 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $history[] = array_filter([
         'ts' => $timestamp,
         'offline' => $offlineFlag,
+
         'status' => !empty($status) ? $status : null,
         'metrics' => !empty($metrics) ? $metrics : null,
     ], static function ($value) {
@@ -374,6 +379,7 @@ function devices_extract_telemetry_payload(array $payload): array
     } elseif (array_key_exists('online', $payload)) {
         $telemetry['offline'] = !(bool) $payload['online'];
     }
+
 
     return $telemetry;
 }
