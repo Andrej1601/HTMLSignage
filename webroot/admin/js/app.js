@@ -628,6 +628,50 @@ function renderSlidesBox(){
     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
   };
 
+  const normalizeAutomationDateTime = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.replace(/\s+/, 'T');
+    const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(normalized);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    if (!Number.isFinite(year) || year < 1970 || year > 9999) return null;
+    if (!Number.isFinite(month) || month < 1 || month > 12) return null;
+    if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+    if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+    const iso = `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hour
+      .toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+    const ms = new Date(year, month - 1, day, hour, minute).getTime();
+    if (!Number.isFinite(ms)) return null;
+    return { iso, ms };
+  };
+
+  const formatAutomationDate = (date) => {
+    if (!(date instanceof Date)) return '';
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    const h = date.getHours().toString().padStart(2, '0');
+    const min = date.getMinutes().toString().padStart(2, '0');
+    return `${y.toString().padStart(4, '0')}-${m}-${d}T${h}:${min}`;
+  };
+
+  const compareAutomationSlots = (a, b) => {
+    const groupA = a.mode === 'range' ? 0 : 1;
+    const groupB = b.mode === 'range' ? 0 : 1;
+    if (groupA !== groupB) return groupA - groupB;
+    if (groupA === 0) {
+      return (a.startDateTime || '').localeCompare(b.startDateTime || '');
+    }
+    return (a.start || '').localeCompare(b.start || '');
+  };
+
   const ensureStyleAutomationState = () => {
     settings.slides ||= {};
     const styleSets = (settings.slides.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
@@ -640,8 +684,7 @@ function renderSlidesBox(){
     const normalized = {
       enabled: current.enabled !== false,
       fallbackStyle: '',
-      timeSlots: [],
-      eventStyle: {}
+      timeSlots: []
     };
 
     const fallbackCandidate = current.fallbackStyle || defaults.fallbackStyle || settings.slides.activeStyleSet || available[0] || '';
@@ -652,47 +695,43 @@ function renderSlidesBox(){
       : (Array.isArray(defaults.timeSlots) ? deepClone(defaults.timeSlots) : []);
 
     const seen = new Set();
-    slotSource.forEach((slot) => {
+    const pushSlot = (slot) => {
       if (!slot || typeof slot !== 'object') return;
       let id = slot.id ? String(slot.id).trim() : '';
       if (!id) id = genId('sty_');
       if (seen.has(id)) return;
-      let start = normalizeTime(slot.start);
-      if (!start) start = normalizeTime(defaults.timeSlots?.[0]?.start) || '06:00';
       const label = typeof slot.label === 'string' ? slot.label.trim() : '';
       const style = available.includes(slot.style) ? slot.style : normalized.fallbackStyle;
-      normalized.timeSlots.push({ id, start, label, style });
+      const mode = slot.mode === 'range' || (slot.startDateTime && slot.endDateTime)
+        ? 'range'
+        : 'daily';
+      if (mode === 'range') {
+        const startInfo = normalizeAutomationDateTime(slot.startDateTime || slot.startDate || slot.start);
+        const endInfo = normalizeAutomationDateTime(slot.endDateTime || slot.endDate || slot.end);
+        if (!startInfo || !endInfo || endInfo.ms < startInfo.ms) return;
+        normalized.timeSlots.push({
+          id,
+          label,
+          style,
+          mode: 'range',
+          startDateTime: startInfo.iso,
+          endDateTime: endInfo.iso
+        });
+      } else {
+        const start = normalizeTime(slot.start || slot.startTime || '');
+        if (!start) return;
+        normalized.timeSlots.push({ id, label, start, style, mode: 'daily' });
+      }
       seen.add(id);
-    });
-    if (!normalized.timeSlots.length && Array.isArray(defaults.timeSlots)) {
-      defaults.timeSlots.forEach((slot) => {
-        if (!slot || typeof slot !== 'object') return;
-        const id = genId('sty_');
-        const start = normalizeTime(slot.start) || '06:00';
-        const label = typeof slot.label === 'string' ? slot.label.trim() : '';
-        const style = available.includes(slot.style) ? slot.style : normalized.fallbackStyle;
-        normalized.timeSlots.push({ id, start, label, style });
-      });
-    }
-    normalized.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
-
-    const defaultEvent = defaults.eventStyle || {};
-    const eventCurrent = current.eventStyle && typeof current.eventStyle === 'object' ? current.eventStyle : {};
-    const defaultEnabled = defaultEvent.enabled !== false;
-    const eventStyle = available.includes(eventCurrent.style)
-      ? eventCurrent.style
-      : (available.includes(defaultEvent.style) ? defaultEvent.style : normalized.fallbackStyle);
-    const lookahead = Number.isFinite(+eventCurrent.lookaheadMinutes)
-      ? Math.max(1, Math.round(+eventCurrent.lookaheadMinutes))
-      : Number.isFinite(+defaultEvent.lookaheadMinutes)
-        ? Math.max(1, Math.round(+defaultEvent.lookaheadMinutes))
-        : 60;
-    normalized.eventStyle = {
-      enabled: defaultEnabled ? (eventCurrent.enabled !== false) : false,
-      lookaheadMinutes: lookahead,
-      style: eventStyle
     };
 
+    slotSource.forEach(pushSlot);
+
+    if (!normalized.timeSlots.length && Array.isArray(defaults.timeSlots)) {
+      defaults.timeSlots.forEach(pushSlot);
+    }
+
+    normalized.timeSlots.sort(compareAutomationSlots);
     settings.slides.styleAutomation = normalized;
     return normalized;
   };
@@ -700,6 +739,12 @@ function renderSlidesBox(){
   const ensureExtrasState = () => {
     const defaults = DEFAULTS.extras || {};
     const extras = settings.extras = (settings.extras && typeof settings.extras === 'object') ? settings.extras : {};
+
+    const toDwellSeconds = (value) => {
+      const num = Number(value);
+      if (!Number.isFinite(num) || num <= 0) return null;
+      return Math.max(1, Math.round(num));
+    };
 
     const sanitizeList = (list, fallback, mapper) => {
       const source = Array.isArray(list) && list.length ? list : (Array.isArray(fallback) ? deepClone(fallback) : []);
@@ -719,27 +764,30 @@ function renderSlidesBox(){
       return normalized;
     };
 
-    extras.wellnessTips = sanitizeList(extras.wellnessTips, defaults.wellnessTips, (entry) => ({
-      id: entry.id,
-      icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
-      title: typeof entry.title === 'string' ? entry.title.trim() : '',
-      text: typeof entry.text === 'string' ? entry.text.trim() : ''
-    }));
+    extras.wellnessTips = sanitizeList(extras.wellnessTips, defaults.wellnessTips, (entry) => {
+      const dwell = toDwellSeconds(entry.dwellSec);
+      const result = {
+        id: entry.id,
+        icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
+        title: typeof entry.title === 'string' ? entry.title.trim() : '',
+        text: typeof entry.text === 'string' ? entry.text.trim() : ''
+      };
+      if (dwell != null) result.dwellSec = dwell;
+      return result;
+    });
 
     extras.eventCountdowns = sanitizeList(extras.eventCountdowns, defaults.eventCountdowns, (entry) => {
-      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
-      let target = rawTarget;
-      if (rawTarget) {
-        const parsed = new Date(rawTarget);
-        if (Number.isFinite(parsed.getTime())) target = parsed.toISOString();
-      }
-      return {
+      const target = typeof entry.target === 'string' ? entry.target.trim() : '';
+      const dwell = toDwellSeconds(entry.dwellSec);
+      const result = {
         id: entry.id,
         title: typeof entry.title === 'string' ? entry.title.trim() : '',
         subtitle: typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '',
         target,
         style: typeof entry.style === 'string' ? entry.style.trim() : ''
       };
+      if (dwell != null) result.dwellSec = dwell;
+      return result;
     });
 
     extras.gastronomyHighlights = sanitizeList(extras.gastronomyHighlights, defaults.gastronomyHighlights, (entry) => {
@@ -749,7 +797,8 @@ function renderSlidesBox(){
       const textLines = Array.isArray(entry.textLines)
         ? entry.textLines.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
         : [];
-      return {
+      const dwell = toDwellSeconds(entry.dwellSec);
+      const result = {
         id: entry.id,
         title: typeof entry.title === 'string' ? entry.title.trim() : '',
         description: typeof entry.description === 'string' ? entry.description.trim() : '',
@@ -757,6 +806,8 @@ function renderSlidesBox(){
         items,
         textLines
       };
+      if (dwell != null) result.dwellSec = dwell;
+      return result;
     });
 
     return extras;
@@ -791,9 +842,7 @@ function renderSlidesBox(){
       if (automation.fallbackStyle && !styleOptions.some(opt => opt.id === automation.fallbackStyle) && styleOptions.length) {
         automation.fallbackStyle = styleOptions[0].id;
       }
-      if (automation.fallbackStyle) {
-        fallbackSelect.value = automation.fallbackStyle;
-      }
+      if (automation.fallbackStyle) fallbackSelect.value = automation.fallbackStyle;
       fallbackSelect.onchange = () => {
         automation.fallbackStyle = fallbackSelect.value || '';
         automation.timeSlots.forEach(slot => {
@@ -809,30 +858,124 @@ function renderSlidesBox(){
     const listHost = document.getElementById('styleAutoList');
     if (listHost) {
       listHost.innerHTML = '';
-      automation.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+      automation.timeSlots.sort(compareAutomationSlots);
       automation.timeSlots.forEach((slot, index) => {
         const row = document.createElement('div');
         row.className = 'style-auto-slot';
 
-        const timeWrap = document.createElement('div');
-        timeWrap.className = 'style-auto-field';
-        const timeLabel = document.createElement('label');
-        timeLabel.textContent = 'Startzeit';
-        const timeInput = document.createElement('input');
-        timeInput.type = 'time';
-        timeInput.value = slot.start || '06:00';
-        timeInput.onchange = () => {
-          const next = normalizeTime(timeInput.value);
-          if (next) {
-            slot.start = next;
-            automation.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+        const modeWrap = document.createElement('div');
+        modeWrap.className = 'style-auto-field style-auto-mode';
+        const modeLabel = document.createElement('label');
+        modeLabel.textContent = 'Typ';
+        const modeSelect = document.createElement('select');
+        modeSelect.className = 'input';
+        [
+          { value: 'daily', label: 'Täglich' },
+          { value: 'range', label: 'Zeitraum' }
+        ].forEach(option => {
+          const opt = document.createElement('option');
+          opt.value = option.value;
+          opt.textContent = option.label;
+          modeSelect.appendChild(opt);
+        });
+        modeSelect.value = slot.mode === 'range' ? 'range' : 'daily';
+        modeSelect.onchange = () => {
+          const nextMode = modeSelect.value === 'range' ? 'range' : 'daily';
+          if (nextMode === slot.mode) return;
+          if (nextMode === 'range') {
+            const now = new Date();
+            const startDefault = formatAutomationDate(now);
+            const endDefault = formatAutomationDate(new Date(now.getTime() + 60 * 60 * 1000));
+            slot.mode = 'range';
+            slot.startDateTime = normalizeAutomationDateTime(slot.startDateTime)?.iso
+              || normalizeAutomationDateTime(slot.start)?.iso
+              || startDefault;
+            slot.endDateTime = normalizeAutomationDateTime(slot.endDateTime)?.iso || endDefault;
+            delete slot.start;
+          } else {
+            const start = normalizeTime(slot.start) || normalizeTime('06:00') || '06:00';
+            slot.mode = 'daily';
+            slot.start = start || '06:00';
+            delete slot.startDateTime;
+            delete slot.endDateTime;
+          }
+          automation.timeSlots.sort(compareAutomationSlots);
+          renderStyleAutomationControls();
+          notifySettingsChanged();
+        };
+        modeWrap.append(modeLabel, modeSelect);
+        row.appendChild(modeWrap);
+
+        if (slot.mode === 'range') {
+          const startWrap = document.createElement('div');
+          startWrap.className = 'style-auto-field';
+          const startLabel = document.createElement('label');
+          startLabel.textContent = 'Start (Datum & Uhrzeit)';
+          const startInput = document.createElement('input');
+          startInput.type = 'datetime-local';
+          startInput.value = slot.startDateTime || '';
+          startInput.onchange = () => {
+            const next = normalizeAutomationDateTime(startInput.value);
+            if (!next) {
+              startInput.value = slot.startDateTime || '';
+              return;
+            }
+            slot.startDateTime = next.iso;
+            const endInfo = normalizeAutomationDateTime(slot.endDateTime);
+            if (endInfo && endInfo.ms < next.ms) {
+              const adjusted = new Date(next.ms + 60 * 60 * 1000);
+              slot.endDateTime = formatAutomationDate(adjusted);
+            }
+            automation.timeSlots.sort(compareAutomationSlots);
             renderStyleAutomationControls();
             notifySettingsChanged();
-          } else {
-            timeInput.value = slot.start || '06:00';
-          }
-        };
-        timeWrap.append(timeLabel, timeInput);
+          };
+          startWrap.append(startLabel, startInput);
+
+          const endWrap = document.createElement('div');
+          endWrap.className = 'style-auto-field';
+          const endLabel = document.createElement('label');
+          endLabel.textContent = 'Ende (Datum & Uhrzeit)';
+          const endInput = document.createElement('input');
+          endInput.type = 'datetime-local';
+          endInput.value = slot.endDateTime || '';
+          endInput.onchange = () => {
+            const next = normalizeAutomationDateTime(endInput.value);
+            const startInfo = normalizeAutomationDateTime(slot.startDateTime);
+            if (!next || (startInfo && next.ms < startInfo.ms)) {
+              endInput.value = slot.endDateTime || '';
+              return;
+            }
+            slot.endDateTime = next.iso;
+            automation.timeSlots.sort(compareAutomationSlots);
+            renderStyleAutomationControls();
+            notifySettingsChanged();
+          };
+          endWrap.append(endLabel, endInput);
+
+          row.append(startWrap, endWrap);
+        } else {
+          const timeWrap = document.createElement('div');
+          timeWrap.className = 'style-auto-field';
+          const timeLabel = document.createElement('label');
+          timeLabel.textContent = 'Startzeit';
+          const timeInput = document.createElement('input');
+          timeInput.type = 'time';
+          timeInput.value = slot.start || '06:00';
+          timeInput.onchange = () => {
+            const next = normalizeTime(timeInput.value);
+            if (!next) {
+              timeInput.value = slot.start || '06:00';
+              return;
+            }
+            slot.start = next;
+            automation.timeSlots.sort(compareAutomationSlots);
+            renderStyleAutomationControls();
+            notifySettingsChanged();
+          };
+          timeWrap.append(timeLabel, timeInput);
+          row.appendChild(timeWrap);
+        }
 
         const styleWrap = document.createElement('div');
         styleWrap.className = 'style-auto-field';
@@ -857,6 +1000,7 @@ function renderSlidesBox(){
           notifySettingsChanged();
         };
         styleWrap.append(styleLabel, styleSelect);
+        row.appendChild(styleWrap);
 
         const labelWrap = document.createElement('div');
         labelWrap.className = 'style-auto-field';
@@ -871,6 +1015,7 @@ function renderSlidesBox(){
           notifySettingsChanged();
         };
         labelWrap.append(labelLabel, labelInput);
+        row.appendChild(labelWrap);
 
         const removeBtn = document.createElement('button');
         removeBtn.className = 'btn sm ghost';
@@ -881,8 +1026,8 @@ function renderSlidesBox(){
           renderStyleAutomationControls();
           notifySettingsChanged();
         };
+        row.appendChild(removeBtn);
 
-        row.append(timeWrap, styleWrap, labelWrap, removeBtn);
         listHost.appendChild(row);
       });
     }
@@ -892,74 +1037,28 @@ function renderSlidesBox(){
       addBtn.dataset.bound = '1';
       addBtn.addEventListener('click', () => {
         const state = ensureStyleAutomationState();
-        const start = state.timeSlots.length ? state.timeSlots[state.timeSlots.length - 1].start : '06:00';
-        state.timeSlots.push({ id: genId('sty_'), start, label: '', style: state.fallbackStyle });
-        state.timeSlots.sort((a, b) => a.start.localeCompare(b.start));
+        const last = state.timeSlots[state.timeSlots.length - 1];
+        const start = last && last.mode === 'daily' ? last.start : '06:00';
+        state.timeSlots.push({ id: genId('sty_'), mode: 'daily', start: start || '06:00', label: '', style: state.fallbackStyle });
+        state.timeSlots.sort(compareAutomationSlots);
         renderStyleAutomationControls();
         notifySettingsChanged();
       });
-    }
-
-    const eventEnabled = document.getElementById('styleEventEnabled');
-    if (eventEnabled) {
-      eventEnabled.checked = automation.eventStyle?.enabled !== false;
-      eventEnabled.onchange = () => {
-        automation.eventStyle.enabled = !!eventEnabled.checked;
-        notifySettingsChanged();
-      };
-    }
-
-    const eventLookahead = document.getElementById('styleEventLookahead');
-    if (eventLookahead) {
-      eventLookahead.value = automation.eventStyle?.lookaheadMinutes ?? 60;
-      eventLookahead.onchange = () => {
-        const next = Number(eventLookahead.value);
-        if (Number.isFinite(next) && next > 0) {
-          automation.eventStyle.lookaheadMinutes = Math.max(1, Math.round(next));
-          notifySettingsChanged();
-        }
-      };
-    }
-
-    const eventStyleSelect = document.getElementById('styleEventStyle');
-    if (eventStyleSelect) {
-      eventStyleSelect.innerHTML = '';
-      const baseOpt = document.createElement('option');
-      baseOpt.value = '';
-      baseOpt.textContent = 'Fallback verwenden';
-      eventStyleSelect.appendChild(baseOpt);
-      styleOptions.forEach(({ id, label }) => {
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = label;
-        eventStyleSelect.appendChild(opt);
-      });
-      const currentStyle = automation.eventStyle?.style && styleOptions.some(opt => opt.id === automation.eventStyle.style)
-        ? automation.eventStyle.style
-        : '';
-      eventStyleSelect.value = currentStyle;
-      eventStyleSelect.onchange = () => {
-        const value = eventStyleSelect.value || '';
-        automation.eventStyle.style = value;
-        notifySettingsChanged();
-      };
     }
   };
 
   const toDatetimeLocal = (value) => {
     if (!value) return '';
-    const date = new Date(value);
+    const trimmed = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+    const date = new Date(trimmed);
     if (!Number.isFinite(date.getTime())) return '';
-    const offset = date.getTimezoneOffset();
-    const local = new Date(date.getTime() - offset * 60 * 1000);
-    return local.toISOString().slice(0, 16);
+    return formatAutomationDate(date);
   };
 
   const fromDatetimeLocal = (value) => {
-    if (!value) return '';
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return date.toISOString();
+    if (typeof value !== 'string') return '';
+    return value.trim();
   };
 
   const renderExtrasEditor = () => {
@@ -1010,6 +1109,30 @@ function renderSlidesBox(){
         };
         body.appendChild(textArea);
 
+        const dwellRow = document.createElement('div');
+        dwellRow.className = 'extras-inline';
+        const dwellLabel = document.createElement('label');
+        dwellLabel.textContent = 'Anzeige (Sek.)';
+        const dwellInput = document.createElement('input');
+        dwellInput.className = 'input num3';
+        dwellInput.type = 'number';
+        dwellInput.min = '1';
+        dwellInput.max = '600';
+        dwellInput.placeholder = 'Standard';
+        dwellInput.value = tip.dwellSec != null ? String(tip.dwellSec) : '';
+        dwellInput.onchange = () => {
+          const num = Number(dwellInput.value);
+          if (Number.isFinite(num) && num > 0) {
+            tip.dwellSec = Math.max(1, Math.round(num));
+          } else {
+            delete tip.dwellSec;
+            dwellInput.value = '';
+          }
+          notifySettingsChanged();
+        };
+        dwellRow.append(dwellLabel, dwellInput);
+        body.appendChild(dwellRow);
+
         const actions = document.createElement('div');
         actions.className = 'extras-item-actions';
         const removeBtn = document.createElement('button');
@@ -1032,7 +1155,7 @@ function renderSlidesBox(){
     if (addWellness && !addWellness.dataset.bound) {
       addWellness.dataset.bound = '1';
       addWellness.addEventListener('click', () => {
-        extras.wellnessTips.push({ id: genId('well_'), icon: '', title: '', text: '' });
+        extras.wellnessTips.push({ id: genId('well_'), icon: '', title: '', text: '', dwellSec: null });
         renderExtrasEditor();
         notifySettingsChanged();
       });
@@ -1105,6 +1228,30 @@ function renderSlidesBox(){
         timeRow.append(timeInput, styleSelect);
         body.append(timeRow);
 
+        const dwellRow = document.createElement('div');
+        dwellRow.className = 'extras-inline';
+        const dwellLabel = document.createElement('label');
+        dwellLabel.textContent = 'Anzeige (Sek.)';
+        const dwellInput = document.createElement('input');
+        dwellInput.className = 'input num3';
+        dwellInput.type = 'number';
+        dwellInput.min = '1';
+        dwellInput.max = '600';
+        dwellInput.placeholder = 'Standard';
+        dwellInput.value = event.dwellSec != null ? String(event.dwellSec) : '';
+        dwellInput.onchange = () => {
+          const num = Number(dwellInput.value);
+          if (Number.isFinite(num) && num > 0) {
+            event.dwellSec = Math.max(1, Math.round(num));
+          } else {
+            delete event.dwellSec;
+            dwellInput.value = '';
+          }
+          notifySettingsChanged();
+        };
+        dwellRow.append(dwellLabel, dwellInput);
+        body.appendChild(dwellRow);
+
         const actions = document.createElement('div');
         actions.className = 'extras-item-actions';
         const removeBtn = document.createElement('button');
@@ -1127,7 +1274,7 @@ function renderSlidesBox(){
     if (addEventBtn && !addEventBtn.dataset.bound) {
       addEventBtn.dataset.bound = '1';
       addEventBtn.addEventListener('click', () => {
-        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '' });
+        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '', dwellSec: null });
         renderExtrasEditor();
         notifySettingsChanged();
       });
@@ -1186,6 +1333,30 @@ function renderSlidesBox(){
 
         body.append(descArea, itemsArea);
 
+        const dwellRow = document.createElement('div');
+        dwellRow.className = 'extras-inline';
+        const dwellLabel = document.createElement('label');
+        dwellLabel.textContent = 'Anzeige (Sek.)';
+        const dwellInput = document.createElement('input');
+        dwellInput.className = 'input num3';
+        dwellInput.type = 'number';
+        dwellInput.min = '1';
+        dwellInput.max = '600';
+        dwellInput.placeholder = 'Standard';
+        dwellInput.value = entry.dwellSec != null ? String(entry.dwellSec) : '';
+        dwellInput.onchange = () => {
+          const num = Number(dwellInput.value);
+          if (Number.isFinite(num) && num > 0) {
+            entry.dwellSec = Math.max(1, Math.round(num));
+          } else {
+            delete entry.dwellSec;
+            dwellInput.value = '';
+          }
+          notifySettingsChanged();
+        };
+        dwellRow.append(dwellLabel, dwellInput);
+        body.appendChild(dwellRow);
+
         const actions = document.createElement('div');
         actions.className = 'extras-item-actions';
         const removeBtn = document.createElement('button');
@@ -1208,10 +1379,126 @@ function renderSlidesBox(){
     if (addGastroBtn && !addGastroBtn.dataset.bound) {
       addGastroBtn.dataset.bound = '1';
       addGastroBtn.addEventListener('click', () => {
-        extras.gastronomyHighlights.push({ id: genId('gas_'), title: '', description: '', icon: '', items: [], textLines: [] });
+        extras.gastronomyHighlights.push({ id: genId('gas_'), title: '', description: '', icon: '', items: [], textLines: [], dwellSec: null });
         renderExtrasEditor();
         notifySettingsChanged();
       });
+    }
+  };
+
+  const renderHeroTimelineControls = () => {
+    const ensureSlides = () => {
+      settings.slides ||= {};
+      return settings.slides;
+    };
+
+    const rerenderPlaylists = () => {
+      const displayCfg = settings.display = settings.display || {};
+      const pagesCfg = displayCfg.pages = displayCfg.pages || {};
+      const leftState = pagesCfg.left = pagesCfg.left || {};
+      const rightState = pagesCfg.right = pagesCfg.right || {};
+      renderPagePlaylist('pageLeftPlaylist', leftState.playlist, { pageKey: 'left' });
+      renderPagePlaylist('pageRightPlaylist', rightState.playlist, { pageKey: 'right' });
+    };
+
+    const enabledInput = document.getElementById('heroTimelineEnabled');
+    const settingsPanel = document.getElementById('heroTimelineSettings');
+    if (enabledInput) {
+      const slidesCfg = ensureSlides();
+      const enabled = !!slidesCfg.heroEnabled;
+      enabledInput.checked = enabled;
+      if (settingsPanel) settingsPanel.hidden = !enabled;
+      if (!enabledInput.dataset.bound) {
+        enabledInput.dataset.bound = '1';
+        enabledInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          slides.heroEnabled = !!enabledInput.checked;
+          if (settingsPanel) settingsPanel.hidden = !enabledInput.checked;
+          rerenderPlaylists();
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const durationInput = document.getElementById('heroTimelineDuration');
+    if (durationInput) {
+      const slidesCfg = ensureSlides();
+      const defaultMs = Number(DEFAULTS.slides?.heroTimelineFillMs) || 8000;
+      const raw = Number(slidesCfg.heroTimelineFillMs);
+      const ms = Number.isFinite(raw) && raw > 0 ? Math.max(1000, Math.round(raw)) : defaultMs;
+      durationInput.value = Math.round(ms / 1000);
+      if (!durationInput.dataset.bound) {
+        durationInput.dataset.bound = '1';
+        durationInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          const value = Number(durationInput.value);
+          if (Number.isFinite(value) && value > 0) {
+            const sanitized = Math.max(1, Math.round(value));
+            slides.heroTimelineFillMs = sanitized * 1000;
+            durationInput.value = String(sanitized);
+          } else {
+            delete slides.heroTimelineFillMs;
+            durationInput.value = String(Math.round((Number(DEFAULTS.slides?.heroTimelineFillMs) || 8000) / 1000));
+          }
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const baseInput = document.getElementById('heroTimelineBase');
+    if (baseInput) {
+      const slidesCfg = ensureSlides();
+      const defaultBase = Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15;
+      const raw = Number(slidesCfg.heroTimelineBaseMinutes);
+      const minutes = Number.isFinite(raw) && raw > 0 ? Math.max(1, Math.round(raw)) : defaultBase;
+      baseInput.value = String(minutes);
+      if (!baseInput.dataset.bound) {
+        baseInput.dataset.bound = '1';
+        baseInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          const value = Number(baseInput.value);
+          if (Number.isFinite(value) && value > 0) {
+            const sanitized = Math.max(1, Math.round(value));
+            slides.heroTimelineBaseMinutes = sanitized;
+            baseInput.value = String(sanitized);
+          } else {
+            delete slides.heroTimelineBaseMinutes;
+            baseInput.value = String(Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15);
+          }
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const maxInput = document.getElementById('heroTimelineMax');
+    if (maxInput) {
+      const slidesCfg = ensureSlides();
+      const raw = slidesCfg.heroTimelineMaxEntries;
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        const sanitized = Math.max(1, Math.round(parsed));
+        slidesCfg.heroTimelineMaxEntries = sanitized;
+        maxInput.value = String(sanitized);
+      } else {
+        delete slidesCfg.heroTimelineMaxEntries;
+        maxInput.value = '';
+      }
+      if (!maxInput.dataset.bound) {
+        maxInput.dataset.bound = '1';
+        maxInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          const value = Number(maxInput.value);
+          if (Number.isFinite(value) && value > 0) {
+            const sanitized = Math.max(1, Math.round(value));
+            slides.heroTimelineMaxEntries = sanitized;
+            maxInput.value = String(sanitized);
+          } else {
+            delete slides.heroTimelineMaxEntries;
+            maxInput.value = '';
+          }
+          notifySettingsChanged();
+        });
+      }
     }
   };
   const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left' } = {}) => {
@@ -1356,6 +1643,23 @@ function renderSlidesBox(){
     selectedKeys.forEach(key => {
       if (seenKeys.has(key)) selected.add(key);
     });
+
+    const hasDynamicSelection = (() => {
+      if (!selected.size) return false;
+      for (const key of selected) {
+        if (!key) continue;
+        if (key === 'overview' || key === 'hero-timeline') continue;
+        return true;
+      }
+      return false;
+    })();
+
+    if (!selected.size || !hasDynamicSelection) {
+      orderList.forEach(entry => {
+        if (!entry || entry.disabled) return;
+        selected.add(entry.key);
+      });
+    }
 
     host.innerHTML = '';
     const grid = document.createElement('div');
@@ -1749,6 +2053,7 @@ function renderSlidesBox(){
 
   renderStyleAutomationControls();
   renderExtrasEditor();
+  renderHeroTimelineControls();
 
   // Reset-Button (nur Felder dieser Box)
   const reset = document.querySelector('#resetSlides');

@@ -262,15 +262,10 @@ export const DEFAULTS = {
       enabled:true,
       fallbackStyle:'classic',
       timeSlots:[
-        { id:'morning', label:'Vormittag', start:'06:00', style:'classic' },
-        { id:'evening', label:'Abend', start:'18:00', style:'sunset' },
-        { id:'night', label:'Nacht', start:'21:30', style:'midnight' }
-      ],
-      eventStyle:{
-        enabled:true,
-        lookaheadMinutes:90,
-        style:'celebration'
-      }
+        { id:'morning', label:'Vormittag', mode:'daily', start:'06:00', style:'classic' },
+        { id:'evening', label:'Abend', mode:'daily', start:'18:00', style:'sunset' },
+        { id:'night', label:'Nacht', mode:'daily', start:'21:30', style:'midnight' }
+      ]
     }
   },
   display:{
@@ -305,14 +300,14 @@ export const DEFAULTS = {
   footnotes:[ { id:'star', label:'*', text:'Nur am Fr und Sa' } ],
   extras:{
     wellnessTips:[
-      { id:'wellness_hydrate', icon:'💧', title:'Hydration', text:'Vor und nach dem Saunagang ausreichend Wasser trinken.' },
-      { id:'wellness_cooldown', icon:'❄️', title:'Abkühlen', text:'Zwischen den Gängen an die frische Luft gehen und kalt abduschen.' }
+      { id:'wellness_hydrate', icon:'💧', title:'Hydration', text:'Vor und nach dem Saunagang ausreichend Wasser trinken.', dwellSec: null },
+      { id:'wellness_cooldown', icon:'❄️', title:'Abkühlen', text:'Zwischen den Gängen an die frische Luft gehen und kalt abduschen.', dwellSec: null }
     ],
     eventCountdowns:[
-      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00:00+01:00' }
+      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', dwellSec: null }
     ],
     gastronomyHighlights:[
-      { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.' }
+      { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.', dwellSec: null }
     ]
   }
 };

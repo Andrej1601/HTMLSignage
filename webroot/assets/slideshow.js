@@ -421,6 +421,26 @@
   // ---------- Time helpers ----------
   const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
   const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  const parseDateTimeLocal = (value) => {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})$/.exec(trimmed);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const hour = Number(match[4]);
+    const minute = Number(match[5]);
+    if (!Number.isFinite(year) || year < 1970 || year > 9999) return null;
+    if (!Number.isFinite(month) || month < 1 || month > 12) return null;
+    if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+    if (!Number.isFinite(hour) || hour < 0 || hour > 23) return null;
+    if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+    const date = new Date(year, month - 1, day, hour, minute);
+    if (!Number.isFinite(date.getTime())) return null;
+    return { ms: date.getTime() };
+  };
 
   // ---------- Presets ----------
   function dayKey(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
@@ -459,9 +479,10 @@
     const valid = [];
     slots.forEach((slot) => {
       if (!slot || typeof slot !== 'object') return;
+      if (slot.mode === 'range') return;
       const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
       if (!styleKey) return;
-      const minutes = parseHM(slot.start);
+      const minutes = parseHM(slot.start || slot.startTime || '');
       if (minutes === null) return;
       valid.push({ minutes, style: styleKey });
     });
@@ -478,39 +499,27 @@
     return selected ? selected.style : null;
   }
 
-  function resolveEventStyle(styleSets, automation) {
+  function resolveRangeSlotStyle(styleSets, automation) {
     if (!automation || automation.enabled === false) return null;
-    const eventCfg = automation.eventStyle || {};
-    if (eventCfg.enabled === false) return null;
-    const lookaheadRaw = Number(eventCfg.lookaheadMinutes);
-    const lookahead = Number.isFinite(lookaheadRaw) && lookaheadRaw > 0
-      ? Math.max(1, Math.round(lookaheadRaw))
-      : 60;
-    const events = Array.isArray(settings?.extras?.eventCountdowns)
-      ? settings.extras.eventCountdowns
-      : [];
+    const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
+    if (!slots.length) return null;
     const now = Date.now();
-    let best = null;
-    events.forEach((entry) => {
-      if (!entry || typeof entry !== 'object') return;
-      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
-      if (!rawTarget) return;
-      const targetDate = new Date(rawTarget);
-      if (!targetDate || Number.isNaN(targetDate.getTime())) return;
-      const diffMs = targetDate.getTime() - now;
-      if (diffMs < 0) return;
-      const diffMinutes = diffMs / 60000;
-      if (diffMinutes > lookahead) return;
-      if (!best || diffMs < best.diffMs) {
-        best = { diffMs, entry };
+    let selected = null;
+    slots.forEach((slot) => {
+      if (!slot || typeof slot !== 'object') return;
+      if (slot.mode !== 'range' && !(slot.startDateTime && slot.endDateTime)) return;
+      const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
+      if (!styleKey) return;
+      const startInfo = parseDateTimeLocal(slot.startDateTime || slot.start);
+      const endInfo = parseDateTimeLocal(slot.endDateTime || slot.end);
+      if (!startInfo || !endInfo) return;
+      if (endInfo.ms < startInfo.ms) return;
+      if (now < startInfo.ms || now > endInfo.ms) return;
+      if (!selected || startInfo.ms >= selected.startMs) {
+        selected = { style: styleKey, startMs: startInfo.ms };
       }
     });
-    if (!best) return null;
-    const preferred = best.entry.style && styleSets[best.entry.style] ? best.entry.style : null;
-    const fallback = eventCfg.style && styleSets[eventCfg.style] ? eventCfg.style : null;
-    const style = preferred || fallback;
-    if (!style) return null;
-    return { style, event: best.entry };
+    return selected ? selected.style : null;
   }
 
   function resolveAutomationStyle() {
@@ -528,9 +537,9 @@
     if (!automation || automation.enabled === false) {
       return { style: fallback, reason: 'disabled' };
     }
-    const eventStyle = resolveEventStyle(styleSets, automation);
-    if (eventStyle && eventStyle.style) {
-      return { style: eventStyle.style, reason: 'event', event: eventStyle.event };
+    const rangeStyle = resolveRangeSlotStyle(styleSets, automation);
+    if (rangeStyle) {
+      return { style: rangeStyle, reason: 'range' };
     }
     const slotStyle = resolveTimeSlotStyle(styleSets, automation);
     if (slotStyle) {
