@@ -2,6 +2,8 @@
 # Install HTMLSignage stack
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
 log(){ printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
 error(){ printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
@@ -200,6 +202,58 @@ configure_basic_auth(){
   chmod 640 /etc/nginx/.signage_admin
 }
 
+seed_admin_user(){
+  log "Registering admin account in application store"
+
+  local user_script="$SCRIPT_DIR/users.php"
+  if [[ ! -x "$user_script" ]]; then
+    warn "User management helper not found; skipping admin registration"
+    return
+  fi
+
+  local php_cli=""
+  if command -v php >/dev/null 2>&1; then
+    php_cli=$(command -v php)
+  elif command -v php8.3 >/dev/null 2>&1; then
+    php_cli=$(command -v php8.3)
+  else
+    warn "PHP CLI not available; skipping admin registration"
+    return
+  fi
+
+  local seed_log
+  seed_log=$(mktemp -t signage-seed.XXXXXX || true)
+  if [[ -z "$seed_log" ]]; then
+    warn "Unable to create temporary file; skipping admin registration"
+    return
+  fi
+  install -d -m 2775 "$APP_DIR/data"
+  chown www-data:www-data "$APP_DIR/data" 2>/dev/null || true
+  if ! SIGNAGE_BASE_PATH="$APP_DIR" \
+       SIGNAGE_USER_PASSWORD="$SIGNAGE_ADMIN_PASS" \
+       SIGNAGE_USER_PASSWORD_CONFIRM="$SIGNAGE_ADMIN_PASS" \
+       "$php_cli" "$user_script" add "$SIGNAGE_ADMIN_USER" admin >"$seed_log" 2>&1; then
+    warn "Unable to register admin account; rerun '$php_cli scripts/users.php add $SIGNAGE_ADMIN_USER admin' manually"
+    cat "$seed_log" >&2 || true
+    rm -f "$seed_log"
+    return
+  fi
+
+  rm -f "$seed_log"
+
+  local users_file="$APP_DIR/data/users.json"
+  if [[ -f "$users_file" ]]; then
+    chown www-data:www-data "$users_file" 2>/dev/null || true
+    chmod 640 "$users_file" 2>/dev/null || true
+  fi
+
+  local audit_file="$APP_DIR/data/audit.log"
+  if [[ -f "$audit_file" ]]; then
+    chown www-data:www-data "$audit_file" 2>/dev/null || true
+    chmod 640 "$audit_file" 2>/dev/null || true
+  fi
+}
+
 validate_and_reload(){
   nginx -t
   systemctl reload nginx
@@ -240,6 +294,7 @@ main(){
   deploy_nginx
   configure_php
   configure_basic_auth
+  seed_admin_user
   validate_and_reload
   print_summary
 }

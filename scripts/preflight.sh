@@ -74,7 +74,6 @@ check_disk() {
   ok "Disk space OK (${avail}MB free)"
 }
 
-
 check_permissions() {
   if [ ! -w webroot/data ]; then
     warn "webroot/data is not writable by current user"
@@ -90,7 +89,6 @@ run_all() {
   check_ports || status=1
   check_disk || status=1
   check_permissions || status=1
-
 
   if [ "$status" -ne 0 ]; then
 

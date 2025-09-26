@@ -2795,7 +2795,6 @@ async function createDevicesPane(){
       if (Number.isFinite(status.network.quality)) netParts.push(`${Math.round(status.network.quality)} %`);
       if (Number.isFinite(status.network.signal)) netParts.push(`${Math.round(status.network.signal)} dBm`);
       if (Number.isFinite(status.network.latency)) netParts.push(`${Math.round(status.network.latency)} ms`);
-
       const netLabel = netParts.length ? netParts.join(' · ') : '—';
       const span = document.createElement('span');
       span.textContent = netLabel;
@@ -2811,7 +2810,6 @@ async function createDevicesPane(){
     if (Number.isFinite(metrics.temperature)) metricParts.push(`${Math.round(metrics.temperature)} °C`);
     if (Number.isFinite(metrics.batteryLevel)) metricParts.push(`Akku ${Math.round(metrics.batteryLevel)} %`);
     if (Number.isFinite(metrics.latency)) metricParts.push(`Ping ${Math.round(metrics.latency)} ms`);
-
     addItem('Leistung', metricParts.join(' · '));
 
     if (status.notes) {
@@ -2864,7 +2862,6 @@ async function createDevicesPane(){
 
     if (!list.children.length) {
       const empty = document.createElement('span');
-
       empty.className = 'mut dev-telemetry-empty';
       empty.textContent = 'Keine Telemetriedaten empfangen';
       cell.appendChild(empty);

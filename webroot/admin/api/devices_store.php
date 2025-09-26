@@ -146,7 +146,6 @@ function devices_sanitize_metrics($value): array
         'uptime' => ['uptime', 'upTimeSeconds', 'uptimeSeconds', 'uptimeSec'],
         'batteryLevel' => ['battery', 'batteryLevel', 'batteryPercent', 'battery_level'],
         'latency' => ['latency', 'ping']
-
     ];
 
     foreach ($map as $target => $candidates) {
@@ -317,7 +316,6 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $history[] = array_filter([
         'ts' => $timestamp,
         'offline' => $offlineFlag,
-
         'status' => !empty($status) ? $status : null,
         'metrics' => !empty($metrics) ? $metrics : null,
     ], static function ($value) {
@@ -379,7 +377,6 @@ function devices_extract_telemetry_payload(array $payload): array
     } elseif (array_key_exists('online', $payload)) {
         $telemetry['offline'] = !(bool) $payload['online'];
     }
-
 
     return $telemetry;
 }
