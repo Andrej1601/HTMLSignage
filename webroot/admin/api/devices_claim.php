@@ -1,7 +1,10 @@
 <?php
 // Hängt am ADMIN-VHost (BasicAuth schützt), nicht im öffentlichen /pair/*
 header('Content-Type: application/json; charset=UTF-8');
-require_once __DIR__.'/devices_store.php';
+require_once __DIR__ . '/auth/guard.php';
+require_once __DIR__ . '/devices_store.php';
+
+auth_require_role('editor');
 
 $raw = file_get_contents('php://input');
 $in  = json_decode($raw, true);
@@ -21,5 +24,10 @@ $db['devices'][$id] = [
 ];
 $db['pairings'][$code]['deviceId'] = $id;
 devices_save($db);
+auth_audit('device.claim', [
+  'code' => $code,
+  'deviceId' => $id,
+  'name' => $name !== '' ? $name : null
+]);
 
 echo json_encode(['ok'=>true,'deviceId'=>$id]);

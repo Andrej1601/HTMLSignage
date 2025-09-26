@@ -13,7 +13,7 @@ const API_ENDPOINTS = {
 };
 
 const FALLBACK_PATH = '/data/devices.json';
-const OFFLINE_AFTER_MIN = 2;
+export const OFFLINE_AFTER_MIN = 2;
 const SNAPSHOT_CACHE_MS = 1500;
 
 const okPredicate = (data) => data?.ok !== false;
@@ -52,6 +52,88 @@ function computeOffline(lastSeenAt, nowSeconds) {
   return (nowSeconds - lastSeenAt) > OFFLINE_AFTER_MIN * 60;
 }
 
+function sanitizeErrors(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        if (typeof item === 'string') return { message: item.trim() };
+        return null;
+      }
+      const code = typeof item.code === 'string' ? item.code.trim() : '';
+      const message = typeof item.message === 'string' ? item.message.trim() : '';
+      const ts = normalizeSeconds(item.ts ?? item.timestamp ?? null);
+      if (!code && !message) return null;
+      const result = {};
+      if (code) result.code = code;
+      if (message) result.message = message;
+      if (ts) result.ts = ts;
+      return result;
+    })
+    .filter(Boolean);
+}
+
+function sanitizeStatus(input) {
+  if (!input || typeof input !== 'object') return {};
+  const status = {};
+  const firmware = typeof input.firmware === 'string' ? input.firmware.trim() : '';
+  if (firmware) status.firmware = firmware;
+  const appVersion = typeof input.appVersion === 'string' ? input.appVersion.trim() : '';
+  if (appVersion) status.appVersion = appVersion;
+  const ip = typeof input.ip === 'string' ? input.ip.trim() : '';
+  if (ip) status.ip = ip;
+  const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
+  if (notes) status.notes = notes;
+  if (input.network && typeof input.network === 'object') {
+    const network = {};
+    const type = typeof input.network.type === 'string' ? input.network.type.trim() : '';
+    if (type) network.type = type;
+    const ssid = typeof input.network.ssid === 'string' ? input.network.ssid.trim() : '';
+    if (ssid) network.ssid = ssid;
+    const quality = Number(input.network.quality);
+    if (Number.isFinite(quality)) network.quality = Math.max(0, Math.min(100, Math.round(quality)));
+    const signal = Number(input.network.signal ?? input.network.rssi);
+    if (Number.isFinite(signal)) network.signal = signal;
+    if (Object.keys(network).length) status.network = network;
+  }
+  const errors = sanitizeErrors(input.errors);
+  if (errors.length) status.errors = errors;
+  return status;
+}
+
+function sanitizeMetrics(input) {
+  if (!input || typeof input !== 'object') return {};
+  const metrics = {};
+  const apply = (key, value) => {
+    const num = Number(value);
+    if (Number.isFinite(num)) metrics[key] = num;
+  };
+  apply('cpuLoad', input.cpuLoad ?? input.cpu);
+  apply('memoryUsage', input.memoryUsage ?? input.memory);
+  apply('storageFree', input.storageFree ?? input.storage_free);
+  apply('storageUsed', input.storageUsed ?? input.storage_used);
+  apply('temperature', input.temperature ?? input.temp);
+  apply('uptime', input.uptime ?? input.upTimeSeconds);
+  apply('batteryLevel', input.batteryLevel ?? input.battery);
+  return metrics;
+}
+
+function sanitizeHistory(input, nowSeconds) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const ts = normalizeSeconds(item.ts ?? item.timestamp ?? null);
+      if (!ts) return null;
+      const offline = typeof item.offline === 'boolean' ? item.offline : false;
+      const status = sanitizeStatus(item.status);
+      const metrics = sanitizeMetrics(item.metrics);
+      return { ts, offline, status, metrics, ago: nowSeconds ? Math.max(0, nowSeconds - ts) : null };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.ts - b.ts);
+}
+
 function sanitizeDevice(entry, nowSeconds) {
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id;
@@ -66,6 +148,9 @@ function sanitizeDevice(entry, nowSeconds) {
     ? entry.overrides
     : null;
   const badgeSource = entry.contextBadge ?? entry.badge ?? entry.badgeInfo ?? null;
+  const status = sanitizeStatus(entry.status);
+  const metrics = sanitizeMetrics(entry.metrics);
+  const history = sanitizeHistory(entry.heartbeatHistory, nowSeconds);
   return {
     id,
     name,
@@ -73,7 +158,10 @@ function sanitizeDevice(entry, nowSeconds) {
     offline,
     useOverrides: !!entry.useOverrides,
     overrides,
-    badgeSource
+    badgeSource,
+    status,
+    metrics,
+    heartbeatHistory: history
   };
 }
 
@@ -211,4 +299,10 @@ export async function cleanupDevices() {
   return postDeviceAction(API_ENDPOINTS.cleanup, {}, { expectOk: true });
 }
 
-export { OFFLINE_AFTER_MIN };
+export const __TEST__ = {
+  sanitizeStatus,
+  sanitizeMetrics,
+  sanitizeHistory,
+  sanitizeErrors
+};
+
