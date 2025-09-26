@@ -52,8 +52,107 @@
   </header>
 
   <main class="layout">
+    <section class="workspace-overview" aria-labelledby="adminIntroTitle">
+      <header class="workspace-head">
+        <div class="workspace-copy">
+          <p class="workspace-kicker">Admin-Cockpit</p>
+          <h2 id="adminIntroTitle">Willkommen im Adminbereich</h2>
+          <p class="workspace-text">
+            Hier steuerst du Tagespläne, Slides, Zusatzinfos und das Design deiner Anzeigen. Wähle den passenden Arbeitsbereich oder springe direkt zu den wichtigsten Aufgaben.
+          </p>
+          <div class="workspace-quick" role="group" aria-label="Schnellzugriff">
+            <button type="button" class="workspace-quick-btn" data-jump="gridPane" aria-controls="gridPane">Aufgussplan</button>
+            <button type="button" class="workspace-quick-btn" data-jump="boxSaunas" aria-controls="boxSaunas">Inhalte &amp; Saunen</button>
+            <button type="button" class="workspace-quick-btn" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf &amp; Zeiten</button>
+            <button type="button" class="workspace-quick-btn" data-jump="boxImages" aria-controls="boxImages">Medien verwalten</button>
+            <button type="button" class="workspace-quick-btn" data-jump="boxSlidesText" aria-controls="boxSlidesText">Layout &amp; Farben</button>
+          </div>
+        </div>
+        <div class="workspace-status" aria-live="polite">
+          <div class="workspace-status-label">Status</div>
+          <div class="workspace-status-value" id="introStatusText">Bereit zum Bearbeiten</div>
+          <p class="workspace-status-help">Speichere regelmäßig, sobald Änderungen fertig sind.</p>
+        </div>
+      </header>
+
+      <div class="workspace-grid" role="list">
+        <article class="workspace-card" role="listitem">
+          <div class="workspace-card-head">
+            <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
+            <div>
+              <h3>Tagesplan &amp; Wochenablauf</h3>
+              <p>Zeiten strukturieren, Reihenfolge anpassen und Wochenvorlagen sichern.</p>
+            </div>
+          </div>
+          <ul class="workspace-card-list">
+            <li>Zeiten verschieben, duplizieren oder löschen</li>
+            <li>Wochentage vergleichen und speichern</li>
+            <li>Schnell zu freien Slots navigieren</li>
+          </ul>
+          <div class="workspace-card-actions">
+            <button type="button" class="workspace-card-btn primary" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
+          </div>
+        </article>
+
+        <article class="workspace-card" role="listitem">
+          <div class="workspace-card-head">
+            <span class="workspace-card-icon" aria-hidden="true">🔥</span>
+            <div>
+              <h3>Saunen &amp; Zusatzinformationen</h3>
+              <p>Saunen, Badges und Zusatztexte pflegen – inklusive Vorschau und Reihenfolge.</p>
+            </div>
+          </div>
+          <ul class="workspace-card-list">
+            <li>Saunen aktivieren/deaktivieren</li>
+            <li>Badges &amp; Hinweise zuweisen</li>
+            <li>Story-Slides komfortabel bearbeiten</li>
+          </ul>
+          <div class="workspace-card-actions">
+            <button type="button" class="workspace-card-btn" data-jump="boxSaunas" aria-controls="boxSaunas">Inhalte öffnen</button>
+          </div>
+        </article>
+
+        <article class="workspace-card" role="listitem">
+          <div class="workspace-card-head">
+            <span class="workspace-card-icon" aria-hidden="true">🎬</span>
+            <div>
+              <h3>Slides &amp; Automationen</h3>
+              <p>Dauer, Übergänge und Reihenfolgen einstellen, damit der Ablauf passt.</p>
+            </div>
+          </div>
+          <ul class="workspace-card-list">
+            <li>Globale oder individuelle Slide-Dauer wählen</li>
+            <li>Automatisierungen aktivieren</li>
+            <li>Übersichten &amp; Vorschauen prüfen</li>
+          </ul>
+          <div class="workspace-card-actions">
+            <button type="button" class="workspace-card-btn" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf steuern</button>
+          </div>
+        </article>
+
+        <article class="workspace-card" role="listitem">
+          <div class="workspace-card-head">
+            <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
+            <div>
+              <h3>Medien &amp; Layout</h3>
+              <p>Slides mit Bildern, Texten und Farben gestalten – inklusive Style-Presets.</p>
+            </div>
+          </div>
+          <ul class="workspace-card-list">
+            <li>Medien-Slides verwalten und sortieren</li>
+            <li>Layouts für Split-Screens definieren</li>
+            <li>Farbpaletten und Typografie justieren</li>
+          </ul>
+          <div class="workspace-card-actions">
+            <button type="button" class="workspace-card-btn" data-jump="boxImages" aria-controls="boxImages">Medienbereich</button>
+            <button type="button" class="workspace-card-btn ghost" data-jump="boxSlidesText" aria-controls="boxSlidesText">Layout &amp; Text</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section class="leftcol">
-<div class="card" id="gridPane">
+<div class="card" id="gridPane" data-jump-target>
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
@@ -82,7 +181,7 @@
       <div class="layout-resizer" id="layoutResizer" role="separator" aria-orientation="vertical" aria-label="Sidebar-Größe anpassen" tabindex="0" aria-hidden="false"></div>
       <div class="rightbar-columns">
 <!-- Slides – Masterbox -->
-<details class="ac full" open id="slidesMaster">
+<details class="ac full" open id="slidesMaster" data-jump-target>
   <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
     <div class="actions">
@@ -166,7 +265,7 @@
     </div>
 
     <!-- Unterbox 1: Saunen & Übersicht -->
-    <details class="ac sub" open id="boxSaunas">
+    <details class="ac sub" open id="boxSaunas" data-jump-target>
       <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
  <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
 </summary>      
@@ -342,7 +441,7 @@
     </details>
 
     <!-- Unterbox 4: Medien-Slides -->
-    <details class="ac sub" id="boxImages">
+    <details class="ac sub" id="boxImages" data-jump-target>
 <summary>
     <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
     <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button></div>
@@ -365,7 +464,7 @@
   </div>
 </details>
 
- <details class="ac full" id="boxSlidesText">
+ <details class="ac full" id="boxSlidesText" data-jump-target>
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
@@ -738,6 +837,70 @@
   </div>
 </div>
 
+<script>
+  (function(){
+    const jumpButtons = document.querySelectorAll('[data-jump]');
+    if (!jumpButtons.length) return;
+
+    const ensureDetailsOpen = (element) => {
+      if (!element) return;
+      if (element.matches('details')) {
+        element.open = true;
+      }
+      let parent = element.closest('details');
+      while (parent) {
+        parent.open = true;
+        parent = parent.parentElement?.closest('details');
+      }
+    };
+
+    const getScrollTarget = (element) => {
+      if (!element) return null;
+      if (element.hasAttribute('data-jump-target')) {
+        return element;
+      }
+      return element.closest('[data-jump-target]') || element;
+    };
+
+    const highlight = (element) => {
+      if (!element) return;
+      element.classList.remove('jump-flash');
+      void element.offsetWidth;
+      element.classList.add('jump-flash');
+      window.setTimeout(() => element.classList.remove('jump-flash'), 1600);
+    };
+
+    const canFocus = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.tabIndex >= 0) return true;
+      return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
+    };
+
+    jumpButtons.forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const targetId = button.dataset.jump;
+        if (!targetId) return;
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        ensureDetailsOpen(target);
+
+        const scrollTarget = getScrollTarget(target);
+        window.requestAnimationFrame(() => {
+          scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const highlightEl = target.matches('details')
+            ? target.querySelector(':scope > summary') || scrollTarget
+            : scrollTarget;
+          highlight(highlightEl);
+          if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
+            highlightEl.focus({ preventScroll: true });
+          }
+        });
+      });
+    });
+  })();
+</script>
 <script>
 
   (function(){
