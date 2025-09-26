@@ -30,6 +30,15 @@
       </label>
     </div>
     <div class="header-actions">
+      <div class="header-cockpit-controls" role="group" aria-label="Admin-Cockpit">
+        <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit schließen" title="Cockpit minimieren">
+          <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+          <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit schließen" data-label-collapsed="Cockpit öffnen">Cockpit schließen</span>
+        </button>
+        <button type="button" class="btn ghost sm header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
+          <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+        </button>
+      </div>
       <!-- Ansicht-Menü -->
       <button class="btn" id="btnDevices">Geräte</button>
       <div class="menuwrap" id="viewMenuWrap">
@@ -55,16 +64,9 @@
   <main class="layout">
     <section class="workspace-overview" aria-labelledby="adminCockpitTitle" data-collapsed="false" data-pinned="false">
       <header class="workspace-toolbar">
-        <h2 id="adminCockpitTitle" class="workspace-title">Admin-Cockpit</h2>
-        <div class="workspace-toolbar-actions" role="group" aria-label="Cockpit-Optionen">
-          <button type="button" class="workspace-tool-btn" data-action="pin" aria-pressed="false" title="Cockpit anheften">
-            <span class="workspace-tool-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
-            <span class="workspace-tool-label" data-role="label" data-label-pinned="Lösen" data-label-unpinned="Anheften">Anheften</span>
-          </button>
-          <button type="button" class="workspace-tool-btn" data-action="toggle" aria-controls="adminCockpitBody" aria-expanded="true" title="Cockpit minimieren">
-            <span class="workspace-tool-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
-            <span class="workspace-tool-label" data-role="label" data-label-expanded="Einklappen" data-label-collapsed="Aufklappen">Einklappen</span>
-          </button>
+        <div class="workspace-toolbar-text">
+          <h2 id="adminCockpitTitle" class="workspace-title">Admin-Cockpit</h2>
+          <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
         </div>
       </header>
 
@@ -75,14 +77,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
               <div>
                 <h3>Vorschau &amp; Geräte</h3>
-                <p>Slides live prüfen, Geräte verwalten und Anzeigen aktualisieren.</p>
+                <p>Live-Status und Display-Steuerung im Blick.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Slideshow in der Vorschau kontrollieren</li>
-              <li>Gerätestatus, Firmware und Pairings im Blick behalten</li>
-              <li>Displays neu laden oder Geräte koppeln</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Vorschau starten</span>
+              <span class="workspace-card-tag" role="listitem">Geräte überwachen</span>
+              <span class="workspace-card-tag" role="listitem">Displays neu laden</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
@@ -99,14 +101,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
               <div>
                 <h3>Tagesplan &amp; Wochenablauf</h3>
-                <p>Zeiten strukturieren, Reihenfolge anpassen und Wochenvorlagen sichern.</p>
+                <p>Zeitpläne schnell anpassen und sichern.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Zeiten verschieben, duplizieren oder löschen</li>
-              <li>Wochentage vergleichen und speichern</li>
-              <li>Schnell zu freien Slots navigieren</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Zeiten verschieben</span>
+              <span class="workspace-card-tag" role="listitem">Vorlagen speichern</span>
+              <span class="workspace-card-tag" role="listitem">Freie Slots finden</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-view="grid" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
@@ -119,14 +121,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🔥</span>
               <div>
                 <h3>Saunen &amp; Hinweise</h3>
-                <p>Saunen, Fußnoten und Badge-Bibliothek pflegen – inklusive Vorschau und Reihenfolge.</p>
+                <p>Saunen und Hinweise zentral verwalten.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Saunen aktivieren/deaktivieren</li>
-              <li>Badges und Hinweise verwalten</li>
-              <li>Übersicht für den Aufgussplan anpassen</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Saunen steuern</span>
+              <span class="workspace-card-tag" role="listitem">Badges pflegen</span>
+              <span class="workspace-card-tag" role="listitem">Bibliothek verwalten</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-jump="boxSaunas" aria-controls="boxSaunas">Saunen öffnen</button>
@@ -143,14 +145,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🎬</span>
               <div>
                 <h3>Slides &amp; Automationen</h3>
-                <p>Dauer, Übergänge und Reihenfolgen einstellen, damit der Ablauf passt.</p>
+                <p>Abläufe und Automationen feinjustieren.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Globale oder individuelle Slide-Dauer wählen</li>
-              <li>Automatisierungen aktivieren</li>
-              <li>Übersichten &amp; Vorschauen prüfen</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Dauer einstellen</span>
+              <span class="workspace-card-tag" role="listitem">Automationen steuern</span>
+              <span class="workspace-card-tag" role="listitem">Reihenfolge prüfen</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf steuern</button>
@@ -167,14 +169,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
               <div>
                 <h3>Infos &amp; Story-Slides</h3>
-                <p>Zusatzinhalte, Countdowns, Wellness-Tipps und Story-Baukasten betreuen.</p>
+                <p>Zusatzinfos und Story-Slides kuratieren.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Wellness-, Gastro- und Eventinfos pflegen</li>
-              <li>Hero-Timeline aktivieren und timen</li>
-              <li>Story-Slides mit Spalten-Baukasten gestalten</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Wellness-Tipps pflegen</span>
+              <span class="workspace-card-tag" role="listitem">Countdowns planen</span>
+              <span class="workspace-card-tag" role="listitem">Story-Slides bauen</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-jump="boxStories" aria-controls="boxStories">Zusatzinfos</button>
@@ -194,14 +196,14 @@
               <span class="workspace-card-icon" aria-hidden="true">🎨</span>
               <div>
                 <h3>Medien &amp; Layout</h3>
-                <p>Slides mit Bildern, Texten, Farben und Layouts gestalten – inklusive Presets.</p>
+                <p>Medien und Layout-Optionen bündeln.</p>
               </div>
             </div>
-            <ul class="workspace-card-list">
-              <li>Medien-Slides verwalten und sortieren</li>
-              <li>Layouts für Splitscreens und Anzeigearten festlegen</li>
-              <li>Style-Presets pflegen und anwenden</li>
-            </ul>
+            <div class="workspace-card-tags" role="list">
+              <span class="workspace-card-tag" role="listitem">Medienslides ordnen</span>
+              <span class="workspace-card-tag" role="listitem">Layouts definieren</span>
+              <span class="workspace-card-tag" role="listitem">Style-Presets nutzen</span>
+            </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
                 <button type="button" class="workspace-card-btn primary" data-jump="boxImages" aria-controls="boxImages">Medienbereich</button>
@@ -966,17 +968,12 @@
   (function(){
     const cockpit = document.querySelector('.workspace-overview');
     if (!cockpit) return;
-    const body = cockpit.querySelector('.workspace-body');
-    if (!body) return;
-
     const root = document.documentElement;
     const header = document.querySelector('header');
-    const toolbar = cockpit.querySelector('.workspace-toolbar');
-
     const resolveCockpitHeight = () => {
       if (cockpit.dataset.pinned !== 'true') return 0;
       if (cockpit.dataset.collapsed === 'true') {
-        return toolbar?.offsetHeight || cockpit.offsetHeight;
+        return 0;
       }
       return cockpit.offsetHeight;
     };
@@ -1019,8 +1016,9 @@
 
     window.addEventListener('resize', scheduleUpdate, { passive:true });
 
-    const pinBtn = cockpit.querySelector('[data-action="pin"]');
-    const toggleBtn = cockpit.querySelector('[data-action="toggle"]');
+    const resolveControls = (action) => Array.from(document.querySelectorAll(`[data-action="${action}"][data-cockpit-control]`));
+    const pinButtons = resolveControls('pin');
+    const toggleButtons = resolveControls('toggle');
 
     let storageAvailable = true;
     try{
@@ -1046,7 +1044,7 @@
 
     const setPinState = (pinned) => {
       cockpit.dataset.pinned = pinned ? 'true' : 'false';
-      if (pinBtn){
+      pinButtons.forEach((pinBtn) => {
         pinBtn.setAttribute('aria-pressed', String(pinned));
         pinBtn.classList.toggle('is-active', pinned);
         const label = pinBtn.querySelector('[data-role="label"]');
@@ -1061,23 +1059,31 @@
           const offIcon = icon.dataset.iconUnpinned || icon.textContent;
           icon.textContent = pinned ? onIcon : offIcon;
         }
-        pinBtn.setAttribute('title', pinned ? 'Cockpit lösen' : 'Cockpit anheften');
-      }
+        const pinTitle = pinned ? 'Cockpit lösen' : 'Cockpit anheften';
+        pinBtn.setAttribute('title', pinTitle);
+        pinBtn.setAttribute('aria-label', pinTitle);
+      });
       save(PIN_KEY, pinned ? '1' : null);
       scheduleUpdate();
     };
 
     const setCollapseState = (collapsed) => {
       cockpit.dataset.collapsed = collapsed ? 'true' : 'false';
-      body.hidden = collapsed;
-      if (toggleBtn){
+      if (collapsed) {
+        cockpit.setAttribute('aria-hidden', 'true');
+      } else {
+        cockpit.removeAttribute('aria-hidden');
+      }
+      toggleButtons.forEach((toggleBtn) => {
         toggleBtn.setAttribute('aria-expanded', String(!collapsed));
         toggleBtn.classList.toggle('is-active', !collapsed);
         const label = toggleBtn.querySelector('[data-role="label"]');
         const icon = toggleBtn.querySelector('[data-role="icon"]');
+        let expandedText = 'Cockpit schließen';
+        let collapsedText = 'Cockpit öffnen';
         if (label){
-          const expandedText = label.dataset.labelExpanded || label.textContent;
-          const collapsedText = label.dataset.labelCollapsed || label.textContent;
+          expandedText = label.dataset.labelExpanded || expandedText;
+          collapsedText = label.dataset.labelCollapsed || collapsedText;
           label.textContent = collapsed ? collapsedText : expandedText;
         }
         if (icon){
@@ -1085,8 +1091,10 @@
           const collapsedIcon = icon.dataset.iconCollapsed || icon.textContent;
           icon.textContent = collapsed ? collapsedIcon : expandedIcon;
         }
-        toggleBtn.setAttribute('title', collapsed ? 'Cockpit öffnen' : 'Cockpit minimieren');
-      }
+        const toggleTitle = collapsed ? collapsedText : expandedText;
+        toggleBtn.setAttribute('title', toggleTitle);
+        toggleBtn.setAttribute('aria-label', toggleTitle);
+      });
       save(COLLAPSE_KEY, collapsed ? '1' : null);
       scheduleUpdate();
     };
@@ -1098,14 +1106,18 @@
     setCollapseState(collapsed);
     scheduleUpdate();
 
-    pinBtn?.addEventListener('click', () => {
-      pinned = !pinned;
-      setPinState(pinned);
+    pinButtons.forEach((pinBtn) => {
+      pinBtn.addEventListener('click', () => {
+        pinned = !pinned;
+        setPinState(pinned);
+      });
     });
 
-    toggleBtn?.addEventListener('click', () => {
-      collapsed = !collapsed;
-      setCollapseState(collapsed);
+    toggleButtons.forEach((toggleBtn) => {
+      toggleBtn.addEventListener('click', () => {
+        collapsed = !collapsed;
+        setCollapseState(collapsed);
+      });
     });
   })();
 </script>
