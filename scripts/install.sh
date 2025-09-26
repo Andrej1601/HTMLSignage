@@ -206,7 +206,7 @@ seed_admin_user(){
   log "Registering admin account in application store"
 
   local user_script="$SCRIPT_DIR/users.php"
-  if [[ ! -x "$user_script" ]]; then
+  if [[ ! -f "$user_script" ]]; then
     warn "User management helper not found; skipping admin registration"
     return
   fi
