@@ -2755,121 +2755,6 @@ async function createDevicesPane(){
     return `vor ${Math.round(seconds / 86400)} Tagen`;
   };
 
-  const renderTelemetryCell = (cell, device) => {
-    if (!cell) return;
-    cell.innerHTML = '';
-    const status = device?.status && typeof device.status === 'object' ? device.status : {};
-    const metrics = device?.metrics && typeof device.metrics === 'object' ? device.metrics : {};
-    const history = Array.isArray(device?.heartbeatHistory) ? device.heartbeatHistory : [];
-
-    const list = document.createElement('dl');
-    list.className = 'dev-telemetry-list';
-    const addItem = (label, content) => {
-      if (!content) return;
-      const dt = document.createElement('dt');
-      dt.textContent = label;
-      const dd = document.createElement('dd');
-      if (Array.isArray(content)) {
-        content.filter(Boolean).forEach((node) => dd.appendChild(node));
-      } else if (content instanceof Node) {
-        dd.appendChild(content);
-      } else {
-        dd.textContent = content;
-      }
-      if (!dd.textContent && !dd.children.length) return;
-      list.append(dt, dd);
-    };
-
-    const versionParts = [];
-    if (status.firmware) versionParts.push(`Firmware ${status.firmware}`);
-    if (status.appVersion) versionParts.push(`App ${status.appVersion}`);
-    addItem('Version', versionParts.join(' · '));
-
-    if (status.ip) {
-      addItem('IP', status.ip);
-    }
-
-    if (status.network && typeof status.network === 'object') {
-      const netParts = [];
-      if (status.network.type) netParts.push(status.network.type);
-      if (Number.isFinite(status.network.quality)) netParts.push(`${Math.round(status.network.quality)} %`);
-      if (Number.isFinite(status.network.signal)) netParts.push(`${Math.round(status.network.signal)} dBm`);
-      if (Number.isFinite(status.network.latency)) netParts.push(`${Math.round(status.network.latency)} ms`);
-      const netLabel = netParts.length ? netParts.join(' · ') : '—';
-      const span = document.createElement('span');
-      span.textContent = netLabel;
-      if (status.network.ssid) {
-        span.title = `SSID: ${status.network.ssid}`;
-      }
-      addItem('Netz', span);
-    }
-
-    const metricParts = [];
-    if (Number.isFinite(metrics.cpuLoad)) metricParts.push(`CPU ${Math.round(metrics.cpuLoad)} %`);
-    if (Number.isFinite(metrics.memoryUsage)) metricParts.push(`RAM ${Math.round(metrics.memoryUsage)} %`);
-    if (Number.isFinite(metrics.temperature)) metricParts.push(`${Math.round(metrics.temperature)} °C`);
-    if (Number.isFinite(metrics.batteryLevel)) metricParts.push(`Akku ${Math.round(metrics.batteryLevel)} %`);
-    if (Number.isFinite(metrics.latency)) metricParts.push(`Ping ${Math.round(metrics.latency)} ms`);
-    addItem('Leistung', metricParts.join(' · '));
-
-    if (status.notes) {
-      addItem('Hinweis', status.notes);
-    }
-
-    if (Array.isArray(status.errors) && status.errors.length) {
-      const errorList = document.createElement('ul');
-      errorList.className = 'dev-error-list';
-      status.errors.slice(0, 3).forEach((error) => {
-        const li = document.createElement('li');
-        const label = [error.code, error.message].filter(Boolean).join(': ');
-        li.textContent = label || 'Fehler';
-        if (error.ts) {
-          const date = new Date(error.ts * 1000);
-          li.title = date.toLocaleString('de-DE');
-        }
-        errorList.appendChild(li);
-      });
-      if (status.errors.length > 3) {
-        const li = document.createElement('li');
-        li.className = 'mut';
-        li.textContent = `+${status.errors.length - 3} weitere`;
-        errorList.appendChild(li);
-      }
-      addItem('Fehler', errorList);
-    }
-
-    if (history.length) {
-      const wrap = document.createElement('div');
-      wrap.className = 'dev-history';
-      history.slice(-4).reverse().forEach((entry) => {
-        const chip = document.createElement('span');
-        chip.className = 'dev-history-chip';
-        chip.dataset.state = entry.offline ? 'offline' : 'online';
-        const ts = Number(entry.ts);
-        if (ts) {
-          const date = new Date(ts * 1000);
-          chip.title = date.toLocaleString('de-DE');
-          const time = document.createElement('time');
-          time.dateTime = date.toISOString();
-          const relSeconds = Number(entry.ago);
-          time.textContent = Number.isFinite(relSeconds) ? formatRelativeSeconds(relSeconds) : date.toLocaleTimeString('de-DE');
-          chip.appendChild(time);
-        }
-        wrap.appendChild(chip);
-      });
-      addItem('Heartbeats', wrap);
-    }
-
-    if (!list.children.length) {
-      const empty = document.createElement('span');
-      empty.className = 'mut dev-telemetry-empty';
-      empty.textContent = 'Keine Telemetriedaten empfangen';
-      cell.appendChild(empty);
-    } else {
-      cell.appendChild(list);
-    }
-  };
-
   async function render(options = {}) {
     const { bypassCache = false } = options || {};
     const snapshot = await loadDeviceSnapshots({ bypassCache });
@@ -2936,14 +2821,16 @@ async function createDevicesPane(){
             if (secondsAgo <= OFFLINE_AFTER_MIN * 180) return 'warn';
             return 'crit';
           })();
-          const relativeText = formatRelativeSeconds(secondsAgo);
-          const heartbeatHtml = `<div class="dev-heartbeat" data-state="${heartbeatState}"><span class="dev-heartbeat-dot"></span><span>${offline ? 'offline' : 'online'}</span>${Number.isFinite(secondsAgo) && lastSeenAt ? `<time datetime="${new Date(lastSeenAt * 1000).toISOString()}">${relativeText}</time>` : ''}</div>`;
+          const relativeText = Number.isFinite(secondsAgo) ? formatRelativeSeconds(secondsAgo) : '';
+          const heartbeatTime = lastSeenAt ? new Date(lastSeenAt * 1000) : null;
+          const heartbeatLabel = lastSeenAt ? seenText : '';
+          const heartbeatHtml = `<div class="dev-heartbeat" data-state="${heartbeatState}"><span class="dev-heartbeat-dot"></span><span>${offline ? 'offline' : 'online'}</span>${heartbeatTime ? ` <time datetime="${heartbeatTime.toISOString()}"${relativeText ? ` title="${relativeText}"` : ''}>${heartbeatLabel}</time>` : ''}</div>`;
 
           const row = document.createElement('tr');
           if (currentDeviceCtx === device.id) row.classList.add('current');
           if (useOverrides) row.classList.add('ind');
           if (offline) row.classList.add('offline');
-          const lastSeenHtml = lastSeenAt ? `<br><small class="mut">${seenText}</small>` : '';
+          const lastSeenHtml = relativeText ? `<br><small class="mut">${relativeText}</small>` : '';
           const statusCell = `<td class="status ${offline ? 'offline' : 'online'}">${heartbeatHtml}${lastSeenHtml}</td>`;
 
           row.innerHTML = `
@@ -2957,12 +2844,8 @@ async function createDevicesPane(){
             <td><button class="btn sm" data-rename>Umbenennen</button></td>
             <td><button class="btn sm ghost" data-url>URL kopieren</button></td>
             <td><button class="btn sm danger" data-unpair>Trennen…</button></td>
-            <td class="dev-telemetry" data-telemetry></td>
             ${statusCell}
           `;
-
-          const telemetryCell = row.querySelector('[data-telemetry]');
-          renderTelemetryCell(telemetryCell, device);
 
           const modeInput = row.querySelector('[data-mode]');
           const modeLabel = row.querySelector('[data-mode-label]');
