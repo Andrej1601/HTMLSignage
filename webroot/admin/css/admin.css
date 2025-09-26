@@ -177,7 +177,8 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   background:color-mix(in oklab, var(--panel) 92%, var(--btn-accent) 8%);
   box-shadow:0 16px 40px -30px rgba(15,23,42,.45);
   border:1px solid color-mix(in oklab, var(--btn-accent) 35%, var(--inbr));
-  grid-column:1 / -1;
+  width:100%;
+
   transition:box-shadow .2s ease, border-color .2s ease, transform .2s ease;
 }
 .workspace-overview[data-pinned="true"]{
@@ -267,6 +268,8 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   display:flex;
   flex-direction:column;
   gap:12px;
+  transition:border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+
 }
 .workspace-card-head{
   display:flex;
@@ -276,6 +279,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .workspace-card-icon{
   font-size:28px;
   line-height:1;
+  transition:transform .2s ease;
 }
 .workspace-card-head h3{
   margin:0 0 4px;
@@ -347,6 +351,20 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .workspace-card-btn.ghost{
   background:color-mix(in oklab, var(--panel) 92%, transparent);
 }
+
+
+.workspace-card.is-active{
+  border-color:color-mix(in oklab, var(--btn-accent) 55%, var(--border));
+  background:color-mix(in oklab, var(--panel) 92%, var(--btn-accent) 12%);
+  box-shadow:0 24px 52px -32px color-mix(in oklab, var(--btn-accent) 60%, transparent);
+}
+.workspace-card.is-active .workspace-card-icon{
+  transform:scale(1.08);
+}
+.workspace-card.is-active .workspace-card-head h3{
+  color:color-mix(in oklab, var(--fg) 96%, var(--btn-accent) 20%);
+}
+  
 .workspace-branch-btn{
   appearance:none;
   border-radius:999px;
@@ -541,7 +559,6 @@ main.layout{
   top:64px;
   max-height:calc(100svh - 64px);
   overflow:auto;
-  padding-right:12px;
   justify-self:end;
   width:clamp(var(--sidebar-min), var(--sidebar-size), var(--sidebar-max));
   max-width:var(--sidebar-max);
@@ -584,11 +601,69 @@ main.layout{
   outline-offset:2px;
 }
 
+.rightbar-inner{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  padding:0 12px 18px 0;
+  min-width:0;
+}
+
+.rightbar-inner > .workspace-overview{
+  margin:0;
+}
+
 .rightbar-columns{
   display:grid;
   gap:14px;
   grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
   align-content:start;
+}
+
+.cockpit-panels{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+}
+
+.cockpit-panel{
+  display:block;
+}
+
+.cockpit-panel[hidden]{
+  display:none !important;
+}
+
+.cockpit-panel .rightbar-columns{
+  margin:0;
+}
+
+.cockpit-info .content{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.cockpit-info-text{
+  margin:0;
+  color:var(--muted);
+  line-height:1.5;
+  font-size:13px;
+}
+
+.cockpit-info-list{
+  margin:0;
+  padding-left:18px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  color:color-mix(in oklab, var(--fg) 85%, var(--muted));
+  font-size:13px;
+  list-style:disc;
+}
+
+.cockpit-info-list strong{
+  color:color-mix(in oklab, var(--fg) 96%, var(--btn-accent) 20%);
 }
 
 .rightbar-columns > details,
