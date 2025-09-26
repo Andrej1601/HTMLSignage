@@ -1541,9 +1541,9 @@ async function loadDeviceResolved(id){
   function flamesWrap(spec) {
     const { count, approx } = parseFlameSpec(spec);
     const wrap = h('div', { class: 'flames' + (approx ? ' approx' : '') });
-    wrap.appendChild(count >= 1 ? flameNode() : h('span'));
-    wrap.appendChild(count >= 2 ? flameNode() : h('span'));
-    wrap.appendChild(count >= 3 ? flameNode() : h('span'));
+    for (let i = 0; i < count; i += 1) {
+      wrap.appendChild(flameNode());
+    }
     return wrap;
   }
 
