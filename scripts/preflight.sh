@@ -1,3 +1,4 @@
+
 #!/bin/sh
 set -eu
 
@@ -20,7 +21,6 @@ check_commands() {
       ok "Found $cmd"
     fi
   done
-
   if command -v docker >/dev/null 2>&1; then
     if docker compose version >/dev/null 2>&1; then
       ok "Docker Compose plugin available"
@@ -58,6 +58,7 @@ check_ports() {
       ok "Port ${port} available"
     fi
   done
+
   [ "$busy" -eq 0 ]
 }
 
@@ -73,6 +74,7 @@ check_disk() {
   fi
   ok "Disk space OK (${avail}MB free)"
 }
+
 
 check_permissions() {
   if [ ! -w webroot/data ]; then
@@ -90,7 +92,9 @@ run_all() {
   check_disk || status=1
   check_permissions || status=1
 
+
   if [ "$status" -ne 0 ]; then
+
     fail "Preflight checks failed"
     exit 1
   fi
