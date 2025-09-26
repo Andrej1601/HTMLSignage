@@ -177,6 +177,7 @@ function ensureBadgeLibrary(settings){
     raw.forEach(entry => pushEntry(entry, true));
   }
 
+
   const shouldUseFallback = !normalized.length && !hadArray;
   if (shouldUseFallback){
     const fallback = DEFAULTS.slides?.badgeLibrary || [];
