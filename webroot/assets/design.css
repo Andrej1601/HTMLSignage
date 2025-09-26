@@ -433,10 +433,18 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 }
 
 /* Flammen rechts, kompakt und nie über dem Text */
-.chip-flames{ 
-  flex:0 0 auto; display:inline-flex; margin-left:.6em;
+.chip-flames{
+  flex:0 0 auto;
+  display:inline-flex;
+  margin-left:auto;
+  padding-left:.6em;
+  justify-content:flex-end;
 }
-.chip-flames .flames{ display:inline-flex; gap:var(--chipFlameGap); }
+.chip-flames .flames{
+  display:inline-flex;
+  gap:var(--chipFlameGap);
+  justify-content:flex-end;
+}
 .chip-flames .flame{
   height:calc(var(--chipH) * var(--chipFlamePct));
   width:auto;
