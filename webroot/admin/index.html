@@ -52,6 +52,170 @@
   </header>
 
   <main class="layout">
+    <section class="workspace-overview" aria-labelledby="adminCockpitTitle" data-collapsed="false" data-pinned="false">
+      <header class="workspace-toolbar">
+        <h2 id="adminCockpitTitle" class="workspace-title">Admin-Cockpit</h2>
+        <div class="workspace-toolbar-actions" role="group" aria-label="Cockpit-Optionen">
+          <button type="button" class="workspace-tool-btn" data-action="pin" aria-pressed="false" title="Cockpit anheften">
+            <span class="workspace-tool-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+            <span class="workspace-tool-label" data-role="label" data-label-pinned="Lösen" data-label-unpinned="Anheften">Anheften</span>
+          </button>
+          <button type="button" class="workspace-tool-btn" data-action="toggle" aria-controls="adminCockpitBody" aria-expanded="true" title="Cockpit minimieren">
+            <span class="workspace-tool-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+            <span class="workspace-tool-label" data-role="label" data-label-expanded="Einklappen" data-label-collapsed="Aufklappen">Einklappen</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="workspace-body" id="adminCockpitBody">
+        <div class="workspace-grid" role="list">
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
+              <div>
+                <h3>Tagesplan &amp; Wochenablauf</h3>
+                <p>Zeiten strukturieren, Reihenfolge anpassen und Wochenvorlagen sichern.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Zeiten verschieben, duplizieren oder löschen</li>
+              <li>Wochentage vergleichen und speichern</li>
+              <li>Schnell zu freien Slots navigieren</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-view="grid" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🔥</span>
+              <div>
+                <h3>Saunen &amp; Hinweise</h3>
+                <p>Saunen, Fußnoten und Badge-Bibliothek pflegen – inklusive Vorschau und Reihenfolge.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Saunen aktivieren/deaktivieren</li>
+              <li>Badges und Hinweise verwalten</li>
+              <li>Übersicht für den Aufgussplan anpassen</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-jump="boxSaunas" aria-controls="boxSaunas">Saunen öffnen</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Weitere Bereiche">
+                <button type="button" class="workspace-branch-btn" data-jump="boxFootnotes" aria-controls="boxFootnotes">Fußnoten &amp; Badges</button>
+                <button type="button" class="workspace-branch-btn" data-jump="badgeLibrarySection" aria-controls="badgeLibrarySection">Badge-Bibliothek</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🎬</span>
+              <div>
+                <h3>Slides &amp; Automationen</h3>
+                <p>Dauer, Übergänge und Reihenfolgen einstellen, damit der Ablauf passt.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Globale oder individuelle Slide-Dauer wählen</li>
+              <li>Automatisierungen aktivieren</li>
+              <li>Übersichten &amp; Vorschauen prüfen</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf steuern</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Weitere Einstellungen">
+                <button type="button" class="workspace-branch-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
+                <button type="button" class="workspace-branch-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
+              <div>
+                <h3>Vorschau &amp; Geräte</h3>
+                <p>Slides live prüfen, Geräte verwalten und Anzeigen aktualisieren.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Slideshow in der Vorschau kontrollieren</li>
+              <li>Gerätestatus, Firmware und Pairings im Blick behalten</li>
+              <li>Displays neu laden oder Geräte koppeln</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
+                <button type="button" class="workspace-branch-btn" data-devices="open" data-highlight="devicesPane">Gerätebereich</button>
+                <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
+              <div>
+                <h3>Infos &amp; Story-Slides</h3>
+                <p>Zusatzinhalte, Countdowns, Wellness-Tipps und Story-Baukasten betreuen.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Wellness-, Gastro- und Eventinfos pflegen</li>
+              <li>Hero-Timeline aktivieren und timen</li>
+              <li>Story-Slides mit Spalten-Baukasten gestalten</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-jump="boxStories" aria-controls="boxStories">Zusatzinfos</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Direkte Abschnitte">
+                <button type="button" class="workspace-branch-btn" data-jump="infoWellness" aria-controls="infoWellness">Wellness-Tipps</button>
+                <button type="button" class="workspace-branch-btn" data-jump="infoEvents" aria-controls="infoEvents">Event-Countdowns</button>
+                <button type="button" class="workspace-branch-btn" data-jump="infoGastro" aria-controls="infoGastro">Gastro-Infos</button>
+                <button type="button" class="workspace-branch-btn" data-jump="infoHero" aria-controls="infoHero">Hero-Timeline</button>
+                <button type="button" class="workspace-branch-btn" data-jump="infoStories" aria-controls="infoStories">Story-Slides</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🎨</span>
+              <div>
+                <h3>Medien &amp; Layout</h3>
+                <p>Slides mit Bildern, Texten, Farben und Layouts gestalten – inklusive Presets.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Medien-Slides verwalten und sortieren</li>
+              <li>Layouts für Splitscreens und Anzeigearten festlegen</li>
+              <li>Style-Presets pflegen und anwenden</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-jump="boxImages" aria-controls="boxImages">Medienbereich</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Layout &amp; Styles">
+                <button type="button" class="workspace-branch-btn" data-jump="boxSlidesText" aria-controls="boxSlidesText">Slideshow &amp; Text</button>
+                <button type="button" class="workspace-branch-btn" data-jump="displayLayoutFold" aria-controls="displayLayoutFold">Darstellung &amp; Seiten</button>
+                <button type="button" class="workspace-branch-btn" data-jump="styleSetControls" aria-controls="styleSetControls">Style-Paletten</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <section class="leftcol">
 <div class="card" id="gridPane" data-jump-target>
         <div class="content" style="padding-bottom:0">
@@ -1060,6 +1224,7 @@
     setPinState(pinned);
     setCollapseState(collapsed);
 
+
     scheduleUpdate();
 
     pinBtn?.addEventListener('click', () => {
@@ -1259,6 +1424,7 @@
         if (typeof window.revealCockpitPanelForElement === 'function') {
           window.revealCockpitPanelForElement(target);
         }
+
 
         ensureDetailsOpen(target);
 

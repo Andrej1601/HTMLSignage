@@ -178,6 +178,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   box-shadow:0 16px 40px -30px rgba(15,23,42,.45);
   border:1px solid color-mix(in oklab, var(--btn-accent) 35%, var(--inbr));
   width:100%;
+
   transition:box-shadow .2s ease, border-color .2s ease, transform .2s ease;
 }
 .workspace-overview[data-pinned="true"]{
@@ -268,6 +269,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   flex-direction:column;
   gap:12px;
   transition:border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+
 }
 .workspace-card-head{
   display:flex;
@@ -350,6 +352,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   background:color-mix(in oklab, var(--panel) 92%, transparent);
 }
 
+
 .workspace-card.is-active{
   border-color:color-mix(in oklab, var(--btn-accent) 55%, var(--border));
   background:color-mix(in oklab, var(--panel) 92%, var(--btn-accent) 12%);
@@ -361,6 +364,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .workspace-card.is-active .workspace-card-head h3{
   color:color-mix(in oklab, var(--fg) 96%, var(--btn-accent) 20%);
 }
+  
 .workspace-branch-btn{
   appearance:none;
   border-radius:999px;
