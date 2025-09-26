@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "displayName": "Administrator",
+      "password": "$2y$10$examplehashreplacewithscripts",
+      "roles": ["admin"]
+    }
+  ]
+}

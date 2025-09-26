@@ -1,5 +1,7 @@
 <?php
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
+auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
@@ -36,5 +38,10 @@ try {
   echo json_encode(['ok'=>false, 'error'=>'save-failed']);
   exit;
 }
+
+auth_audit('device.rename', [
+  'deviceId' => $devIn,
+  'name' => $name
+]);
 
 echo json_encode(['ok'=>true, 'device'=>$devIn, 'name'=>$name]);

@@ -1,6 +1,8 @@
 <?php
 // /admin/api/devices_gc.php – aufräumen & reparieren (vollständig)
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
+auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
@@ -37,4 +39,8 @@ foreach (($db['pairings'] ?? []) as $code => $row) {
 }
 
 if (!devices_save($db)) { echo json_encode(['ok'=>false,'error'=>'save-failed']); exit; }
+auth_audit('device.gc', [
+  'deletedDevices' => $deletedDevices,
+  'deletedPairings' => $deletedPairings
+]);
 echo json_encode(['ok'=>true,'deletedDevices'=>$deletedDevices,'deletedPairings'=>$deletedPairings]);

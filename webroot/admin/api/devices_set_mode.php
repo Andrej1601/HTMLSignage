@@ -1,5 +1,7 @@
 <?php
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
+auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
@@ -30,5 +32,10 @@ if (!devices_save($db)) {
   echo json_encode(['ok'=>false, 'error'=>'write-failed']);
   exit;
 }
+
+auth_audit('device.mode', [
+  'deviceId' => $devId,
+  'mode' => $mode
+]);
 
 echo json_encode(['ok'=>true]);
