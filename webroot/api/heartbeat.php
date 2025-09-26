@@ -15,7 +15,8 @@ if ($deviceId === '') {
 }
 
 $db = devices_load();
-if (!devices_touch_entry($db, $deviceId)) {
+$telemetry = devices_extract_telemetry_payload($payload);
+if (!devices_touch_entry($db, $deviceId, null, $telemetry)) {
   echo json_encode(['ok' => false, 'error' => 'unknown-device']);
   exit;
 }

@@ -1220,6 +1220,18 @@ body.device-mode #devPairedList tr.selected{
 #devPairedList .dev-heartbeat[data-state="crit"] .dev-heartbeat-dot{ background:#EF4444; box-shadow:0 0 0 3px rgba(239,68,68,.26); }
 #devPairedList .dev-heartbeat[data-state="unknown"] .dev-heartbeat-dot{ background:#9CA3AF; box-shadow:0 0 0 3px rgba(156,163,175,.22); }
 #devPairedList .dev-heartbeat time{ font-size:12px; font-weight:500; color:var(--muted); }
+#devPairedList td.dev-telemetry{ font-size:12px; line-height:1.4; min-width:220px; }
+.dev-telemetry-list{ display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin:0; }
+.dev-telemetry-list dt{ font-weight:600; color:var(--muted-strong); }
+.dev-telemetry-list dd{ margin:0; }
+.dev-telemetry-list dd .mut{ color:var(--muted); }
+.dev-error-list{ margin:0; padding-left:18px; }
+.dev-error-list li{ margin:0; }
+.dev-history{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.dev-history-chip{ display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:999px; font-weight:600; font-size:11px; background:var(--surface-muted); color:var(--muted-strong); }
+.dev-history-chip time{ color:inherit; font-weight:inherit; font-size:inherit; }
+.dev-history-chip[data-state="offline"]{ background:#fee2e2; color:#b91c1c; }
+.dev-history-chip[data-state="online"]{ background:#dcfce7; color:#166534; }
   #devPairedList tr.ind{ border-left:none; border-inline-start:4px solid var(--btn-accent); padding-left:8px; }
   body.device-mode #devPairedList tr.ind{ border-inline-start-color:var(--btn-primary); }
   #devPairedList tr.selected{ outline-offset:2px; }

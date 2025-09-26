@@ -1,0 +1,230 @@
+<?php
+// Nutzer- und Rollenverwaltung für das Admin-Interface
+// Persistiert Benutzer in data/users.json und bietet Hilfsfunktionen für die APIs.
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../storage.php';
+
+const SIGNAGE_AUTH_USERS_FILE = 'users.json';
+const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
+const SIGNAGE_AUTH_ROLES = ['viewer', 'editor', 'admin'];
+
+function auth_users_path(): string
+{
+    $custom = getenv('USERS_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['USERS_PATH'])) {
+        return (string) $_ENV['USERS_PATH'];
+    }
+    return signage_data_path(SIGNAGE_AUTH_USERS_FILE);
+}
+
+function auth_audit_path(): string
+{
+    $custom = getenv('AUDIT_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['AUDIT_PATH'])) {
+        return (string) $_ENV['AUDIT_PATH'];
+    }
+    return signage_data_path(SIGNAGE_AUTH_AUDIT_FILE);
+}
+
+function auth_users_default(): array
+{
+    return ['users' => []];
+}
+
+function auth_users_normalize(array $state): array
+{
+    $normalized = auth_users_default();
+    if (!empty($state['users']) && is_array($state['users'])) {
+        foreach ($state['users'] as $entry) {
+            if (!is_array($entry) || empty($entry['username'])) {
+                continue;
+            }
+            $username = strtolower(trim((string) $entry['username']));
+            if ($username === '') {
+                continue;
+            }
+            $user = [
+                'username' => $username,
+                'displayName' => isset($entry['displayName']) && is_string($entry['displayName'])
+                    ? trim($entry['displayName'])
+                    : null,
+                'password' => isset($entry['password']) && is_string($entry['password'])
+                    ? $entry['password']
+                    : null,
+                'roles' => [],
+            ];
+            $roles = $entry['roles'] ?? $entry['role'] ?? [];
+            if (is_string($roles)) {
+                $roles = preg_split('/[,\s]+/', $roles) ?: [];
+            }
+            if (is_array($roles)) {
+                foreach ($roles as $role) {
+                    $roleName = strtolower(trim((string) $role));
+                    if ($roleName === '') {
+                        continue;
+                    }
+                    if (!in_array($roleName, SIGNAGE_AUTH_ROLES, true)) {
+                        continue;
+                    }
+                    if (!in_array($roleName, $user['roles'], true)) {
+                        $user['roles'][] = $roleName;
+                    }
+                }
+            }
+            if (!$user['roles']) {
+                $user['roles'][] = 'viewer';
+            }
+            $normalized['users'][$username] = $user;
+        }
+    }
+    return $normalized;
+}
+
+function auth_users_load(): array
+{
+    $path = auth_users_path();
+    if (!is_file($path)) {
+        return auth_users_default();
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return auth_users_default();
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return auth_users_default();
+    }
+    return auth_users_normalize($decoded);
+}
+
+function auth_users_save(array $state): void
+{
+    $normalized = auth_users_normalize($state);
+    $path = auth_users_path();
+    @mkdir(dirname($path), 02775, true);
+    $json = json_encode($normalized, SIGNAGE_JSON_FLAGS);
+    if (@file_put_contents($path, $json, LOCK_EX) === false) {
+        throw new RuntimeException('Unable to write users database');
+    }
+    @chmod($path, 0640);
+}
+
+function auth_users_find(string $username): ?array
+{
+    $state = auth_users_load();
+    $key = strtolower(trim($username));
+    return $state['users'][$key] ?? null;
+}
+
+function auth_users_set(array $user): void
+{
+    if (empty($user['username'])) {
+        throw new InvalidArgumentException('username required');
+    }
+    $state = auth_users_load();
+    $key = strtolower(trim((string) $user['username']));
+    $current = $state['users'][$key] ?? [];
+    $merged = array_merge($current, $user);
+    $merged['username'] = $key;
+    if (!empty($merged['roles']) && is_array($merged['roles'])) {
+        $normalizedRoles = [];
+        foreach ($merged['roles'] as $role) {
+            $roleName = strtolower(trim((string) $role));
+            if ($roleName !== '') {
+                $normalizedRoles[] = $roleName;
+            }
+        }
+        $merged['roles'] = array_values(array_unique(array_intersect($normalizedRoles, SIGNAGE_AUTH_ROLES)));
+    }
+    if (empty($merged['roles'])) {
+        $merged['roles'] = ['viewer'];
+    }
+    $state['users'][$key] = $merged;
+    auth_users_save($state);
+}
+
+function auth_users_remove(string $username): bool
+{
+    $state = auth_users_load();
+    $key = strtolower(trim($username));
+    if (!isset($state['users'][$key])) {
+        return false;
+    }
+    unset($state['users'][$key]);
+    auth_users_save($state);
+    return true;
+}
+
+function auth_user_roles(array $user): array
+{
+    $roles = [];
+    if (!empty($user['roles']) && is_array($user['roles'])) {
+        foreach ($user['roles'] as $role) {
+            $roleName = strtolower(trim((string) $role));
+            if ($roleName !== '' && in_array($roleName, SIGNAGE_AUTH_ROLES, true)) {
+                $roles[] = $roleName;
+            }
+        }
+    }
+    if (!$roles) {
+        $roles[] = 'viewer';
+    }
+    return array_values(array_unique($roles));
+}
+
+function auth_user_has_role(array $user, string $role): bool
+{
+    $role = strtolower(trim($role));
+    if (!in_array($role, SIGNAGE_AUTH_ROLES, true)) {
+        return false;
+    }
+    $roles = auth_user_roles($user);
+    $rank = auth_role_rank($role);
+    foreach ($roles as $userRole) {
+        if (auth_role_rank($userRole) >= $rank) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function auth_role_rank(string $role): int
+{
+    static $map = ['viewer' => 0, 'editor' => 1, 'admin' => 2];
+    $role = strtolower(trim($role));
+    return $map[$role] ?? -1;
+}
+
+function auth_hash_password(string $password): string
+{
+    return password_hash($password, PASSWORD_DEFAULT);
+}
+
+function auth_verify_password(string $password, string $hash): bool
+{
+    if ($hash === '') {
+        return false;
+    }
+    return password_verify($password, $hash);
+}
+
+function auth_append_audit(string $event, array $context = []): void
+{
+    $path = auth_audit_path();
+    @mkdir(dirname($path), 02775, true);
+    $row = [
+        'ts' => time(),
+        'event' => $event,
+        'context' => $context,
+    ];
+    $line = json_encode($row, JSON_UNESCAPED_SLASHES) . "\n";
+    @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
+}
