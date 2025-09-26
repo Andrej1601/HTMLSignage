@@ -87,7 +87,7 @@
                 <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
               </div>
               <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
-                <button type="button" class="workspace-branch-btn" data-devices="open" data-highlight="devicesPane">Gerätebereich</button>
+                <button type="button" class="workspace-branch-btn" data-devices="toggle" data-highlight="devicesPane">Gerätebereich</button>
                 <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
               </div>
             </div>
@@ -1090,6 +1090,20 @@
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    const runViewChange = async (view) => {
+      if (!view) return;
+      const viewHandler = window.__adminShowView || window.showView;
+      if (typeof viewHandler === 'function') {
+        await viewHandler(view);
+        return;
+      }
+      const menuItem = document.querySelector(`#viewMenu .dd-item[data-view="${view}"]`);
+      if (menuItem) {
+        menuItem.click();
+        await sleep(160);
+      }
+    };
+
     const resolveTarget = (id) => {
       if (!id) return null;
       if (id.startsWith('#')) return document.querySelector(id);
@@ -1110,9 +1124,9 @@
         event.preventDefault();
 
         const desiredView = button.dataset.view;
-        if (desiredView && typeof showView === 'function') {
+        if (desiredView) {
           try {
-            await showView(desiredView);
+            await runViewChange(desiredView);
           } catch (error) {
             console.error('[admin] Ansicht konnte nicht gewechselt werden', error);
           }
