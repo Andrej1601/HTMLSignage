@@ -8,6 +8,7 @@ require_once __DIR__ . '/../storage.php';
 
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
+const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
 const SIGNAGE_AUTH_ROLES = ['viewer', 'editor', 'admin'];
 
 
@@ -43,6 +44,18 @@ function auth_audit_path(): string
         return (string) $_ENV['AUDIT_PATH'];
     }
     return signage_data_path(SIGNAGE_AUTH_AUDIT_FILE);
+}
+
+function auth_basic_path(): string
+{
+    $custom = getenv('BASIC_AUTH_FILE');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['BASIC_AUTH_FILE'])) {
+        return (string) $_ENV['BASIC_AUTH_FILE'];
+    }
+    return signage_data_path(SIGNAGE_AUTH_BASIC_FILE);
 }
 
 function auth_users_default(): array
@@ -124,6 +137,30 @@ function auth_users_save(array $state): void
     $json = json_encode($normalized, SIGNAGE_JSON_FLAGS);
     if (@file_put_contents($path, $json, LOCK_EX) === false) {
         throw new RuntimeException('Unable to write users database');
+    }
+    @chmod($path, 0640);
+    auth_basic_sync($normalized);
+}
+
+function auth_basic_sync(array $state): void
+{
+    $path = auth_basic_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to prepare basic auth directory');
+    }
+    $lines = [];
+    foreach ($state['users'] as $user) {
+        $username = isset($user['username']) ? trim((string) $user['username']) : '';
+        $password = $user['password'] ?? '';
+        if ($username === '' || !is_string($password) || $password === '') {
+            continue;
+        }
+        $lines[] = $username . ':' . $password;
+    }
+    $content = $lines ? implode("\n", $lines) . "\n" : '';
+    if (@file_put_contents($path, $content, LOCK_EX) === false) {
+        throw new RuntimeException('Unable to write basic auth file');
     }
     @chmod($path, 0640);
 }
