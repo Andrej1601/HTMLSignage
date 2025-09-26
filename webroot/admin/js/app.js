@@ -3068,6 +3068,8 @@ async function showView(v){
   attachDockLivePush();
 }
 
+window.__adminShowView = showView;
+
 function initViewMenu(){
   const btn  = document.getElementById('viewMenuBtn');
   const menu = document.getElementById('viewMenu');

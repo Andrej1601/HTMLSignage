@@ -71,6 +71,30 @@
         <div class="workspace-grid" role="list">
           <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
+              <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
+              <div>
+                <h3>Vorschau &amp; Geräte</h3>
+                <p>Slides live prüfen, Geräte verwalten und Anzeigen aktualisieren.</p>
+              </div>
+            </div>
+            <ul class="workspace-card-list">
+              <li>Slideshow in der Vorschau kontrollieren</li>
+              <li>Gerätestatus, Firmware und Pairings im Blick behalten</li>
+              <li>Displays neu laden oder Geräte koppeln</li>
+            </ul>
+            <div class="workspace-card-actions">
+              <div class="workspace-card-actions-main">
+                <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
+              </div>
+              <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
+                <button type="button" class="workspace-branch-btn" data-devices="toggle" data-highlight="devicesPane">Gerätebereich</button>
+                <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="workspace-card" role="listitem">
+            <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
               <div>
                 <h3>Tagesplan &amp; Wochenablauf</h3>
@@ -133,30 +157,6 @@
               <div class="workspace-card-branches" role="group" aria-label="Weitere Einstellungen">
                 <button type="button" class="workspace-branch-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
                 <button type="button" class="workspace-branch-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
-              <div>
-                <h3>Vorschau &amp; Geräte</h3>
-                <p>Slides live prüfen, Geräte verwalten und Anzeigen aktualisieren.</p>
-              </div>
-            </div>
-            <ul class="workspace-card-list">
-              <li>Slideshow in der Vorschau kontrollieren</li>
-              <li>Gerätestatus, Firmware und Pairings im Blick behalten</li>
-              <li>Displays neu laden oder Geräte koppeln</li>
-            </ul>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
-                <button type="button" class="workspace-branch-btn" data-devices="open" data-highlight="devicesPane">Gerätebereich</button>
-                <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
               </div>
             </div>
           </article>
@@ -1051,8 +1051,8 @@
 </script>
 <script>
   (function(){
-    const jumpButtons = document.querySelectorAll('[data-jump]');
-    if (!jumpButtons.length) return;
+    const actionButtons = document.querySelectorAll('.workspace-card [data-jump], .workspace-card [data-view], .workspace-card [data-devices]');
+    if (!actionButtons.length) return;
 
     const ensureDetailsOpen = (element) => {
       if (!element) return;
@@ -1090,6 +1090,20 @@
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+    const runViewChange = async (view) => {
+      if (!view) return;
+      const viewHandler = window.__adminShowView || window.showView;
+      if (typeof viewHandler === 'function') {
+        await viewHandler(view);
+        return;
+      }
+      const menuItem = document.querySelector(`#viewMenu .dd-item[data-view="${view}"]`);
+      if (menuItem) {
+        menuItem.click();
+        await sleep(160);
+      }
+    };
+
     const resolveTarget = (id) => {
       if (!id) return null;
       if (id.startsWith('#')) return document.querySelector(id);
@@ -1105,14 +1119,14 @@
       return waitForElement(id, attempts - 1);
     };
 
-    jumpButtons.forEach((button) => {
+    actionButtons.forEach((button) => {
       button.addEventListener('click', async (event) => {
         event.preventDefault();
 
         const desiredView = button.dataset.view;
-        if (desiredView && typeof showView === 'function') {
+        if (desiredView) {
           try {
-            await showView(desiredView);
+            await runViewChange(desiredView);
           } catch (error) {
             console.error('[admin] Ansicht konnte nicht gewechselt werden', error);
           }
