@@ -40,8 +40,10 @@
         </button>
       </div>
       <!-- Ansicht-Menü -->
-      <button class="btn" id="btnDevices">Geräte</button>
-      <div class="menuwrap" id="viewMenuWrap">
+      <span class="help-anchor" data-help-key="devices-panel">
+        <button class="btn" id="btnDevices">Geräte</button>
+      </span>
+      <div class="menuwrap" id="viewMenuWrap" data-help-key="view-menu">
         <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
           Ansicht: <span id="viewMenuLabel">Grid</span> ▾
         </button>
@@ -53,7 +55,9 @@
       <button class="btn" id="btnHelp">Hilfe</button>
       <button class="btn" id="btnUsers">Benutzer</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
-      <button class="btn primary" id="btnSave">Speichern</button>
+      <span class="help-anchor" data-help-key="save">
+        <button class="btn primary" id="btnSave">Speichern</button>
+      </span>
       <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
         <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
         <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
@@ -62,7 +66,7 @@
   </header>
 
   <main class="layout">
-    <section class="workspace-overview" aria-labelledby="adminCockpitTitle" data-collapsed="false" data-pinned="false">
+    <section class="workspace-overview" aria-labelledby="adminCockpitTitle" data-collapsed="false" data-pinned="false" data-help-key="cockpit">
       <header class="workspace-toolbar">
         <div class="workspace-toolbar-text">
           <h2 id="adminCockpitTitle" class="workspace-title">Admin-Cockpit</h2>
@@ -220,7 +224,7 @@
     </section>
 
     <section class="leftcol">
-<div class="card" id="gridPane" data-jump-target>
+    <div class="card" id="gridPane" data-jump-target data-help-key="schedule">
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
@@ -959,6 +963,7 @@
     <ul>
       <li>Nutze „Sauna hinzufügen“, um neue Slides zu erstellen.</li>
       <li>Wechsle zur Ansicht „Geräte“, um Displays zu bearbeiten.</li>
+      <li>Achte auf die „?“ Buttons für kontextbezogene Hilfe direkt an den Bedienelementen.</li>
     </ul>
     <p>Mehr Hilfe in der <a href="/admin/help.md" target="_blank">Dokumentation</a>.</p>
   </div>

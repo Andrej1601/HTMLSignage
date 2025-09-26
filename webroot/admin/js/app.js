@@ -16,8 +16,11 @@ import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
-import { createSafeLocalStorage } from './core/safe_storage.js';
 import { createUnsavedTracker } from './core/unsaved_state.js';
+import storage from './core/storage.js';
+import { createAppState } from './core/app_state.js';
+import { createDeviceContextManager } from './core/device_context.js';
+import { initContextHelp } from './ui/context_help.js';
 import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
@@ -49,18 +52,10 @@ import {
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
-const safeStorage = createSafeLocalStorage({
-  onFallback: () => {
-    if (typeof alert === 'function') {
-      alert('Speicher voll – Daten werden nur temporär gespeichert.');
-    }
-  },
-  logger: (method, error) => console.warn(`[admin] localStorage.${method} failed`, error)
-});
 
-const lsGet = (key) => safeStorage.getItem(key);
-const lsSet = (key, value) => safeStorage.setItem(key, value);
-const lsRemove = (key) => safeStorage.removeItem(key);
+const lsGet = (key) => storage.get(key);
+const lsSet = (key, value) => storage.set(key, value);
+const lsRemove = (key) => storage.remove(key);
 
 const ROLE_META = {
   viewer: {
@@ -84,23 +79,76 @@ let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
 let deviceBaseSchedule = null;      // Basis für Geräte-Kontext
 let deviceBaseSettings = null;
-let currentDeviceCtx = null;        // z.B. "dev_abc..."
-let currentDeviceName = null;
-let currentDeviceBadgeMeta = null;
 let storedView = lsGet('adminView');
 if (storedView === 'devices') storedView = 'grid';
 if (storedView !== 'grid' && storedView !== 'preview') storedView = 'grid';
-let currentView = storedView; // 'grid' | 'preview'
-let dockPane = null;     // Vorschau-Pane (wird nur bei "Vorschau" erzeugt)
-let devicesPane = null;  // Geräte-Pane (wenn angeheftet)
-let devicesPinned = (lsGet('devicesPinned') === '1');
-document.body?.classList.toggle('devices-pinned', devicesPinned);
+const appState = createAppState({
+  initialView: storedView,
+  devicesPinned: lsGet('devicesPinned') === '1'
+});
+document.body?.classList.toggle('devices-pinned', appState.isDevicesPinned());
 
 const stateAccess = {
   getSchedule: () => schedule,
   getSettings: () => settings,
-  setSchedule: (next) => { schedule = next; },
-  setSettings: (next) => { settings = next; }
+  setSchedule: (next) => {
+    schedule = next;
+    appState.setSchedule(next);
+  },
+  setSettings: (next) => {
+    settings = next;
+    appState.setSettings(next);
+  }
+};
+
+let renderContextBadge = () => {};
+let enterDeviceContext = async () => {};
+let exitDeviceContext = () => {};
+let getDeviceContext = () => appState.getDeviceContext();
+const getDevicesPane = () => deviceContextState.getDevicesPane();
+const setDevicesPane = (pane) => deviceContextState.setDevicesPane(pane);
+const getDockPane = () => deviceContextState.getDockPane();
+const setDockPane = (pane) => deviceContextState.setDockPane(pane);
+const getCurrentView = () => deviceContextState.getCurrentView();
+const setCurrentView = (view) => deviceContextState.setCurrentView(view);
+const isDevicesPinned = () => deviceContextState.isDevicesPinned();
+const setDevicesPinned = (flag) => {
+  deviceContextState.setDevicesPinned(flag);
+};
+
+const deviceContextState = {
+  getSchedule: () => schedule,
+  setSchedule: (next) => stateAccess.setSchedule(next),
+  getSettings: () => settings,
+  setSettings: (next) => stateAccess.setSettings(next),
+  setBaseState: (scheduleValue, settingsValue) => {
+    baseSchedule = scheduleValue;
+    baseSettings = settingsValue;
+    appState.setBaseState(scheduleValue, settingsValue);
+  },
+  getBaseState: () => ({ schedule: baseSchedule, settings: baseSettings }),
+  setDeviceBaseState: (scheduleValue, settingsValue) => {
+    deviceBaseSchedule = scheduleValue;
+    deviceBaseSettings = settingsValue;
+    appState.setDeviceBaseState(scheduleValue, settingsValue);
+  },
+  getDeviceBaseState: () => ({ schedule: deviceBaseSchedule, settings: deviceBaseSettings }),
+  clearDeviceBaseState: () => {
+    deviceBaseSchedule = null;
+    deviceBaseSettings = null;
+    appState.clearDeviceBaseState();
+  },
+  setDeviceContext: (ctx) => appState.setDeviceContext(ctx),
+  getDeviceContext: () => appState.getDeviceContext(),
+  clearDeviceContext: () => appState.clearDeviceContext(),
+  setCurrentView: (view) => appState.setCurrentView(view),
+  getCurrentView: () => appState.getCurrentView(),
+  setDevicesPinned: (flag) => appState.setDevicesPinned(flag),
+  isDevicesPinned: () => appState.isDevicesPinned(),
+  setDockPane: (el) => appState.setDockPane(el),
+  getDockPane: () => appState.getDockPane(),
+  setDevicesPane: (el) => appState.setDevicesPane(el),
+  getDevicesPane: () => appState.getDevicesPane()
 };
 
 function createGridContext() {
@@ -199,6 +247,22 @@ const evaluateUnsavedState = unsavedTracker.evaluate;
 const setUnsavedState = (state, options) => unsavedTracker.setUnsavedState(state, options);
 const restoreFromBaseline = unsavedTracker.restoreBaseline;
 const ensureUnsavedChangeListener = unsavedTracker.ensureListeners;
+
+const deviceContextManager = createDeviceContextManager({
+  document,
+  state: deviceContextState,
+  updateBaseline,
+  evaluateUnsavedState,
+  setUnsavedState,
+  refreshAllUi,
+  showView,
+  loadDeviceById
+});
+
+renderContextBadge = deviceContextManager.renderContextBadge;
+enterDeviceContext = deviceContextManager.enterDeviceContext;
+exitDeviceContext = deviceContextManager.exitDeviceContext;
+getDeviceContext = () => deviceContextManager.getDeviceContext();
 
 const unsavedBadgeResetBtn = document.getElementById('unsavedBadgeReset');
 if (unsavedBadgeResetBtn){
@@ -375,191 +439,6 @@ function initSidebarResize(){
   syncState();
 }
 
-function normalizeContextBadge(source){
-  if (!source) return null;
-  if (typeof source === 'string'){
-    const trimmed = source.trim();
-    if (!trimmed) return null;
-    const isUrl = /^(?:https?:)?\//i.test(trimmed) || /^data:/i.test(trimmed);
-    if (isUrl) return { icon:'', imageUrl: trimmed, label:'' };
-    return { icon: trimmed, imageUrl:'', label:'' };
-  }
-  if (typeof source !== 'object') return null;
-  const icon = typeof source.icon === 'string'
-    ? source.icon.trim()
-    : (typeof source.emoji === 'string' ? source.emoji.trim() : '');
-  const imageUrlRaw = typeof source.imageUrl === 'string' ? source.imageUrl
-    : (typeof source.iconUrl === 'string' ? source.iconUrl : '');
-  const imageUrl = String(imageUrlRaw || '').trim();
-  const label = typeof source.label === 'string' ? source.label.trim() : '';
-  if (!icon && !imageUrl) return null;
-  return { icon, imageUrl, label };
-}
-
-// --- Kontext-Badge (Header) im Modul-Scope ---
-function renderContextBadge(){
-  const header = document.querySelector('header');
-  const actions = header?.querySelector('.header-actions');
-  if (!header) return;
-  let wrap = header.querySelector('.ctx-wrap');
-  let el = document.getElementById('ctxBadge');
-  if (!currentDeviceCtx){
-    if (wrap) wrap.remove();
-    return;
-  }
-  if (!wrap){
-    wrap = document.createElement('div');
-    wrap.className = 'ctx-wrap';
-  }
-  if (actions){
-    header.insertBefore(wrap, actions);
-  } else if (!wrap.isConnected){
-    header.appendChild(wrap);
-  }
-  if (!el){
-    el = document.createElement('span');
-    el.id = 'ctxBadge';
-    el.className = 'ctx-badge';
-    el.title = 'Geräte-Kontext aktiv';
-
-    const label = document.createElement('span');
-    label.className = 'ctx-badge-label';
-
-    const media = document.createElement('span');
-    media.className = 'ctx-badge-media';
-    media.hidden = true;
-
-    const mediaImage = document.createElement('img');
-    mediaImage.className = 'ctx-badge-media-image';
-    mediaImage.alt = '';
-    mediaImage.hidden = true;
-
-    const mediaIcon = document.createElement('span');
-    mediaIcon.className = 'ctx-badge-media-icon';
-    mediaIcon.hidden = true;
-
-    media.appendChild(mediaImage);
-    media.appendChild(mediaIcon);
-
-    const text = document.createElement('span');
-    text.className = 'ctx-badge-text';
-
-    label.appendChild(media);
-    label.appendChild(text);
-    el.appendChild(label);
-
-    const resetBtn = document.createElement('button');
-    resetBtn.type = 'button';
-    resetBtn.id = 'ctxReset';
-    resetBtn.className = 'ctx-badge-close';
-    resetBtn.title = 'Geräte-Kontext verlassen';
-    resetBtn.textContent = 'Kontext schließen';
-    resetBtn.addEventListener('click', () => exitDeviceContext());
-    el.appendChild(resetBtn);
-
-    wrap.appendChild(el);
-  }
-
-  const textEl = el.querySelector('.ctx-badge-text');
-  if (textEl){
-    textEl.textContent = `Kontext: ${currentDeviceName || currentDeviceCtx}`;
-  }
-
-  const mediaWrap = el.querySelector('.ctx-badge-media');
-  const mediaImage = el.querySelector('.ctx-badge-media-image');
-  const mediaIcon = el.querySelector('.ctx-badge-media-icon');
-  const badge = currentDeviceBadgeMeta;
-  if (mediaWrap && mediaImage && mediaIcon){
-    const iconText = (badge?.icon || '').trim();
-    const imageUrl = (badge?.imageUrl || '').trim();
-    if (badge && (iconText || imageUrl)){
-      if (imageUrl){
-        mediaImage.src = imageUrl;
-        mediaImage.hidden = false;
-        mediaIcon.hidden = true;
-        mediaIcon.textContent = '';
-      } else {
-        mediaIcon.textContent = iconText;
-        mediaIcon.hidden = !iconText;
-        mediaImage.hidden = true;
-        mediaImage.removeAttribute('src');
-      }
-      mediaWrap.hidden = false;
-      mediaWrap.title = badge?.label || '';
-      el.classList.add('has-media');
-    } else {
-      mediaWrap.hidden = true;
-      mediaIcon.hidden = true;
-      mediaIcon.textContent = '';
-      mediaImage.hidden = true;
-      mediaImage.removeAttribute('src');
-      mediaWrap.removeAttribute('title');
-      el.classList.remove('has-media');
-    }
-  }
-}
-
-// --- e) Kontext-Wechsel-Funktionen (Modul-Scope) ---
-async function enterDeviceContext(deviceLike, fallbackName){
-  const provided = (deviceLike && typeof deviceLike === 'object') ? deviceLike : null;
-  const rawId = provided?.id ?? deviceLike;
-  const deviceId = typeof rawId === 'string' ? rawId : String(rawId ?? '');
-  if (!deviceId) {
-    alert('Gerät wurde nicht gefunden.');
-    return;
-  }
-
-  let device = provided;
-  if (!device?.overrides?.settings) {
-    try {
-      device = await loadDeviceById(deviceId);
-    } catch (error) {
-      console.error('[admin] Geräte-Kontext konnte nicht geladen werden', error);
-      alert('Gerät konnte nicht geladen werden: ' + error.message);
-      return;
-    }
-  }
-
-  const overrides = (device?.overrides?.settings && typeof device.overrides.settings === 'object')
-    ? device.overrides.settings
-    : {};
-  const badgeSource = device?.badgeSource ?? device?.badge ?? device?.badgeInfo ?? null;
-
-  currentDeviceCtx = deviceId;
-  currentDeviceName = device?.name || fallbackName || deviceId;
-  document.body.classList.add('device-mode');
-  currentDeviceBadgeMeta = normalizeContextBadge(badgeSource);
-
-  // globale Settings als Basis + Overrides mergen
-  settings = mergeDeep(deepClone(baseSettings), overrides);
-  settings = normalizeSettings(settings, { assignMissingIds: false });
-  deviceBaseSchedule = deepClone(schedule);
-  deviceBaseSettings = deepClone(settings);
-  updateBaseline(deviceBaseSchedule, deviceBaseSettings);
-  setUnsavedState(false);
-
-  refreshAllUi();
-
-  // in den Grid-Modus springen (falls du showView hast)
-  if (typeof showView==='function') showView('grid');
-}
-
-function exitDeviceContext(){
-  currentDeviceCtx = null;
-  currentDeviceName = null;
-  document.body.classList.remove('device-mode');
-  currentDeviceBadgeMeta = null;
-
-  settings = deepClone(baseSettings);
-  deviceBaseSchedule = null;
-  deviceBaseSettings = null;
-  updateBaseline(baseSchedule, baseSettings);
-  evaluateUnsavedState({ immediate: true });
-
-  refreshAllUi();
-}
-
-
 // ============================================================================
 // 1) Bootstrap: Laden + Initialisieren
 // ============================================================================
@@ -578,18 +457,18 @@ async function loadAll(){
     return;
   }
 
-  schedule = deepClone(s || {});
-  settings = normalizeSettings(cfg || {}, { assignMissingIds: true });
+  stateAccess.setSchedule(deepClone(s || {}));
+  stateAccess.setSettings(normalizeSettings(cfg || {}, { assignMissingIds: true }));
   baseSchedule = deepClone(schedule);
   baseSettings = deepClone(settings);
-  deviceBaseSchedule = null;
-  deviceBaseSettings = null;
+  deviceContextState.setBaseState(baseSchedule, baseSettings);
+  deviceContextState.clearDeviceBaseState();
   updateBaseline(baseSchedule, baseSettings);
 
   try {
     const draft = lsGet('scheduleDraft');
     if (draft) {
-      schedule = JSON.parse(draft);
+      stateAccess.setSchedule(JSON.parse(draft));
       unsavedFromDraft = true;
     }
   } catch {}
@@ -598,11 +477,11 @@ async function loadAll(){
     const draft = lsGet('settingsDraft');
     if (draft) {
       const parsed = JSON.parse(draft);
-      settings = mergeDeep(settings, parsed);
+      stateAccess.setSettings(mergeDeep(settings, parsed));
       unsavedFromDraft = true;
     }
   } catch {}
-  settings = normalizeSettings(settings, { assignMissingIds: false });
+  stateAccess.setSettings(normalizeSettings(settings, { assignMissingIds: false }));
 
   setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
 
@@ -623,6 +502,7 @@ async function loadAll(){
   initUserAdmin();
   initViewMenu();
   initSidebarResize();
+  initContextHelp({ storage });
 }
 
 // ============================================================================
@@ -2609,7 +2489,8 @@ $('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/'
 $('#btnSave')?.addEventListener('click', async ()=>{
   const body = collectSettings();
 
-  if (!currentDeviceCtx){
+  const ctx = getDeviceContext();
+  if (!ctx.id){
     // Global speichern
     body.schedule.version = (Date.now()/1000|0);
     body.settings.version = (Date.now()/1000|0);
@@ -2622,8 +2503,8 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       });
       baseSchedule = deepClone(schedule);
       baseSettings = deepClone(settings);
-      deviceBaseSchedule = null;
-      deviceBaseSettings = null;
+      deviceContextState.setBaseState(baseSchedule, baseSettings);
+      deviceContextState.clearDeviceBaseState();
       updateBaseline(baseSchedule, baseSettings);
       clearDraftsIfPresent();
       setUnsavedState(false);
@@ -2634,7 +2515,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
     }
   } else {
     // Geräte-Override speichern
-    const payload = { device: currentDeviceCtx, settings: body.settings, schedule: body.schedule };
+    const payload = { device: ctx.id, settings: body.settings, schedule: body.schedule };
     try {
       await fetchJson('/admin/api/devices_save_override.php', {
         method:'POST',
@@ -2644,10 +2525,11 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       });
       deviceBaseSchedule = deepClone(schedule);
       deviceBaseSettings = deepClone(settings);
+      deviceContextState.setDeviceBaseState(deviceBaseSchedule, deviceBaseSettings);
       updateBaseline(deviceBaseSchedule, deviceBaseSettings);
       clearDraftsIfPresent();
       setUnsavedState(false);
-      alert('Gespeichert für Gerät: ' + (currentDeviceName || currentDeviceCtx));
+      alert('Gespeichert für Gerät: ' + (ctx.name || ctx.id));
     } catch (error) {
       console.error('[admin] Speichern (Gerät) fehlgeschlagen', error);
       alert('Fehler: ' + error.message);
@@ -2806,6 +2688,7 @@ async function createDevicesPane(){
           tr.classList.add('selected');
         };
 
+        const activeDeviceId = getDeviceContext().id;
         devices.forEach((device) => {
           const lastSeenAt = Number(device.lastSeenAt) || 0;
           const seenText = lastSeenAt
@@ -2827,7 +2710,7 @@ async function createDevicesPane(){
           const heartbeatHtml = `<div class="dev-heartbeat" data-state="${heartbeatState}"><span class="dev-heartbeat-dot"></span><span>${offline ? 'offline' : 'online'}</span>${heartbeatTime ? ` <time datetime="${heartbeatTime.toISOString()}"${relativeText ? ` title="${relativeText}"` : ''}>${heartbeatLabel}</time>` : ''}</div>`;
 
           const row = document.createElement('tr');
-          if (currentDeviceCtx === device.id) row.classList.add('current');
+          if (activeDeviceId === device.id) row.classList.add('current');
           if (useOverrides) row.classList.add('ind');
           if (offline) row.classList.add('offline');
           const lastSeenHtml = relativeText ? `<br><small class="mut">${relativeText}</small>` : '';
@@ -3021,6 +2904,7 @@ function createDockPane(){
   frame.addEventListener('load', ()=> dockSend(false), { once:true });
   wrap.querySelector('#dockReload')?.addEventListener('click', ()=> dockSend(true));
 
+  setDockPane(wrap);
   return wrap;
 }
 
@@ -3031,25 +2915,30 @@ function destroyDockPane(){
     if (frame) frame.src = 'about:blank';
     pane.remove();
   }
+  setDockPane(null);
 }
 
 function destroyDevicesPane(){
-  if (devicesPane){
-    clearInterval(devicesPane.__refreshInterval);
+  const pane = getDevicesPane();
+  if (pane){
+    clearInterval(pane.__refreshInterval);
     window.__refreshDevicesPane = undefined;
-    devicesPane.remove();
-    devicesPane = null;
+    pane.remove();
+    setDevicesPane(null);
   }
 }
 
 async function applyDevicesPaneState(){
-  lsSet('devicesPinned', devicesPinned ? '1' : '0');
-  document.body.classList.toggle('devices-pinned', devicesPinned);
-  if (devicesPinned){
-    if (!devicesPane){
-      devicesPane = await createDevicesPane();
+  const pinned = isDevicesPinned();
+  lsSet('devicesPinned', pinned ? '1' : '0');
+  document.body.classList.toggle('devices-pinned', pinned);
+  let pane = getDevicesPane();
+  if (pinned){
+    if (!pane){
+      pane = await createDevicesPane();
+      setDevicesPane(pane);
     } else {
-      devicesPane.style.display = '';
+      pane.style.display = '';
       await refreshDevicesPane({ bypassCache: true });
     }
   } else {
@@ -3065,7 +2954,7 @@ async function showView(v){
   if (v === 'devices') v = 'grid';
   if (v !== 'grid' && v !== 'preview') v = 'grid';
 
-  currentView = v;
+  setCurrentView(v);
   lsSet('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
@@ -3084,13 +2973,15 @@ async function showView(v){
   if (v === 'grid'){
     gridCard.style.display = '';
     destroyDockPane();
-    if (devicesPane) devicesPane.style.display = '';
+    const currentPane = getDevicesPane();
+    if (currentPane) currentPane.style.display = '';
     return;
   }
 
   gridCard.style.display = 'none';
-  if (devicesPane) devicesPane.style.display = '';
-  if (!document.getElementById('dockPane')) createDockPane();
+  const pane = getDevicesPane();
+  if (pane) pane.style.display = '';
+  if (!document.getElementById('dockPane')) setDockPane(createDockPane());
   attachDockLivePush();
 }
 
@@ -3122,14 +3013,15 @@ function initViewMenu(){
   const btnDevices = document.getElementById('btnDevices');
   const updateDevicesButton = ()=>{
     if (!btnDevices) return;
-    btnDevices.classList.toggle('active', devicesPinned);
-    btnDevices.setAttribute('aria-pressed', devicesPinned ? 'true' : 'false');
+    const pinned = isDevicesPinned();
+    btnDevices.classList.toggle('active', pinned);
+    btnDevices.setAttribute('aria-pressed', pinned ? 'true' : 'false');
   };
   const toggleDevicesPane = async ()=>{
-    devicesPinned = !devicesPinned;
+    setDevicesPinned(!isDevicesPinned());
     await applyDevicesPaneState();
     updateDevicesButton();
-    await showView(currentView);
+    await showView(getCurrentView());
   };
   document.addEventListener('keydown', async (e)=>{
     if (e.key === 'Escape' && !menu.hidden) closeMenu();
@@ -3143,9 +3035,9 @@ function initViewMenu(){
   if (btnDevices) btnDevices.onclick = toggleDevicesPane;
   updateDevicesButton();
 
-  document.getElementById('viewMenuLabel').textContent = viewLabel(currentView);
+  document.getElementById('viewMenuLabel').textContent = viewLabel(getCurrentView());
   // Initial zeichnen
-  Promise.resolve().then(()=> showView(currentView));
+  Promise.resolve().then(()=> showView(getCurrentView()));
 }
 
 
