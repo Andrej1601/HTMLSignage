@@ -6,10 +6,10 @@
 
 const HELP_TOPICS = {
   'cockpit': {
-    title: 'Admin-Cockpit',
-    description: 'Das Cockpit bündelt Schnellzugriffe auf Vorschau, Geräteverwaltung und Inhaltsbereiche.',
+    title: 'Cockpit-Schnellzugriff',
+    description: 'Der kompakte Cockpit-Bereich bündelt Schnellzugriffe auf Vorschau, Geräteverwaltung und Inhaltsbereiche.',
     steps: [
-      'Nutze die Karten, um direkt zu wichtigen Abschnitten zu springen.',
+      'Nutze die Karten oder Schnellaktionen, um direkt zu wichtigen Abschnitten zu springen.',
       'Mit den verlinkten Aktionen kannst du Vorschau oder Gerätebereich sofort öffnen.'
     ]
   },
