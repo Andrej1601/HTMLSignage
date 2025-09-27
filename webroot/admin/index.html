@@ -987,10 +987,14 @@
     const updateOffsets = () => {
       const headerHeight = header?.offsetHeight || 0;
       const pinned = cockpit.dataset.pinned === 'true';
-      const cockpitHeight = pinned ? resolveCockpitHeight() : 0;
-      const workspaceOffset = Math.max(132, headerHeight + cockpitHeight + (pinned ? 28 : 24));
-      const stickTop = headerHeight + 12;
-      const devicesOffset = headerHeight + cockpitHeight + 12;
+      const collapsed = cockpit.dataset.collapsed === 'true';
+      const pinnedActive = pinned && !collapsed;
+      const cockpitHeight = pinnedActive ? resolveCockpitHeight() : 0;
+      const gap = pinnedActive ? 16 : 24;
+      const workspaceOffset = Math.max(112, headerHeight + cockpitHeight + gap);
+      const stickGap = pinnedActive ? 6 : 12;
+      const stickTop = Math.max(0, headerHeight + stickGap);
+      const devicesOffset = headerHeight + (pinnedActive ? cockpitHeight : 0) + 8;
 
       root?.style.setProperty('--workspace-offset', `${workspaceOffset}px`);
       root?.style.setProperty('--cockpit-stick-top', `${stickTop}px`);
