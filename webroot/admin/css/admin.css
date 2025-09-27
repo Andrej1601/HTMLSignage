@@ -744,9 +744,9 @@ main.layout{
 }
 
 body.devices-pinned #devicesPane{
-  position:sticky;
-  top:var(--devices-offset);
-  z-index:40;
+  position:static; /* stay in flow above grid */
+  top:auto;
+  z-index:auto;
 }
 #devicesPane,
 #dockPane{
