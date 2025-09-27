@@ -35,7 +35,6 @@
           <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
             <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
             <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
-            <span class="header-cockpit-pinstate" data-role="pin" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
           </button>
           <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
             <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
@@ -984,13 +983,30 @@
       return cockpit.offsetHeight;
     };
 
+    const resolveHeaderMetrics = () => {
+      if (!header) return { height: 0, top: 0 };
+      let height = header.offsetHeight || 0;
+      let top = header.offsetTop || 0;
+      if (typeof header.getBoundingClientRect === 'function') {
+        const rect = header.getBoundingClientRect();
+        if (rect && typeof rect.height === 'number') height = rect.height;
+        if (rect && typeof rect.top === 'number') top = rect.top;
+      }
+      return { height, top };
+    };
+
     const updateOffsets = () => {
-      const headerHeight = header?.offsetHeight || 0;
+      const { height: headerHeight, top: headerTop } = resolveHeaderMetrics();
       const pinned = cockpit.dataset.pinned === 'true';
-      const cockpitHeight = pinned ? resolveCockpitHeight() : 0;
-      const workspaceOffset = Math.max(132, headerHeight + cockpitHeight + (pinned ? 28 : 24));
-      const stickTop = headerHeight + 12;
-      const devicesOffset = headerHeight + cockpitHeight + 12;
+      const collapsed = cockpit.dataset.collapsed === 'true';
+      const pinnedActive = pinned && !collapsed;
+      const cockpitHeight = pinnedActive ? resolveCockpitHeight() : 0;
+      const pinnedSpacing = pinnedActive ? 10 : 24;
+      const workspaceBase = headerHeight + (pinnedActive ? cockpitHeight + pinnedSpacing : pinnedSpacing);
+      const workspaceOffset = Math.max(112, workspaceBase);
+      const stickGap = pinnedActive ? 2 : 12;
+      const stickTop = Math.max(0, headerTop + headerHeight + stickGap);
+      const devicesOffset = headerHeight + (pinnedActive ? cockpitHeight : 0) + 8;
 
       root?.style.setProperty('--workspace-offset', `${workspaceOffset}px`);
       root?.style.setProperty('--cockpit-stick-top', `${stickTop}px`);
