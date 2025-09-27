@@ -214,9 +214,11 @@ function ensureBadgeLibrary(settings){
   };
 
   const raw = settings.slides.badgeLibrary;
-  const hadSettingsEntries = collectFromList(raw, true);
+  const rawIsArray = Array.isArray(raw);
+  collectFromList(raw, true);
+  const isExplicitEmpty = rawIsArray && raw.length === 0;
 
-  if (!hadSettingsEntries) {
+  if (!normalized.length && !isExplicitEmpty) {
     const styleSets = settings.slides?.styleSets;
     if (styleSets && typeof styleSets === 'object') {
       const activeId = settings.slides?.activeStyleSet;
@@ -234,7 +236,7 @@ function ensureBadgeLibrary(settings){
     }
   }
 
-  if (!normalized.length) {
+  if (!normalized.length && !isExplicitEmpty) {
     const fallback = DEFAULTS.slides?.badgeLibrary || [];
     if (Array.isArray(fallback)) collectFromList(fallback, true);
   }
