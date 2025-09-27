@@ -30,14 +30,18 @@
       </label>
     </div>
     <div class="header-actions">
-      <div class="header-cockpit-controls" role="group" aria-label="Admin-Cockpit">
-        <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit schließen" title="Cockpit minimieren">
-          <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
-          <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit schließen" data-label-collapsed="Cockpit öffnen">Cockpit schließen</span>
-        </button>
-        <button type="button" class="btn ghost sm header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
-          <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
-        </button>
+      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff">
+        <div class="header-cockpit-toggle">
+          <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
+            <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+            <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
+            <span class="header-cockpit-pinstate" data-role="pin" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+          </button>
+          <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
+            <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+            <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
+          </button>
+        </div>
       </div>
       <!-- Ansicht-Menü -->
       <span class="help-anchor" data-help-key="devices-panel">
@@ -53,7 +57,6 @@
       </div>
     </div>
       <button class="btn" id="btnHelp">Hilfe</button>
-      <button class="btn" id="btnUsers">Benutzer</button>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <span class="help-anchor" data-help-key="save">
         <button class="btn primary" id="btnSave">Speichern</button>
@@ -66,12 +69,9 @@
   </header>
 
   <main class="layout">
-    <section class="workspace-overview" aria-labelledby="adminCockpitTitle" data-collapsed="false" data-pinned="false" data-help-key="cockpit">
+    <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false" data-help-key="cockpit">
       <header class="workspace-toolbar">
-        <div class="workspace-toolbar-text">
-          <h2 id="adminCockpitTitle" class="workspace-title">Admin-Cockpit</h2>
-          <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
-        </div>
+        <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
       </header>
 
       <div class="workspace-body" id="adminCockpitBody">
@@ -94,7 +94,7 @@
                 <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
               </div>
               <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
-                <button type="button" class="workspace-branch-btn" data-devices="toggle" data-highlight="devicesPane">Gerätebereich</button>
+                <button type="button" class="workspace-branch-btn workspace-branch-devices" data-devices="toggle" data-highlight="devicesPane">Geräte</button>
                 <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
               </div>
             </div>
@@ -836,6 +836,7 @@
           </div>
           <div class="sys-cleanup">
             <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
+            <button class="btn sm" id="btnUsers">Benutzer</button>
           </div>
           <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
         </div>
@@ -1024,6 +1025,7 @@
     const resolveControls = (action) => Array.from(document.querySelectorAll(`[data-action="${action}"][data-cockpit-control]`));
     const pinButtons = resolveControls('pin');
     const toggleButtons = resolveControls('toggle');
+    const toggleGroup = document.querySelector('.header-cockpit-toggle');
 
     let storageAvailable = true;
     try{
@@ -1068,6 +1070,19 @@
         pinBtn.setAttribute('title', pinTitle);
         pinBtn.setAttribute('aria-label', pinTitle);
       });
+      toggleButtons.forEach((toggleBtn) => {
+        toggleBtn.classList.toggle('is-pinned', pinned);
+        const pinIndicator = toggleBtn.querySelector('[data-role="pin"]');
+        if (pinIndicator){
+          const onIcon = pinIndicator.dataset.iconPinned || pinIndicator.textContent;
+          const offIcon = pinIndicator.dataset.iconUnpinned || pinIndicator.textContent;
+          pinIndicator.textContent = pinned ? onIcon : offIcon;
+          pinIndicator.classList.toggle('is-pinned', pinned);
+        }
+      });
+      if (toggleGroup){
+        toggleGroup.classList.toggle('is-pinned', pinned);
+      }
       save(PIN_KEY, pinned ? '1' : null);
       scheduleUpdate();
     };
@@ -1096,7 +1111,9 @@
           const collapsedIcon = icon.dataset.iconCollapsed || icon.textContent;
           icon.textContent = collapsed ? collapsedIcon : expandedIcon;
         }
-        const toggleTitle = collapsed ? collapsedText : expandedText;
+        const expandedTitle = toggleBtn.dataset.titleExpanded || expandedText;
+        const collapsedTitle = toggleBtn.dataset.titleCollapsed || collapsedText;
+        const toggleTitle = collapsed ? collapsedTitle : expandedTitle;
         toggleBtn.setAttribute('title', toggleTitle);
         toggleBtn.setAttribute('aria-label', toggleTitle);
       });
