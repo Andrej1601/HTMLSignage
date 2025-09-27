@@ -160,14 +160,14 @@ function ensureBadgeLibrary(settings){
     return '';
   };
 
-  const resolveBadgeText = (value, fallback) => {
-    if (typeof value === 'string') return value.trim();
+  const resolveBadgeText = (primary, fallback) => {
+    if (typeof primary === 'string') return primary.trim();
     if (typeof fallback === 'string') return fallback.trim();
     return '';
   };
 
-  const resolveBadgeImage = (value, fallback) => {
-    if (typeof value === 'string') return value.trim();
+  const resolveBadgeImage = (primary, fallback) => {
+    if (typeof primary === 'string') return primary.trim();
     if (typeof fallback === 'string') return fallback.trim();
     return '';
   };
@@ -197,9 +197,9 @@ function ensureBadgeLibrary(settings){
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
     const prev = previousById.get(id);
-    const icon = resolveBadgeText(prev?.icon, entry.icon);
-    const label = resolveBadgeText(prev?.label, entry.label);
-    const imageUrl = resolveBadgeImage(prev?.imageUrl, readBadgeImage(entry));
+    const icon = resolveBadgeText(entry?.icon, prev?.icon);
+    const label = resolveBadgeText(entry?.label, prev?.label);
+    const imageUrl = resolveBadgeImage(readBadgeImage(entry), prev?.imageUrl);
     const record = { id, icon, label };
     if (imageUrl) record.imageUrl = imageUrl;
     normalized.push(record);
