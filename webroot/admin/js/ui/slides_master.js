@@ -160,17 +160,19 @@ function ensureBadgeLibrary(settings){
     return '';
   };
 
-  const resolveBadgeText = (primary, fallback) => {
-    if (typeof primary === 'string') return primary.trim();
-    if (typeof fallback === 'string') return fallback.trim();
-    return '';
-  };
+const resolveBadgeText = (primary, fallback) => {
+// Preserve existing edits when rebuilding: prefer previous value
+if (typeof fallback === 'string' && fallback.trim() !== '') return fallback.trim();
+if (typeof primary === 'string') return primary.trim();
+return '';
+};
 
-  const resolveBadgeImage = (primary, fallback) => {
-    if (typeof primary === 'string') return primary.trim();
-    if (typeof fallback === 'string') return fallback.trim();
-    return '';
-  };
+const resolveBadgeImage = (primary, fallback) => {
+// Preserve existing edits when rebuilding: prefer previous image
+if (typeof fallback === 'string' && fallback.trim() !== '') return fallback.trim();
+if (typeof primary === 'string') return primary.trim();
+return '';
+};
 
   const previousById = (() => {
     const map = new Map();
