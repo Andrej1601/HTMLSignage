@@ -474,6 +474,29 @@ h1{ margin:0; font-size:20px; letter-spacing:.2px; }
   .header-subtitle{ max-width:100%; }
 }
 
+@media (max-width: 1024px){
+  header{
+    padding:20px 20px 16px;
+  }
+  .header-top{ align-items:center; }
+  .nav-toggle{ display:inline-flex; }
+  .header-title{ align-items:center; gap:12px; }
+  .header-actions{ flex-direction:column; align-items:stretch; }
+  .header-actions-left,
+  .header-actions-right{ justify-content:flex-start; }
+  .header-actions-right{ width:100%; }
+  .header-cockpit-controls{
+    border-right:none;
+    padding-right:0;
+    margin-right:0;
+  }
+}
+
+@media (max-width: 680px){
+  header{ padding:18px 16px 14px; }
+  .header-subtitle{ max-width:100%; }
+}
+
 #unsavedBadge{
   display:inline-flex;
   align-items:center;
