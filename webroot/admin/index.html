@@ -6,71 +6,109 @@
 
 </head>
 <body class="theme-light">
-  <header>
-    <div class="header-title">
-      <h1>Anzeigensteuerung – Admin</h1>
-      <label class="toggle" title="Hell/Dunkel">
-        <input type="checkbox" id="themeMode">
-        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="4" fill="currentColor"/>
-          <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="2" x2="12" y2="4"/>
-            <line x1="12" y1="20" x2="12" y2="22"/>
-            <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
-            <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
-            <line x1="2" y1="12" x2="4" y2="12"/>
-            <line x1="20" y1="12" x2="22" y2="12"/>
-            <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
-            <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
-          </g>
-        </svg>
-        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
-        </svg>
-      </label>
-    </div>
-    <div class="header-actions">
-      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff">
-        <div class="header-cockpit-toggle">
-          <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
-            <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
-          </button>
-          <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
-            <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
-          </button>
+  <div class="admin-shell">
+    <aside class="shell-sidebar" aria-label="Hauptnavigation">
+      <div class="sidebar-brand">
+        <span class="sidebar-logo" aria-hidden="true">♨️</span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-title">Anzeigensteuerung</span>
+          <span class="sidebar-brand-sub">Admin-Cockpit</span>
         </div>
       </div>
-      <!-- Ansicht-Menü -->
-      <span class="help-anchor" data-help-key="devices-panel">
-        <button class="btn" id="btnDevices">Geräte</button>
-      </span>
-      <div class="menuwrap" id="viewMenuWrap" data-help-key="view-menu">
-        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-        </button>
-      <div class="dropdown" id="viewMenu" role="menu" hidden>
-        <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-        <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+      <div class="sidebar-section">
+        <p class="sidebar-section-label">Arbeitsbereiche</p>
+        <nav class="sidebar-nav" aria-label="Arbeitsbereiche">
+          <button type="button" class="sidebar-nav-btn" data-jump="adminCockpitBody" data-highlight="adminCockpitBody">Dashboard</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="gridPane">Tagesplanung</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="slidesMaster">Slides &amp; Automationen</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="boxSaunas">Saunen &amp; Hinweise</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="boxImages">Medienverwaltung</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="devicesPane" data-highlight="devicesPane">Geräteübersicht</button>
+          <button type="button" class="sidebar-nav-btn" data-jump="styleSetControls">Design &amp; Layout</button>
+        </nav>
       </div>
-    </div>
-      <button class="btn" id="btnHelp">Hilfe</button>
-      <button class="btn" id="btnOpen">Slideshow öffnen</button>
-      <span class="help-anchor" data-help-key="save">
-        <button class="btn primary" id="btnSave">Speichern</button>
-      </span>
-      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
-        <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
-        <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
-      </span>
-    </div>
-  </header>
+      <div class="sidebar-section sidebar-support">
+        <p class="sidebar-section-label">Support</p>
+        <p class="sidebar-support-text">Hilfe, Tastenkürzel und Dokumentation für Redaktionsteams.</p>
+        <button type="button" class="btn ghost sidebar-help-btn" id="btnHelp">Hilfe öffnen</button>
+      </div>
+    </aside>
+    <div class="shell-overlay" data-role="sidebar-overlay" aria-hidden="true"></div>
+    <div class="shell-main">
+      <header>
+        <div class="header-top">
+          <div class="header-title">
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Navigation ein- oder ausblenden" aria-expanded="false">☰</button>
+            <div class="header-title-text">
+              <span class="header-eyebrow">Admin-Cockpit</span>
+              <h1>Anzeigensteuerung</h1>
+              <p class="header-subtitle">Kuratiere Inhalte, plane Aufgüsse und behalte Displays jederzeit im Blick.</p>
+            </div>
+          </div>
+          <label class="toggle" title="Hell/Dunkel">
+            <input type="checkbox" id="themeMode">
+            <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="4" fill="currentColor"/>
+              <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="12" y1="2" x2="12" y2="4"/>
+                <line x1="12" y1="20" x2="12" y2="22"/>
+                <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+                <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+                <line x1="2" y1="12" x2="4" y2="12"/>
+                <line x1="20" y1="12" x2="22" y2="12"/>
+                <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+                <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+              </g>
+            </svg>
+            <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
+            </svg>
+          </label>
+        </div>
+        <div class="header-actions">
+          <div class="header-actions-left">
+            <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff">
+              <div class="header-cockpit-toggle">
+                <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
+                  <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+                  <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
+                </button>
+                <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
+                  <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+                  <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
+                </button>
+              </div>
+            </div>
+            <span class="help-anchor" data-help-key="devices-panel">
+              <button class="btn" id="btnDevices">Geräte</button>
+            </span>
+            <div class="menuwrap" id="viewMenuWrap" data-help-key="view-menu">
+              <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+                Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+              </button>
+              <div class="dropdown" id="viewMenu" role="menu" hidden>
+                <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+                <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+              </div>
+            </div>
+          </div>
+          <div class="header-actions-right">
+            <button class="btn" id="btnOpen">Slideshow öffnen</button>
+            <span class="help-anchor" data-help-key="save">
+              <button class="btn primary" id="btnSave">Speichern</button>
+            </span>
+            <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
+              <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
+              <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
+            </span>
+          </div>
+        </div>
+      </header>
 
-  <main class="layout">
+      <main class="layout">
     <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false" data-help-key="cockpit">
       <header class="workspace-toolbar">
-        <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
+        <p class="workspace-subtitle">Direkte Einstiege in Monitoring, Planung, Inhalte und Design.</p>
       </header>
 
       <div class="workspace-body" id="adminCockpitBody">
@@ -79,14 +117,14 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
               <div>
-                <h3>Vorschau &amp; Geräte</h3>
-                <p>Live-Status und Display-Steuerung im Blick.</p>
+                <h3>Live-Monitoring</h3>
+                <p>Vorschau starten, Geräte prüfen und sofort reagieren.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Vorschau starten</span>
-              <span class="workspace-card-tag" role="listitem">Geräte überwachen</span>
-              <span class="workspace-card-tag" role="listitem">Displays neu laden</span>
+              <span class="workspace-card-tag" role="listitem">Displays überwachen</span>
+              <span class="workspace-card-tag" role="listitem">Geräteaktionen auslösen</span>
+              <span class="workspace-card-tag" role="listitem">Schnell in die Vorschau</span>
             </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
@@ -103,14 +141,14 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
               <div>
-                <h3>Tagesplan &amp; Wochenablauf</h3>
-                <p>Zeitpläne schnell anpassen und sichern.</p>
+                <h3>Tagesplanung</h3>
+                <p>Zeitslots im Tages- und Wochenplan flexibel pflegen.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Zeiten verschieben</span>
-              <span class="workspace-card-tag" role="listitem">Vorlagen speichern</span>
-              <span class="workspace-card-tag" role="listitem">Freie Slots finden</span>
+              <span class="workspace-card-tag" role="listitem">Zeitfenster verschieben</span>
+              <span class="workspace-card-tag" role="listitem">Presets sichern</span>
+              <span class="workspace-card-tag" role="listitem">Spontane Änderungen</span>
             </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
@@ -123,12 +161,12 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🔥</span>
               <div>
-                <h3>Saunen &amp; Hinweise</h3>
-                <p>Saunen und Hinweise zentral verwalten.</p>
+                <h3>Standorte &amp; Hinweise</h3>
+                <p>Saunen, Hinweise und Badge-Infos gezielt steuern.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Saunen steuern</span>
+              <span class="workspace-card-tag" role="listitem">Saunen konfigurieren</span>
               <span class="workspace-card-tag" role="listitem">Badges pflegen</span>
               <span class="workspace-card-tag" role="listitem">Bibliothek verwalten</span>
             </div>
@@ -147,14 +185,14 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🎬</span>
               <div>
-                <h3>Slides &amp; Automationen</h3>
-                <p>Abläufe und Automationen feinjustieren.</p>
+                <h3>Automationen &amp; Ablauf</h3>
+                <p>Slides orchestrieren, Zeiten definieren und testen.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Dauer einstellen</span>
-              <span class="workspace-card-tag" role="listitem">Automationen steuern</span>
-              <span class="workspace-card-tag" role="listitem">Reihenfolge prüfen</span>
+              <span class="workspace-card-tag" role="listitem">Reihenfolgen prüfen</span>
+              <span class="workspace-card-tag" role="listitem">Timing optimieren</span>
+              <span class="workspace-card-tag" role="listitem">Automationen definieren</span>
             </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
@@ -171,14 +209,14 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
               <div>
-                <h3>Infos &amp; Story-Slides</h3>
-                <p>Zusatzinfos und Story-Slides kuratieren.</p>
+                <h3>Storytelling &amp; Infos</h3>
+                <p>Zusatzinfos, Countdowns und Story-Slides kuratieren.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Wellness-Tipps pflegen</span>
-              <span class="workspace-card-tag" role="listitem">Countdowns planen</span>
-              <span class="workspace-card-tag" role="listitem">Story-Slides bauen</span>
+              <span class="workspace-card-tag" role="listitem">Wellness-Tipps</span>
+              <span class="workspace-card-tag" role="listitem">Event-Countdowns</span>
+              <span class="workspace-card-tag" role="listitem">Story-Slides planen</span>
             </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
@@ -198,14 +236,14 @@
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🎨</span>
               <div>
-                <h3>Medien &amp; Layout</h3>
-                <p>Medien und Layout-Optionen bündeln.</p>
+                <h3>Designsystem &amp; Medien</h3>
+                <p>Bilder, Layouts und Farbwelten zentral pflegen.</p>
               </div>
             </div>
             <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Medienslides ordnen</span>
-              <span class="workspace-card-tag" role="listitem">Layouts definieren</span>
-              <span class="workspace-card-tag" role="listitem">Style-Presets nutzen</span>
+              <span class="workspace-card-tag" role="listitem">Medien sortieren</span>
+              <span class="workspace-card-tag" role="listitem">Layout-Settings</span>
+              <span class="workspace-card-tag" role="listitem">Style-Paletten</span>
             </div>
             <div class="workspace-card-actions">
               <div class="workspace-card-actions-main">
@@ -968,6 +1006,64 @@
     <p>Mehr Hilfe in der <a href="/admin/help.md" target="_blank">Dokumentation</a>.</p>
   </div>
 </div>
+
+    </div>
+  </div>
+
+<script>
+  (function(){
+    const shell = document.querySelector('.admin-shell');
+    const toggle = document.getElementById('navToggle');
+    const overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    if (!shell || !toggle) return;
+
+    const updateExpanded = () => {
+      const expanded = shell.classList.contains('sidebar-open');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const closeSidebar = () => {
+      shell.classList.remove('sidebar-open');
+      updateExpanded();
+    };
+
+    const openSidebar = () => {
+      shell.classList.add('sidebar-open');
+      updateExpanded();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (shell.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    const autoClose = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1024px)') : null;
+    if (autoClose && typeof autoClose.addEventListener === 'function') {
+      autoClose.addEventListener('change', (event) => {
+        if (!event.matches) closeSidebar();
+      });
+    }
+
+    shell.querySelectorAll('.sidebar-nav-btn[data-jump]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+          closeSidebar();
+        }
+      });
+    });
+
+    updateExpanded();
+  })();
+</script>
 
 <script>
   (function(){
