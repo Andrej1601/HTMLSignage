@@ -21,7 +21,6 @@ import storage from './core/storage.js';
 import { createAppState } from './core/app_state.js';
 import { createDeviceContextManager } from './core/device_context.js';
 import { initContextHelp } from './ui/context_help.js';
-import initShell from './ui/shell.js';
 import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
@@ -88,8 +87,6 @@ const appState = createAppState({
   devicesPinned: lsGet('devicesPinned') === '1'
 });
 document.body?.classList.toggle('devices-pinned', appState.isDevicesPinned());
-
-initShell();
 
 const stateAccess = {
   getSchedule: () => schedule,
