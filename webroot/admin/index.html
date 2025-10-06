@@ -6,225 +6,178 @@
 
 </head>
 <body class="theme-light">
-  <header>
-    <div class="header-title">
-      <h1>Anzeigensteuerung – Admin</h1>
-      <label class="toggle" title="Hell/Dunkel">
-        <input type="checkbox" id="themeMode">
-        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="4" fill="currentColor"/>
-          <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="12" y1="2" x2="12" y2="4"/>
-            <line x1="12" y1="20" x2="12" y2="22"/>
-            <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
-            <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
-            <line x1="2" y1="12" x2="4" y2="12"/>
-            <line x1="20" y1="12" x2="22" y2="12"/>
-            <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
-            <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
-          </g>
-        </svg>
-        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
-        </svg>
-      </label>
-    </div>
-    <div class="header-actions">
-      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff">
-        <div class="header-cockpit-toggle">
-          <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
-            <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
-          </button>
-          <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
-            <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
-          </button>
+  <div class="admin-shell">
+    <aside class="shell-sidebar" aria-label="Hauptnavigation">
+      <div class="sidebar-brand">
+        <span class="sidebar-logo" aria-hidden="true">♨️</span>
+        <div class="sidebar-brand-text">
+          <span class="sidebar-brand-title">Anzeigensteuerung</span>
+          <span class="sidebar-brand-sub">Admin-Cockpit</span>
         </div>
       </div>
-      <!-- Ansicht-Menü -->
-      <span class="help-anchor" data-help-key="devices-panel">
-        <button class="btn" id="btnDevices">Geräte</button>
-      </span>
-      <div class="menuwrap" id="viewMenuWrap" data-help-key="view-menu">
-        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-        </button>
-      <div class="dropdown" id="viewMenu" role="menu" hidden>
-        <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-        <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+      <div class="sidebar-section">
+        <p class="sidebar-section-label">Arbeitsbereiche</p>
+        <nav class="sidebar-nav" aria-label="Arbeitsbereiche" data-shell-menu>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🖥️</span> Live-Monitoring</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="monitoring" data-focus="#dockPane">Vorschau</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="monitoring" data-focus="#devicesPane">Geräteübersicht</button>
+            </div>
+          </div>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🗓️</span> Tagesplanung</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="planning" data-focus="#gridPane">Plan bearbeiten</button>
+            </div>
+          </div>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🔥</span> Standorte &amp; Hinweise</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="saunas" data-focus="#boxSaunas">Saunen &amp; Übersicht</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="saunas" data-focus="#boxFootnotes">Fußnoten &amp; Badges</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="saunas" data-focus="#badgeLibrarySection">Badge-Bibliothek</button>
+            </div>
+          </div>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🎬</span> Automationen &amp; Ablauf</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="slides" data-focus="#slidesMaster">Slides – Ablauf</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="slides" data-focus="#slidesFlowCard">Zeitsteuerung</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="slides" data-focus="#slidesAutomationCard">Automatisierung</button>
+            </div>
+          </div>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🖼️</span> Storytelling &amp; Infos</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#boxStories">Zusatzinfos</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#infoWellness">Wellness-Tipps</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#infoEvents">Event-Countdowns</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#infoGastro">Gastro-Infos</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#infoHero">Hero-Timeline</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="stories" data-focus="#infoStories">Story-Slides</button>
+            </div>
+          </div>
+          <div class="sidebar-nav-group" data-shell-group>
+            <button type="button" class="sidebar-nav-btn" data-shell-trigger>
+              <span class="sidebar-nav-label"><span aria-hidden="true">🎨</span> Designsystem &amp; Medien</span>
+              <span class="sidebar-nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="sidebar-submenu" data-shell-submenu>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#boxImages">Medien-Slides</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#boxSlidesText">Slideshow &amp; Text</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#displayLayoutFold">Layout &amp; Darstellung</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#styleSetControls">Style-Paletten</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#colorsOverview">Farben</button>
+              <button type="button" class="sidebar-submenu-btn" data-panel="media" data-focus="#systemSettings">System &amp; Import</button>
+            </div>
+          </div>
+        </nav>
       </div>
-    </div>
-      <button class="btn" id="btnHelp">Hilfe</button>
-      <button class="btn" id="btnOpen">Slideshow öffnen</button>
-      <span class="help-anchor" data-help-key="save">
-        <button class="btn primary" id="btnSave">Speichern</button>
-      </span>
-      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
-        <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
-        <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
-      </span>
-    </div>
-  </header>
-
-  <main class="layout">
-    <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false" data-help-key="cockpit">
-      <header class="workspace-toolbar">
-        <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
+      <div class="sidebar-section sidebar-support">
+        <p class="sidebar-section-label">Support</p>
+        <p class="sidebar-support-text">Hilfe, Tastenkürzel und Dokumentation für Redaktionsteams.</p>
+        <button type="button" class="btn ghost sidebar-help-btn" id="btnHelp">Hilfe öffnen</button>
+      </div>
+    </aside>
+    <div class="shell-overlay" data-role="sidebar-overlay" aria-hidden="true"></div>
+    <div class="shell-main">
+      <header>
+        <div class="header-top">
+          <div class="header-title">
+            <button type="button" class="nav-toggle" id="navToggle" aria-label="Navigation ein- oder ausblenden" aria-expanded="false">☰</button>
+            <div class="header-title-text">
+              <span class="header-eyebrow">Admin-Cockpit</span>
+              <h1>Anzeigensteuerung</h1>
+              <p class="header-subtitle">Kuratiere Inhalte, plane Aufgüsse und behalte Displays jederzeit im Blick.</p>
+            </div>
+          </div>
+          <label class="toggle" title="Hell/Dunkel">
+            <input type="checkbox" id="themeMode">
+            <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="4" fill="currentColor"/>
+              <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="12" y1="2" x2="12" y2="4"/>
+                <line x1="12" y1="20" x2="12" y2="22"/>
+                <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+                <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+                <line x1="2" y1="12" x2="4" y2="12"/>
+                <line x1="20" y1="12" x2="22" y2="12"/>
+                <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+                <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+              </g>
+            </svg>
+            <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
+            </svg>
+          </label>
+        </div>
+        <div class="header-actions">
+          <div class="header-actions-left">
+            <span class="help-anchor" data-help-key="devices-panel">
+              <button class="btn" id="btnDevices">Geräte</button>
+            </span>
+            <div class="menuwrap" id="viewMenuWrap" data-help-key="view-menu">
+              <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+                Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+              </button>
+              <div class="dropdown" id="viewMenu" role="menu" hidden>
+                <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+                <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+              </div>
+            </div>
+          </div>
+          <div class="header-actions-right">
+            <button class="btn" id="btnOpen">Slideshow öffnen</button>
+            <span class="help-anchor" data-help-key="save">
+              <button class="btn primary" id="btnSave">Speichern</button>
+            </span>
+            <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
+              <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
+              <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
+            </span>
+          </div>
+        </div>
       </header>
 
-      <div class="workspace-body" id="adminCockpitBody">
-        <div class="workspace-grid" role="list">
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
-              <div>
-                <h3>Vorschau &amp; Geräte</h3>
-                <p>Live-Status und Display-Steuerung im Blick.</p>
-              </div>
-            </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Vorschau starten</span>
-              <span class="workspace-card-tag" role="listitem">Geräte überwachen</span>
-              <span class="workspace-card-tag" role="listitem">Displays neu laden</span>
-            </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-view="preview" data-highlight="dockPane">Vorschau öffnen</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Geräteverwaltung">
-                <button type="button" class="workspace-branch-btn workspace-branch-devices" data-devices="toggle" data-highlight="devicesPane">Geräte</button>
-                <button type="button" class="workspace-branch-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
-              </div>
-            </div>
-          </article>
+      <main class="layout">
+    
 
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
-              <div>
-                <h3>Tagesplan &amp; Wochenablauf</h3>
-                <p>Zeitpläne schnell anpassen und sichern.</p>
-              </div>
+    <section class="workspace-panels" id="workspacePanels" aria-live="polite" data-help-key="shell-workspace">
+      <div class="workspace-panel" data-panel="monitoring">
+        <div class="panel-stack">
+          <div class="panel-slot" id="previewPaneHost" aria-live="polite">
+            <div class="panel-placeholder">
+              <h2>Vorschau</h2>
+              <p>Nutze „Vorschau“ im Menü, um eine Live-Ansicht der Slides zu laden.</p>
             </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Zeiten verschieben</span>
-              <span class="workspace-card-tag" role="listitem">Vorlagen speichern</span>
-              <span class="workspace-card-tag" role="listitem">Freie Slots finden</span>
+          </div>
+          <div class="panel-slot" id="devicesPaneHost" aria-live="polite">
+            <div class="panel-placeholder">
+              <h2>Geräteübersicht</h2>
+              <p>Die gekoppelte Geräteverwaltung erscheint hier, sobald sie angeheftet ist.</p>
             </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-view="grid" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🔥</span>
-              <div>
-                <h3>Saunen &amp; Hinweise</h3>
-                <p>Saunen und Hinweise zentral verwalten.</p>
-              </div>
-            </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Saunen steuern</span>
-              <span class="workspace-card-tag" role="listitem">Badges pflegen</span>
-              <span class="workspace-card-tag" role="listitem">Bibliothek verwalten</span>
-            </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-jump="boxSaunas" aria-controls="boxSaunas">Saunen öffnen</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Weitere Bereiche">
-                <button type="button" class="workspace-branch-btn" data-jump="boxFootnotes" aria-controls="boxFootnotes">Fußnoten &amp; Badges</button>
-                <button type="button" class="workspace-branch-btn" data-jump="badgeLibrarySection" aria-controls="badgeLibrarySection">Badge-Bibliothek</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🎬</span>
-              <div>
-                <h3>Slides &amp; Automationen</h3>
-                <p>Abläufe und Automationen feinjustieren.</p>
-              </div>
-            </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Dauer einstellen</span>
-              <span class="workspace-card-tag" role="listitem">Automationen steuern</span>
-              <span class="workspace-card-tag" role="listitem">Reihenfolge prüfen</span>
-            </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf steuern</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Weitere Einstellungen">
-                <button type="button" class="workspace-branch-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
-                <button type="button" class="workspace-branch-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
-              <div>
-                <h3>Infos &amp; Story-Slides</h3>
-                <p>Zusatzinfos und Story-Slides kuratieren.</p>
-              </div>
-            </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Wellness-Tipps pflegen</span>
-              <span class="workspace-card-tag" role="listitem">Countdowns planen</span>
-              <span class="workspace-card-tag" role="listitem">Story-Slides bauen</span>
-            </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-jump="boxStories" aria-controls="boxStories">Zusatzinfos</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Direkte Abschnitte">
-                <button type="button" class="workspace-branch-btn" data-jump="infoWellness" aria-controls="infoWellness">Wellness-Tipps</button>
-                <button type="button" class="workspace-branch-btn" data-jump="infoEvents" aria-controls="infoEvents">Event-Countdowns</button>
-                <button type="button" class="workspace-branch-btn" data-jump="infoGastro" aria-controls="infoGastro">Gastro-Infos</button>
-                <button type="button" class="workspace-branch-btn" data-jump="infoHero" aria-controls="infoHero">Hero-Timeline</button>
-                <button type="button" class="workspace-branch-btn" data-jump="infoStories" aria-controls="infoStories">Story-Slides</button>
-              </div>
-            </div>
-          </article>
-
-          <article class="workspace-card" role="listitem">
-            <div class="workspace-card-head">
-              <span class="workspace-card-icon" aria-hidden="true">🎨</span>
-              <div>
-                <h3>Medien &amp; Layout</h3>
-                <p>Medien und Layout-Optionen bündeln.</p>
-              </div>
-            </div>
-            <div class="workspace-card-tags" role="list">
-              <span class="workspace-card-tag" role="listitem">Medienslides ordnen</span>
-              <span class="workspace-card-tag" role="listitem">Layouts definieren</span>
-              <span class="workspace-card-tag" role="listitem">Style-Presets nutzen</span>
-            </div>
-            <div class="workspace-card-actions">
-              <div class="workspace-card-actions-main">
-                <button type="button" class="workspace-card-btn primary" data-jump="boxImages" aria-controls="boxImages">Medienbereich</button>
-              </div>
-              <div class="workspace-card-branches" role="group" aria-label="Layout &amp; Styles">
-                <button type="button" class="workspace-branch-btn" data-jump="boxSlidesText" aria-controls="boxSlidesText">Slideshow &amp; Text</button>
-                <button type="button" class="workspace-branch-btn" data-jump="displayLayoutFold" aria-controls="displayLayoutFold">Darstellung &amp; Seiten</button>
-                <button type="button" class="workspace-branch-btn" data-jump="styleSetControls" aria-controls="styleSetControls">Style-Paletten</button>
-              </div>
-            </div>
-          </article>
+          </div>
         </div>
       </div>
-    </section>
-
-    <section class="leftcol">
-    <div class="card" id="gridPane" data-jump-target data-help-key="schedule">
-        <div class="content" style="padding-bottom:0">
+      <div class="workspace-panel is-active" data-panel="planning">
+        <div class="card" id="gridPane" data-jump-target data-help-key="schedule">
+          <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
   <div style="font-weight:700">Aufgussplan <span class="mut">(<span id="activeDayLabel">—</span>)</span></div>
   <div id="gridActionsLeft" class="row" style="gap:6px">
@@ -244,13 +197,10 @@
             <button class="btn sm" id="btnDeleteRow">Ausgewählte Zeile löschen</button>
             <span class="mut">Zeit anklicken = Zeile markieren · Zeitänderungen im Dialog verschieben Aufguss korrekt.</span>
           </div>
+          </div>
         </div>
       </div>
-    </section>
-
-    <aside class="rightbar">
-      <div class="layout-resizer" id="layoutResizer" role="separator" aria-orientation="vertical" aria-label="Sidebar-Größe anpassen" tabindex="0" aria-hidden="false"></div>
-      <div class="rightbar-columns">
+      <div class="workspace-panel" data-panel="slides">
 <!-- Slides – Masterbox -->
 <details class="ac full" open id="slidesMaster" data-jump-target>
   <summary>
@@ -332,8 +282,8 @@
           </div>
         </details>
       </div>
-
-    </div>
+      </div>
+      <div class="workspace-panel" data-panel="saunas">
 
     <!-- Unterbox 1: Saunen & Übersicht -->
     <details class="ac sub" open id="boxSaunas" data-jump-target>
@@ -427,6 +377,8 @@
     </div>
   </div>
 </details>
+      </div>
+      <div class="workspace-panel" data-panel="stories">
 
     <!-- Unterbox 4: Globale Zusatzinhalte & Informationen -->
     <details class="ac sub" id="boxStories" data-jump-target>
@@ -510,6 +462,8 @@
         </div>
       </div>
     </details>
+      </div>
+      <div class="workspace-panel" data-panel="media">
 
     <!-- Unterbox 4: Medien-Slides -->
     <details class="ac sub" id="boxImages" data-jump-target>
@@ -769,7 +723,7 @@
         </div>
 </details>
 
-      <details class="ac full">
+        <details class="ac full" id="colorsOverview">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
           <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
@@ -777,7 +731,7 @@
         <div class="content color-cols" id="colorList"></div>
       </details>
 
-      <details class="ac">
+        <details class="ac" id="systemSettings">
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> System</div>
         </summary>
@@ -842,8 +796,8 @@
       </details>
 
       </div>
+    </section>
 
-    </aside>
   </main>
 
   <footer>© Andrej Soennecken</footer>
@@ -969,205 +923,10 @@
   </div>
 </div>
 
-<script>
-  (function(){
-    const cockpit = document.querySelector('.workspace-overview');
-    if (!cockpit) return;
-    const root = document.documentElement;
-    const header = document.querySelector('header');
-    const resolveCockpitHeight = () => {
-      if (cockpit.dataset.pinned !== 'true') return 0;
-      if (cockpit.dataset.collapsed === 'true') {
-        return 0;
-      }
-      return cockpit.offsetHeight;
-    };
+    </div>
+  </div>
 
-    const resolveHeaderMetrics = () => {
-      if (!header) return { height: 0 };
-      let height = header.offsetHeight || 0;
-      if (typeof header.getBoundingClientRect === 'function') {
-        const rect = header.getBoundingClientRect();
-        if (rect && typeof rect.height === 'number') height = rect.height;
-      }
-      return { height};
-    };
-
-    const updateOffsets = () => {
-      const { height: headerHeight } = resolveHeaderMetrics();
-      const pinned = cockpit.dataset.pinned === 'true';
-      const collapsed = cockpit.dataset.collapsed === 'true';
-      const pinnedActive = pinned && !collapsed;
-      const cockpitHeight = pinnedActive ? resolveCockpitHeight() : 0;
-      const pinnedSpacing = pinnedActive ? 10 : 24;
-      const workspaceBase = headerHeight + (pinnedActive ? cockpitHeight + pinnedSpacing : pinnedSpacing);
-      const workspaceOffset = Math.max(112, workspaceBase);
-      const stickGap = pinnedActive ? 0 : 12;
-      const stickTop = Math.max(0, headerHeight + stickGap);
-      const devicesOffset = headerHeight + (pinnedActive ? cockpitHeight : 0) + 8;
-
-      root?.style.setProperty('--workspace-offset', `${workspaceOffset}px`);
-      root?.style.setProperty('--cockpit-stick-top', `${stickTop}px`);
-      root?.style.setProperty('--devices-offset', `${devicesOffset}px`);
-      root?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
-      document.body?.style.setProperty('scroll-padding-top', `${workspaceOffset}px`);
-    };
-
-    const scheduleUpdate = () => {
-      if ('requestAnimationFrame' in window) {
-        window.requestAnimationFrame(updateOffsets);
-      } else {
-        updateOffsets();
-      }
-    };
-
-    if ('ResizeObserver' in window){
-      const resizeObserver = new ResizeObserver(() => scheduleUpdate());
-      resizeObserver.observe(cockpit);
-      if (header) resizeObserver.observe(header);
-      window.addEventListener('beforeunload', () => resizeObserver.disconnect(), { once:true });
-    }
-
-    if ('MutationObserver' in window){
-      const bodyObserver = new MutationObserver(() => scheduleUpdate());
-      bodyObserver.observe(document.body, { attributes:true, attributeFilter:['class'] });
-      window.addEventListener('beforeunload', () => bodyObserver.disconnect(), { once:true });
-    }
-
-    window.addEventListener('resize', scheduleUpdate, { passive:true });
-
-    const resolveControls = (action) => Array.from(document.querySelectorAll(`[data-action="${action}"][data-cockpit-control]`));
-    const pinButtons = resolveControls('pin');
-    const toggleButtons = resolveControls('toggle');
-    const toggleGroup = document.querySelector('.header-cockpit-toggle');
-
-    let storageAvailable = true;
-    try{
-      const testKey = '__cockpit__';
-      localStorage.setItem(testKey, '1');
-      localStorage.removeItem(testKey);
-    }catch(err){
-      storageAvailable = false;
-    }
-
-    const load = (key) => storageAvailable ? localStorage.getItem(key) : null;
-    const save = (key, value) => {
-      if (!storageAvailable) return;
-      if (value === null){
-        localStorage.removeItem(key);
-      }else{
-        localStorage.setItem(key, value);
-      }
-    };
-
-    const PIN_KEY = 'adminCockpitPinned';
-    const COLLAPSE_KEY = 'adminCockpitCollapsed';
-
-    const setPinState = (pinned) => {
-      cockpit.dataset.pinned = pinned ? 'true' : 'false';
-      pinButtons.forEach((pinBtn) => {
-        pinBtn.setAttribute('aria-pressed', String(pinned));
-        pinBtn.classList.toggle('is-active', pinned);
-        const label = pinBtn.querySelector('[data-role="label"]');
-        const icon = pinBtn.querySelector('[data-role="icon"]');
-        if (label){
-          const onText = label.dataset.labelPinned || label.textContent;
-          const offText = label.dataset.labelUnpinned || label.textContent;
-          label.textContent = pinned ? onText : offText;
-        }
-        if (icon){
-          const onIcon = icon.dataset.iconPinned || icon.textContent;
-          const offIcon = icon.dataset.iconUnpinned || icon.textContent;
-          icon.textContent = pinned ? onIcon : offIcon;
-        }
-        const pinTitle = pinned ? 'Cockpit lösen' : 'Cockpit anheften';
-        pinBtn.setAttribute('title', pinTitle);
-        pinBtn.setAttribute('aria-label', pinTitle);
-      });
-      toggleButtons.forEach((toggleBtn) => {
-        toggleBtn.classList.toggle('is-pinned', pinned);
-        const pinIndicator = toggleBtn.querySelector('[data-role="pin"]');
-        if (pinIndicator){
-          const onIcon = pinIndicator.dataset.iconPinned || pinIndicator.textContent;
-          const offIcon = pinIndicator.dataset.iconUnpinned || pinIndicator.textContent;
-          pinIndicator.textContent = pinned ? onIcon : offIcon;
-          pinIndicator.classList.toggle('is-pinned', pinned);
-        }
-      });
-      if (toggleGroup){
-        toggleGroup.classList.toggle('is-pinned', pinned);
-      }
-		// Ensure sticky behavior applies even if CSS selector conflicts
-      if (pinned) {
-        cockpit.style.position = 'sticky';
-        cockpit.style.top = 'var(--cockpit-stick-top)';
-        cockpit.style.zIndex = '40';
-      } else {
-        cockpit.style.position = '';
-        cockpit.style.top = '';
-        cockpit.style.zIndex = '';
-      }
-      save(PIN_KEY, pinned ? '1' : null);
-      scheduleUpdate();
-    };
-
-    const setCollapseState = (collapsed) => {
-      cockpit.dataset.collapsed = collapsed ? 'true' : 'false';
-      if (collapsed) {
-        cockpit.setAttribute('aria-hidden', 'true');
-      } else {
-        cockpit.removeAttribute('aria-hidden');
-      }
-      toggleButtons.forEach((toggleBtn) => {
-        toggleBtn.setAttribute('aria-expanded', String(!collapsed));
-        toggleBtn.classList.toggle('is-active', !collapsed);
-        const label = toggleBtn.querySelector('[data-role="label"]');
-        const icon = toggleBtn.querySelector('[data-role="icon"]');
-        let expandedText = 'Cockpit schließen';
-        let collapsedText = 'Cockpit öffnen';
-        if (label){
-          expandedText = label.dataset.labelExpanded || expandedText;
-          collapsedText = label.dataset.labelCollapsed || collapsedText;
-          label.textContent = collapsed ? collapsedText : expandedText;
-        }
-        if (icon){
-          const expandedIcon = icon.dataset.iconExpanded || icon.textContent;
-          const collapsedIcon = icon.dataset.iconCollapsed || icon.textContent;
-          icon.textContent = collapsed ? collapsedIcon : expandedIcon;
-        }
-        const expandedTitle = toggleBtn.dataset.titleExpanded || expandedText;
-        const collapsedTitle = toggleBtn.dataset.titleCollapsed || collapsedText;
-        const toggleTitle = collapsed ? collapsedTitle : expandedTitle;
-        toggleBtn.setAttribute('title', toggleTitle);
-        toggleBtn.setAttribute('aria-label', toggleTitle);
-      });
-      save(COLLAPSE_KEY, collapsed ? '1' : null);
-      scheduleUpdate();
-    };
-
-    let pinned = load(PIN_KEY) === '1';
-    let collapsed = load(COLLAPSE_KEY) === '1';
-
-    setPinState(pinned);
-    setCollapseState(collapsed);
-    scheduleUpdate();
-
-    pinButtons.forEach((pinBtn) => {
-      pinBtn.addEventListener('click', () => {
-        pinned = !pinned;
-        setPinState(pinned);
-      });
-    });
-
-    toggleButtons.forEach((toggleBtn) => {
-      toggleBtn.addEventListener('click', () => {
-        collapsed = !collapsed;
-        setCollapseState(collapsed);
-      });
-    });
-  })();
-</script>
-<script>
+script>
   (function(){
     const actionButtons = document.querySelectorAll('.workspace-card [data-jump], .workspace-card [data-view], .workspace-card [data-devices]');
     if (!actionButtons.length) return;
@@ -1208,100 +967,892 @@
 
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    const runViewChange = async (view) => {
-      if (!view) return;
-      const viewHandler = window.__adminShowView || window.showView;
-      if (typeof viewHandler === 'function') {
-        await viewHandler(view);
-        return;
+<script>
+  (function(){
+    const shell = document.querySelector('.admin-shell');
+    const toggle = document.getElementById('navToggle');
+    const overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    if (!shell || !toggle) return;
+
+    const updateExpanded = () => {
+      const expanded = shell.classList.contains('sidebar-open');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const closeSidebar = () => {
+      shell.classList.remove('sidebar-open');
+      updateExpanded();
+    };
+
+    const openSidebar = () => {
+      shell.classList.add('sidebar-open');
+      updateExpanded();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (shell.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
       }
-      const menuItem = document.querySelector(`#viewMenu .dd-item[data-view="${view}"]`);
-      if (menuItem) {
-        menuItem.click();
-        await sleep(160);
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    const autoClose = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1024px)') : null;
+    if (autoClose && typeof autoClose.addEventListener === 'function') {
+      autoClose.addEventListener('change', (event) => {
+        if (!event.matches) closeSidebar();
+      });
+    }
+
+    shell.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+          closeSidebar();
+        }
+      });
+    });
+
+    updateExpanded();
+  })();
+</script>
+
+<script>
+  (function(){
+    const menu = document.querySelector('[data-shell-menu]');
+    const panelsHost = document.getElementById('workspacePanels');
+    if (!menu || !panelsHost) return;
+
+    const groups = Array.from(menu.querySelectorAll('[data-shell-group]'));
+    const panels = Array.from(panelsHost.querySelectorAll('.workspace-panel'));
+    const panelLookup = new Map(panels.map((panel) => [panel.dataset.panel, panel]));
+    let activeButton = null;
+    let activePanelId = null;
+
+    const ensureDetailsOpen = (element) => {
+      if (!element) return;
+      if (element.matches('details')) {
+        element.open = true;
+      }
+      let parent = element.closest('details');
+      while (parent) {
+        parent.open = true;
+        parent = parent.parentElement?.closest('details');
       }
     };
 
-    const resolveTarget = (id) => {
-      if (!id) return null;
-      if (id.startsWith('#')) return document.querySelector(id);
-      return document.getElementById(id);
+    const getScrollTarget = (element) => {
+      if (!element) return null;
+      if (element.hasAttribute('data-jump-target')) {
+        return element;
+      }
+      return element.closest('[data-jump-target]') || element;
     };
 
-    const waitForElement = async (id, attempts = 4) => {
-      if (!id) return null;
-      const existing = resolveTarget(id);
+    const highlight = (element) => {
+      if (!element) return;
+      element.classList.remove('jump-flash');
+      void element.offsetWidth;
+      element.classList.add('jump-flash');
+      window.setTimeout(() => element.classList.remove('jump-flash'), 1600);
+    };
+
+    const canFocus = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.tabIndex >= 0) return true;
+      return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
+    };
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const waitForElement = async (selector, attempts = 6) => {
+      if (!selector) return null;
+      const existing = document.querySelector(selector);
       if (existing) return existing;
       if (attempts <= 0) return null;
       await sleep(120);
-      return waitForElement(id, attempts - 1);
+      return waitForElement(selector, attempts - 1);
     };
 
-    actionButtons.forEach((button) => {
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
+    const setActiveButton = (button) => {
+      if (activeButton) activeButton.classList.remove('is-active');
+      activeButton = button || null;
+      if (activeButton) activeButton.classList.add('is-active');
+    };
 
-        const desiredView = button.dataset.view;
-        if (desiredView) {
-          try {
-            await runViewChange(desiredView);
-          } catch (error) {
-            console.error('[admin] Ansicht konnte nicht gewechselt werden', error);
-          }
-        }
+    const setActivePanel = (panelId) => {
+      if (!panelLookup.has(panelId)) return false;
+      panels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.panel === panelId);
+      });
+      activePanelId = panelId;
+      return true;
+    };
 
-        const devicesAction = button.dataset.devices;
-        if (devicesAction) {
-          const devicesBtn = document.getElementById('btnDevices');
-          const isActive = devicesBtn?.classList.contains('active');
-          if (devicesBtn) {
-            if ((devicesAction === 'open' || devicesAction === 'refresh') && !isActive) {
-              devicesBtn.click();
-            } else if (devicesAction === 'close' && isActive) {
-              devicesBtn.click();
-            } else if (devicesAction === 'toggle') {
-              devicesBtn.click();
+    const revealGroupForPanel = (panelId) => {
+      const button = menu.querySelector(`.sidebar-submenu-btn[data-panel="${panelId}"]`);
+      if (!button) return;
+      const group = button.closest('[data-shell-group]');
+      if (!group) return;
+      group.classList.add('is-open');
+      const trigger = group.querySelector('[data-shell-trigger]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const showPanel = async ({ panel, focus, button }) => {
+      if (!panel) return;
+      if (!setActivePanel(panel)) return;
+      setActiveButton(button || menu.querySelector(`.sidebar-submenu-btn[data-panel="${panel}"]`));
+      revealGroupForPanel(panel);
+
+      if (focus) {
+        const target = await waitForElement(focus);
+        if (target) {
+          ensureDetailsOpen(target);
+          const scrollTarget = getScrollTarget(target);
+          window.requestAnimationFrame(() => {
+            scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const highlightEl = target.matches('details')
+              ? target.querySelector(':scope > summary') || scrollTarget
+              : scrollTarget;
+            highlight(highlightEl);
+            if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
+              highlightEl.focus({ preventScroll: true });
             }
-          }
-          if (devicesAction === 'refresh') {
-            const attemptRefresh = async (tries = 4) => {
-              if (typeof window.__refreshDevicesPane === 'function') {
-                return window.__refreshDevicesPane({ bypassCache: true });
-              }
-              if (tries <= 0) return null;
-              await sleep(120);
-              return attemptRefresh(tries - 1);
-            };
-            try {
-              await attemptRefresh();
-            } catch (error) {
-              console.error('[admin] Gerätebereich konnte nicht aktualisiert werden', error);
-            }
-          }
+          });
         }
+      }
+    };
 
-        const targetId = button.dataset.jump;
-        const highlightId = button.dataset.highlight;
-        const target = await waitForElement(targetId) || await waitForElement(highlightId);
-        if (!target) return;
-
-        ensureDetailsOpen(target);
-
-        const scrollTarget = getScrollTarget(target);
-        window.requestAnimationFrame(() => {
-          scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          const highlightEl = target.matches('details')
-            ? target.querySelector(':scope > summary') || scrollTarget
-            : scrollTarget;
-          highlight(highlightEl);
-          if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
-            highlightEl.focus({ preventScroll: true });
-          }
-        });
+    menu.querySelectorAll('[data-shell-trigger]').forEach((trigger) => {
+      const group = trigger.closest('[data-shell-group]');
+      if (!group) return;
+      trigger.setAttribute('aria-expanded', group.classList.contains('is-open') ? 'true' : 'false');
+      trigger.addEventListener('click', () => {
+        const expanded = !group.classList.contains('is-open');
+        group.classList.toggle('is-open', expanded);
+        trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       });
     });
+
+    menu.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const panel = button.dataset.panel;
+        const focus = button.dataset.focus;
+        await showPanel({ panel, focus, button });
+      });
+    });
+
+    document.addEventListener('shell:show-panel', async (event) => {
+      const detail = event?.detail || {};
+      await showPanel({ panel: detail.panel, focus: detail.focus || null, button: null });
+    });
+
+    const defaultButton = menu.querySelector('.sidebar-submenu-btn[data-panel="planning"]') || menu.querySelector('.sidebar-submenu-btn');
+    if (defaultButton) {
+      const defaultGroup = defaultButton.closest('[data-shell-group]');
+      if (defaultGroup) {
+        defaultGroup.classList.add('is-open');
+        const trigger = defaultGroup.querySelector('[data-shell-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      }
+      showPanel({ panel: defaultButton.dataset.panel, focus: defaultButton.dataset.focus || null, button: defaultButton });
+    }
   })();
 </script>
+
+<script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+  (function(){
+    const shell = document.querySelector('.admin-shell');
+    const toggle = document.getElementById('navToggle');
+    const overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    if (!shell || !toggle) return;
+
+    const updateExpanded = () => {
+      const expanded = shell.classList.contains('sidebar-open');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const closeSidebar = () => {
+      shell.classList.remove('sidebar-open');
+      updateExpanded();
+    };
+
+    const openSidebar = () => {
+      shell.classList.add('sidebar-open');
+      updateExpanded();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (shell.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    const autoClose = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1024px)') : null;
+    if (autoClose && typeof autoClose.addEventListener === 'function') {
+      autoClose.addEventListener('change', (event) => {
+        if (!event.matches) closeSidebar();
+      });
+    }
+
+    shell.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+          closeSidebar();
+        }
+      });
+    });
+
+    updateExpanded();
+  })();
+</script>
+
+<script>
+  (function(){
+    const menu = document.querySelector('[data-shell-menu]');
+    const panelsHost = document.getElementById('workspacePanels');
+    if (!menu || !panelsHost) return;
+
+    const groups = Array.from(menu.querySelectorAll('[data-shell-group]'));
+    const panels = Array.from(panelsHost.querySelectorAll('.workspace-panel'));
+    const panelLookup = new Map(panels.map((panel) => [panel.dataset.panel, panel]));
+    let activeButton = null;
+    let activePanelId = null;
+
+    const ensureDetailsOpen = (element) => {
+      if (!element) return;
+      if (element.matches('details')) {
+        element.open = true;
+      }
+      let parent = element.closest('details');
+      while (parent) {
+        parent.open = true;
+        parent = parent.parentElement?.closest('details');
+      }
+    };
+
+    const getScrollTarget = (element) => {
+      if (!element) return null;
+      if (element.hasAttribute('data-jump-target')) {
+        return element;
+      }
+      return element.closest('[data-jump-target]') || element;
+    };
+
+    const highlight = (element) => {
+      if (!element) return;
+      element.classList.remove('jump-flash');
+      void element.offsetWidth;
+      element.classList.add('jump-flash');
+      window.setTimeout(() => element.classList.remove('jump-flash'), 1600);
+    };
+
+    const canFocus = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.tabIndex >= 0) return true;
+      return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
+    };
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const waitForElement = async (selector, attempts = 6) => {
+      if (!selector) return null;
+      const existing = document.querySelector(selector);
+      if (existing) return existing;
+      if (attempts <= 0) return null;
+      await sleep(120);
+      return waitForElement(selector, attempts - 1);
+    };
+
+    const setActiveButton = (button) => {
+      if (activeButton) activeButton.classList.remove('is-active');
+      activeButton = button || null;
+      if (activeButton) activeButton.classList.add('is-active');
+    };
+
+    const setActivePanel = (panelId) => {
+      if (!panelLookup.has(panelId)) return false;
+      panels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.panel === panelId);
+      });
+      activePanelId = panelId;
+      return true;
+    };
+
+    const revealGroupForPanel = (panelId) => {
+      const button = menu.querySelector(`.sidebar-submenu-btn[data-panel="${panelId}"]`);
+      if (!button) return;
+      const group = button.closest('[data-shell-group]');
+      if (!group) return;
+      group.classList.add('is-open');
+      const trigger = group.querySelector('[data-shell-trigger]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const showPanel = async ({ panel, focus, button }) => {
+      if (!panel) return;
+      if (!setActivePanel(panel)) return;
+      setActiveButton(button || menu.querySelector(`.sidebar-submenu-btn[data-panel="${panel}"]`));
+      revealGroupForPanel(panel);
+
+      if (focus) {
+        const target = await waitForElement(focus);
+        if (target) {
+          ensureDetailsOpen(target);
+          const scrollTarget = getScrollTarget(target);
+          window.requestAnimationFrame(() => {
+            scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const highlightEl = target.matches('details')
+              ? target.querySelector(':scope > summary') || scrollTarget
+              : scrollTarget;
+            highlight(highlightEl);
+            if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
+              highlightEl.focus({ preventScroll: true });
+            }
+          });
+        }
+      }
+    };
+
+    menu.querySelectorAll('[data-shell-trigger]').forEach((trigger) => {
+      const group = trigger.closest('[data-shell-group]');
+      if (!group) return;
+      trigger.setAttribute('aria-expanded', group.classList.contains('is-open') ? 'true' : 'false');
+      trigger.addEventListener('click', () => {
+        const expanded = !group.classList.contains('is-open');
+        group.classList.toggle('is-open', expanded);
+        trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      });
+    });
+
+    menu.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const panel = button.dataset.panel;
+        const focus = button.dataset.focus;
+        await showPanel({ panel, focus, button });
+      });
+    });
+
+    document.addEventListener('shell:show-panel', async (event) => {
+      const detail = event?.detail || {};
+      await showPanel({ panel: detail.panel, focus: detail.focus || null, button: null });
+    });
+
+    const defaultButton = menu.querySelector('.sidebar-submenu-btn[data-panel="planning"]') || menu.querySelector('.sidebar-submenu-btn');
+    if (defaultButton) {
+      const defaultGroup = defaultButton.closest('[data-shell-group]');
+      if (defaultGroup) {
+        defaultGroup.classList.add('is-open');
+        const trigger = defaultGroup.querySelector('[data-shell-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      }
+      showPanel({ panel: defaultButton.dataset.panel, focus: defaultButton.dataset.focus || null, button: defaultButton });
+    }
+  })();
+</script>
+
+<script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+  (function(){
+    const shell = document.querySelector('.admin-shell');
+    const toggle = document.getElementById('navToggle');
+    const overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    if (!shell || !toggle) return;
+
+    const updateExpanded = () => {
+      const expanded = shell.classList.contains('sidebar-open');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const closeSidebar = () => {
+      shell.classList.remove('sidebar-open');
+      updateExpanded();
+    };
+
+    const openSidebar = () => {
+      shell.classList.add('sidebar-open');
+      updateExpanded();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (shell.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    const autoClose = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1024px)') : null;
+    if (autoClose && typeof autoClose.addEventListener === 'function') {
+      autoClose.addEventListener('change', (event) => {
+        if (!event.matches) closeSidebar();
+      });
+    }
+
+    shell.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+          closeSidebar();
+        }
+      });
+    });
+
+    updateExpanded();
+  })();
+</script>
+
+<script>
+  (function(){
+    const menu = document.querySelector('[data-shell-menu]');
+    const panelsHost = document.getElementById('workspacePanels');
+    if (!menu || !panelsHost) return;
+
+    const groups = Array.from(menu.querySelectorAll('[data-shell-group]'));
+    const panels = Array.from(panelsHost.querySelectorAll('.workspace-panel'));
+    const panelLookup = new Map(panels.map((panel) => [panel.dataset.panel, panel]));
+    let activeButton = null;
+    let activePanelId = null;
+
+    const ensureDetailsOpen = (element) => {
+      if (!element) return;
+      if (element.matches('details')) {
+        element.open = true;
+      }
+      let parent = element.closest('details');
+      while (parent) {
+        parent.open = true;
+        parent = parent.parentElement?.closest('details');
+      }
+    };
+
+    const getScrollTarget = (element) => {
+      if (!element) return null;
+      if (element.hasAttribute('data-jump-target')) {
+        return element;
+      }
+      return element.closest('[data-jump-target]') || element;
+    };
+
+    const highlight = (element) => {
+      if (!element) return;
+      element.classList.remove('jump-flash');
+      void element.offsetWidth;
+      element.classList.add('jump-flash');
+      window.setTimeout(() => element.classList.remove('jump-flash'), 1600);
+    };
+
+    const canFocus = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.tabIndex >= 0) return true;
+      return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
+    };
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const waitForElement = async (selector, attempts = 6) => {
+      if (!selector) return null;
+      const existing = document.querySelector(selector);
+      if (existing) return existing;
+      if (attempts <= 0) return null;
+      await sleep(120);
+      return waitForElement(selector, attempts - 1);
+    };
+
+    const setActiveButton = (button) => {
+      if (activeButton) activeButton.classList.remove('is-active');
+      activeButton = button || null;
+      if (activeButton) activeButton.classList.add('is-active');
+    };
+
+    const setActivePanel = (panelId) => {
+      if (!panelLookup.has(panelId)) return false;
+      panels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.panel === panelId);
+      });
+      activePanelId = panelId;
+      return true;
+    };
+
+    const revealGroupForPanel = (panelId) => {
+      const button = menu.querySelector(`.sidebar-submenu-btn[data-panel="${panelId}"]`);
+      if (!button) return;
+      const group = button.closest('[data-shell-group]');
+      if (!group) return;
+      group.classList.add('is-open');
+      const trigger = group.querySelector('[data-shell-trigger]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const showPanel = async ({ panel, focus, button }) => {
+      if (!panel) return;
+      if (!setActivePanel(panel)) return;
+      setActiveButton(button || menu.querySelector(`.sidebar-submenu-btn[data-panel="${panel}"]`));
+      revealGroupForPanel(panel);
+
+      if (focus) {
+        const target = await waitForElement(focus);
+        if (target) {
+          ensureDetailsOpen(target);
+          const scrollTarget = getScrollTarget(target);
+          window.requestAnimationFrame(() => {
+            scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const highlightEl = target.matches('details')
+              ? target.querySelector(':scope > summary') || scrollTarget
+              : scrollTarget;
+            highlight(highlightEl);
+            if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
+              highlightEl.focus({ preventScroll: true });
+            }
+          });
+        }
+      }
+    };
+
+    menu.querySelectorAll('[data-shell-trigger]').forEach((trigger) => {
+      const group = trigger.closest('[data-shell-group]');
+      if (!group) return;
+      trigger.setAttribute('aria-expanded', group.classList.contains('is-open') ? 'true' : 'false');
+      trigger.addEventListener('click', () => {
+        const expanded = !group.classList.contains('is-open');
+        group.classList.toggle('is-open', expanded);
+        trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      });
+    });
+
+    menu.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const panel = button.dataset.panel;
+        const focus = button.dataset.focus;
+        await showPanel({ panel, focus, button });
+      });
+    });
+
+    document.addEventListener('shell:show-panel', async (event) => {
+      const detail = event?.detail || {};
+      await showPanel({ panel: detail.panel, focus: detail.focus || null, button: null });
+    });
+
+    const defaultButton = menu.querySelector('.sidebar-submenu-btn[data-panel="planning"]') || menu.querySelector('.sidebar-submenu-btn');
+    if (defaultButton) {
+      const defaultGroup = defaultButton.closest('[data-shell-group]');
+      if (defaultGroup) {
+        defaultGroup.classList.add('is-open');
+        const trigger = defaultGroup.querySelector('[data-shell-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      }
+      showPanel({ panel: defaultButton.dataset.panel, focus: defaultButton.dataset.focus || null, button: defaultButton });
+    }
+  })();
+</script>
+
+<script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+
+  (function(){
+    const p = '__PUBLIC_PORT__';
+    const proto = location.protocol;
+    const def = proto === 'https:' ? '443' : '80';
+    let port = /^\d+$/.test(p) ? p : def;
+    const suffix = port === def ? '' : ':' + port;
+    window.SLIDESHOW_ORIGIN = `${proto}//${location.hostname}${suffix}`;
+  })();
+
+</script>
+<script type="module" src="/admin/js/help.js"></script>
+<script type="module" src="/admin/js/app.js"></script>
+</body>
+</html><script>
+  (function(){
+    const shell = document.querySelector('.admin-shell');
+    const toggle = document.getElementById('navToggle');
+    const overlay = document.querySelector('[data-role="sidebar-overlay"]');
+    if (!shell || !toggle) return;
+
+    const updateExpanded = () => {
+      const expanded = shell.classList.contains('sidebar-open');
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    };
+
+    const closeSidebar = () => {
+      shell.classList.remove('sidebar-open');
+      updateExpanded();
+    };
+
+    const openSidebar = () => {
+      shell.classList.add('sidebar-open');
+      updateExpanded();
+    };
+
+    toggle.addEventListener('click', () => {
+      if (shell.classList.contains('sidebar-open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    overlay?.addEventListener('click', closeSidebar);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeSidebar();
+    });
+
+    const autoClose = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 1024px)') : null;
+    if (autoClose && typeof autoClose.addEventListener === 'function') {
+      autoClose.addEventListener('change', (event) => {
+        if (!event.matches) closeSidebar();
+      });
+    }
+
+    shell.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.matchMedia && window.matchMedia('(max-width: 1024px)').matches) {
+          closeSidebar();
+        }
+      });
+    });
+
+    updateExpanded();
+  })();
+</script>
+
+<script>
+  (function(){
+    const menu = document.querySelector('[data-shell-menu]');
+    const panelsHost = document.getElementById('workspacePanels');
+    if (!menu || !panelsHost) return;
+
+    const groups = Array.from(menu.querySelectorAll('[data-shell-group]'));
+    const panels = Array.from(panelsHost.querySelectorAll('.workspace-panel'));
+    const panelLookup = new Map(panels.map((panel) => [panel.dataset.panel, panel]));
+    let activeButton = null;
+    let activePanelId = null;
+
+    const ensureDetailsOpen = (element) => {
+      if (!element) return;
+      if (element.matches('details')) {
+        element.open = true;
+      }
+      let parent = element.closest('details');
+      while (parent) {
+        parent.open = true;
+        parent = parent.parentElement?.closest('details');
+      }
+    };
+
+    const getScrollTarget = (element) => {
+      if (!element) return null;
+      if (element.hasAttribute('data-jump-target')) {
+        return element;
+      }
+      return element.closest('[data-jump-target]') || element;
+    };
+
+    const highlight = (element) => {
+      if (!element) return;
+      element.classList.remove('jump-flash');
+      void element.offsetWidth;
+      element.classList.add('jump-flash');
+      window.setTimeout(() => element.classList.remove('jump-flash'), 1600);
+    };
+
+    const canFocus = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.tabIndex >= 0) return true;
+      return /^(A|BUTTON|SUMMARY|INPUT|SELECT|TEXTAREA)$/i.test(element.tagName);
+    };
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const waitForElement = async (selector, attempts = 6) => {
+      if (!selector) return null;
+      const existing = document.querySelector(selector);
+      if (existing) return existing;
+      if (attempts <= 0) return null;
+      await sleep(120);
+      return waitForElement(selector, attempts - 1);
+    };
+
+    const setActiveButton = (button) => {
+      if (activeButton) activeButton.classList.remove('is-active');
+      activeButton = button || null;
+      if (activeButton) activeButton.classList.add('is-active');
+    };
+
+    const setActivePanel = (panelId) => {
+      if (!panelLookup.has(panelId)) return false;
+      panels.forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.panel === panelId);
+      });
+      activePanelId = panelId;
+      return true;
+    };
+
+    const revealGroupForPanel = (panelId) => {
+      const button = menu.querySelector(`.sidebar-submenu-btn[data-panel="${panelId}"]`);
+      if (!button) return;
+      const group = button.closest('[data-shell-group]');
+      if (!group) return;
+      group.classList.add('is-open');
+      const trigger = group.querySelector('[data-shell-trigger]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const showPanel = async ({ panel, focus, button }) => {
+      if (!panel) return;
+      if (!setActivePanel(panel)) return;
+      setActiveButton(button || menu.querySelector(`.sidebar-submenu-btn[data-panel="${panel}"]`));
+      revealGroupForPanel(panel);
+
+      if (focus) {
+        const target = await waitForElement(focus);
+        if (target) {
+          ensureDetailsOpen(target);
+          const scrollTarget = getScrollTarget(target);
+          window.requestAnimationFrame(() => {
+            scrollTarget?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const highlightEl = target.matches('details')
+              ? target.querySelector(':scope > summary') || scrollTarget
+              : scrollTarget;
+            highlight(highlightEl);
+            if (highlightEl && typeof highlightEl.focus === 'function' && canFocus(highlightEl)) {
+              highlightEl.focus({ preventScroll: true });
+            }
+          });
+        }
+      }
+    };
+
+    menu.querySelectorAll('[data-shell-trigger]').forEach((trigger) => {
+      const group = trigger.closest('[data-shell-group]');
+      if (!group) return;
+      trigger.setAttribute('aria-expanded', group.classList.contains('is-open') ? 'true' : 'false');
+      trigger.addEventListener('click', () => {
+        const expanded = !group.classList.contains('is-open');
+        group.classList.toggle('is-open', expanded);
+        trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      });
+    });
+
+    menu.querySelectorAll('.sidebar-submenu-btn').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const panel = button.dataset.panel;
+        const focus = button.dataset.focus;
+        await showPanel({ panel, focus, button });
+      });
+    });
+
+    document.addEventListener('shell:show-panel', async (event) => {
+      const detail = event?.detail || {};
+      await showPanel({ panel: detail.panel, focus: detail.focus || null, button: null });
+    });
+
+    const defaultButton = menu.querySelector('.sidebar-submenu-btn[data-panel="planning"]') || menu.querySelector('.sidebar-submenu-btn');
+    if (defaultButton) {
+      const defaultGroup = defaultButton.closest('[data-shell-group]');
+      if (defaultGroup) {
+        defaultGroup.classList.add('is-open');
+        const trigger = defaultGroup.querySelector('[data-shell-trigger]');
+        if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      }
+      showPanel({ panel: defaultButton.dataset.panel, focus: defaultButton.dataset.focus || null, button: defaultButton });
+    }
+  })();
+</script>
+
 <script>
 
   (function(){
