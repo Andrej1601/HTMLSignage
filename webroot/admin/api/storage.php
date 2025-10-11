@@ -18,8 +18,8 @@ function signage_base_path(): string
         getenv('SIGNAGE_BASE_PATH') ?: null,
         $_ENV['SIGNAGE_BASE_PATH'] ?? null,
         $_SERVER['SIGNAGE_BASE_PATH'] ?? null,
-        $_SERVER['DOCUMENT_ROOT'] ?? null,
         realpath(__DIR__ . '/../../') ?: (__DIR__ . '/../../'),
+        $_SERVER['DOCUMENT_ROOT'] ?? null,
     ];
 
     foreach ($candidates as $candidate) {
@@ -31,7 +31,14 @@ function signage_base_path(): string
             $candidate = $resolved;
         }
         if (is_dir($candidate)) {
-            return $base = rtrim($candidate, '/');
+            $base = rtrim($candidate, '/');
+            if (is_dir($base . '/data') || substr($base, -6) !== '/admin') {
+                return $base;
+            }
+            $parent = rtrim(dirname($base), '/');
+            if ($parent !== '' && is_dir($parent . '/data')) {
+                return $base = $parent;
+            }
         }
     }
 
