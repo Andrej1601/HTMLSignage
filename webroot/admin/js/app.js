@@ -20,7 +20,6 @@ import { createUnsavedTracker } from './core/unsaved_state.js';
 import storage from './core/storage.js';
 import { createAppState } from './core/app_state.js';
 import { createDeviceContextManager } from './core/device_context.js';
-import { initContextHelp } from './ui/context_help.js';
 import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
@@ -210,6 +209,30 @@ function safeInvoke(label, fn) {
 function clearDraftsIfPresent() {
   lsRemove('scheduleDraft');
   lsRemove('settingsDraft');
+}
+
+function stripBadgeDraftArtifacts(source) {
+  if (!source || typeof source !== 'object') return;
+  const removeBadgeData = (target) => {
+    if (!target || typeof target !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(target, 'badgeLibrary')) {
+      delete target.badgeLibrary;
+    }
+    if (Object.prototype.hasOwnProperty.call(target, 'customBadgeEmojis')) {
+      delete target.customBadgeEmojis;
+    }
+  };
+
+  if (source.slides && typeof source.slides === 'object') {
+    removeBadgeData(source.slides);
+    const sets = source.slides.styleSets;
+    if (sets && typeof sets === 'object') {
+      Object.values(sets).forEach((entry) => {
+        if (!entry || typeof entry !== 'object') return;
+        removeBadgeData(entry.slides);
+      });
+    }
+  }
 }
 
 function rerenderAfterBaselineRestore() {
@@ -477,6 +500,7 @@ async function loadAll(){
     const draft = lsGet('settingsDraft');
     if (draft) {
       const parsed = JSON.parse(draft);
+      stripBadgeDraftArtifacts(parsed);
       stateAccess.setSettings(mergeDeep(settings, parsed));
       unsavedFromDraft = true;
     }
@@ -502,7 +526,6 @@ async function loadAll(){
   initUserAdmin();
   initViewMenu();
   initSidebarResize();
-  initContextHelp({ storage });
 }
 
 // ============================================================================
@@ -2388,19 +2411,6 @@ function collectSettings(){
           const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
           (settings.slides ||= {}).badgeLibrary = sanitized;
           return sanitized;
-        })(),
-        customBadgeEmojis:(() => {
-          const list = Array.isArray(settings.slides?.customBadgeEmojis)
-            ? settings.slides.customBadgeEmojis
-            : [];
-          const out = [];
-          list.forEach(entry => {
-            if (typeof entry !== 'string') return;
-            const value = entry.trim();
-            if (!value || out.includes(value)) return;
-            out.push(value);
-          });
-          return out;
         })(),
         styleAutomation: deepClone(settings.slides?.styleAutomation || {}),
         showOverview: !!document.getElementById('ovShow')?.checked,

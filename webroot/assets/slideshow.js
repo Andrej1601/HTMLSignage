@@ -45,7 +45,7 @@
     'overviewCellScale','h1Scale','h2Scale'
   ];
   const STYLE_SLIDE_KEYS = [
-    'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
+    'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
     'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
     'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix','heroTimelineItemMs',
     'heroTimelineItemDelayMs','heroTimelineFillMs','heroTimelineDelayMs','tileEnterMs','tileStaggerMs','showSaunaFlames'
@@ -338,23 +338,10 @@
     return normalized;
   }
 
-  function sanitizeCustomEmojiList(list){
-    if (!Array.isArray(list)) return [];
-    const out = [];
-    list.forEach(entry => {
-      if (typeof entry !== 'string') return;
-      const value = entry.trim();
-      if (!value || out.includes(value)) return;
-      out.push(value);
-    });
-    return out;
-  }
-
   function sanitizeSettingsPayload(payload){
     const cfg = (payload && typeof payload === 'object') ? payload : {};
     const slides = (cfg.slides && typeof cfg.slides === 'object') ? cfg.slides : (cfg.slides = {});
     slides.badgeLibrary = sanitizeBadgeLibrary(slides.badgeLibrary);
-    slides.customBadgeEmojis = sanitizeCustomEmojiList(slides.customBadgeEmojis);
     return cfg;
   }
 
