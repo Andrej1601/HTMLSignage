@@ -11,7 +11,7 @@ const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 export const PAGE_CONTENT_TYPES = [
   ['overview', 'Übersicht'],
   ['sauna', 'Saunen'],
-  ['hero-timeline', 'Hero-Timeline'],
+  ['hero-timeline', 'Event Countdown'],
   ['story', 'Erklärungen'],
   ['wellness-tip', 'Wellness-Tipps'],
   ['event-countdown', 'Event-Countdown'],
@@ -341,8 +341,12 @@ function sanitizeEventCountdowns(list, fallback){
     const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
     const target = rawTarget || '';
     const style = typeof entry.style === 'string' ? entry.style.trim() : '';
+    const image = typeof entry.image === 'string' ? entry.image.trim() : '';
+    const imageThumb = typeof entry.imageThumb === 'string' ? entry.imageThumb.trim() : '';
     const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
     const record = { id, title, subtitle, target, style };
+    if (image) record.image = image;
+    if (imageThumb) record.imageThumb = imageThumb;
     if (dwellSec != null) record.dwellSec = dwellSec;
     normalized.push(record);
     seen.add(id);

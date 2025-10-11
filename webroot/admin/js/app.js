@@ -1107,7 +1107,7 @@ function renderSlidesBox(){
 
         const subtitleInput = document.createElement('input');
         subtitleInput.className = 'input';
-        subtitleInput.placeholder = 'Untertitel (optional)';
+        subtitleInput.placeholder = 'Infos zum Event (optional)';
         subtitleInput.value = event.subtitle || '';
         subtitleInput.oninput = () => {
           event.subtitle = subtitleInput.value.trim();
@@ -1152,6 +1152,55 @@ function renderSlidesBox(){
 
         timeRow.append(timeInput, styleSelect);
         body.append(timeRow);
+
+        const mediaRow = document.createElement('div');
+        mediaRow.className = 'extras-inline extras-media-row';
+        const thumbImg = document.createElement('img');
+        thumbImg.className = 'extras-thumb';
+        thumbImg.alt = 'Event-Vorschau';
+        const updateThumb = () => {
+          const src = event.imageThumb || event.image || THUMB_FALLBACK;
+          thumbImg.src = src || THUMB_FALLBACK;
+          thumbImg.classList.toggle('is-empty', !event.image && !event.imageThumb);
+        };
+        updateThumb();
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+        const uploadLabel = document.createElement('label');
+        uploadLabel.className = 'btn sm';
+        uploadLabel.textContent = 'Bild wählen';
+        uploadLabel.appendChild(fileInput);
+        fileInput.onchange = () => {
+          uploadGeneric(fileInput, (path, thumb) => {
+            event.image = path || '';
+            event.imageThumb = thumb || path || '';
+            updateThumb();
+            updateClearState();
+            notifySettingsChanged();
+          });
+        };
+
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'btn sm ghost';
+        clearBtn.type = 'button';
+        clearBtn.textContent = 'Bild entfernen';
+        const updateClearState = () => {
+          clearBtn.disabled = !(event.image || event.imageThumb);
+        };
+        updateClearState();
+        clearBtn.onclick = () => {
+          event.image = '';
+          event.imageThumb = '';
+          updateThumb();
+          updateClearState();
+          notifySettingsChanged();
+        };
+
+        mediaRow.append(thumbImg, uploadLabel, clearBtn);
+        body.append(mediaRow);
 
         const dwellRow = document.createElement('div');
         dwellRow.className = 'extras-inline';
@@ -1199,7 +1248,7 @@ function renderSlidesBox(){
     if (addEventBtn && !addEventBtn.dataset.bound) {
       addEventBtn.dataset.bound = '1';
       addEventBtn.addEventListener('click', () => {
-        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '', dwellSec: null });
+        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '', image: '', imageThumb: '', dwellSec: null });
         renderExtrasEditor();
         notifySettingsChanged();
       });
@@ -1462,7 +1511,7 @@ function renderSlidesBox(){
     pushEntry({
       key: 'hero-timeline',
       kind: 'hero-timeline',
-      label: 'Hero-Timeline',
+      label: 'Event Countdown',
       thumb: THUMB_FALLBACK,
       disabled: !heroEnabled,
       statusText: heroEnabled ? null : 'Deaktiviert'

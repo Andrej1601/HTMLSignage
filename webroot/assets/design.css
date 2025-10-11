@@ -234,7 +234,7 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
   position:relative;
   display:grid;
   grid-template-columns:minmax(0, var(--heroTimelineThumb)) 1fr;
-  align-items:center;
+  align-items:flex-start;
   gap:var(--heroTimelineGap);
   padding:calc(16px*var(--vwScale));
   border-radius:var(--heroTimelineRadius);
@@ -308,6 +308,13 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
   font-size:calc(18px*var(--scale));
   line-height:1.35;
 }
+.hero-timeline .timeline-countdown{display:flex;flex-direction:column;gap:calc(6px*var(--vwScale));margin-top:calc(6px*var(--vwScale));}
+.hero-timeline .timeline-countdown-value{font-size:calc(34px*var(--scale));font-weight:700;color:var(--boxfg);}
+.hero-timeline .timeline-countdown-label{text-transform:uppercase;letter-spacing:.12em;font-size:calc(16px*var(--scale));color:color-mix(in srgb, var(--boxfg) 65%, rgba(0,0,0,.35));}
+.hero-timeline .timeline-item.is-live .timeline-countdown-value{color:var(--hlColor);}
+.hero-timeline .timeline-item.is-live .timeline-countdown-label{color:var(--hlColor);}
+.hero-timeline .timeline-item.is-soon:not(.is-live) .timeline-countdown-value{color:var(--accent);}
+.hero-timeline .timeline-item.is-soon:not(.is-live) .timeline-countdown-label{color:color-mix(in srgb, var(--accent) 70%, rgba(0,0,0,.25));}
 .hero-timeline .timeline-entry.highlight .timeline-sauna,
 .hero-timeline .timeline-entry.highlight .timeline-title{color:var(--accent);}
 .hero-timeline .timeline-item.is-active .timeline-entry.highlight .timeline-sauna,

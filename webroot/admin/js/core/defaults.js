@@ -298,7 +298,7 @@ export const DEFAULTS = {
       { id:'wellness_cooldown', icon:'❄️', title:'Abkühlen', text:'Zwischen den Gängen an die frische Luft gehen und kalt abduschen.', dwellSec: null }
     ],
     eventCountdowns:[
-      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', dwellSec: null }
+      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', image:'', imageThumb:'', dwellSec: null }
     ],
     gastronomyHighlights:[
       { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.', dwellSec: null }
