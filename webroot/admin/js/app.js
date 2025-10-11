@@ -709,7 +709,9 @@ function renderSlidesBox(){
         title: typeof entry.title === 'string' ? entry.title.trim() : '',
         subtitle: typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '',
         target,
-        style: typeof entry.style === 'string' ? entry.style.trim() : ''
+        style: typeof entry.style === 'string' ? entry.style.trim() : '',
+        image: typeof entry.image === 'string' ? entry.image.trim() : '',
+        imageThumb: typeof entry.imageThumb === 'string' ? entry.imageThumb.trim() : ''
       };
       if (dwell != null) result.dwellSec = dwell;
       return result;

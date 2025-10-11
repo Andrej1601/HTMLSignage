@@ -245,7 +245,7 @@ export const DEFAULTS = {
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
     badgeScale:1,
     badgeDescriptionScale:1,
-    heroEnabled:false,
+    heroEnabled:true,
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,
     heroTimelineMaxEntries:null,
