@@ -254,7 +254,7 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   box-shadow:0 12px 28px -24px rgba(15,23,42,.35);
   display:flex;
   flex-wrap:wrap;
-  align-items:center;
+  align-items:flex-start;
   gap:10px 12px;
 }
 .workspace-overview.cockpit-compact .workspace-card{
@@ -267,8 +267,8 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   display:flex;
   gap:8px;
   align-items:center;
-  flex:1 1 auto;
-  min-width:180px;
+  flex:1 1 100%;
+  min-width:0;
 }
 .workspace-card-icon{
   font-size:24px;
@@ -284,8 +284,9 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   flex-wrap:wrap;
   gap:6px;
   margin:0;
-  justify-content:flex-end;
-  flex:0 0 auto;
+  justify-content:flex-start;
+  flex:1 1 100%;
+  max-width:100%;
 }
 .workspace-card-btn{
   border-radius:999px;
@@ -864,7 +865,6 @@ details.ac[open] .chev{ transform: rotate(90deg); }
 
 /* ---------- Hilfe-Overlay & Tooltips ---------- */
 @layer overlays{
-.tip{ cursor:help; color:var(--muted); margin-left:4px; }
 
 #helpOverlay,
 #slideOrderOverlay{
