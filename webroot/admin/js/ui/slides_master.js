@@ -35,7 +35,7 @@ const STYLE_FONT_KEYS = [
   'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
 ];
 const STYLE_SLIDE_KEYS = [
-  'infobadgeColor','badgeLibrary','customBadgeEmojis','badgeScale','badgeDescriptionScale',
+  'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
   'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
   'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
 ];
@@ -161,17 +161,15 @@ function ensureBadgeLibrary(settings){
   };
 
 const resolveBadgeText = (primary, fallback) => {
-// Preserve existing edits when rebuilding: prefer previous value
-if (typeof fallback === 'string' && fallback.trim() !== '') return fallback.trim();
-if (typeof primary === 'string') return primary.trim();
-return '';
+  if (typeof primary === 'string') return primary.trim();
+  if (typeof fallback === 'string') return fallback.trim();
+  return '';
 };
 
 const resolveBadgeImage = (primary, fallback) => {
-// Preserve existing edits when rebuilding: prefer previous image
-if (typeof fallback === 'string' && fallback.trim() !== '') return fallback.trim();
-if (typeof primary === 'string') return primary.trim();
-return '';
+  if (typeof primary === 'string') return primary.trim();
+  if (typeof fallback === 'string') return fallback.trim();
+  return '';
 };
 
   const previousById = (() => {
@@ -280,17 +278,6 @@ function syncActiveStyleSetBadgeSettings(settings){
   });
   targetSlides.badgeLibrary = clonedLibrary;
 
-  const emojiList = Array.isArray(settings.slides.customBadgeEmojis)
-    ? settings.slides.customBadgeEmojis
-    : [];
-  const clonedEmojis = [];
-  emojiList.forEach((value) => {
-    if (typeof value !== 'string') return;
-    const trimmed = value.trim();
-    if (!trimmed || clonedEmojis.includes(trimmed)) return;
-    clonedEmojis.push(trimmed);
-  });
-  targetSlides.customBadgeEmojis = clonedEmojis;
 }
 
 function markBadgeLibraryChanged(settings){
@@ -361,21 +348,6 @@ const scheduleBadgeLibraryChanged = (() => {
   schedule.cancel = clear;
   return schedule;
 })();
-
-function ensureCustomBadgeEmojis(settings){
-  settings.slides ||= {};
-  const raw = settings.slides.customBadgeEmojis;
-  const list = Array.isArray(raw) ? raw : [];
-  const filtered = [];
-  list.forEach(entry => {
-    if (typeof entry !== 'string') return;
-    const value = entry.trim();
-    if (!value || filtered.includes(value)) return;
-    filtered.push(value);
-  });
-  settings.slides.customBadgeEmojis = filtered;
-  return filtered;
-}
 
 function snapshotStyleSet(settings){
   return {
@@ -2373,88 +2345,7 @@ export function renderSlidesMaster(){
 
   const renderBadgeLibraryRows = () => {
     const list = ensureBadgeLibrary(settings);
-    const customEmojis = ensureCustomBadgeEmojis(settings);
-    const getCustomEmojiList = () => {
-      settings.slides ||= {};
-      if (!Array.isArray(settings.slides.customBadgeEmojis)) settings.slides.customBadgeEmojis = [];
-      return settings.slides.customBadgeEmojis;
-    };
     if (!badgeListHost) return;
-
-    const emojiInput = $('#badgeEmojiInput');
-    const emojiAddBtn = $('#badgeEmojiAdd');
-    const emojiCustomList = $('#badgeEmojiCustom');
-
-    const updateEmojiAddState = () => {
-      if (!emojiAddBtn) return;
-      const value = (emojiInput?.value || '').trim();
-      const listRef = getCustomEmojiList();
-      emojiAddBtn.disabled = !value || listRef.includes(value);
-    };
-
-    const renderEmojiChips = () => {
-      if (!emojiCustomList) return;
-      emojiCustomList.innerHTML = '';
-      const listRef = getCustomEmojiList();
-      if (!listRef.length){
-        const empty = document.createElement('div');
-        empty.className = 'badge-lib-emoji-empty';
-        empty.textContent = 'Keine eigenen Emojis gespeichert.';
-        emojiCustomList.appendChild(empty);
-        return;
-      }
-      listRef.forEach(value => {
-        const chip = document.createElement('span');
-        chip.className = 'badge-lib-emoji-chip';
-        chip.textContent = value;
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'badge-lib-emoji-remove';
-        removeBtn.title = `${value} entfernen`;
-        removeBtn.setAttribute('aria-label', `Emoji ${value} entfernen`);
-        removeBtn.textContent = '✕';
-        removeBtn.addEventListener('click', () => {
-          const list = getCustomEmojiList();
-          const idx = list.indexOf(value);
-          if (idx >= 0) list.splice(idx, 1);
-          renderBadgeLibraryRows();
-          markBadgeLibraryChanged(settings);
-        });
-        chip.appendChild(removeBtn);
-        emojiCustomList.appendChild(chip);
-      });
-    };
-
-    const addCustomEmoji = (rawValue) => {
-      const value = (rawValue || '').trim();
-      if (!value) return;
-      const listRef = getCustomEmojiList();
-      if (listRef.includes(value)) return;
-      listRef.push(value);
-      if (emojiInput){
-        emojiInput.value = '';
-      }
-      renderBadgeLibraryRows();
-      markBadgeLibraryChanged(settings);
-    };
-
-    if (emojiAddBtn && !emojiAddBtn.dataset.bound){
-      emojiAddBtn.addEventListener('click', () => addCustomEmoji(emojiInput?.value));
-      emojiAddBtn.dataset.bound = '1';
-    }
-    if (emojiInput && !emojiInput.dataset.bound){
-      emojiInput.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter'){
-          ev.preventDefault();
-          addCustomEmoji(emojiInput.value);
-        }
-      });
-      emojiInput.addEventListener('input', updateEmojiAddState);
-      emojiInput.dataset.bound = '1';
-    }
-
-    updateEmojiAddState();
-    renderEmojiChips();
 
     badgeListHost.innerHTML = '';
     if (!list.length){
@@ -2523,7 +2414,6 @@ export function renderSlidesMaster(){
       };
 
       addGroup('Empfohlen', SUGGESTED_BADGE_EMOJIS, (entry) => entry.value);
-      addGroup('Eigene Emojis', customEmojis, (entry) => entry);
       const otherIcons = usedIcons.filter(value => !added.has(value));
       addGroup('Verwendet', otherIcons, (entry) => entry);
 

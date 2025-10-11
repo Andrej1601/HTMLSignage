@@ -60,7 +60,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      customBadgeEmojis:[],
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
@@ -100,7 +99,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.75,
-      customBadgeEmojis:[],
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
@@ -140,7 +138,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.78,
-      customBadgeEmojis:[],
       tileFlameSizeScale:1.05,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
@@ -180,7 +177,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1,
       badgeDescriptionScale:1,
       tilePaddingScale:0.72,
-      customBadgeEmojis:[],
       tileFlameSizeScale:0.92,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:90
@@ -220,7 +216,6 @@ const DEFAULT_STYLE_SETS = {
       badgeScale:1.05,
       badgeDescriptionScale:1.05,
       tilePaddingScale:0.82,
-      customBadgeEmojis:['🎉','✨','🎶'],
       tileFlameSizeScale:1.1,
       tileFlameGapScale:1.05,
       saunaTitleMaxWidthPercent:100
@@ -250,7 +245,6 @@ export const DEFAULTS = {
     badgeLibrary: JSON.parse(JSON.stringify(DEFAULT_BADGE_LIBRARY)),
     badgeScale:1,
     badgeDescriptionScale:1,
-    customBadgeEmojis:[],
     heroEnabled:false,
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,

@@ -8,18 +8,6 @@ import { deepClone, genId } from './utils.js';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
-function sanitizeEmojiList(list){
-  if (!Array.isArray(list)) return [];
-  const out = [];
-  list.forEach(entry => {
-    if (typeof entry !== 'string') return;
-    const value = entry.trim();
-    if (!value || out.includes(value)) return;
-    out.push(value);
-  });
-  return out;
-}
-
 export const PAGE_CONTENT_TYPES = [
   ['overview', 'Übersicht'],
   ['sauna', 'Saunen'],
@@ -297,7 +285,6 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.slides.badgeDescriptionScale = Number.isFinite(badgeDescRaw)
     ? clamp(0.3, badgeDescRaw, 3)
     : defaultBadgeDescScale;
-  src.slides.customBadgeEmojis = sanitizeEmojiList(src.slides?.customBadgeEmojis);
   return src;
 }
 
