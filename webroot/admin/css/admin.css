@@ -704,6 +704,10 @@ body.devices-pinned #devicesPane{
 .extras-item-actions{ display:flex; justify-content:flex-end; }
 .extras-inline{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .extras-inline .input{ flex:1 1 160px; min-width:120px; }
+.extras-media-row{ align-items:center; }
+.extras-media-row .btn{ flex:0 0 auto; }
+.extras-thumb{ width:92px; height:92px; border-radius:12px; object-fit:cover; border:1px solid color-mix(in srgb, var(--border) 75%, transparent); background:color-mix(in srgb, var(--panel) 90%, transparent); box-shadow:inset 0 0 0 1px rgba(255,255,255,.04); }
+.extras-thumb.is-empty{ object-fit:contain; opacity:.6; }
 .extras-item small.help{ color:var(--muted); font-size:12px; }
 .style-auto-fold{ border:1px solid color-mix(in srgb, var(--border) 85%, transparent); border-radius:12px; background:color-mix(in srgb, var(--panel) 96%, var(--fg) 3%); }
 .style-auto-fold > summary{ list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; cursor:pointer; font-weight:600; font-size:13px; color:var(--fg); }

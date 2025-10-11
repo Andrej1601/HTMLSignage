@@ -470,6 +470,8 @@
         "subtitle": "Heute 20:00",
         "target": "2024-12-24T20:00",
         "style": "celebration",
+        "image": "",
+        "imageThumb": "",
         "dwellSec": null
       }
     ],

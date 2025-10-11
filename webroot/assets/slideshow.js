@@ -879,88 +879,53 @@ async function loadDeviceResolved(id){
     return '';
   }
 
-  function collectHeroTimelineData() {
-    heroTimeline = [];
-    if (!schedule || !Array.isArray(schedule.rows)) return heroTimeline;
-
-    const saunas = Array.isArray(schedule.saunas) ? schedule.saunas : [];
-    if (!saunas.length) return heroTimeline;
-
-    const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
-    const highlight = getHighlightMap();
-    const rawBase = settings?.slides?.heroTimelineBaseMinutes;
-    const parsedBase = Number(rawBase);
-    const baseMinutes = Number.isFinite(parsedBase) && parsedBase > 0
-      ? Math.max(1, Math.round(parsedBase))
-      : 15;
-    const rawMax = settings?.slides?.heroTimelineMaxEntries;
-    const parsedMax = Number(rawMax);
-    const maxEntries = Number.isFinite(parsedMax) && parsedMax > 0
-      ? Math.max(1, Math.floor(parsedMax))
-      : null;
-
-    (schedule.rows || []).forEach((row, ri) => {
-      if (!row) return;
-      const time = String(row.time || '').trim();
-      const minute = parseHM(time);
-      if (!time || minute === null) return;
-      const entries = [];
-      saunas.forEach((saunaName, colIdx) => {
-        if (hiddenSaunas.has(saunaName)) return;
-        const cell = (row.entries || [])[colIdx];
-        if (!cell || !cell.title) return;
-        if (cell.hidden === true || cell.visible === false || cell.enabled === false) return;
-        const label = String(cell.title).replace(/\*+$/, '').trim();
-        if (!label) return;
-        const detail = firstTextValue(
-          cell.subtitle,
-          cell.detail,
-          cell.aroma,
-          cell.aromas,
-          cell.extra
-        );
-        const badges = collectCellBadges(cell);
-        const saunaImage = settings?.assets?.rightImages?.[saunaName];
-        const imageUrl = firstImageUrl(
-          cell.heroImage,
-          cell.timelineImage,
-          cell.image,
-          cell.imageUrl,
-          cell.mediaUrl,
-          cell.badgeImage,
-          saunaImage
-        );
-        const key = 'r' + ri + 'c' + colIdx;
-        entries.push({
-          sauna: saunaName,
-          title: label,
-          detail,
-          highlight: !!highlight.byCell[key],
-          badges,
-          imageUrl: imageUrl ? imageUrl : ''
-        });
+  function normalizeEventCountdowns(list) {
+    const source = Array.isArray(list) ? list : [];
+    const normalized = [];
+    const seen = new Set();
+    source.forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      const id = entry.id != null ? String(entry.id).trim() : '';
+      if (id && seen.has(id)) return;
+      if (id) seen.add(id);
+      const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+      const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
+      if (!title && !subtitle && !rawTarget) return;
+      const parsedTarget = rawTarget ? new Date(rawTarget) : null;
+      const fallbackTargetMs = Number.isFinite(entry.targetMs) ? Math.round(+entry.targetMs) : null;
+      const targetMs = parsedTarget && !Number.isNaN(parsedTarget.getTime())
+        ? parsedTarget.getTime()
+        : fallbackTargetMs;
+      const styleKey = typeof entry.style === 'string' ? entry.style.trim() : '';
+      const image = typeof entry.image === 'string' ? entry.image.trim() : '';
+      const imageThumb = typeof entry.imageThumb === 'string' ? entry.imageThumb.trim() : '';
+      const dwellSec = Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null;
+      normalized.push({
+        type: 'event-countdown',
+        id: id || null,
+        title,
+        subtitle,
+        target: rawTarget,
+        targetMs: targetMs ?? null,
+        styleKey,
+        image,
+        imageThumb,
+        imageUrl: image || imageThumb || '',
+        dwellSec
       });
-      if (entries.length) heroTimeline.push({ time, minute, entries });
     });
-
-    heroTimeline.sort((a, b) => {
-      if (a.minute !== b.minute) return a.minute - b.minute;
-      return a.time.localeCompare(b.time);
+    normalized.sort((a, b) => {
+      const aTime = a.targetMs ?? Number.POSITIVE_INFINITY;
+      const bTime = b.targetMs ?? Number.POSITIVE_INFINITY;
+      if (aTime !== bTime) return aTime - bTime;
+      return (a.title || '').localeCompare(b.title || '');
     });
+    return normalized;
+  }
 
-    if (maxEntries && heroTimeline.length > maxEntries) {
-      heroTimeline = heroTimeline.slice(0, maxEntries);
-    }
-
-    for (let i = 0; i < heroTimeline.length; i++) {
-      const cur = heroTimeline[i];
-      const next = heroTimeline[i + 1] || null;
-      const diff = next ? Math.max(1, next.minute - cur.minute) : baseMinutes;
-      const ratio = diff / baseMinutes;
-      cur.durationRatio = Number.isFinite(ratio) ? Math.max(0.25, Math.min(4, ratio)) : 1;
-      cur.isActive = cur.entries.some(entry => entry.highlight);
-    }
-
+  function collectHeroTimelineData() {
+    heroTimeline = collectEventCountdowns();
     return heroTimeline;
   }
 
@@ -988,29 +953,7 @@ async function loadDeviceResolved(id){
   }
 
   function collectEventCountdowns() {
-    const list = Array.isArray(settings?.extras?.eventCountdowns) ? settings.extras.eventCountdowns : [];
-    const normalized = [];
-    list.forEach((entry) => {
-      if (!entry || typeof entry !== 'object') return;
-      const id = entry.id != null ? String(entry.id).trim() : '';
-      const title = typeof entry.title === 'string' ? entry.title.trim() : '';
-      const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
-      const rawTarget = typeof entry.target === 'string' ? entry.target.trim() : '';
-      if (!title && !subtitle) return;
-      const targetDate = rawTarget ? new Date(rawTarget) : null;
-      const targetMs = targetDate && !Number.isNaN(targetDate.getTime()) ? targetDate.getTime() : null;
-      normalized.push({
-        type: 'event-countdown',
-        id: id || null,
-        title,
-        subtitle,
-        target: rawTarget,
-        targetMs,
-        styleKey: typeof entry.style === 'string' ? entry.style.trim() : '',
-        dwellSec: Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null
-      });
-    });
-    return normalized;
+    return normalizeEventCountdowns(settings?.extras?.eventCountdowns);
   }
 
   function collectGastronomyHighlights() {
@@ -1046,10 +989,9 @@ async function loadDeviceResolved(id){
   function buildMasterQueue() {
     maybeApplyPreset();
 
-    const heroEnabled = !!(settings?.slides?.heroEnabled);
-    const timeline = heroEnabled ? collectHeroTimelineData() : (heroTimeline = []);
-    const hasHero = heroEnabled && timeline.length > 0;
-    const withHero = (queue) => hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
+    const eventCountdownEnabled = !!(settings?.slides?.heroEnabled);
+    if (eventCountdownEnabled) collectHeroTimelineData(); else heroTimeline = [];
+    const withHero = (queue) => queue.slice();
 
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
@@ -1078,7 +1020,12 @@ async function loadDeviceResolved(id){
   const wellnessTips = collectWellnessTips();
   const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(it.id), it]));
   const eventCountdowns = collectEventCountdowns();
-  const eventMap = new Map(eventCountdowns.filter(it => it.id).map(it => [String(it.id), it]));
+  const eventDwell = (() => {
+    for (const evt of eventCountdowns) {
+      if (Number.isFinite(+evt.dwellSec)) return Math.max(1, Math.round(+evt.dwellSec));
+    }
+    return null;
+  })();
   const gastronomyHighlights = collectGastronomyHighlights();
   const gastroMap = new Map(gastronomyHighlights.filter(it => it.id).map(it => [String(it.id), it]));
 
@@ -1091,7 +1038,7 @@ async function loadDeviceResolved(id){
     const usedMedia = new Set();
     const usedStories = new Set();
     const usedWellness = new Set();
-    const usedEvents = new Set();
+    let eventSlideAdded = false;
     const usedGastro = new Set();
     for (const entry of sortOrder) {
       if (entry.type === 'sauna') {
@@ -1136,11 +1083,11 @@ async function loadDeviceResolved(id){
         continue;
       }
       if (entry.type === 'event-countdown') {
-        const key = String(entry.id ?? '');
-        const event = eventMap.get(key);
-        if (event) {
-          queue.push({ ...event, eventId: key });
-          usedEvents.add(key);
+        if (eventCountdownEnabled && !eventSlideAdded && eventCountdowns.length) {
+          const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
+          if (eventDwell != null) slide.dwellSec = eventDwell;
+          queue.push(slide);
+          eventSlideAdded = true;
         }
         continue;
       }
@@ -1180,11 +1127,11 @@ async function loadDeviceResolved(id){
         queue.push({ ...tip, tipId: key });
       }
     }
-    for (const event of eventCountdowns) {
-      const key = event.id != null ? String(event.id) : null;
-      if (!key || !usedEvents.has(key)) {
-        queue.push({ ...event, eventId: key });
-      }
+    if (eventCountdownEnabled && !eventSlideAdded && eventCountdowns.length) {
+      const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
+      if (eventDwell != null) slide.dwellSec = eventDwell;
+      queue.push(slide);
+      eventSlideAdded = true;
     }
     for (const highlight of gastronomyHighlights) {
       const key = highlight.id != null ? String(highlight.id) : null;
@@ -1203,8 +1150,9 @@ async function loadDeviceResolved(id){
         const id = q.tipId ?? q.id;
         if (id != null && wellnessMap.has(String(id))) clean.push({ type: 'wellness-tip', id: String(id) });
       } else if (q.type === 'event-countdown') {
-        const id = q.eventId ?? q.id;
-        if (id != null && eventMap.has(String(id))) clean.push({ type: 'event-countdown', id: String(id) });
+        if (!clean.some(entry => entry.type === 'event-countdown')) {
+          clean.push({ type: 'event-countdown' });
+        }
       } else if (q.type === 'gastronomy-highlight') {
         const id = q.highlightId ?? q.id;
         if (id != null && gastroMap.has(String(id))) clean.push({ type: 'gastronomy-highlight', id: String(id) });
@@ -1275,9 +1223,11 @@ async function loadDeviceResolved(id){
   wellnessTips.forEach((tip) => {
     queue.push({ ...tip, tipId: tip.id != null ? String(tip.id) : null });
   });
-  eventCountdowns.forEach((event) => {
-    queue.push({ ...event, eventId: event.id != null ? String(event.id) : null });
-  });
+  if (eventCountdownEnabled && eventCountdowns.length) {
+    const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
+    if (eventDwell != null) slide.dwellSec = eventDwell;
+    queue.push(slide);
+  }
   gastronomyHighlights.forEach((entry) => {
     queue.push({ ...entry, highlightId: entry.id != null ? String(entry.id) : null });
   });
@@ -1314,65 +1264,185 @@ async function loadDeviceResolved(id){
   }
 
   function renderEventCountdown(item = {}, region = 'left') {
-    const container = h('div', { class: 'container extra extra-event fade show' });
+    const container = h('div', { class: 'container extra extra-event hero-timeline fade show' });
     container.dataset.region = region;
-    if (item.id) container.dataset.extraId = String(item.id);
-    if (item.styleKey) container.dataset.eventStyle = String(item.styleKey);
 
-    const title = typeof item.title === 'string' ? item.title.trim() : '';
-    const subtitle = typeof item.subtitle === 'string' ? item.subtitle.trim() : '';
-    const targetMs = Number.isFinite(item.targetMs) ? item.targetMs : null;
+    const eventsInput = Array.isArray(item.events) && item.events.length
+      ? normalizeEventCountdowns(item.events)
+      : collectHeroTimelineData();
+    const events = eventsInput.slice();
 
-    const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Event-Countdown');
-    const headingWrap = h('div', { class: 'extra-heading-wrap' });
-    if (title) headingWrap.appendChild(h('h2', { class: 'extra-title' }, title));
-    if (subtitle) headingWrap.appendChild(h('p', { class: 'extra-subtitle' }, subtitle));
-
-    const countdownValue = h('div', { class: 'extra-countdown-value' }, '–');
-    const countdownLabel = h('div', { class: 'extra-countdown-label' }, 'Verbleibende Zeit');
-
-    const updateCountdown = () => {
-      if (!targetMs) {
-        countdownValue.textContent = 'bald';
-        countdownLabel.textContent = 'Termin wird angekündigt';
-        container.classList.remove('is-live', 'is-soon');
-        return;
-      }
-      const diff = targetMs - Date.now();
-      if (diff <= 0) {
-        countdownValue.textContent = 'Jetzt';
-        countdownLabel.textContent = 'Event läuft';
-        container.classList.add('is-live');
-        container.classList.remove('is-soon');
-        return;
-      }
-      container.classList.remove('is-live');
-      const minutesTotal = Math.floor(diff / 60000);
-      const days = Math.floor(minutesTotal / (60 * 24));
-      const hours = Math.floor((minutesTotal - days * 24 * 60) / 60);
-      const minutes = minutesTotal % 60;
-      let text = '';
-      if (days > 1) text = `${days} Tage`;
-      else if (days === 1) text = '1 Tag';
-      else if (hours >= 1) text = minutes > 0 ? `${hours} Std ${minutes} Min` : `${hours} Std`;
-      else text = `${Math.max(1, minutes)} Min`;
-      countdownValue.textContent = text;
-      container.classList.toggle('is-soon', diff < 60 * 60 * 1000);
-      const date = new Date(targetMs);
-      countdownLabel.textContent = `Start: ${date.toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`;
-    };
-
-    updateCountdown();
-    let timer = null;
-    if (targetMs) timer = setInterval(updateCountdown, 30000);
-    container.__cleanup = () => { if (timer) clearInterval(timer); };
-
-    const body = h('div', { class: 'extra-content extra-countdown' }, [
+    const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Event Countdown');
+    const headingWrap = h('div', { class: 'headings hero-headings' }, [
       eyebrow,
-      headingWrap,
-      h('div', { class: 'extra-countdown-display' }, [countdownValue, countdownLabel])
+      h('h1', { class: 'h1' }, 'Bevorstehende Events'),
+      h('h2', { class: 'h2' }, events.length ? 'Verpasse keine Highlights' : 'Derzeit sind keine Events geplant.')
     ]);
 
+    const list = h('div', { class: 'hero-timeline-list' });
+    const updates = [];
+
+    const formatDisplay = (targetMs, rawTarget, nowTs) => {
+      if (!targetMs) {
+        const fallback = rawTarget && rawTarget.trim() ? rawTarget.trim() : 'Termin folgt';
+        return {
+          timeLabel: fallback,
+          countdownValue: 'Bald',
+          countdownLabel: 'Termin folgt',
+          isLive: false,
+          isSoon: false
+        };
+      }
+      const now = new Date(nowTs);
+      const eventDate = new Date(targetMs);
+      if (Number.isNaN(eventDate.getTime())) {
+        return {
+          timeLabel: rawTarget || 'Termin folgt',
+          countdownValue: 'Bald',
+          countdownLabel: 'Termin folgt',
+          isLive: false,
+          isSoon: false
+        };
+      }
+      const diff = targetMs - nowTs;
+      const sameDay = eventDate.toDateString() === now.toDateString();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      const isTomorrow = eventDate.toDateString() === tomorrow.toDateString();
+      const dateOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
+      let dateLabel = eventDate.toLocaleDateString('de-DE', dateOptions);
+      if (!sameDay && eventDate.getFullYear() !== now.getFullYear()) {
+        dateLabel += ` ${eventDate.getFullYear()}`;
+      }
+      const timePart = eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      if (sameDay) dateLabel = `Heute · ${timePart}`;
+      else if (isTomorrow) dateLabel = `Morgen · ${timePart}`;
+      else dateLabel = `${dateLabel} · ${timePart}`;
+
+      if (diff <= 0) {
+        return {
+          timeLabel: dateLabel,
+          countdownValue: 'Jetzt',
+          countdownLabel: 'Event läuft',
+          isLive: true,
+          isSoon: true
+        };
+      }
+
+      const dayMs = 24 * 60 * 60 * 1000;
+      if (sameDay) {
+        const hours = Math.floor(diff / (60 * 60 * 1000));
+        const minutes = Math.floor((diff % (60 * 60 * 1000)) / 60000);
+        const parts = [];
+        if (hours > 0) parts.push(`${hours} Std`);
+        if (minutes > 0 || hours === 0) parts.push(`${Math.max(1, minutes)} Min`);
+        const value = parts.join(' ');
+        return {
+          timeLabel: dateLabel,
+          countdownValue: `Noch ${value}`,
+          countdownLabel: 'heute',
+          isLive: false,
+          isSoon: true
+        };
+      }
+
+      const days = Math.ceil(diff / dayMs);
+      const value = days === 1 ? '1 Tag' : `${days} Tage`;
+      return {
+        timeLabel: dateLabel,
+        countdownValue: `Noch ${value}`,
+        countdownLabel: 'bis zum Start',
+        isLive: false,
+        isSoon: diff <= dayMs
+      };
+    };
+
+    if (!events.length) {
+      list.appendChild(h('div', { class: 'caption' }, 'Aktuell sind keine Events geplant.'));
+      container.classList.add('is-empty');
+    } else {
+      events.forEach((event, idx) => {
+        const item = h('div', { class: 'timeline-item' });
+        item.style.setProperty('--hero-index', String(idx));
+        const timeEl = h('div', { class: 'timeline-time' }, '');
+        item.appendChild(timeEl);
+
+        const details = h('div', { class: 'timeline-details' });
+        const entryClasses = ['timeline-entry'];
+        if (event.imageUrl) entryClasses.push('has-thumb'); else entryClasses.push('no-thumb');
+        const entryNode = h('div', { class: entryClasses.join(' ') });
+
+        const thumb = h('div', { class: 'timeline-entry-thumb' });
+        if (event.imageUrl) {
+          const style = 'background-image:url(' + JSON.stringify(event.imageUrl) + ')';
+          thumb.appendChild(h('div', { class: 'timeline-entry-thumb-image', style }));
+        } else {
+          thumb.classList.add('is-empty');
+          const fallbackSrc = firstText(event.title, event.subtitle).trim();
+          const fallbackChar = fallbackSrc ? fallbackSrc.charAt(0).toUpperCase() : 'E';
+          if (fallbackChar) {
+            thumb.appendChild(h('span', { class: 'timeline-entry-thumb-fallback' }, fallbackChar));
+          }
+        }
+        entryNode.appendChild(thumb);
+
+        const content = h('div', { class: 'timeline-entry-content' });
+        const header = h('div', { class: 'timeline-entry-header' });
+        header.appendChild(h('span', { class: 'timeline-title' }, event.title || 'Event'));
+        content.appendChild(header);
+        if (event.subtitle) {
+          content.appendChild(h('div', { class: 'timeline-detail' }, event.subtitle));
+        }
+
+        const countdownValue = h('div', { class: 'timeline-countdown-value' }, '–');
+        const countdownLabel = h('div', { class: 'timeline-countdown-label' }, '');
+        const countdownWrap = h('div', { class: 'timeline-countdown' }, [countdownValue, countdownLabel]);
+        content.appendChild(countdownWrap);
+
+        entryNode.appendChild(content);
+        details.appendChild(entryNode);
+        item.appendChild(details);
+
+        const bar = h('div', { class: 'timeline-bar' }, [
+          h('div', { class: 'timeline-progress' })
+        ]);
+        item.appendChild(bar);
+
+        list.appendChild(item);
+
+        updates.push({
+          targetMs: Number.isFinite(event.targetMs) ? event.targetMs : null,
+          rawTarget: event.target,
+          itemEl: item,
+          timeEl,
+          valueEl: countdownValue,
+          labelEl: countdownLabel
+        });
+      });
+    }
+
+    const updateCountdowns = () => {
+      const now = Date.now();
+      updates.forEach((entry) => {
+        const display = formatDisplay(entry.targetMs, entry.rawTarget, now);
+        entry.timeEl.textContent = display.timeLabel;
+        entry.valueEl.textContent = display.countdownValue;
+        entry.labelEl.textContent = display.countdownLabel;
+        entry.itemEl.classList.toggle('is-live', display.isLive);
+        entry.itemEl.classList.toggle('is-soon', display.isSoon && !display.isLive);
+        entry.itemEl.classList.toggle('is-active', display.isLive || display.isSoon);
+      });
+    };
+
+    updateCountdowns();
+    let timer = null;
+    if (updates.some(entry => entry.targetMs)) {
+      timer = setInterval(updateCountdowns, 30000);
+    }
+    container.__cleanup = () => { if (timer) clearInterval(timer); };
+
+    const body = h('div', { class: 'hero-body' }, [list]);
+    container.appendChild(headingWrap);
     container.appendChild(body);
     container.appendChild(h('div', { class: 'brand' }, 'Signage'));
     return container;
@@ -2133,87 +2203,7 @@ return h('div', {}, [ t ]);
 
   function renderHeroTimeline(region = 'left') {
     const data = (heroTimeline.length ? heroTimeline : collectHeroTimelineData()).slice();
-    const headingWrap = h('div', { class: 'headings hero-headings' }, [
-      h('h1', { class: 'h1' }, settings?.slides?.heroTitle || 'Tagesüberblick'),
-      h('h2', { class: 'h2' }, computeH2Text() || '')
-    ]);
-
-    const list = h('div', { class: 'hero-timeline-list' });
-
-    if (!data.length) {
-      list.appendChild(h('div', { class: 'caption' }, 'Keine Einträge.'));
-    } else {
-      data.forEach((row, idx) => {
-        const cls = 'timeline-item' + (row.isActive ? ' is-active' : '');
-        const item = h('div', { class: cls });
-        item.style.setProperty('--hero-index', String(idx));
-        if (Number.isFinite(+row.durationRatio)) {
-          item.style.setProperty('--hero-duration-ratio', String(row.durationRatio));
-        }
-
-        const timeLabel = formatTimeLabel(row.time);
-        if (timeLabel) {
-          item.appendChild(h('div', { class: 'timeline-time' }, timeLabel));
-        }
-
-        const details = h('div', { class: 'timeline-details' });
-        row.entries.forEach(entry => {
-          const hasBadges = Array.isArray(entry.badges) && entry.badges.length > 0;
-          const classParts = ['timeline-entry'];
-          if (entry.highlight) classParts.push('highlight');
-          if (entry.imageUrl) classParts.push('has-thumb'); else classParts.push('no-thumb');
-          if (hasBadges) classParts.push('has-badges');
-          const entryNode = h('div', { class: classParts.join(' ') });
-
-          const thumb = h('div', { class: 'timeline-entry-thumb' });
-          if (entry.imageUrl) {
-            const style = 'background-image:url(' + JSON.stringify(entry.imageUrl) + ')';
-            thumb.appendChild(h('div', { class: 'timeline-entry-thumb-image', style }));
-          } else {
-            thumb.classList.add('is-empty');
-            const fallbackSrc = firstText(entry.sauna, entry.title, entry.detail).trim();
-            const fallbackChar = fallbackSrc ? fallbackSrc.charAt(0).toUpperCase() : '';
-            if (fallbackChar) {
-              thumb.appendChild(h('span', { class: 'timeline-entry-thumb-fallback' }, fallbackChar));
-            }
-          }
-          entryNode.appendChild(thumb);
-
-          const content = h('div', { class: 'timeline-entry-content' });
-          const header = h('div', { class: 'timeline-entry-header' });
-          header.appendChild(h('span', { class: 'timeline-sauna' }, entry.sauna));
-          header.appendChild(h('span', { class: 'timeline-title' }, entry.title));
-          content.appendChild(header);
-          if (entry.detail) {
-            content.appendChild(h('div', { class: 'timeline-detail' }, entry.detail));
-          }
-          if (hasBadges) {
-            const badgeRow = createBadgeRow(entry.badges, 'timeline-entry-badges');
-            if (badgeRow) content.appendChild(badgeRow);
-          }
-          entryNode.appendChild(content);
-          details.appendChild(entryNode);
-        });
-        item.appendChild(details);
-
-        const bar = h('div', { class: 'timeline-bar' }, [
-          h('div', { class: 'timeline-progress' })
-        ]);
-        item.appendChild(bar);
-
-        list.appendChild(item);
-      });
-    }
-
-    const body = h('div', { class: 'hero-body' }, [list]);
-    const container = h('div', { class: 'container hero hero-timeline fade show' }, [
-      headingWrap,
-      body,
-      h('div', { class: 'brand' }, 'Signage')
-    ]);
-
-    setResizeHandler(region, null);
-    return container;
+    return renderEventCountdown({ events: data }, region);
   }
 
 // ---------- Interstitial image slide ----------

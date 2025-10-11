@@ -1880,8 +1880,9 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   const wellness = Array.isArray(extrasRaw.wellnessTips)
     ? extrasRaw.wellnessTips.map((item, idx) => ({ kind: 'wellness-tip', item, key: item?.id != null ? String(item.id) : 'well_' + idx }))
     : [];
-  const events = Array.isArray(extrasRaw.eventCountdowns)
-    ? extrasRaw.eventCountdowns.map((item, idx) => ({ kind: 'event-countdown', item, key: item?.id != null ? String(item.id) : 'evt_' + idx }))
+  const eventItems = Array.isArray(extrasRaw.eventCountdowns) ? extrasRaw.eventCountdowns : [];
+  const events = eventItems.length
+    ? [{ kind: 'event-countdown', item: { id: 'event-countdown', entries: eventItems.slice() }, key: 'event-countdown' }]
     : [];
   const gastronomy = Array.isArray(extrasRaw.gastronomyHighlights)
     ? extrasRaw.gastronomyHighlights.map((item, idx) => ({ kind: 'gastronomy-highlight', item, key: item?.id != null ? String(item.id) : 'gas_' + idx }))
@@ -1937,6 +1938,7 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
 
 export function renderSlideOrderView(){
   const settings = ctx.getSettings();
+  const heroEnabled = !!settings?.slides?.heroEnabled;
   const host = document.getElementById('slideOrderGrid');
   if (!host) return;
 
@@ -1965,6 +1967,16 @@ export function renderSlideOrderView(){
       statusEl.className = 'slide-status';
       statusEl.dataset.state = 'hidden';
       statusEl.textContent = 'Ausgeblendet';
+    }
+    const isEventDisabled = entry.kind === 'event-countdown' && !heroEnabled;
+    if (isEventDisabled) {
+      if (!statusEl) {
+        statusEl = document.createElement('div');
+        statusEl.className = 'slide-status';
+        statusEl.dataset.state = 'hidden';
+        statusEl.textContent = 'Ausgeblendet';
+      }
+      tile.classList.add('is-disabled');
     }
     if (entry.kind === 'sauna'){
       tile.dataset.name = entry.name;
@@ -1995,15 +2007,14 @@ export function renderSlideOrderView(){
       if (statusEl) tile.appendChild(statusEl);
     } else if (entry.kind === 'event-countdown') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
-      title.textContent = entry.item?.title || 'Event';
+      title.textContent = 'Event Countdown';
       tile.appendChild(title);
       if (statusEl) tile.appendChild(statusEl);
-      if (entry.item?.target) {
-        const info = document.createElement('div');
-        info.className = 'tile-meta';
-        info.textContent = new Date(entry.item.target).toLocaleString('de-DE');
-        tile.appendChild(info);
-      }
+      const count = Array.isArray(settings?.extras?.eventCountdowns) ? settings.extras.eventCountdowns.length : 0;
+      const info = document.createElement('div');
+      info.className = 'tile-meta';
+      info.textContent = count === 1 ? '1 Event' : `${count} Events`;
+      tile.appendChild(info);
     } else if (entry.kind === 'gastronomy-highlight') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
       const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
