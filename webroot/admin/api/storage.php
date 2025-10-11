@@ -18,8 +18,8 @@ function signage_base_path(): string
         getenv('SIGNAGE_BASE_PATH') ?: null,
         $_ENV['SIGNAGE_BASE_PATH'] ?? null,
         $_SERVER['SIGNAGE_BASE_PATH'] ?? null,
-        $_SERVER['DOCUMENT_ROOT'] ?? null,
         realpath(__DIR__ . '/../../') ?: (__DIR__ . '/../../'),
+        $_SERVER['DOCUMENT_ROOT'] ?? null,
     ];
 
     foreach ($candidates as $candidate) {
@@ -30,12 +30,29 @@ function signage_base_path(): string
         if ($resolved !== false) {
             $candidate = $resolved;
         }
-        if (is_dir($candidate)) {
-            return $base = rtrim($candidate, '/');
+        if (!is_dir($candidate)) {
+            continue;
+        }
+
+        $baseDir = rtrim($candidate, '/');
+        if (is_dir($baseDir . '/data')) {
+            return $base = $baseDir;
+        }
+
+        if (substr($baseDir, -6) === '/admin') {
+            $parent = rtrim(dirname($baseDir), '/');
+            if ($parent !== '' && is_dir($parent . '/data')) {
+                return $base = $parent;
+            }
         }
     }
 
-    return $base = rtrim(__DIR__ . '/../../', '/');
+    $fallback = realpath(__DIR__ . '/../../');
+    if ($fallback === false) {
+        $fallback = __DIR__ . '/../../';
+    }
+
+    return $base = rtrim($fallback, '/');
 }
 
 function signage_data_path(string $file = ''): string
