@@ -989,7 +989,7 @@ async function loadDeviceResolved(id){
   function buildMasterQueue() {
     maybeApplyPreset();
 
-    const eventCountdownEnabled = !!(settings?.slides?.heroEnabled);
+    const eventCountdownEnabled = settings?.slides?.heroEnabled !== false;
     if (eventCountdownEnabled) collectHeroTimelineData(); else heroTimeline = [];
     const withHero = (queue) => queue.slice();
 

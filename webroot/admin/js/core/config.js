@@ -254,7 +254,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   sanitizeStyleAutomation(src);
 
   const slidesCfg = src.slides || {};
-  slidesCfg.heroEnabled = slidesCfg.heroEnabled === true;
+  slidesCfg.heroEnabled = slidesCfg.heroEnabled !== false;
   const defaultHeroFill = Number(DEFAULTS.slides?.heroTimelineFillMs) || 8000;
   const rawHeroFill = Number(slidesCfg.heroTimelineFillMs);
   slidesCfg.heroTimelineFillMs = Number.isFinite(rawHeroFill) && rawHeroFill > 0
