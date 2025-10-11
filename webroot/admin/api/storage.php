@@ -30,19 +30,29 @@ function signage_base_path(): string
         if ($resolved !== false) {
             $candidate = $resolved;
         }
-        if (is_dir($candidate)) {
-            $base = rtrim($candidate, '/');
-            if (is_dir($base . '/data') || substr($base, -6) !== '/admin') {
-                return $base;
-            }
-            $parent = rtrim(dirname($base), '/');
+        if (!is_dir($candidate)) {
+            continue;
+        }
+
+        $baseDir = rtrim($candidate, '/');
+        if (is_dir($baseDir . '/data')) {
+            return $base = $baseDir;
+        }
+
+        if (substr($baseDir, -6) === '/admin') {
+            $parent = rtrim(dirname($baseDir), '/');
             if ($parent !== '' && is_dir($parent . '/data')) {
                 return $base = $parent;
             }
         }
     }
 
-    return $base = rtrim(__DIR__ . '/../../', '/');
+    $fallback = realpath(__DIR__ . '/../../');
+    if ($fallback === false) {
+        $fallback = __DIR__ . '/../../';
+    }
+
+    return $base = rtrim($fallback, '/');
 }
 
 function signage_data_path(string $file = ''): string
