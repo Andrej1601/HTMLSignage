@@ -63,6 +63,10 @@ const DEFAULT_STYLE_SETS = {
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
+    },
+    display:{
+      layoutMode:'single',
+      layoutProfile:'landscape'
     }
   },
   fresh:{
@@ -102,6 +106,10 @@ const DEFAULT_STYLE_SETS = {
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
+    },
+    display:{
+      layoutMode:'single',
+      layoutProfile:'landscape'
     }
   },
   sunset:{
@@ -141,6 +149,10 @@ const DEFAULT_STYLE_SETS = {
       tileFlameSizeScale:1.05,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:100
+    },
+    display:{
+      layoutMode:'single',
+      layoutProfile:'landscape'
     }
   },
   midnight:{
@@ -180,6 +192,10 @@ const DEFAULT_STYLE_SETS = {
       tileFlameSizeScale:0.92,
       tileFlameGapScale:1,
       saunaTitleMaxWidthPercent:90
+    },
+    display:{
+      layoutMode:'single',
+      layoutProfile:'landscape'
     }
   },
   celebration:{
@@ -219,6 +235,10 @@ const DEFAULT_STYLE_SETS = {
       tileFlameSizeScale:1.1,
       tileFlameGapScale:1.05,
       saunaTitleMaxWidthPercent:100
+    },
+    display:{
+      layoutMode:'single',
+      layoutProfile:'landscape'
     }
   }
 };
