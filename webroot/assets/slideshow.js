@@ -16,6 +16,23 @@
   });
   const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
   const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
+  const clampNumber = (min, val, max) => Math.min(Math.max(val, min), max);
+  const HEADING_WIDTH_INPUT_MIN = 10;
+  const HEADING_WIDTH_INPUT_MAX = 100;
+  const HEADING_WIDTH_ACTUAL_MIN = 10;
+  const HEADING_WIDTH_ACTUAL_MAX = 160;
+  const HEADING_WIDTH_INPUT_SPAN = HEADING_WIDTH_INPUT_MAX - HEADING_WIDTH_INPUT_MIN;
+  const HEADING_WIDTH_ACTUAL_SPAN = HEADING_WIDTH_ACTUAL_MAX - HEADING_WIDTH_ACTUAL_MIN;
+  const HEADING_WIDTH_RATIO = HEADING_WIDTH_ACTUAL_SPAN / HEADING_WIDTH_INPUT_SPAN;
+  const resolveHeadingWidthPercent = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 100;
+    if (num > HEADING_WIDTH_INPUT_MAX) {
+      return clampNumber(HEADING_WIDTH_ACTUAL_MIN, num, HEADING_WIDTH_ACTUAL_MAX);
+    }
+    const clamped = clampNumber(HEADING_WIDTH_INPUT_MIN, num, HEADING_WIDTH_INPUT_MAX);
+    return HEADING_WIDTH_ACTUAL_MIN + (clamped - HEADING_WIDTH_INPUT_MIN) * HEADING_WIDTH_RATIO;
+  };
   if (DEVICE_ID) {
     // persist valid device IDs for subsequent loads
     ls.set('deviceId', DEVICE_ID);
@@ -649,9 +666,7 @@ async function loadDeviceResolved(id){
     const overlayOpacity = overlayEnabled ? clamp(0, 0.9 * overlayStrength, 1) : 0;
     const overlayLight = overlayEnabled ? clamp(0, 0.12 * overlayStrength, 1) : 0;
     const overlayShadow = overlayEnabled ? clamp(0, 0.42 * overlayStrength, 1) : 0;
-    const headingWidthPct = Number.isFinite(+slidesCfg.saunaTitleMaxWidthPercent)
-      ? clamp(10, +slidesCfg.saunaTitleMaxWidthPercent, 160)
-      : 100;
+    const headingWidthPct = resolveHeadingWidthPercent(slidesCfg.saunaTitleMaxWidthPercent);
 
     setVars({
       '--bg': t.bg, '--fg': t.fg, '--accent': t.accent,
@@ -2452,8 +2467,8 @@ return h('div', {}, [ t ]);
 
   function shouldUseFullHeadingWidth() {
     const raw = settings?.slides?.saunaTitleMaxWidthPercent;
-    const num = Number(raw);
-    return Number.isFinite(num) && num >= 100;
+    const actual = resolveHeadingWidthPercent(raw);
+    return actual >= 100;
   }
 
   function renderHeroTimeline(region = 'left', ctx = {}) {

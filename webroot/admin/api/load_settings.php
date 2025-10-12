@@ -32,7 +32,7 @@ echo json_encode([
     'tileFlameSizeScale'=>1,'tileFlameGapScale'=>1,
     'durationMode'=>'uniform','globalDwellSec'=>6,'loop'=>true,
     'order'=>['overview'],
-    'saunaTitleMaxWidthPercent'=>100
+    'saunaTitleMaxWidthPercent'=>64
   ],
   'assets'=>['rightImages'=>[], 'flameImage'=>'/assets/img/flame_test.svg'],
   'footnotes'=>[ ['id'=>'star','label'=>'*','text'=>'Nur am Fr und Sa'] ],

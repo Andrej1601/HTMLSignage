@@ -29,7 +29,10 @@ import {
   sanitizeBadgeLibrary,
   normalizeSettings,
   sanitizeScheduleForCompare,
-  sanitizeSettingsForCompare
+  sanitizeSettingsForCompare,
+  mapSaunaHeadingWidthToInput,
+  normalizeSaunaHeadingWidth,
+  SAUNA_HEADING_WIDTH_LIMITS
 } from './core/config.js';
 import {
   loadDeviceSnapshots,
@@ -225,23 +228,34 @@ function clearDraftsIfPresent() {
 
 function stripBadgeDraftArtifacts(source) {
   if (!source || typeof source !== 'object') return;
-  const removeBadgeData = (target) => {
+  const fallbackHeading = DEFAULTS.slides?.saunaTitleMaxWidthPercent ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+  const sanitizeSlidesDraft = (target) => {
     if (!target || typeof target !== 'object') return;
     if (Object.prototype.hasOwnProperty.call(target, 'badgeLibrary')) {
-      delete target.badgeLibrary;
+      target.badgeLibrary = sanitizeBadgeLibrary(target.badgeLibrary, { assignMissingIds: true });
     }
     if (Object.prototype.hasOwnProperty.call(target, 'customBadgeEmojis')) {
-      delete target.customBadgeEmojis;
+      const list = Array.isArray(target.customBadgeEmojis)
+        ? target.customBadgeEmojis.map((entry) => (typeof entry === 'string' ? entry.trim() : '')).filter(Boolean)
+        : [];
+      if (list.length) target.customBadgeEmojis = list;
+      else delete target.customBadgeEmojis;
+    }
+    if (Object.prototype.hasOwnProperty.call(target, 'saunaTitleMaxWidthPercent')) {
+      target.saunaTitleMaxWidthPercent = normalizeSaunaHeadingWidth(
+        target.saunaTitleMaxWidthPercent,
+        { fallback: fallbackHeading }
+      );
     }
   };
 
   if (source.slides && typeof source.slides === 'object') {
-    removeBadgeData(source.slides);
+    sanitizeSlidesDraft(source.slides);
     const sets = source.slides.styleSets;
     if (sets && typeof sets === 'object') {
       Object.values(sets).forEach((entry) => {
         if (!entry || typeof entry !== 'object') return;
-        removeBadgeData(entry.slides);
+        sanitizeSlidesDraft(entry.slides);
       });
     }
   }
@@ -2059,7 +2073,11 @@ function renderSlidesBox(){
   setV('#tilePct',       settings.slides?.tileWidthPercent ?? 45);
   setV('#tileMin',       settings.slides?.tileMinScale ?? 0.25);
   setV('#tileMax',       settings.slides?.tileMaxScale ?? 0.57);
-  setV('#saunaHeadingWidth', settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100);
+  const headingStored = settings.slides?.saunaTitleMaxWidthPercent
+    ?? DEFAULTS.slides.saunaTitleMaxWidthPercent
+    ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+  const headingInputValue = mapSaunaHeadingWidthToInput(headingStored);
+  setV('#saunaHeadingWidth', Math.round(headingInputValue * 10) / 10);
   setV('#tileHeightScale', settings.slides?.tileHeightScale ?? DEFAULTS.slides.tileHeightScale ?? 1);
   setV('#tilePaddingScale', settings.slides?.tilePaddingScale ?? DEFAULTS.slides.tilePaddingScale ?? 0.75);
   setV('#badgeScale', settings.slides?.badgeScale ?? DEFAULTS.slides.badgeScale ?? 1);
@@ -2155,7 +2173,7 @@ function renderSlidesBox(){
     setV('#tileMax',       DEFAULTS.slides.tileMaxScale);
     setV('#tileFlameSizeScale', DEFAULTS.slides.tileFlameSizeScale);
     setV('#tileFlameGapScale', DEFAULTS.slides.tileFlameGapScale);
-    setV('#saunaHeadingWidth', DEFAULTS.slides.saunaTitleMaxWidthPercent);
+    setV('#saunaHeadingWidth', Math.round(mapSaunaHeadingWidthToInput(DEFAULTS.slides.saunaTitleMaxWidthPercent) * 10) / 10);
     setV('#tileHeightScale', DEFAULTS.slides.tileHeightScale);
     setV('#tilePaddingScale', DEFAULTS.slides.tilePaddingScale);
     setV('#badgeScale',    DEFAULTS.slides.badgeScale);
@@ -2523,9 +2541,11 @@ function collectSettings(){
         })(),
         appendTimeSuffix: !!document.getElementById('timeSuffixToggle')?.checked,
         saunaTitleMaxWidthPercent:(() => {
-          const raw = Number($('#saunaHeadingWidth')?.value);
-          if (!Number.isFinite(raw)) return settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100;
-          return clamp(10, raw, 160);
+          const el = $('#saunaHeadingWidth');
+          const fallback = settings.slides?.saunaTitleMaxWidthPercent
+            ?? DEFAULTS.slides.saunaTitleMaxWidthPercent
+            ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+          return normalizeSaunaHeadingWidth(el?.value, { fallback });
         })(),
         badgeScale:(() => {
           const raw = Number($('#badgeScale')?.value);

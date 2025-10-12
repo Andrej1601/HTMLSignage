@@ -8,6 +8,63 @@ import { deepClone, genId } from './utils.js';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
+const HEADING_WIDTH_INPUT_MIN = 10;
+const HEADING_WIDTH_INPUT_MAX = 100;
+const HEADING_WIDTH_ACTUAL_MIN = 10;
+const HEADING_WIDTH_ACTUAL_MAX = 160;
+const HEADING_WIDTH_INPUT_SPAN = HEADING_WIDTH_INPUT_MAX - HEADING_WIDTH_INPUT_MIN;
+const HEADING_WIDTH_ACTUAL_SPAN = HEADING_WIDTH_ACTUAL_MAX - HEADING_WIDTH_ACTUAL_MIN;
+const HEADING_WIDTH_RATIO = HEADING_WIDTH_ACTUAL_SPAN / HEADING_WIDTH_INPUT_SPAN;
+const HEADING_WIDTH_INV_RATIO = HEADING_WIDTH_INPUT_SPAN / HEADING_WIDTH_ACTUAL_SPAN;
+
+export const SAUNA_HEADING_WIDTH_LIMITS = Object.freeze({
+  inputMin: HEADING_WIDTH_INPUT_MIN,
+  inputMax: HEADING_WIDTH_INPUT_MAX,
+  actualMin: HEADING_WIDTH_ACTUAL_MIN,
+  actualMax: HEADING_WIDTH_ACTUAL_MAX
+});
+
+export function mapSaunaHeadingWidthToActual(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return HEADING_WIDTH_ACTUAL_MAX;
+  }
+  if (num > HEADING_WIDTH_INPUT_MAX) {
+    return clamp(HEADING_WIDTH_ACTUAL_MIN, num, HEADING_WIDTH_ACTUAL_MAX);
+  }
+  const clamped = clamp(HEADING_WIDTH_INPUT_MIN, num, HEADING_WIDTH_INPUT_MAX);
+  return HEADING_WIDTH_ACTUAL_MIN + (clamped - HEADING_WIDTH_INPUT_MIN) * HEADING_WIDTH_RATIO;
+}
+
+export function mapSaunaHeadingWidthToInput(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return HEADING_WIDTH_INPUT_MAX;
+  }
+  if (num > HEADING_WIDTH_INPUT_MAX) {
+    const clampedActual = clamp(HEADING_WIDTH_ACTUAL_MIN, num, HEADING_WIDTH_ACTUAL_MAX);
+    return HEADING_WIDTH_INPUT_MIN + (clampedActual - HEADING_WIDTH_ACTUAL_MIN) * HEADING_WIDTH_INV_RATIO;
+  }
+  return clamp(HEADING_WIDTH_INPUT_MIN, num, HEADING_WIDTH_INPUT_MAX);
+}
+
+export function normalizeSaunaHeadingWidth(value, { fallback } = {}) {
+  const num = Number(value);
+  if (Number.isFinite(num)) {
+    if (num > HEADING_WIDTH_INPUT_MAX) {
+      return mapSaunaHeadingWidthToInput(num);
+    }
+    return clamp(HEADING_WIDTH_INPUT_MIN, num, HEADING_WIDTH_INPUT_MAX);
+  }
+  if (fallback != null) {
+    const fallbackNum = Number(fallback);
+    if (Number.isFinite(fallbackNum)) {
+      return normalizeSaunaHeadingWidth(fallbackNum);
+    }
+  }
+  return HEADING_WIDTH_INPUT_MAX;
+}
+
 const STYLE_THEME_KEYS = [
   'bg','fg','accent','gridBorder','gridTable','gridTableW','cellBg','boxFg','headRowBg','headRowFg',
   'timeColBg','timeZebra1','timeZebra2','zebra1','zebra2','cornerBg','cornerFg','tileBorder','tileBorderW',
@@ -230,6 +287,21 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);
   src.slides.styleSets = styleSetState.sets;
   src.slides.activeStyleSet = styleSetState.active;
+  const headingFallback = DEFAULTS.slides?.saunaTitleMaxWidthPercent ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+  src.slides.saunaTitleMaxWidthPercent = normalizeSaunaHeadingWidth(src.slides.saunaTitleMaxWidthPercent, {
+    fallback: headingFallback
+  });
+  const styleSets = src.slides.styleSets;
+  if (styleSets && typeof styleSets === 'object') {
+    Object.values(styleSets).forEach((entry) => {
+      if (!entry || typeof entry !== 'object') return;
+      if (!entry.slides || typeof entry.slides !== 'object') return;
+      entry.slides.saunaTitleMaxWidthPercent = normalizeSaunaHeadingWidth(
+        entry.slides.saunaTitleMaxWidthPercent,
+        { fallback: src.slides.saunaTitleMaxWidthPercent }
+      );
+    });
+  }
   src.interstitials = Array.isArray(src.interstitials)
     ? src.interstitials.map((it) => {
         const next = {
