@@ -409,6 +409,7 @@ function setActiveDay(key, { loadPreset = true } = {}){
 
   // Optional: Preset in den aktuellen Schedule laden
   const settings = ctx.getSettings();
+  const hadUnsaved = typeof ctx?.hasUnsavedChanges === 'function' ? !!ctx.hasUnsavedChanges() : false;
   if (loadPreset && key !== 'Opt' && settings?.presets?.[key]) {
     const cloned = JSON.parse(JSON.stringify(settings.presets[key]));
     ctx.setSchedule(cloned);
@@ -419,6 +420,10 @@ function setActiveDay(key, { loadPreset = true } = {}){
     ctx.setSchedule(empty);
     renderGridUI();
     renderSlidesMaster();
+  }
+  ctx.queueUnsavedEvaluation?.({});
+  if (!hadUnsaved) {
+    ctx.resetUnsavedBaseline?.({ skipDraftClear: true });
   }
 }
 

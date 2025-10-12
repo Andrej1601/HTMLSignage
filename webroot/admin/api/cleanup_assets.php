@@ -2,12 +2,25 @@
 require_once __DIR__ . '/storage.php';
 
 header('Content-Type: application/json; charset=UTF-8');
-$assetsDir = signage_assets_path('media');
+$imgDir = signage_assets_path('img');
+$mediaDir = signage_assets_path('media');
 $settingsFile = signage_data_path('settings.json');
+$scheduleFile = signage_data_path('schedule.json');
 
-if (!is_dir($assetsDir)) { echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit; }
+if (!is_dir($imgDir) && !@mkdir($imgDir, 02775, true) && !is_dir($imgDir)) {
+  echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit;
+}
+if (!is_dir($mediaDir) && !@mkdir($mediaDir, 02775, true) && !is_dir($mediaDir)) {
+  echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit;
+}
+
 $cfg = is_file($settingsFile) ? json_decode(file_get_contents($settingsFile), true) : [];
+$schedule = is_file($scheduleFile) ? json_decode(file_get_contents($scheduleFile), true) : [];
 $keep = [];
+
+$removeSauna = isset($_GET['sauna']) && $_GET['sauna'] === '1';
+$removeInter = isset($_GET['inter']) && $_GET['inter'] === '1';
+$removeFlame = isset($_GET['flame']) && $_GET['flame'] === '1';
 
 function stripCacheSimple($url){
   if (!is_string($url)) return '';
@@ -47,35 +60,30 @@ function collectAssetStrings($value, &$list){
   pushAssetPath($list, $value);
 }
 
-if (!empty($cfg['assets']['flameImage'])) pushAssetPath($keep, $cfg['assets']['flameImage']);
-if (!empty($cfg['assets']['rightImages']) && is_array($cfg['assets']['rightImages'])) {
+$settingsScan = $cfg;
+if ($removeSauna && isset($settingsScan['assets']['rightImages'])) {
+  unset($settingsScan['assets']['rightImages']);
+}
+if ($removeFlame && isset($settingsScan['assets']['flameImage'])) {
+  unset($settingsScan['assets']['flameImage']);
+}
+if ($removeInter && isset($settingsScan['interstitials'])) {
+  unset($settingsScan['interstitials']);
+}
+
+collectAssetStrings($settingsScan, $keep);
+collectAssetStrings($schedule, $keep);
+
+if (!$removeFlame && !empty($cfg['assets']['flameImage'])) pushAssetPath($keep, $cfg['assets']['flameImage']);
+if (!$removeSauna && !empty($cfg['assets']['rightImages']) && is_array($cfg['assets']['rightImages'])) {
   foreach($cfg['assets']['rightImages'] as $p){ if($p) pushAssetPath($keep, $p); }
 }
-if (!empty($cfg['interstitials']) && is_array($cfg['interstitials'])) {
+if (!$removeInter && !empty($cfg['interstitials']) && is_array($cfg['interstitials'])) {
   foreach($cfg['interstitials'] as $it){
     if (!is_array($it)) continue;
     foreach(['url','thumb'] as $k){
       $p = $it[$k] ?? '';
       pushAssetPath($keep, $p);
-    }
-  }
-}
-
-if (!empty($cfg['slides']) && is_array($cfg['slides'])) {
-  $slides = $cfg['slides'];
-  if (!empty($slides['badgeLibrary']) && is_array($slides['badgeLibrary'])) {
-    collectAssetStrings($slides['badgeLibrary'], $keep);
-  }
-  if (!empty($slides['storySlides']) && is_array($slides['storySlides'])) {
-    foreach ($slides['storySlides'] as $story){
-      if (!is_array($story)) continue;
-      collectAssetStrings($story, $keep);
-    }
-  }
-  if (!empty($slides['styleSets']) && is_array($slides['styleSets'])) {
-    foreach ($slides['styleSets'] as $styleSet){
-      if (!is_array($styleSet)) continue;
-      collectAssetStrings($styleSet, $keep);
     }
   }
 }
@@ -92,16 +100,19 @@ $keepReal = array_map(function($p){ return signage_absolute_path($p); }, array_k
 $basePath = signage_base_path();
 
 $removed = [];
-$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($assetsDir, FilesystemIterator::SKIP_DOTS));
-foreach ($it as $f){
-  if(!$f->isFile()) continue;
-  $full = $f->getPathname();
-  if (!in_array($full, $keepReal, true)){
-    @unlink($full);
-    if(!file_exists($full)) {
-      $removed[] = str_starts_with($full, $basePath)
-        ? substr($full, strlen($basePath))
-        : $full;
+$directories = array_filter([$imgDir, $mediaDir], 'is_dir');
+foreach ($directories as $dir) {
+  $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+  foreach ($it as $f){
+    if(!$f->isFile()) continue;
+    $full = $f->getPathname();
+    if (!in_array($full, $keepReal, true)){
+      @unlink($full);
+      if(!file_exists($full)) {
+        $removed[] = str_starts_with($full, $basePath)
+          ? substr($full, strlen($basePath))
+          : $full;
+      }
     }
   }
 }

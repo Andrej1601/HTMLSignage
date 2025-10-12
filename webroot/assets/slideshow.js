@@ -1635,9 +1635,26 @@ async function loadDeviceResolved(id){
       frame = raf(step);
     };
 
-    const begin = () => {
+    let retryTimer = 0;
+    let retries = 0;
+    const maxRetries = 10;
+    const scheduleRetry = () => {
       if (destroyed) return;
-      if (!ensureScrollable()) return;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (retries >= maxRetries) return;
+      retries += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = 0;
+        begin(true);
+      }, 420);
+    };
+
+    const begin = (fromRetry = false) => {
+      if (destroyed) return;
+      if (!ensureScrollable()) {
+        if (!fromRetry) scheduleRetry();
+        return;
+      }
       const initialDelay = loopMode ? Math.min(800, pauseInterval) : pauseInterval;
       schedule(initialDelay);
     };
@@ -1650,6 +1667,8 @@ async function loadDeviceResolved(id){
         schedule();
       }
     };
+    const globalWin = typeof window === 'object' ? window : null;
+
     if (typeof ResizeObserver === 'function') {
       resizeObserver = new ResizeObserver(() => {
         if (destroyed) return;
@@ -1660,9 +1679,16 @@ async function loadDeviceResolved(id){
         resizeFrame = raf(flushResize);
       });
       resizeObserver.observe(container);
+    } else if (globalWin && typeof globalWin.addEventListener === 'function') {
+      globalWin.addEventListener('resize', flushResize);
     }
 
     setTimeout(begin, 400);
+
+    if (!loopMode) {
+      // ensure at least one retry in case contents resize after load
+      scheduleRetry();
+    }
 
     return () => {
       destroyed = true;
@@ -1672,6 +1698,10 @@ async function loadDeviceResolved(id){
         resizeFrame = 0;
       }
       if (resizeObserver) resizeObserver.disconnect();
+      if (retryTimer) clearTimeout(retryTimer);
+      if (globalWin && typeof globalWin.removeEventListener === 'function') {
+        globalWin.removeEventListener('resize', flushResize);
+      }
       container.classList.remove('is-scrollable');
     };
   }

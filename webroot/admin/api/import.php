@@ -49,8 +49,23 @@ $hasSettings = array_key_exists('settings', $j);
 $hasSchedule = array_key_exists('schedule', $j);
 if (!$hasSettings && !$hasSchedule) fail('missing-sections');
 
-$assetsDir = signage_assets_path('img');
-@mkdir($assetsDir, 02775, true);
+@mkdir(signage_assets_path('img'), 02775, true);
+@mkdir(signage_assets_path('media'), 02775, true);
+
+function normalize_asset_rel($rel) {
+  if (!is_string($rel) || $rel === '') return null;
+  $normalized = '/' . ltrim(trim($rel), '/');
+  if (!str_starts_with($normalized, '/assets/')) return null;
+  return $normalized;
+}
+
+function ensure_asset_directory(string $relDir): ?string {
+  $absolute = signage_absolute_path($relDir);
+  if (!is_dir($absolute) && !@mkdir($absolute, 02775, true) && !is_dir($absolute)) {
+    return null;
+  }
+  return $absolute;
+}
 
 $pathMap = []; // original rel path => new rel path
 if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
@@ -59,15 +74,34 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
     $mime = $info['mime'] ?? 'application/octet-stream';
     $b64  = $info['b64'] ?? '';
     if (!$b64) continue;
-    $ext = match($mime){
+    $originalRel = normalize_asset_rel(is_string($rel) ? $rel : ($info['rel'] ?? ''));
+    $baseName = pathinfo($originalRel ?: ($info['name'] ?? ''), PATHINFO_FILENAME);
+    if (!is_string($baseName) || $baseName === '') {
+      $baseName = 'import';
+    }
+    $safeBase = preg_replace('/[^A-Za-z0-9._-]+/', '_', $baseName) ?: 'import';
+    $extFromRel = strtolower(pathinfo($originalRel ?? '', PATHINFO_EXTENSION));
+    $ext = $extFromRel ?: match($mime){
       'image/png' => 'png',
       'image/jpeg'=> 'jpg',
       'image/webp'=> 'webp',
       'image/svg+xml'=>'svg',
-      default => 'bin'
+      'image/gif' => 'gif',
+      'video/mp4' => 'mp4',
+      'video/webm'=> 'webm',
+      'video/ogg' => 'ogv',
+      'audio/mpeg'=> 'mp3',
+      'audio/ogg' => 'ogg',
+      default => ($extFromRel ?: 'bin')
     };
-    $name = pathinfo($info['name'] ?? basename($rel), PATHINFO_FILENAME);
-    $outRel = '/assets/img/import_'.date('Ymd_His').'_'.($i++).'.'.$ext;
+    $relDir = $originalRel ? dirname($originalRel) : '/assets/img';
+    if ($relDir === '/assets') {
+      $relDir = '/assets/img';
+    }
+    $absDir = ensure_asset_directory($relDir);
+    if ($absDir === null) continue;
+    $stamp = date('Ymd_His');
+    $outRel = rtrim($relDir, '/') . '/' . $safeBase . '_' . $stamp . '_' . ($i++) . '.' . $ext;
     $outAbs = signage_absolute_path($outRel);
     error_clear_last();
     $res = file_put_contents($outAbs, base64_decode($b64));
@@ -78,6 +112,9 @@ if ($writeAssets && !empty($j['blobs']) && is_array($j['blobs'])) {
     }
     @chmod($outAbs, 0644);
     $pathMap[$rel] = $outRel;
+    if ($originalRel && $originalRel !== $rel) {
+      $pathMap[$originalRel] = $outRel;
+    }
   }
 
   if (!empty($pathMap)) {
