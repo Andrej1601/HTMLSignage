@@ -41,6 +41,10 @@ const STYLE_SLIDE_KEYS = [
   'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
 ];
 
+const STYLE_DISPLAY_KEYS = [
+  'layoutMode','layoutProfile'
+];
+
 const SUGGESTED_BADGE_EMOJIS = [
   { value:'🌿', label:'Kräuter & Natur' },
   { value:'🔥', label:'Feuer & Hitze' },
@@ -110,7 +114,8 @@ function sanitizeStyleSetEntry(entry = {}){
     label: label || null,
     theme: cloneSubset(entry.theme, STYLE_THEME_KEYS),
     fonts: cloneSubset(entry.fonts, STYLE_FONT_KEYS),
-    slides: cloneSubset(entry.slides, STYLE_SLIDE_KEYS)
+    slides: cloneSubset(entry.slides, STYLE_SLIDE_KEYS),
+    display: cloneSubset(entry.display, STYLE_DISPLAY_KEYS)
   };
   if (!clean.label) clean.label = null;
   return clean;
@@ -133,7 +138,8 @@ function ensureStyleSets(settings){
       label: entry.label || slug,
       theme: entry.theme,
       fonts: entry.fonts,
-      slides: entry.slides
+      slides: entry.slides,
+      display: entry.display
     };
   });
 
@@ -354,7 +360,8 @@ function snapshotStyleSet(settings){
   return {
     theme: cloneSubset(settings.theme, STYLE_THEME_KEYS),
     fonts: cloneSubset(settings.fonts, STYLE_FONT_KEYS),
-    slides: cloneSubset(settings.slides, STYLE_SLIDE_KEYS)
+    slides: cloneSubset(settings.slides, STYLE_SLIDE_KEYS),
+    display: cloneSubset(settings.display, STYLE_DISPLAY_KEYS)
   };
 }
 
@@ -382,6 +389,9 @@ function applyStyleSet(settings, id){
   }
   if (entry.slides && typeof entry.slides === 'object'){
     settings.slides = { ...(settings.slides || {}), ...cloneSubset(entry.slides, STYLE_SLIDE_KEYS) };
+  }
+  if (entry.display && typeof entry.display === 'object'){
+    settings.display = { ...(settings.display || {}), ...cloneSubset(entry.display, STYLE_DISPLAY_KEYS) };
   }
   settings.slides.activeStyleSet = id;
   return true;
@@ -2680,10 +2690,11 @@ export function renderSlidesMaster(){
   };
 
   if (!hasStyleSet(selectedStyleSetId)){
-    selectedStyleSetId = fallbackStyleSetId();
+    const fallbackId = fallbackStyleSetId();
+    selectedStyleSetId = fallbackId || '';
   }
 
-  const getSelectedStyleSetId = () => {
+  const getSelectedStyleSetId = ({ allowFallback = true } = {}) => {
     if (styleSelect){
       const domValue = styleSelect.value;
       if (hasStyleSet(domValue)) {
@@ -2692,8 +2703,22 @@ export function renderSlidesMaster(){
       }
     }
     if (hasStyleSet(selectedStyleSetId)) return selectedStyleSetId;
-    selectedStyleSetId = fallbackStyleSetId();
-    return selectedStyleSetId;
+    if (!allowFallback) return '';
+    const fallbackId = fallbackStyleSetId();
+    if (fallbackId){
+      selectedStyleSetId = fallbackId;
+      if (styleSelect) styleSelect.value = fallbackId;
+    }
+    return fallbackId;
+  };
+
+  const requireSelectedStyleSet = () => {
+    const id = getSelectedStyleSetId({ allowFallback: false });
+    if (!id){
+      alert('Bitte zuerst eine Style-Palette auswählen.');
+      return null;
+    }
+    return id;
   };
 
   if (styleSelect){
@@ -2710,7 +2735,7 @@ export function renderSlidesMaster(){
     } else {
       const fallbackId = fallbackStyleSetId();
       styleSelect.value = fallbackId;
-      selectedStyleSetId = fallbackId;
+      selectedStyleSetId = fallbackId || '';
     }
     styleSelect.disabled = setIds.length === 0;
   }
@@ -2734,15 +2759,23 @@ export function renderSlidesMaster(){
 
   if (styleSelect){
     styleSelect.onchange = () => {
-      const newId = getSelectedStyleSetId();
-      selectedStyleSetId = newId;
+      const newId = getSelectedStyleSetId({ allowFallback: false });
+      if (!newId){
+        const fallbackId = fallbackStyleSetId();
+        if (fallbackId){
+          selectedStyleSetId = fallbackId;
+          styleSelect.value = fallbackId;
+        }
+      } else {
+        selectedStyleSetId = newId;
+      }
       updateLabelField();
     };
   }
 
   if (labelField){
     labelField.oninput = () => {
-      const currentId = getSelectedStyleSetId();
+      const currentId = getSelectedStyleSetId({ allowFallback: false });
       selectedStyleSetId = currentId;
       if (!currentId || !styleSets[currentId]) return;
       styleSets[currentId].label = labelField.value.trim() || currentId;
@@ -2761,7 +2794,7 @@ export function renderSlidesMaster(){
 
   if (applyBtn){
     applyBtn.onclick = () => {
-      const currentId = getSelectedStyleSetId();
+      const currentId = requireSelectedStyleSet();
       if (!currentId) return;
       if (!applyStyleSet(settings, currentId)) return;
       selectedStyleSetId = currentId;
@@ -2776,7 +2809,7 @@ export function renderSlidesMaster(){
 
   if (saveBtn){
     saveBtn.onclick = () => {
-      const currentId = getSelectedStyleSetId();
+      const currentId = requireSelectedStyleSet();
       if (!currentId || !styleSets[currentId]) return;
       const label = styleSets[currentId].label || currentId;
       if (!confirm(`Palette "${label}" überschreiben?`)) return;
@@ -2785,7 +2818,8 @@ export function renderSlidesMaster(){
         label: styleSets[currentId].label || currentId,
         theme: snap.theme,
         fonts: snap.fonts,
-        slides: snap.slides
+        slides: snap.slides,
+        display: snap.display
       };
       selectedStyleSetId = currentId;
       window.__queueUnsaved?.();
@@ -2807,7 +2841,8 @@ export function renderSlidesMaster(){
         label: trimmed,
         theme: snap.theme,
         fonts: snap.fonts,
-        slides: snap.slides
+        slides: snap.slides,
+        display: snap.display
       };
       settings.slides.activeStyleSet = newId;
       selectedStyleSetId = newId;
@@ -2820,7 +2855,7 @@ export function renderSlidesMaster(){
 
   if (deleteBtn){
     deleteBtn.onclick = () => {
-      const currentId = getSelectedStyleSetId();
+      const currentId = requireSelectedStyleSet();
       if (!currentId || !styleSets[currentId]) return;
       if (Object.keys(styleSets).length <= 1){
         alert('Mindestens eine Palette muss vorhanden sein.');
