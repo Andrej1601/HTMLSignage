@@ -2496,6 +2496,8 @@ function collectSettings(){
       },
       slides:{
         ...(settings.slides||{}),
+        styleSets: deepClone(settings.slides?.styleSets || {}),
+        styleAutomation: deepClone(settings.slides?.styleAutomation || {}),
         tileWidthPercent:+($('#tilePct')?.value || 45),
         tileMinScale:+($('#tileMin')?.value || 0.25),
         tileMaxScale:+($('#tileMax')?.value || 0.57),
