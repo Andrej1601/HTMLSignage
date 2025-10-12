@@ -250,6 +250,8 @@ export const DEFAULTS = {
     heroTimelineBaseMinutes:15,
     heroTimelineMaxEntries:null,
     heroTimelineWaitForScroll:false,
+    heroTimelineScrollSpeed:28,
+    heroTimelineScrollPauseMs:4000,
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic',
@@ -299,7 +301,7 @@ export const DEFAULTS = {
       { id:'wellness_cooldown', icon:'❄️', title:'Abkühlen', text:'Zwischen den Gängen an die frische Luft gehen und kalt abduschen.', dwellSec: null }
     ],
     eventCountdowns:[
-      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', image:'', imageThumb:'', dwellSec: null }
+      { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', image:'', imageThumb:'' }
     ],
     gastronomyHighlights:[
       { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.', dwellSec: null }

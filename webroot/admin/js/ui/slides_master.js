@@ -2310,6 +2310,48 @@ export function renderSlidesMaster(){
     };
   }
 
+  const heroScrollSpeedEl = $('#heroTimelineScrollSpeed');
+  if (heroScrollSpeedEl){
+    const fallback = Math.max(4, Math.round(DEFAULTS.slides?.heroTimelineScrollSpeed ?? 28));
+    const raw = settings.slides?.heroTimelineScrollSpeed;
+    const init = Number.isFinite(+raw) && +raw > 0 ? Math.max(4, Math.round(+raw)) : fallback;
+    heroScrollSpeedEl.value = String(init);
+    heroScrollSpeedEl.onchange = () => {
+      const num = Number(heroScrollSpeedEl.value);
+      if (!Number.isFinite(num) || num <= 0){
+        (settings.slides ||= {}).heroTimelineScrollSpeed = fallback;
+        heroScrollSpeedEl.value = String(fallback);
+        return;
+      }
+      const speed = Math.max(4, Math.round(num));
+      (settings.slides ||= {}).heroTimelineScrollSpeed = speed;
+      heroScrollSpeedEl.value = String(speed);
+    };
+  }
+
+  const heroScrollPauseEl = $('#heroTimelineScrollPause');
+  if (heroScrollPauseEl){
+    const defaultMs = Math.max(0, Math.round(DEFAULTS.slides?.heroTimelineScrollPauseMs ?? 4000));
+    const raw = settings.slides?.heroTimelineScrollPauseMs;
+    const initMs = Number.isFinite(+raw) && +raw >= 0
+      ? Math.max(0, Math.round(+raw < 1000 ? +raw * 1000 : +raw))
+      : defaultMs;
+    const toDisplay = (ms) => String(Math.round((Math.max(0, ms) / 1000) * 10) / 10);
+    heroScrollPauseEl.value = toDisplay(initMs);
+    heroScrollPauseEl.onchange = () => {
+      const num = Number(heroScrollPauseEl.value);
+      if (!Number.isFinite(num) || num < 0){
+        (settings.slides ||= {}).heroTimelineScrollPauseMs = defaultMs;
+        heroScrollPauseEl.value = toDisplay(defaultMs);
+        return;
+      }
+      const seconds = Math.max(0, num);
+      const ms = Math.round(seconds * 1000);
+      (settings.slides ||= {}).heroTimelineScrollPauseMs = ms;
+      heroScrollPauseEl.value = toDisplay(ms);
+    };
+  }
+
   const heroWaitEl = $('#heroTimelineWaitForScroll');
   if (heroWaitEl){
     heroWaitEl.checked = !!settings.slides?.heroTimelineWaitForScroll;
