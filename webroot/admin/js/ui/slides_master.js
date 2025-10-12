@@ -365,6 +365,29 @@ function snapshotStyleSet(settings){
   };
 }
 
+export function syncActiveStyleSetSnapshot(settings, {
+  includeTheme = true,
+  includeFonts = true,
+  includeSlides = true,
+  includeDisplay = true
+} = {}){
+  if (!settings || typeof settings !== 'object') return false;
+  const sectionsEnabled = includeTheme || includeFonts || includeSlides || includeDisplay;
+  if (!sectionsEnabled) return false;
+  settings.slides ||= {};
+  const sets = ensureStyleSets(settings);
+  const activeId = settings.slides.activeStyleSet;
+  if (!activeId || !Object.prototype.hasOwnProperty.call(sets, activeId)) return false;
+  const entry = sets[activeId];
+  if (!entry || typeof entry !== 'object') return false;
+  const snap = snapshotStyleSet(settings);
+  if (includeTheme) entry.theme = snap.theme;
+  if (includeFonts) entry.fonts = snap.fonts;
+  if (includeSlides) entry.slides = snap.slides;
+  if (includeDisplay) entry.display = snap.display;
+  return true;
+}
+
 function slugifyStyleSet(label, existingIds = []){
   const base = (label || 'palette').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'palette';
   const set = new Set(existingIds);
@@ -2794,6 +2817,8 @@ export function renderSlidesMaster(){
 
   if (applyBtn){
     applyBtn.onclick = () => {
+      try { syncActiveStyleSetSnapshot(settings); }
+      catch (err) { console.warn('[admin] Style palette sync failed before switching', err); }
       const currentId = requireSelectedStyleSet();
       if (!currentId) return;
       if (!applyStyleSet(settings, currentId)) return;
