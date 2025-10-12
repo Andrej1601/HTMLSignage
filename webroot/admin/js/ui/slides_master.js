@@ -2686,7 +2686,10 @@ export function renderSlidesMaster(){
   const getSelectedStyleSetId = () => {
     if (styleSelect){
       const domValue = styleSelect.value;
-      if (hasStyleSet(domValue)) return domValue;
+      if (hasStyleSet(domValue)) {
+        selectedStyleSetId = domValue;
+        return domValue;
+      }
     }
     if (hasStyleSet(selectedStyleSetId)) return selectedStyleSetId;
     selectedStyleSetId = fallbackStyleSetId();
@@ -2702,6 +2705,13 @@ export function renderSlidesMaster(){
       opt.selected = (id === selectedStyleSetId);
       styleSelect.appendChild(opt);
     });
+    if (hasStyleSet(selectedStyleSetId)) {
+      styleSelect.value = selectedStyleSetId;
+    } else {
+      const fallbackId = fallbackStyleSetId();
+      styleSelect.value = fallbackId;
+      selectedStyleSetId = fallbackId;
+    }
     styleSelect.disabled = setIds.length === 0;
   }
 
@@ -2709,6 +2719,9 @@ export function renderSlidesMaster(){
     if (!labelField) return;
     const currentId = getSelectedStyleSetId();
     selectedStyleSetId = currentId;
+    if (styleSelect && hasStyleSet(currentId)) {
+      styleSelect.value = currentId;
+    }
     if (currentId && styleSets[currentId]){
       labelField.disabled = false;
       labelField.value = styleSets[currentId].label || currentId;
