@@ -21,6 +21,7 @@ import { DEFAULTS } from '../core/defaults.js';
 // App-Context (Getter/Setter aus app.js)
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
+let selectedStyleSetId = null;
 
 const COMPONENT_KEYS = ['title','description','badges'];
 
@@ -2669,9 +2670,28 @@ export function renderSlidesMaster(){
   const createBtn = $('#styleSetCreate');
   const deleteBtn = $('#styleSetDelete');
   const setIds = Object.keys(styleSets);
-  const activeSetId = settings.slides?.activeStyleSet && setIds.includes(settings.slides.activeStyleSet)
-    ? settings.slides.activeStyleSet
-    : (setIds[0] || '');
+
+  const hasStyleSet = (id) => !!(id && Object.prototype.hasOwnProperty.call(styleSets, id));
+  const fallbackStyleSetId = () => {
+    const currentActive = settings.slides?.activeStyleSet;
+    if (hasStyleSet(currentActive)) return currentActive;
+    const ids = Object.keys(styleSets);
+    return ids[0] || '';
+  };
+
+  if (!hasStyleSet(selectedStyleSetId)){
+    selectedStyleSetId = fallbackStyleSetId();
+  }
+
+  const getSelectedStyleSetId = () => {
+    if (styleSelect){
+      const domValue = styleSelect.value;
+      if (hasStyleSet(domValue)) return domValue;
+    }
+    if (hasStyleSet(selectedStyleSetId)) return selectedStyleSetId;
+    selectedStyleSetId = fallbackStyleSetId();
+    return selectedStyleSetId;
+  };
 
   if (styleSelect){
     styleSelect.innerHTML = '';
@@ -2679,7 +2699,7 @@ export function renderSlidesMaster(){
       const opt = document.createElement('option');
       opt.value = id;
       opt.textContent = styleSets[id]?.label || id;
-      opt.selected = (id === activeSetId);
+      opt.selected = (id === selectedStyleSetId);
       styleSelect.appendChild(opt);
     });
     styleSelect.disabled = setIds.length === 0;
@@ -2687,7 +2707,8 @@ export function renderSlidesMaster(){
 
   const updateLabelField = () => {
     if (!labelField) return;
-    const currentId = styleSelect?.value || activeSetId;
+    const currentId = getSelectedStyleSetId();
+    selectedStyleSetId = currentId;
     if (currentId && styleSets[currentId]){
       labelField.disabled = false;
       labelField.value = styleSets[currentId].label || currentId;
@@ -2700,13 +2721,16 @@ export function renderSlidesMaster(){
 
   if (styleSelect){
     styleSelect.onchange = () => {
+      const newId = getSelectedStyleSetId();
+      selectedStyleSetId = newId;
       updateLabelField();
     };
   }
 
   if (labelField){
     labelField.oninput = () => {
-      const currentId = styleSelect?.value || activeSetId;
+      const currentId = getSelectedStyleSetId();
+      selectedStyleSetId = currentId;
       if (!currentId || !styleSets[currentId]) return;
       styleSets[currentId].label = labelField.value.trim() || currentId;
       if (styleSelect){
@@ -2724,9 +2748,10 @@ export function renderSlidesMaster(){
 
   if (applyBtn){
     applyBtn.onclick = () => {
-      const currentId = styleSelect?.value || activeSetId;
+      const currentId = getSelectedStyleSetId();
       if (!currentId) return;
       if (!applyStyleSet(settings, currentId)) return;
+      selectedStyleSetId = currentId;
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -2738,8 +2763,10 @@ export function renderSlidesMaster(){
 
   if (saveBtn){
     saveBtn.onclick = () => {
-      const currentId = styleSelect?.value || activeSetId;
+      const currentId = getSelectedStyleSetId();
       if (!currentId || !styleSets[currentId]) return;
+      const label = styleSets[currentId].label || currentId;
+      if (!confirm(`Palette "${label}" überschreiben?`)) return;
       const snap = snapshotStyleSet(settings);
       styleSets[currentId] = {
         label: styleSets[currentId].label || currentId,
@@ -2747,6 +2774,7 @@ export function renderSlidesMaster(){
         fonts: snap.fonts,
         slides: snap.slides
       };
+      selectedStyleSetId = currentId;
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -2769,6 +2797,7 @@ export function renderSlidesMaster(){
         slides: snap.slides
       };
       settings.slides.activeStyleSet = newId;
+      selectedStyleSetId = newId;
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -2778,7 +2807,7 @@ export function renderSlidesMaster(){
 
   if (deleteBtn){
     deleteBtn.onclick = () => {
-      const currentId = styleSelect?.value || activeSetId;
+      const currentId = getSelectedStyleSetId();
       if (!currentId || !styleSets[currentId]) return;
       if (Object.keys(styleSets).length <= 1){
         alert('Mindestens eine Palette muss vorhanden sein.');
@@ -2788,6 +2817,9 @@ export function renderSlidesMaster(){
       delete styleSets[currentId];
       if (settings.slides.activeStyleSet === currentId){
         settings.slides.activeStyleSet = Object.keys(styleSets)[0] || '';
+      }
+      if (selectedStyleSetId === currentId){
+        selectedStyleSetId = fallbackStyleSetId();
       }
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
