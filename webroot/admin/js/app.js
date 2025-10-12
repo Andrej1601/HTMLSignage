@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream, syncActiveStyleSetSnapshot } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 import { createUnsavedTracker } from './core/unsaved_state.js';
@@ -297,6 +297,23 @@ const setUnsavedState = (state, options) => unsavedTracker.setUnsavedState(state
 const restoreFromBaseline = unsavedTracker.restoreBaseline;
 const ensureUnsavedChangeListener = unsavedTracker.ensureListeners;
 const queueUnsavedEvaluation = (options) => unsavedTracker.queueEvaluation(options || {});
+
+if (typeof window === 'object') {
+  const originalQueueUnsaved = window.__queueUnsaved;
+  if (typeof originalQueueUnsaved === 'function' && !window.__queueUnsavedPatched) {
+    window.__queueUnsaved = (...args) => {
+      const result = originalQueueUnsaved(...args);
+      try {
+        const currentSettings = stateAccess.getSettings?.() || settings;
+        if (currentSettings) syncActiveStyleSetSnapshot(currentSettings);
+      } catch (error) {
+        console.warn('[admin] Style palette sync failed after unsaved queue', error);
+      }
+      return result;
+    };
+    window.__queueUnsavedPatched = true;
+  }
+}
 const unsavedHasChanges = () => unsavedTracker.hasUnsaved();
 const resetUnsavedBaseline = ({ skipDraftClear = true } = {}) => {
   updateBaseline(stateAccess.getSchedule(), stateAccess.getSettings());
@@ -2304,6 +2321,10 @@ const host = $('#colorList');
   B.appendChild(colorField('timeZebra2','Zeitspalte Zebra 2', theme.timeZebra2||DEFAULTS.theme.timeZebra2));
   B.appendChild(colorField('cornerBg','Ecke (oben-links) BG', theme.cornerBg||DEFAULTS.theme.cornerBg));
   B.appendChild(colorField('cornerFg','Ecke (oben-links) FG', theme.cornerFg||DEFAULTS.theme.cornerFg));
+  B.appendChild(colorField('chipBorder','Chip-Rahmen', theme.chipBorder||DEFAULTS.theme.chipBorder));
+  const chipBw=document.createElement('div'); chipBw.className='kv';
+  chipBw.innerHTML='<label>Chip-Rahmen Breite (px)</label><input id="bw_chipBorderW" class="input" type="number" min="0" max="10" step="1" value="'+(Number.isFinite(+theme.chipBorderW)?theme.chipBorderW:DEFAULTS.theme.chipBorderW)+'">';
+  B.appendChild(chipBw);
 
   // Saunafolien & Flammen
   const C=document.createElement('div'); C.className='fieldset'; C.innerHTML='<div class="legend">Sauna-Folien & Flammen</div>';
@@ -2365,7 +2386,43 @@ const host = $('#colorList');
     });
     const bws=document.getElementById('bw_gridTableW');
     if(bws) bws.value = DEFAULTS.theme.gridTableW ?? 2;
+    const cbw=document.getElementById('bw_chipBorderW');
+    if(cbw) cbw.value = DEFAULTS.theme.chipBorderW ?? 2;
+    settings.theme = collectColors();
+    try { syncActiveStyleSetSnapshot(settings, { includeFonts:false, includeSlides:false, includeDisplay:false }); }
+    catch (error) { console.warn('[admin] Style palette sync failed after color reset', error); }
+    window.__queueUnsaved?.();
+    window.__markUnsaved?.();
+    if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
   };
+
+  if (host && !host.dataset.themeSyncBound) {
+    const commitTheme = () => {
+      settings.theme = collectColors();
+      try { syncActiveStyleSetSnapshot(settings, { includeFonts:false, includeSlides:false, includeDisplay:false }); }
+      catch (error) { console.warn('[admin] Style palette sync failed after color change', error); }
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    };
+    host.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.id.startsWith('cl_') || target.id.startsWith('cp_') || target.id === 'bw_gridTableW' || target.id === 'bw_chipBorderW') {
+        commitTheme();
+      }
+    });
+    host.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (target.type === 'color' || target.type === 'number') {
+        if (target.id.startsWith('cp_') || target.id === 'bw_gridTableW' || target.id === 'bw_chipBorderW') {
+          commitTheme();
+        }
+      }
+    });
+    host.dataset.themeSyncBound = '1';
+  }
 }
 
 function ensureColorTools(){
@@ -2450,6 +2507,8 @@ function collectColors(){
   });
   const bw=document.getElementById('bw_gridTableW');
   if(bw) theme.gridTableW = Math.max(0, Math.min(10, +bw.value||0));
+  const cbw=document.getElementById('bw_chipBorderW');
+  if(cbw) theme.chipBorderW = Math.max(0, Math.min(10, +cbw.value||0));
   return theme;
 }
 
