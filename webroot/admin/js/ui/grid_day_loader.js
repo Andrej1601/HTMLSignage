@@ -64,9 +64,14 @@ function ensureUI() {
       return;
     }
     // Preset ins aktuelle Schedule übernehmen (deep clone)
+    const hadUnsaved = typeof ctx?.hasUnsavedChanges === 'function' ? !!ctx.hasUnsavedChanges() : false;
     ctx.setSchedule(deepClone(preset));
     renderGridUI();
     renderSlidesMaster();
+    ctx.queueUnsavedEvaluation?.({});
+    if (!hadUnsaved) {
+      ctx.resetUnsavedBaseline?.({ skipDraftClear: true });
+    }
   };
 }
 

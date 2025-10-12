@@ -93,10 +93,16 @@ const stateAccess = {
   setSchedule: (next) => {
     schedule = next;
     appState.setSchedule(next);
+    if (typeof window === 'object') {
+      try { window.__queueUnsaved?.(); } catch {}
+    }
   },
   setSettings: (next) => {
     settings = next;
     appState.setSettings(next);
+    if (typeof window === 'object') {
+      try { window.__queueUnsaved?.(); } catch {}
+    }
   }
 };
 
@@ -154,7 +160,10 @@ function createGridContext() {
   return {
     getSchedule: stateAccess.getSchedule,
     getSettings: stateAccess.getSettings,
-    setSchedule: stateAccess.setSchedule
+    setSchedule: stateAccess.setSchedule,
+    hasUnsavedChanges: () => unsavedHasChanges(),
+    resetUnsavedBaseline: (options) => resetUnsavedBaseline(options || {}),
+    queueUnsavedEvaluation: (options) => queueUnsavedEvaluation(options || {})
   };
 }
 
@@ -165,7 +174,10 @@ function createSlidesMasterContext() {
     setSchedule: stateAccess.setSchedule,
     setSettings: stateAccess.setSettings,
     refreshSlidesBox: renderSlidesBox,
-    refreshColors: renderColors
+    refreshColors: renderColors,
+    hasUnsavedChanges: () => unsavedHasChanges(),
+    resetUnsavedBaseline: (options) => resetUnsavedBaseline(options || {}),
+    queueUnsavedEvaluation: (options) => queueUnsavedEvaluation(options || {})
   };
 }
 
@@ -270,6 +282,12 @@ const evaluateUnsavedState = unsavedTracker.evaluate;
 const setUnsavedState = (state, options) => unsavedTracker.setUnsavedState(state, options);
 const restoreFromBaseline = unsavedTracker.restoreBaseline;
 const ensureUnsavedChangeListener = unsavedTracker.ensureListeners;
+const queueUnsavedEvaluation = (options) => unsavedTracker.queueEvaluation(options || {});
+const unsavedHasChanges = () => unsavedTracker.hasUnsaved();
+const resetUnsavedBaseline = ({ skipDraftClear = true } = {}) => {
+  updateBaseline(stateAccess.getSchedule(), stateAccess.getSettings());
+  setUnsavedState(false, { skipDraftClear });
+};
 
 const deviceContextManager = createDeviceContextManager({
   document,

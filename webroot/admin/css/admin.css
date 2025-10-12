@@ -864,6 +864,11 @@ details.ac[open] .chev{ transform: rotate(90deg); }
 .sys-cleanup{
   margin-top:12px;
   display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.sys-cleanup-row{
+  display:flex;
   flex-wrap:wrap;
   gap:8px;
 }
