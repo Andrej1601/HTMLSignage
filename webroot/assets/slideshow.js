@@ -1611,29 +1611,52 @@ async function loadDeviceResolved(id){
       frame = raf(step);
     };
 
-    const begin = () => {
+    const initialDelay = loopMode ? Math.min(800, pauseInterval) : pauseInterval;
+
+    let startTimer = 0;
+    const attemptBegin = () => {
+      startTimer = 0;
       if (destroyed) return;
-      if (!ensureScrollable()) return;
-      const initialDelay = loopMode ? Math.min(800, pauseInterval) : pauseInterval;
+      if (!container.isConnected) {
+        startTimer = setTimeout(attemptBegin, 200);
+        return;
+      }
+      if (!ensureScrollable()) {
+        startTimer = setTimeout(attemptBegin, 400);
+        return;
+      }
       schedule(initialDelay);
     };
 
     let resizeObserver = null;
-    if (typeof ResizeObserver === 'function') {
-      resizeObserver = new ResizeObserver(() => {
+    let pendingResize = false;
+    const handleResize = () => {
+      if (destroyed || pendingResize) return;
+      pendingResize = true;
+      raf(() => {
+        pendingResize = false;
         if (destroyed) return;
-        if (ensureScrollable() && !frame && !idleTimer) {
-          schedule();
+        const scrollable = ensureScrollable();
+        if (scrollable) {
+          if (!frame && !idleTimer) {
+            schedule();
+          }
+        } else {
+          stopTimers();
         }
       });
+    };
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(handleResize);
       resizeObserver.observe(container);
     }
 
-    setTimeout(begin, 400);
+    startTimer = setTimeout(attemptBegin, 400);
 
     return () => {
       destroyed = true;
       stopTimers();
+      if (startTimer) { clearTimeout(startTimer); startTimer = 0; }
       if (resizeObserver) resizeObserver.disconnect();
       container.classList.remove('is-scrollable');
     };
