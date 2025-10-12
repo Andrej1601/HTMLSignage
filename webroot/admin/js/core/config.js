@@ -8,6 +8,33 @@ import { deepClone, genId } from './utils.js';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
+const STYLE_THEME_KEYS = [
+  'bg','fg','accent','gridBorder','gridTable','gridTableW','cellBg','boxFg','headRowBg','headRowFg',
+  'timeColBg','timeZebra1','timeZebra2','zebra1','zebra2','cornerBg','cornerFg','tileBorder','tileBorderW',
+  'chipBorder','chipBorderW','flame','saunaColor'
+];
+
+const STYLE_FONT_KEYS = [
+  'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
+];
+
+const STYLE_SLIDE_KEYS = [
+  'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
+  'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
+  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
+];
+
+const cloneSubset = (src = {}, keys = []) => {
+  const out = {};
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(src, key)) {
+      out[key] = deepClone(src[key]);
+    }
+  });
+  return out;
+};
+
 export const PAGE_CONTENT_TYPES = [
   ['overview', 'Übersicht'],
   ['sauna', 'Saunen'],
@@ -200,6 +227,9 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
   src.extras = sanitizeExtras(src.extras, DEFAULTS.extras);
+  const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);
+  src.slides.styleSets = styleSetState.sets;
+  src.slides.activeStyleSet = styleSetState.active;
   src.interstitials = Array.isArray(src.interstitials)
     ? src.interstitials.map((it) => {
         const next = {
@@ -305,6 +335,44 @@ export function sanitizeScheduleForCompare(src) {
 
 export function sanitizeSettingsForCompare(src) {
   return normalizeSettings(src || {}, { assignMissingIds: false });
+}
+
+function sanitizeStyleSets(rawSets, defaultSets, activeId) {
+  const source = (rawSets && typeof rawSets === 'object') ? rawSets : {};
+  const fallback = (defaultSets && typeof defaultSets === 'object') ? defaultSets : {};
+  const cleaned = {};
+  const seen = new Set();
+
+  const pushEntry = (key, value) => {
+    if (!value || typeof value !== 'object') return;
+    const slug = typeof key === 'string' ? key.trim() : '';
+    if (!slug || seen.has(slug)) return;
+    const entry = {
+      label: typeof value.label === 'string' ? value.label.trim() : '',
+      theme: cloneSubset(value.theme, STYLE_THEME_KEYS),
+      fonts: cloneSubset(value.fonts, STYLE_FONT_KEYS),
+      slides: cloneSubset(value.slides, STYLE_SLIDE_KEYS)
+    };
+    cleaned[slug] = {
+      label: entry.label || slug,
+      theme: entry.theme,
+      fonts: entry.fonts,
+      slides: entry.slides
+    };
+    seen.add(slug);
+  };
+
+  Object.entries(source).forEach(([key, value]) => pushEntry(key, value));
+
+  if (!Object.keys(cleaned).length) {
+    Object.entries(fallback).forEach(([key, value]) => pushEntry(key, value));
+  }
+
+  const ids = Object.keys(cleaned);
+  const candidate = typeof activeId === 'string' ? activeId.trim() : '';
+  const active = ids.includes(candidate) ? candidate : (ids[0] || '');
+
+  return { sets: cleaned, ids, active };
 }
 
 function sanitizeExtras(extras, defaults){

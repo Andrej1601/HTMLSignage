@@ -1250,7 +1250,6 @@ async function loadDeviceResolved(id){
 
     container.appendChild(eyebrow);
     container.appendChild(content);
-    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
     return container;
   }
 
@@ -1494,7 +1493,6 @@ async function loadDeviceResolved(id){
     const body = h('div', { class: 'hero-body' }, [list]);
     container.appendChild(headingWrap);
     container.appendChild(body);
-    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
     const stopAutoScroll = enableAutoScroll(list, {
       axis: 'y',
       speed: heroScrollSpeed,
@@ -1743,7 +1741,6 @@ async function loadDeviceResolved(id){
     content.appendChild(body);
     container.appendChild(eyebrow);
     container.appendChild(content);
-    container.appendChild(h('div', { class: 'brand' }, 'Signage'));
     return container;
   }
 
@@ -4135,8 +4132,6 @@ function renderStorySlide(story = {}, region = 'left') {
       });
       c.appendChild(h('div', { class: fnClass }, nodes));
     }
-
-    c.appendChild(h('div', { class: 'brand' }, 'Signage'));
 
     const pager = ensureTilePager(list);
     c.__cleanup = () => {
