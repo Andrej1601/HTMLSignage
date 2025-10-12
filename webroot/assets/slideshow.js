@@ -650,7 +650,7 @@ async function loadDeviceResolved(id){
     const overlayLight = overlayEnabled ? clamp(0, 0.12 * overlayStrength, 1) : 0;
     const overlayShadow = overlayEnabled ? clamp(0, 0.42 * overlayStrength, 1) : 0;
     const headingWidthPct = Number.isFinite(+slidesCfg.saunaTitleMaxWidthPercent)
-      ? clamp(10, +slidesCfg.saunaTitleMaxWidthPercent, 100)
+      ? clamp(10, +slidesCfg.saunaTitleMaxWidthPercent, 160)
       : 100;
 
     setVars({

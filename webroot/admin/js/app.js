@@ -2525,7 +2525,7 @@ function collectSettings(){
         saunaTitleMaxWidthPercent:(() => {
           const raw = Number($('#saunaHeadingWidth')?.value);
           if (!Number.isFinite(raw)) return settings.slides?.saunaTitleMaxWidthPercent ?? DEFAULTS.slides.saunaTitleMaxWidthPercent ?? 100;
-          return clamp(10, raw, 100);
+          return clamp(10, raw, 160);
         })(),
         badgeScale:(() => {
           const raw = Number($('#badgeScale')?.value);
