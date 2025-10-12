@@ -318,8 +318,10 @@ function sanitizeWellnessTips(list, fallback){
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
     const title = typeof entry.title === 'string' ? entry.title.trim() : '';
     const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    const enabled = entry.enabled !== false;
     const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
     const record = { id, icon, title, text };
+    if (!enabled) record.enabled = false;
     if (dwellSec != null) record.dwellSec = dwellSec;
     normalized.push(record);
     seen.add(id);
