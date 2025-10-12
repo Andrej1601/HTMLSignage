@@ -935,6 +935,7 @@ async function loadDeviceResolved(id){
     const normalized = [];
     list.forEach((entry) => {
       if (!entry || typeof entry !== 'object') return;
+      if (entry.enabled === false) return;
       const id = entry.id != null ? String(entry.id).trim() : '';
       const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
       const title = typeof entry.title === 'string' ? entry.title.trim() : '';
@@ -1439,13 +1440,124 @@ async function loadDeviceResolved(id){
     if (updates.some(entry => entry.targetMs)) {
       timer = setInterval(updateCountdowns, 30000);
     }
-    container.__cleanup = () => { if (timer) clearInterval(timer); };
 
     const body = h('div', { class: 'hero-body' }, [list]);
     container.appendChild(headingWrap);
     container.appendChild(body);
     container.appendChild(h('div', { class: 'brand' }, 'Signage'));
+    const stopAutoScroll = enableAutoScroll(list, { axis: 'y', speed: 28, pauseMs: 4000 });
+    const cleanups = [];
+    if (timer) cleanups.push(() => clearInterval(timer));
+    if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
+    container.__cleanup = () => {
+      cleanups.splice(0).forEach((fn) => {
+        try { fn(); } catch {}
+      });
+    };
     return container;
+  }
+
+  function enableAutoScroll(container, { axis = 'y', speed = 24, pauseMs = 3500 } = {}) {
+    if (!container || typeof container !== 'object') return null;
+    const isVertical = axis !== 'x';
+    const scrollProp = isVertical ? 'scrollTop' : 'scrollLeft';
+    const sizeProp = isVertical ? 'clientHeight' : 'clientWidth';
+    const scrollSizeProp = isVertical ? 'scrollHeight' : 'scrollWidth';
+    const raf = typeof requestAnimationFrame === 'function'
+      ? (fn) => requestAnimationFrame(fn)
+      : (fn) => setTimeout(() => fn(Date.now()), 16);
+    const caf = typeof cancelAnimationFrame === 'function'
+      ? (id) => cancelAnimationFrame(id)
+      : (id) => clearTimeout(id);
+    let frame = 0;
+    let idleTimer = 0;
+    let destroyed = false;
+    let direction = 1;
+    let lastTs = 0;
+
+    const getMaxScroll = () => Math.max(0, container[scrollSizeProp] - container[sizeProp]);
+
+    const stopTimers = () => {
+      if (frame) { caf(frame); frame = 0; }
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; }
+    };
+
+    const ensureScrollable = () => {
+      const maxScroll = getMaxScroll();
+      const scrollable = maxScroll > 0;
+      container.classList.toggle('is-scrollable', scrollable);
+      if (!scrollable) {
+        container[scrollProp] = 0;
+        stopTimers();
+      }
+      return scrollable;
+    };
+
+    const schedule = (delay = pauseMs) => {
+      if (destroyed) return;
+      stopTimers();
+      idleTimer = setTimeout(() => {
+        idleTimer = 0;
+        lastTs = 0;
+        frame = raf(step);
+      }, Math.max(0, delay));
+    };
+
+    const step = (ts) => {
+      if (destroyed) return;
+      const maxScroll = getMaxScroll();
+      if (maxScroll <= 0) {
+        container.classList.remove('is-scrollable');
+        container[scrollProp] = 0;
+        stopTimers();
+        return;
+      }
+      if (!lastTs) lastTs = ts;
+      const delta = ts - lastTs;
+      lastTs = ts;
+      const distance = (speed * delta) / 1000;
+      const next = container[scrollProp] + (direction * distance);
+      if (next <= 0) {
+        container[scrollProp] = 0;
+        direction = 1;
+        schedule();
+        return;
+      }
+      if (next >= maxScroll) {
+        container[scrollProp] = maxScroll;
+        direction = -1;
+        schedule();
+        return;
+      }
+      container[scrollProp] = next;
+      frame = raf(step);
+    };
+
+    const begin = () => {
+      if (destroyed) return;
+      if (!ensureScrollable()) return;
+      schedule();
+    };
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver === 'function') {
+      resizeObserver = new ResizeObserver(() => {
+        if (destroyed) return;
+        if (ensureScrollable() && !frame && !idleTimer) {
+          schedule();
+        }
+      });
+      resizeObserver.observe(container);
+    }
+
+    setTimeout(begin, 400);
+
+    return () => {
+      destroyed = true;
+      stopTimers();
+      if (resizeObserver) resizeObserver.disconnect();
+      container.classList.remove('is-scrollable');
+    };
   }
 
   function renderGastronomyHighlight(item = {}, region = 'left') {
@@ -3929,7 +4041,7 @@ function renderStorySlide(story = {}, region = 'left') {
 
   function slideKey(item){
     if (!item) return '';
-    return item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || '');
+    return item.type + '|' + (item.sauna || item.src || item.url || item.storyId || item.story?.id || item.tipId || item.id || item.title || item.text || '');
   }
 
   function dwellMsForItem(item, pageConfig) {
