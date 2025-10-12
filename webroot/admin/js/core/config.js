@@ -270,6 +270,16 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
     ? Math.max(1, Math.round(rawHeroMax))
     : null;
   slidesCfg.heroTimelineWaitForScroll = slidesCfg.heroTimelineWaitForScroll === true;
+  const defaultHeroScrollSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28;
+  const rawHeroScrollSpeed = Number(slidesCfg.heroTimelineScrollSpeed);
+  slidesCfg.heroTimelineScrollSpeed = Number.isFinite(rawHeroScrollSpeed) && rawHeroScrollSpeed > 0
+    ? clamp(4, Math.round(rawHeroScrollSpeed), 240)
+    : defaultHeroScrollSpeed;
+  const defaultHeroPause = Number(DEFAULTS.slides?.heroTimelineScrollPauseMs) || 4000;
+  const rawHeroPause = Number(slidesCfg.heroTimelineScrollPauseMs);
+  slidesCfg.heroTimelineScrollPauseMs = Number.isFinite(rawHeroPause) && rawHeroPause >= 0
+    ? Math.max(0, Math.round(rawHeroPause < 1000 ? rawHeroPause * 1000 : rawHeroPause))
+    : defaultHeroPause;
 
   const hasBadgeArray = Array.isArray(src.slides?.badgeLibrary);
   src.slides.badgeLibrary = sanitizeBadgeLibrary(src.slides.badgeLibrary, {
@@ -346,11 +356,9 @@ function sanitizeEventCountdowns(list, fallback){
     const style = typeof entry.style === 'string' ? entry.style.trim() : '';
     const image = typeof entry.image === 'string' ? entry.image.trim() : '';
     const imageThumb = typeof entry.imageThumb === 'string' ? entry.imageThumb.trim() : '';
-    const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
     const record = { id, title, subtitle, target, style };
     if (image) record.image = image;
     if (imageThumb) record.imageThumb = imageThumb;
-    if (dwellSec != null) record.dwellSec = dwellSec;
     normalized.push(record);
     seen.add(id);
   });

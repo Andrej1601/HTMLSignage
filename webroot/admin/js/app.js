@@ -1226,30 +1226,6 @@ function renderSlidesBox(){
         mediaRow.append(thumbImg, uploadLabel, clearBtn);
         body.append(mediaRow);
 
-        const dwellRow = document.createElement('div');
-        dwellRow.className = 'extras-inline';
-        const dwellLabel = document.createElement('label');
-        dwellLabel.textContent = 'Anzeige (Sek.)';
-        const dwellInput = document.createElement('input');
-        dwellInput.className = 'input num3';
-        dwellInput.type = 'number';
-        dwellInput.min = '1';
-        dwellInput.max = '600';
-        dwellInput.placeholder = 'Standard';
-        dwellInput.value = event.dwellSec != null ? String(event.dwellSec) : '';
-        dwellInput.onchange = () => {
-          const num = Number(dwellInput.value);
-          if (Number.isFinite(num) && num > 0) {
-            event.dwellSec = Math.max(1, Math.round(num));
-          } else {
-            delete event.dwellSec;
-            dwellInput.value = '';
-          }
-          notifySettingsChanged();
-        };
-        dwellRow.append(dwellLabel, dwellInput);
-        body.appendChild(dwellRow);
-
         const actions = document.createElement('div');
         actions.className = 'extras-item-actions';
         const removeBtn = document.createElement('button');
@@ -1272,7 +1248,7 @@ function renderSlidesBox(){
     if (addEventBtn && !addEventBtn.dataset.bound) {
       addEventBtn.dataset.bound = '1';
       addEventBtn.addEventListener('click', () => {
-        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '', image: '', imageThumb: '', dwellSec: null });
+        extras.eventCountdowns.push({ id: genId('evt_'), title: '', subtitle: '', target: '', style: '', image: '', imageThumb: '' });
         renderExtrasEditor();
         notifySettingsChanged();
       });
@@ -1493,6 +1469,64 @@ function renderSlidesBox(){
           } else {
             delete slides.heroTimelineMaxEntries;
             maxInput.value = '';
+          }
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const scrollSpeedInput = document.getElementById('heroTimelineScrollSpeed');
+    if (scrollSpeedInput) {
+      const slidesCfg = ensureSlides();
+      const defaultSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28;
+      const raw = Number(slidesCfg.heroTimelineScrollSpeed);
+      const speed = Number.isFinite(raw) && raw > 0 ? Math.max(4, Math.round(raw)) : defaultSpeed;
+      scrollSpeedInput.value = String(speed);
+      if (!scrollSpeedInput.dataset.bound) {
+        scrollSpeedInput.dataset.bound = '1';
+        scrollSpeedInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          const value = Number(scrollSpeedInput.value);
+          if (Number.isFinite(value) && value > 0) {
+            const sanitized = Math.max(4, Math.round(value));
+            slides.heroTimelineScrollSpeed = sanitized;
+            scrollSpeedInput.value = String(sanitized);
+          } else {
+            delete slides.heroTimelineScrollSpeed;
+            scrollSpeedInput.value = String(Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28);
+          }
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const scrollPauseInput = document.getElementById('heroTimelineScrollPause');
+    if (scrollPauseInput) {
+      const slidesCfg = ensureSlides();
+      const defaultPause = Number(DEFAULTS.slides?.heroTimelineScrollPauseMs) || 4000;
+      const raw = Number(slidesCfg.heroTimelineScrollPauseMs);
+      const normalizeDisplay = (ms) => {
+        const seconds = Math.max(0, Math.round(ms));
+        return String(Math.round((seconds / 1000) * 10) / 10);
+      };
+      const pauseMs = Number.isFinite(raw) && raw >= 0
+        ? Math.max(0, Math.round(raw < 1000 ? raw * 1000 : raw))
+        : defaultPause;
+      scrollPauseInput.value = normalizeDisplay(pauseMs);
+      if (!scrollPauseInput.dataset.bound) {
+        scrollPauseInput.dataset.bound = '1';
+        scrollPauseInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          const value = Number(scrollPauseInput.value);
+          if (Number.isFinite(value) && value >= 0) {
+            const sanitized = Math.max(0, value);
+            const msValue = Math.round(sanitized * 1000);
+            slides.heroTimelineScrollPauseMs = msValue;
+            scrollPauseInput.value = normalizeDisplay(msValue);
+          } else {
+            delete slides.heroTimelineScrollPauseMs;
+            const fallbackMs = Number(DEFAULTS.slides?.heroTimelineScrollPauseMs) || 4000;
+            scrollPauseInput.value = normalizeDisplay(fallbackMs);
           }
           notifySettingsChanged();
         });
@@ -2538,6 +2572,23 @@ function collectSettings(){
           const num = Number(raw);
           if (!Number.isFinite(num) || num <= 0) return null;
           return Math.max(1, Math.floor(num));
+        })(),
+        heroTimelineScrollSpeed: (() => {
+          const el = document.getElementById('heroTimelineScrollSpeed');
+          const fallback = settings?.slides?.heroTimelineScrollSpeed ?? (DEFAULTS?.slides?.heroTimelineScrollSpeed ?? 28);
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw) || raw <= 0) return Math.max(4, Math.round(fallback));
+          return Math.max(4, Math.round(raw));
+        })(),
+        heroTimelineScrollPauseMs: (() => {
+          const el = document.getElementById('heroTimelineScrollPause');
+          const fallback = settings?.slides?.heroTimelineScrollPauseMs ?? (DEFAULTS?.slides?.heroTimelineScrollPauseMs ?? 4000);
+          const fallbackMs = Number.isFinite(fallback) && fallback >= 0
+            ? Math.max(0, Math.round(fallback < 1000 ? fallback * 1000 : fallback))
+            : 4000;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw) || raw < 0) return fallbackMs;
+          return Math.max(0, Math.round(raw * 1000));
         })(),
         heroTimelineWaitForScroll: !!document.getElementById('heroTimelineWaitForScroll')?.checked
       },

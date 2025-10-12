@@ -126,7 +126,7 @@
               <button type="button" class="workspace-card-btn" data-jump="infoWellness" aria-controls="infoWellness">Wellness-Tipps</button>
               <button type="button" class="workspace-card-btn" data-jump="infoEvents" aria-controls="infoEvents">Event-Countdowns</button>
               <button type="button" class="workspace-card-btn" data-jump="infoGastro" aria-controls="infoGastro">Gastro-Infos</button>
-              <button type="button" class="workspace-card-btn" data-jump="infoHero" aria-controls="infoHero">Hero-Timeline</button>
+              <button type="button" class="workspace-card-btn" data-jump="heroTimelineEnabled" aria-controls="infoEvents">Hero-Timeline</button>
               <button type="button" class="workspace-card-btn" data-jump="infoStories" aria-controls="infoStories">Story-Slides</button>
             </div>
           </article>
@@ -367,6 +367,33 @@
                   <div class="extras-group-title">Event-Countdowns</div>
                   <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
                 </div>
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="heroTimelineEnabled" type="checkbox">
+                    <span>Event Countdown im Hero anzeigen</span>
+                  </label>
+                </div>
+                <div class="kv" id="heroTimelineSettings" hidden>
+                  <label>Einstellungen</label>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                    <span class="mut">Slide-Dauer (s)</span>
+                    <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="180" step="1">
+                    <span class="mut">Basis-Minuten</span>
+                    <input id="heroTimelineBase" class="input num3" type="number" min="1" max="240" step="1">
+                    <span class="mut">Max. Einträge</span>
+                    <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
+                  </div>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
+                    <span class="mut">Scrolltempo (px/s)</span>
+                    <input id="heroTimelineScrollSpeed" class="input num3" type="number" min="4" max="240" step="1">
+                    <span class="mut">Scroll-Pause (s)</span>
+                    <input id="heroTimelineScrollPause" class="input num3" type="number" min="0" max="30" step="0.5">
+                  </div>
+                  <label class="row" style="gap:8px;align-items:center;margin-top:12px">
+                    <input id="heroTimelineWaitForScroll" type="checkbox">
+                    <span>Slide erst nach vollständigem Scrollen wechseln</span>
+                  </label>
+                </div>
                 <div class="extras-group-list" id="extrasEventList"></div>
                 <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
               </div>
@@ -381,32 +408,6 @@
                   <button class="btn sm" id="extrasGastroAdd">Highlight hinzufügen</button>
                 </div>
                 <div class="extras-group-list" id="extrasGastroList"></div>
-              </div>
-            </div>
-          </details>
-          <details class="info-fold" id="infoHero" data-jump-target>
-            <summary>Event Countdown</summary>
-            <div class="info-fold-body hero-fold-body">
-              <div class="kv">
-                <label class="row" style="gap:8px;align-items:center">
-                  <input id="heroTimelineEnabled" type="checkbox">
-                  <span>Event Countdown anzeigen</span>
-                </label>
-              </div>
-              <div class="kv" id="heroTimelineSettings" hidden>
-                <label>Einstellungen</label>
-                <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                  <span class="mut">Dauer (s)</span>
-                  <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="120" step="1">
-                  <span class="mut">Basis-Minuten</span>
-                  <input id="heroTimelineBase" class="input num3" type="number" min="1" max="120" step="1">
-                  <span class="mut">Max. Einträge</span>
-                  <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
-                </div>
-                <label class="row" style="gap:8px;align-items:center;margin-top:12px">
-                  <input id="heroTimelineWaitForScroll" type="checkbox">
-                  <span>Zeit erst starten, nachdem alle Events gezeigt wurden</span>
-                </label>
               </div>
             </div>
           </details>

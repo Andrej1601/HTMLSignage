@@ -900,7 +900,6 @@ async function loadDeviceResolved(id){
       const styleKey = typeof entry.style === 'string' ? entry.style.trim() : '';
       const image = typeof entry.image === 'string' ? entry.image.trim() : '';
       const imageThumb = typeof entry.imageThumb === 'string' ? entry.imageThumb.trim() : '';
-      const dwellSec = Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null;
       normalized.push({
         type: 'event-countdown',
         id: id || null,
@@ -911,8 +910,7 @@ async function loadDeviceResolved(id){
         styleKey,
         image,
         imageThumb,
-        imageUrl: image || imageThumb || '',
-        dwellSec
+        imageUrl: image || imageThumb || ''
       });
     });
     normalized.sort((a, b) => {
@@ -1264,6 +1262,20 @@ async function loadDeviceResolved(id){
       ? normalizeEventCountdowns(item.events)
       : collectHeroTimelineData();
     const events = eventsInput.slice();
+    const slidesCfg = settings?.slides || {};
+    const heroScrollSpeed = (() => {
+      const raw = Number(slidesCfg.heroTimelineScrollSpeed);
+      if (Number.isFinite(raw) && raw > 0) return Math.max(4, Math.round(raw));
+      return 28;
+    })();
+    const heroScrollPauseMs = (() => {
+      const raw = Number(slidesCfg.heroTimelineScrollPauseMs);
+      if (Number.isFinite(raw) && raw >= 0) {
+        const normalized = raw < 1000 ? raw * 1000 : raw;
+        return Math.max(0, Math.round(normalized));
+      }
+      return 4000;
+    })();
 
     const slideItem = ctx?.item || item;
     const isHeroSlide = slideItem?.type === 'hero-timeline';
@@ -1485,8 +1497,8 @@ async function loadDeviceResolved(id){
     container.appendChild(h('div', { class: 'brand' }, 'Signage'));
     const stopAutoScroll = enableAutoScroll(list, {
       axis: 'y',
-      speed: 28,
-      pauseMs: 4000,
+      speed: heroScrollSpeed,
+      pauseMs: heroScrollPauseMs,
       mode: isHeroSlide ? 'loop' : 'bounce',
       onCycle: () => {
         if (waitForScroll) markCycle();
