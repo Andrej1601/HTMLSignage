@@ -691,11 +691,13 @@ function renderSlidesBox(){
 
     extras.wellnessTips = sanitizeList(extras.wellnessTips, defaults.wellnessTips, (entry) => {
       const dwell = toDwellSeconds(entry.dwellSec);
+      const enabled = entry.enabled !== false;
       const result = {
         id: entry.id,
         icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
         title: typeof entry.title === 'string' ? entry.title.trim() : '',
-        text: typeof entry.text === 'string' ? entry.text.trim() : ''
+        text: typeof entry.text === 'string' ? entry.text.trim() : '',
+        enabled
       };
       if (dwell != null) result.dwellSec = dwell;
       return result;
@@ -1022,7 +1024,27 @@ function renderSlidesBox(){
           notifySettingsChanged();
         };
 
-        header.append(iconInput, titleInput);
+        const enabledToggle = document.createElement('label');
+        enabledToggle.className = 'toggle extras-toggle';
+        const enabledInput = document.createElement('input');
+        enabledInput.type = 'checkbox';
+        const enabledText = document.createElement('span');
+        enabledText.className = 'extras-toggle-label';
+        enabledToggle.append(enabledInput, enabledText);
+
+        const applyEnabledState = (shouldNotify = false) => {
+          const active = !!enabledInput.checked;
+          tip.enabled = active;
+          enabledText.textContent = active ? 'Aktiv' : 'Ausgeblendet';
+          row.classList.toggle('is-disabled', !active);
+          if (shouldNotify) notifySettingsChanged();
+        };
+
+        enabledInput.addEventListener('change', () => applyEnabledState(true));
+        enabledInput.checked = tip.enabled !== false;
+        applyEnabledState(false);
+
+        header.append(iconInput, titleInput, enabledToggle);
 
         const body = document.createElement('div');
         body.className = 'extras-item-body';
@@ -1082,7 +1104,7 @@ function renderSlidesBox(){
     if (addWellness && !addWellness.dataset.bound) {
       addWellness.dataset.bound = '1';
       addWellness.addEventListener('click', () => {
-        extras.wellnessTips.push({ id: genId('well_'), icon: '', title: '', text: '', dwellSec: null });
+        extras.wellnessTips.push({ id: genId('well_'), icon: '', title: '', text: '', dwellSec: null, enabled: true });
         renderExtrasEditor();
         notifySettingsChanged();
       });
@@ -1471,6 +1493,24 @@ function renderSlidesBox(){
           } else {
             delete slides.heroTimelineMaxEntries;
             maxInput.value = '';
+          }
+          notifySettingsChanged();
+        });
+      }
+    }
+
+    const waitInput = document.getElementById('heroTimelineWaitForScroll');
+    if (waitInput) {
+      const slidesCfg = ensureSlides();
+      waitInput.checked = !!slidesCfg.heroTimelineWaitForScroll;
+      if (!waitInput.dataset.bound) {
+        waitInput.dataset.bound = '1';
+        waitInput.addEventListener('change', () => {
+          const slides = ensureSlides();
+          if (waitInput.checked) {
+            slides.heroTimelineWaitForScroll = true;
+          } else {
+            delete slides.heroTimelineWaitForScroll;
           }
           notifySettingsChanged();
         });
@@ -2498,7 +2538,8 @@ function collectSettings(){
           const num = Number(raw);
           if (!Number.isFinite(num) || num <= 0) return null;
           return Math.max(1, Math.floor(num));
-        })()
+        })(),
+        heroTimelineWaitForScroll: !!document.getElementById('heroTimelineWaitForScroll')?.checked
       },
       theme: collectColors(),
       highlightNext:{

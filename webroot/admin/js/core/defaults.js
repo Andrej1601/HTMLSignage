@@ -249,6 +249,7 @@ export const DEFAULTS = {
     heroTimelineFillMs:8000,
     heroTimelineBaseMinutes:15,
     heroTimelineMaxEntries:null,
+    heroTimelineWaitForScroll:false,
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic',
