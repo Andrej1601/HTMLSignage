@@ -62,7 +62,7 @@ const DEFAULT_STYLE_SETS = {
       tilePaddingScale:0.75,
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
-      saunaTitleMaxWidthPercent:100
+      saunaTitleMaxWidthPercent:64
     },
     display:{
       layoutMode:'single',
@@ -105,7 +105,7 @@ const DEFAULT_STYLE_SETS = {
       tilePaddingScale:0.75,
       tileFlameSizeScale:1,
       tileFlameGapScale:1,
-      saunaTitleMaxWidthPercent:100
+      saunaTitleMaxWidthPercent:64
     },
     display:{
       layoutMode:'single',
@@ -148,7 +148,7 @@ const DEFAULT_STYLE_SETS = {
       tilePaddingScale:0.78,
       tileFlameSizeScale:1.05,
       tileFlameGapScale:1,
-      saunaTitleMaxWidthPercent:100
+      saunaTitleMaxWidthPercent:64
     },
     display:{
       layoutMode:'single',
@@ -191,7 +191,7 @@ const DEFAULT_STYLE_SETS = {
       tilePaddingScale:0.72,
       tileFlameSizeScale:0.92,
       tileFlameGapScale:1,
-      saunaTitleMaxWidthPercent:90
+      saunaTitleMaxWidthPercent:58
     },
     display:{
       layoutMode:'single',
@@ -234,7 +234,7 @@ const DEFAULT_STYLE_SETS = {
       tilePaddingScale:0.82,
       tileFlameSizeScale:1.1,
       tileFlameGapScale:1.05,
-      saunaTitleMaxWidthPercent:100
+      saunaTitleMaxWidthPercent:64
     },
     display:{
       layoutMode:'single',
@@ -256,7 +256,7 @@ export const DEFAULTS = {
     appendTimeSuffix:false,
     tileFlameSizeScale:1,
     tileFlameGapScale:1,
-    saunaTitleMaxWidthPercent:100,
+    saunaTitleMaxWidthPercent:64,
     tileOverlayEnabled:true,
     tileOverlayStrength:1,
     showSaunaFlames:true,
