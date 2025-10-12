@@ -2310,6 +2310,14 @@ export function renderSlidesMaster(){
     };
   }
 
+  const heroWaitEl = $('#heroTimelineWaitForScroll');
+  if (heroWaitEl){
+    heroWaitEl.checked = !!settings.slides?.heroTimelineWaitForScroll;
+    heroWaitEl.onchange = () => {
+      (settings.slides ||= {}).heroTimelineWaitForScroll = !!heroWaitEl.checked;
+    };
+  }
+
   const badgeColorEl = $('#badgeColor');
   if (badgeColorEl){
     const rawInit = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor || '#5C3101';

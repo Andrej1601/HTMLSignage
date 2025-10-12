@@ -697,7 +697,10 @@ body.devices-pinned #devicesPane{
 .extras-group-title{ font-weight:700; font-size:13px; letter-spacing:.01em; }
 .extras-group-list{ display:flex; flex-direction:column; gap:10px; }
 .extras-item{ border:1px solid color-mix(in srgb, var(--border) 80%, var(--fg) 6%); border-radius:12px; background:color-mix(in srgb, var(--panel) 96%, var(--fg) 2%); padding:10px 12px; display:flex; flex-direction:column; gap:10px; }
+.extras-item.is-disabled{ opacity:.65; }
 .extras-item-header{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.extras-item-header .extras-toggle{ margin-left:auto; cursor:pointer; }
+.extras-item-header .extras-toggle-label{ font-weight:600; }
 .extras-item-header .input{ flex:1 1 160px; min-width:120px; }
 .extras-item-body{ display:flex; flex-direction:column; gap:8px; }
 .extras-item textarea{ min-height:72px; resize:vertical; }
