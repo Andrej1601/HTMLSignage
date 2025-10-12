@@ -269,6 +269,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   slidesCfg.heroTimelineMaxEntries = Number.isFinite(rawHeroMax) && rawHeroMax > 0
     ? Math.max(1, Math.round(rawHeroMax))
     : null;
+  slidesCfg.heroTimelineWaitForScroll = slidesCfg.heroTimelineWaitForScroll === true;
 
   const hasBadgeArray = Array.isArray(src.slides?.badgeLibrary);
   src.slides.badgeLibrary = sanitizeBadgeLibrary(src.slides.badgeLibrary, {

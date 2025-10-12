@@ -196,8 +196,8 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .container.hero{align-items:stretch}
 .hero-headings{width:100%;margin:0 0 calc(18px*var(--vwScale))}
 .hero-body{width:100%;display:flex;flex-direction:column;gap:calc(18px*var(--vwScale))}
-.hero-timeline-list{display:flex;flex-direction:column;gap:calc(16px*var(--vwScale));width:100%}
-.hero-timeline-list.is-scrollable{overflow:hidden;scrollbar-width:none}
+.hero-timeline-list{display:flex;flex-direction:column;gap:calc(16px*var(--vwScale));width:100%;overflow-x:hidden}
+.hero-timeline-list.is-scrollable{overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain}
 .hero-timeline-list.is-scrollable::-webkit-scrollbar{display:none}
 .hero-timeline{--heroTimelineThumb:calc(120px*var(--vwScale));--heroTimelineRadius:calc(18px*var(--vwScale));--heroTimelineGap:calc(16px*var(--vwScale));}
 .hero-timeline .timeline-item{

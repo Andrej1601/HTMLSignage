@@ -990,9 +990,10 @@ async function loadDeviceResolved(id){
   function buildMasterQueue() {
     maybeApplyPreset();
 
-    const eventCountdownEnabled = settings?.slides?.heroEnabled !== false;
-    if (eventCountdownEnabled) collectHeroTimelineData(); else heroTimeline = [];
-    const withHero = (queue) => queue.slice();
+    const heroEnabled = settings?.slides?.heroEnabled !== false;
+    const timeline = heroEnabled ? collectHeroTimelineData() : (heroTimeline = []);
+    const hasHero = heroEnabled && timeline.length > 0;
+    const withHero = (queue) => hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
 
   const showOverview = (settings?.slides?.showOverview !== false);
   const hidden = new Set(settings?.slides?.hiddenSaunas || []);
@@ -1021,12 +1022,6 @@ async function loadDeviceResolved(id){
   const wellnessTips = collectWellnessTips();
   const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(it.id), it]));
   const eventCountdowns = collectEventCountdowns();
-  const eventDwell = (() => {
-    for (const evt of eventCountdowns) {
-      if (Number.isFinite(+evt.dwellSec)) return Math.max(1, Math.round(+evt.dwellSec));
-    }
-    return null;
-  })();
   const gastronomyHighlights = collectGastronomyHighlights();
   const gastroMap = new Map(gastronomyHighlights.filter(it => it.id).map(it => [String(it.id), it]));
 
@@ -1084,9 +1079,8 @@ async function loadDeviceResolved(id){
         continue;
       }
       if (entry.type === 'event-countdown') {
-        if (eventCountdownEnabled && !eventSlideAdded && eventCountdowns.length) {
+        if (heroEnabled && !eventSlideAdded && eventCountdowns.length) {
           const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
-          if (eventDwell != null) slide.dwellSec = eventDwell;
           queue.push(slide);
           eventSlideAdded = true;
         }
@@ -1128,9 +1122,8 @@ async function loadDeviceResolved(id){
         queue.push({ ...tip, tipId: key });
       }
     }
-    if (eventCountdownEnabled && !eventSlideAdded && eventCountdowns.length) {
+    if (heroEnabled && !eventSlideAdded && eventCountdowns.length) {
       const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
-      if (eventDwell != null) slide.dwellSec = eventDwell;
       queue.push(slide);
       eventSlideAdded = true;
     }
@@ -1224,9 +1217,8 @@ async function loadDeviceResolved(id){
   wellnessTips.forEach((tip) => {
     queue.push({ ...tip, tipId: tip.id != null ? String(tip.id) : null });
   });
-  if (eventCountdownEnabled && eventCountdowns.length) {
+  if (heroEnabled && eventCountdowns.length) {
     const slide = { type: 'event-countdown', events: eventCountdowns.map(evt => ({ ...evt })) };
-    if (eventDwell != null) slide.dwellSec = eventDwell;
     queue.push(slide);
   }
   gastronomyHighlights.forEach((entry) => {
@@ -1264,7 +1256,7 @@ async function loadDeviceResolved(id){
     return container;
   }
 
-  function renderEventCountdown(item = {}, region = 'left') {
+  function renderEventCountdown(item = {}, region = 'left', ctx = {}) {
     const container = h('div', { class: 'container extra extra-event hero-timeline fade show' });
     container.dataset.region = region;
 
@@ -1272,6 +1264,52 @@ async function loadDeviceResolved(id){
       ? normalizeEventCountdowns(item.events)
       : collectHeroTimelineData();
     const events = eventsInput.slice();
+
+    const slideItem = ctx?.item || item;
+    const isHeroSlide = slideItem?.type === 'hero-timeline';
+    const waitForScroll = isHeroSlide && !!(settings?.slides?.heroTimelineWaitForScroll);
+    const computedDwell = (() => {
+      try {
+        return dwellMsForItem(slideItem || item, ctx?.pageConfig);
+      } catch (err) {
+        return null;
+      }
+    })();
+    const fallbackDwell = Number.isFinite(computedDwell) ? computedDwell : null;
+    let advanceHelper = null;
+    let cycleReached = !waitForScroll;
+    const scheduleIfReady = () => {
+      if (!advanceHelper) return;
+      if (waitForScroll && !cycleReached) return;
+      const ms = Number.isFinite(advanceHelper.defaultMs) && advanceHelper.defaultMs > 0
+        ? advanceHelper.defaultMs
+        : (Number.isFinite(fallbackDwell) && fallbackDwell > 0 ? fallbackDwell : 8000);
+      advanceHelper.schedule(Math.max(1000, Math.round(ms)));
+      advanceHelper = null;
+    };
+    if (typeof ctx?.deferAdvance === 'function') {
+      ctx.deferAdvance((helper) => {
+        advanceHelper = {
+          schedule: helper.schedule,
+          defaultMs: helper.defaultMs
+        };
+        if (!waitForScroll) {
+          scheduleIfReady();
+        } else {
+          cycleReached && scheduleIfReady();
+        }
+        return true;
+      });
+    }
+    if (!events.length) {
+      cycleReached = true;
+      scheduleIfReady();
+    }
+    const markCycle = () => {
+      if (cycleReached) return;
+      cycleReached = true;
+      scheduleIfReady();
+    };
 
     const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Event Countdown');
     const headingWrap = h('div', { class: 'headings hero-headings' }, [
@@ -1445,7 +1483,18 @@ async function loadDeviceResolved(id){
     container.appendChild(headingWrap);
     container.appendChild(body);
     container.appendChild(h('div', { class: 'brand' }, 'Signage'));
-    const stopAutoScroll = enableAutoScroll(list, { axis: 'y', speed: 28, pauseMs: 4000 });
+    const stopAutoScroll = enableAutoScroll(list, {
+      axis: 'y',
+      speed: 28,
+      pauseMs: 4000,
+      mode: isHeroSlide ? 'loop' : 'bounce',
+      onCycle: () => {
+        if (waitForScroll) markCycle();
+      },
+      onScrollableChange: (scrollable) => {
+        if (waitForScroll && !scrollable) markCycle();
+      }
+    });
     const cleanups = [];
     if (timer) cleanups.push(() => clearInterval(timer));
     if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
@@ -1457,7 +1506,7 @@ async function loadDeviceResolved(id){
     return container;
   }
 
-  function enableAutoScroll(container, { axis = 'y', speed = 24, pauseMs = 3500 } = {}) {
+  function enableAutoScroll(container, { axis = 'y', speed = 24, pauseMs = 3500, mode = 'bounce', onCycle, onScrollableChange } = {}) {
     if (!container || typeof container !== 'object') return null;
     const isVertical = axis !== 'x';
     const scrollProp = isVertical ? 'scrollTop' : 'scrollLeft';
@@ -1474,6 +1523,11 @@ async function loadDeviceResolved(id){
     let destroyed = false;
     let direction = 1;
     let lastTs = 0;
+    const loopMode = mode === 'loop';
+    const cycleCb = typeof onCycle === 'function' ? onCycle : null;
+    const scrollableCb = typeof onScrollableChange === 'function' ? onScrollableChange : null;
+    let cycleCount = 0;
+    const pauseInterval = Number.isFinite(+pauseMs) ? Math.max(0, +pauseMs) : 3500;
 
     const getMaxScroll = () => Math.max(0, container[scrollSizeProp] - container[sizeProp]);
 
@@ -1486,6 +1540,9 @@ async function loadDeviceResolved(id){
       const maxScroll = getMaxScroll();
       const scrollable = maxScroll > 0;
       container.classList.toggle('is-scrollable', scrollable);
+      if (scrollableCb) {
+        try { scrollableCb(scrollable, maxScroll); } catch (err) { console.warn('[slideshow] auto scroll callback failed', err); }
+      }
       if (!scrollable) {
         container[scrollProp] = 0;
         stopTimers();
@@ -1493,7 +1550,7 @@ async function loadDeviceResolved(id){
       return scrollable;
     };
 
-    const schedule = (delay = pauseMs) => {
+    const schedule = (delay = pauseInterval) => {
       if (destroyed) return;
       stopTimers();
       idleTimer = setTimeout(() => {
@@ -1517,6 +1574,27 @@ async function loadDeviceResolved(id){
       lastTs = ts;
       const distance = (speed * delta) / 1000;
       const next = container[scrollProp] + (direction * distance);
+      if (loopMode) {
+        if (next >= maxScroll) {
+          container[scrollProp] = maxScroll;
+          if (cycleCb) {
+            try { cycleCb({ cycle: ++cycleCount }); } catch (err) { console.warn('[slideshow] auto scroll cycle callback failed', err); }
+          } else {
+            cycleCount += 1;
+          }
+          stopTimers();
+          idleTimer = setTimeout(() => {
+            if (destroyed) return;
+            container[scrollProp] = 0;
+            lastTs = 0;
+            frame = raf(step);
+          }, pauseInterval);
+          return;
+        }
+        container[scrollProp] = Math.min(next, maxScroll);
+        frame = raf(step);
+        return;
+      }
       if (next <= 0) {
         container[scrollProp] = 0;
         direction = 1;
@@ -1536,7 +1614,8 @@ async function loadDeviceResolved(id){
     const begin = () => {
       if (destroyed) return;
       if (!ensureScrollable()) return;
-      schedule();
+      const initialDelay = loopMode ? Math.min(800, pauseInterval) : pauseInterval;
+      schedule(initialDelay);
     };
 
     let resizeObserver = null;
@@ -2313,9 +2392,9 @@ return h('div', {}, [ t ]);
     return Number.isFinite(num) && num >= 100;
   }
 
-  function renderHeroTimeline(region = 'left') {
+  function renderHeroTimeline(region = 'left', ctx = {}) {
     const data = (heroTimeline.length ? heroTimeline : collectHeroTimelineData()).slice();
-    return renderEventCountdown({ events: data }, region);
+    return renderEventCountdown({ events: data }, region, ctx);
   }
 
 // ---------- Interstitial image slide ----------
@@ -4092,19 +4171,18 @@ function renderStorySlide(story = {}, region = 'left') {
       return sec(v) * 1000;
     }
 
-    if (item.type === 'hero-timeline') {
+    if (item.type === 'hero-timeline' || item.type === 'event-countdown') {
+      const raw = Number(slides.heroTimelineFillMs);
+      if (Number.isFinite(raw) && raw > 0) {
+        const ms = raw < 1000 ? raw * 1000 : raw;
+        return Math.max(1000, Math.round(ms));
+      }
       const fallback = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
       return sec(fallback) * 1000;
     }
 
     if (item.type === 'wellness-tip' || item.type === 'gastronomy-highlight') {
       const base = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
-      const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
-      return sec(v) * 1000;
-    }
-
-    if (item.type === 'event-countdown') {
-      const base = slides.heroDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 10;
       const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
       return sec(v) * 1000;
     }
@@ -4267,20 +4345,50 @@ function renderStorySlide(story = {}, region = 'left') {
         item = queue[index];
         key = slideKey(item);
       }
+      let deferAdvanceHandler = null;
       const ctx = {
         region: id,
+        item,
         advance,
         scheduleAdvance,
         clearScheduledAdvance: () => { if (slideTimer) { clearTimeout(slideTimer); slideTimer = 0; } },
-        pageConfig: config
+        pageConfig: config,
+        deferAdvance(handler) {
+          if (typeof handler === 'function') deferAdvanceHandler = handler;
+        }
       };
       const node = renderSlideNode(item, ctx);
       show(node);
       last = key;
       updateActiveState();
+      const dwell = dwellMsForItem(item, config);
       if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
-        const dwell = dwellMsForItem(item, config);
-        scheduleAdvance(dwell);
+        let handled = false;
+        if (typeof deferAdvanceHandler === 'function') {
+          try {
+            const helpers = {
+              schedule(ms) {
+                const target = Number.isFinite(ms) && ms > 0 ? Math.round(ms) : dwell;
+                scheduleAdvance(target);
+              },
+              scheduleDefault() {
+                scheduleAdvance(dwell);
+              },
+              clear() {
+                if (slideTimer) { clearTimeout(slideTimer); slideTimer = 0; }
+              },
+              defaultMs: dwell,
+              item,
+              pageConfig: config
+            };
+            handled = deferAdvanceHandler(helpers) === true;
+          } catch (err) {
+            console.warn('[slideshow] custom advance handler failed', err);
+          }
+        }
+        if (!handled) {
+          scheduleAdvance(dwell);
+        }
       }
       preloadUpcomingForStage(controller, { offset: 1 });
     }
@@ -4348,11 +4456,11 @@ function renderStorySlide(story = {}, region = 'left') {
       case 'story':
         return renderStorySlide(item.story, region);
       case 'hero-timeline':
-        return renderHeroTimeline(region);
+        return renderHeroTimeline(region, ctx);
       case 'wellness-tip':
         return renderWellnessTip(item, region);
       case 'event-countdown':
-        return renderEventCountdown(item, region);
+        return renderEventCountdown(item, region, ctx);
       case 'gastronomy-highlight':
         return renderGastronomyHighlight(item, region);
       default:
