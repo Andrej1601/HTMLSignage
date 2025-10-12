@@ -1507,9 +1507,20 @@ async function loadDeviceResolved(id){
         if (waitForScroll && !scrollable) markCycle();
       }
     });
+    const handleManualScroll = () => {
+      if (!waitForScroll) return;
+      const maxScroll = list.scrollHeight - list.clientHeight;
+      if (maxScroll <= 0) return;
+      const threshold = Math.max(1, maxScroll * 0.02);
+      if (list.scrollTop >= maxScroll - threshold) {
+        markCycle();
+      }
+    };
+    list.addEventListener('scroll', handleManualScroll, { passive: true });
     const cleanups = [];
     if (timer) cleanups.push(() => clearInterval(timer));
     if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
+    cleanups.push(() => list.removeEventListener('scroll', handleManualScroll));
     container.__cleanup = () => {
       cleanups.splice(0).forEach((fn) => {
         try { fn(); } catch {}
@@ -1540,6 +1551,7 @@ async function loadDeviceResolved(id){
     const scrollableCb = typeof onScrollableChange === 'function' ? onScrollableChange : null;
     let cycleCount = 0;
     const pauseInterval = Number.isFinite(+pauseMs) ? Math.max(0, +pauseMs) : 3500;
+    let resizeFrame = 0;
 
     const getMaxScroll = () => Math.max(0, container[scrollSizeProp] - container[sizeProp]);
 
@@ -1631,12 +1643,21 @@ async function loadDeviceResolved(id){
     };
 
     let resizeObserver = null;
+    const flushResize = () => {
+      resizeFrame = 0;
+      if (destroyed) return;
+      if (ensureScrollable() && !frame && !idleTimer) {
+        schedule();
+      }
+    };
     if (typeof ResizeObserver === 'function') {
       resizeObserver = new ResizeObserver(() => {
         if (destroyed) return;
-        if (ensureScrollable() && !frame && !idleTimer) {
-          schedule();
+        if (resizeFrame) {
+          caf(resizeFrame);
+          resizeFrame = 0;
         }
+        resizeFrame = raf(flushResize);
       });
       resizeObserver.observe(container);
     }
@@ -1646,6 +1667,10 @@ async function loadDeviceResolved(id){
     return () => {
       destroyed = true;
       stopTimers();
+      if (resizeFrame) {
+        caf(resizeFrame);
+        resizeFrame = 0;
+      }
       if (resizeObserver) resizeObserver.disconnect();
       container.classList.remove('is-scrollable');
     };
