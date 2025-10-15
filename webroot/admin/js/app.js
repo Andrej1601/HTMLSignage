@@ -1715,7 +1715,7 @@ function renderSlidesBox(){
     }
   };
   const playlistLayoutHosts = new Set();
-  const PLAYLIST_WIDE_THRESHOLD = 480;
+  const PLAYLIST_WIDE_THRESHOLD = 320;
   const updatePlaylistLayoutState = () => {
     const layoutSelect = document.getElementById('layoutMode');
     const isSplit = (layoutSelect?.value === 'split');
