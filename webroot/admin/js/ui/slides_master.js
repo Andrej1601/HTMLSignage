@@ -483,6 +483,7 @@ function syncActiveStyleSetBadgeSettings(settings){
 }
 
 function markBadgeLibraryChanged(settings){
+  ensureBadgeLibrary(settings);
   syncActiveStyleSetBadgeSettings(settings);
   if (ctx && typeof ctx.refreshSlidesBox === 'function') {
     try { ctx.refreshSlidesBox(); }

@@ -910,8 +910,12 @@ details.ac[open] .chev{ transform: rotate(90deg); }
 .slide-order-grid{
   display:grid;
   gap:12px;
-  grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
+  grid-template-columns:repeat(auto-fill, minmax(140px,1fr));
   margin-top:16px;
+}
+
+.layout-display-columns .slide-order-grid{
+  grid-template-columns:repeat(auto-fill, minmax(104px,1fr));
 }
 
 .slide-order-tile{
