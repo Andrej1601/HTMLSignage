@@ -565,16 +565,25 @@ function applyRoleRestrictions() {
   }
   document.body?.classList.add('role-limited');
 
+  const allowedDetailIds = new Set(['boxSaunas', 'boxFootnotes']);
+
   const slidesMaster = document.getElementById('slidesMaster');
   if (slidesMaster) {
-    slidesMaster.open = true;
+    slidesMaster.remove();
   }
 
   document.querySelectorAll('.rightbar details').forEach((details) => {
-    if (details.id !== 'slidesMaster') {
+    if (!allowedDetailIds.has(details.id)) {
       details.remove();
+    } else {
+      details.open = true;
     }
   });
+
+  const cockpit = document.querySelector('.workspace-overview');
+  if (cockpit) {
+    cockpit.remove();
+  }
 
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
