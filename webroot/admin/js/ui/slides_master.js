@@ -485,10 +485,6 @@ function syncActiveStyleSetBadgeSettings(settings){
 
 function markBadgeLibraryChanged(settings){
   syncActiveStyleSetBadgeSettings(settings);
-  if (ctx && typeof ctx.setSettings === 'function') {
-    try { ctx.setSettings(settings); }
-    catch (err) { console.warn('[admin] Failed to persist badge settings to context', err); }
-  }
   if (ctx && typeof ctx.refreshSlidesBox === 'function') {
     try { ctx.refreshSlidesBox(); }
     catch (err) { console.warn('[admin] Slides box refresh failed after badge update', err); }
@@ -500,8 +496,6 @@ function markBadgeLibraryChanged(settings){
     window.__markUnsaved?.();
     if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
   }
-  try { ctx?.queueUnsavedEvaluation?.({ reason: 'badge-library-change' }); }
-  catch (err) { console.warn('[admin] Unsaved evaluation failed after badge update', err); }
 }
 
 const scheduleBadgeLibraryChanged = (() => {
@@ -2984,73 +2978,36 @@ export function renderSlidesMaster(){
     return automation;
   };
 
-  const syncAutomationFallbackStyle = ({ candidateId = '', markUnsaved = false } = {}) => {
-    const normalizedCandidate = (typeof candidateId === 'string') ? candidateId : '';
+  const syncAutomationFallbackStyle = (styleId, { markUnsaved = false } = {}) => {
+    if (!styleId || !hasStyleSet(styleId)) return;
     const automation = ensureStyleAutomationForPalette();
-    let changed = false;
-    const fallbackSelect = document.getElementById('styleAutoFallback');
-
-    const ensureOption = (id) => {
-      if (!id || !hasStyleSet(id) || !fallbackSelect) return;
-      const label = styleSets[id]?.label || id;
-      const options = Array.from(fallbackSelect.options || []);
-      let opt = options.find(entry => entry.value === id);
-      if (!opt) {
-        opt = document.createElement('option');
-        opt.value = id;
-        fallbackSelect.appendChild(opt);
+    const previous = automation.fallbackStyle;
+    if (previous === styleId) {
+      const fallbackSelect = document.getElementById('styleAutoFallback');
+      if (fallbackSelect && fallbackSelect.value !== styleId) {
+        fallbackSelect.value = styleId;
       }
-      if (opt.textContent !== label) opt.textContent = label;
-    };
-
-    const pruneMissingOptions = () => {
-      if (!fallbackSelect) return;
-      Array.from(fallbackSelect.options || []).forEach(opt => {
-        if (!hasStyleSet(opt.value)) opt.remove();
-      });
-    };
-
-    const resolveFallback = () => {
-      const previous = typeof automation.fallbackStyle === 'string' ? automation.fallbackStyle : '';
-      if (previous && hasStyleSet(previous)) return previous;
-      const nextCandidate = normalizedCandidate && hasStyleSet(normalizedCandidate)
-        ? normalizedCandidate
-        : fallbackStyleSetId();
-      const resolved = nextCandidate || '';
-      if (resolved !== previous) {
-        automation.fallbackStyle = resolved;
-        changed = true;
-      }
-      return resolved;
-    };
-
-    pruneMissingOptions();
-    Object.keys(styleSets).forEach(id => ensureOption(id));
-
-    if (normalizedCandidate && hasStyleSet(normalizedCandidate)) ensureOption(normalizedCandidate);
-
-    const fallbackId = resolveFallback();
-    if (fallbackId) ensureOption(fallbackId);
-
-    if (Array.isArray(automation.timeSlots) && fallbackId) {
+      return;
+    }
+    automation.fallbackStyle = styleId;
+    if (Array.isArray(automation.timeSlots)) {
       automation.timeSlots.forEach(slot => {
         if (!slot || typeof slot !== 'object') return;
-        if (!slot.style || !hasStyleSet(slot.style)) {
-          slot.style = fallbackId;
-          changed = true;
-        }
+        if (!slot.style || !hasStyleSet(slot.style)) slot.style = styleId;
       });
     }
-
+    const fallbackSelect = document.getElementById('styleAutoFallback');
     if (fallbackSelect) {
-      if (fallbackId) {
-        if (fallbackSelect.value !== fallbackId) fallbackSelect.value = fallbackId;
-      } else if (fallbackSelect.value !== '') {
-        fallbackSelect.value = '';
+      const hasOption = Array.from(fallbackSelect.options || []).some(opt => opt.value === styleId);
+      if (!hasOption) {
+        const opt = document.createElement('option');
+        opt.value = styleId;
+        opt.textContent = styleSets[styleId]?.label || styleId;
+        fallbackSelect.appendChild(opt);
       }
+      fallbackSelect.value = styleId;
     }
-
-    if (markUnsaved && changed) {
+    if (markUnsaved) {
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
@@ -3061,8 +3018,6 @@ export function renderSlidesMaster(){
     const fallbackId = fallbackStyleSetId();
     selectedStyleSetId = fallbackId || '';
   }
-
-  syncAutomationFallbackStyle({ candidateId: selectedStyleSetId, markUnsaved: false });
 
   const getSelectedStyleSetId = ({ allowFallback = true } = {}) => {
     if (styleSelect){
@@ -3120,7 +3075,7 @@ export function renderSlidesMaster(){
     if (currentId && styleSets[currentId]){
       labelField.disabled = false;
       labelField.value = styleSets[currentId].label || currentId;
-      syncAutomationFallbackStyle({ candidateId: currentId, markUnsaved: false });
+      syncAutomationFallbackStyle(currentId, { markUnsaved: false });
     } else {
       labelField.disabled = true;
       labelField.value = '';
@@ -3141,7 +3096,7 @@ export function renderSlidesMaster(){
         selectedStyleSetId = newId;
       }
       const effectiveId = getSelectedStyleSetId();
-      if (effectiveId) syncAutomationFallbackStyle({ candidateId: effectiveId, markUnsaved: true });
+      if (effectiveId) syncAutomationFallbackStyle(effectiveId, { markUnsaved: true });
       updateLabelField();
     };
   }
@@ -3244,7 +3199,6 @@ export function renderSlidesMaster(){
       if (selectedStyleSetId === currentId){
         selectedStyleSetId = fallbackStyleSetId();
       }
-      syncAutomationFallbackStyle({ candidateId: selectedStyleSetId, markUnsaved: true });
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
