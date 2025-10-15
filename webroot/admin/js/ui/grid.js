@@ -391,7 +391,7 @@ export function renderGrid(){
   (sc.rows || []).forEach((row, ri) => {
     html += '<tr>';
     html += `<td class="time timecol" data-ri="${ri}">
-               <input class="input" type="text" value="${row.time}" style="width:7.5ch;text-align:center">
+               <input class="input" type="text" value="${row.time}" style="width:clamp(7ch,2.8vw,12ch);text-align:center">
              </td>`;
     (row.entries || []).forEach((cell, ci) => {
       const filled = (cell && cell.title) ? 'filled' : '';
