@@ -22,6 +22,7 @@ import { DEFAULTS } from '../core/defaults.js';
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
 let selectedStyleSetId = null;
+let lastActiveStyleSetId = null;
 
 const COMPONENT_KEYS = ['title','description','badges'];
 
@@ -2475,6 +2476,27 @@ export function renderSlidesMaster(){
 
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
+  const styleSetIds = Object.keys(styleSets);
+  const resolveActiveStyleId = () => {
+    const rawId = typeof settings?.slides?.activeStyleSet === 'string'
+      ? settings.slides.activeStyleSet
+      : '';
+    if (rawId && styleSetIds.includes(rawId)) return rawId;
+    return styleSetIds[0] || '';
+  };
+  const normalizedActiveId = resolveActiveStyleId();
+  if (settings?.slides) {
+    if (settings.slides.activeStyleSet !== normalizedActiveId) {
+      settings.slides.activeStyleSet = normalizedActiveId;
+    }
+  }
+  if (!selectedStyleSetId || !styleSetIds.includes(selectedStyleSetId)) {
+    selectedStyleSetId = normalizedActiveId;
+  }
+  if (normalizedActiveId && normalizedActiveId !== lastActiveStyleSetId) {
+    selectedStyleSetId = normalizedActiveId;
+  }
+  lastActiveStyleSetId = normalizedActiveId;
   const componentFlags = ensureEnabledComponents(settings);
   // Transition
   const transEl = $('#transMs2');
