@@ -617,14 +617,12 @@
     const savedActive = slidesCfg.activeStyleSet && styleSets[slidesCfg.activeStyleSet]
       ? slidesCfg.activeStyleSet
       : null;
-    const automationFallback = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
+    const fallback = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
       ? automation.fallbackStyle
-      : null;
-    const disabledChoice = savedActive || automationFallback || availableIds[0];
+      : (savedActive || availableIds[0]);
     if (!automation || automation.enabled === false) {
-      return { style: disabledChoice, reason: 'disabled' };
+      return { style: fallback, reason: 'disabled' };
     }
-    const fallback = automationFallback || savedActive || availableIds[0];
     const rangeStyle = resolveRangeSlotStyle(styleSets, automation);
     if (rangeStyle) {
       return { style: rangeStyle, reason: 'range' };
@@ -4045,7 +4043,6 @@ function renderStorySlide(story = {}, region = 'left') {
     const colIdx = (schedule.saunas || []).indexOf(name);
     const saunaStatus = getSaunaStatus(name);
     const hideForStatus = saunaStatus !== SAUNA_STATUS.ACTIVE;
-    const hideInfusionChips = saunaStatus === SAUNA_STATUS.OUT_OF_ORDER;
     const componentFlags = getSlideComponentFlags();
     const showSaunaFlames = settings?.slides?.showSaunaFlames !== false;
     const inlineBadgeColumn = settings?.slides?.badgeInlineColumn === true;
@@ -4155,12 +4152,10 @@ function renderStorySlide(story = {}, region = 'left') {
       const componentDefs = [
         { key: 'title', node: titleNode, target: 'main' },
         { key: 'description', render: () => createDescriptionNode(it.description, 'description'), target: 'main' },
-        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list'), target: 'main' }
+        { key: 'aromas', render: () => createAromaListNode(it.aromas, 'aroma-list'), target: 'main' },
+        { key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip'), target: 'main' },
+        { key: 'badges', render: () => badgeRowNode, target: inlineBadgeColumn ? 'badge' : 'main' }
       ];
-      if (!hideInfusionChips) {
-        componentDefs.push({ key: 'facts', render: () => createFactsList(it.facts, 'facts', 'card-chip'), target: 'main' });
-      }
-      componentDefs.push({ key: 'badges', render: () => badgeRowNode, target: inlineBadgeColumn ? 'badge' : 'main' });
       renderComponentNodes(
         componentFlags,
         componentDefs,
