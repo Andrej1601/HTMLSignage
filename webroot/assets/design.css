@@ -404,8 +404,33 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
 .grid thead th{white-space:normal;word-break:break-word;hyphens:auto;overflow-wrap:anywhere;}
 .grid thead th.timecol{white-space:nowrap;}
-.grid thead th .sauna-status-note{display:block;margin-top:4px;font-size:calc(16px*var(--scale)*var(--ovHeadScale)*var(--ovAuto)*0.7);font-weight:600;opacity:.82;}
-.grid thead th[data-status="out-of-order"]{position:relative;}
+.grid thead th .sauna-status-note{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:.45em;
+  margin-top:6px;
+  padding:.35em .9em;
+  font-size:calc(16px*var(--scale)*var(--ovHeadScale)*var(--ovAuto)*0.9);
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  border-radius:999px;
+  color:var(--headFg);
+  background:color-mix(in srgb, var(--headBg) 70%, transparent);
+}
+.grid thead th[data-status="out-of-order"]{position:relative;--oobBadgeBg:color-mix(in srgb, var(--accent) 70%, var(--headBg) 30%);--oobBadgeBorder:color-mix(in srgb, var(--accent) 80%, transparent);}
+.grid thead th[data-status="out-of-order"] .sauna-status-note{
+  background:var(--oobBadgeBg);
+  color:var(--cornerFg);
+  box-shadow:0 0 0 1px var(--oobBadgeBorder),0 8px 24px rgba(0,0,0,.25);
+  opacity:1;
+}
+.grid thead th[data-status="out-of-order"] .sauna-status-note::before{
+  content:'⚠️';
+  font-size:1.1em;
+  line-height:1;
+}
 .overview .grid thead th{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
 
@@ -421,6 +446,17 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch));color:var(--fg)}
 .grid td[data-status="out-of-order"] .caption,
 .grid td[data-status="out-of-order"] .chip-text{font-style:italic;}
+.grid td[data-status="out-of-order"] .chip{
+  background:color-mix(in srgb, var(--accent) 18%, var(--cell));
+  border-color:color-mix(in srgb, var(--accent) 60%, var(--chipBorder));
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent) inset;
+}
+.grid td[data-status="out-of-order"] .chip::before{
+  content:'⚠';
+  margin-right:.55em;
+  font-size:1.1em;
+  line-height:1;
+}
 
 /* equal chips */
 .cellwrap{display:block;width:100%;min-width:0}

@@ -11,6 +11,15 @@ let inited = false;
 let undoStack = [];
 let redoStack = [];
 
+function scheduleChanged(reason = 'grid-update'){
+  if (!ctx || typeof ctx.notifyScheduleChanged !== 'function') return;
+  try {
+    ctx.notifyScheduleChanged({ reason });
+  } catch (error) {
+    console.warn('[admin] schedule change notification failed', error);
+  }
+}
+
 function cloneCell(cell){
   if (!cell) return null;
   if (typeof structuredClone === 'function'){
@@ -345,6 +354,7 @@ function undo(){
   const sc = ctx.getSchedule();
   redoStack.push(cloneRows(sc.rows));
   sc.rows = undoStack.pop();
+  scheduleChanged('undo');
   renderGrid();
   updateSelTime();
   updateUndoRedoButtons();
@@ -356,6 +366,7 @@ function redo(){
   const sc = ctx.getSchedule();
   undoStack.push(cloneRows(sc.rows));
   sc.rows = redoStack.pop();
+  scheduleChanged('redo');
   renderGrid();
   updateSelTime();
   updateUndoRedoButtons();
@@ -420,6 +431,7 @@ export function renderGrid(){
       pushHistory();
       sc2.rows[ri].time = t;
       sc2.rows.sort((a,b)=>a.time.localeCompare(b.time));
+      scheduleChanged('time-edit');
       renderGrid();
     };
     inp.onclick = () => { curRow = +inp.parentElement.dataset.ri; updateSelTime(); };
@@ -538,6 +550,7 @@ function initOnce(){
     }
     sc.rows.sort((a,b)=>a.time.localeCompare(b.time));
 
+    scheduleChanged('cell-edit');
     $('#modal').style.display = 'none';
     renderGrid();
   };
@@ -548,6 +561,7 @@ function initOnce(){
     pushHistory();
     const cols = sc.saunas.length;
     sc.rows.splice(curRow, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    scheduleChanged('row-insert-above');
     renderGrid();
   };
   $('#btnAddBelow').onclick = () => {
@@ -555,6 +569,7 @@ function initOnce(){
     pushHistory();
     const cols = sc.saunas.length;
     sc.rows.splice(curRow+1, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    scheduleChanged('row-insert-below');
     renderGrid();
   };
   $('#btnDeleteRow').onclick = () => {
@@ -563,6 +578,7 @@ function initOnce(){
       pushHistory();
       sc.rows.splice(curRow, 1);
       curRow = Math.max(0, curRow - 1);
+      scheduleChanged('row-delete');
       renderGrid();
       updateSelTime();
     }

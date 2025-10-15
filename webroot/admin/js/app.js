@@ -164,6 +164,12 @@ function createGridContext() {
     getSchedule: stateAccess.getSchedule,
     getSettings: stateAccess.getSettings,
     setSchedule: stateAccess.setSchedule,
+    notifyScheduleChanged: (info = {}) => {
+      const reason = typeof info?.reason === 'string' ? info.reason : 'grid-update';
+      safeInvoke(`[admin] Slides master sync failed after grid change (${reason})`, () => {
+        renderSlidesMaster();
+      });
+    },
     hasUnsavedChanges: () => unsavedHasChanges(),
     resetUnsavedBaseline: (options) => resetUnsavedBaseline(options || {}),
     queueUnsavedEvaluation: (options) => queueUnsavedEvaluation(options || {})
