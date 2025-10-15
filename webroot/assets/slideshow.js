@@ -81,6 +81,86 @@
     cancelFrame: null
   };
 
+  const SAUNA_STATUS = Object.freeze({
+    ACTIVE: 'active',
+    NO_INFUSIONS: 'no-infusions',
+    OUT_OF_ORDER: 'out-of-order',
+    HIDDEN: 'hidden'
+  });
+
+  const SAUNA_STATUS_TEXT = {
+    [SAUNA_STATUS.ACTIVE]: 'Aufgüsse',
+    [SAUNA_STATUS.NO_INFUSIONS]: 'Keine Aufgüsse',
+    [SAUNA_STATUS.OUT_OF_ORDER]: 'Außer Betrieb',
+    [SAUNA_STATUS.HIDDEN]: 'Ausgeblendet'
+  };
+
+  let saunaStatusState = { map: new Map(), hidden: new Set() };
+
+  function normalizeSaunaStatus(value){
+    if (typeof value !== 'string') return null;
+    let key = value.trim();
+    if (!key) return null;
+    try { key = key.normalize('NFKD'); }
+    catch (err) { /* ignore */ }
+    key = key.replace(/ß/g, 'ss').replace(/[\u0300-\u036f]/g, '');
+    key = key.toLowerCase().replace(/[_\s]+/g, '-');
+    if (Object.values(SAUNA_STATUS).includes(key)) return key;
+    if (key === 'keine-aufgusse' || key === 'kein-aufguss' || key === 'no-aufguss' || key === 'noaufguss' || key === 'noinfusions') {
+      return SAUNA_STATUS.NO_INFUSIONS;
+    }
+    if (key === 'ausser-betrieb' || key === 'ausserbetrieb' || key === 'outoforder') {
+      return SAUNA_STATUS.OUT_OF_ORDER;
+    }
+    if (key === 'ausgeblendet' || key === 'ausblenden') {
+      return SAUNA_STATUS.HIDDEN;
+    }
+    return null;
+  }
+
+  function computeSaunaStatusState(currentSettings, currentSchedule){
+    const map = new Map();
+    const hidden = new Set();
+    const statusCfg = (currentSettings?.slides?.saunaStatus && typeof currentSettings.slides.saunaStatus === 'object')
+      ? currentSettings.slides.saunaStatus
+      : {};
+    const legacyHidden = new Set(currentSettings?.slides?.hiddenSaunas || []);
+    const saunas = Array.isArray(currentSchedule?.saunas) ? currentSchedule.saunas : [];
+    const rows = Array.isArray(currentSchedule?.rows) ? currentSchedule.rows : [];
+    saunas.forEach((name, idx) => {
+      if (typeof name !== 'string' || !name) return;
+      let status = normalizeSaunaStatus(statusCfg[name]);
+      const hasEntries = rows.some(row => {
+        const entries = Array.isArray(row?.entries) ? row.entries : [];
+        const cell = entries[idx];
+        return !!(cell && cell.title);
+      });
+      if (!status && legacyHidden.has(name)) status = SAUNA_STATUS.NO_INFUSIONS;
+      if (!status) status = hasEntries ? SAUNA_STATUS.ACTIVE : SAUNA_STATUS.NO_INFUSIONS;
+      if (status === SAUNA_STATUS.ACTIVE && !hasEntries) status = SAUNA_STATUS.NO_INFUSIONS;
+      if (status === SAUNA_STATUS.NO_INFUSIONS && hasEntries) status = SAUNA_STATUS.ACTIVE;
+      if (!SAUNA_STATUS_TEXT[status] && status !== SAUNA_STATUS.ACTIVE){
+        status = hasEntries ? SAUNA_STATUS.ACTIVE : SAUNA_STATUS.NO_INFUSIONS;
+      }
+      map.set(name, status);
+      if (status !== SAUNA_STATUS.ACTIVE) hidden.add(name);
+    });
+    return { map, hidden };
+  }
+
+  function ensureSaunaStatusState(force = false){
+    if (!settings || !schedule) return saunaStatusState;
+    if (force || !saunaStatusState.map || !saunaStatusState.map.size){
+      saunaStatusState = computeSaunaStatusState(settings, schedule);
+    }
+    return saunaStatusState;
+  }
+
+  function getSaunaStatus(name){
+    const state = ensureSaunaStatusState();
+    return state.map.get(name) || SAUNA_STATUS.ACTIVE;
+  }
+
   function cleanupDisplayListeners(){
     if (displayListeners.resizeHandler) {
       window.removeEventListener('resize', displayListeners.resizeHandler);
@@ -378,6 +458,7 @@
 
     schedule = nextSchedule;
     settings = sanitizeSettingsPayload(nextSettings);
+    saunaStatusState = computeSaunaStatusState(settings, schedule);
     badgeLookupCache = null;
 
     snapshotStyleAutomationBase();
@@ -456,6 +537,7 @@
     const preset = presets[key] || presets['Default'] || null;
     if (preset && preset.saunas && Array.isArray(preset.rows)) {
       schedule = preset; // gleiche Struktur wie schedule.json erwartet
+      saunaStatusState = computeSaunaStatusState(settings, schedule);
     }
   }
 
@@ -1009,7 +1091,8 @@ async function loadDeviceResolved(id){
     const withHero = (queue) => hasHero ? [{ type: 'hero-timeline' }, ...queue] : queue.slice();
 
   const showOverview = (settings?.slides?.showOverview !== false);
-  const hidden = new Set(settings?.slides?.hiddenSaunas || []);
+  const statusState = ensureSaunaStatusState(true);
+  const hidden = new Set(statusState.hidden || []);
   const allSaunas = (schedule?.saunas || []);
   const sortOrder = Array.isArray(settings?.slides?.sortOrder) ? settings.slides.sortOrder : null;
 
@@ -2337,17 +2420,39 @@ function tableGrid(hlMap) {
 
   const notes = footnoteMap();
   const showFlames = (settings?.fonts?.overviewShowFlames !== false);
+  const statusStateLocal = ensureSaunaStatusState();
+  const saunas = Array.isArray(schedule?.saunas) ? schedule.saunas : [];
+  const saunaInfo = saunas.map((name, idx) => ({
+    name,
+    idx,
+    status: statusStateLocal.map.get(name) || SAUNA_STATUS.ACTIVE
+  }));
+  const visibleSaunas = saunaInfo.filter(info => info.status !== SAUNA_STATUS.HIDDEN);
+
   const t = h('table', { class: 'grid' });
   const colg = h('colgroup');
   colg.appendChild(h('col', { class: 'c_time' }));
-  for (const _ of (schedule?.saunas ?? [])) colg.appendChild(h('col', { class: 'c_auto' }));
+  visibleSaunas.forEach(info => {
+    const attrs = { class: 'c_auto' };
+    if (info.status === SAUNA_STATUS.OUT_OF_ORDER) attrs['data-status'] = 'out-of-order';
+    colg.appendChild(h('col', attrs));
+  });
   t.appendChild(colg);
 
   const thead = h('thead');
   const tr = h('tr');
   tr.appendChild(h('th', { class: 'timecol corner' }, 'Zeit'));
-  for (const s of (schedule?.saunas ?? [])) tr.appendChild(h('th', {}, s));
-  thead.appendChild(tr); t.appendChild(thead);
+  visibleSaunas.forEach(info => {
+    const attrs = {};
+    if (info.status === SAUNA_STATUS.OUT_OF_ORDER) attrs['data-status'] = 'out-of-order';
+    const headerChildren = [info.name];
+    if (info.status === SAUNA_STATUS.OUT_OF_ORDER) {
+      headerChildren.push(h('span', { class: 'sauna-status-note' }, SAUNA_STATUS_TEXT[SAUNA_STATUS.OUT_OF_ORDER]));
+    }
+    tr.appendChild(h('th', attrs, headerChildren));
+  });
+  thead.appendChild(tr);
+  t.appendChild(thead);
 
   const usedSet = new Set();
   const tb = h('tbody');
@@ -2355,46 +2460,76 @@ function tableGrid(hlMap) {
     const trr = h('tr');
     const timeText = formatTimeLabel(row?.time || '');
     trr.appendChild(h('td', { class: 'timecol' }, timeText));
-    (row?.entries ?? []).forEach((cell, ci) => {
-      const td = h('td', {}, []);
-      const key = 'r' + ri + 'c' + ci;
+    const entries = Array.isArray(row?.entries) ? row.entries : [];
+    visibleSaunas.forEach(info => {
+      const cell = entries[info.idx];
+      const tdAttrs = {};
+      if (info.status === SAUNA_STATUS.OUT_OF_ORDER) tdAttrs['data-status'] = 'out-of-order';
+      const td = h('td', tdAttrs, []);
+      const key = 'r' + ri + 'c' + info.idx;
       if (cell && cell.title) {
-          const title = String(cell.title).replace(/\*+$/, '');
-          const hasStarInText = /\*$/.test(cell.title || '');
-// Textbereich
-const txt = h('div', { class: 'chip-text' }, title);
-if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', {class:'note legacy'}, '*')]));
-const supNote = noteSup(cell, notes);
-if (supNote) { txt.appendChild(h('span', { class: 'notewrap' }, [supNote])); usedSet.add(cell.noteId); }
-
-// Chip-Container (Flex: Text links, Flammen rechts)
-const chipChildren = [txt];
-if (showFlames) {
-  chipChildren.push(h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]));
-}
-const chip = h('div', { class: 'chip' + (hlMap?.byCell?.[key] ? ' highlight' : '') }, chipChildren);
-const wrap = h('div', { class: 'cellwrap' }, [chip]);
-          td.appendChild(wrap);
-        } else {
-          td.appendChild(h('div', { class: 'caption' }, '—'));
+        const title = String(cell.title).replace(/\*+$/, '');
+        const hasStarInText = /\*$/.test(cell.title || '');
+        const txt = h('div', { class: 'chip-text' }, title);
+        if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
+        const supNote = noteSup(cell, notes);
+        if (supNote) {
+          txt.appendChild(h('span', { class: 'notewrap' }, [supNote]));
+          usedSet.add(cell.noteId);
         }
-        trr.appendChild(td);
-      });
-      tb.appendChild(trr);
+
+        const chipChildren = [txt];
+        if (showFlames) {
+          chipChildren.push(h('div', { class: 'chip-flames' }, [flamesWrap(cell.flames || '')]));
+        }
+        const chipClass = 'chip' + (hlMap?.byCell?.[key] ? ' highlight' : '');
+        const chip = h('div', { class: chipClass }, chipChildren);
+        const wrap = h('div', { class: 'cellwrap' }, [chip]);
+        td.appendChild(wrap);
+      } else {
+        td.appendChild(h('div', { class: 'caption' }, '—'));
+      }
+      trr.appendChild(td);
     });
-    t.appendChild(tb);
+    tb.appendChild(trr);
+  });
+  t.appendChild(tb);
 
 const footNodes = [];
 const order = (settings?.footnotes||[]).map(fn=>fn.id);
 for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
 const layout = (settings?.footnoteLayout ?? 'one-line');
 const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : 'fn-one');
-if (footNodes.length){
-  const nodes = [];
-  footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
-  return h('div', {}, [ t, h('div', { class: fnClass }, nodes) ]);
-}
-return h('div', {}, [ t ]);
+  if (footNodes.length){
+    const nodes = [];
+    footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
+    return h('div', {}, [ t, h('div', { class: fnClass }, nodes) ]);
+  }
+  return h('div', {}, [ t ]);
+  }
+
+  function updateOverviewTimeWidth(container) {
+    if (!container) return;
+    const table = container.querySelector('.grid');
+    if (!table) {
+      container.style.removeProperty('--ovTimeWidthPx');
+      return;
+    }
+    const cells = table.querySelectorAll('.timecol');
+    if (!cells.length) {
+      container.style.removeProperty('--ovTimeWidthPx');
+      return;
+    }
+    let max = 0;
+    cells.forEach(cell => {
+      const width = cell.scrollWidth;
+      if (width > max) max = width;
+    });
+    if (max > 0) {
+      container.style.setProperty('--ovTimeWidthPx', `${Math.ceil(max + 4)}px`);
+    } else {
+      container.style.removeProperty('--ovTimeWidthPx');
+    }
   }
 
   function autoScaleOverview(container) {
@@ -2448,6 +2583,7 @@ return h('div', {}, [ t ]);
     const bar = h('div',{class:'ovbar headings'}, [ h('h1',{class:'h1'}, 'Aufgussplan'), rightH2 ]);
     const c = h('div', {class:'container overview fade show'}, [ bar, h('div', {class:'ovwrap'}, [table]) ]);
     const recalc = () => {
+      updateOverviewTimeWidth(c);
       autoScaleOverview(c);
       fitChipsIn(c); // nach dem Autoscale die Chip-Texte einpassen
     };
@@ -3901,7 +4037,8 @@ function renderStorySlide(story = {}, region = 'left') {
 
     const notes = footnoteMap();
     const colIdx = (schedule.saunas || []).indexOf(name);
-    const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
+    const saunaStatus = getSaunaStatus(name);
+    const hideForStatus = saunaStatus !== SAUNA_STATUS.ACTIVE;
     const componentFlags = getSlideComponentFlags();
     const showSaunaFlames = settings?.slides?.showSaunaFlames !== false;
     const inlineBadgeColumn = settings?.slides?.badgeInlineColumn === true;
@@ -3966,7 +4103,7 @@ function renderStorySlide(story = {}, region = 'left') {
       const hasStar = /\*$/.test(it.title || '');
       const tileClasses = ['tile'];
       if (hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) tileClasses.push('highlight');
-      if (it.hidden || hiddenSaunas.has(name)) tileClasses.push('is-hidden');
+      if (it.hidden || hideForStatus) tileClasses.push('is-hidden');
       let iconVariant = 'default';
       if (iconsEnabled) {
         iconVariant = resolveIconVariant(it.iconVariant);
@@ -4116,7 +4253,7 @@ function renderStorySlide(story = {}, region = 'left') {
       const tile = h('div', { class: tileClasses.join(' '), 'data-time': it.time }, tileChildren);
       tile.style.setProperty('--tile-index', String(list.children.length));
 
-      if (it.hidden || hiddenSaunas.has(name)) {
+      if (it.hidden || hideForStatus) {
         tile.appendChild(h('div', { class: 'card-chip card-chip--status', 'data-role': 'hidden' }, 'Ausgeblendet'));
       }
 
