@@ -2255,8 +2255,6 @@ function renderSlidesBox(){
   const applyLayoutVisibility = (mode) => {
     const rightWrap = document.getElementById('layoutRight');
     if (rightWrap) rightWrap.hidden = (mode !== 'split');
-    const pagesWrap = document.getElementById('layoutPages');
-    if (pagesWrap) pagesWrap.dataset.mode = (mode === 'split') ? 'split' : 'single';
   };
   applyLayoutVisibility(layoutMode);
   if (layoutModeSelect) {
