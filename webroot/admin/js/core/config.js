@@ -73,7 +73,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','overviewTimeWidthCh','overviewShowFlames'
+  'tileMetaScale','overviewTimeScale','overviewTimeWidthCh','overviewShowFlames'
 ];
 
 const STYLE_SLIDE_KEYS = [
