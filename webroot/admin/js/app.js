@@ -49,6 +49,7 @@ import {
   fetchUsers as fetchUserAccounts,
   saveUser as saveUserAccount,
   deleteUser as deleteUserAccount,
+  fetchSession as fetchCurrentUserSession,
   AVAILABLE_ROLES as AUTH_ROLES
 } from './core/auth_service.js';
 
@@ -73,6 +74,11 @@ const ROLE_META = {
     description: 'Voller Zugriff inklusive Benutzer- und Rollenkonfiguration.'
   }
 };
+
+let currentUser = { username: null, displayName: null, roles: ['admin'] };
+let currentUserRoles = new Set(currentUser.roles.map((role) => String(role).toLowerCase()));
+
+const hasRole = (role) => currentUserRoles.has(String(role || '').toLowerCase());
 
 // === Global State ============================================================
 let schedule = null;
@@ -515,6 +521,108 @@ function initSidebarResize(){
   });
 
   syncState();
+}
+
+// ============================================================================
+// 0) Zugriff & Rollensteuerung
+// ============================================================================
+async function resolveCurrentUser() {
+  try {
+    const session = await fetchCurrentUserSession();
+    const payload = session?.user || {};
+    const normalizedRoles = Array.isArray(payload.roles)
+      ? payload.roles
+        .map((role) => String(role || '').toLowerCase())
+        .filter((role) => role)
+      : [];
+    currentUserRoles = normalizedRoles.length ? new Set(normalizedRoles) : new Set();
+    currentUser = {
+      username: typeof payload.username === 'string' ? payload.username : null,
+      displayName: typeof payload.displayName === 'string' && payload.displayName !== ''
+        ? payload.displayName
+        : null,
+      roles: Array.from(currentUserRoles)
+    };
+    if (currentUser.roles.length === 0 && normalizedRoles.length === 0 && session?.ok === false) {
+      currentUser.roles = ['admin'];
+      currentUserRoles = new Set(['admin']);
+    }
+  } catch (error) {
+    console.warn('[admin] Benutzerstatus konnte nicht geladen werden', error);
+    currentUser = { username: null, displayName: null, roles: ['admin'] };
+    currentUserRoles = new Set(['admin']);
+  }
+  try {
+    window.__currentUser = currentUser;
+    window.__currentUserRoles = Array.from(currentUserRoles);
+  } catch {}
+}
+
+function applyRoleRestrictions() {
+  if (hasRole('admin')) {
+    document.body?.classList.remove('role-limited');
+    return;
+  }
+  document.body?.classList.add('role-limited');
+
+  const allowedDetailIds = new Set(['boxSaunas', 'boxFootnotes']);
+
+  const slidesMaster = document.getElementById('slidesMaster');
+  if (slidesMaster) {
+    slidesMaster.remove();
+  }
+
+  document.querySelectorAll('.rightbar details').forEach((details) => {
+    if (!allowedDetailIds.has(details.id)) {
+      details.remove();
+    } else {
+      details.open = true;
+    }
+  });
+
+  const cockpit = document.querySelector('.workspace-overview');
+  if (cockpit) {
+    cockpit.remove();
+  }
+
+  document.querySelectorAll('[data-devices]').forEach((element) => {
+    element.remove();
+  });
+
+  const btnDevices = document.getElementById('btnDevices');
+  if (btnDevices) {
+    btnDevices.remove();
+  }
+
+  setDevicesPinned(false);
+  lsRemove('devicesPinned');
+  document.body?.classList.remove('devices-pinned');
+  destroyDevicesPane();
+
+  const devicesPane = document.getElementById('devicesPane');
+  if (devicesPane) {
+    devicesPane.remove();
+  }
+
+  const devicesDock = document.getElementById('devicesDock');
+  if (devicesDock) {
+    devicesDock.remove();
+  }
+
+  const devPrevModal = document.getElementById('devPrevModal');
+  if (devPrevModal) {
+    devPrevModal.remove();
+  }
+
+  const btnUsers = document.getElementById('btnUsers');
+  if (btnUsers) {
+    btnUsers.remove();
+  }
+
+  const userModal = document.getElementById('userModal');
+  if (userModal) {
+    userModal.remove();
+  }
 }
 
 // ============================================================================
@@ -2109,6 +2217,7 @@ function renderSlidesBox(){
   setV('#ovTitleScale', f.overviewTitleScale ?? 1);
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
+  setV('#ovTimeScale',  f.overviewTimeScale  ?? f.overviewCellScale ?? 0.8);
   setV('#ovTimeWidth',  f.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10);
   setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
   const overviewFlamesToggle = document.getElementById('overviewFlames');
@@ -2216,6 +2325,7 @@ function renderSlidesBox(){
     setV('#ovTitleScale', DEFAULTS.fonts.overviewTitleScale);
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
+    setV('#ovTimeScale',  DEFAULTS.fonts.overviewTimeScale ?? DEFAULTS.fonts.overviewCellScale);
     setV('#ovTimeWidth',  DEFAULTS.fonts.overviewTimeWidthCh);
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
@@ -2589,6 +2699,13 @@ function collectSettings(){
         overviewTitleScale:+($('#ovTitleScale').value||1),
         overviewHeadScale:+($('#ovHeadScale').value||0.9),
         overviewCellScale:+($('#ovCellScale').value||0.8),
+        overviewTimeScale:(() => {
+          const raw = Number($('#ovTimeScale')?.value);
+          if (!Number.isFinite(raw)) {
+            return settings.fonts?.overviewTimeScale ?? settings.fonts?.overviewCellScale ?? DEFAULTS.fonts.overviewTimeScale ?? 0.8;
+          }
+          return clamp(0.5, raw, 3);
+        })(),
         overviewTimeWidthCh:(() => {
           const raw = Number($('#ovTimeWidth')?.value);
           if (!Number.isFinite(raw)) return settings.fonts?.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10;
@@ -3398,6 +3515,13 @@ function initThemeToggle(){
 // 8) Benutzer & Rollen
 // ============================================================================
 function initUserAdmin(){
+  if (!hasRole('admin')) {
+    const limitedBtn = document.getElementById('btnUsers');
+    if (limitedBtn) limitedBtn.remove();
+    const limitedModal = document.getElementById('userModal');
+    if (limitedModal) limitedModal.remove();
+    return;
+  }
   const openBtn = document.getElementById('btnUsers');
   const modal = document.getElementById('userModal');
   if (!openBtn || !modal) return;
@@ -3727,4 +3851,12 @@ function initCleanupInSystem(){
 // ============================================================================
 // 10) Start
 // ============================================================================
-loadAll();
+async function bootstrap(){
+  await resolveCurrentUser();
+  applyRoleRestrictions();
+  await loadAll();
+}
+
+bootstrap().catch((error) => {
+  console.error('[admin] Initialisierung fehlgeschlagen', error);
+});

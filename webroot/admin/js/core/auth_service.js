@@ -7,6 +7,24 @@ const DEFAULT_ROLES = ['viewer', 'editor', 'admin'];
 
 const okPredicate = (data) => data?.ok !== false;
 
+export async function fetchSession() {
+  const data = await fetchJson(`${API_BASE}/session.php`, {
+    cache: 'no-store',
+    okPredicate,
+    errorMessage: 'Benutzerstatus konnte nicht geladen werden.'
+  });
+  const user = data?.user || {};
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  return {
+    ok: data?.ok !== false,
+    user: {
+      username: typeof user?.username === 'string' ? user.username : null,
+      displayName: typeof user?.displayName === 'string' ? user.displayName : null,
+      roles
+    }
+  };
+}
+
 export async function fetchUsers() {
   const data = await fetchJson(`${API_BASE}/users_list.php`, {
     cache: 'no-store',

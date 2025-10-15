@@ -741,6 +741,9 @@ async function loadDeviceResolved(id){
     const overviewTimeWidth = Number.isFinite(+fonts.overviewTimeWidthCh)
       ? clamp(6, +fonts.overviewTimeWidthCh, 30)
       : 10;
+    const overviewTimeScale = Number.isFinite(+fonts.overviewTimeScale)
+      ? clamp(0.5, +fonts.overviewTimeScale, 3)
+      : (Number.isFinite(+fonts.overviewCellScale) ? +fonts.overviewCellScale : 0.8);
     const overlayEnabled = slidesCfg.tileOverlayEnabled !== false;
     const overlayStrength = overlayEnabled
       ? clamp(0, Number(slidesCfg.tileOverlayStrength ?? 1), 3)
@@ -772,6 +775,7 @@ async function loadDeviceResolved(id){
       '--ovTitleScale': fonts.overviewTitleScale || 1,
       '--ovHeadScale': fonts.overviewHeadScale || 0.9,
       '--ovCellScale': fonts.overviewCellScale || 0.8,
+      '--ovTimeScale': overviewTimeScale,
       '--ovTimeWidth': `${overviewTimeWidth}ch`,
       '--tileTextScale': fonts.tileTextScale || 0.8,
       '--tileWeight': fonts.tileWeight || 600,
