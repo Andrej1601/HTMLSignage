@@ -2477,17 +2477,26 @@ export function renderSlidesMaster(){
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
   const styleSetIds = Object.keys(styleSets);
-  const activeStyleIdRaw = settings?.slides?.activeStyleSet;
-  const activeStyleId = (typeof activeStyleIdRaw === 'string' && styleSetIds.includes(activeStyleIdRaw))
-    ? activeStyleIdRaw
-    : null;
+  const resolveActiveStyleId = () => {
+    const rawId = typeof settings?.slides?.activeStyleSet === 'string'
+      ? settings.slides.activeStyleSet
+      : '';
+    if (rawId && styleSetIds.includes(rawId)) return rawId;
+    return styleSetIds[0] || '';
+  };
+  const normalizedActiveId = resolveActiveStyleId();
+  if (settings?.slides) {
+    if (settings.slides.activeStyleSet !== normalizedActiveId) {
+      settings.slides.activeStyleSet = normalizedActiveId;
+    }
+  }
   if (!selectedStyleSetId || !styleSetIds.includes(selectedStyleSetId)) {
-    selectedStyleSetId = activeStyleId || (styleSetIds[0] || '');
+    selectedStyleSetId = normalizedActiveId;
   }
-  if (activeStyleId && activeStyleId !== lastActiveStyleSetId) {
-    selectedStyleSetId = activeStyleId;
+  if (normalizedActiveId && normalizedActiveId !== lastActiveStyleSetId) {
+    selectedStyleSetId = normalizedActiveId;
   }
-  lastActiveStyleSetId = activeStyleId;
+  lastActiveStyleSetId = normalizedActiveId;
   const componentFlags = ensureEnabledComponents(settings);
   // Transition
   const transEl = $('#transMs2');
