@@ -2255,10 +2255,24 @@ function renderSlidesBox(){
   const applyLayoutVisibility = (mode) => {
     const rightWrap = document.getElementById('layoutRight');
     if (rightWrap) rightWrap.hidden = (mode !== 'split');
+    const columnWrap = document.querySelector('.layout-display-columns');
+    if (columnWrap) columnWrap.classList.toggle('is-split', mode === 'split');
   };
   applyLayoutVisibility(layoutMode);
   if (layoutModeSelect) {
-    layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
+    layoutModeSelect.onchange = () => {
+      const mode = layoutModeSelect.value === 'split' ? 'split' : 'single';
+      settings.display = settings.display || {};
+      settings.display.layoutMode = mode;
+      applyLayoutVisibility(mode);
+      const displayCfg = settings.display;
+      const pagesCfg = displayCfg.pages = displayCfg.pages || {};
+      const leftState = pagesCfg.left = pagesCfg.left || {};
+      const rightState = pagesCfg.right = pagesCfg.right || {};
+      renderPagePlaylist('pageLeftPlaylist', leftState.playlist, { pageKey: 'left' });
+      renderPagePlaylist('pageRightPlaylist', rightState.playlist, { pageKey: 'right' });
+      notifySettingsChanged();
+    };
   }
 
   const layoutProfileSelect = document.getElementById('layoutProfile');
