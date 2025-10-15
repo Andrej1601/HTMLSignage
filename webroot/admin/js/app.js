@@ -13,7 +13,7 @@
 import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
-import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream, syncActiveStyleSetSnapshot } from './ui/slides_master.js';
+import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream, syncActiveStyleSetSnapshot, SAUNA_STATUS, SAUNA_STATUS_TEXT } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
 import { uploadGeneric } from './core/upload.js';
 import { createUnsavedTracker } from './core/unsaved_state.js';
@@ -1613,7 +1613,7 @@ function renderSlidesBox(){
       pageState.playlist = sanitized;
     }
 
-    const { entries: baseEntries, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: false });
+    const { entries: baseEntries, hiddenSaunas, statusBySauna } = collectSlideOrderStream({ normalizeSortOrder: false });
     const showOverview = settings?.slides?.showOverview !== false;
     const heroEnabled = !!(settings?.slides?.heroEnabled);
 
@@ -1647,14 +1647,17 @@ function renderSlidesBox(){
       if (entry.kind === 'sauna') {
         const name = entry.name || '';
         if (!name) return;
+        const status = statusBySauna?.[name] || SAUNA_STATUS.ACTIVE;
+        const disabled = status !== SAUNA_STATUS.ACTIVE;
+        const statusText = disabled ? (SAUNA_STATUS_TEXT[status] || 'Ausgeblendet') : null;
         pushEntry({
           key: 'sauna:' + name,
           kind: 'sauna',
           name,
           label: name,
           thumb: settings.assets?.rightImages?.[name] || '',
-          disabled: hiddenSaunas.has(name),
-          statusText: hiddenSaunas.has(name) ? 'Ausgeblendet' : null
+          disabled,
+          statusText
         });
       } else if (entry.kind === 'media') {
         const id = entry.item?.id != null ? String(entry.item.id) : '';

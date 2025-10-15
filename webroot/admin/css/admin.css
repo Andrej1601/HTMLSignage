@@ -54,7 +54,7 @@
   /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
   --col-name:minmax(140px,0.9fr);
   --col-type:8ch;
-  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:22px;
+  --col-prev:64px; --col-dur:70px; --col-btn:28px; --col-del:28px; --col-vis:minmax(150px, 1fr);
 
   /* Preview-Größe */
   --prev-w:60px; --prev-h:42px;
@@ -1370,6 +1370,10 @@ body.mode-uniform #ovSec{ display:none !important; }
 
 /* Checkbox-Spalte bündig */
 .saunarow input[type="checkbox"], .mediarow input[type="checkbox"]{ justify-self:center; }
+.saunarow .input.status{
+  width:clamp(120px, 18ch, 100%);
+  justify-self:start;
+}
 
 /* Upload/Default Buttons kompakt */
 .btn.icon{ width:28px; height:28px; }

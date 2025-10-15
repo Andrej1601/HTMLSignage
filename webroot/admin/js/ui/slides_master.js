@@ -94,6 +94,201 @@ function cloneSubset(src = {}, keys = []){
   return out;
 }
 
+const SAUNA_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  NO_INFUSIONS: 'no-infusions',
+  OUT_OF_ORDER: 'out-of-order',
+  HIDDEN: 'hidden'
+});
+
+const SAUNA_STATUS_VALUES = new Set(Object.values(SAUNA_STATUS));
+
+const SAUNA_STATUS_ALIASES = {
+  'keine-aufgusse': SAUNA_STATUS.NO_INFUSIONS,
+  'kein-aufguss': SAUNA_STATUS.NO_INFUSIONS,
+  'no-aufguss': SAUNA_STATUS.NO_INFUSIONS,
+  'noaufguss': SAUNA_STATUS.NO_INFUSIONS,
+  'noinfusions': SAUNA_STATUS.NO_INFUSIONS,
+  'ausser-betrieb': SAUNA_STATUS.OUT_OF_ORDER,
+  'ausserbetrieb': SAUNA_STATUS.OUT_OF_ORDER,
+  'outoforder': SAUNA_STATUS.OUT_OF_ORDER,
+  'ausgeblendet': SAUNA_STATUS.HIDDEN,
+  'ausblenden': SAUNA_STATUS.HIDDEN
+};
+
+const SAUNA_STATUS_TEXT = {
+  [SAUNA_STATUS.ACTIVE]: 'Aufgüsse',
+  [SAUNA_STATUS.NO_INFUSIONS]: 'Keine Aufgüsse',
+  [SAUNA_STATUS.OUT_OF_ORDER]: 'Außer Betrieb',
+  [SAUNA_STATUS.HIDDEN]: 'Ausblenden'
+};
+
+let saunaStatusCache = new Map();
+
+export { SAUNA_STATUS, SAUNA_STATUS_TEXT };
+
+function normalizeSaunaStatus(value){
+  if (typeof value !== 'string') return null;
+  let key = value.trim();
+  if (!key) return null;
+  try {
+    key = key.normalize('NFKD');
+  } catch (err) {
+    // ignore normalization errors (older browsers)
+  }
+  key = key.replace(/\u00df/g, 'ss');
+  key = key.replace(/[\u0300-\u036f]/g, '');
+  key = key.toLowerCase().replace(/[_\s]+/g, '-');
+  if (SAUNA_STATUS_VALUES.has(key)) return key;
+  if (Object.prototype.hasOwnProperty.call(SAUNA_STATUS_ALIASES, key)) return SAUNA_STATUS_ALIASES[key];
+  return null;
+}
+
+function ensureSaunaStatusMap(settings){
+  settings.slides ||= {};
+  const src = (settings.slides.saunaStatus && typeof settings.slides.saunaStatus === 'object')
+    ? settings.slides.saunaStatus
+    : {};
+  const normalized = {};
+  Object.entries(src).forEach(([name, value]) => {
+    if (typeof name !== 'string' || !name) return;
+    const status = normalizeSaunaStatus(value);
+    if (status && status !== SAUNA_STATUS.ACTIVE) normalized[name] = status;
+  });
+  const legacy = Array.isArray(settings.slides.hiddenSaunas) ? settings.slides.hiddenSaunas : [];
+  legacy.forEach(name => {
+    if (typeof name !== 'string' || !name) return;
+    if (!normalized[name]) normalized[name] = SAUNA_STATUS.NO_INFUSIONS;
+  });
+  settings.slides.saunaStatus = normalized;
+  return settings.slides.saunaStatus;
+}
+
+function saunaHasEntries(schedule, name){
+  if (!schedule || typeof name !== 'string' || !name) return false;
+  const saunas = Array.isArray(schedule.saunas) ? schedule.saunas : [];
+  const idx = saunas.indexOf(name);
+  if (idx === -1) return false;
+  const rows = Array.isArray(schedule.rows) ? schedule.rows : [];
+  return rows.some(row => {
+    const entries = Array.isArray(row?.entries) ? row.entries : [];
+    const cell = entries[idx];
+    return !!(cell && cell.title);
+  });
+}
+
+function syncHiddenSaunasFromStatus(settings, map){
+  const statusMap = map || ensureSaunaStatusMap(settings);
+  const hidden = new Set();
+  Object.entries(statusMap).forEach(([name, value]) => {
+    if (typeof name !== 'string' || !name) return;
+    const status = normalizeSaunaStatus(value);
+    if (status && status !== SAUNA_STATUS.ACTIVE) hidden.add(name);
+  });
+  settings.slides.hiddenSaunas = Array.from(hidden);
+  return hidden;
+}
+
+function computeSaunaStatusState(settings, schedule, { autoAssign = false } = {}){
+  const statusStore = ensureSaunaStatusMap(settings);
+  const saunas = Array.isArray(schedule?.saunas) ? schedule.saunas : [];
+  let changed = false;
+  const statusMap = new Map();
+
+  saunas.forEach(name => {
+    if (typeof name !== 'string' || !name) return;
+    const hasEntries = saunaHasEntries(schedule, name);
+    let status = normalizeSaunaStatus(statusStore[name]);
+    if (!status) status = hasEntries ? SAUNA_STATUS.ACTIVE : SAUNA_STATUS.NO_INFUSIONS;
+
+    if (status === SAUNA_STATUS.ACTIVE && !hasEntries){
+      status = SAUNA_STATUS.NO_INFUSIONS;
+      if (autoAssign && statusStore[name] !== SAUNA_STATUS.NO_INFUSIONS){
+        statusStore[name] = SAUNA_STATUS.NO_INFUSIONS;
+        changed = true;
+      }
+    } else if (status === SAUNA_STATUS.NO_INFUSIONS && hasEntries){
+      status = SAUNA_STATUS.ACTIVE;
+      if (autoAssign && statusStore[name]){
+        delete statusStore[name];
+        changed = true;
+      }
+    } else if (!SAUNA_STATUS_VALUES.has(status)) {
+      const fallback = hasEntries ? SAUNA_STATUS.ACTIVE : SAUNA_STATUS.NO_INFUSIONS;
+      if (autoAssign){
+        if (fallback === SAUNA_STATUS.ACTIVE) delete statusStore[name];
+        else statusStore[name] = fallback;
+        changed = true;
+      }
+      status = fallback;
+    } else if (autoAssign) {
+      if (status === SAUNA_STATUS.ACTIVE && statusStore[name]){
+        delete statusStore[name];
+        changed = true;
+      } else if (status !== SAUNA_STATUS.ACTIVE && statusStore[name] !== status) {
+        statusStore[name] = status;
+        changed = true;
+      }
+    }
+
+    statusMap.set(name, status);
+  });
+
+  let hiddenSet;
+  if (autoAssign){
+    const prevHidden = JSON.stringify(settings.slides?.hiddenSaunas || []);
+    hiddenSet = syncHiddenSaunasFromStatus(settings, statusStore);
+    if (!changed && prevHidden !== JSON.stringify(settings.slides?.hiddenSaunas || [])) changed = true;
+  } else {
+    hiddenSet = new Set();
+    Object.entries(statusStore).forEach(([name, value]) => {
+      const status = normalizeSaunaStatus(value);
+      if (status && status !== SAUNA_STATUS.ACTIVE) hiddenSet.add(name);
+    });
+    statusMap.forEach((status, name) => {
+      if (status && status !== SAUNA_STATUS.ACTIVE) hiddenSet.add(name);
+      else if (status === SAUNA_STATUS.ACTIVE && !statusStore[name]) hiddenSet.delete(name);
+    });
+  }
+
+  saunaStatusCache = statusMap;
+  return { statusMap, hiddenSet, changed };
+}
+
+function setSaunaStatus(name, value, { refresh = true } = {}){
+  if (!ctx || typeof ctx.getSettings !== 'function') return SAUNA_STATUS.ACTIVE;
+  const settings = ctx.getSettings();
+  const schedule = typeof ctx.getSchedule === 'function' ? ctx.getSchedule() : {};
+  if (!settings || typeof name !== 'string' || !name) return SAUNA_STATUS.ACTIVE;
+
+  const statusStore = ensureSaunaStatusMap(settings);
+  const normalized = normalizeSaunaStatus(value) || SAUNA_STATUS.ACTIVE;
+  const prevStored = statusStore[name];
+
+  if (normalized === SAUNA_STATUS.ACTIVE) delete statusStore[name];
+  else statusStore[name] = normalized;
+
+  const prevHidden = JSON.stringify(settings.slides?.hiddenSaunas || []);
+  const { statusMap, changed } = computeSaunaStatusState(settings, schedule, { autoAssign: true });
+  const resolved = statusMap.get(name) || SAUNA_STATUS.ACTIVE;
+  const hiddenChanged = prevHidden !== JSON.stringify(settings.slides?.hiddenSaunas || []);
+  const didChange = changed || hiddenChanged || prevStored !== statusStore[name];
+
+  if (didChange && refresh && ctx && typeof ctx.refreshSlidesBox === 'function'){
+    try {
+      ctx.refreshSlidesBox();
+    } catch (err) {
+      console.warn('[admin] Slides box refresh failed after sauna status change', err);
+    }
+  }
+
+  return resolved;
+}
+
+function getSaunaStatus(name){
+  return saunaStatusCache.get(name) || SAUNA_STATUS.ACTIVE;
+}
+
 function ensureEnabledComponents(settings){
   settings.slides ||= {};
   const defaults = DEFAULTS.slides?.enabledComponents || {};
@@ -557,6 +752,9 @@ function deleteSaunaEverywhere(name){
   if (settings.slides?.hiddenSaunas){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
   }
+  if (settings.slides?.saunaStatus && Object.prototype.hasOwnProperty.call(settings.slides.saunaStatus, name)){
+    delete settings.slides.saunaStatus[name];
+  }
 
   renderSlidesMaster();
   renderGridUI();
@@ -598,6 +796,11 @@ function renameSaunaEverywhere(oldName, newName){
   // Sichtbarkeit
   if (settings.slides?.hiddenSaunas){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.map(n => n===oldName ? newName : n);
+  }
+  if (settings.slides?.saunaStatus && Object.prototype.hasOwnProperty.call(settings.slides.saunaStatus, oldName)){
+    const val = settings.slides.saunaStatus[oldName];
+    delete settings.slides.saunaStatus[oldName];
+    if (val && val !== SAUNA_STATUS.ACTIVE) settings.slides.saunaStatus[newName] = val;
   }
 
 }
@@ -798,7 +1001,14 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
              <button class="btn sm ghost icon" id="delinv_${id}" title="Dauerhaft löschen">🗑</button>
            </div>`
     }
-    ${ mode === 'normal' ? `<input id="en_${id}" type="checkbox" checked />` : `<span></span>` }
+    ${ mode === 'normal'
+        ? `<select id="st_${id}" class="input status">
+             <option value="${SAUNA_STATUS.ACTIVE}">${SAUNA_STATUS_TEXT[SAUNA_STATUS.ACTIVE]}</option>
+             <option value="${SAUNA_STATUS.NO_INFUSIONS}">${SAUNA_STATUS_TEXT[SAUNA_STATUS.NO_INFUSIONS]}</option>
+             <option value="${SAUNA_STATUS.OUT_OF_ORDER}">${SAUNA_STATUS_TEXT[SAUNA_STATUS.OUT_OF_ORDER]}</option>
+             <option value="${SAUNA_STATUS.HIDDEN}">${SAUNA_STATUS_TEXT[SAUNA_STATUS.HIDDEN]}</option>
+           </select>`
+        : `<span></span>` }
   `;
 
   // DOM-Refs
@@ -810,7 +1020,7 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
   const $del    = wrap.querySelector('#x_'+id);
   const $mv     = wrap.querySelector('#mv_'+id);
   const $delinv = wrap.querySelector('#delinv_'+id);
-  const $en     = wrap.querySelector('#en_'+id);
+  const $status = wrap.querySelector('#st_'+id);
 
   // Bild-Preview
   const url = (settings.assets?.rightImages?.[name]) || '';
@@ -832,14 +1042,15 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
     };
   }
 
-  // Sichtbarkeit
-  if ($en){
-    const hidden = new Set(settings.slides?.hiddenSaunas || []);
-    $en.checked = !hidden.has(name);
-    $en.onchange = () => {
-      const set = new Set(settings.slides?.hiddenSaunas || []);
-      if ($en.checked) set.delete(name); else set.add(name);
-      settings.slides ||= {}; settings.slides.hiddenSaunas = Array.from(set);
+  // Status-Auswahl
+  if ($status){
+    const current = getSaunaStatus(name);
+    if (Array.from($status.options).some(opt => opt.value === current)){
+      $status.value = current;
+    }
+    $status.onchange = () => {
+      const next = setSaunaStatus(name, $status.value);
+      if ($status.value !== next) $status.value = next;
     };
   }
 
@@ -1906,6 +2117,9 @@ function renderStorySlidesPanel(hostId='storyList'){
 export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
+  const statusState = computeSaunaStatusState(settings, schedule, { autoAssign: true });
+  const hiddenSaunas = new Set(statusState.hiddenSet || []);
+  const statusBySauna = Object.fromEntries(statusState.statusMap);
   const saunas = (schedule?.saunas || []).map(name => ({ kind: 'sauna', name }));
   const media = (Array.isArray(settings.interstitials) ? settings.interstitials : [])
     .map(it => ({ kind: 'media', item: it }));
@@ -1927,7 +2141,6 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     ? extrasRaw.gastronomyHighlights.map((item, idx) => ({ kind: 'gastronomy-highlight', item, key: item?.id != null ? String(item.id) : 'gas_' + idx }))
     : [];
   const extrasCombined = wellness.concat(events, gastronomy);
-  const hiddenSaunas = new Set(settings?.slides?.hiddenSaunas || []);
 
   let combined = [];
   const ord = settings?.slides?.sortOrder;
@@ -1971,7 +2184,8 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
       events,
       gastronomy
     },
-    hiddenSaunas
+    hiddenSaunas,
+    statusBySauna
   };
 }
 
@@ -1981,7 +2195,7 @@ export function renderSlideOrderView(){
   const host = document.getElementById('slideOrderGrid');
   if (!host) return;
 
-  const { entries: combinedRaw, hiddenSaunas } = collectSlideOrderStream({ normalizeSortOrder: true });
+  const { entries: combinedRaw, hiddenSaunas, statusBySauna } = collectSlideOrderStream({ normalizeSortOrder: true });
   let combined = combinedRaw.slice();
 
   host.innerHTML = '';
@@ -1992,6 +2206,9 @@ export function renderSlideOrderView(){
     tile.dataset.idx = idx;
     tile.dataset.type = entry.kind;
 
+    const saunaStatus = entry.kind === 'sauna'
+      ? (statusBySauna?.[entry.name] || SAUNA_STATUS.ACTIVE)
+      : SAUNA_STATUS.ACTIVE;
     const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
     const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
     const isDisabledStory = entry.kind === 'story' && entry.item?.enabled === false;
@@ -2001,20 +2218,25 @@ export function renderSlideOrderView(){
     const title = document.createElement('div');
     title.className = 'title';
     let statusEl = null;
-    if (isHiddenSauna || isDisabledMedia || isDisabledStory){
-      statusEl = document.createElement('div');
-      statusEl.className = 'slide-status';
-      statusEl.dataset.state = 'hidden';
-      statusEl.textContent = 'Ausgeblendet';
-    }
-    const isEventDisabled = entry.kind === 'event-countdown' && !heroEnabled;
-    if (isEventDisabled) {
+    const applyStatus = (text, state = 'hidden') => {
+      if (!text) return;
       if (!statusEl) {
         statusEl = document.createElement('div');
         statusEl.className = 'slide-status';
-        statusEl.dataset.state = 'hidden';
-        statusEl.textContent = 'Ausgeblendet';
       }
+      statusEl.dataset.state = state;
+      statusEl.textContent = text;
+    };
+    if (entry.kind === 'sauna' && saunaStatus !== SAUNA_STATUS.ACTIVE){
+      const state = saunaStatus === SAUNA_STATUS.HIDDEN ? 'hidden' : 'inactive';
+      applyStatus(SAUNA_STATUS_TEXT[saunaStatus] || 'Ausgeblendet', state);
+    }
+    if (!statusEl && (isDisabledMedia || isDisabledStory)){
+      applyStatus('Deaktiviert', 'hidden');
+    }
+    const isEventDisabled = entry.kind === 'event-countdown' && !heroEnabled;
+    if (isEventDisabled) {
+      if (!statusEl) applyStatus('Ausgeblendet', 'hidden');
       tile.classList.add('is-disabled');
     }
     if (entry.kind === 'sauna'){
@@ -2241,6 +2463,15 @@ export function renderSlideOrderView(){
 export function renderSlidesMaster(){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
+
+  const statusState = computeSaunaStatusState(settings, schedule, { autoAssign: true });
+  if (statusState.changed && ctx && typeof ctx.refreshSlidesBox === 'function'){
+    try {
+      ctx.refreshSlidesBox();
+    } catch (err) {
+      console.warn('[admin] Slides box refresh failed after status normalization', err);
+    }
+  }
 
   ensureStorySlides(settings);
   const styleSets = ensureStyleSets(settings);
@@ -3005,6 +3236,7 @@ if (durPer) durPer.onchange = () => {
     settings.slides.globalDwellSec = 6;
     settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
+    settings.slides.saunaStatus = {};
     settings.slides.saunaDurations = {};
     renderSlidesMaster();
   };

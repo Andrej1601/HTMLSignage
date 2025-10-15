@@ -399,11 +399,13 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 /* overview table */
 .grid{width:100%;max-width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .grid th,.grid td{border:var(--gridTableW) solid var(--gridTable);white-space:nowrap;max-width:100%;}
-.grid col.c_time{width:var(--ovTimeWidth,10ch)}
+.grid col.c_time{width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch))}
 .grid col.c_auto{width:auto}
 .grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
 .grid thead th{white-space:normal;word-break:break-word;hyphens:auto;overflow-wrap:anywhere;}
 .grid thead th.timecol{white-space:nowrap;}
+.grid thead th .sauna-status-note{display:block;margin-top:4px;font-size:calc(16px*var(--scale)*var(--ovHeadScale)*var(--ovAuto)*0.7);font-weight:600;opacity:.82;}
+.grid thead th[data-status="out-of-order"]{position:relative;}
 .overview .grid thead th{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid thead th.corner{background:var(--cornerBg);color:var(--cornerFg)}
 
@@ -415,8 +417,10 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 
 .grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale))}
 .overview .grid td{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
-.grid th.timecol, .grid td.timecol{width:var(--ovTimeWidth,10ch)}
-.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidth,10ch);color:var(--fg)}
+.grid th.timecol, .grid td.timecol{width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch))}
+.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch));color:var(--fg)}
+.grid td[data-status="out-of-order"] .caption,
+.grid td[data-status="out-of-order"] .chip-text{font-style:italic;}
 
 /* equal chips */
 .cellwrap{display:block;width:100%;min-width:0}
