@@ -2468,10 +2468,12 @@ function tableGrid(hlMap) {
     visibleSaunas.forEach(info => {
       const cell = entries[info.idx];
       const tdAttrs = {};
-      if (info.status === SAUNA_STATUS.OUT_OF_ORDER) tdAttrs['data-status'] = 'out-of-order';
+      const isOutOfOrder = info.status === SAUNA_STATUS.OUT_OF_ORDER;
+      if (isOutOfOrder) tdAttrs['data-status'] = 'out-of-order';
       const td = h('td', tdAttrs, []);
       const key = 'r' + ri + 'c' + info.idx;
-      if (cell && cell.title) {
+
+      if (!isOutOfOrder && cell && cell.title) {
         const title = String(cell.title).replace(/\*+$/, '');
         const hasStarInText = /\*$/.test(cell.title || '');
         const txt = h('div', { class: 'chip-text' }, title);
@@ -2490,7 +2492,7 @@ function tableGrid(hlMap) {
         const chip = h('div', { class: chipClass }, chipChildren);
         const wrap = h('div', { class: 'cellwrap' }, [chip]);
         td.appendChild(wrap);
-      } else {
+      } else if (!isOutOfOrder) {
         td.appendChild(h('div', { class: 'caption' }, '—'));
       }
       trr.appendChild(td);
