@@ -907,30 +907,11 @@ details.ac[open] .chev{ transform: rotate(90deg); }
   gap:8px;
 }
 
-.kv-playlist{
-  grid-template-columns:minmax(0,1fr);
-  gap:8px;
-  align-items:start;
-}
-
-.kv-playlist .playlist-selector{
-  gap:12px;
-}
-
-.kv-playlist .help{
-  font-size:12px;
-  line-height:1.4;
-}
-
 .slide-order-grid{
   display:grid;
   gap:12px;
   grid-template-columns:repeat(auto-fill, minmax(120px,1fr));
   margin-top:16px;
-}
-
-.layout-display-columns.is-split .playlist-selector .slide-order-grid{
-  grid-template-columns:repeat(2, minmax(0,1fr));
 }
 
 .slide-order-tile{
