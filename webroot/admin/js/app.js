@@ -1714,39 +1714,9 @@ function renderSlidesBox(){
       }
     }
   };
-  const playlistLayoutHosts = new Set();
-  const PLAYLIST_WIDE_THRESHOLD = 480;
-  const updatePlaylistLayoutState = () => {
-    const layoutSelect = document.getElementById('layoutMode');
-    const isSplit = (layoutSelect?.value === 'split');
-    const hosts = Array.from(playlistLayoutHosts);
-    hosts.forEach(host => {
-      if (!host || !host.isConnected) {
-        if (host?.__playlistLayoutObserver) {
-          try { host.__playlistLayoutObserver.disconnect(); }
-          catch (error) { console.warn('[admin] Playlist layout observer cleanup failed', error); }
-          host.__playlistLayoutObserver = null;
-        }
-        playlistLayoutHosts.delete(host);
-        return;
-      }
-      const width = host.getBoundingClientRect().width;
-      const wide = isSplit && width >= PLAYLIST_WIDE_THRESHOLD;
-      host.classList.toggle('playlist-wide', wide);
-    });
-  };
   const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left' } = {}) => {
     const host = document.getElementById(hostId);
     if (!host) return;
-    playlistLayoutHosts.add(host);
-    if (!host.__playlistLayoutObserver && typeof ResizeObserver === 'function') {
-      const observer = new ResizeObserver(() => {
-        try { updatePlaylistLayoutState(); }
-        catch (error) { console.warn('[admin] Playlist layout update failed after resize', error); }
-      });
-      observer.observe(host);
-      host.__playlistLayoutObserver = observer;
-    }
     const normalizedKey = pageKey === 'right' ? 'right' : 'left';
     const displayCfg = settings.display = settings.display || {};
     const pagesCfg = displayCfg.pages = displayCfg.pages || {};
@@ -2175,7 +2145,6 @@ function renderSlidesBox(){
     }
 
     renderTiles();
-    updatePlaylistLayoutState();
     if (normalizedKey === 'left') {
       const layoutSelect = document.getElementById('layoutMode');
       if ((layoutSelect?.value === 'split' ? 'split' : 'single') !== 'split') {
@@ -2286,7 +2255,6 @@ function renderSlidesBox(){
   const applyLayoutVisibility = (mode) => {
     const rightWrap = document.getElementById('layoutRight');
     if (rightWrap) rightWrap.hidden = (mode !== 'split');
-    updatePlaylistLayoutState();
   };
   applyLayoutVisibility(layoutMode);
   if (layoutModeSelect) {
