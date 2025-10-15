@@ -167,11 +167,6 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .layout-display-fold[open] .layout-display-chev{ transform:rotate(180deg); }
 .layout-display-body{ padding:12px 16px 14px; display:grid; gap:12px; }
 .layout-display-columns{ display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
-.layout-page__header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; }
-.layout-page__header .legend{ margin-bottom:0; }
-.layout-page__playlist-label{ font-weight:600; opacity:.85; }
-.layout-page__timer{ margin-bottom:8px; }
-.layout-page__playlist{ display:flex; flex-direction:column; gap:6px; }
 .mut,.help{ color:var(--muted); }
 
 /* Utility classes for headings and toolbars */
