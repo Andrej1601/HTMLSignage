@@ -2471,7 +2471,8 @@ function tableGrid(hlMap) {
       if (info.status === SAUNA_STATUS.OUT_OF_ORDER) tdAttrs['data-status'] = 'out-of-order';
       const td = h('td', tdAttrs, []);
       const key = 'r' + ri + 'c' + info.idx;
-      if (cell && cell.title) {
+      const isOutOfOrder = info.status === SAUNA_STATUS.OUT_OF_ORDER;
+      if (cell && cell.title && !isOutOfOrder) {
         const title = String(cell.title).replace(/\*+$/, '');
         const hasStarInText = /\*$/.test(cell.title || '');
         const txt = h('div', { class: 'chip-text' }, title);
