@@ -2943,6 +2943,55 @@ export function renderSlidesMaster(){
     return ids[0] || '';
   };
 
+  const ensureStyleAutomationForPalette = () => {
+    settings.slides ||= {};
+    let automation = settings.slides.styleAutomation;
+    if (!automation || typeof automation !== 'object') {
+      automation = { enabled: true, fallbackStyle: '', timeSlots: [] };
+      settings.slides.styleAutomation = automation;
+      return automation;
+    }
+    if (typeof automation.fallbackStyle !== 'string') automation.fallbackStyle = '';
+    if (!Array.isArray(automation.timeSlots)) automation.timeSlots = [];
+    return automation;
+  };
+
+  const syncAutomationFallbackStyle = (styleId, { markUnsaved = false } = {}) => {
+    if (!styleId || !hasStyleSet(styleId)) return;
+    const automation = ensureStyleAutomationForPalette();
+    const previous = automation.fallbackStyle;
+    if (previous === styleId) {
+      const fallbackSelect = document.getElementById('styleAutoFallback');
+      if (fallbackSelect && fallbackSelect.value !== styleId) {
+        fallbackSelect.value = styleId;
+      }
+      return;
+    }
+    automation.fallbackStyle = styleId;
+    if (Array.isArray(automation.timeSlots)) {
+      automation.timeSlots.forEach(slot => {
+        if (!slot || typeof slot !== 'object') return;
+        if (!slot.style || !hasStyleSet(slot.style)) slot.style = styleId;
+      });
+    }
+    const fallbackSelect = document.getElementById('styleAutoFallback');
+    if (fallbackSelect) {
+      const hasOption = Array.from(fallbackSelect.options || []).some(opt => opt.value === styleId);
+      if (!hasOption) {
+        const opt = document.createElement('option');
+        opt.value = styleId;
+        opt.textContent = styleSets[styleId]?.label || styleId;
+        fallbackSelect.appendChild(opt);
+      }
+      fallbackSelect.value = styleId;
+    }
+    if (markUnsaved) {
+      window.__queueUnsaved?.();
+      window.__markUnsaved?.();
+      if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+    }
+  };
+
   if (!hasStyleSet(selectedStyleSetId)){
     const fallbackId = fallbackStyleSetId();
     selectedStyleSetId = fallbackId || '';
@@ -3004,6 +3053,7 @@ export function renderSlidesMaster(){
     if (currentId && styleSets[currentId]){
       labelField.disabled = false;
       labelField.value = styleSets[currentId].label || currentId;
+      syncAutomationFallbackStyle(currentId, { markUnsaved: false });
     } else {
       labelField.disabled = true;
       labelField.value = '';
@@ -3023,6 +3073,8 @@ export function renderSlidesMaster(){
       } else {
         selectedStyleSetId = newId;
       }
+      const effectiveId = getSelectedStyleSetId();
+      if (effectiveId) syncAutomationFallbackStyle(effectiveId, { markUnsaved: true });
       updateLabelField();
     };
   }

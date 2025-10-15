@@ -914,6 +914,10 @@ details.ac[open] .chev{ transform: rotate(90deg); }
   margin-top:16px;
 }
 
+.playlist-selector.playlist-wide .slide-order-grid{
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
 .slide-order-tile{
   display:flex;
   flex-direction:column;
