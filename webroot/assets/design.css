@@ -15,7 +15,7 @@
   --cornerBg:#E8DEBD; --cornerFg:#5C3101;   /* Ecke (oben-links) */
   /* typography */
   --font:-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
-  --baseScale:1; --vwScale:1; --scale:calc(var(--baseScale)*var(--vwScale)); --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80;
+  --baseScale:1; --vwScale:1; --scale:calc(var(--baseScale)*var(--vwScale)); --h1Scale:1; --h2Scale:1; --ovHeadScale:0.90; --ovCellScale:0.80; --ovTimeScale:var(--ovCellScale);
   --tileTextScale:0.80; --tileWeight:600; --flameSizePx:28;
   --chipHBase:calc(44px*var(--scale));
   --chipHScale:1;
@@ -443,7 +443,7 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .grid td{font-size:calc(22px*var(--scale)*var(--ovCellScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale))}
 .overview .grid td{padding:calc(8px*var(--ovAuto)) calc(12px*var(--ovAuto))}
 .grid th.timecol, .grid td.timecol{width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch))}
-.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch));color:var(--fg)}
+.grid td.timecol{background:var(--timecol)!important;text-align:center;font-weight:800;min-width:var(--ovTimeWidthPx, var(--ovTimeWidth,10ch));color:var(--fg);font-size:calc(22px*var(--scale)*var(--ovTimeScale, var(--ovCellScale))*var(--ovAuto))}
 .grid td[data-status="out-of-order"] .caption,
 .grid td[data-status="out-of-order"] .chip-text{font-style:italic;}
 .grid td[data-status="out-of-order"] .chip{
