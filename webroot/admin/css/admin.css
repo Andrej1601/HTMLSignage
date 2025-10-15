@@ -200,27 +200,11 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
   gap:12px;
 }
 .layout-page-playlist{
-  display:grid;
   grid-template-columns:minmax(0, 1fr);
-  gap:12px;
-  align-content:start;
-}
-.layout-page-playlist .playlist-selector{
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-  margin-top:0;
+  gap:8px;
 }
 .layout-page-playlist .help{ margin-top:0; }
-#layoutPages[data-mode="split"] .layout-page-playlist .slide-order-grid{
-  grid-template-columns:repeat(2, minmax(0, 1fr));
-  gap:12px;
-}
-@media (max-width: 900px){
-  #layoutPages[data-mode="split"] .layout-page-playlist .slide-order-grid{
-    grid-template-columns:minmax(0, 1fr);
-  }
-}
+.layout-page-playlist .playlist-selector{ margin-top:0; }
 .mut,.help{ color:var(--muted); }
 
 /* Utility classes for headings and toolbars */
