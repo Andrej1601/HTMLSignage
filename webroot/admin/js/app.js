@@ -563,14 +563,14 @@ function applyRoleRestrictions() {
     document.body?.classList.remove('role-limited');
     return;
   }
-  const isEditor = hasRole('editor');
   document.body?.classList.add('role-limited');
 
-  const allowedDetailIds = new Set(
-    isEditor
-      ? ['slidesMaster', 'boxSaunas', 'boxFootnotes']
-      : ['boxSaunas', 'boxFootnotes']
-  );
+  const allowedDetailIds = new Set(['boxSaunas', 'boxFootnotes']);
+
+  const slidesMaster = document.getElementById('slidesMaster');
+  if (slidesMaster) {
+    slidesMaster.remove();
+  }
 
   document.querySelectorAll('.rightbar details').forEach((details) => {
     if (!allowedDetailIds.has(details.id)) {
@@ -580,18 +580,9 @@ function applyRoleRestrictions() {
     }
   });
 
-  if (isEditor) {
-    const slidesMaster = document.getElementById('slidesMaster');
-    if (slidesMaster) {
-      slidesMaster.open = true;
-      const configStack = slidesMaster.querySelector('.settings-stack');
-      if (configStack) configStack.remove();
-    }
-  } else {
-    const cockpit = document.querySelector('.workspace-overview');
-    if (cockpit) {
-      cockpit.remove();
-    }
+  const cockpit = document.querySelector('.workspace-overview');
+  if (cockpit) {
+    cockpit.remove();
   }
 
   document.querySelectorAll('[data-devices]').forEach((element) => {
@@ -2074,8 +2065,8 @@ function renderSlidesBox(){
           removeBtn.type = 'button';
           removeBtn.className = 'reorder-btn playlist-remove';
           removeBtn.innerHTML = '✕';
-          removeBtn.title = 'Aus Auswahl entfernen';
-          removeBtn.setAttribute('aria-label', 'Aus Auswahl entfernen');
+          removeBtn.title = 'Aus Playlist entfernen';
+          removeBtn.setAttribute('aria-label', 'Aus Playlist entfernen');
           removeBtn.addEventListener('click', ev => {
             ev.stopPropagation();
             selected.delete(entry.key);
