@@ -907,6 +907,19 @@ details.ac[open] .chev{ transform: rotate(90deg); }
   gap:8px;
 }
 
+.layout-page .kv.playlist-row{
+  grid-template-columns:minmax(0,1fr);
+}
+
+.layout-page .kv.playlist-row label{
+  grid-column:1;
+}
+
+.layout-page .kv.playlist-row .playlist-selector,
+.layout-page .kv.playlist-row .help{
+  grid-column:1;
+}
+
 .slide-order-grid{
   display:grid;
   gap:12px;
