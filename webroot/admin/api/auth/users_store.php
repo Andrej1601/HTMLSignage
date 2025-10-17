@@ -9,7 +9,42 @@ require_once __DIR__ . '/../storage.php';
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
-const SIGNAGE_AUTH_ROLES = ['viewer', 'editor', 'admin'];
+const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
+const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
+const SIGNAGE_AUTH_ROLE_ALIASES = [
+    'viewer' => 'saunameister',
+    'sauna' => 'saunameister',
+];
+const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
+
+function auth_normalize_role_name(string $role): ?string
+{
+    $role = strtolower(trim($role));
+    if ($role === '') {
+        return null;
+    }
+    if (isset(SIGNAGE_AUTH_ROLE_ALIASES[$role])) {
+        $role = SIGNAGE_AUTH_ROLE_ALIASES[$role];
+    }
+    if (!in_array($role, SIGNAGE_AUTH_ROLES, true)) {
+        return null;
+    }
+    return $role;
+}
+
+function auth_is_protected_user(string $username): bool
+{
+    $username = strtolower(trim($username));
+    return $username !== '' && in_array($username, SIGNAGE_AUTH_PROTECTED_USERS, true);
+}
+
+function auth_enforce_protected_roles(string $username, array $roles): array
+{
+    if (auth_is_protected_user($username) && !in_array('admin', $roles, true)) {
+        $roles[] = 'admin';
+    }
+    return array_values(array_unique($roles));
+}
 
 
 function auth_users_public_payload(array $user): array
@@ -91,11 +126,8 @@ function auth_users_normalize(array $state): array
             }
             if (is_array($roles)) {
                 foreach ($roles as $role) {
-                    $roleName = strtolower(trim((string) $role));
-                    if ($roleName === '') {
-                        continue;
-                    }
-                    if (!in_array($roleName, SIGNAGE_AUTH_ROLES, true)) {
+                    $roleName = auth_normalize_role_name((string) $role);
+                    if ($roleName === null) {
                         continue;
                     }
                     if (!in_array($roleName, $user['roles'], true)) {
@@ -104,8 +136,9 @@ function auth_users_normalize(array $state): array
                 }
             }
             if (!$user['roles']) {
-                $user['roles'][] = 'viewer';
+                $user['roles'][] = SIGNAGE_AUTH_DEFAULT_ROLE;
             }
+            $user['roles'] = auth_enforce_protected_roles($username, $user['roles']);
             $normalized['users'][$username] = $user;
         }
     }
@@ -185,16 +218,17 @@ function auth_users_set(array $user): void
     if (!empty($merged['roles']) && is_array($merged['roles'])) {
         $normalizedRoles = [];
         foreach ($merged['roles'] as $role) {
-            $roleName = strtolower(trim((string) $role));
-            if ($roleName !== '') {
+            $roleName = auth_normalize_role_name((string) $role);
+            if ($roleName !== null) {
                 $normalizedRoles[] = $roleName;
             }
         }
-        $merged['roles'] = array_values(array_unique(array_intersect($normalizedRoles, SIGNAGE_AUTH_ROLES)));
+        $merged['roles'] = array_values(array_unique($normalizedRoles));
     }
     if (empty($merged['roles'])) {
-        $merged['roles'] = ['viewer'];
+        $merged['roles'] = [SIGNAGE_AUTH_DEFAULT_ROLE];
     }
+    $merged['roles'] = auth_enforce_protected_roles($key, $merged['roles']);
     $state['users'][$key] = $merged;
     auth_users_save($state);
 }
@@ -205,6 +239,9 @@ function auth_users_remove(string $username): bool
     $key = strtolower(trim($username));
     if (!isset($state['users'][$key])) {
         return false;
+    }
+    if (auth_is_protected_user($key)) {
+        throw new RuntimeException('protected-user');
     }
     unset($state['users'][$key]);
     auth_users_save($state);
@@ -232,25 +269,26 @@ function auth_user_roles(array $user): array
     if (!empty($user['roles']) && is_array($user['roles'])) {
         foreach ($user['roles'] as $role) {
             $roleName = strtolower(trim((string) $role));
-            if ($roleName !== '' && in_array($roleName, SIGNAGE_AUTH_ROLES, true)) {
+            $roleName = auth_normalize_role_name($role);
+            if ($roleName !== null) {
                 $roles[] = $roleName;
             }
         }
     }
     if (!$roles) {
-        $roles[] = 'viewer';
+        $roles[] = SIGNAGE_AUTH_DEFAULT_ROLE;
     }
     return array_values(array_unique($roles));
 }
 
 function auth_user_has_role(array $user, string $role): bool
 {
-    $role = strtolower(trim($role));
-    if (!in_array($role, SIGNAGE_AUTH_ROLES, true)) {
+    $roleName = auth_normalize_role_name($role);
+    if ($roleName === null) {
         return false;
     }
     $roles = auth_user_roles($user);
-    $rank = auth_role_rank($role);
+    $rank = auth_role_rank($roleName);
     foreach ($roles as $userRole) {
         if (auth_role_rank($userRole) >= $rank) {
             return true;
@@ -261,8 +299,8 @@ function auth_user_has_role(array $user, string $role): bool
 
 function auth_role_rank(string $role): int
 {
-    static $map = ['viewer' => 0, 'editor' => 1, 'admin' => 2];
-    $role = strtolower(trim($role));
+    static $map = ['saunameister' => 0, 'editor' => 1, 'admin' => 2];
+    $role = auth_normalize_role_name($role) ?? $role;
     return $map[$role] ?? -1;
 }
 

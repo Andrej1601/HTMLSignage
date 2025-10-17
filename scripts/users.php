@@ -10,7 +10,7 @@ function usage(): void
     echo "  php scripts/users.php list\n";
     echo "  php scripts/users.php add <username> [roles]\n";
     echo "  php scripts/users.php delete <username>\n";
-    echo "\nRoles: viewer, editor, admin (default: viewer)\n";
+    echo "\nRoles: saunameister, editor, admin (default: saunameister)\n";
     exit(1);
 }
 
@@ -60,10 +60,16 @@ switch ($command) {
         if ($username === '') {
             usage();
         }
-        $rolesArg = $argv[3] ?? 'viewer';
+        $rolesArg = $argv[3] ?? SIGNAGE_AUTH_DEFAULT_ROLE;
         $roles = array_values(array_filter(array_map('trim', preg_split('/[,\s]+/', $rolesArg) ?: [])));
         if (!$roles) {
-            $roles = ['viewer'];
+            $roles = [SIGNAGE_AUTH_DEFAULT_ROLE];
+        }
+        $roles = array_values(array_unique(array_filter(array_map(static function (string $role): ?string {
+            return auth_normalize_role_name($role);
+        }, $roles))));
+        if (!$roles) {
+            $roles = [SIGNAGE_AUTH_DEFAULT_ROLE];
         }
         $password = getenv('SIGNAGE_USER_PASSWORD') ?: prompt_hidden('Password: ');
         if ($password === '') {
@@ -93,9 +99,19 @@ switch ($command) {
         if ($username === '') {
             usage();
         }
-        if (auth_users_remove($username)) {
-            echo "User '{$username}' removed.\n";
-            exit(0);
+        try {
+            if (auth_is_protected_user($username)) {
+                throw new RuntimeException('protected-user');
+            }
+            if (auth_users_remove($username)) {
+                echo "User '{$username}' removed.\n";
+                exit(0);
+            }
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === 'protected-user') {
+                fwrite(STDERR, "Cannot remove protected admin account.\n");
+                exit(1);
+            }
         }
         fwrite(STDERR, "User not found.\n");
         exit(1);

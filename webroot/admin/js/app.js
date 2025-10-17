@@ -61,10 +61,21 @@ const lsGet = (key) => storage.get(key);
 const lsSet = (key, value) => storage.set(key, value);
 const lsRemove = (key) => storage.remove(key);
 
+const ROLE_ALIASES = {
+  viewer: 'saunameister'
+};
+
+const PROTECTED_ADMIN_USERNAME = 'admin';
+
+const normalizeRoleName = (role) => {
+  const name = String(role || '').toLowerCase();
+  return ROLE_ALIASES[name] || name;
+};
+
 const ROLE_META = {
-  viewer: {
-    title: 'Viewer',
-    description: 'Lesender Zugriff auf Geräteübersicht und Inhalte.'
+  saunameister: {
+    title: 'Saunameister',
+    description: 'Darf den Aufgussplan und Slides bearbeiten.'
   },
   editor: {
     title: 'Editor',
@@ -77,9 +88,9 @@ const ROLE_META = {
 };
 
 let currentUser = { username: null, displayName: null, roles: ['admin'] };
-let currentUserRoles = new Set(currentUser.roles.map((role) => String(role).toLowerCase()));
+let currentUserRoles = new Set(currentUser.roles.map((role) => normalizeRoleName(role)));
 
-const hasRole = (role) => currentUserRoles.has(String(role || '').toLowerCase());
+const hasRole = (role) => currentUserRoles.has(normalizeRoleName(role));
 
 // === Global State ============================================================
 let schedule = null;
@@ -533,7 +544,7 @@ async function resolveCurrentUser() {
     const payload = session?.user || {};
     const normalizedRoles = Array.isArray(payload.roles)
       ? payload.roles
-        .map((role) => String(role || '').toLowerCase())
+        .map((role) => normalizeRoleName(role))
         .filter((role) => role)
       : [];
     currentUserRoles = normalizedRoles.length ? new Set(normalizedRoles) : new Set();
@@ -560,31 +571,40 @@ async function resolveCurrentUser() {
 }
 
 function applyRoleRestrictions() {
+  document.body?.classList.remove('role-limited');
   if (hasRole('admin')) {
-    document.body?.classList.remove('role-limited');
     return;
   }
-  document.body?.classList.add('role-limited');
-
-  const allowedDetailIds = new Set(['boxSaunas', 'boxFootnotes']);
-
-  const slidesMaster = document.getElementById('slidesMaster');
-  if (slidesMaster) {
-    slidesMaster.remove();
+  if (hasRole('editor')) {
+    return;
   }
 
-  document.querySelectorAll('.rightbar details').forEach((details) => {
-    if (!allowedDetailIds.has(details.id)) {
-      details.remove();
-    } else {
-      details.open = true;
-    }
-  });
+  document.body?.classList.add('role-limited');
 
   const cockpit = document.querySelector('.workspace-overview');
   if (cockpit) {
     cockpit.remove();
   }
+
+  const rightbarColumns = document.querySelector('.rightbar-columns');
+  if (rightbarColumns) {
+    Array.from(rightbarColumns.children).forEach((child) => {
+      if (!child) return;
+      if (child.id === 'slidesMaster' || child.querySelector?.('#slidesMaster')) {
+        if (child.id === 'slidesMaster') {
+          child.open = true;
+        }
+        return;
+      }
+      child.remove();
+    });
+  }
+
+  document.querySelectorAll('.rightbar details').forEach((details) => {
+    if (details.id === 'slidesMaster') {
+      details.open = true;
+    }
+  });
 
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
@@ -3370,6 +3390,7 @@ function initViewMenu(){
   const menu = document.getElementById('viewMenu');
   if (!btn || !menu) return;
 
+  const canUseDevices = hasRole('editor') || hasRole('admin');
   const openMenu  = ()=>{ menu.hidden=false; btn.setAttribute('aria-expanded','true'); };
   const closeMenu = ()=>{ menu.hidden=true;  btn.setAttribute('aria-expanded','false'); };
 
@@ -3390,12 +3411,13 @@ function initViewMenu(){
   });
   const btnDevices = document.getElementById('btnDevices');
   const updateDevicesButton = ()=>{
-    if (!btnDevices) return;
+    if (!btnDevices || !canUseDevices) return;
     const pinned = isDevicesPinned();
     btnDevices.classList.toggle('active', pinned);
     btnDevices.setAttribute('aria-pressed', pinned ? 'true' : 'false');
   };
   const toggleDevicesPane = async ()=>{
+    if (!canUseDevices) return;
     setDevicesPinned(!isDevicesPinned());
     await applyDevicesPaneState();
     updateDevicesButton();
@@ -3407,11 +3429,17 @@ function initViewMenu(){
     if (typing) return;
     if (e.key === '1') { await showView('grid');    closeMenu(); }
     if (e.key === '2') { await showView('preview'); closeMenu(); }
-    if (e.key === '3') { await toggleDevicesPane(); closeMenu(); }
+    if (e.key === '3' && canUseDevices) { await toggleDevicesPane(); closeMenu(); }
   });
 
-  if (btnDevices) btnDevices.onclick = toggleDevicesPane;
-  updateDevicesButton();
+  if (btnDevices) {
+    if (canUseDevices) {
+      btnDevices.onclick = toggleDevicesPane;
+      updateDevicesButton();
+    } else {
+      btnDevices.remove();
+    }
+  }
 
   document.getElementById('viewMenuLabel').textContent = viewLabel(getCurrentView());
   // Initial zeichnen
@@ -3512,11 +3540,20 @@ function initUserAdmin(){
   const closeButtons = modal.querySelectorAll('[data-user-close]');
 
   let users = [];
-  let roles = Array.isArray(AUTH_ROLES) && AUTH_ROLES.length ? AUTH_ROLES.slice() : ['viewer', 'editor', 'admin'];
+  let roles = Array.isArray(AUTH_ROLES) && AUTH_ROLES.length
+    ? Array.from(new Set(AUTH_ROLES.map((role) => normalizeRoleName(role)).filter((role) => role)))
+    : ['saunameister', 'editor', 'admin'];
   let editing = null;
   let isBusy = false;
 
-  const roleMetaFor = (role) => ROLE_META[role] || { title: role, description: '' };
+  const roleMetaFor = (role) => {
+    const key = normalizeRoleName(role);
+    if (ROLE_META[key]) {
+      return ROLE_META[key];
+    }
+    const title = typeof role === 'string' && role ? role : key;
+    return { title, description: '' };
+  };
 
   const setStatus = (message, type = 'info') => {
     if (!status) return;
@@ -3549,11 +3586,11 @@ function initUserAdmin(){
   const buildRoleOptions = (selectedRoles = []) => {
     if (!roleContainer) return;
     const selection = Array.isArray(selectedRoles)
-      ? selectedRoles.map((role) => String(role).toLowerCase())
+      ? selectedRoles.map((role) => normalizeRoleName(role))
       : [];
     roleContainer.innerHTML = '';
     roles.forEach((role) => {
-      const roleName = String(role);
+      const roleName = normalizeRoleName(role);
       const meta = roleMetaFor(roleName);
       const label = document.createElement('label');
       label.className = 'user-role-option';
@@ -3562,6 +3599,10 @@ function initUserAdmin(){
       checkbox.name = 'roles';
       checkbox.value = roleName;
       checkbox.checked = selection.includes(roleName);
+      if (editing && editing.username === PROTECTED_ADMIN_USERNAME && roleName === 'admin') {
+        checkbox.disabled = true;
+        label.title = 'Der ursprüngliche Admin behält immer die Admin-Rolle.';
+      }
       const copy = document.createElement('div');
       copy.className = 'user-role-copy';
       const titleEl = document.createElement('span');
@@ -3591,7 +3632,7 @@ function initUserAdmin(){
     if (passwordInput) passwordInput.value = '';
     if (passwordHint) passwordHint.textContent = 'Passwort wird beim Speichern gesetzt.';
     if (submitBtn) submitBtn.textContent = 'Speichern';
-    buildRoleOptions(['viewer']);
+    buildRoleOptions(['saunameister']);
     renderUserTable();
     focusInitial();
   }
@@ -3614,7 +3655,7 @@ function initUserAdmin(){
     if (passwordInput) passwordInput.value = '';
     if (passwordHint) passwordHint.textContent = 'Leer lassen, um das Passwort unverändert zu lassen.';
     if (submitBtn) submitBtn.textContent = 'Änderungen speichern';
-    buildRoleOptions(editing.roles.length ? editing.roles : ['viewer']);
+    buildRoleOptions(editing.roles.length ? editing.roles : ['saunameister']);
     renderUserTable();
     focusInitial();
   }
@@ -3679,7 +3720,15 @@ function initUserAdmin(){
         </td>
       `;
       row.querySelector('[data-user-edit]')?.addEventListener('click', () => startEdit(user));
-      row.querySelector('[data-user-delete]')?.addEventListener('click', () => handleDelete(user));
+      const deleteBtn = row.querySelector('[data-user-delete]');
+      if (deleteBtn) {
+        if (username.toLowerCase() === PROTECTED_ADMIN_USERNAME) {
+          deleteBtn.disabled = true;
+          deleteBtn.title = 'Der ursprüngliche Admin kann nicht gelöscht werden.';
+        } else {
+          deleteBtn.addEventListener('click', () => handleDelete(user));
+        }
+      }
       tableBody.appendChild(row);
     });
   }
@@ -3691,7 +3740,9 @@ function initUserAdmin(){
     try {
       const data = await fetchUserAccounts();
       users = Array.isArray(data?.users) ? data.users : [];
-      roles = Array.isArray(data?.roles) && data.roles.length ? data.roles : roles;
+      roles = Array.isArray(data?.roles) && data.roles.length
+        ? Array.from(new Set(data.roles.map((role) => normalizeRoleName(role)).filter((role) => role)))
+        : roles;
       if (preserveSelection && editing) {
         const match = users.find((entry) => entry?.username === editing.username);
         renderUserTable();

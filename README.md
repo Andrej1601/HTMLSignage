@@ -87,8 +87,13 @@ php scripts/users.php list
 php scripts/users.php delete bob
 ```
 
-Available roles are `viewer`, `editor` and `admin`. Once at least one account
-exists the API requires HTTP Basic authentication.
+Available roles are `saunameister`, `editor` and `admin`. Saunameister accounts
+may edit the Aufguss grid, adjust the slideshow box, trigger the live preview,
+open the slideshow player, store changes and toggle the light/dark mode. Editors
+retain access to all other administrative tools except user management. Admins
+can manage accounts in addition to all other features, and the initial
+`admin` user is protected from deletion. Once at least one account exists the
+API requires HTTP Basic authentication.
 
 ### Device telemetry
 

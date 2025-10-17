@@ -2,7 +2,7 @@
 // /var/www/signage/admin/api/devices_status.php
 require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
-auth_require_role('viewer');
+auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
 
 $state = devices_load();

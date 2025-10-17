@@ -3,7 +3,7 @@
 import { fetchJson } from './utils.js';
 
 const API_BASE = '/admin/api/auth';
-const DEFAULT_ROLES = ['viewer', 'editor', 'admin'];
+const DEFAULT_ROLES = ['saunameister', 'editor', 'admin'];
 
 const okPredicate = (data) => data?.ok !== false;
 
