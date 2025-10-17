@@ -30,7 +30,7 @@
       </label>
     </div>
     <div class="header-actions">
-      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff">
+      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff" hidden>
         <div class="header-cockpit-toggle">
           <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
             <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
@@ -63,7 +63,7 @@
   </header>
 
   <main class="layout">
-    <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false">
+    <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false" hidden>
       <header class="workspace-toolbar">
         <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
       </header>
@@ -186,7 +186,7 @@
   </summary>
   <div class="content">
     <div class="settings-stack">
-      <div class="settings-card" id="slidesFlowCard" data-jump-target>
+      <div class="settings-card" id="slidesFlowCard" data-jump-target hidden>
         <div class="settings-card-head">
           <div class="settings-card-title">Ablauf &amp; Zeitsteuerung</div>
           <p class="settings-card-description">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
@@ -225,7 +225,7 @@
         </div>
       </div>
 
-      <div class="settings-card" id="slidesAutomationCard" data-jump-target>
+      <div class="settings-card" id="slidesAutomationCard" data-jump-target hidden>
         <div class="settings-card-head">
           <div class="settings-card-title">Automatisierung</div>
           <p class="settings-card-description">Lädt zu Start oder Tab-Wechsel automatisch passende Voreinstellungen.</p>
