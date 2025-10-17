@@ -15,6 +15,26 @@ const SIGNAGE_AUTH_ROLE_ALIASES = [
     'viewer' => 'saunameister',
     'sauna' => 'saunameister',
 ];
+const SIGNAGE_AUTH_PERMISSIONS = [
+    'cockpit',
+    'slides',
+    'global-info',
+    'colors',
+    'system',
+    'devices',
+    'user-admin',
+];
+const SIGNAGE_AUTH_PERMISSION_ALIASES = [
+    'overview' => 'cockpit',
+    'slideshows' => 'slides',
+    'info' => 'global-info',
+    'users' => 'user-admin',
+];
+const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
+    'saunameister' => ['cockpit', 'slides', 'global-info'],
+    'editor' => ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices'],
+    'admin' => ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
+];
 const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
 
 function auth_normalize_role_name(string $role): ?string
@@ -30,6 +50,21 @@ function auth_normalize_role_name(string $role): ?string
         return null;
     }
     return $role;
+}
+
+function auth_normalize_permission_name(string $permission): ?string
+{
+    $permission = strtolower(trim($permission));
+    if ($permission === '') {
+        return null;
+    }
+    if (isset(SIGNAGE_AUTH_PERMISSION_ALIASES[$permission])) {
+        $permission = SIGNAGE_AUTH_PERMISSION_ALIASES[$permission];
+    }
+    if (!in_array($permission, SIGNAGE_AUTH_PERMISSIONS, true)) {
+        return null;
+    }
+    return $permission;
 }
 
 function auth_is_protected_user(string $username): bool
@@ -53,6 +88,7 @@ function auth_users_public_payload(array $user): array
         'username' => $user['username'] ?? '',
         'displayName' => $user['displayName'] ?? null,
         'roles' => auth_user_roles($user),
+        'permissions' => auth_user_permissions($user),
     ];
 }
 
@@ -139,6 +175,7 @@ function auth_users_normalize(array $state): array
                 $user['roles'][] = SIGNAGE_AUTH_DEFAULT_ROLE;
             }
             $user['roles'] = auth_enforce_protected_roles($username, $user['roles']);
+            $user['permissions'] = auth_normalize_permissions($entry['permissions'] ?? null, $user['roles']);
             $normalized['users'][$username] = $user;
         }
     }
@@ -229,6 +266,7 @@ function auth_users_set(array $user): void
         $merged['roles'] = [SIGNAGE_AUTH_DEFAULT_ROLE];
     }
     $merged['roles'] = auth_enforce_protected_roles($key, $merged['roles']);
+    $merged['permissions'] = auth_normalize_permissions($merged['permissions'] ?? null, $merged['roles']);
     $state['users'][$key] = $merged;
     auth_users_save($state);
 }
@@ -279,6 +317,71 @@ function auth_user_roles(array $user): array
         $roles[] = SIGNAGE_AUTH_DEFAULT_ROLE;
     }
     return array_values(array_unique($roles));
+}
+
+function auth_roles_default_permissions(array $roles): array
+{
+    $resolved = [];
+    foreach ($roles as $role) {
+        $roleName = auth_normalize_role_name((string) $role);
+        if ($roleName === null) {
+            continue;
+        }
+        $defaults = SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS[$roleName] ?? [];
+        foreach ($defaults as $permission) {
+            $permissionName = auth_normalize_permission_name($permission);
+            if ($permissionName !== null && !in_array($permissionName, $resolved, true)) {
+                $resolved[] = $permissionName;
+            }
+        }
+    }
+    if (!$resolved) {
+        foreach (SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS[SIGNAGE_AUTH_DEFAULT_ROLE] as $permission) {
+            $permissionName = auth_normalize_permission_name($permission);
+            if ($permissionName !== null && !in_array($permissionName, $resolved, true)) {
+                $resolved[] = $permissionName;
+            }
+        }
+    }
+    return $resolved;
+}
+
+function auth_enforce_role_permissions(array $roles, array $permissions): array
+{
+    $normalized = [];
+    foreach ($permissions as $permission) {
+        $permissionName = auth_normalize_permission_name((string) $permission);
+        if ($permissionName !== null && !in_array($permissionName, $normalized, true)) {
+            $normalized[] = $permissionName;
+        }
+    }
+    if (!$normalized) {
+        $normalized = auth_roles_default_permissions($roles);
+    }
+    if (in_array('admin', $roles, true) && !in_array('user-admin', $normalized, true)) {
+        $normalized[] = 'user-admin';
+    }
+    return array_values($normalized);
+}
+
+function auth_normalize_permissions(mixed $raw, array $roles = []): array
+{
+    if (is_string($raw)) {
+        $raw = preg_split('/[,\s]+/', $raw) ?: [];
+    }
+    if (!is_array($raw)) {
+        $raw = [];
+    }
+    return auth_enforce_role_permissions($roles, $raw);
+}
+
+function auth_user_permissions(array $user): array
+{
+    $roles = auth_user_roles($user);
+    if (!empty($user['permissions']) && is_array($user['permissions'])) {
+        return auth_enforce_role_permissions($roles, $user['permissions']);
+    }
+    return auth_roles_default_permissions($roles);
 }
 
 function auth_user_has_role(array $user, string $role): bool

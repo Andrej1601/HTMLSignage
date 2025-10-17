@@ -27,4 +27,5 @@ echo json_encode([
     'ok' => true,
     'users' => $users,
     'roles' => array_values(SIGNAGE_AUTH_ROLES),
+    'permissions' => array_values(SIGNAGE_AUTH_PERMISSIONS),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
