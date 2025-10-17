@@ -12,11 +12,16 @@
 
 'use strict';
 
-import { $, $$, preloadImg, escapeHtml, genId } from '../core/utils.js';
+import { $, $$, preloadImg, escapeHtml } from '../core/utils.js';
 import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
+import {
+  ensureBadgeLibrary,
+  createBadge,
+  propagateBadgeLibraryToStyleSets
+} from '../core/badge_library.js';
 
 // App-Context (Getter/Setter aus app.js)
 let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
@@ -350,159 +355,8 @@ function ensureStyleSets(settings){
   return cleaned;
 }
 
-function ensureBadgeLibrary(settings){
-  settings.slides ||= {};
-
-  const readBadgeImage = (entry) => {
-    if (!entry || typeof entry !== 'object') return '';
-    if (typeof entry.imageUrl === 'string') return entry.imageUrl.trim();
-    if (typeof entry.iconUrl === 'string') return entry.iconUrl.trim();
-    if (typeof entry.image === 'string') return entry.image.trim();
-    if (entry.image && typeof entry.image.url === 'string') return entry.image.url.trim();
-    return '';
-  };
-
-  const readBadgeField = (entry, keys) => {
-    if (!entry || typeof entry !== 'object') return '';
-    for (const key of keys) {
-      const value = entry[key];
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) return trimmed;
-      }
-    }
-    return '';
-  };
-
-  const readBadgeIcon = (entry) => readBadgeField(entry, ['icon', 'emoji', 'symbol']);
-  const readBadgeLabel = (entry) => readBadgeField(entry, ['label', 'title', 'text', 'name']);
-
-  const resolveBadgeText = (primary, fallback) => {
-    if (typeof primary === 'string' && primary.trim()) return primary.trim();
-    if (typeof fallback === 'string') return fallback.trim();
-    return '';
-  };
-
-  const resolveBadgeImage = (primary, fallback) => {
-    if (typeof primary === 'string' && primary.trim()) return primary.trim();
-    if (typeof fallback === 'string') return fallback.trim();
-    return '';
-  };
-
-  const previousById = (() => {
-    const map = new Map();
-    const list = settings.slides.badgeLibrary;
-    if (!Array.isArray(list)) return map;
-    list.forEach((entry) => {
-      if (!entry || typeof entry !== 'object') return;
-      const id = typeof entry.id === 'string' ? entry.id.trim() : '';
-      if (!id || map.has(id)) return;
-      map.set(id, {
-        icon: readBadgeIcon(entry) || undefined,
-        label: readBadgeLabel(entry) || undefined,
-        imageUrl: readBadgeImage(entry)
-      });
-    });
-    return map;
-  })();
-
-  const seen = new Set();
-  const normalized = [];
-  const pushEntry = (entry, assignId = false) => {
-    if (!entry || typeof entry !== 'object') return;
-    let id = String(entry.id ?? '').trim();
-    if (!id && assignId) id = genId('bdg_');
-    if (!id || seen.has(id)) return;
-    const prev = previousById.get(id);
-    const icon = resolveBadgeText(readBadgeIcon(entry), prev?.icon);
-    const label = resolveBadgeText(readBadgeLabel(entry), prev?.label);
-    const imageUrl = resolveBadgeImage(readBadgeImage(entry), prev?.imageUrl);
-    const record = { id, icon, label };
-    if (imageUrl) record.imageUrl = imageUrl;
-    normalized.push(record);
-    seen.add(id);
-  };
-
-  const collectFromList = (list, assignIds = false) => {
-    if (!Array.isArray(list)) return false;
-    const before = normalized.length;
-    list.forEach((entry) => pushEntry(entry, assignIds));
-    return normalized.length > before;
-  };
-
-  const raw = settings.slides.badgeLibrary;
-  const rawIsArray = Array.isArray(raw);
-  collectFromList(raw, true);
-  const isExplicitEmpty = rawIsArray && raw.length === 0;
-
-  if (!normalized.length && !isExplicitEmpty) {
-    const styleSets = settings.slides?.styleSets;
-    if (styleSets && typeof styleSets === 'object') {
-      const activeId = settings.slides?.activeStyleSet;
-      const tryUseBadgeList = (candidate) => collectFromList(candidate, true);
-      let loaded = false;
-      if (activeId && styleSets[activeId]?.slides) {
-        loaded = tryUseBadgeList(styleSets[activeId].slides.badgeLibrary);
-      }
-      if (!loaded) {
-        Object.values(styleSets).some((entry) => {
-          if (!entry || typeof entry !== 'object') return false;
-          return tryUseBadgeList(entry.slides?.badgeLibrary);
-        });
-      }
-    }
-  }
-
-  if (!normalized.length && !isExplicitEmpty) {
-    const fallback = DEFAULTS.slides?.badgeLibrary || [];
-    if (Array.isArray(fallback)) collectFromList(fallback, true);
-  }
-
-  settings.slides.badgeLibrary = normalized;
-  return normalized;
-}
-
-function syncActiveStyleSetBadgeSettings(settings){
-  if (!settings || typeof settings !== 'object') return;
-  settings.slides ||= {};
-  const styleSets = settings.slides.styleSets;
-  if (!styleSets || typeof styleSets !== 'object') return;
-
-  const sourceLibrary = Array.isArray(settings.slides.badgeLibrary)
-    ? settings.slides.badgeLibrary
-    : [];
-
-  const cloneBadgeLibrary = () => {
-    const cloned = [];
-    sourceLibrary.forEach((item) => {
-      if (!item || typeof item !== 'object') return;
-      const id = String(item.id ?? '').trim();
-      if (!id) return;
-      const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
-      const label = typeof item.label === 'string' ? item.label.trim() : '';
-      let imageUrl = '';
-      if (typeof item.imageUrl === 'string') imageUrl = item.imageUrl.trim();
-      else if (typeof item.iconUrl === 'string') imageUrl = item.iconUrl.trim();
-      else if (typeof item.image === 'string') imageUrl = item.image.trim();
-      else if (item.image && typeof item.image.url === 'string') imageUrl = item.image.url.trim();
-      const record = { id, icon, label };
-      if (imageUrl) record.imageUrl = imageUrl;
-      cloned.push(record);
-    });
-    return cloned;
-  };
-
-  Object.values(styleSets).forEach((entry) => {
-    if (!entry || typeof entry !== 'object') return;
-    const targetSlides = entry.slides = (entry.slides && typeof entry.slides === 'object')
-      ? entry.slides
-      : {};
-    targetSlides.badgeLibrary = cloneBadgeLibrary();
-  });
-}
-
-function markBadgeLibraryChanged(settings){
-  syncActiveStyleSetBadgeSettings(settings);
+function commitBadgeLibraryChanges(settings){
+  const library = propagateBadgeLibraryToStyleSets(settings);
   if (ctx && typeof ctx.refreshSlidesBox === 'function') {
     try { ctx.refreshSlidesBox(); }
     catch (err) { console.warn('[admin] Slides box refresh failed after badge update', err); }
@@ -514,6 +368,7 @@ function markBadgeLibraryChanged(settings){
     window.__markUnsaved?.();
     if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
   }
+  return library;
 }
 
 const scheduleBadgeLibraryChanged = (() => {
@@ -556,7 +411,7 @@ const scheduleBadgeLibraryChanged = (() => {
     const run = () => {
       handle = null;
       isAnimationFrame = false;
-      markBadgeLibraryChanged(settings);
+      commitBadgeLibraryChanges(settings);
     };
     if (raf){
       isAnimationFrame = true;
@@ -569,6 +424,11 @@ const scheduleBadgeLibraryChanged = (() => {
   schedule.cancel = clear;
   return schedule;
 })();
+
+function markBadgeLibraryChanged(settings){
+  scheduleBadgeLibraryChanged.cancel?.();
+  commitBadgeLibraryChanges(settings);
+}
 
 function snapshotStyleSet(settings){
   return {
@@ -2885,7 +2745,7 @@ export function renderSlidesMaster(){
           scheduleBadgeLibraryChanged.cancel?.();
           markBadgeLibraryChanged(settings);
         } else {
-          syncActiveStyleSetBadgeSettings(settings);
+          propagateBadgeLibraryToStyleSets(settings);
           scheduleBadgeLibraryChanged(settings);
           if (typeof window !== 'undefined'){
             window.__queueUnsaved?.();
@@ -2919,7 +2779,7 @@ export function renderSlidesMaster(){
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
       const list = ensureBadgeLibrary(settings);
-      list.push({ id: genId('bdg_'), icon:'', label:'' });
+      list.push(createBadge());
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
       markBadgeLibraryChanged(settings);
