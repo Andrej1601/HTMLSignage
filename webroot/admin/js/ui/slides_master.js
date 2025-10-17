@@ -420,7 +420,7 @@ const resolveBadgeImage = (primary, fallback) => {
   collectFromList(raw, true);
   const isExplicitEmpty = rawIsArray && raw.length === 0;
 
-  if (!normalized.length && !isExplicitEmpty) {
+  if (!normalized.length) {
     const styleSets = settings.slides?.styleSets;
     if (styleSets && typeof styleSets === 'object') {
       const activeId = settings.slides?.activeStyleSet;
