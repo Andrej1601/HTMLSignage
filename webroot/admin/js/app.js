@@ -12,6 +12,7 @@
 // === Modular imports =========================================================
 import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
+import { ensureBadgeLibrary } from './core/badge_library.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
 import { initSlidesMasterUI, renderSlidesMaster, getActiveDayKey, collectSlideOrderStream, syncActiveStyleSetSnapshot, SAUNA_STATUS, SAUNA_STATUS_TEXT } from './ui/slides_master.js';
 import { initGridDayLoader } from './ui/grid_day_loader.js';
@@ -2758,9 +2759,8 @@ function collectSettings(){
         })(),
         showSaunaFlames: !!$('#saunaFlames')?.checked,
         badgeLibrary: (() => {
-          const sanitized = sanitizeBadgeLibrary(settings.slides?.badgeLibrary, { assignMissingIds: true });
-          (settings.slides ||= {}).badgeLibrary = sanitized;
-          return sanitized;
+          const library = ensureBadgeLibrary(settings);
+          return library.map((entry) => ({ ...entry }));
         })(),
         styleAutomation: deepClone(settings.slides?.styleAutomation || {}),
         showOverview: !!document.getElementById('ovShow')?.checked,
