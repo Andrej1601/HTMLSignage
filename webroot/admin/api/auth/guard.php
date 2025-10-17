@@ -98,6 +98,32 @@ function auth_require_role(string $role): array
     return $user;
 }
 
+function auth_user_has_permission(array $user, string $permission): bool
+{
+    $permissionName = auth_normalize_permission_name($permission);
+    if ($permissionName === null) {
+        return false;
+    }
+    $granted = auth_user_permissions($user);
+    return in_array($permissionName, $granted, true);
+}
+
+function auth_require_permission(string $permission): array
+{
+    if (!auth_is_enabled()) {
+        return ['username' => 'system', 'roles' => ['admin']];
+    }
+    $user = auth_get_request_user();
+    if ($user === null) {
+        auth_send_unauthorized();
+    }
+    if (!auth_user_has_permission($user, $permission)) {
+        auth_send_forbidden();
+    }
+    auth_register_last_user($user);
+    return $user;
+}
+
 function auth_register_last_user(array $user): void
 {
     $GLOBALS['__signage_auth_last_user'] = $user;
