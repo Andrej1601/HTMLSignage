@@ -580,35 +580,19 @@ function applyRoleRestrictions() {
   }
 
   document.body?.classList.add('role-limited');
-
-  const cockpit = document.querySelector('.workspace-overview');
-  if (cockpit) {
-    cockpit.remove();
-  }
-
-  const rightbarColumns = document.querySelector('.rightbar-columns');
-  if (rightbarColumns) {
-    Array.from(rightbarColumns.children).forEach((child) => {
-      if (!child) return;
-      if (child.id === 'slidesMaster' || child.querySelector?.('#slidesMaster')) {
-        if (child.id === 'slidesMaster') {
-          child.open = true;
-        }
-        return;
-      }
-      child.remove();
-    });
-  }
-
-  document.querySelectorAll('.rightbar details').forEach((details) => {
-    if (details.id === 'slidesMaster') {
-      details.open = true;
-    }
-  });
-
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
   });
+
+  const cockpitToggle = document.querySelector('.header-cockpit-controls');
+  if (cockpitToggle) {
+    cockpitToggle.remove();
+  }
+
+  const cockpitSection = document.querySelector('.workspace-overview');
+  if (cockpitSection) {
+    cockpitSection.remove();
+  }
 
   const btnDevices = document.getElementById('btnDevices');
   if (btnDevices) {
@@ -633,6 +617,21 @@ function applyRoleRestrictions() {
   const devPrevModal = document.getElementById('devPrevModal');
   if (devPrevModal) {
     devPrevModal.remove();
+  }
+
+  const slideshowBox = document.getElementById('boxSlidesText');
+  if (slideshowBox) {
+    slideshowBox.remove();
+  }
+
+  const colorsSection = document.getElementById('resetColors')?.closest('details');
+  if (colorsSection) {
+    colorsSection.remove();
+  }
+
+  const systemSection = document.getElementById('btnExport')?.closest('details');
+  if (systemSection) {
+    systemSection.remove();
   }
 
   const btnUsers = document.getElementById('btnUsers');
