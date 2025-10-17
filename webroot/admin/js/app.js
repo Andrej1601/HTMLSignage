@@ -584,6 +584,16 @@ function applyRoleRestrictions() {
     element.remove();
   });
 
+  const cockpitToggle = document.querySelector('.header-cockpit-controls');
+  if (cockpitToggle) {
+    cockpitToggle.remove();
+  }
+
+  const cockpitSection = document.querySelector('.workspace-overview');
+  if (cockpitSection) {
+    cockpitSection.remove();
+  }
+
   const btnDevices = document.getElementById('btnDevices');
   if (btnDevices) {
     btnDevices.remove();
@@ -607,6 +617,21 @@ function applyRoleRestrictions() {
   const devPrevModal = document.getElementById('devPrevModal');
   if (devPrevModal) {
     devPrevModal.remove();
+  }
+
+  const slideshowBox = document.getElementById('boxSlidesText');
+  if (slideshowBox) {
+    slideshowBox.remove();
+  }
+
+  const colorsSection = document.getElementById('resetColors')?.closest('details');
+  if (colorsSection) {
+    colorsSection.remove();
+  }
+
+  const systemSection = document.getElementById('btnExport')?.closest('details');
+  if (systemSection) {
+    systemSection.remove();
   }
 
   const btnUsers = document.getElementById('btnUsers');
