@@ -143,8 +143,42 @@ export function ensureBadgeLibrary(settings, { fallback } = {}) {
     fallback: existing ? undefined : effectiveFallback,
     previous: existing ?? undefined
   });
-  slides.badgeLibrary = normalized;
-  return normalized;
+  if (!existing) {
+    slides.badgeLibrary = normalized;
+    return normalized;
+  }
+
+  if (existing === normalized) {
+    return normalized;
+  }
+
+  const byId = new Map();
+  existing.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const id = readId(entry);
+    if (!id || byId.has(id)) return;
+    byId.set(id, entry);
+  });
+
+  existing.length = 0;
+
+  normalized.forEach((entry) => {
+    const current = byId.get(entry.id);
+    if (current) {
+      Object.keys(current).forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(entry, key)) {
+          delete current[key];
+        }
+      });
+      Object.assign(current, entry);
+      existing.push(current);
+    } else {
+      existing.push({ ...entry });
+    }
+  });
+
+  slides.badgeLibrary = existing;
+  return existing;
 }
 
 export function cloneBadgeLibrary(list) {
