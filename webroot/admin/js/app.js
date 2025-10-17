@@ -571,6 +571,32 @@ async function resolveCurrentUser() {
 }
 
 function applyRoleRestrictions() {
+  const cockpitToggle = document.querySelector('.header-cockpit-controls');
+  const cockpitSection = document.querySelector('.workspace-overview');
+  const slideshowBox = document.getElementById('boxSlidesText');
+  const colorsSection = document.getElementById('resetColors')?.closest('details');
+  const systemSection = document.getElementById('btnExport')?.closest('details');
+
+  if (cockpitToggle) {
+    cockpitToggle.removeAttribute('hidden');
+  }
+
+  if (cockpitSection) {
+    cockpitSection.removeAttribute('hidden');
+  }
+
+  if (slideshowBox) {
+    slideshowBox.removeAttribute('hidden');
+  }
+
+  if (colorsSection) {
+    colorsSection.removeAttribute('hidden');
+  }
+
+  if (systemSection) {
+    systemSection.removeAttribute('hidden');
+  }
+
   document.body?.classList.remove('role-limited');
   if (hasRole('admin')) {
     return;
@@ -584,14 +610,12 @@ function applyRoleRestrictions() {
     element.remove();
   });
 
-  const cockpitToggle = document.querySelector('.header-cockpit-controls');
   if (cockpitToggle) {
-    cockpitToggle.remove();
+    cockpitToggle.setAttribute('hidden', '');
   }
 
-  const cockpitSection = document.querySelector('.workspace-overview');
   if (cockpitSection) {
-    cockpitSection.remove();
+    cockpitSection.setAttribute('hidden', '');
   }
 
   const btnDevices = document.getElementById('btnDevices');
@@ -619,19 +643,19 @@ function applyRoleRestrictions() {
     devPrevModal.remove();
   }
 
-  const slideshowBox = document.getElementById('boxSlidesText');
   if (slideshowBox) {
-    slideshowBox.remove();
+    slideshowBox.open = false;
+    slideshowBox.setAttribute('hidden', '');
   }
 
-  const colorsSection = document.getElementById('resetColors')?.closest('details');
   if (colorsSection) {
-    colorsSection.remove();
+    colorsSection.open = false;
+    colorsSection.setAttribute('hidden', '');
   }
 
-  const systemSection = document.getElementById('btnExport')?.closest('details');
   if (systemSection) {
-    systemSection.remove();
+    systemSection.open = false;
+    systemSection.setAttribute('hidden', '');
   }
 
   const btnUsers = document.getElementById('btnUsers');
