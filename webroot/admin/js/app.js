@@ -580,32 +580,6 @@ function applyRoleRestrictions() {
   }
 
   document.body?.classList.add('role-limited');
-
-  const cockpit = document.querySelector('.workspace-overview');
-  if (cockpit) {
-    cockpit.remove();
-  }
-
-  const rightbarColumns = document.querySelector('.rightbar-columns');
-  if (rightbarColumns) {
-    Array.from(rightbarColumns.children).forEach((child) => {
-      if (!child) return;
-      if (child.id === 'slidesMaster' || child.querySelector?.('#slidesMaster')) {
-        if (child.id === 'slidesMaster') {
-          child.open = true;
-        }
-        return;
-      }
-      child.remove();
-    });
-  }
-
-  document.querySelectorAll('.rightbar details').forEach((details) => {
-    if (details.id === 'slidesMaster') {
-      details.open = true;
-    }
-  });
-
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
   });
