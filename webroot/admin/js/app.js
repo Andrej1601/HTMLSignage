@@ -587,6 +587,7 @@ function applyRoleRestrictions() {
   const slidesAutomationCard = document.getElementById('slidesAutomationCard');
   const colorsSection = document.getElementById('resetColors')?.closest('details');
   const systemSection = document.getElementById('btnExport')?.closest('details');
+  const globalInfoBox = document.getElementById('boxStories');
 
   const isAdmin = hasRole('admin');
   const isEditor = hasRole('editor');
@@ -597,6 +598,7 @@ function applyRoleRestrictions() {
   setHiddenState(slideshowBox, !hasFullAccess);
   setHiddenState(slidesFlowCard, !hasFullAccess);
   setHiddenState(slidesAutomationCard, !hasFullAccess);
+  setHiddenState(globalInfoBox, !hasFullAccess);
   setHiddenState(colorsSection, !hasFullAccess);
   setHiddenState(systemSection, !hasFullAccess);
 
@@ -615,6 +617,10 @@ function applyRoleRestrictions() {
 
   if (systemSection) {
     systemSection.open = false;
+  }
+
+  if (globalInfoBox) {
+    globalInfoBox.open = false;
   }
 
   document.body?.classList.add('role-limited');
