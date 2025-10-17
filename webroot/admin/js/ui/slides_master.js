@@ -420,7 +420,7 @@ const resolveBadgeImage = (primary, fallback) => {
   collectFromList(raw, true);
   const isExplicitEmpty = rawIsArray && raw.length === 0;
 
-  if (!normalized.length && !isExplicitEmpty) {
+  if (!normalized.length) {
     const styleSets = settings.slides?.styleSets;
     if (styleSets && typeof styleSets === 'object') {
       const activeId = settings.slides?.activeStyleSet;
@@ -451,35 +451,39 @@ function syncActiveStyleSetBadgeSettings(settings){
   if (!settings || typeof settings !== 'object') return;
   settings.slides ||= {};
   const styleSets = settings.slides.styleSets;
-  const activeId = settings.slides.activeStyleSet;
-  if (!styleSets || typeof styleSets !== 'object' || !activeId) return;
-  const entry = styleSets[activeId];
-  if (!entry || typeof entry !== 'object') return;
-  const targetSlides = entry.slides = (entry.slides && typeof entry.slides === 'object')
-    ? entry.slides
-    : {};
+  if (!styleSets || typeof styleSets !== 'object') return;
 
-  const library = Array.isArray(settings.slides.badgeLibrary)
+  const sourceLibrary = Array.isArray(settings.slides.badgeLibrary)
     ? settings.slides.badgeLibrary
     : [];
-  const clonedLibrary = [];
-  library.forEach((item) => {
-    if (!item || typeof item !== 'object') return;
-    const id = String(item.id ?? '').trim();
-    if (!id) return;
-    const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
-    const label = typeof item.label === 'string' ? item.label.trim() : '';
-    let imageUrl = '';
-    if (typeof item.imageUrl === 'string') imageUrl = item.imageUrl.trim();
-    else if (typeof item.iconUrl === 'string') imageUrl = item.iconUrl.trim();
-    else if (typeof item.image === 'string') imageUrl = item.image.trim();
-    else if (item.image && typeof item.image.url === 'string') imageUrl = item.image.url.trim();
-    const record = { id, icon, label };
-    if (imageUrl) record.imageUrl = imageUrl;
-    clonedLibrary.push(record);
-  });
-  targetSlides.badgeLibrary = clonedLibrary;
 
+  const cloneBadgeLibrary = () => {
+    const cloned = [];
+    sourceLibrary.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const id = String(item.id ?? '').trim();
+      if (!id) return;
+      const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
+      const label = typeof item.label === 'string' ? item.label.trim() : '';
+      let imageUrl = '';
+      if (typeof item.imageUrl === 'string') imageUrl = item.imageUrl.trim();
+      else if (typeof item.iconUrl === 'string') imageUrl = item.iconUrl.trim();
+      else if (typeof item.image === 'string') imageUrl = item.image.trim();
+      else if (item.image && typeof item.image.url === 'string') imageUrl = item.image.url.trim();
+      const record = { id, icon, label };
+      if (imageUrl) record.imageUrl = imageUrl;
+      cloned.push(record);
+    });
+    return cloned;
+  };
+
+  Object.values(styleSets).forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const targetSlides = entry.slides = (entry.slides && typeof entry.slides === 'object')
+      ? entry.slides
+      : {};
+    targetSlides.badgeLibrary = cloneBadgeLibrary();
+  });
 }
 
 function markBadgeLibraryChanged(settings){
