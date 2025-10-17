@@ -368,6 +368,10 @@ function commitBadgeLibraryChanges(settings){
     window.__markUnsaved?.();
     if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
   }
+  if (ctx && typeof ctx.queueUnsavedEvaluation === 'function') {
+    try { ctx.queueUnsavedEvaluation({ immediate: true }); }
+    catch (err) { console.warn('[admin] Unsaved evaluation failed after badge update', err); }
+  }
   return library;
 }
 
