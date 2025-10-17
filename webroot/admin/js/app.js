@@ -574,6 +574,8 @@ function applyRoleRestrictions() {
   const cockpitToggle = document.querySelector('.header-cockpit-controls');
   const cockpitSection = document.querySelector('.workspace-overview');
   const slideshowBox = document.getElementById('boxSlidesText');
+  const slidesFlowCard = document.getElementById('slidesFlowCard');
+  const slidesAutomationCard = document.getElementById('slidesAutomationCard');
   const colorsSection = document.getElementById('resetColors')?.closest('details');
   const systemSection = document.getElementById('btnExport')?.closest('details');
 
@@ -587,6 +589,14 @@ function applyRoleRestrictions() {
 
   if (slideshowBox) {
     slideshowBox.removeAttribute('hidden');
+  }
+
+  if (slidesFlowCard) {
+    slidesFlowCard.removeAttribute('hidden');
+  }
+
+  if (slidesAutomationCard) {
+    slidesAutomationCard.removeAttribute('hidden');
   }
 
   if (colorsSection) {
@@ -646,6 +656,14 @@ function applyRoleRestrictions() {
   if (slideshowBox) {
     slideshowBox.open = false;
     slideshowBox.setAttribute('hidden', '');
+  }
+
+  if (slidesFlowCard) {
+    slidesFlowCard.setAttribute('hidden', '');
+  }
+
+  if (slidesAutomationCard) {
+    slidesAutomationCard.setAttribute('hidden', '');
   }
 
   if (colorsSection) {
