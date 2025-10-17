@@ -240,13 +240,21 @@ export function sanitizeBadgeLibrary(list, { assignMissingIds = false, fallback 
   const seen = new Set();
   const normalized = [];
 
+  const asTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
+
   const pushEntry = (entry, assignId = false) => {
     if (!entry || typeof entry !== 'object') return;
     let id = String(entry.id ?? '').trim();
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
-    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
-    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    let icon = asTrimmedString(entry.icon);
+    if (!icon) icon = asTrimmedString(entry.emoji);
+    if (!icon) icon = asTrimmedString(entry.symbol);
+
+    let label = asTrimmedString(entry.label);
+    if (!label) label = asTrimmedString(entry.title);
+    if (!label) label = asTrimmedString(entry.text);
+    if (!label) label = asTrimmedString(entry.name);
     let imageUrl = '';
     if (typeof entry.imageUrl === 'string') imageUrl = entry.imageUrl.trim();
     else if (typeof entry.iconUrl === 'string') imageUrl = entry.iconUrl.trim();

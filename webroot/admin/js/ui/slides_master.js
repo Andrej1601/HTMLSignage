@@ -362,17 +362,32 @@ function ensureBadgeLibrary(settings){
     return '';
   };
 
-const resolveBadgeText = (primary, fallback) => {
-  if (typeof primary === 'string') return primary.trim();
-  if (typeof fallback === 'string') return fallback.trim();
-  return '';
-};
+  const readBadgeField = (entry, keys) => {
+    if (!entry || typeof entry !== 'object') return '';
+    for (const key of keys) {
+      const value = entry[key];
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+    return '';
+  };
 
-const resolveBadgeImage = (primary, fallback) => {
-  if (typeof primary === 'string') return primary.trim();
-  if (typeof fallback === 'string') return fallback.trim();
-  return '';
-};
+  const readBadgeIcon = (entry) => readBadgeField(entry, ['icon', 'emoji', 'symbol']);
+  const readBadgeLabel = (entry) => readBadgeField(entry, ['label', 'title', 'text', 'name']);
+
+  const resolveBadgeText = (primary, fallback) => {
+    if (typeof primary === 'string' && primary.trim()) return primary.trim();
+    if (typeof fallback === 'string') return fallback.trim();
+    return '';
+  };
+
+  const resolveBadgeImage = (primary, fallback) => {
+    if (typeof primary === 'string' && primary.trim()) return primary.trim();
+    if (typeof fallback === 'string') return fallback.trim();
+    return '';
+  };
 
   const previousById = (() => {
     const map = new Map();
@@ -383,8 +398,8 @@ const resolveBadgeImage = (primary, fallback) => {
       const id = typeof entry.id === 'string' ? entry.id.trim() : '';
       if (!id || map.has(id)) return;
       map.set(id, {
-        icon: typeof entry.icon === 'string' ? entry.icon : undefined,
-        label: typeof entry.label === 'string' ? entry.label : undefined,
+        icon: readBadgeIcon(entry) || undefined,
+        label: readBadgeLabel(entry) || undefined,
         imageUrl: readBadgeImage(entry)
       });
     });
@@ -399,8 +414,8 @@ const resolveBadgeImage = (primary, fallback) => {
     if (!id && assignId) id = genId('bdg_');
     if (!id || seen.has(id)) return;
     const prev = previousById.get(id);
-    const icon = resolveBadgeText(entry?.icon, prev?.icon);
-    const label = resolveBadgeText(entry?.label, prev?.label);
+    const icon = resolveBadgeText(readBadgeIcon(entry), prev?.icon);
+    const label = resolveBadgeText(readBadgeLabel(entry), prev?.label);
     const imageUrl = resolveBadgeImage(readBadgeImage(entry), prev?.imageUrl);
     const record = { id, icon, label };
     if (imageUrl) record.imageUrl = imageUrl;
