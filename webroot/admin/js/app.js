@@ -571,6 +571,15 @@ async function resolveCurrentUser() {
 }
 
 function applyRoleRestrictions() {
+  const setHiddenState = (element, shouldHide) => {
+    if (!element) return;
+    if (shouldHide) {
+      element.setAttribute('hidden', '');
+    } else {
+      element.removeAttribute('hidden');
+    }
+  };
+
   const cockpitToggle = document.querySelector('.header-cockpit-controls');
   const cockpitSection = document.querySelector('.workspace-overview');
   const slideshowBox = document.getElementById('boxSlidesText');
@@ -579,54 +588,39 @@ function applyRoleRestrictions() {
   const colorsSection = document.getElementById('resetColors')?.closest('details');
   const systemSection = document.getElementById('btnExport')?.closest('details');
 
-  if (cockpitToggle) {
-    cockpitToggle.removeAttribute('hidden');
-  }
+  const isAdmin = hasRole('admin');
+  const isEditor = hasRole('editor');
+  const hasFullAccess = isAdmin || isEditor;
 
-  if (cockpitSection) {
-    cockpitSection.removeAttribute('hidden');
+  setHiddenState(cockpitToggle, !hasFullAccess);
+  setHiddenState(cockpitSection, !hasFullAccess);
+  setHiddenState(slideshowBox, !hasFullAccess);
+  setHiddenState(slidesFlowCard, !hasFullAccess);
+  setHiddenState(slidesAutomationCard, !hasFullAccess);
+  setHiddenState(colorsSection, !hasFullAccess);
+  setHiddenState(systemSection, !hasFullAccess);
+
+  document.body?.classList.toggle('role-limited', !hasFullAccess);
+  if (hasFullAccess) {
+    return;
   }
 
   if (slideshowBox) {
-    slideshowBox.removeAttribute('hidden');
-  }
-
-  if (slidesFlowCard) {
-    slidesFlowCard.removeAttribute('hidden');
-  }
-
-  if (slidesAutomationCard) {
-    slidesAutomationCard.removeAttribute('hidden');
+    slideshowBox.open = false;
   }
 
   if (colorsSection) {
-    colorsSection.removeAttribute('hidden');
+    colorsSection.open = false;
   }
 
   if (systemSection) {
-    systemSection.removeAttribute('hidden');
-  }
-
-  document.body?.classList.remove('role-limited');
-  if (hasRole('admin')) {
-    return;
-  }
-  if (hasRole('editor')) {
-    return;
+    systemSection.open = false;
   }
 
   document.body?.classList.add('role-limited');
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
   });
-
-  if (cockpitToggle) {
-    cockpitToggle.setAttribute('hidden', '');
-  }
-
-  if (cockpitSection) {
-    cockpitSection.setAttribute('hidden', '');
-  }
 
   const btnDevices = document.getElementById('btnDevices');
   if (btnDevices) {
@@ -651,29 +645,6 @@ function applyRoleRestrictions() {
   const devPrevModal = document.getElementById('devPrevModal');
   if (devPrevModal) {
     devPrevModal.remove();
-  }
-
-  if (slideshowBox) {
-    slideshowBox.open = false;
-    slideshowBox.setAttribute('hidden', '');
-  }
-
-  if (slidesFlowCard) {
-    slidesFlowCard.setAttribute('hidden', '');
-  }
-
-  if (slidesAutomationCard) {
-    slidesAutomationCard.setAttribute('hidden', '');
-  }
-
-  if (colorsSection) {
-    colorsSection.open = false;
-    colorsSection.setAttribute('hidden', '');
-  }
-
-  if (systemSection) {
-    systemSection.open = false;
-    systemSection.setAttribute('hidden', '');
   }
 
   const btnUsers = document.getElementById('btnUsers');
