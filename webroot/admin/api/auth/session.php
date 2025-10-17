@@ -32,6 +32,7 @@ echo json_encode([
     'user' => [
         'username' => $user['username'] ?? null,
         'displayName' => $displayName !== '' ? $displayName : null,
-        'roles' => $roles
+        'roles' => $roles,
+        'permissions' => auth_user_permissions($user),
     ]
 ], SIGNAGE_JSON_FLAGS);

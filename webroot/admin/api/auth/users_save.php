@@ -50,6 +50,9 @@ if (!$roles) {
     $roles[] = SIGNAGE_AUTH_DEFAULT_ROLE;
 }
 
+$permissionsInput = $payload['permissions'] ?? null;
+$permissions = auth_normalize_permissions($permissionsInput, $roles);
+
 $state = auth_users_load();
 $current = $state['users'][$username] ?? null;
 $wasAdmin = $current ? auth_user_has_role($current, 'admin') : false;
@@ -76,6 +79,7 @@ $user = [
     'username' => $username,
     'roles' => $roles,
     'displayName' => $displayName !== '' ? $displayName : null,
+    'permissions' => $permissions,
 ];
 
 if ($password !== '') {
