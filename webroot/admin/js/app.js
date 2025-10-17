@@ -571,6 +571,32 @@ async function resolveCurrentUser() {
 }
 
 function applyRoleRestrictions() {
+  const cockpitToggle = document.querySelector('.header-cockpit-controls');
+  const cockpitSection = document.querySelector('.workspace-overview');
+  const slideshowBox = document.getElementById('boxSlidesText');
+  const colorsSection = document.getElementById('resetColors')?.closest('details');
+  const systemSection = document.getElementById('btnExport')?.closest('details');
+
+  if (cockpitToggle) {
+    cockpitToggle.removeAttribute('hidden');
+  }
+
+  if (cockpitSection) {
+    cockpitSection.removeAttribute('hidden');
+  }
+
+  if (slideshowBox) {
+    slideshowBox.removeAttribute('hidden');
+  }
+
+  if (colorsSection) {
+    colorsSection.removeAttribute('hidden');
+  }
+
+  if (systemSection) {
+    systemSection.removeAttribute('hidden');
+  }
+
   document.body?.classList.remove('role-limited');
   if (hasRole('admin')) {
     return;
@@ -580,35 +606,17 @@ function applyRoleRestrictions() {
   }
 
   document.body?.classList.add('role-limited');
-
-  const cockpit = document.querySelector('.workspace-overview');
-  if (cockpit) {
-    cockpit.remove();
-  }
-
-  const rightbarColumns = document.querySelector('.rightbar-columns');
-  if (rightbarColumns) {
-    Array.from(rightbarColumns.children).forEach((child) => {
-      if (!child) return;
-      if (child.id === 'slidesMaster' || child.querySelector?.('#slidesMaster')) {
-        if (child.id === 'slidesMaster') {
-          child.open = true;
-        }
-        return;
-      }
-      child.remove();
-    });
-  }
-
-  document.querySelectorAll('.rightbar details').forEach((details) => {
-    if (details.id === 'slidesMaster') {
-      details.open = true;
-    }
-  });
-
   document.querySelectorAll('[data-devices]').forEach((element) => {
     element.remove();
   });
+
+  if (cockpitToggle) {
+    cockpitToggle.setAttribute('hidden', '');
+  }
+
+  if (cockpitSection) {
+    cockpitSection.setAttribute('hidden', '');
+  }
 
   const btnDevices = document.getElementById('btnDevices');
   if (btnDevices) {
@@ -633,6 +641,21 @@ function applyRoleRestrictions() {
   const devPrevModal = document.getElementById('devPrevModal');
   if (devPrevModal) {
     devPrevModal.remove();
+  }
+
+  if (slideshowBox) {
+    slideshowBox.open = false;
+    slideshowBox.setAttribute('hidden', '');
+  }
+
+  if (colorsSection) {
+    colorsSection.open = false;
+    colorsSection.setAttribute('hidden', '');
+  }
+
+  if (systemSection) {
+    systemSection.open = false;
+    systemSection.setAttribute('hidden', '');
   }
 
   const btnUsers = document.getElementById('btnUsers');
