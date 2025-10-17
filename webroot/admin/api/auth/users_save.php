@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/guard.php';
 
-auth_require_role('admin');
+auth_require_permission('user-admin');
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -50,6 +50,9 @@ if (!$roles) {
     $roles[] = SIGNAGE_AUTH_DEFAULT_ROLE;
 }
 
+$permissionsInput = $payload['permissions'] ?? null;
+$permissions = auth_normalize_permissions($permissionsInput, $roles);
+
 $state = auth_users_load();
 $current = $state['users'][$username] ?? null;
 $wasAdmin = $current ? auth_user_has_role($current, 'admin') : false;
@@ -76,6 +79,7 @@ $user = [
     'username' => $username,
     'roles' => $roles,
     'displayName' => $displayName !== '' ? $displayName : null,
+    'permissions' => $permissions,
 ];
 
 if ($password !== '') {

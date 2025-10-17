@@ -5,7 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/guard.php';
 
-auth_require_role('admin');
+auth_require_permission('user-admin');
 
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
@@ -27,4 +27,5 @@ echo json_encode([
     'ok' => true,
     'users' => $users,
     'roles' => array_values(SIGNAGE_AUTH_ROLES),
+    'permissions' => array_values(SIGNAGE_AUTH_PERMISSIONS),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

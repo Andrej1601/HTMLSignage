@@ -51,7 +51,8 @@ import {
   saveUser as saveUserAccount,
   deleteUser as deleteUserAccount,
   fetchSession as fetchCurrentUserSession,
-  AVAILABLE_ROLES as AUTH_ROLES
+  AVAILABLE_ROLES as AUTH_ROLES,
+  AVAILABLE_PERMISSIONS as AUTH_PERMISSIONS
 } from './core/auth_service.js';
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
@@ -72,6 +73,9 @@ const normalizeRoleName = (role) => {
   return ROLE_ALIASES[name] || name;
 };
 
+let availablePermissions = mergeAvailablePermissions(AUTH_PERMISSIONS);
+const defaultAdminPermissions = resolvePermissionsForRoles(['admin']);
+
 const ROLE_META = {
   saunameister: {
     title: 'Saunameister',
@@ -87,10 +91,108 @@ const ROLE_META = {
   }
 };
 
-let currentUser = { username: null, displayName: null, roles: ['admin'] };
+const PERMISSION_ALIASES = {
+  overview: 'cockpit',
+  slideshows: 'slides',
+  info: 'global-info',
+  users: 'user-admin'
+};
+
+const PERMISSION_META = {
+  cockpit: {
+    title: 'Cockpit & Übersicht',
+    description: 'Zugriff auf die Übersichtskacheln und Schnellaktionen.'
+  },
+  slides: {
+    title: 'Slides & Inhalte',
+    description: 'Aufgussplan, Slides und Automationen bearbeiten.'
+  },
+  'global-info': {
+    title: 'Infobox',
+    description: 'Globale Informationen und Hinweise pflegen.'
+  },
+  colors: {
+    title: 'Farben & Layout',
+    description: 'Farbpaletten, Schriftvarianten und Layout-Einstellungen anpassen.'
+  },
+  system: {
+    title: 'System & Wartung',
+    description: 'Daten importieren/exportieren und Aufräumaktionen ausführen.'
+  },
+  devices: {
+    title: 'Geräteverwaltung',
+    description: 'Geräte koppeln, Vorschauen öffnen und Aktionen auslösen.'
+  },
+  'user-admin': {
+    title: 'Benutzerverwaltung',
+    description: 'Konten anlegen, Rechte vergeben und Passwörter setzen.'
+  }
+};
+
+const ROLE_DEFAULT_PERMISSIONS = {
+  saunameister: ['cockpit', 'slides', 'global-info'],
+  editor: ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices'],
+  admin: ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices', 'user-admin']
+};
+
+const normalizePermissionName = (permission) => {
+  const key = String(permission || '').toLowerCase();
+  return PERMISSION_ALIASES[key] || key;
+};
+
+const resolvePermissionsForRoles = (roles = []) => {
+  const selection = new Set();
+  const normalizedRoles = Array.isArray(roles) ? roles.map((role) => normalizeRoleName(role)).filter((role) => role) : [];
+  normalizedRoles.forEach((role) => {
+    const defaults = ROLE_DEFAULT_PERMISSIONS[role] || [];
+    defaults.forEach((permission) => {
+      const permissionName = normalizePermissionName(permission);
+      if (permissionName) {
+        selection.add(permissionName);
+      }
+    });
+  });
+  if (selection.size === 0) {
+    ROLE_DEFAULT_PERMISSIONS.saunameister.forEach((permission) => {
+      const permissionName = normalizePermissionName(permission);
+      if (permissionName) selection.add(permissionName);
+    });
+  }
+  return Array.from(selection);
+};
+
+const mergeAvailablePermissions = (source = []) => {
+  const result = new Set();
+  Object.keys(PERMISSION_META).forEach((permission) => {
+    const name = normalizePermissionName(permission);
+    if (name) result.add(name);
+  });
+  if (Array.isArray(source)) {
+    source.forEach((permission) => {
+      const name = normalizePermissionName(permission);
+      if (name) result.add(name);
+    });
+  }
+  return Array.from(result);
+};
+
+const createPermissionSet = (permissions = []) => {
+  const set = new Set();
+  if (Array.isArray(permissions)) {
+    permissions.forEach((permission) => {
+      const name = normalizePermissionName(permission);
+      if (name) set.add(name);
+    });
+  }
+  return set;
+};
+
+let currentUser = { username: null, displayName: null, roles: ['admin'], permissions: defaultAdminPermissions };
 let currentUserRoles = new Set(currentUser.roles.map((role) => normalizeRoleName(role)));
+let currentUserPermissions = createPermissionSet(currentUser.permissions);
 
 const hasRole = (role) => currentUserRoles.has(normalizeRoleName(role));
+const hasPermission = (permission) => currentUserPermissions.has(normalizePermissionName(permission));
 
 // === Global State ============================================================
 let schedule = null;
@@ -548,25 +650,39 @@ async function resolveCurrentUser() {
         .filter((role) => role)
       : [];
     currentUserRoles = normalizedRoles.length ? new Set(normalizedRoles) : new Set();
+    const normalizedPermissions = Array.isArray(payload.permissions)
+      ? payload.permissions
+        .map((permission) => normalizePermissionName(permission))
+        .filter((permission) => permission)
+      : [];
+    const fallbackPermissions = normalizedPermissions.length
+      ? normalizedPermissions
+      : resolvePermissionsForRoles(Array.from(currentUserRoles));
+    currentUserPermissions = createPermissionSet(fallbackPermissions);
     currentUser = {
       username: typeof payload.username === 'string' ? payload.username : null,
       displayName: typeof payload.displayName === 'string' && payload.displayName !== ''
         ? payload.displayName
         : null,
-      roles: Array.from(currentUserRoles)
+      roles: Array.from(currentUserRoles),
+      permissions: Array.from(currentUserPermissions)
     };
     if (currentUser.roles.length === 0 && normalizedRoles.length === 0 && session?.ok === false) {
       currentUser.roles = ['admin'];
       currentUserRoles = new Set(['admin']);
+      currentUserPermissions = createPermissionSet(resolvePermissionsForRoles(['admin']));
+      currentUser.permissions = Array.from(currentUserPermissions);
     }
   } catch (error) {
     console.warn('[admin] Benutzerstatus konnte nicht geladen werden', error);
-    currentUser = { username: null, displayName: null, roles: ['admin'] };
+    currentUser = { username: null, displayName: null, roles: ['admin'], permissions: resolvePermissionsForRoles(['admin']) };
     currentUserRoles = new Set(['admin']);
+    currentUserPermissions = createPermissionSet(currentUser.permissions);
   }
   try {
     window.__currentUser = currentUser;
     window.__currentUserRoles = Array.from(currentUserRoles);
+    window.__currentUserPermissions = Array.from(currentUserPermissions);
   } catch {}
 }
 
@@ -589,78 +705,82 @@ function applyRoleRestrictions() {
   const systemSection = document.getElementById('btnExport')?.closest('details');
   const globalInfoBox = document.getElementById('boxStories');
 
-  const isAdmin = hasRole('admin');
-  const isEditor = hasRole('editor');
-  const hasFullAccess = isAdmin || isEditor;
+  const canUseCockpit = hasPermission('cockpit');
+  const canUseSlides = hasPermission('slides');
+  const canUseGlobalInfo = hasPermission('global-info');
+  const canUseColors = hasPermission('colors');
+  const canUseSystem = hasPermission('system');
+  const canManageDevices = hasPermission('devices');
+  const canManageUsers = hasPermission('user-admin');
 
-  setHiddenState(cockpitToggle, !hasFullAccess);
-  setHiddenState(cockpitSection, !hasFullAccess);
-  setHiddenState(slideshowBox, !hasFullAccess);
-  setHiddenState(slidesFlowCard, !hasFullAccess);
-  setHiddenState(slidesAutomationCard, !hasFullAccess);
-  setHiddenState(globalInfoBox, !hasFullAccess);
-  setHiddenState(colorsSection, !hasFullAccess);
-  setHiddenState(systemSection, !hasFullAccess);
+  setHiddenState(cockpitToggle, !canUseCockpit);
+  setHiddenState(cockpitSection, !canUseCockpit);
+  setHiddenState(slideshowBox, !canUseSlides);
+  setHiddenState(slidesFlowCard, !canUseSlides);
+  setHiddenState(slidesAutomationCard, !canUseSlides);
+  setHiddenState(globalInfoBox, !canUseGlobalInfo);
+  setHiddenState(colorsSection, !canUseColors);
+  setHiddenState(systemSection, !canUseSystem);
 
+  const hasFullAccess = availablePermissions.every((permission) => hasPermission(permission));
   document.body?.classList.toggle('role-limited', !hasFullAccess);
-  if (hasFullAccess) {
-    return;
-  }
 
-  if (slideshowBox) {
+  if (!canUseSlides && slideshowBox) {
     slideshowBox.open = false;
   }
 
-  if (colorsSection) {
+  if (!canUseColors && colorsSection) {
     colorsSection.open = false;
   }
 
-  if (systemSection) {
+  if (!canUseSystem && systemSection) {
     systemSection.open = false;
   }
 
-  if (globalInfoBox) {
+  if (!canUseGlobalInfo && globalInfoBox) {
     globalInfoBox.open = false;
   }
 
-  document.body?.classList.add('role-limited');
-  document.querySelectorAll('[data-devices]').forEach((element) => {
-    element.remove();
-  });
+  if (!canManageDevices) {
+    document.querySelectorAll('[data-devices]').forEach((element) => {
+      element.remove();
+    });
 
-  const btnDevices = document.getElementById('btnDevices');
-  if (btnDevices) {
-    btnDevices.remove();
+    const btnDevices = document.getElementById('btnDevices');
+    if (btnDevices) {
+      btnDevices.remove();
+    }
+
+    setDevicesPinned(false);
+    lsRemove('devicesPinned');
+    document.body?.classList.remove('devices-pinned');
+    destroyDevicesPane();
+
+    const devicesPane = document.getElementById('devicesPane');
+    if (devicesPane) {
+      devicesPane.remove();
+    }
+
+    const devicesDock = document.getElementById('devicesDock');
+    if (devicesDock) {
+      devicesDock.remove();
+    }
+
+    const devPrevModal = document.getElementById('devPrevModal');
+    if (devPrevModal) {
+      devPrevModal.remove();
+    }
   }
 
-  setDevicesPinned(false);
-  lsRemove('devicesPinned');
-  document.body?.classList.remove('devices-pinned');
-  destroyDevicesPane();
-
-  const devicesPane = document.getElementById('devicesPane');
-  if (devicesPane) {
-    devicesPane.remove();
-  }
-
-  const devicesDock = document.getElementById('devicesDock');
-  if (devicesDock) {
-    devicesDock.remove();
-  }
-
-  const devPrevModal = document.getElementById('devPrevModal');
-  if (devPrevModal) {
-    devPrevModal.remove();
-  }
-
-  const btnUsers = document.getElementById('btnUsers');
-  if (btnUsers) {
-    btnUsers.remove();
-  }
-
-  const userModal = document.getElementById('userModal');
-  if (userModal) {
-    userModal.remove();
+  if (!canManageUsers) {
+    const btnUsers = document.getElementById('btnUsers');
+    if (btnUsers) {
+      btnUsers.remove();
+    }
+    const userModal = document.getElementById('userModal');
+    if (userModal) {
+      userModal.remove();
+    }
   }
 }
 
@@ -3408,7 +3528,7 @@ function initViewMenu(){
   const menu = document.getElementById('viewMenu');
   if (!btn || !menu) return;
 
-  const canUseDevices = hasRole('editor') || hasRole('admin');
+  const canUseDevices = hasPermission('devices');
   const openMenu  = ()=>{ menu.hidden=false; btn.setAttribute('aria-expanded','true'); };
   const closeMenu = ()=>{ menu.hidden=true;  btn.setAttribute('aria-expanded','false'); };
 
@@ -3529,7 +3649,7 @@ function initThemeToggle(){
 // 8) Benutzer & Rollen
 // ============================================================================
 function initUserAdmin(){
-  if (!hasRole('admin')) {
+  if (!hasPermission('user-admin')) {
     const limitedBtn = document.getElementById('btnUsers');
     if (limitedBtn) limitedBtn.remove();
     const limitedModal = document.getElementById('userModal');
@@ -3549,6 +3669,7 @@ function initUserAdmin(){
   const tableBody = modal.querySelector('[data-user-table]');
   const emptyHint = modal.querySelector('[data-user-empty]');
   const roleContainer = modal.querySelector('[data-role-options]');
+  const permissionContainer = modal.querySelector('[data-permission-options]');
   const usernameInput = modal.querySelector('#userUsername');
   const displayInput = modal.querySelector('#userDisplay');
   const passwordInput = modal.querySelector('#userPassword');
@@ -3561,8 +3682,10 @@ function initUserAdmin(){
   let roles = Array.isArray(AUTH_ROLES) && AUTH_ROLES.length
     ? Array.from(new Set(AUTH_ROLES.map((role) => normalizeRoleName(role)).filter((role) => role)))
     : ['saunameister', 'editor', 'admin'];
+  let permissionsCatalog = mergeAvailablePermissions(availablePermissions);
   let editing = null;
   let isBusy = false;
+  let permissionsTouched = false;
 
   const roleMetaFor = (role) => {
     const key = normalizeRoleName(role);
@@ -3572,6 +3695,21 @@ function initUserAdmin(){
     const title = typeof role === 'string' && role ? role : key;
     return { title, description: '' };
   };
+
+  const permissionMetaFor = (permission) => {
+    const key = normalizePermissionName(permission);
+    if (PERMISSION_META[key]) {
+      return PERMISSION_META[key];
+    }
+    const title = typeof permission === 'string' && permission ? permission : key;
+    return { title, description: '' };
+  };
+
+  const recommendedForRoles = (rolesSelection) => resolvePermissionsForRoles(
+    Array.isArray(rolesSelection) && rolesSelection.length
+      ? rolesSelection
+      : ['saunameister']
+  );
 
   const setStatus = (message, type = 'info') => {
     if (!status) return;
@@ -3601,6 +3739,14 @@ function initUserAdmin(){
     }
   };
 
+  const collectSelectedRoles = () => Array.from(
+    roleContainer?.querySelectorAll('input[name="roles"]:checked') || []
+  ).map((input) => normalizeRoleName(input.value));
+
+  const collectSelectedPermissions = () => Array.from(
+    permissionContainer?.querySelectorAll('input[name="permissions"]:checked') || []
+  ).map((input) => normalizePermissionName(input.value));
+
   const buildRoleOptions = (selectedRoles = []) => {
     if (!roleContainer) return;
     const selection = Array.isArray(selectedRoles)
@@ -3611,7 +3757,7 @@ function initUserAdmin(){
       const roleName = normalizeRoleName(role);
       const meta = roleMetaFor(roleName);
       const label = document.createElement('label');
-      label.className = 'user-role-option';
+      label.className = 'user-role-option user-access-option';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.name = 'roles';
@@ -3633,13 +3779,72 @@ function initUserAdmin(){
         desc.textContent = meta.description;
         copy.appendChild(desc);
       }
+      checkbox.addEventListener('change', () => {
+        const forceDefaults = !permissionsTouched;
+        syncPermissionOptions({ forceDefaults });
+      });
       label.append(checkbox, copy);
       roleContainer.appendChild(label);
     });
   };
 
+  const buildPermissionOptions = (selectedPermissions = [], { recommended = [] } = {}) => {
+    if (!permissionContainer) return;
+    const selection = createPermissionSet(selectedPermissions);
+    const recommendedSet = createPermissionSet(recommended);
+    permissionContainer.innerHTML = '';
+    permissionsCatalog.forEach((permission) => {
+      const permissionName = normalizePermissionName(permission);
+      if (!permissionName) {
+        return;
+      }
+      const meta = permissionMetaFor(permissionName);
+      const label = document.createElement('label');
+      label.className = 'user-permission-option user-access-option';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = 'permissions';
+      checkbox.value = permissionName;
+      checkbox.checked = selection.has(permissionName);
+      checkbox.addEventListener('change', () => {
+        permissionsTouched = true;
+      });
+      const copy = document.createElement('div');
+      copy.className = 'user-permission-copy';
+      const titleEl = document.createElement('span');
+      titleEl.className = 'permission-title';
+      titleEl.textContent = meta.title;
+      copy.appendChild(titleEl);
+      if (meta.description) {
+        const desc = document.createElement('span');
+        desc.className = 'permission-desc';
+        desc.textContent = meta.description;
+        copy.appendChild(desc);
+      }
+      if (recommendedSet.has(permissionName)) {
+        const badge = document.createElement('span');
+        badge.className = 'user-option-badge';
+        badge.textContent = 'Empfohlen';
+        copy.appendChild(badge);
+      }
+      label.append(checkbox, copy);
+      permissionContainer.appendChild(label);
+    });
+  };
+
+  const syncPermissionOptions = ({ forceDefaults = false } = {}) => {
+    const rolesSelection = collectSelectedRoles();
+    const recommended = recommendedForRoles(rolesSelection);
+    let selected = collectSelectedPermissions();
+    if (forceDefaults || (!permissionsTouched && !selected.length)) {
+      selected = recommended;
+    }
+    buildPermissionOptions(selected, { recommended });
+  };
+
   function startCreate({ preserveStatus = false } = {}) {
     editing = null;
+    permissionsTouched = false;
     if (title) title.textContent = 'Benutzer anlegen';
     if (!preserveStatus) setStatus('');
     if (usernameInput) {
@@ -3650,7 +3855,10 @@ function initUserAdmin(){
     if (passwordInput) passwordInput.value = '';
     if (passwordHint) passwordHint.textContent = 'Passwort wird beim Speichern gesetzt.';
     if (submitBtn) submitBtn.textContent = 'Speichern';
-    buildRoleOptions(['saunameister']);
+    const defaultRoles = ['saunameister'];
+    buildRoleOptions(defaultRoles);
+    const recommended = recommendedForRoles(defaultRoles);
+    buildPermissionOptions(recommended, { recommended });
     renderUserTable();
     focusInitial();
   }
@@ -3661,8 +3869,10 @@ function initUserAdmin(){
     editing = {
       username,
       displayName: user.displayName ?? '',
-      roles: Array.isArray(user.roles) ? user.roles.slice() : []
+      roles: Array.isArray(user.roles) ? user.roles.slice() : [],
+      permissions: Array.isArray(user.permissions) ? user.permissions.slice() : []
     };
+    permissionsTouched = true;
     if (title) title.textContent = `Benutzer „${user.username}“ bearbeiten`;
     if (!preserveStatus) setStatus('');
     if (usernameInput) {
@@ -3673,7 +3883,11 @@ function initUserAdmin(){
     if (passwordInput) passwordInput.value = '';
     if (passwordHint) passwordHint.textContent = 'Leer lassen, um das Passwort unverändert zu lassen.';
     if (submitBtn) submitBtn.textContent = 'Änderungen speichern';
-    buildRoleOptions(editing.roles.length ? editing.roles : ['saunameister']);
+    const roleSelection = editing.roles.length ? editing.roles : ['saunameister'];
+    buildRoleOptions(roleSelection);
+    const recommended = recommendedForRoles(roleSelection);
+    const permissionSelection = editing.permissions.length ? editing.permissions : recommended;
+    buildPermissionOptions(permissionSelection, { recommended });
     renderUserTable();
     focusInitial();
   }
@@ -3721,6 +3935,9 @@ function initUserAdmin(){
       const rolesList = Array.isArray(user?.roles) ? user.roles : [];
       const roleTitles = rolesList.map((role) => roleMetaFor(role).title).join(', ');
       const roleHtml = roleTitles ? escapeHtml(roleTitles) : '—';
+      const permissionsList = Array.isArray(user?.permissions) ? user.permissions : [];
+      const permissionTitles = permissionsList.map((permission) => permissionMetaFor(permission).title).join(', ');
+      const permissionsHtml = permissionTitles ? escapeHtml(permissionTitles) : '—';
       const displayHtml = display ? `<div class="mut">${escapeHtml(display)}</div>` : '';
       const row = document.createElement('tr');
       if (editing && editing.username === username) {
@@ -3732,6 +3949,7 @@ function initUserAdmin(){
           ${displayHtml}
         </td>
         <td>${roleHtml}</td>
+        <td>${permissionsHtml}</td>
         <td class="user-actions">
           <button type="button" class="btn sm" data-user-edit>Bearbeiten</button>
           <button type="button" class="btn sm danger" data-user-delete>Löschen</button>
@@ -3751,8 +3969,6 @@ function initUserAdmin(){
     });
   }
 
-  const collectSelectedRoles = () => Array.from(roleContainer?.querySelectorAll('input[type=checkbox]:checked') || []).map((input) => input.value);
-
   async function reloadUsers({ preserveSelection = false, silent = false } = {}) {
     if (!silent) setBusy(true);
     try {
@@ -3761,6 +3977,10 @@ function initUserAdmin(){
       roles = Array.isArray(data?.roles) && data.roles.length
         ? Array.from(new Set(data.roles.map((role) => normalizeRoleName(role)).filter((role) => role)))
         : roles;
+      if (Array.isArray(data?.permissions) && data.permissions.length) {
+        permissionsCatalog = mergeAvailablePermissions(data.permissions);
+        availablePermissions = mergeAvailablePermissions(data.permissions);
+      }
       if (preserveSelection && editing) {
         const match = users.find((entry) => entry?.username === editing.username);
         renderUserTable();
@@ -3793,10 +4013,16 @@ function initUserAdmin(){
         setStatus('Mindestens eine Rolle auswählen.', 'error');
         return;
       }
+      const permissionsSelection = collectSelectedPermissions();
+      if (!permissionsSelection.length) {
+        setStatus('Mindestens einen Bereich auswählen.', 'error');
+        return;
+      }
       const payload = {
         username,
         displayName: (displayInput?.value || '').trim(),
-        roles: rolesSelection
+        roles: rolesSelection,
+        permissions: permissionsSelection
       };
       const password = (passwordInput?.value || '').trim();
       if (password) {
