@@ -37,11 +37,8 @@ if (is_string($rolesInput)) {
 $roles = [];
 if (is_array($rolesInput)) {
     foreach ($rolesInput as $role) {
-        $roleName = strtolower(trim((string) $role));
-        if ($roleName === '') {
-            continue;
-        }
-        if (!in_array($roleName, SIGNAGE_AUTH_ROLES, true)) {
+        $roleName = auth_normalize_role_name((string) $role);
+        if ($roleName === null) {
             continue;
         }
         if (!in_array($roleName, $roles, true)) {
@@ -50,13 +47,17 @@ if (is_array($rolesInput)) {
     }
 }
 if (!$roles) {
-    $roles[] = 'viewer';
+    $roles[] = SIGNAGE_AUTH_DEFAULT_ROLE;
 }
 
 $state = auth_users_load();
 $current = $state['users'][$username] ?? null;
 $wasAdmin = $current ? auth_user_has_role($current, 'admin') : false;
 $willBeAdmin = in_array('admin', $roles, true);
+
+if (auth_is_protected_user($username) && !$willBeAdmin) {
+    auth_users_send_error('protected-admin', 409);
+}
 
 if ($wasAdmin && !$willBeAdmin && auth_users_count_admins($state, $username) === 0) {
     auth_users_send_error('last-admin', 409);

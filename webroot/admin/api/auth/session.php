@@ -18,7 +18,7 @@ if (!auth_is_enabled()) {
     exit;
 }
 
-$user = auth_require_role('viewer');
+$user = auth_require_role('saunameister');
 $roles = auth_user_roles($user);
 $displayName = '';
 if (!empty($user['displayName']) && is_string($user['displayName'])) {

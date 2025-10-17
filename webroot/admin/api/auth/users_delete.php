@@ -37,11 +37,22 @@ if (!isset($state['users'][$username])) {
     auth_users_delete_error('user-not-found', 404);
 }
 
+if (auth_is_protected_user($username)) {
+    auth_users_delete_error('protected-admin', 409);
+}
+
 if (auth_user_has_role($state['users'][$username], 'admin') && auth_users_count_admins($state, $username) === 0) {
     auth_users_delete_error('last-admin', 409);
 }
 
-if (!auth_users_remove($username)) {
+try {
+    if (!auth_users_remove($username)) {
+        auth_users_delete_error('user-not-found', 404);
+    }
+} catch (RuntimeException $exception) {
+    if ($exception->getMessage() === 'protected-user') {
+        auth_users_delete_error('protected-admin', 409);
+    }
     auth_users_delete_error('user-not-found', 404);
 }
 
