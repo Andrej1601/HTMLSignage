@@ -402,10 +402,18 @@
     if (!Array.isArray(list)) return [];
     const seen = new Set();
     const normalized = [];
+    const asTrimmedString = value => (typeof value === 'string' ? value.trim() : '');
+
     list.forEach(entry => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
-      const label = typeof entry.label === 'string' ? entry.label.trim() : '';
-      const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      let label = asTrimmedString(entry.label);
+      if (!label) label = asTrimmedString(entry.title);
+      if (!label) label = asTrimmedString(entry.text);
+      if (!label) label = asTrimmedString(entry.name);
+
+      let icon = asTrimmedString(entry.icon);
+      if (!icon) icon = asTrimmedString(entry.emoji);
+      if (!icon) icon = asTrimmedString(entry.symbol);
       const candidates = [
         entry.id,
         entry.key,
