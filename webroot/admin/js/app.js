@@ -73,9 +73,6 @@ const normalizeRoleName = (role) => {
   return ROLE_ALIASES[name] || name;
 };
 
-let availablePermissions = mergeAvailablePermissions(AUTH_PERMISSIONS);
-const defaultAdminPermissions = resolvePermissionsForRoles(['admin']);
-
 const ROLE_META = {
   saunameister: {
     title: 'Saunameister',
@@ -186,6 +183,9 @@ const createPermissionSet = (permissions = []) => {
   }
   return set;
 };
+
+let availablePermissions = mergeAvailablePermissions(AUTH_PERMISSIONS);
+const defaultAdminPermissions = resolvePermissionsForRoles(['admin']);
 
 let currentUser = { username: null, displayName: null, roles: ['admin'], permissions: defaultAdminPermissions };
 let currentUserRoles = new Set(currentUser.roles.map((role) => normalizeRoleName(role)));
