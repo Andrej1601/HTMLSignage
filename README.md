@@ -27,11 +27,15 @@ Run the installer as root:
 sudo scripts/install.sh
 ```
 
-The script will prompt for ports and admin credentials if run interactively
-and prints the URLs and configuration paths when finished.
-Environment variables such as `SIGNAGE_PUBLIC_PORT`, `SIGNAGE_ADMIN_PORT`,
-`SIGNAGE_ADMIN_USER` and `SIGNAGE_ADMIN_PASS` can still be set to override
-the defaults.
+When executed interactively the installer prompts for the network ports and
+admin username, then generates a random administrator password using
+`openssl rand`. The password is printed once during the run, so copy it to a
+safe place before closing the terminal. Non-interactive usage (for example in
+CI) must provide `SIGNAGE_ADMIN_PASS` explicitly, otherwise the script aborts.
+Environment variables such as `SIGNAGE_PUBLIC_PORT`, `SIGNAGE_ADMIN_PORT` and
+`SIGNAGE_ADMIN_USER` can still be set to override the defaults, and
+`SIGNAGE_ADMIN_PASS` may be provided to supply a custom password in either
+mode.
 
 ### Preflight checks
 
