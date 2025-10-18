@@ -4,7 +4,7 @@ require_once __DIR__ . '/devices_store.php';
 auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
 
-$state = devices_load(); // lädt Geräte aus der SQLite-Datenbank (JSON-Export bleibt unter /data/devices.json)
+$state = devices_load(); // liest /var/www/signage/data/devices.json
 $pending = [];
 if (!empty($state['pending']) && is_array($state['pending'])) {
   foreach ($state['pending'] as $code => $info) {
