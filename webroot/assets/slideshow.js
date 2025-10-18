@@ -57,6 +57,7 @@
   const LIVE_RETRY_BASE_DELAY = 2000;
   const LIVE_RETRY_MAX_DELAY = 60000;
   const LIVE_RETRY_MAX_ATTEMPTS = 5;
+  const eventStreamProbeCache = new Map();
   let badgeLookupCache = null;
   let styleAutomationTimer = null;
   const STYLE_THEME_KEYS = [
@@ -250,7 +251,63 @@
     }, delay);
   }
 
-  function startConfigEventSource(config, options = {}){
+  async function ensureEventStreamAvailable(url, cacheKey){
+    const key = cacheKey || url;
+    if (eventStreamProbeCache.has(key)) {
+      return eventStreamProbeCache.get(key);
+    }
+    if (typeof fetch !== 'function') {
+      const result = { ok: true, reason: null };
+      eventStreamProbeCache.set(key, result);
+      return result;
+    }
+    const supportsAbort = typeof AbortController === 'function';
+    const controller = supportsAbort ? new AbortController() : null;
+    const probeOptions = {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+      cache: 'no-store'
+    };
+    if (controller) {
+      probeOptions.signal = controller.signal;
+    }
+    let timeoutId = null;
+    try {
+      if (controller) {
+        timeoutId = setTimeout(() => {
+          try { controller.abort(); } catch (error) { /* ignore */ }
+        }, 2000);
+      }
+      const response = await fetch(url, probeOptions);
+      const type = String(response.headers?.get('content-type') || '').toLowerCase();
+      const ok = response.ok && type.includes('text/event-stream');
+      const reason = ok
+        ? null
+        : (!response.ok
+          ? `http-${response.status}`
+          : (type ? `bad-mime:${type}` : 'bad-mime'));
+      const result = { ok, reason };
+      eventStreamProbeCache.set(key, result);
+      return result;
+    } catch (error) {
+      const reason = error && error.name === 'AbortError' ? 'timeout' : 'fetch-error';
+      const result = { ok: false, reason };
+      eventStreamProbeCache.set(key, result);
+      return result;
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      if (controller) {
+        try { controller.abort(); } catch (error) { /* ignore */ }
+      }
+    }
+  }
+
+  function logEventStreamProbeFailure(context, reason){
+    const message = `[live] event stream probe failed for ${context}` + (reason ? ` (${reason})` : '');
+    console.warn(message);
+  }
+
+  async function startConfigEventSource(config, options = {}){
     if (!config) return;
     const { resetAttempts = true } = options;
     if (resetAttempts) liveRetryAttempts = 0;
@@ -264,6 +321,13 @@
       params.set('device', DEVICE_ID);
     }
     const url = `/api/live.php${params.toString() ? `?${params.toString()}` : ''}`;
+    const probeKey = config.deviceMode && DEVICE_ID ? 'config:device' : 'config:global';
+    const probeResult = await ensureEventStreamAvailable(url, probeKey);
+    if (!probeResult || !probeResult.ok) {
+      logEventStreamProbeFailure(probeKey, probeResult?.reason || 'unavailable');
+      if (typeof config.fallback === 'function') config.fallback();
+      return;
+    }
     try {
       const source = new EventSource(url);
       liveSource = source;
@@ -310,7 +374,7 @@
     }
   }
 
-  function startPairEventSource(config, options = {}){
+  async function startPairEventSource(config, options = {}){
     if (!config) return;
     const { resetAttempts = true } = options;
     if (resetAttempts) liveRetryAttempts = 0;
@@ -322,6 +386,12 @@
     const params = new URLSearchParams();
     params.set('pair', config.code);
     const url = `/api/live.php?${params.toString()}`;
+    const probeResult = await ensureEventStreamAvailable(url, 'pair');
+    if (!probeResult || !probeResult.ok) {
+      logEventStreamProbeFailure('pair', probeResult?.reason || 'unavailable');
+      if (typeof config.fallback === 'function') config.fallback();
+      return;
+    }
     try {
       const source = new EventSource(url);
       liveSource = source;
