@@ -731,7 +731,17 @@ function devices_load(): array
         }
     }
 
-    return devices_load_from_file();
+    $state = devices_load_from_file();
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(DEVICES_STORAGE_KEY, $state);
+        } catch (Throwable $exception) {
+            error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return $state;
 }
 
 function devices_save(array &$db): bool
