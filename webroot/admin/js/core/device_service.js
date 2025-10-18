@@ -16,6 +16,203 @@ const FALLBACK_PATH = '/data/devices.json';
 export const OFFLINE_AFTER_MIN = 2;
 const SNAPSHOT_CACHE_MS = 1500;
 
+// >>> GENERATED: DEVICE_FIELD_CONFIG >>>
+const DEVICE_STATUS_FIELD_CONFIG = [
+  {
+    name: 'firmware',
+    type: 'string',
+    aliases: [
+      'firmware',
+      'version',
+    ],
+    maxLength: 100,
+  },
+  {
+    name: 'appVersion',
+    type: 'string',
+    aliases: [
+      'appVersion',
+      'player',
+    ],
+    maxLength: 100,
+  },
+  {
+    name: 'ip',
+    type: 'string',
+    aliases: [
+      'ip',
+      'address',
+    ],
+    maxLength: 64,
+  },
+  {
+    name: 'notes',
+    type: 'string',
+    aliases: [
+      'notes',
+    ],
+    maxLength: 180,
+  },
+];
+
+const DEVICE_NETWORK_FIELD_CONFIG = [
+  {
+    name: 'type',
+    type: 'string',
+    aliases: [
+      'type',
+      'interface',
+    ],
+    maxLength: 40,
+  },
+  {
+    name: 'ssid',
+    type: 'string',
+    aliases: [
+      'ssid',
+      'networkName',
+    ],
+    maxLength: 64,
+  },
+  {
+    name: 'quality',
+    type: 'number',
+    aliases: [
+      'quality',
+      'signalQuality',
+      'linkQuality',
+      'strength',
+    ],
+    min: 0,
+    max: 100,
+    integer: true,
+    round: 'nearest',
+  },
+  {
+    name: 'signal',
+    type: 'number',
+    aliases: [
+      'signal',
+      'dbm',
+      'wifiSignal',
+      'strength',
+      'rssi',
+    ],
+  },
+  {
+    name: 'rssi',
+    type: 'number',
+    aliases: [
+      'rssi',
+    ],
+    integer: true,
+    round: 'nearest',
+  },
+  {
+    name: 'latency',
+    type: 'number',
+    aliases: [
+      'latency',
+    ],
+    min: 0,
+  },
+];
+
+const DEVICE_METRIC_FIELD_CONFIG = [
+  {
+    name: 'cpuLoad',
+    type: 'number',
+    aliases: [
+      'cpuLoad',
+      'cpu',
+      'cpu_usage',
+      'cpuPercent',
+      'cpuLoadPercent',
+    ],
+  },
+  {
+    name: 'memoryUsage',
+    type: 'number',
+    aliases: [
+      'memoryUsage',
+      'memory',
+      'ram',
+      'memoryPercent',
+      'memUsage',
+      'ramUsage',
+    ],
+  },
+  {
+    name: 'storageFree',
+    type: 'number',
+    aliases: [
+      'storageFree',
+      'storage_free',
+      'storageFreeMb',
+      'diskFree',
+      'diskFreeMb',
+      'freeStorage',
+    ],
+  },
+  {
+    name: 'storageUsed',
+    type: 'number',
+    aliases: [
+      'storageUsed',
+      'storage_used',
+      'storageUsedMb',
+      'diskUsed',
+      'diskUsedMb',
+      'usedStorage',
+    ],
+  },
+  {
+    name: 'temperature',
+    type: 'number',
+    aliases: [
+      'temperature',
+      'temp',
+      'temperatureC',
+      'tempC',
+    ],
+  },
+  {
+    name: 'uptime',
+    type: 'number',
+    aliases: [
+      'uptime',
+      'upTimeSeconds',
+      'uptimeSeconds',
+      'uptimeSec',
+    ],
+  },
+  {
+    name: 'batteryLevel',
+    type: 'number',
+    aliases: [
+      'batteryLevel',
+      'battery',
+      'batteryPercent',
+      'battery_level',
+    ],
+  },
+  {
+    name: 'latency',
+    type: 'number',
+    aliases: [
+      'latency',
+      'ping',
+    ],
+  },
+];
+
+export const DEVICE_FIELD_CONFIG = {
+  status: DEVICE_STATUS_FIELD_CONFIG,
+  network: DEVICE_NETWORK_FIELD_CONFIG,
+  metrics: DEVICE_METRIC_FIELD_CONFIG
+};
+// <<< GENERATED: DEVICE_FIELD_CONFIG <<<
+
 const okPredicate = (data) => data?.ok !== false;
 
 export function normalizeSeconds(value) {
@@ -30,6 +227,61 @@ export function normalizeSeconds(value) {
 export function resolveNowSeconds(value) {
   if (value === undefined || value === null) return normalizeSeconds(Date.now());
   return normalizeSeconds(value);
+}
+
+function optionalString(value, maxLength = 120) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'object' || typeof value === 'function') return null;
+  const string = String(value).trim();
+  if (!string) return null;
+  if (string.length > maxLength) {
+    return string.slice(0, maxLength);
+  }
+  return string;
+}
+
+function optionalNumber(value, config = {}) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  let result = num;
+  if (typeof config.min === 'number') {
+    result = Math.max(config.min, result);
+  }
+  if (typeof config.max === 'number') {
+    result = Math.min(config.max, result);
+  }
+  if (config.round === 'nearest') {
+    result = Math.round(result);
+  } else if (config.round === 'floor') {
+    result = Math.floor(result);
+  } else if (config.round === 'ceil') {
+    result = Math.ceil(result);
+  }
+  if (config.integer) {
+    return Math.trunc(result);
+  }
+  return result;
+}
+
+function sanitizeFields(input, configList) {
+  const result = {};
+  configList.forEach((field) => {
+    if (!Array.isArray(field.aliases)) return;
+    for (const alias of field.aliases) {
+      if (!Object.prototype.hasOwnProperty.call(input, alias)) continue;
+      const raw = input[alias];
+      let sanitized = null;
+      if (field.type === 'string') {
+        sanitized = optionalString(raw, field.maxLength ?? 120);
+      } else if (field.type === 'number') {
+        sanitized = optionalNumber(raw, field);
+      }
+      if (sanitized === null) continue;
+      result[field.name] = sanitized;
+      break;
+    }
+  });
+  return result;
 }
 
 function sanitizePairings(input) {
@@ -73,49 +325,58 @@ function sanitizeErrors(input) {
     .filter(Boolean);
 }
 
+function sanitizeNetwork(input) {
+  if (!input || typeof input !== 'object') return {};
+  const network = sanitizeFields(input, DEVICE_FIELD_CONFIG.network);
+  if (typeof network.signal === 'number') {
+    network.signal = Number(network.signal);
+  }
+  if (typeof network.latency === 'number') {
+    network.latency = Math.max(0, network.latency);
+  }
+  if (typeof network.quality === 'number') {
+    network.quality = Math.trunc(network.quality);
+  }
+  return network;
+}
+
 function sanitizeStatus(input) {
   if (!input || typeof input !== 'object') return {};
-  const status = {};
-  const firmware = typeof input.firmware === 'string' ? input.firmware.trim() : '';
-  if (firmware) status.firmware = firmware;
-  const appVersion = typeof input.appVersion === 'string' ? input.appVersion.trim() : '';
-  if (appVersion) status.appVersion = appVersion;
-  const ip = typeof input.ip === 'string' ? input.ip.trim() : '';
-  if (ip) status.ip = ip;
-  const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
-  if (notes) status.notes = notes;
+  const status = sanitizeFields(input, DEVICE_FIELD_CONFIG.status);
+
+  let networkSource = {};
   if (input.network && typeof input.network === 'object') {
-    const network = {};
-    const type = typeof input.network.type === 'string' ? input.network.type.trim() : '';
-    if (type) network.type = type;
-    const ssid = typeof input.network.ssid === 'string' ? input.network.ssid.trim() : '';
-    if (ssid) network.ssid = ssid;
-    const quality = Number(input.network.quality);
-    if (Number.isFinite(quality)) network.quality = Math.max(0, Math.min(100, Math.round(quality)));
-    const signal = Number(input.network.signal ?? input.network.rssi);
-    if (Number.isFinite(signal)) network.signal = signal;
-    if (Object.keys(network).length) status.network = network;
+    networkSource = { ...input.network };
   }
+  if (input.networkType !== undefined && networkSource.type === undefined) {
+    networkSource = { ...networkSource, type: input.networkType };
+  }
+  if (input.signal !== undefined && networkSource.signal === undefined) {
+    networkSource = { ...networkSource, signal: input.signal };
+  }
+  if (input.quality !== undefined && networkSource.quality === undefined) {
+    networkSource = { ...networkSource, quality: input.quality };
+  }
+  if (input.ssid !== undefined && networkSource.ssid === undefined) {
+    networkSource = { ...networkSource, ssid: input.ssid };
+  }
+
+  const network = sanitizeNetwork(networkSource);
+  if (Object.keys(network).length) {
+    status.network = network;
+  }
+
   const errors = sanitizeErrors(input.errors);
-  if (errors.length) status.errors = errors;
+  if (errors.length) {
+    status.errors = errors;
+  }
+
   return status;
 }
 
 function sanitizeMetrics(input) {
   if (!input || typeof input !== 'object') return {};
-  const metrics = {};
-  const apply = (key, value) => {
-    const num = Number(value);
-    if (Number.isFinite(num)) metrics[key] = num;
-  };
-  apply('cpuLoad', input.cpuLoad ?? input.cpu);
-  apply('memoryUsage', input.memoryUsage ?? input.memory);
-  apply('storageFree', input.storageFree ?? input.storage_free);
-  apply('storageUsed', input.storageUsed ?? input.storage_used);
-  apply('temperature', input.temperature ?? input.temp);
-  apply('uptime', input.uptime ?? input.upTimeSeconds);
-  apply('batteryLevel', input.batteryLevel ?? input.battery);
-  return metrics;
+  return sanitizeFields(input, DEVICE_FIELD_CONFIG.metrics);
 }
 
 function sanitizeHistory(input, nowSeconds) {

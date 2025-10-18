@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeSeconds,
   resolveNowSeconds,
+  DEVICE_FIELD_CONFIG,
   __TEST__
 } from '../webroot/admin/js/core/device_service.js';
 
-const { sanitizeStatus, sanitizeMetrics, sanitizeHistory } = __TEST__;
+const { sanitizeStatus, sanitizeMetrics, sanitizeHistory, sanitizeErrors } = __TEST__;
 
 describe('device service helpers', () => {
   it('normalizes various timestamp units', () => {
@@ -20,13 +21,13 @@ describe('device service helpers', () => {
     expect(result).toBeGreaterThan(0);
   });
 
-  it('sanitizes status details', () => {
+  it('sanitizes status details with schema aliases', () => {
     const status = sanitizeStatus({
-      firmware: ' 1.2.3 ',
-      appVersion: ' Player 4 ',
-      ip: '192.168.0.10 ',
+      version: ' 1.2.3 ',
+      player: ' Player 4 ',
+      address: '192.168.0.10 ',
       notes: 'Needs maintenance',
-      network: { type: 'wifi', quality: 87.4, rssi: -44.1, ssid: 'Guest' },
+      network: { interface: 'wifi', signalQuality: 87.4, rssi: -44.1, ssid: 'Guest' },
       errors: [
         { code: 'E1', message: 'Overheat ', ts: 1700000000 },
         'Loose cable'
@@ -34,13 +35,14 @@ describe('device service helpers', () => {
     });
     expect(status.firmware).toBe('1.2.3');
     expect(status.network.quality).toBe(87);
+    expect(status.network.rssi).toBe(-44);
     expect(status.errors).toHaveLength(2);
     expect(status.errors[0]).toMatchObject({ code: 'E1', message: 'Overheat', ts: 1700000000 });
   });
 
   it('sanitizes metrics', () => {
     const metrics = sanitizeMetrics({
-      cpuLoad: '34.2',
+      cpu: '34.2',
       memoryUsage: 61,
       temperature: '41'
     });
@@ -55,5 +57,20 @@ describe('device service helpers', () => {
     expect(history).toHaveLength(1);
     expect(history[0].ago).toBe(300);
     expect(history[0].status.firmware).toBe('1.0.0');
+  });
+
+  it('exposes schema metadata for shared sanitizers', () => {
+    expect(DEVICE_FIELD_CONFIG.status.map((field) => field.name)).toEqual([
+      'firmware',
+      'appVersion',
+      'ip',
+      'notes'
+    ]);
+    const cpuField = DEVICE_FIELD_CONFIG.metrics.find((field) => field.name === 'cpuLoad');
+    expect(cpuField.aliases).toContain('cpu');
+    const errors = sanitizeErrors([
+      { code: 'X', detail: 'Problem', ts: 12 }
+    ]);
+    expect(errors[0]).toEqual({ code: 'X', ts: 12 });
   });
 });
