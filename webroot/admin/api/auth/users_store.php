@@ -18,6 +18,13 @@ const SIGNAGE_AUTH_ROLE_ALIASES = [
 const SIGNAGE_AUTH_PERMISSIONS = [
     'cockpit',
     'slides',
+    'slides-flow',
+    'slides-automation',
+    'slides-overview',
+    'saunas',
+    'media',
+    'footnotes',
+    'badges',
     'global-info',
     'colors',
     'system',
@@ -31,9 +38,13 @@ const SIGNAGE_AUTH_PERMISSION_ALIASES = [
     'users' => 'user-admin',
 ];
 const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
-    'saunameister' => ['cockpit', 'slides', 'global-info'],
-    'editor' => ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices'],
-    'admin' => ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
+    'saunameister' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info'],
+    'editor' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
+    'admin' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
+];
+const SIGNAGE_AUTH_PERMISSIONS_VERSION = 3;
+const SIGNAGE_AUTH_PERMISSION_UPGRADES = [
+    'slides' => ['slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges'],
 ];
 const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
 
@@ -175,6 +186,11 @@ function auth_users_normalize(array $state): array
                 $user['roles'][] = SIGNAGE_AUTH_DEFAULT_ROLE;
             }
             $user['roles'] = auth_enforce_protected_roles($username, $user['roles']);
+            $version = isset($entry['permissionsVersion']) ? (int) $entry['permissionsVersion'] : 1;
+            if ($version < 1) {
+                $version = 1;
+            }
+            $user['permissionsVersion'] = $version;
             $user['permissions'] = auth_normalize_permissions($entry['permissions'] ?? null, $user['roles']);
             $normalized['users'][$username] = $user;
         }
@@ -267,6 +283,7 @@ function auth_users_set(array $user): void
     }
     $merged['roles'] = auth_enforce_protected_roles($key, $merged['roles']);
     $merged['permissions'] = auth_normalize_permissions($merged['permissions'] ?? null, $merged['roles']);
+    $merged['permissionsVersion'] = SIGNAGE_AUTH_PERMISSIONS_VERSION;
     $state['users'][$key] = $merged;
     auth_users_save($state);
 }
@@ -379,9 +396,37 @@ function auth_user_permissions(array $user): array
 {
     $roles = auth_user_roles($user);
     if (!empty($user['permissions']) && is_array($user['permissions'])) {
-        return auth_enforce_role_permissions($roles, $user['permissions']);
+        $permissions = auth_enforce_role_permissions($roles, $user['permissions']);
+    } else {
+        $permissions = auth_roles_default_permissions($roles);
     }
-    return auth_roles_default_permissions($roles);
+    $version = auth_user_permission_version($user);
+    return auth_permissions_upgrade($permissions, $version);
+}
+
+function auth_user_permission_version(array $user): int
+{
+    $version = isset($user['permissionsVersion']) ? (int) $user['permissionsVersion'] : 1;
+    return $version >= 1 ? $version : 1;
+}
+
+function auth_permissions_upgrade(array $permissions, int $version): array
+{
+    if ($version >= SIGNAGE_AUTH_PERMISSIONS_VERSION) {
+        return array_values($permissions);
+    }
+    foreach (SIGNAGE_AUTH_PERMISSION_UPGRADES as $base => $upgrades) {
+        if (!in_array($base, $permissions, true)) {
+            continue;
+        }
+        foreach ($upgrades as $permission) {
+            $permissionName = auth_normalize_permission_name((string) $permission);
+            if ($permissionName !== null && !in_array($permissionName, $permissions, true)) {
+                $permissions[] = $permissionName;
+            }
+        }
+    }
+    return array_values(array_unique($permissions));
 }
 
 function auth_user_has_role(array $user, string $role): bool

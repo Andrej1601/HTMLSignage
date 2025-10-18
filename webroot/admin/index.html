@@ -268,34 +268,36 @@
 <div class="content">
 
         <!-- Übersicht im Saunen-Stil -->
-        <div class="fieldset" style="margin-bottom:10px">
+        <div class="fieldset" id="overviewSection" style="margin-bottom:10px">
           <div class="legend">Übersicht (Aufgussplan)</div>
           <div id="overviewRow"></div>
         </div>
 
-        <!-- Saunenliste -->
-		<!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
-<div class="groupHead">
-  <div class="legend">Aufguss</div>
-  <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
-</div>
- 	<!-- Aufguss -->
-<div class="sl-head sl-saunas">
-  <span class="col-name">Name</span>
-  <span class="col-prev">Preview</span>
-  <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
-  <span class="col-up">Upload</span>
-  <span class="col-def">Default</span>
-  <span class="col-del">✕</span>
-  <span class="col-vis">Status</span>
-</div>
-        
-	<!-- kein Aufguss -->
-	<div id="saunaList"></div>
-	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
-        <div id="extraSaunaList"></div>
+        <div class="sauna-section" id="saunaSection">
+          <!-- Saunenliste -->
+          <!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
+          <div class="groupHead">
+            <div class="legend">Aufguss</div>
+            <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
+          </div>
+          <!-- Aufguss -->
+          <div class="sl-head sl-saunas">
+            <span class="col-name">Name</span>
+            <span class="col-prev">Preview</span>
+            <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
+            <span class="col-up">Upload</span>
+            <span class="col-def">Default</span>
+            <span class="col-del">✕</span>
+            <span class="col-vis">Status</span>
+          </div>
 
-        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+          <!-- kein Aufguss -->
+          <div id="saunaList"></div>
+          <div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
+          <div id="extraSaunaList"></div>
+
+          <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+        </div>
       </div>
     </details>
 
@@ -316,14 +318,16 @@
         </div>
       </div>
     </div>
-    <div class="subh">Darstellung</div>
-    <div class="kv">
-      <label>Fußnoten-Layout</label>
-      <select id="footnoteLayout" class="input">
-        <option value="one-line" selected>Möglichst einzeilig</option>
-        <option value="multi">Mehrzeilig</option>
-        <option value="stacked">Untereinander (jede Zeile)</option>
-      </select>
+    <div class="footnote-layout" id="footnoteLayoutSection">
+      <div class="subh">Darstellung</div>
+      <div class="kv">
+        <label>Fußnoten-Layout</label>
+        <select id="footnoteLayout" class="input">
+          <option value="one-line" selected>Möglichst einzeilig</option>
+          <option value="multi">Mehrzeilig</option>
+          <option value="stacked">Untereinander (jede Zeile)</option>
+        </select>
+      </div>
     </div>
     <div class="badge-lib-section" id="badgeLibrarySection" data-jump-target>
       <div class="badge-lib-header">
@@ -578,7 +582,7 @@
               </div>
             </div>
 
-            <div class="settings-card">
+            <div class="settings-card" id="overviewSettingsCard">
               <div class="settings-card-head">
                 <div class="settings-card-title">Übersicht (Tabelle)</div>
               </div>
@@ -606,7 +610,7 @@
               </div>
             </div>
 
-            <div class="settings-card">
+            <div class="settings-card" id="saunaSettingsCard">
               <div class="settings-card-head">
                 <div class="settings-card-title">Saunafolien &amp; Komponenten</div>
               </div>
