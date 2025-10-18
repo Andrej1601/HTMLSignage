@@ -65,13 +65,23 @@ public signage runs on <http://localhost:8080/>.
 
 ### Tests and linting
 
-JavaScript tooling is managed through `npm`. Install dependencies once and use
-Vitest for unit tests as well as ESLint for static analysis:
+Install both the JavaScript and PHP tooling once before running the suites:
 
 ```bash
 npm install
-npm run test
-npm run lint
+composer install
+```
+
+Frontend checks use Vitest and ESLint, while backend API tests are covered by
+PHPUnit. You can execute them individually or run the combined workflow:
+
+```bash
+npm run test:frontend   # Vitest
+npm run test:backend    # PHPUnit wrapper
+npm run lint            # ESLint
+
+# Run both layers in one go
+npm test
 ```
 
 ### User and role management
