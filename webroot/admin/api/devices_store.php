@@ -690,6 +690,7 @@ function devices_normalize_state($state): array
 
 function devices_load_from_file(): array
 {
+    $state = signage_read_json('devices.json', devices_default_state());
     try {
         $pdo = signage_db();
     } catch (Throwable $e) {
@@ -767,6 +768,21 @@ function devices_load_from_file(): array
 function devices_save_to_file(array &$db): bool
 {
     $db = devices_normalize_state($db);
+    $error = null;
+    if (!signage_write_json('devices.json', $db, $error)) {
+        if ($error) {
+            throw new RuntimeException('Unable to write device database: ' . $error);
+        }
+        throw new RuntimeException('Unable to write device database');
+    }
+
+    if (signage_json_fallback_enabled()) {
+        $path = devices_path();
+        @chown($path, 'www-data');
+        @chgrp($path, 'www-data');
+    }
+
+    return true;
 
     try {
         $pdo = signage_db();
