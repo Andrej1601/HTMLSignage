@@ -16,7 +16,7 @@ if (!is_dir($mediaDir) && !@mkdir($mediaDir, 02775, true) && !is_dir($mediaDir))
 }
 
 $cfg = signage_read_json('settings.json');
-$schedule = signage_read_json('schedule.json');
+$schedule = signage_normalize_schedule(signage_read_json('schedule.json', signage_default_schedule()));
 $keep = [];
 
 $removeSauna = isset($_GET['sauna']) && $_GET['sauna'] === '1';
