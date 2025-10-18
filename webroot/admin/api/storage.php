@@ -544,7 +544,19 @@ function signage_write_settings_to_db(array $settings, ?string &$error = null): 
         return false;
     }
 
-    return signage_write_json_file('settings.json', $settings, $error);
+    if (!signage_json_fallback_enabled()) {
+        return true;
+    }
+
+    $fallbackError = null;
+    if (!signage_write_json_file('settings.json', $settings, $fallbackError)) {
+        error_log('[signage] unable to write fallback for settings.json: ' . ($fallbackError ?? 'unknown'));
+        if ($error === null && $fallbackError !== null) {
+            $error = $fallbackError;
+        }
+    }
+
+    return true;
 }
 
 function signage_read_schedule_from_db(array $default = []): array
@@ -641,7 +653,19 @@ function signage_write_schedule_to_db(array $schedule, ?string &$error = null): 
         return false;
     }
 
-    return signage_write_json_file('schedule.json', $normalized, $error);
+    if (!signage_json_fallback_enabled()) {
+        return true;
+    }
+
+    $fallbackError = null;
+    if (!signage_write_json_file('schedule.json', $normalized, $fallbackError)) {
+        error_log('[signage] unable to write fallback for schedule.json: ' . ($fallbackError ?? 'unknown'));
+        if ($error === null && $fallbackError !== null) {
+            $error = $fallbackError;
+        }
+    }
+
+    return true;
 }
 
 function signage_absolute_path(string $relative): string
