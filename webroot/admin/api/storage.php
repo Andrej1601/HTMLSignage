@@ -5,6 +5,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/db.php';
+
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
 
 /**
@@ -136,6 +138,80 @@ function signage_db(): ?PDO
         error_log('[signage] database connection failed: ' . $e->getMessage());
         $failed = true;
         return null;
+function signage_db_path(): string
+{
+    $custom = getenv('SIGNAGE_DB_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['SIGNAGE_DB_PATH'])) {
+        return (string) $_ENV['SIGNAGE_DB_PATH'];
+    }
+    if (!empty($_SERVER['SIGNAGE_DB_PATH'])) {
+        return (string) $_SERVER['SIGNAGE_DB_PATH'];
+    }
+    return signage_data_path('signage.db');
+}
+
+function signage_db_available(): bool
+{
+    static $available;
+    if ($available !== null) {
+        return $available;
+    }
+    if (!class_exists('\\PDO')) {
+        return $available = false;
+    }
+    try {
+        $drivers = \PDO::getAvailableDrivers();
+    } catch (Throwable $exception) {
+        error_log('PDO drivers unavailable: ' . $exception->getMessage());
+        return $available = false;
+    }
+    if (!in_array('sqlite', $drivers, true)) {
+        return $available = false;
+    }
+    if (!extension_loaded('pdo_sqlite') && !extension_loaded('sqlite3')) {
+        return $available = false;
+    }
+    return $available = true;
+}
+
+function signage_db(): \PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof \PDO) {
+        return $pdo;
+    }
+    if (!signage_db_available()) {
+        throw new RuntimeException('SQLite support is not available.');
+    }
+
+    $path = signage_db_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to create SQLite directory: ' . $dir);
+    }
+
+    try {
+        $pdo = new \PDO('sqlite:' . $path, null, null, [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            \PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to open SQLite database: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    try {
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    } catch (Throwable $exception) {
+        error_log('Unable to enable SQLite foreign_keys pragma: ' . $exception->getMessage());
+    }
+
+    $pathExists = @file_exists($path);
+    if ($pathExists) {
+        @chmod($path, 0660);
     }
 
     return $pdo;
@@ -209,6 +285,93 @@ function signage_db_store_document(PDO $pdo, string $name, string $body, int $ti
         'updated_at' => $timestamp,
         'checksum' => $checksum,
     ]);
+function signage_db_bootstrap(): void
+{
+    static $bootstrapped = false;
+    if ($bootstrapped) {
+        return;
+    }
+    $pdo = signage_db();
+    $queries = [
+        'CREATE TABLE IF NOT EXISTS kv_store (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+        'CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event TEXT NOT NULL,
+            username TEXT,
+            context TEXT,
+            created_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+    ];
+    try {
+        foreach ($queries as $sql) {
+            $pdo->exec($sql);
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to initialize SQLite schema: ' . $exception->getMessage(), 0, $exception);
+    }
+    $bootstrapped = true;
+}
+
+function signage_kv_get(string $key, mixed $default = null): mixed
+{
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT value FROM kv_store WHERE key = :key LIMIT 1');
+        $stmt->execute([':key' => $key]);
+        $value = $stmt->fetchColumn();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to load SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    if ($value === false || $value === null) {
+        return $default;
+    }
+
+    $decoded = json_decode((string) $value, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('SQLite JSON decode error for key ' . $key . ': ' . json_last_error_msg());
+        return $default;
+    }
+
+    return $decoded;
+}
+
+function signage_kv_set(string $key, mixed $value): void
+{
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $json = json_encode($value, SIGNAGE_JSON_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
+    }
+
+    $ts = time();
+    try {
+        $stmt = $pdo->prepare('INSERT INTO kv_store(key, value, updated_at) VALUES (:key, :value, :updated)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
+        $stmt->execute([
+            ':key' => $key,
+            ':value' => $json,
+            ':updated' => $ts,
+        ]);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to persist SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
 }
 
 function signage_default_schedule(): array
@@ -347,6 +510,34 @@ function signage_read_json(string $file, array $default = []): array
     }
 
     $path = signage_resolve_json_path($file);
+    $normalized = strtolower(trim($file));
+    if ($normalized === 'settings.json') {
+        return signage_read_settings_from_db($default);
+    }
+    if ($normalized === 'schedule.json') {
+        return signage_read_schedule_from_db($default);
+    }
+
+    return signage_read_json_file($file, $default);
+}
+
+function signage_write_json(string $file, $data, ?string &$error = null): bool
+{
+    $normalized = strtolower(trim($file));
+    if ($normalized === 'settings.json') {
+        return signage_write_settings_to_db(is_array($data) ? $data : [], $error);
+    }
+    if ($normalized === 'schedule.json') {
+        $schedule = is_array($data) ? $data : [];
+        return signage_write_schedule_to_db($schedule, $error);
+    }
+
+    return signage_write_json_file($file, $data, $error);
+}
+
+function signage_read_json_file(string $file, array $default = []): array
+{
+    $path = signage_data_path($file);
     if (!is_file($path)) {
         return $default;
     }
@@ -359,6 +550,7 @@ function signage_read_json(string $file, array $default = []): array
 }
 
 function signage_write_json_to_file(string $file, string $json, ?string &$error = null): bool
+function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $path = signage_resolve_json_path($file);
     $dir = dirname($path);
@@ -390,6 +582,34 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
 {
     $json = json_encode($data, SIGNAGE_JSON_FLAGS);
     if ($json === false) {
+function signage_read_settings_from_db(array $default = []): array
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        return $default;
+    }
+    $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
+    $stmt->execute([':key' => 'app_settings']);
+    $json = $stmt->fetchColumn();
+    if ($json === false || $json === null || $json === '') {
+        return $default;
+    }
+    $decoded = json_decode((string) $json, true);
+    return is_array($decoded) ? $decoded : $default;
+}
+
+function signage_write_settings_to_db(array $settings, ?string &$error = null): bool
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    $payload = json_encode($settings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($payload === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
         return false;
     }
@@ -415,6 +635,101 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
     }
 
     return true;
+    try {
+        $stmt = $pdo->prepare('INSERT OR REPLACE INTO settings (key, payload_json) VALUES (:key, :payload)');
+        $stmt->execute([
+            ':key' => 'app_settings',
+            ':payload' => $payload,
+        ]);
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    return signage_write_json_file('settings.json', $settings, $error);
+}
+
+function signage_read_schedule_from_db(array $default = []): array
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        return signage_normalize_schedule($default);
+    }
+
+    $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
+    $stmt->execute([':key' => 'schedule_full']);
+    $json = $stmt->fetchColumn();
+    if ($json !== false && $json !== null && $json !== '') {
+        $decoded = json_decode((string) $json, true);
+        if (is_array($decoded)) {
+            return signage_normalize_schedule($decoded);
+        }
+    }
+
+    $schedule = signage_normalize_schedule($default);
+    $rows = [];
+    $rowsStmt = $pdo->query('SELECT payload_json FROM schedule_rows ORDER BY position ASC, id ASC');
+    if ($rowsStmt instanceof PDOStatement) {
+        foreach ($rowsStmt as $row) {
+            $decodedRow = json_decode((string) ($row['payload_json'] ?? ''), true);
+            $rows[] = is_array($decodedRow) ? $decodedRow : [];
+        }
+    }
+    if ($rows) {
+        $schedule['rows'] = $rows;
+    }
+
+    return $schedule;
+}
+
+function signage_write_schedule_to_db(array $schedule, ?string &$error = null): bool
+{
+    $normalized = signage_normalize_schedule($schedule);
+
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    $payload = json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($payload === false) {
+        $error = 'json_encode failed: ' . json_last_error_msg();
+        return false;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('INSERT OR REPLACE INTO settings (key, payload_json) VALUES (:key, :payload)');
+        $stmt->execute([
+            ':key' => 'schedule_full',
+            ':payload' => $payload,
+        ]);
+        $pdo->exec('DELETE FROM schedule_rows');
+        $insert = $pdo->prepare('INSERT INTO schedule_rows (position, payload_json) VALUES (:position, :payload)');
+        $position = 0;
+        foreach ($normalized['rows'] as $row) {
+            $rowPayload = json_encode($row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($rowPayload === false) {
+                continue;
+            }
+            $insert->execute([
+                ':position' => $position++,
+                ':payload' => $rowPayload,
+            ]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $error = $e->getMessage();
+        return false;
+    }
+
+    return signage_write_json_file('schedule.json', $normalized, $error);
 }
 
 function signage_absolute_path(string $relative): string

@@ -8,6 +8,7 @@ require_once __DIR__ . '/../storage.php';
 
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
+const SIGNAGE_AUTH_USERS_STORAGE_KEY = 'auth.users';
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
 const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
 const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
@@ -196,13 +197,58 @@ function auth_users_normalize(array $state): array
     return $normalized;
 }
 
-function auth_users_load(): array
+function auth_users_load_from_file(): array
 {
     $state = signage_read_json(SIGNAGE_AUTH_USERS_FILE, auth_users_default());
     return auth_users_normalize($state);
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        return auth_users_default();
+    }
+
+    $raw = ['users' => []];
+    $stmt = $pdo->query('SELECT username, display_name, password, roles_json, permissions_json, permissions_version, payload_json FROM users ORDER BY username ASC');
+    if ($stmt instanceof PDOStatement) {
+        foreach ($stmt as $row) {
+            $username = isset($row['username']) ? strtolower(trim((string) $row['username'])) : '';
+            if ($username === '') {
+                continue;
+            }
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                $payload = [
+                    'username' => $username,
+                    'displayName' => $row['display_name'] ?? null,
+                    'password' => $row['password'] ?? null,
+                    'roles' => json_decode((string) ($row['roles_json'] ?? '[]'), true) ?: [],
+                    'permissions' => json_decode((string) ($row['permissions_json'] ?? '[]'), true) ?: [],
+                    'permissionsVersion' => isset($row['permissions_version']) ? (int) $row['permissions_version'] : 1,
+                ];
+            } else {
+                $payload['username'] = $username;
+            }
+            $raw['users'][] = $payload;
+        }
+    }
+
+    if (!$raw['users']) {
+        $path = auth_users_path();
+        if (is_file($path)) {
+            $legacyRaw = @file_get_contents($path);
+            if ($legacyRaw !== false && $legacyRaw !== '') {
+                $decoded = json_decode($legacyRaw, true);
+                if (is_array($decoded)) {
+                    return auth_users_normalize($decoded);
+                }
+            }
+        }
+    }
+
+    return auth_users_normalize($raw);
 }
 
-function auth_users_save(array $state): void
+function auth_users_save_to_file(array $state): void
 {
     $normalized = auth_users_normalize($state);
     $error = null;
@@ -216,9 +262,88 @@ function auth_users_save(array $state): void
     if (signage_json_fallback_enabled()) {
         $path = auth_users_path();
         @chmod($path, 0640);
+
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        throw new RuntimeException('Unable to open users database', 0, $e);
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $pdo->exec('DELETE FROM users');
+        $insert = $pdo->prepare('INSERT INTO users (username, display_name, password, roles_json, permissions_json, permissions_version, payload_json)
+            VALUES (:username, :display_name, :password, :roles, :permissions, :permissions_version, :payload)');
+        foreach ($normalized['users'] as $user) {
+            if (!is_array($user) || empty($user['username'])) {
+                continue;
+            }
+            $payload = json_encode($user, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($payload === false) {
+                throw new RuntimeException('Unable to encode user payload');
+            }
+            $insert->execute([
+                ':username' => $user['username'],
+                ':display_name' => isset($user['displayName']) ? $user['displayName'] : null,
+                ':password' => isset($user['password']) && is_string($user['password']) ? $user['password'] : null,
+                ':roles' => json_encode(array_values($user['roles'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                ':permissions' => json_encode(array_values($user['permissions'] ?? []), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                ':permissions_version' => isset($user['permissionsVersion']) ? (int) $user['permissionsVersion'] : SIGNAGE_AUTH_PERMISSIONS_VERSION,
+                ':payload' => $payload,
+            ]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
 
     auth_basic_sync($normalized);
+    auth_users_export($normalized);
+}
+
+function auth_users_load(): array
+{
+    if (signage_db_available()) {
+        try {
+            $state = signage_kv_get(SIGNAGE_AUTH_USERS_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return auth_users_normalize($state);
+            }
+        } catch (Throwable $exception) {
+            error_log('Failed to load users from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return auth_users_load_from_file();
+}
+
+function auth_users_save(array $state): void
+{
+    $normalized = auth_users_normalize($state);
+    $errors = [];
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
+            auth_basic_sync($normalized);
+            return;
+        } catch (Throwable $exception) {
+            $errors[] = 'sqlite: ' . $exception->getMessage();
+            error_log('Failed to persist users to SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    try {
+        auth_users_save_to_file($normalized);
+        return;
+    } catch (Throwable $exception) {
+        $errors[] = 'file: ' . $exception->getMessage();
+    }
+
+    throw new RuntimeException('Unable to write users database (' . implode('; ', $errors) . ')');
 }
 
 function auth_basic_sync(array $state): void
@@ -240,6 +365,23 @@ function auth_basic_sync(array $state): void
     $content = $lines ? implode("\n", $lines) . "\n" : '';
     if (@file_put_contents($path, $content, LOCK_EX) === false) {
         throw new RuntimeException('Unable to write basic auth file');
+    }
+    @chmod($path, 0640);
+}
+
+function auth_users_export(array $state): void
+{
+    $path = auth_users_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to prepare users export directory');
+    }
+    $json = json_encode($state, SIGNAGE_JSON_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('Unable to encode users export');
+    }
+    if (@file_put_contents($path, $json, LOCK_EX) === false) {
+        throw new RuntimeException('Unable to write users export');
     }
     @chmod($path, 0640);
 }
@@ -460,6 +602,32 @@ function auth_verify_password(string $password, string $hash): bool
 
 function auth_append_audit(string $event, array $context = []): void
 {
+    $username = null;
+    if (isset($context['user']) && is_string($context['user'])) {
+        $username = $context['user'];
+    }
+
+    if (signage_db_available()) {
+        try {
+            signage_db_bootstrap();
+            $pdo = signage_db();
+            $payload = json_encode($context, SIGNAGE_JSON_FLAGS);
+            if ($payload === false) {
+                $payload = json_encode(['error' => 'json_encode failed'], JSON_UNESCAPED_SLASHES);
+            }
+            $stmt = $pdo->prepare('INSERT INTO audit_log(event, username, context, created_at) VALUES (:event, :username, :context, :created)');
+            $stmt->execute([
+                ':event' => $event,
+                ':username' => $username,
+                ':context' => $payload,
+                ':created' => time(),
+            ]);
+            return;
+        } catch (Throwable $exception) {
+            error_log('Failed to append audit entry to SQLite: ' . $exception->getMessage());
+        }
+    }
+
     $path = auth_audit_path();
     @mkdir(dirname($path), 02775, true);
     $row = [

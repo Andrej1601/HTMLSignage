@@ -180,10 +180,12 @@ install_packages(){
     nginx
     php8.3-fpm
     php8.3-cli
+    php8.3-sqlite3
     php8.3-xml
     php8.3-mbstring
     php8.3-curl
     php8.3-gd
+    sqlite3
     jq
     unzip
     curl
@@ -193,6 +195,36 @@ install_packages(){
   )
   apt-get update -y
   apt-get install -y "${packages[@]}"
+}
+
+prepare_database(){
+  log "Preparing SQLite database"
+  local db_dir="/data"
+  local db_path="$db_dir/signage.db"
+
+  install -d -m 2775 "$db_dir"
+  chown root:www-data "$db_dir" 2>/dev/null || true
+
+  sqlite3 "$db_path" <<'EOSQL'
+PRAGMA journal_mode = WAL;
+CREATE TABLE IF NOT EXISTS kv_store (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event TEXT NOT NULL,
+  username TEXT,
+  context TEXT,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+EOSQL
+
+  install -d -m 2775 "$APP_DIR/data"
+  ln -snf "$db_path" "$APP_DIR/data/signage.db"
+  chown www-data:www-data "$db_path" 2>/dev/null || true
+  chmod 0660 "$db_path" 2>/dev/null || true
 }
 
 deploy_application(){
@@ -392,6 +424,7 @@ main(){
 
   install_packages
   deploy_application
+  prepare_database
   deploy_nginx
   configure_php
   configure_basic_auth
