@@ -20,6 +20,8 @@ const SIGNAGE_AUTH_PERMISSIONS = [
     'slides',
     'slides-flow',
     'slides-automation',
+    'slides-overview',
+    'saunas',
     'media',
     'footnotes',
     'badges',
@@ -36,13 +38,13 @@ const SIGNAGE_AUTH_PERMISSION_ALIASES = [
     'users' => 'user-admin',
 ];
 const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
-    'saunameister' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info'],
-    'editor' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
-    'admin' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
+    'saunameister' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info'],
+    'editor' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
+    'admin' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
 ];
-const SIGNAGE_AUTH_PERMISSIONS_VERSION = 2;
+const SIGNAGE_AUTH_PERMISSIONS_VERSION = 3;
 const SIGNAGE_AUTH_PERMISSION_UPGRADES = [
-    'slides' => ['slides-flow', 'slides-automation', 'media', 'footnotes', 'badges'],
+    'slides' => ['slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges'],
 ];
 const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
 
