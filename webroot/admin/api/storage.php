@@ -7,6 +7,39 @@ declare(strict_types=1);
 
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
 
+function signage_default_schedule(): array
+{
+    return [
+        'version' => 1,
+        'saunas' => [],
+        'rows' => [],
+        'meta' => [],
+    ];
+}
+
+function signage_normalize_schedule($schedule): array
+{
+    if (!is_array($schedule)) {
+        $schedule = [];
+    }
+
+    if (!isset($schedule['saunas']) || !is_array($schedule['saunas'])) {
+        $schedule['saunas'] = [];
+    }
+
+    if (!isset($schedule['rows']) || !is_array($schedule['rows'])) {
+        $schedule['rows'] = [];
+    }
+
+    if (!isset($schedule['meta']) || !is_array($schedule['meta'])) {
+        $schedule['meta'] = [];
+    }
+
+    $schedule['version'] = (int) ($schedule['version'] ?? 1);
+
+    return $schedule;
+}
+
 function signage_base_path(): string
 {
     static $base = null;
