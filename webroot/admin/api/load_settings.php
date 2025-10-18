@@ -2,8 +2,9 @@
 require_once __DIR__ . '/storage.php';
 
 header('Content-Type: application/json; charset=UTF-8');
-
-$defaultSettings = [
+$fn = signage_data_path('settings.json');
+if(!is_file($fn)){
+echo json_encode([
   'version'=>1,
   'theme'=>[
     'bg'=>'#E8DEBD','fg'=>'#5C3101','accent'=>'#5C3101',
@@ -39,7 +40,13 @@ $defaultSettings = [
   'interstitials'=>[],
   'presets'=>[],
   'presetAuto'=>false
-];
-
-$settings = signage_read_json('settings.json', $defaultSettings);
-echo json_encode($settings, SIGNAGE_JSON_FLAGS);
+], SIGNAGE_JSON_FLAGS);
+exit;
+}
+$raw = file_get_contents($fn);
+if ($raw === false) {
+  http_response_code(500);
+  echo json_encode(['error'=>'read-failed']);
+  exit;
+}
+echo $raw;

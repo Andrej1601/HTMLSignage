@@ -199,8 +199,6 @@ function auth_users_normalize(array $state): array
 
 function auth_users_load_from_file(): array
 {
-    $state = signage_read_json(SIGNAGE_AUTH_USERS_FILE, auth_users_default());
-    return auth_users_normalize($state);
     try {
         $pdo = signage_db();
     } catch (Throwable $e) {
@@ -251,17 +249,6 @@ function auth_users_load_from_file(): array
 function auth_users_save_to_file(array $state): void
 {
     $normalized = auth_users_normalize($state);
-    $error = null;
-    if (!signage_write_json(SIGNAGE_AUTH_USERS_FILE, $normalized, $error)) {
-        if ($error) {
-            throw new RuntimeException('Unable to write users database: ' . $error);
-        }
-        throw new RuntimeException('Unable to write users database');
-    }
-
-    if (signage_json_fallback_enabled()) {
-        $path = auth_users_path();
-        @chmod($path, 0640);
 
     try {
         $pdo = signage_db();
