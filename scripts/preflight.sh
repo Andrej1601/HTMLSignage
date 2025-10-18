@@ -9,6 +9,7 @@ ok() { printf '\033[1;32m[ OK ]\033[0m %s\n' "$@"; }
 REQUIRED_CMDS="docker"
 REQUIRED_PORTS="80 443"
 MIN_DISK_MB=2048
+DEFAULT_DB_PATH="/data/signage.db"
 
 check_commands() {
   missing=0
@@ -82,6 +83,52 @@ check_permissions() {
   ok "webroot/data writable"
 }
 
+check_php_sqlite() {
+  if ! command -v php >/dev/null 2>&1; then
+    warn "PHP CLI not found; skipping SQLite extension check"
+    return 0
+  fi
+
+  if php -r 'exit(extension_loaded("pdo_sqlite") ? 0 : 1);' >/dev/null 2>&1; then
+    ok "PHP pdo_sqlite extension available"
+  else
+    fail "PHP pdo_sqlite extension missing"
+    return 1
+  fi
+
+  if php -r 'exit(extension_loaded("sqlite3") ? 0 : 1);' >/dev/null 2>&1; then
+    ok "PHP sqlite3 extension available"
+  else
+    warn "PHP sqlite3 extension not reported; continuing"
+  fi
+}
+
+check_db_permissions() {
+  db_path=${SIGNAGE_DB_PATH:-$DEFAULT_DB_PATH}
+  db_dir=$(dirname "$db_path")
+
+  if [ -e "$db_path" ] && [ ! -w "$db_path" ]; then
+    fail "SQLite database not writable: $db_path"
+    return 1
+  fi
+
+  if [ -d "$db_dir" ]; then
+    if [ ! -w "$db_dir" ]; then
+      fail "SQLite directory not writable: $db_dir"
+      return 1
+    fi
+    ok "SQLite directory writable ($db_dir)"
+    return 0
+  fi
+
+  parent=$(dirname "$db_dir")
+  if [ ! -w "$parent" ]; then
+    fail "Cannot create SQLite directory $db_dir"
+    return 1
+  fi
+  ok "SQLite directory creatable ($db_dir)"
+}
+
 run_all() {
   status=0
   log "Running deployment preflight checks"
@@ -89,6 +136,8 @@ run_all() {
   check_ports || status=1
   check_disk || status=1
   check_permissions || status=1
+  check_php_sqlite || status=1
+  check_db_permissions || status=1
 
   if [ "$status" -ne 0 ]; then
 

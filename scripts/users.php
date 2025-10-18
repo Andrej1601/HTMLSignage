@@ -4,6 +4,18 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../webroot/admin/api/auth/users_store.php';
 
+if (!signage_db_available()) {
+    fwrite(STDERR, "SQLite backend not available. Install php8.3-sqlite3 and ensure SIGNAGE_DB_PATH is configured.\n");
+    exit(1);
+}
+
+try {
+    signage_db_bootstrap();
+} catch (Throwable $exception) {
+    fwrite(STDERR, 'Unable to initialize SQLite backend: ' . $exception->getMessage() . "\n");
+    exit(1);
+}
+
 function usage(): void
 {
     echo "Usage:\n";
