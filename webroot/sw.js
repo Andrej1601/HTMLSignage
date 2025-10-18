@@ -8,7 +8,7 @@ const PRECACHE_URLS = [
   OFFLINE_URL
 ];
 
-const DATA_URLS = new Set(['/data/schedule.json', '/data/settings.json']);
+const DATA_URLS = new Set(['/api/schedule.php', '/api/settings.php']);
 
 const STATIC_DESTINATIONS = new Set(['style', 'script', 'image', 'font', 'video', 'audio']);
 

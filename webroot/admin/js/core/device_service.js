@@ -12,7 +12,7 @@ const API_ENDPOINTS = {
   cleanup: `${API_BASE}/devices_gc.php`
 };
 
-const FALLBACK_PATH = '/data/devices.json';
+const FALLBACK_PATH = '/api/devices.php';
 export const OFFLINE_AFTER_MIN = 2;
 const SNAPSHOT_CACHE_MS = 1500;
 

@@ -152,18 +152,43 @@ $watchGlobals = ($deviceId === '' && $pairCode === '');
 $watchDevice = $deviceId !== '';
 $watchPair = $pairCode !== '';
 
-$paths = [];
-if ($watchGlobals || $watchDevice) {
-    $paths['settings'] = signage_data_path('settings.json');
-    $paths['schedule'] = signage_data_path('schedule.json');
-}
-if ($watchDevice || $watchPair) {
-    $paths['devices'] = devices_path();
+$metaResolvers = [];
+if (signage_db_available()) {
+    if ($watchGlobals || $watchDevice) {
+        $metaResolvers['settings'] = function (): array {
+            return signage_kv_meta(SIGNAGE_SETTINGS_STORAGE_KEY);
+        };
+        $metaResolvers['schedule'] = function (): array {
+            return signage_kv_meta(SIGNAGE_SCHEDULE_STORAGE_KEY);
+        };
+    }
+    if ($watchDevice || $watchPair) {
+        $metaResolvers['devices'] = function (): array {
+            return signage_kv_meta(DEVICES_STORAGE_KEY);
+        };
+    }
+} else {
+    if ($watchGlobals || $watchDevice) {
+        $settingsPath = signage_data_path('settings.json');
+        $schedulePath = signage_data_path('schedule.json');
+        $metaResolvers['settings'] = function () use ($settingsPath): array {
+            return live_file_meta($settingsPath);
+        };
+        $metaResolvers['schedule'] = function () use ($schedulePath): array {
+            return live_file_meta($schedulePath);
+        };
+    }
+    if ($watchDevice || $watchPair) {
+        $devicesPath = devices_path();
+        $metaResolvers['devices'] = function () use ($devicesPath): array {
+            return live_file_meta($devicesPath);
+        };
+    }
 }
 
 $meta = [];
-foreach ($paths as $key => $path) {
-    $meta[$key] = live_file_meta($path);
+foreach ($metaResolvers as $key => $resolver) {
+    $meta[$key] = $resolver();
 }
 
 echo "retry: 5000\n\n";
@@ -200,8 +225,8 @@ while (!connection_aborted()) {
     $configChanged = false;
     $devicesChanged = false;
 
-    foreach ($paths as $key => $path) {
-        $current = live_file_meta($path);
+    foreach ($metaResolvers as $key => $resolver) {
+        $current = $resolver();
         $previous = $meta[$key] ?? ['mtime' => 0, 'hash' => null];
         if ($current['mtime'] !== $previous['mtime'] || $current['hash'] !== $previous['hash']) {
             $meta[$key] = $current;

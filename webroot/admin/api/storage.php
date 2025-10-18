@@ -303,7 +303,7 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
 
 function signage_schedule_load(?array $fallback = null): array
 {
-    $default = $fallback ?? signage_default_schedule();
+    $default = signage_normalize_schedule($fallback ?? signage_default_schedule());
 
     if (signage_db_available()) {
         try {
@@ -314,25 +314,26 @@ function signage_schedule_load(?array $fallback = null): array
         } catch (Throwable $exception) {
             error_log('Failed to load schedule from SQLite: ' . $exception->getMessage());
         }
-    }
 
-    $schedule = signage_read_json_file('schedule.json', $default);
-    $schedule = signage_normalize_schedule($schedule);
-
-    if (signage_db_available()) {
+        $import = signage_read_json_file('schedule.json', $default);
+        $import = signage_normalize_schedule($import);
         try {
-            signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $schedule);
+            signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $import);
         } catch (Throwable $exception) {
             error_log('Failed to import schedule into SQLite: ' . $exception->getMessage());
         }
+        signage_delete_data_file('schedule.json');
+        return $import;
     }
 
-    return $schedule;
+    $schedule = signage_read_json_file('schedule.json', $default);
+    return signage_normalize_schedule($schedule);
 }
 
 function signage_settings_load(?array $fallback = null): array
 {
-    $default = $fallback ?? signage_default_settings();
+    $baseDefault = signage_default_settings();
+    $default = signage_normalize_settings($fallback ?? $baseDefault, $baseDefault);
 
     if (signage_db_available()) {
         try {
@@ -343,20 +344,20 @@ function signage_settings_load(?array $fallback = null): array
         } catch (Throwable $exception) {
             error_log('Failed to load settings from SQLite: ' . $exception->getMessage());
         }
-    }
 
-    $settings = signage_read_json_file('settings.json', $default);
-    $settings = signage_normalize_settings($settings, $default);
-
-    if (signage_db_available()) {
+        $import = signage_read_json_file('settings.json', $default);
+        $import = signage_normalize_settings($import, $default);
         try {
-            signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $settings);
+            signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $import);
         } catch (Throwable $exception) {
             error_log('Failed to import settings into SQLite: ' . $exception->getMessage());
         }
+        signage_delete_data_file('settings.json');
+        return $import;
     }
 
-    return $settings;
+    $settings = signage_read_json_file('settings.json', $default);
+    return signage_normalize_settings($settings, $default);
 }
 
 function signage_schedule_save($schedule, ?string &$error = null): bool
@@ -366,28 +367,33 @@ function signage_schedule_save($schedule, ?string &$error = null): bool
     $errors = [];
 
     $hasSqlite = signage_db_available();
-    $sqliteOk = !$hasSqlite;
+    $sqliteOk = false;
+
     if ($hasSqlite) {
         try {
             signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $normalized);
             $sqliteOk = true;
         } catch (Throwable $exception) {
-            $sqliteOk = false;
             $errors[] = 'sqlite: ' . $exception->getMessage();
         }
     }
 
-    $fileError = null;
-    $fileOk = signage_write_json_file('schedule.json', $normalized, $fileError);
-    if (!$fileOk) {
-        $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+    $fileOk = true;
+    if (!$hasSqlite || !$sqliteOk) {
+        $fileError = null;
+        $fileOk = signage_write_json_file('schedule.json', $normalized, $fileError);
+        if (!$fileOk) {
+            $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+        }
+    } else {
+        signage_delete_data_file('schedule.json');
     }
 
     if ($errors) {
         $error = implode('; ', $errors);
     }
 
-    return $sqliteOk && $fileOk;
+    return $hasSqlite ? $sqliteOk : $fileOk;
 }
 
 function signage_settings_save($settings, ?string &$error = null): bool
@@ -397,28 +403,33 @@ function signage_settings_save($settings, ?string &$error = null): bool
     $errors = [];
 
     $hasSqlite = signage_db_available();
-    $sqliteOk = !$hasSqlite;
+    $sqliteOk = false;
+
     if ($hasSqlite) {
         try {
             signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $normalized);
             $sqliteOk = true;
         } catch (Throwable $exception) {
-            $sqliteOk = false;
             $errors[] = 'sqlite: ' . $exception->getMessage();
         }
     }
 
-    $fileError = null;
-    $fileOk = signage_write_json_file('settings.json', $normalized, $fileError);
-    if (!$fileOk) {
-        $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+    $fileOk = true;
+    if (!$hasSqlite || !$sqliteOk) {
+        $fileError = null;
+        $fileOk = signage_write_json_file('settings.json', $normalized, $fileError);
+        if (!$fileOk) {
+            $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+        }
+    } else {
+        signage_delete_data_file('settings.json');
     }
 
     if ($errors) {
         $error = implode('; ', $errors);
     }
 
-    return $sqliteOk && $fileOk;
+    return $hasSqlite ? $sqliteOk : $fileOk;
 }
 
 function signage_base_path(): string
@@ -546,6 +557,43 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
         default:
             return signage_write_json_file($file, $data, $error);
     }
+}
+
+function signage_delete_data_file(string $file): void
+{
+    $path = signage_data_path($file);
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
+
+function signage_kv_meta(string $key): array
+{
+    $meta = ['mtime' => 0, 'hash' => null];
+
+    if (!signage_db_available()) {
+        return $meta;
+    }
+
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+        $stmt = $pdo->prepare('SELECT updated_at, value FROM kv_store WHERE key = :key LIMIT 1');
+        $stmt->execute([':key' => $key]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return $meta;
+        }
+        $meta['mtime'] = isset($row['updated_at']) ? (int) $row['updated_at'] : 0;
+        if (isset($row['value'])) {
+            $meta['hash'] = sha1((string) $row['value']);
+        }
+        return $meta;
+    } catch (Throwable $exception) {
+        error_log('Failed to fetch SQLite metadata for key ' . $key . ': ' . $exception->getMessage());
+    }
+
+    return $meta;
 }
 
 function signage_absolute_path(string $relative): string

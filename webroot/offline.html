@@ -45,7 +45,7 @@
   if (!cache) return;
 
   async function loadJson(path){
-    const response = await cache.match(path);
+    const response = await cache.match(path, { ignoreSearch: true });
     if (!response) return null;
     try {
       return await response.json();
@@ -54,8 +54,8 @@
     }
   }
 
-  const schedule = await loadJson('/data/schedule.json');
-  const settings = await loadJson('/data/settings.json');
+  const schedule = await loadJson('/api/schedule.php');
+  const settings = await loadJson('/api/settings.php');
 
   if (schedule) {
     const section = document.getElementById('scheduleSection');
