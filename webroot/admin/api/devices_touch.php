@@ -23,19 +23,20 @@ if ($deviceId === '') {
   exit;
 }
 
-$db = devices_load();
 $telemetry = devices_extract_telemetry_payload($payload);
-if (!devices_touch_entry($db, $deviceId, null, $telemetry)) {
-  echo json_encode(['ok' => false, 'error' => 'unknown-device']);
-  exit;
-}
-
+$ok = false;
 try {
-  devices_save($db);
+  $ok = devices_touch_entry_persistent($deviceId, null, $telemetry);
 } catch (RuntimeException $e) {
   http_response_code(500);
   error_log('Failed to persist device touch: ' . $e->getMessage());
   echo json_encode(['ok' => false, 'error' => 'storage-failed']);
   exit;
 }
+
+if (!$ok) {
+  echo json_encode(['ok' => false, 'error' => 'unknown-device']);
+  exit;
+}
+
 echo json_encode(['ok' => true]);

@@ -11,6 +11,9 @@ const DEVICES_ID_PATTERN = '/^dev_[a-f0-9]{12}$/';
 const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
 const DEVICES_HISTORY_LIMIT = 20;
 const DEVICES_MAX_ERRORS = 10;
+const DEVICES_STORAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+const DEVICES_SQLITE_JOURNAL_MODE = 'WAL';
+const DEVICES_SQLITE_BUSY_TIMEOUT_MS = 5000;
 
 // >>> GENERATED: DEVICE_FIELD_CONFIG >>>
 const DEVICES_STATUS_FIELD_CONFIG = [
@@ -566,6 +569,136 @@ function devices_path(): string
     return signage_data_path('devices.json');
 }
 
+function devices_sqlite_path(): string
+{
+    $custom = getenv('DEVICES_SQLITE_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['DEVICES_SQLITE_PATH'])) {
+        return (string) $_ENV['DEVICES_SQLITE_PATH'];
+    }
+    return signage_data_path('devices.sqlite');
+}
+
+function devices_pdo(): PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    $path = devices_sqlite_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to create devices storage directory: ' . $dir);
+    }
+
+    try {
+        $pdo = new PDO('sqlite:' . $path, null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    } catch (PDOException $exception) {
+        throw new RuntimeException('Unable to open devices database: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $pdo->exec('PRAGMA journal_mode = ' . DEVICES_SQLITE_JOURNAL_MODE);
+    $pdo->exec('PRAGMA foreign_keys = ON');
+    $pdo->exec('PRAGMA busy_timeout = ' . DEVICES_SQLITE_BUSY_TIMEOUT_MS);
+
+    devices_initialize_schema($pdo);
+
+    @chmod($path, 0660);
+    @chown($path, 'www-data');
+    @chgrp($path, 'www-data');
+
+    return $pdo;
+}
+
+function devices_initialize_schema(PDO $pdo): void
+{
+    $pdo->exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS devices (
+        id TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        last_seen INTEGER,
+        last_seen_at INTEGER
+    )');
+    $pdo->exec('CREATE TABLE IF NOT EXISTS pairings (
+        code TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created INTEGER
+    )');
+}
+
+function devices_state_is_empty(array $state): bool
+{
+    return empty($state['devices']) && empty($state['pairings']);
+}
+
+function devices_encode_row(array $row): string
+{
+    $json = json_encode($row, DEVICES_STORAGE_JSON_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('Failed to encode devices payload');
+    }
+    return $json;
+}
+
+function devices_load_legacy_json(): ?array
+{
+    $path = devices_path();
+    if (!is_file($path)) {
+        return null;
+    }
+    $raw = @file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return null;
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+    return devices_normalize_state($decoded);
+}
+
+function devices_load_from_sqlite(PDO $pdo): array
+{
+    $state = devices_default_state();
+
+    $metaStmt = $pdo->prepare('SELECT value FROM meta WHERE key = :key');
+    if ($metaStmt !== false && $metaStmt->execute([':key' => 'version'])) {
+        $version = $metaStmt->fetchColumn();
+        if ($version !== false) {
+            $state['version'] = (int) $version;
+        }
+    }
+
+    $devices = [];
+    foreach ($pdo->query('SELECT id, data FROM devices') as $row) {
+        $decoded = json_decode($row['data'], true);
+        if (!is_array($decoded)) {
+            continue;
+        }
+        $devices[$row['id']] = $decoded;
+    }
+    $state['devices'] = $devices;
+
+    $pairings = [];
+    foreach ($pdo->query('SELECT code, data FROM pairings') as $row) {
+        $decoded = json_decode($row['data'], true);
+        if (!is_array($decoded)) {
+            continue;
+        }
+        $pairings[$row['code']] = $decoded;
+    }
+    $state['pairings'] = $pairings;
+
+    return devices_normalize_state($state);
+}
+
 function devices_default_state(): array
 {
     return [
@@ -689,31 +822,77 @@ function devices_normalize_state($state): array
 
 function devices_load(): array
 {
-    $path = devices_path();
-    if (!is_file($path)) {
-        return devices_default_state();
+    $pdo = devices_pdo();
+    $state = devices_load_from_sqlite($pdo);
+    if (!devices_state_is_empty($state)) {
+        return $state;
     }
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
-        return devices_default_state();
+
+    $legacy = devices_load_legacy_json();
+    if ($legacy !== null && !devices_state_is_empty($legacy)) {
+        $copy = $legacy;
+        devices_save($copy);
+        return $copy;
     }
-    $decoded = json_decode($raw, true);
-    return devices_normalize_state($decoded);
+
+    return $state;
 }
 
 function devices_save(array &$db): bool
 {
     $db = devices_normalize_state($db);
-    $path = devices_path();
-    @mkdir(dirname($path), 02775, true);
-    $json = json_encode($db, SIGNAGE_JSON_FLAGS);
-    $bytes = @file_put_contents($path, $json, LOCK_EX);
-    if ($bytes === false) {
-        throw new RuntimeException('Unable to write device database');
+    $pdo = devices_pdo();
+
+    try {
+        $pdo->beginTransaction();
+
+        $pdo->exec('DELETE FROM devices');
+        $pdo->exec('DELETE FROM pairings');
+
+        $insertDevice = $pdo->prepare('INSERT INTO devices (id, data, last_seen, last_seen_at) VALUES (:id, :data, :last_seen, :last_seen_at)');
+        if ($insertDevice === false) {
+            throw new RuntimeException('Failed to prepare device insert statement');
+        }
+        foreach ($db['devices'] as $id => $device) {
+            $encoded = devices_encode_row($device);
+            $insertDevice->execute([
+                ':id' => $id,
+                ':data' => $encoded,
+                ':last_seen' => isset($device['lastSeen']) ? (int) $device['lastSeen'] : null,
+                ':last_seen_at' => isset($device['lastSeenAt']) ? (int) $device['lastSeenAt'] : null,
+            ]);
+        }
+
+        $insertPairing = $pdo->prepare('INSERT INTO pairings (code, data, created) VALUES (:code, :data, :created)');
+        if ($insertPairing === false) {
+            throw new RuntimeException('Failed to prepare pairing insert statement');
+        }
+        foreach ($db['pairings'] as $code => $pairing) {
+            $encoded = devices_encode_row($pairing);
+            $insertPairing->execute([
+                ':code' => $code,
+                ':data' => $encoded,
+                ':created' => isset($pairing['created']) ? (int) $pairing['created'] : null,
+            ]);
+        }
+
+        $metaStmt = $pdo->prepare('INSERT INTO meta (key, value) VALUES (:key, :value) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+        if ($metaStmt === false) {
+            throw new RuntimeException('Failed to prepare metadata statement');
+        }
+        $metaStmt->execute([
+            ':key' => 'version',
+            ':value' => (string) ($db['version'] ?? 1),
+        ]);
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw new RuntimeException('Unable to write device database', 0, $exception);
     }
-    @chmod($path, 0644);
-    @chown($path, 'www-data');
-    @chgrp($path, 'www-data');
+
     return true;
 }
 
@@ -729,6 +908,67 @@ function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $tel
     if (!empty($telemetry)) {
         devices_record_telemetry($db['devices'][$normalizedId], $telemetry, $ts);
     }
+    return true;
+}
+
+function devices_touch_entry_persistent($id, ?int $timestamp = null, array $telemetry = []): bool
+{
+    $normalizedId = devices_normalize_device_id((string) $id);
+    if ($normalizedId === '') {
+        return false;
+    }
+
+    $pdo = devices_pdo();
+
+    try {
+        $pdo->beginTransaction();
+
+        $select = $pdo->prepare('SELECT data FROM devices WHERE id = :id LIMIT 1');
+        if ($select === false) {
+            throw new RuntimeException('Failed to prepare device lookup statement');
+        }
+        $select->execute([':id' => $normalizedId]);
+        $row = $select->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            $pdo->rollBack();
+            return false;
+        }
+
+        $device = json_decode($row['data'], true);
+        if (!is_array($device)) {
+            $device = ['id' => $normalizedId];
+        }
+
+        $state = devices_normalize_state(['devices' => [$normalizedId => $device]]);
+        $device = $state['devices'][$normalizedId];
+
+        $ts = $timestamp ?? time();
+        $device['lastSeen'] = $ts;
+        $device['lastSeenAt'] = $ts;
+        if (!empty($telemetry)) {
+            devices_record_telemetry($device, $telemetry, $ts);
+        }
+
+        $encoded = devices_encode_row($device);
+        $update = $pdo->prepare('UPDATE devices SET data = :data, last_seen = :last_seen, last_seen_at = :last_seen_at WHERE id = :id');
+        if ($update === false) {
+            throw new RuntimeException('Failed to prepare device update statement');
+        }
+        $update->execute([
+            ':id' => $normalizedId,
+            ':data' => $encoded,
+            ':last_seen' => isset($device['lastSeen']) ? (int) $device['lastSeen'] : null,
+            ':last_seen_at' => isset($device['lastSeenAt']) ? (int) $device['lastSeenAt'] : null,
+        ]);
+
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw new RuntimeException('Failed to update device heartbeat', 0, $exception);
+    }
+
     return true;
 }
 
