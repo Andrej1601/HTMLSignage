@@ -67,7 +67,7 @@ function live_file_meta(string $path, ?array $previous = null): array
 
 function live_build_global_state(): array
 {
-    $schedule = signage_read_json('schedule.json');
+    $schedule = signage_normalize_schedule(signage_read_json('schedule.json', signage_default_schedule()));
     $settings = signage_read_json('settings.json');
     return [
         'ok' => true,
