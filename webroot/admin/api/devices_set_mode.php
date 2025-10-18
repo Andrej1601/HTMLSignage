@@ -28,7 +28,11 @@ if (!isset($db['devices'][$devId])) {
 
 $db['devices'][$devId]['useOverrides'] = ($mode === 'device');
 
-if (!devices_save($db)) {
+try {
+  devices_save($db);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device mode change: ' . $e->getMessage());
   echo json_encode(['ok'=>false, 'error'=>'write-failed']);
   exit;
 }
