@@ -13,9 +13,6 @@ const API_ENDPOINTS = {
 };
 
 const FALLBACK_PATH = '/data/devices.json';
-const FALLBACK_ENABLED = typeof window !== 'undefined'
-  ? window.SIGNAGE_ENABLE_DEVICE_FALLBACK !== false
-  : true;
 export const OFFLINE_AFTER_MIN = 2;
 const SNAPSHOT_CACHE_MS = 1500;
 
@@ -452,9 +449,6 @@ async function fetchSnapshotFromApi() {
 }
 
 async function fetchSnapshotFromFallback() {
-  if (!FALLBACK_ENABLED) {
-    return null;
-  }
   try {
     const fallbackData = await fetchJson(`${FALLBACK_PATH}?t=${Date.now()}`, { cache: 'no-store' });
     const now = resolveNowSeconds(fallbackData?.now);
