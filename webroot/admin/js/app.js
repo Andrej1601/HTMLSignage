@@ -112,14 +112,6 @@ const PERMISSION_META = {
     title: 'Automationen',
     description: 'Zeit- und Stil-Automationen verwalten.'
   },
-  'slides-overview': {
-    title: 'Übersicht',
-    description: 'Tabellen-Übersicht bearbeiten und Dauer für die Übersicht festlegen.'
-  },
-  saunas: {
-    title: 'Saunen',
-    description: 'Saunen verwalten, Uploads durchführen und Sichtbarkeit steuern.'
-  },
   media: {
     title: 'Medien',
     description: 'Medien-Slides hinzufügen, sortieren und konfigurieren.'
@@ -155,9 +147,9 @@ const PERMISSION_META = {
 };
 
 const ROLE_DEFAULT_PERMISSIONS = {
-  saunameister: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info'],
-  editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
-  admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'slides-overview', 'saunas', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
+  saunameister: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info'],
+  editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
+  admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
 };
 
 const normalizePermissionName = (permission) => {
@@ -729,13 +721,6 @@ function applyRoleRestrictions() {
   const slideshowBox = document.getElementById('boxSlidesText');
   const slidesFlowCard = document.getElementById('slidesFlowCard');
   const slidesAutomationCard = document.getElementById('slidesAutomationCard');
-  const overviewSettingsCard = document.getElementById('overviewSettingsCard');
-  const saunaSettingsCard = document.getElementById('saunaSettingsCard');
-  const saunaBox = document.getElementById('boxSaunas');
-  const saunaSection = document.getElementById('saunaSection');
-  const overviewSection = document.getElementById('overviewSection');
-  const addSaunaBtn = document.getElementById('btnAddSauna');
-  const cockpitSaunaJump = document.querySelector('[data-jump="boxSaunas"]');
   const mediaBox = document.getElementById('boxImages');
   const footnoteBox = document.getElementById('boxFootnotes');
   const footnoteSection = document.getElementById('footnoteSection');
@@ -749,8 +734,6 @@ function applyRoleRestrictions() {
   const canUseSlides = hasPermission('slides');
   const canManageFlow = canUseSlides && hasPermission('slides-flow');
   const canManageAutomation = canUseSlides && hasPermission('slides-automation');
-  const canManageOverview = canUseSlides && hasPermission('slides-overview');
-  const canManageSaunas = canUseSlides && hasPermission('saunas');
   const canManageMedia = canUseSlides && hasPermission('media');
   const canManageFootnotes = canUseSlides && hasPermission('footnotes');
   const canManageBadges = canUseSlides && hasPermission('badges');
@@ -765,11 +748,6 @@ function applyRoleRestrictions() {
   setHiddenState(slideshowBox, !canUseSlides);
   setHiddenState(slidesFlowCard, !canManageFlow);
   setHiddenState(slidesAutomationCard, !canManageAutomation);
-  setHiddenState(overviewSettingsCard, !canManageOverview);
-  setHiddenState(overviewSection, !canManageOverview);
-  setHiddenState(saunaSettingsCard, !canManageSaunas);
-  setHiddenState(saunaSection, !canManageSaunas);
-  setHiddenState(addSaunaBtn, !canManageSaunas);
   setHiddenState(mediaBox, !canManageMedia);
   setHiddenState(footnoteSection, !canManageFootnotes);
   setHiddenState(footnoteLayoutSection, !canManageFootnotes);
@@ -777,10 +755,6 @@ function applyRoleRestrictions() {
   setHiddenState(globalInfoBox, !canUseGlobalInfo);
   setHiddenState(colorsSection, !canUseColors);
   setHiddenState(systemSection, !canUseSystem);
-
-  const hideSaunaBox = !canUseSlides || (!canManageSaunas && !canManageOverview);
-  setHiddenState(saunaBox, hideSaunaBox);
-  setHiddenState(cockpitSaunaJump, hideSaunaBox);
 
   const hasFullAccess = availablePermissions.every((permission) => hasPermission(permission));
   document.body?.classList.toggle('role-limited', !hasFullAccess);
@@ -799,10 +773,6 @@ function applyRoleRestrictions() {
 
   if (!canUseGlobalInfo && globalInfoBox) {
     globalInfoBox.open = false;
-  }
-
-  if (hideSaunaBox && saunaBox) {
-    saunaBox.open = false;
   }
 
   const hideFootnoteBox = !canUseSlides || (!canManageFootnotes && !canManageBadges);
@@ -915,8 +885,6 @@ async function loadAll(){
   initUserAdmin();
   initViewMenu();
   initSidebarResize();
-
-  applyRoleRestrictions();
 }
 
 // ============================================================================
