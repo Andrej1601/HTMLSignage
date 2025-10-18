@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/storage.php';
 
+const DEVICES_STORAGE_KEY = 'devices.state';
 const DEVICES_ID_PATTERN = '/^dev_[a-f0-9]{12}$/';
 const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
 const DEVICES_HISTORY_LIMIT = 20;
@@ -689,29 +690,10 @@ function devices_normalize_state($state): array
 
 function devices_load_from_file(): array
 {
-    $path = devices_path();
-    if (!is_file($path)) {
-        return devices_default_state();
-    }
-
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
-        return devices_default_state();
-    }
-
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return devices_default_state();
-    }
-
-    return devices_normalize_state($decoded);
-}
-
-function devices_load_from_db(): array
-{
+    $state = signage_read_json('devices.json', devices_default_state());
     try {
         $pdo = signage_db();
-    } catch (Throwable $exception) {
+    } catch (Throwable $e) {
         return devices_default_state();
     }
 
@@ -724,12 +706,10 @@ function devices_load_from_db(): array
             if ($id === '') {
                 continue;
             }
-
             $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
             if (!is_array($payload)) {
                 $payload = [];
             }
-
             $payload['id'] = $id;
             if (empty($payload['name']) && !empty($row['name'])) {
                 $payload['name'] = $row['name'];
@@ -743,7 +723,6 @@ function devices_load_from_db(): array
             if (!isset($payload['lastSeenAt']) && isset($row['last_seen_at'])) {
                 $payload['lastSeenAt'] = (int) $row['last_seen_at'];
             }
-
             $state['devices'][$id] = $payload;
         }
     }
@@ -755,12 +734,10 @@ function devices_load_from_db(): array
             if ($code === '') {
                 continue;
             }
-
             $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
             if (!is_array($payload)) {
                 $payload = [];
             }
-
             $payload['code'] = $code;
             if (!isset($payload['deviceId']) && isset($row['device_id']) && is_string($row['device_id'])) {
                 $payload['deviceId'] = $row['device_id'];
@@ -768,13 +745,21 @@ function devices_load_from_db(): array
             if (!isset($payload['created']) && isset($row['created'])) {
                 $payload['created'] = (int) $row['created'];
             }
-
             $state['pairings'][$code] = $payload;
         }
     }
 
     if (!$state['devices'] && !$state['pairings']) {
-        return devices_load_from_file();
+        $path = devices_path();
+        if (is_file($path)) {
+            $raw = @file_get_contents($path);
+            if ($raw !== false && $raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    return devices_normalize_state($decoded);
+                }
+            }
+        }
     }
 
     return devices_normalize_state($state);
@@ -783,39 +768,26 @@ function devices_load_from_db(): array
 function devices_save_to_file(array &$db): bool
 {
     $db = devices_normalize_state($db);
-
-    $json = json_encode($db, SIGNAGE_JSON_FLAGS);
-    if ($json === false) {
-        throw new RuntimeException('Unable to encode device database');
+    $error = null;
+    if (!signage_write_json('devices.json', $db, $error)) {
+        if ($error) {
+            throw new RuntimeException('Unable to write device database: ' . $error);
+        }
+        throw new RuntimeException('Unable to write device database');
     }
 
-    $path = devices_path();
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
-        throw new RuntimeException('Unable to prepare device directory');
+    if (signage_json_fallback_enabled()) {
+        $path = devices_path();
+        @chown($path, 'www-data');
+        @chgrp($path, 'www-data');
     }
-
-    if (@file_put_contents($path, $json, LOCK_EX) === false) {
-        $error = error_get_last();
-        $message = $error['message'] ?? 'file_put_contents failed';
-        throw new RuntimeException('Unable to write device database: ' . $message);
-    }
-
-    @chmod($path, 0644);
-    @chown($path, 'www-data');
-    @chgrp($path, 'www-data');
 
     return true;
-}
-
-function devices_save_to_db(array &$db): void
-{
-    $db = devices_normalize_state($db);
 
     try {
         $pdo = signage_db();
-    } catch (Throwable $exception) {
-        throw new RuntimeException('Unable to open device database', 0, $exception);
+    } catch (Throwable $e) {
+        throw new RuntimeException('Unable to open device database', 0, $e);
     }
 
     try {
@@ -828,17 +800,14 @@ function devices_save_to_db(array &$db): void
             if (!is_array($device)) {
                 continue;
             }
-
             $deviceId = devices_normalize_device_id($id);
             if ($deviceId === '') {
                 continue;
             }
-
             $payload = json_encode($device, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($payload === false) {
                 continue;
             }
-
             $insertDevice->execute([
                 ':id' => $deviceId,
                 ':name' => isset($device['name']) && is_string($device['name']) ? $device['name'] : $deviceId,
@@ -856,17 +825,14 @@ function devices_save_to_db(array &$db): void
             if (!is_array($pairing)) {
                 continue;
             }
-
             $pairCode = devices_normalize_code($code);
             if ($pairCode === '') {
                 continue;
             }
-
             $payload = json_encode($pairing, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($payload === false) {
                 continue;
             }
-
             $deviceId = null;
             if (isset($pairing['deviceId']) && is_string($pairing['deviceId'])) {
                 $normalizedId = devices_normalize_device_id($pairing['deviceId']);
@@ -874,7 +840,6 @@ function devices_save_to_db(array &$db): void
                     $deviceId = $normalizedId;
                 }
             }
-
             $insertPairing->execute([
                 ':code' => $pairCode,
                 ':device_id' => $deviceId,
@@ -884,12 +849,16 @@ function devices_save_to_db(array &$db): void
         }
 
         $pdo->commit();
-    } catch (Throwable $exception) {
+    } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        throw $exception;
+        throw $e;
     }
+
+    devices_export_state($db);
+
+    return true;
 }
 
 function devices_export_state(array $db): void
@@ -913,9 +882,9 @@ function devices_load(): array
 {
     if (signage_db_available()) {
         try {
-            $state = devices_load_from_db();
-            if (!empty($state['devices']) || !empty($state['pairings'])) {
-                return $state;
+            $state = signage_kv_get(DEVICES_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return devices_normalize_state($state);
             }
         } catch (Throwable $exception) {
             error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
@@ -931,8 +900,7 @@ function devices_save(array &$db): bool
 
     if (signage_db_available()) {
         try {
-            devices_save_to_db($db);
-            devices_export_state($db);
+            signage_kv_set(DEVICES_STORAGE_KEY, $db);
             return true;
         } catch (Throwable $exception) {
             error_log('Failed to persist devices to SQLite: ' . $exception->getMessage());
