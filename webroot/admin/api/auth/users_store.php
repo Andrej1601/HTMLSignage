@@ -8,6 +8,7 @@ require_once __DIR__ . '/../storage.php';
 
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
+const SIGNAGE_AUTH_AUDIT_MAX_ENTRIES = 5000;
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
 const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
 const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
@@ -473,5 +474,43 @@ function auth_append_audit(string $event, array $context = []): void
         'context' => $context,
     ];
     $line = json_encode($row, JSON_UNESCAPED_SLASHES) . "\n";
-    @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
+
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) {
+        return;
+    }
+
+    if (!@flock($handle, LOCK_EX)) {
+        @fclose($handle);
+        return;
+    }
+
+    if (@fseek($handle, 0, SEEK_END) === 0) {
+        @fwrite($handle, $line);
+    }
+    @fflush($handle);
+
+    if (SIGNAGE_AUTH_AUDIT_MAX_ENTRIES > 0) {
+        $lines = [];
+        $count = 0;
+        @rewind($handle);
+        while (($existing = fgets($handle)) !== false) {
+            $count++;
+            $lines[] = $existing;
+            if (count($lines) > SIGNAGE_AUTH_AUDIT_MAX_ENTRIES) {
+                array_shift($lines);
+            }
+        }
+        if ($count > SIGNAGE_AUTH_AUDIT_MAX_ENTRIES) {
+            @ftruncate($handle, 0);
+            @rewind($handle);
+            @fwrite($handle, implode('', $lines));
+            @fflush($handle);
+        }
+    }
+
+    @chmod($path, 0644);
+
+    @flock($handle, LOCK_UN);
+    @fclose($handle);
 }
