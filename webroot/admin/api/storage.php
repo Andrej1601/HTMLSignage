@@ -95,60 +95,17 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
         $error = 'unable to create directory: ' . $dir;
         return false;
     }
-
     $json = json_encode($data, SIGNAGE_JSON_FLAGS);
     if ($json === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
         return false;
     }
-
-    $temp = @tempnam($dir, basename($path) . '.tmp');
-    if ($temp === false) {
-        $error = 'unable to create temporary file';
-        return false;
-    }
-
-    $handle = @fopen($temp, 'wb');
-    if ($handle === false) {
-        @unlink($temp);
-        $error = 'unable to open temporary file for writing';
-        return false;
-    }
-
-    $bytesWritten = @fwrite($handle, $json);
-    if ($bytesWritten === false || $bytesWritten < strlen($json)) {
+    $bytes = @file_put_contents($path, $json, LOCK_EX);
+    if ($bytes === false) {
         $err = error_get_last();
-        @fclose($handle);
-        @unlink($temp);
-        $error = $err['message'] ?? 'failed writing json payload';
+        $error = $err['message'] ?? 'file_put_contents failed';
         return false;
     }
-
-    if (!@fflush($handle)) {
-        @fclose($handle);
-        @unlink($temp);
-        $error = 'unable to flush json payload';
-        return false;
-    }
-
-    if (function_exists('fsync')) {
-        @fsync($handle);
-    } elseif (function_exists('posix_fsync')) {
-        $meta = @stream_get_meta_data($handle);
-        if (isset($meta['stream_type']) && $meta['stream_type'] === 'STDIO') {
-            @posix_fsync(@fileno($handle));
-        }
-    }
-
-    @fclose($handle);
-
-    if (!@rename($temp, $path)) {
-        $err = error_get_last();
-        @unlink($temp);
-        $error = $err['message'] ?? 'rename failed';
-        return false;
-    }
-
     @chmod($path, 0644);
     return true;
 }
