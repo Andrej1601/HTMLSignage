@@ -12,24 +12,36 @@ let inited = false;
 let undoStack = [];
 let redoStack = [];
 
-const TIME_WIDTH_MIN = 6;
-const TIME_WIDTH_MAX = 30;
+const TIME_WIDTH_BASE_CH = 10;
+const TIME_WIDTH_SCALE_MIN = 0.5;
+const TIME_WIDTH_SCALE_MAX = 3;
 
 function clampNumber(value, min, max){
   return Math.min(Math.max(value, min), max);
+}
+
+function resolveTimeWidthScale(fonts = {}){
+  const rawScale = Number(fonts.overviewTimeWidthScale);
+  if (Number.isFinite(rawScale) && rawScale > 0){
+    return clampNumber(rawScale, TIME_WIDTH_SCALE_MIN, TIME_WIDTH_SCALE_MAX);
+  }
+  const legacyWidth = Number(fonts.overviewTimeWidthCh);
+  if (Number.isFinite(legacyWidth) && legacyWidth > 0){
+    const legacyScale = legacyWidth / TIME_WIDTH_BASE_CH;
+    return clampNumber(legacyScale, TIME_WIDTH_SCALE_MIN, TIME_WIDTH_SCALE_MAX);
+  }
+  return 1;
 }
 
 function updateTimeColumnMetrics(table){
   if (!table) return;
   const settings = ctx?.getSettings?.() || {};
   const fonts = settings.fonts || {};
-  const widthRaw = Number(fonts.overviewTimeWidthCh);
-  const timeWidth = Number.isFinite(widthRaw)
-    ? clampNumber(widthRaw, TIME_WIDTH_MIN, TIME_WIDTH_MAX)
-    : clampNumber(10, TIME_WIDTH_MIN, TIME_WIDTH_MAX);
+  const widthScale = resolveTimeWidthScale(fonts);
   const scaleRaw = Number(fonts.overviewTimeScale ?? fonts.overviewCellScale);
   const timeScale = Number.isFinite(scaleRaw) ? clampNumber(scaleRaw, 0.5, 3) : 1;
-  table.style.setProperty('--grid-time-width', `${timeWidth}ch`);
+  table.style.setProperty('--grid-time-width-scale', String(widthScale));
+  table.style.setProperty('--grid-time-width', `calc(${TIME_WIDTH_BASE_CH}ch * ${widthScale})`);
   table.style.setProperty('--grid-time-scale', String(timeScale));
 }
 
@@ -619,7 +631,7 @@ export function initGridUI(context){
   initOnce();
   const table = $('#grid');
   const updateMetricsFromControls = () => updateTimeColumnMetrics(table);
-  ['#ovTimeWidth', '#ovTimeScale'].forEach(sel => {
+  ['#ovTimeWidthScale', '#ovTimeScale'].forEach(sel => {
     const el = document.querySelector(sel);
     if (!el || el.dataset.gridMetricsBound) return;
     el.addEventListener('input', updateMetricsFromControls);

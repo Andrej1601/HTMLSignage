@@ -17,6 +17,9 @@
   const rawDevice = (Q.get('device') || ls.get('deviceId') || '').trim();
   const DEVICE_ID = /^dev_[a-f0-9]{12}$/i.test(rawDevice) ? rawDevice : null;
   const clampNumber = (min, val, max) => Math.min(Math.max(val, min), max);
+  const OVERVIEW_TIME_BASE_CH = 10;
+  const OVERVIEW_TIME_SCALE_MIN = 0.5;
+  const OVERVIEW_TIME_SCALE_MAX = 3;
   const HEADING_WIDTH_INPUT_MIN = 10;
   const HEADING_WIDTH_INPUT_MAX = 100;
   const HEADING_WIDTH_ACTUAL_MIN = 10;
@@ -67,7 +70,7 @@
   ];
   const STYLE_FONT_KEYS = [
     'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-    'tileMetaScale','overviewTimeWidthCh','overviewShowFlames','overviewTitleScale','overviewHeadScale',
+    'tileMetaScale','overviewTimeWidthScale','overviewShowFlames','overviewTitleScale','overviewHeadScale',
     'overviewCellScale','h1Scale','h2Scale'
   ];
   const STYLE_SLIDE_KEYS = [
@@ -1110,9 +1113,21 @@ async function loadDeviceResolved(id){
       const num = Number.isFinite(+value) ? Math.max(0, +value) : fallback;
       return (Number.isFinite(num) ? num : fallback) + 'ms';
     };
-    const overviewTimeWidth = Number.isFinite(+fonts.overviewTimeWidthCh)
-      ? clamp(6, +fonts.overviewTimeWidthCh, 30)
-      : 10;
+    const overviewTimeWidthScale = (() => {
+      const rawScale = Number(fonts.overviewTimeWidthScale);
+      if (Number.isFinite(rawScale) && rawScale > 0) {
+        return clamp(OVERVIEW_TIME_SCALE_MIN, rawScale, OVERVIEW_TIME_SCALE_MAX);
+      }
+      const legacyWidth = Number(fonts.overviewTimeWidthCh);
+      if (Number.isFinite(legacyWidth) && legacyWidth > 0) {
+        return clamp(
+          OVERVIEW_TIME_SCALE_MIN,
+          legacyWidth / OVERVIEW_TIME_BASE_CH,
+          OVERVIEW_TIME_SCALE_MAX
+        );
+      }
+      return 1;
+    })();
     const overviewTimeScale = Number.isFinite(+fonts.overviewTimeScale)
       ? clamp(0.5, +fonts.overviewTimeScale, 3)
       : (Number.isFinite(+fonts.overviewCellScale) ? +fonts.overviewCellScale : 0.8);
@@ -1148,7 +1163,8 @@ async function loadDeviceResolved(id){
       '--ovHeadScale': fonts.overviewHeadScale || 0.9,
       '--ovCellScale': fonts.overviewCellScale || 0.8,
       '--ovTimeScale': overviewTimeScale,
-      '--ovTimeWidth': `${overviewTimeWidth}ch`,
+      '--ovTimeWidthScale': overviewTimeWidthScale,
+      '--ovTimeWidth': `calc(${OVERVIEW_TIME_BASE_CH}ch * ${overviewTimeWidthScale})`,
       '--tileTextScale': fonts.tileTextScale || 0.8,
       '--tileWeight': fonts.tileWeight || 600,
       '--chipHScale': fonts.chipHeight || 1,

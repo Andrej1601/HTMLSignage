@@ -1327,7 +1327,9 @@ table.tbl{
   width:100%;
   border-collapse:separate;
   border-spacing:0;
-  --grid-time-width:10ch;
+  --grid-time-base:10ch;
+  --grid-time-width-scale:1;
+  --grid-time-width:calc(var(--grid-time-base) * var(--grid-time-width-scale));
   --grid-time-scale:1;
 }
 .tbl th,.tbl td{ border:1px solid var(--inbr); padding:7px; }
@@ -1363,6 +1365,13 @@ table.tbl{
   border-style:solid;
   background: color-mix(in oklab, var(--grid-entry-bg) 85%, transparent);
   border-color: color-mix(in oklab, var(--input-border) 85%, transparent);
+}
+
+#slidesMaster[data-limited="true"] > summary{
+  display:none;
+}
+#slidesMaster[data-limited="true"] .settings-stack{
+  display:none;
 }
 
 /* ---------- Key/Value-Linien ---------- */

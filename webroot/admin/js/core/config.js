@@ -11,6 +11,10 @@ export { sanitizeBadgeLibrary } from './badge_library.js';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
+const OVERVIEW_TIME_BASE_CH = 10;
+const OVERVIEW_TIME_SCALE_MIN = 0.5;
+const OVERVIEW_TIME_SCALE_MAX = 3;
+
 const HEADING_WIDTH_INPUT_MIN = 10;
 const HEADING_WIDTH_INPUT_MAX = 100;
 const HEADING_WIDTH_ACTUAL_MIN = 10;
@@ -76,7 +80,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','overviewTimeScale','overviewTimeWidthCh','overviewShowFlames'
+  'tileMetaScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 
 const STYLE_SLIDE_KEYS = [
@@ -248,6 +252,34 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.assets = { ...DEFAULTS.assets, ...(src.assets || {}) };
   src.h2 = { ...DEFAULTS.h2, ...(src.h2 || {}) };
   src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
+
+  const fonts = src.fonts || {};
+  const defaultTimeWidthScale = Number(DEFAULTS.fonts?.overviewTimeWidthScale ?? 1);
+  const rawTimeWidthScale = Number(fonts.overviewTimeWidthScale);
+  if (Number.isFinite(rawTimeWidthScale) && rawTimeWidthScale > 0) {
+    fonts.overviewTimeWidthScale = clamp(
+      OVERVIEW_TIME_SCALE_MIN,
+      rawTimeWidthScale,
+      OVERVIEW_TIME_SCALE_MAX
+    );
+  } else {
+    const legacyWidth = Number(fonts.overviewTimeWidthCh);
+    if (Number.isFinite(legacyWidth) && legacyWidth > 0) {
+      fonts.overviewTimeWidthScale = clamp(
+        OVERVIEW_TIME_SCALE_MIN,
+        legacyWidth / OVERVIEW_TIME_BASE_CH,
+        OVERVIEW_TIME_SCALE_MAX
+      );
+    } else {
+      fonts.overviewTimeWidthScale = clamp(
+        OVERVIEW_TIME_SCALE_MIN,
+        defaultTimeWidthScale,
+        OVERVIEW_TIME_SCALE_MAX
+      );
+    }
+  }
+  delete fonts.overviewTimeWidthCh;
+
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
   src.extras = sanitizeExtras(src.extras, DEFAULTS.extras);
   const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);

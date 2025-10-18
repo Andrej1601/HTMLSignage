@@ -134,6 +134,25 @@ const setDevicesPinned = (flag) => {
   deviceContextState.setDevicesPinned(flag);
 };
 
+const OVERVIEW_TIME_BASE_CH = 10;
+const OVERVIEW_TIME_SCALE_MIN = 0.5;
+const OVERVIEW_TIME_SCALE_MAX = 3;
+
+const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const resolveOverviewTimeWidthScale = (fonts = {}, { fallback = 1 } = {}) => {
+  const rawScale = Number(fonts?.overviewTimeWidthScale);
+  if (Number.isFinite(rawScale) && rawScale > 0) {
+    return clampNumber(rawScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+  }
+  const legacyWidth = Number(fonts?.overviewTimeWidthCh);
+  if (Number.isFinite(legacyWidth) && legacyWidth > 0) {
+    const legacyScale = legacyWidth / OVERVIEW_TIME_BASE_CH;
+    return clampNumber(legacyScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+  }
+  return clampNumber(fallback, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+};
+
 const deviceContextState = {
   getSchedule: () => schedule,
   setSchedule: (next) => stateAccess.setSchedule(next),
@@ -599,14 +618,24 @@ function applyRoleRestrictions() {
   const colorsSection = document.getElementById('resetColors')?.closest('details');
   const systemSection = document.getElementById('btnExport')?.closest('details');
   const globalInfoBox = document.getElementById('boxStories');
+  const slidesMaster = document.getElementById('slidesMaster');
+
+  const cockpitCardFrom = (selector) => {
+    const control = document.querySelector(selector);
+    return control ? control.closest('.workspace-card') : null;
+  };
+
+  const slidesCockpitCard = cockpitCardFrom('[data-jump="slidesMaster"]');
+  const infoCockpitCard = cockpitCardFrom('[data-jump="boxStories"]');
+  const mediaLayoutCard = cockpitCardFrom('[data-jump="boxImages"]') || cockpitCardFrom('[data-jump="boxSlidesText"]');
 
   const canUseCockpit = hasPermission('cockpit');
   const canUseSlides = hasPermission('slides');
   const canManageFlow = canUseSlides && hasPermission('slides-flow');
   const canManageAutomation = canUseSlides && hasPermission('slides-automation');
   const canManageMedia = canUseSlides && hasPermission('media');
-  const canManageFootnotes = canUseSlides && hasPermission('footnotes');
-  const canManageBadges = canUseSlides && hasPermission('badges');
+  const canManageFootnotes = hasPermission('footnotes');
+  const canManageBadges = hasPermission('badges');
   const canUseGlobalInfo = hasPermission('global-info');
   const canUseColors = hasPermission('colors');
   const canUseSystem = hasPermission('system');
@@ -625,6 +654,23 @@ function applyRoleRestrictions() {
   setHiddenState(globalInfoBox, !canUseGlobalInfo);
   setHiddenState(colorsSection, !canUseColors);
   setHiddenState(systemSection, !canUseSystem);
+
+  if (slidesMaster) {
+    if (!canUseSlides) {
+      slidesMaster.setAttribute('data-limited', 'true');
+      slidesMaster.open = true;
+    } else {
+      slidesMaster.removeAttribute('data-limited');
+    }
+  }
+
+  const showSlidesCard = canUseSlides || canManageFlow || canManageAutomation;
+  const showInfoCard = canUseGlobalInfo || canManageMedia;
+  const showMediaLayoutCard = canManageMedia || canUseColors || canUseSlides;
+
+  setHiddenState(slidesCockpitCard, !showSlidesCard);
+  setHiddenState(infoCockpitCard, !showInfoCard);
+  setHiddenState(mediaLayoutCard, !showMediaLayoutCard);
 
   const hasFullAccess = availablePermissions.every((permission) => hasPermission(permission));
   document.body?.classList.toggle('role-limited', !hasFullAccess);
@@ -645,7 +691,7 @@ function applyRoleRestrictions() {
     globalInfoBox.open = false;
   }
 
-  const hideFootnoteBox = !canUseSlides || (!canManageFootnotes && !canManageBadges);
+  const hideFootnoteBox = (!canManageFootnotes && !canManageBadges);
   setHiddenState(footnoteBox, hideFootnoteBox);
 
   if (!canManageDevices) {
@@ -2263,7 +2309,9 @@ function renderSlidesBox(){
   setV('#ovHeadScale',  f.overviewHeadScale  ?? 0.9);
   setV('#ovCellScale',  f.overviewCellScale  ?? 0.8);
   setV('#ovTimeScale',  f.overviewTimeScale  ?? f.overviewCellScale ?? 0.8);
-  setV('#ovTimeWidth',  f.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10);
+  setV('#ovTimeWidthScale', resolveOverviewTimeWidthScale(f, {
+    fallback: DEFAULTS.fonts?.overviewTimeWidthScale ?? 1
+  }));
   setV('#chipH',        Math.round((f.chipHeight ?? 1)*100));
   const overviewFlamesToggle = document.getElementById('overviewFlames');
   const overviewFlameControls = ['#flamePct', '#flameGap'].map(sel => document.querySelector(sel));
@@ -2370,7 +2418,7 @@ function renderSlidesBox(){
     setV('#ovHeadScale',  DEFAULTS.fonts.overviewHeadScale);
     setV('#ovCellScale',  DEFAULTS.fonts.overviewCellScale);
     setV('#ovTimeScale',  DEFAULTS.fonts.overviewTimeScale ?? DEFAULTS.fonts.overviewCellScale);
-    setV('#ovTimeWidth',  DEFAULTS.fonts.overviewTimeWidthCh);
+    setV('#ovTimeWidthScale',  DEFAULTS.fonts.overviewTimeWidthScale);
     setV('#chipH',        Math.round(DEFAULTS.fonts.chipHeight*100));
     setV('#chipOverflowMode', DEFAULTS.fonts.chipOverflowMode);
     setV('#flamePct',         DEFAULTS.fonts.flamePct);
@@ -2750,10 +2798,14 @@ function collectSettings(){
           }
           return clamp(0.5, raw, 3);
         })(),
-        overviewTimeWidthCh:(() => {
-          const raw = Number($('#ovTimeWidth')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.overviewTimeWidthCh ?? DEFAULTS.fonts.overviewTimeWidthCh ?? 10;
-          return clamp(6, raw, 24);
+        overviewTimeWidthScale:(() => {
+          const raw = Number($('#ovTimeWidthScale')?.value);
+          if (Number.isFinite(raw) && raw > 0) {
+            return clamp(OVERVIEW_TIME_SCALE_MIN, raw, OVERVIEW_TIME_SCALE_MAX);
+          }
+          return resolveOverviewTimeWidthScale(settings.fonts, {
+            fallback: DEFAULTS.fonts?.overviewTimeWidthScale ?? 1
+          });
         })(),
         chipHeight:(+($('#chipH').value||100)/100),
         chipOverflowMode: ($('#chipOverflowMode')?.value || 'scale'),
