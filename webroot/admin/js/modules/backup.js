@@ -5,12 +5,21 @@
 
 'use strict';
 
-import { notifyError, notifySuccess } from '../core/notifications.js';
+import { notifyError, notifyInfo, notifySuccess } from '../core/notifications.js';
 
 export function initBackupButtons({ fetchJson }) {
   const expBtn = document.getElementById('btnExport');
   const impFile = document.getElementById('importFile');
   const impWrite = document.getElementById('impWriteImg');
+
+  try {
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('importSuccess') === '1') {
+      notifySuccess('Import abgeschlossen.');
+      sessionStorage.removeItem('importSuccess');
+    }
+  } catch (error) {
+    console.warn('[admin] Import-Status konnte nicht gelesen werden', error);
+  }
 
   if (expBtn) {
     expBtn.onclick = () => {
@@ -32,13 +41,22 @@ export function initBackupButtons({ fetchJson }) {
       fd.append('writeSettings', document.getElementById('impWriteSettings')?.checked ? '1' : '0');
       fd.append('writeSchedule', document.getElementById('impWriteSchedule')?.checked ? '1' : '0');
       try {
+        notifyInfo('Import läuft …');
         await fetchJson('/admin/api/import.php', {
           method: 'POST',
           body: fd,
           expectOk: true,
           errorMessage: 'Import fehlgeschlagen.'
         });
-        notifySuccess('Import erfolgreich.');
+        notifySuccess('Import abgeschlossen. Oberfläche wird neu geladen …');
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem('importSuccess', '1');
+          }
+        } catch (error) {
+          console.warn('[admin] Import-Status konnte nicht gespeichert werden', error);
+        }
+        await new Promise(resolve => setTimeout(resolve, 600));
         location.reload();
       } catch (error) {
         console.error('[admin] Import fehlgeschlagen', error);

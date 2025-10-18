@@ -12,6 +12,27 @@ let inited = false;
 let undoStack = [];
 let redoStack = [];
 
+const TIME_WIDTH_MIN = 6;
+const TIME_WIDTH_MAX = 30;
+
+function clampNumber(value, min, max){
+  return Math.min(Math.max(value, min), max);
+}
+
+function updateTimeColumnMetrics(table){
+  if (!table) return;
+  const settings = ctx?.getSettings?.() || {};
+  const fonts = settings.fonts || {};
+  const widthRaw = Number(fonts.overviewTimeWidthCh);
+  const timeWidth = Number.isFinite(widthRaw)
+    ? clampNumber(widthRaw, TIME_WIDTH_MIN, TIME_WIDTH_MAX)
+    : clampNumber(10, TIME_WIDTH_MIN, TIME_WIDTH_MAX);
+  const scaleRaw = Number(fonts.overviewTimeScale ?? fonts.overviewCellScale);
+  const timeScale = Number.isFinite(scaleRaw) ? clampNumber(scaleRaw, 0.5, 3) : 1;
+  table.style.setProperty('--grid-time-width', `${timeWidth}ch`);
+  table.style.setProperty('--grid-time-scale', String(timeScale));
+}
+
 function scheduleChanged(reason = 'grid-update'){
   if (!ctx || typeof ctx.notifyScheduleChanged !== 'function') return;
   try {
@@ -403,7 +424,7 @@ export function renderGrid(){
   (sc.rows || []).forEach((row, ri) => {
     html += '<tr>';
     html += `<td class="time timecol" data-ri="${ri}">
-               <input class="input" type="text" value="${row.time}" style="width:clamp(7ch,2.8vw,12ch);text-align:center">
+               <input class="input time-input" type="text" value="${row.time}" inputmode="numeric" autocomplete="off" spellcheck="false">
              </td>`;
     (row.entries || []).forEach((cell, ci) => {
       const filled = (cell && cell.title) ? 'filled' : '';
@@ -416,7 +437,9 @@ export function renderGrid(){
   });
   html += '</tbody>';
 
-  $('#grid').innerHTML = html;
+  const table = $('#grid');
+  table.innerHTML = html;
+  updateTimeColumnMetrics(table);
 
   // Zeit-Spalte
   $$('#grid .time input').forEach(inp => {
@@ -594,6 +617,15 @@ export function initGridUI(context){
   // context: { getSchedule:()=>schedule, getSettings:()=>settings }
   ctx = context;
   initOnce();
+  const table = $('#grid');
+  const updateMetricsFromControls = () => updateTimeColumnMetrics(table);
+  ['#ovTimeWidth', '#ovTimeScale'].forEach(sel => {
+    const el = document.querySelector(sel);
+    if (!el || el.dataset.gridMetricsBound) return;
+    el.addEventListener('input', updateMetricsFromControls);
+    el.addEventListener('change', updateMetricsFromControls);
+    el.dataset.gridMetricsBound = '1';
+  });
   updateSelTime();
   renderGrid();
   updateUndoRedoButtons();
