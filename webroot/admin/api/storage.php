@@ -58,167 +58,39 @@ function signage_resolve_json_path(string $file): string
 }
 
 /**
- * Return the DSN/user/pass triple for the signage database connection.
+ * Determine whether the SQLite backend is usable.
  */
-function signage_db_config(): array
-{
-    $dsn = getenv('SIGNAGE_DB_DSN');
-    if ($dsn === false && isset($_ENV['SIGNAGE_DB_DSN'])) {
-        $dsn = (string) $_ENV['SIGNAGE_DB_DSN'];
-    }
-    if ($dsn === false && isset($_SERVER['SIGNAGE_DB_DSN'])) {
-        $dsn = (string) $_SERVER['SIGNAGE_DB_DSN'];
-    }
-
-    $dsn = ($dsn !== false) ? trim((string) $dsn) : '';
-
-    if ($dsn === '') {
-        $sqlitePath = signage_data_path('signage.sqlite');
-        $dir = dirname($sqlitePath);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 02775, true);
-        }
-        $dsn = 'sqlite:' . $sqlitePath;
-    }
-
-    $user = getenv('SIGNAGE_DB_USER');
-    if ($user === false && isset($_ENV['SIGNAGE_DB_USER'])) {
-        $user = (string) $_ENV['SIGNAGE_DB_USER'];
-    }
-    if ($user === false && isset($_SERVER['SIGNAGE_DB_USER'])) {
-        $user = (string) $_SERVER['SIGNAGE_DB_USER'];
-    }
-    $user = ($user !== false) ? (string) $user : null;
-
-    $pass = getenv('SIGNAGE_DB_PASS');
-    if ($pass === false && isset($_ENV['SIGNAGE_DB_PASS'])) {
-        $pass = (string) $_ENV['SIGNAGE_DB_PASS'];
-    }
-    if ($pass === false && isset($_SERVER['SIGNAGE_DB_PASS'])) {
-        $pass = (string) $_SERVER['SIGNAGE_DB_PASS'];
-    }
-    $pass = ($pass !== false) ? (string) $pass : null;
-
-    return [$dsn, $user, $pass];
-}
-
-/**
- * Lazily open a PDO connection. Returns null if connection fails.
- */
-function signage_db(): ?PDO
-{
-    static $pdo = null;
-    static $failed = false;
-
-    if ($pdo instanceof PDO) {
-        return $pdo;
-    }
-
-    if ($failed) {
-        return null;
-    }
-
-    [$dsn, $user, $pass] = signage_db_config();
-
-    try {
-        $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ];
-
-        $pdo = new PDO($dsn, $user, $pass, $options);
-
-        if (str_starts_with($dsn, 'sqlite:')) {
-            $pdo->exec('PRAGMA foreign_keys = ON');
-            $pdo->exec('PRAGMA journal_mode = WAL');
-        }
-
-        signage_db_initialize($pdo);
-    } catch (Throwable $e) {
-        error_log('[signage] database connection failed: ' . $e->getMessage());
-        $failed = true;
-        return null;
-function signage_db_path(): string
-{
-    $custom = getenv('SIGNAGE_DB_PATH');
-    if (is_string($custom) && $custom !== '') {
-        return $custom;
-    }
-    if (!empty($_ENV['SIGNAGE_DB_PATH'])) {
-        return (string) $_ENV['SIGNAGE_DB_PATH'];
-    }
-    if (!empty($_SERVER['SIGNAGE_DB_PATH'])) {
-        return (string) $_SERVER['SIGNAGE_DB_PATH'];
-    }
-    return signage_data_path('signage.db');
-}
-
 function signage_db_available(): bool
 {
-    static $available;
+    static $available = null;
     if ($available !== null) {
         return $available;
     }
-    if (!class_exists('\\PDO')) {
+
+    if (!class_exists('PDO')) {
         return $available = false;
     }
+
     try {
-        $drivers = \PDO::getAvailableDrivers();
+        $drivers = PDO::getAvailableDrivers();
     } catch (Throwable $exception) {
         error_log('PDO drivers unavailable: ' . $exception->getMessage());
         return $available = false;
     }
+
     if (!in_array('sqlite', $drivers, true)) {
         return $available = false;
     }
+
     if (!extension_loaded('pdo_sqlite') && !extension_loaded('sqlite3')) {
         return $available = false;
     }
+
     return $available = true;
 }
 
-function signage_db(): \PDO
-{
-    static $pdo = null;
-    if ($pdo instanceof \PDO) {
-        return $pdo;
-    }
-    if (!signage_db_available()) {
-        throw new RuntimeException('SQLite support is not available.');
-    }
-
-    $path = signage_db_path();
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
-        throw new RuntimeException('Unable to create SQLite directory: ' . $dir);
-    }
-
-    try {
-        $pdo = new \PDO('sqlite:' . $path, null, null, [
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
-            \PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-    } catch (Throwable $exception) {
-        throw new RuntimeException('Unable to open SQLite database: ' . $exception->getMessage(), 0, $exception);
-    }
-
-    try {
-        $pdo->exec('PRAGMA foreign_keys = ON');
-    } catch (Throwable $exception) {
-        error_log('Unable to enable SQLite foreign_keys pragma: ' . $exception->getMessage());
-    }
-
-    $pathExists = @file_exists($path);
-    if ($pathExists) {
-        @chmod($path, 0660);
-    }
-
-    return $pdo;
-}
-
 /**
- * Run one-time schema migrations.
+ * Run one-time schema migrations for generic document storage.
  */
 function signage_db_initialize(PDO $pdo): void
 {
@@ -228,10 +100,10 @@ function signage_db_initialize(PDO $pdo): void
     }
 
     $pdo->exec('CREATE TABLE IF NOT EXISTS signage_documents (
-        name VARCHAR(190) PRIMARY KEY,
+        name TEXT PRIMARY KEY,
         body TEXT NOT NULL,
         updated_at INTEGER NOT NULL,
-        checksum VARCHAR(64) NULL
+        checksum TEXT NULL
     )');
 
     $initialized = true;
@@ -285,6 +157,8 @@ function signage_db_store_document(PDO $pdo, string $name, string $body, int $ti
         'updated_at' => $timestamp,
         'checksum' => $checksum,
     ]);
+}
+
 function signage_db_bootstrap(): void
 {
     static $bootstrapped = false;
@@ -475,28 +349,37 @@ function signage_assets_path(string $path = ''): string
 
 function signage_has_json(string $file): bool
 {
-    $pdo = signage_db();
-    if ($pdo instanceof PDO) {
+    if (signage_db_available()) {
         try {
+            $pdo = signage_db();
+            signage_db_initialize($pdo);
             $stmt = $pdo->prepare('SELECT 1 FROM signage_documents WHERE name = :name');
-            $stmt->execute(['name' => signage_document_key($file)]);
+            $stmt->execute([':name' => signage_document_key($file)]);
             if ($stmt->fetchColumn() !== false) {
                 return true;
             }
-        } catch (Throwable $e) {
-            error_log('[signage] query failed: ' . $e->getMessage());
+        } catch (Throwable $exception) {
+            error_log('[signage] query failed: ' . $exception->getMessage());
         }
     }
 
-    $path = signage_resolve_json_path($file);
-    return is_file($path);
+    return is_file(signage_resolve_json_path($file));
 }
 
 function signage_read_json(string $file, array $default = []): array
 {
-    $pdo = signage_db();
-    if ($pdo instanceof PDO) {
+    $normalized = strtolower(trim($file));
+    if ($normalized === 'settings.json') {
+        return signage_read_settings_from_db($default);
+    }
+    if ($normalized === 'schedule.json') {
+        return signage_read_schedule_from_db($default);
+    }
+
+    if (signage_db_available()) {
         try {
+            $pdo = signage_db();
+            signage_db_initialize($pdo);
             $raw = signage_db_fetch_document($pdo, signage_document_key($file));
             if ($raw !== null && $raw !== '') {
                 $decoded = json_decode($raw, true);
@@ -504,18 +387,9 @@ function signage_read_json(string $file, array $default = []): array
                     return $decoded;
                 }
             }
-        } catch (Throwable $e) {
-            error_log('[signage] read document failed: ' . $e->getMessage());
+        } catch (Throwable $exception) {
+            error_log('[signage] read document failed: ' . $exception->getMessage());
         }
-    }
-
-    $path = signage_resolve_json_path($file);
-    $normalized = strtolower(trim($file));
-    if ($normalized === 'settings.json') {
-        return signage_read_settings_from_db($default);
-    }
-    if ($normalized === 'schedule.json') {
-        return signage_read_schedule_from_db($default);
     }
 
     return signage_read_json_file($file, $default);
@@ -532,25 +406,57 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
         return signage_write_schedule_to_db($schedule, $error);
     }
 
-    return signage_write_json_file($file, $data, $error);
+    $dbError = null;
+    if (signage_db_available()) {
+        try {
+            $pdo = signage_db();
+            signage_db_initialize($pdo);
+            $json = json_encode($data, SIGNAGE_JSON_FLAGS);
+            if ($json === false) {
+                $error = 'json_encode failed: ' . json_last_error_msg();
+                return false;
+            }
+
+            signage_db_store_document($pdo, signage_document_key($file), $json, time());
+
+            if (signage_json_fallback_enabled()) {
+                $fallbackError = null;
+                if (!signage_write_json_to_file($file, $json, $fallbackError)) {
+                    error_log('[signage] unable to write fallback for ' . $file . ': ' . ($fallbackError ?? 'unknown'));
+                }
+            }
+
+            return true;
+        } catch (Throwable $exception) {
+            $dbError = 'database write failed: ' . $exception->getMessage();
+            error_log('[signage] write document failed: ' . $exception->getMessage());
+        }
+    }
+
+    $result = signage_write_json_file($file, $data, $error);
+    if (!$result && $dbError !== null) {
+        $error = $error !== null ? $dbError . '; ' . $error : $dbError;
+    }
+    return $result;
 }
 
 function signage_read_json_file(string $file, array $default = []): array
 {
-    $path = signage_data_path($file);
+    $path = signage_resolve_json_path($file);
     if (!is_file($path)) {
         return $default;
     }
+
     $raw = @file_get_contents($path);
     if ($raw === false || $raw === '') {
         return $default;
     }
+
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : $default;
 }
 
 function signage_write_json_to_file(string $file, string $json, ?string &$error = null): bool
-function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $path = signage_resolve_json_path($file);
     $dir = dirname($path);
@@ -558,43 +464,44 @@ function signage_write_json_file(string $file, $data, ?string &$error = null): b
         $error = 'unable to create directory: ' . $dir;
         return false;
     }
+
     $bytes = @file_put_contents($path, $json, LOCK_EX);
     if ($bytes === false) {
         $err = error_get_last();
         $error = $err['message'] ?? 'file_put_contents failed';
         return false;
     }
+
     @chmod($path, 0644);
     return true;
 }
 
-function signage_write_json_fallback(string $file, $data, ?string &$error = null): bool
+function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $json = json_encode($data, SIGNAGE_JSON_FLAGS);
     if ($json === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
         return false;
     }
+
     return signage_write_json_to_file($file, $json, $error);
 }
 
-function signage_write_json(string $file, $data, ?string &$error = null): bool
-{
-    $json = json_encode($data, SIGNAGE_JSON_FLAGS);
-    if ($json === false) {
 function signage_read_settings_from_db(array $default = []): array
 {
     try {
         $pdo = signage_db();
-    } catch (Throwable $e) {
+    } catch (Throwable $exception) {
         return $default;
     }
+
     $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
     $stmt->execute([':key' => 'app_settings']);
     $json = $stmt->fetchColumn();
     if ($json === false || $json === null || $json === '') {
         return $default;
     }
+
     $decoded = json_decode((string) $json, true);
     return is_array($decoded) ? $decoded : $default;
 }
@@ -603,8 +510,8 @@ function signage_write_settings_to_db(array $settings, ?string &$error = null): 
 {
     try {
         $pdo = signage_db();
-    } catch (Throwable $e) {
-        $error = $e->getMessage();
+    } catch (Throwable $exception) {
+        $error = $exception->getMessage();
         return false;
     }
 
@@ -614,35 +521,14 @@ function signage_write_settings_to_db(array $settings, ?string &$error = null): 
         return false;
     }
 
-    $pdo = signage_db();
-    if (!($pdo instanceof PDO)) {
-        $error = 'database connection unavailable';
-        return false;
-    }
-
-    try {
-        signage_db_store_document($pdo, signage_document_key($file), $json, time());
-    } catch (Throwable $e) {
-        $error = 'database write failed: ' . $e->getMessage();
-        return false;
-    }
-
-    if (signage_json_fallback_enabled()) {
-        $fallbackError = null;
-        if (!signage_write_json_to_file($file, $json, $fallbackError)) {
-            error_log('[signage] unable to write fallback for ' . $file . ': ' . ($fallbackError ?? 'unknown'));
-        }
-    }
-
-    return true;
     try {
         $stmt = $pdo->prepare('INSERT OR REPLACE INTO settings (key, payload_json) VALUES (:key, :payload)');
         $stmt->execute([
             ':key' => 'app_settings',
             ':payload' => $payload,
         ]);
-    } catch (Throwable $e) {
-        $error = $e->getMessage();
+    } catch (Throwable $exception) {
+        $error = $exception->getMessage();
         return false;
     }
 

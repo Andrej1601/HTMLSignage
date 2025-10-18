@@ -8,7 +8,6 @@ require_once __DIR__ . '/../storage.php';
 
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
-const SIGNAGE_AUTH_USERS_STORAGE_KEY = 'auth.users';
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
 const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
 const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
@@ -199,11 +198,29 @@ function auth_users_normalize(array $state): array
 
 function auth_users_load_from_file(): array
 {
-    $state = signage_read_json(SIGNAGE_AUTH_USERS_FILE, auth_users_default());
-    return auth_users_normalize($state);
+    $path = auth_users_path();
+    if (!is_file($path)) {
+        return auth_users_default();
+    }
+
+    $raw = @file_get_contents($path);
+    if ($raw === false || $raw === '') {
+        return auth_users_default();
+    }
+
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return auth_users_default();
+    }
+
+    return auth_users_normalize($decoded);
+}
+
+function auth_users_load_from_db(): array
+{
     try {
         $pdo = signage_db();
-    } catch (Throwable $e) {
+    } catch (Throwable $exception) {
         return auth_users_default();
     }
 
@@ -215,6 +232,7 @@ function auth_users_load_from_file(): array
             if ($username === '') {
                 continue;
             }
+
             $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
             if (!is_array($payload)) {
                 $payload = [
@@ -228,6 +246,7 @@ function auth_users_load_from_file(): array
             } else {
                 $payload['username'] = $username;
             }
+
             $raw['users'][] = $payload;
         }
     }
@@ -250,23 +269,17 @@ function auth_users_load_from_file(): array
 
 function auth_users_save_to_file(array $state): void
 {
-    $normalized = auth_users_normalize($state);
-    $error = null;
-    if (!signage_write_json(SIGNAGE_AUTH_USERS_FILE, $normalized, $error)) {
-        if ($error) {
-            throw new RuntimeException('Unable to write users database: ' . $error);
-        }
-        throw new RuntimeException('Unable to write users database');
-    }
+    auth_users_export(auth_users_normalize($state));
+}
 
-    if (signage_json_fallback_enabled()) {
-        $path = auth_users_path();
-        @chmod($path, 0640);
+function auth_users_save_to_db(array $state): void
+{
+    $normalized = auth_users_normalize($state);
 
     try {
         $pdo = signage_db();
-    } catch (Throwable $e) {
-        throw new RuntimeException('Unable to open users database', 0, $e);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to open users database', 0, $exception);
     }
 
     try {
@@ -278,10 +291,12 @@ function auth_users_save_to_file(array $state): void
             if (!is_array($user) || empty($user['username'])) {
                 continue;
             }
+
             $payload = json_encode($user, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($payload === false) {
                 throw new RuntimeException('Unable to encode user payload');
             }
+
             $insert->execute([
                 ':username' => $user['username'],
                 ':display_name' => isset($user['displayName']) ? $user['displayName'] : null,
@@ -293,24 +308,21 @@ function auth_users_save_to_file(array $state): void
             ]);
         }
         $pdo->commit();
-    } catch (Throwable $e) {
+    } catch (Throwable $exception) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        throw $e;
+        throw $exception;
     }
-
-    auth_basic_sync($normalized);
-    auth_users_export($normalized);
 }
 
 function auth_users_load(): array
 {
     if (signage_db_available()) {
         try {
-            $state = signage_kv_get(SIGNAGE_AUTH_USERS_STORAGE_KEY, null);
-            if (is_array($state)) {
-                return auth_users_normalize($state);
+            $state = auth_users_load_from_db();
+            if (!empty($state['users'])) {
+                return $state;
             }
         } catch (Throwable $exception) {
             error_log('Failed to load users from SQLite: ' . $exception->getMessage());
@@ -327,8 +339,9 @@ function auth_users_save(array $state): void
 
     if (signage_db_available()) {
         try {
-            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
+            auth_users_save_to_db($normalized);
             auth_basic_sync($normalized);
+            auth_users_export($normalized);
             return;
         } catch (Throwable $exception) {
             $errors[] = 'sqlite: ' . $exception->getMessage();
@@ -338,6 +351,7 @@ function auth_users_save(array $state): void
 
     try {
         auth_users_save_to_file($normalized);
+        auth_basic_sync($normalized);
         return;
     } catch (Throwable $exception) {
         $errors[] = 'file: ' . $exception->getMessage();
