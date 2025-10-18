@@ -505,30 +505,29 @@ export async function loadDeviceSnapshots({ bypassCache = false } = {}) {
   return promise;
 }
 
-export async function loadDeviceById(id) {
+export async function loadDeviceById(id, { preferCache = true } = {}) {
   const deviceId = typeof id === 'string' ? id : String(id ?? '');
   if (!deviceId) throw new Error('Geräte-ID fehlt.');
-  const data = await fetchJson(API_ENDPOINTS.list, {
-    cache: 'no-store',
-    okPredicate
-  });
-  const now = resolveNowSeconds(data?.now);
-  const device = Array.isArray(data?.devices)
-    ? data.devices.find((entry) => entry && entry.id === deviceId)
-    : null;
-  if (!device) {
-    throw new Error('Gerät wurde nicht gefunden.');
-  }
-  const sanitized = sanitizeDevice(device, now);
-  return sanitized || {
-    id: deviceId,
-    name: typeof device.name === 'string' ? device.name : '',
-    lastSeenAt: normalizeSeconds(device.lastSeenAt ?? device.lastSeen ?? 0),
-    offline: computeOffline(normalizeSeconds(device.lastSeenAt ?? device.lastSeen ?? 0), now),
-    useOverrides: !!device.useOverrides,
-    overrides: (device.overrides && typeof device.overrides === 'object') ? device.overrides : null,
-    badgeSource: device.contextBadge ?? device.badge ?? device.badgeInfo ?? null
+
+  const fromSnapshot = async (options = {}) => {
+    const snapshot = await loadDeviceSnapshots(options);
+    const devices = Array.isArray(snapshot?.devices) ? snapshot.devices : [];
+    return devices.find((entry) => entry && entry.id === deviceId) || null;
   };
+
+  if (preferCache) {
+    try {
+      const cached = await fromSnapshot();
+      if (cached) return cached;
+    } catch (error) {
+      console.warn('[admin] Geräte-Cache nicht verfügbar', error);
+    }
+  }
+
+  const fresh = await fromSnapshot({ bypassCache: true });
+  if (fresh) return fresh;
+
+  throw new Error('Gerät wurde nicht gefunden.');
 }
 
 async function postDeviceAction(endpoint, payload = {}, { expectOk = true } = {}) {

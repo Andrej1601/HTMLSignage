@@ -5,6 +5,8 @@
 
 'use strict';
 
+import { notifyError, notifySuccess } from '../core/notifications.js';
+
 export function initBackupButtons({ fetchJson }) {
   const expBtn = document.getElementById('btnExport');
   const impFile = document.getElementById('importFile');
@@ -36,11 +38,11 @@ export function initBackupButtons({ fetchJson }) {
           expectOk: true,
           errorMessage: 'Import fehlgeschlagen.'
         });
-        alert('Import erfolgreich.');
+        notifySuccess('Import erfolgreich.');
         location.reload();
       } catch (error) {
         console.error('[admin] Import fehlgeschlagen', error);
-        alert('Fehler: ' + error.message);
+        notifyError('Fehler: ' + error.message);
       } finally {
         try {
           impFile.value = '';
