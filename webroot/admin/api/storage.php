@@ -5,6 +5,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/db.php';
+
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
 
 function signage_default_schedule(): array
@@ -108,6 +110,33 @@ function signage_assets_path(string $path = ''): string
 
 function signage_read_json(string $file, array $default = []): array
 {
+    $normalized = strtolower(trim($file));
+    if ($normalized === 'settings.json') {
+        return signage_read_settings_from_db($default);
+    }
+    if ($normalized === 'schedule.json') {
+        return signage_read_schedule_from_db($default);
+    }
+
+    return signage_read_json_file($file, $default);
+}
+
+function signage_write_json(string $file, $data, ?string &$error = null): bool
+{
+    $normalized = strtolower(trim($file));
+    if ($normalized === 'settings.json') {
+        return signage_write_settings_to_db(is_array($data) ? $data : [], $error);
+    }
+    if ($normalized === 'schedule.json') {
+        $schedule = is_array($data) ? $data : [];
+        return signage_write_schedule_to_db($schedule, $error);
+    }
+
+    return signage_write_json_file($file, $data, $error);
+}
+
+function signage_read_json_file(string $file, array $default = []): array
+{
     $path = signage_data_path($file);
     if (!is_file($path)) {
         return $default;
@@ -120,7 +149,7 @@ function signage_read_json(string $file, array $default = []): array
     return is_array($decoded) ? $decoded : $default;
 }
 
-function signage_write_json(string $file, $data, ?string &$error = null): bool
+function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $path = signage_data_path($file);
     $dir = dirname($path);
@@ -141,6 +170,135 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
     }
     @chmod($path, 0644);
     return true;
+}
+
+function signage_read_settings_from_db(array $default = []): array
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        return $default;
+    }
+    $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
+    $stmt->execute([':key' => 'app_settings']);
+    $json = $stmt->fetchColumn();
+    if ($json === false || $json === null || $json === '') {
+        return $default;
+    }
+    $decoded = json_decode((string) $json, true);
+    return is_array($decoded) ? $decoded : $default;
+}
+
+function signage_write_settings_to_db(array $settings, ?string &$error = null): bool
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    $payload = json_encode($settings, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($payload === false) {
+        $error = 'json_encode failed: ' . json_last_error_msg();
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare('INSERT OR REPLACE INTO settings (key, payload_json) VALUES (:key, :payload)');
+        $stmt->execute([
+            ':key' => 'app_settings',
+            ':payload' => $payload,
+        ]);
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    return signage_write_json_file('settings.json', $settings, $error);
+}
+
+function signage_read_schedule_from_db(array $default = []): array
+{
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        return signage_normalize_schedule($default);
+    }
+
+    $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
+    $stmt->execute([':key' => 'schedule_full']);
+    $json = $stmt->fetchColumn();
+    if ($json !== false && $json !== null && $json !== '') {
+        $decoded = json_decode((string) $json, true);
+        if (is_array($decoded)) {
+            return signage_normalize_schedule($decoded);
+        }
+    }
+
+    $schedule = signage_normalize_schedule($default);
+    $rows = [];
+    $rowsStmt = $pdo->query('SELECT payload_json FROM schedule_rows ORDER BY position ASC, id ASC');
+    if ($rowsStmt instanceof PDOStatement) {
+        foreach ($rowsStmt as $row) {
+            $decodedRow = json_decode((string) ($row['payload_json'] ?? ''), true);
+            $rows[] = is_array($decodedRow) ? $decodedRow : [];
+        }
+    }
+    if ($rows) {
+        $schedule['rows'] = $rows;
+    }
+
+    return $schedule;
+}
+
+function signage_write_schedule_to_db(array $schedule, ?string &$error = null): bool
+{
+    $normalized = signage_normalize_schedule($schedule);
+
+    try {
+        $pdo = signage_db();
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+        return false;
+    }
+
+    $payload = json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($payload === false) {
+        $error = 'json_encode failed: ' . json_last_error_msg();
+        return false;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare('INSERT OR REPLACE INTO settings (key, payload_json) VALUES (:key, :payload)');
+        $stmt->execute([
+            ':key' => 'schedule_full',
+            ':payload' => $payload,
+        ]);
+        $pdo->exec('DELETE FROM schedule_rows');
+        $insert = $pdo->prepare('INSERT INTO schedule_rows (position, payload_json) VALUES (:position, :payload)');
+        $position = 0;
+        foreach ($normalized['rows'] as $row) {
+            $rowPayload = json_encode($row, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if ($rowPayload === false) {
+                continue;
+            }
+            $insert->execute([
+                ':position' => $position++,
+                ':payload' => $rowPayload,
+            ]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        $error = $e->getMessage();
+        return false;
+    }
+
+    return signage_write_json_file('schedule.json', $normalized, $error);
 }
 
 function signage_absolute_path(string $relative): string
