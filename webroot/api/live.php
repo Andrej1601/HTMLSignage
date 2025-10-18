@@ -1,17 +1,18 @@
 <?php
 declare(strict_types=1);
 
+header('Content-Type: text/event-stream; charset=UTF-8', true, 200);
+header('Cache-Control: no-cache, no-transform', true);
+header('Connection: keep-alive', true);
+header('X-Accel-Buffering: no', true);
+header('X-Content-Type-Options: nosniff', true);
+
 require_once __DIR__ . '/../admin/api/storage.php';
 require_once __DIR__ . '/../admin/api/devices_store.php';
 require_once __DIR__ . '/../admin/api/device_resolver.php';
 
 set_time_limit(0);
 ignore_user_abort(true);
-
-if (function_exists('header_remove')) {
-    @header_remove('Content-Type');
-    @header_remove('Cache-Control');
-}
 
 if (function_exists('ini_set')) {
     @ini_set('zlib.output_compression', '0');
@@ -20,14 +21,9 @@ if (function_exists('ini_set')) {
 }
 
 while (ob_get_level() > 0) {
-    @ob_end_flush();
+    @ob_end_clean();
 }
 @ob_implicit_flush(1);
-
-header('Content-Type: text/event-stream; charset=UTF-8', true);
-header('Cache-Control: no-cache, no-transform', true);
-header('Connection: keep-alive', true);
-header('X-Accel-Buffering: no', true);
 
 define('LIVE_JSON_FLAGS', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
