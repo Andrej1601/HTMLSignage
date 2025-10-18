@@ -1,7 +1,12 @@
 <?php
 declare(strict_types=1);
 
-header('Content-Type: text/event-stream; charset=UTF-8', true, 200);
+http_response_code(200);
+if (function_exists('header_remove')) {
+    @header_remove('Content-Type');
+}
+header('Content-Type: text/event-stream; charset=UTF-8');
+header('Content-Disposition: inline');
 header('Cache-Control: no-cache, no-transform', true);
 header('Connection: keep-alive', true);
 header('X-Accel-Buffering: no', true);
