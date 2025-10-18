@@ -44,12 +44,72 @@ export function createUnsavedTracker(options = {}) {
   let baselineSanitizedSettings = null;
   let indicatorTimer = 0;
   let evalTimer = 0;
+  let detailTimer = 0;
+  let unsavedSince = 0;
   let inputListener = null;
   let blurListener = null;
+
+  const badgeTitle = unsavedBadge?.querySelector('[data-role="unsaved-title"]') || null;
+  const badgeDetail = unsavedBadge?.querySelector('[data-role="unsaved-detail"]') || null;
+  const savedTitleText = 'Alles gespeichert';
+  const savedDetailText = 'Alle Änderungen wurden gespeichert.';
+
+  const clearDetailTimer = () => {
+    if (detailTimer) {
+      clearInterval(detailTimer);
+      detailTimer = 0;
+    }
+  };
+
+  const describeUnsavedAge = () => {
+    if (!unsavedSince) return 'wenigen Augenblicken';
+    const diff = Date.now() - unsavedSince;
+    if (!Number.isFinite(diff) || diff < 0) {
+      return 'wenigen Augenblicken';
+    }
+    if (diff < 15_000) return 'wenigen Sekunden';
+    if (diff < 60_000) return 'unter einer Minute';
+    if (diff < 120_000) return 'etwa einer Minute';
+    if (diff < 3_600_000) {
+      const minutes = Math.round(diff / 60_000);
+      return minutes === 1 ? 'etwa einer Minute' : `${minutes} Minuten`;
+    }
+    const hours = Math.round(diff / 3_600_000);
+    return hours === 1 ? 'etwa einer Stunde' : `${hours} Stunden`;
+  };
+
+  const updateBadgeMessaging = () => {
+    if (!badgeTitle && !badgeDetail) return;
+    if (hasUnsavedChanges) {
+      if (badgeTitle) {
+        badgeTitle.textContent = 'Änderungen ausstehend';
+      }
+      if (badgeDetail) {
+        badgeDetail.textContent = `Zuletzt geändert vor ${describeUnsavedAge()} – bitte speichern.`;
+      }
+    } else {
+      if (badgeTitle) {
+        badgeTitle.textContent = savedTitleText;
+      }
+      if (badgeDetail) {
+        badgeDetail.textContent = savedDetailText;
+      }
+    }
+  };
+
+  const ensureDetailTimer = () => {
+    if (!badgeDetail || detailTimer) return;
+    detailTimer = setInterval(() => {
+      if (!hasUnsavedChanges) return;
+      if (!badgeDetail) return;
+      badgeDetail.textContent = `Zuletzt geändert vor ${describeUnsavedAge()} – bitte speichern.`;
+    }, 15_000);
+  };
 
   const clearTimers = () => {
     clearTimeout(indicatorTimer);
     clearTimeout(evalTimer);
+    clearDetailTimer();
     indicatorTimer = 0;
     evalTimer = 0;
   };
@@ -60,10 +120,20 @@ export function createUnsavedTracker(options = {}) {
       unsavedBadge.setAttribute('aria-hidden', hasUnsavedChanges ? 'false' : 'true');
     }
     doc?.body?.classList.toggle('has-unsaved-changes', hasUnsavedChanges);
+    updateBadgeMessaging();
   };
 
   const setUnsavedState = (next, { skipDraftClear = false } = {}) => {
+    const prevState = hasUnsavedChanges;
     hasUnsavedChanges = !!next;
+    if (hasUnsavedChanges) {
+      if (!prevState) {
+        unsavedSince = Date.now();
+      }
+      ensureDetailTimer();
+    } else {
+      unsavedSince = 0;
+    }
     syncDomState();
     if (!hasUnsavedChanges) {
       clearTimers();

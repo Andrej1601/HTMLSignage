@@ -56,7 +56,11 @@
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
       <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
-        <span class="unsaved-badge-text">Änderungen nicht gespeichert</span>
+        <span class="unsaved-badge-icon" aria-hidden="true"></span>
+        <span class="unsaved-badge-content">
+          <span class="unsaved-badge-title" data-role="unsaved-title">Änderungen nicht gespeichert</span>
+          <span class="unsaved-badge-detail" data-role="unsaved-detail">Lokal geänderte Inhalte warten auf das Speichern.</span>
+        </span>
         <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
       </span>
     </div>
@@ -751,6 +755,12 @@
                 <input type="checkbox" id="impWriteImg" checked>
                 <span>Bilder</span>
               </label>
+            </div>
+            <div class="sys-progress" id="importProgress" hidden role="status" aria-live="polite">
+              <div class="sys-progress-bar" aria-hidden="true">
+                <div class="sys-progress-fill" data-role="progress-fill"></div>
+              </div>
+              <div class="sys-progress-label" id="importProgressLabel">Import wird vorbereitet …</div>
             </div>
           </div>
           <div class="sys-cleanup">

@@ -464,30 +464,52 @@ header .header-title{
 #unsavedBadge{
   display:inline-flex;
   align-items:center;
-  justify-content:center;
-  gap:8px;
-  padding:4px 12px;
+  gap:12px;
+  padding:6px 16px;
   border-radius:999px;
-  font-size:11px;
+  font-size:12px;
   font-weight:600;
-  letter-spacing:0.025em;
+  letter-spacing:0.015em;
   text-transform:none;
   color:var(--unsaved-fg);
   background:var(--unsaved-bg);
   box-shadow:0 0 0 1px color-mix(in oklab, var(--unsaved-bg) 55%, transparent);
-  line-height:1.1;
+  line-height:1.25;
   flex-shrink:0;
 }
-#unsavedBadge::before{
-  content:'●';
-  font-size:0.65em;
-  filter:drop-shadow(0 0 4px currentColor);
-  margin-right:2px;
+#unsavedBadge .unsaved-badge-icon{
+  width:14px;
+  height:14px;
+  border-radius:999px;
+  position:relative;
+  background:color-mix(in oklab, var(--unsaved-fg) 75%, var(--unsaved-bg));
+  box-shadow:0 0 0 3px color-mix(in oklab, var(--unsaved-bg) 35%, transparent);
+  flex-shrink:0;
 }
-#unsavedBadge .unsaved-badge-text{
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
+#unsavedBadge .unsaved-badge-icon::after{
+  content:"";
+  position:absolute;
+  inset:2px;
+  border-radius:999px;
+  background:var(--unsaved-fg);
+  box-shadow:0 0 10px color-mix(in oklab, var(--unsaved-fg) 60%, transparent);
+}
+#unsavedBadge .unsaved-badge-content{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+}
+#unsavedBadge .unsaved-badge-title{
+  font-size:11px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.09em;
+}
+#unsavedBadge .unsaved-badge-detail{
+  font-size:11px;
+  font-weight:500;
+  opacity:0.92;
   white-space:nowrap;
 }
 #unsavedBadge .unsaved-badge-btn{
@@ -895,6 +917,47 @@ details.ac[open] .chev{ transform: rotate(90deg); }
   display:flex;
   flex-wrap:wrap;
   gap:8px;
+}
+
+.sys-progress{
+  grid-column:1 / -1;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:10px 14px;
+  border-radius:var(--radius);
+  background:color-mix(in oklab, var(--btn-accent) 6%, var(--panel));
+  box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--btn-accent) 28%, transparent);
+  transition:opacity .25s ease;
+}
+.sys-progress[hidden]{
+  display:none;
+}
+.sys-progress-bar{
+  position:relative;
+  height:8px;
+  border-radius:999px;
+  overflow:hidden;
+  background:color-mix(in oklab, var(--btn-accent) 18%, transparent);
+}
+.sys-progress-fill{
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg, var(--btn-primary) 0%, var(--btn-primary-2) 100%);
+  transform-origin:left center;
+  transform:scaleX(var(--progress-scale, 0));
+  transition:transform .3s ease;
+}
+.sys-progress[data-status="success"] .sys-progress-fill{
+  background:linear-gradient(90deg, rgba(18, 109, 57, 0.8) 0%, rgba(31, 151, 76, 0.95) 100%);
+}
+.sys-progress[data-status="error"] .sys-progress-fill{
+  background:linear-gradient(90deg, rgba(148, 32, 32, 0.8) 0%, rgba(203, 67, 53, 0.95) 100%);
+}
+.sys-progress-label{
+  font-size:12px;
+  font-weight:600;
+  color:color-mix(in oklab, var(--btn-accent) 65%, var(--fg));
 }
 
 }
