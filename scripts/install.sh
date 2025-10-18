@@ -21,7 +21,6 @@ declare -A CONFIG_DEFAULTS=(
   [SIGNAGE_PUBLIC_PORT]=80
   [SIGNAGE_ADMIN_PORT]=8888
   [SIGNAGE_ADMIN_USER]=admin
-  [SIGNAGE_ADMIN_PASS]=admin
   [PHP_SOCK]=/run/php/php8.3-fpm.sock
   [APP_DIR]=/var/www/signage
 )
@@ -30,12 +29,11 @@ declare -A CONFIG_PROMPTS=(
   [SIGNAGE_PUBLIC_PORT]="Public port"
   [SIGNAGE_ADMIN_PORT]="Admin port"
   [SIGNAGE_ADMIN_USER]="Admin username"
-  [SIGNAGE_ADMIN_PASS]="Admin password"
 )
 
-declare -A CONFIG_SILENT_PROMPT=(
-  [SIGNAGE_ADMIN_PASS]=1
-)
+GENERATED_ADMIN_PASS=0
+
+declare -A CONFIG_SILENT_PROMPT=()
 
 trap 'error "Installation failed (line $LINENO)."; exit 1' ERR
 
@@ -83,13 +81,38 @@ prompt_for(){
 load_defaults(){
   local key
   for key in "${CONFIG_KEYS[@]}"; do
-    printf -v "$key" '%s' "${!key:-${CONFIG_DEFAULTS[$key]}}"
+    local default_value=""
+    if [[ -v CONFIG_DEFAULTS[$key] ]]; then
+      default_value=${CONFIG_DEFAULTS[$key]}
+    fi
+    printf -v "$key" '%s' "${!key:-$default_value}"
   done
+}
+
+generate_admin_password(){
+  local password=""
+  if command -v openssl >/dev/null 2>&1; then
+    password=$(openssl rand -base64 32 2>/dev/null | tr -d '\n' | head -c 40 || true)
+  fi
+  if [[ -z $password ]]; then
+    password=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32 || true)
+  fi
+  if [[ -z $password ]]; then
+    error "Unable to generate random password"
+    exit 1
+  fi
+  printf '%s' "$password"
 }
 
 collect_settings(){
   load_defaults
-  if [[ -t 0 ]]; then
+
+  local interactive=0
+  if [[ -t 0 && -t 1 ]]; then
+    interactive=1
+  fi
+
+  if [[ $interactive -eq 1 ]]; then
     local key prompt silent
     for key in "${CONFIG_KEYS[@]}"; do
       prompt=${CONFIG_PROMPTS[$key]:-}
@@ -97,6 +120,18 @@ collect_settings(){
       silent=${CONFIG_SILENT_PROMPT[$key]:-0}
       prompt_for "$key" "${!key}" "$prompt" "$silent"
     done
+    if [[ -z ${SIGNAGE_ADMIN_PASS:-} ]]; then
+      SIGNAGE_ADMIN_PASS=$(generate_admin_password)
+      GENERATED_ADMIN_PASS=1
+    else
+      GENERATED_ADMIN_PASS=0
+    fi
+  else
+    if [[ -z ${SIGNAGE_ADMIN_PASS:-} ]]; then
+      error "SIGNAGE_ADMIN_PASS must be set for non-interactive installations"
+      exit 1
+    fi
+    GENERATED_ADMIN_PASS=0
   fi
 }
 
@@ -243,6 +278,7 @@ seed_admin_user(){
     return
   fi
 
+  : >"$seed_log" 2>/dev/null || true
   rm -f "$seed_log"
 
   local users_file="$APP_DIR/data/users.json"
@@ -256,6 +292,32 @@ seed_admin_user(){
     chown www-data:www-data "$audit_file" 2>/dev/null || true
     chmod 640 "$audit_file" 2>/dev/null || true
   fi
+}
+
+maybe_print_generated_password(){
+  if [[ ${GENERATED_ADMIN_PASS:-0} -ne 1 ]]; then
+    return
+  fi
+
+  local message="Generated admin password (store securely): ${SIGNAGE_ADMIN_PASS}"
+
+  if [[ -t 1 ]]; then
+    printf '\n%s\n\n' "$message"
+  else
+    local target=""
+    if [[ -n ${TTY:-} ]]; then
+      target=$TTY
+    elif [[ -e /dev/tty ]]; then
+      target=/dev/tty
+    fi
+    if [[ -n $target && -w $target ]]; then
+      printf '\n%s\n\n' "$message" >"$target"
+    else
+      printf '\n%s\n\n' "$message"
+    fi
+  fi
+
+  GENERATED_ADMIN_PASS=0
 }
 
 validate_and_reload(){
@@ -299,6 +361,7 @@ main(){
   configure_php
   configure_basic_auth
   seed_admin_user
+  maybe_print_generated_password
   validate_and_reload
   print_summary
 }

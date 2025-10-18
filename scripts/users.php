@@ -71,12 +71,19 @@ switch ($command) {
         if (!$roles) {
             $roles = [SIGNAGE_AUTH_DEFAULT_ROLE];
         }
-        $password = getenv('SIGNAGE_USER_PASSWORD') ?: prompt_hidden('Password: ');
+        $passwordEnv = getenv('SIGNAGE_USER_PASSWORD');
+        $passwordFromEnv = $passwordEnv !== false && $passwordEnv !== '';
+        $password = $passwordFromEnv ? (string) $passwordEnv : prompt_hidden('Password: ');
         if ($password === '') {
             fwrite(STDERR, "Password required\n");
             exit(1);
         }
-        $confirm = getenv('SIGNAGE_USER_PASSWORD_CONFIRM') ?: prompt_hidden('Repeat password: ');
+        $confirmEnv = getenv('SIGNAGE_USER_PASSWORD_CONFIRM');
+        if ($confirmEnv === false) {
+            $confirm = $passwordFromEnv ? $password : prompt_hidden('Repeat password: ');
+        } else {
+            $confirm = (string) $confirmEnv;
+        }
         if ($password !== $confirm) {
             fwrite(STDERR, "Passwords do not match\n");
             exit(1);
@@ -92,6 +99,12 @@ switch ($command) {
         }
         auth_users_set($user);
         echo "User '{$username}' saved.\n";
+        if ($passwordFromEnv) {
+            putenv('SIGNAGE_USER_PASSWORD=');
+            putenv('SIGNAGE_USER_PASSWORD_CONFIRM=');
+            unset($_ENV['SIGNAGE_USER_PASSWORD'], $_ENV['SIGNAGE_USER_PASSWORD_CONFIRM']);
+            unset($_SERVER['SIGNAGE_USER_PASSWORD'], $_SERVER['SIGNAGE_USER_PASSWORD_CONFIRM']);
+        }
         exit(0);
 
     case 'delete':
