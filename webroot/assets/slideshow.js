@@ -222,13 +222,16 @@
     }
   }
 
-  function scheduleLiveRestart(){
+  function scheduleLiveRestart(reason = 'error'){
     if (!liveConfig) return;
     resetLiveRetry();
     liveRetryAttempts += 1;
-    if (liveRetryAttempts > LIVE_RETRY_MAX_ATTEMPTS) {
+    const maxAttempts = liveConfig.type === 'pair' ? 1 : LIVE_RETRY_MAX_ATTEMPTS;
+    if (liveRetryAttempts >= maxAttempts) {
       if (typeof liveConfig.fallback === 'function') {
-        console.warn('[live] falling back to polling after repeated failures');
+        const context = liveConfig.type === 'pair' ? 'pair' : 'config';
+        const attemptMsg = `[live] falling back to polling after ${liveRetryAttempts} failed ${context} attempt(s)`;
+        console.warn(attemptMsg + (reason ? ` (${reason})` : ''));
         liveConfig.fallback();
       }
       return;
@@ -299,7 +302,7 @@
 
       source.onerror = () => {
         clearLiveSource({ resetAttempts: false });
-        scheduleLiveRestart();
+        scheduleLiveRestart('config-eventsource-error');
       };
     } catch (error) {
       console.error('[live] event source failed', error);
@@ -343,7 +346,7 @@
 
       source.onerror = () => {
         clearLiveSource({ resetAttempts: false });
-        scheduleLiveRestart();
+        scheduleLiveRestart('pair-eventsource-error');
       };
     } catch (error) {
       console.error('[live] pair event source failed', error);

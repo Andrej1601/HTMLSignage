@@ -49,7 +49,7 @@ function devices_resolve_payload(string $deviceId, ?array &$error = null): ?arra
     }
 
     $baseSettings = signage_read_json('settings.json');
-    $baseSchedule = signage_normalize_schedule(signage_read_json('schedule.json', signage_default_schedule()));
+    $baseSchedule = signage_read_json('schedule.json');
     $baseScheduleVersion = (int) ($baseSchedule['version'] ?? 0);
 
     $useOverrides = !empty($device['useOverrides']);
@@ -79,7 +79,7 @@ function devices_resolve_payload(string $deviceId, ?array &$error = null): ?arra
         }
     }
 
-    $schedule = $baseSchedule;
+    $schedule = is_array($baseSchedule) ? $baseSchedule : [];
     if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) && is_array($mergedSettings['presets'])) {
         $presets = $mergedSettings['presets'];
         $dayKey = devices_resolver_day_key();

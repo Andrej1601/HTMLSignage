@@ -8,9 +8,26 @@ require_once __DIR__ . '/../admin/api/device_resolver.php';
 set_time_limit(0);
 ignore_user_abort(true);
 
-header('Content-Type: text/event-stream; charset=UTF-8');
-header('Cache-Control: no-cache, no-transform');
-header('Connection: keep-alive');
+if (function_exists('header_remove')) {
+    @header_remove('Content-Type');
+    @header_remove('Cache-Control');
+}
+
+if (function_exists('ini_set')) {
+    @ini_set('zlib.output_compression', '0');
+    @ini_set('implicit_flush', '1');
+    @ini_set('output_buffering', '0');
+}
+
+while (ob_get_level() > 0) {
+    @ob_end_flush();
+}
+@ob_implicit_flush(1);
+
+header('Content-Type: text/event-stream; charset=UTF-8', true);
+header('Cache-Control: no-cache, no-transform', true);
+header('Connection: keep-alive', true);
+header('X-Accel-Buffering: no', true);
 
 define('LIVE_JSON_FLAGS', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
@@ -30,44 +47,27 @@ function live_send_event(string $event, $data): void
     @flush();
 }
 
-function live_file_meta(string $path, ?array $previous = null): array
+function live_file_meta(string $path): array
 {
-    $meta = ['mtime' => 0, 'size' => 0, 'hash' => null];
+    $meta = ['mtime' => 0, 'hash' => null];
     if (!is_file($path)) {
         return $meta;
     }
-
     clearstatcache(false, $path);
-
     $mtime = @filemtime($path);
     if ($mtime !== false) {
         $meta['mtime'] = (int) $mtime;
     }
-
-    $size = @filesize($path);
-    if ($size !== false) {
-        $meta['size'] = (int) $size;
-    }
-
-    if ($previous !== null
-        && ($previous['mtime'] ?? null) === $meta['mtime']
-        && ($previous['size'] ?? null) === $meta['size']
-    ) {
-        $meta['hash'] = $previous['hash'] ?? null;
-        return $meta;
-    }
-
     $hash = @sha1_file($path);
     if ($hash !== false) {
         $meta['hash'] = $hash;
     }
-
     return $meta;
 }
 
 function live_build_global_state(): array
 {
-    $schedule = signage_normalize_schedule(signage_read_json('schedule.json', signage_default_schedule()));
+    $schedule = signage_read_json('schedule.json');
     $settings = signage_read_json('settings.json');
     return [
         'ok' => true,
@@ -200,12 +200,9 @@ while (!connection_aborted()) {
     $devicesChanged = false;
 
     foreach ($paths as $key => $path) {
-        $previous = $meta[$key] ?? ['mtime' => 0, 'size' => 0, 'hash' => null];
-        $current = live_file_meta($path, $previous);
-        if ($current['mtime'] !== $previous['mtime']
-            || $current['size'] !== $previous['size']
-            || $current['hash'] !== $previous['hash']
-        ) {
+        $current = live_file_meta($path);
+        $previous = $meta[$key] ?? ['mtime' => 0, 'hash' => null];
+        if ($current['mtime'] !== $previous['mtime'] || $current['hash'] !== $previous['hash']) {
             $meta[$key] = $current;
             if ($key === 'devices') {
                 $devicesChanged = true;
