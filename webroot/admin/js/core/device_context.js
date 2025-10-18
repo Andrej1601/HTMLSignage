@@ -6,6 +6,7 @@
 
 import { deepClone, mergeDeep } from './utils.js';
 import { normalizeSettings } from './config.js';
+import { notifyError, notifyWarning } from './notifications.js';
 
 /**
  * Normalises badge metadata so the UI can render a consistent badge.
@@ -166,7 +167,7 @@ export function createDeviceContextManager({
     const rawId = provided?.id ?? deviceLike;
     const deviceId = typeof rawId === 'string' ? rawId : String(rawId ?? '');
     if (!deviceId) {
-      alert('Gerät wurde nicht gefunden.');
+      notifyWarning('Gerät wurde nicht gefunden.');
       return;
     }
 
@@ -176,7 +177,7 @@ export function createDeviceContextManager({
         device = await loadDeviceById(deviceId);
       } catch (error) {
         console.error('[admin] Geräte-Kontext konnte nicht geladen werden', error);
-        alert('Gerät konnte nicht geladen werden: ' + error.message);
+        notifyError('Gerät konnte nicht geladen werden: ' + error.message);
         return;
       }
     }

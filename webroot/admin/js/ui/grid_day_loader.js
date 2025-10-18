@@ -15,6 +15,7 @@ import { $, deepClone } from '../core/utils.js';
 import { DAY_LABELS } from '../core/defaults.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { renderSlidesMaster } from './slides_master.js';
+import { notifyWarning } from '../core/notifications.js';
 
 let ctx = null; // { getSchedule, getSettings, setSchedule }
 
@@ -60,7 +61,7 @@ function ensureUI() {
     const key = sel.value;
     const preset = settings?.presets?.[key];
     if (!preset) {
-      alert(`Kein Preset für "${(DAY_LABELS && DAY_LABELS[key]) || key}" vorhanden.`);
+      notifyWarning(`Kein Preset für "${(DAY_LABELS && DAY_LABELS[key]) || key}" vorhanden.`);
       return;
     }
     // Preset ins aktuelle Schedule übernehmen (deep clone)

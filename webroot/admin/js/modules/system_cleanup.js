@@ -5,6 +5,8 @@
 
 'use strict';
 
+import { notifyError, notifySuccess } from '../core/notifications.js';
+
 export function initCleanupInSystem({ fetchJson }) {
   const btn = document.getElementById('btnCleanupSys');
   if (!btn) return;
@@ -26,10 +28,10 @@ export function initCleanupInSystem({ fetchJson }) {
         errorMessage: 'Bereinigung fehlgeschlagen.'
       });
       const removed = result?.removed ?? '?';
-      alert(`Bereinigt: ${removed} Dateien entfernt.`);
+      notifySuccess(`Bereinigt: ${removed} Dateien entfernt.`);
     } catch (error) {
       console.error('[admin] Asset-Bereinigung fehlgeschlagen', error);
-      alert('Fehler: ' + error.message);
+      notifyError('Fehler: ' + error.message);
     }
   };
 }

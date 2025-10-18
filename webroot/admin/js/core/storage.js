@@ -5,12 +5,11 @@
  */
 
 import { createSafeLocalStorage } from './safe_storage.js';
+import { notifyWarning } from './notifications.js';
 
 const safeStorage = createSafeLocalStorage({
   onFallback: () => {
-    if (typeof alert === 'function') {
-      alert('Speicher voll – Daten werden nur temporär gespeichert.');
-    }
+    notifyWarning('Speicher voll – Daten werden nur temporär gespeichert.');
   },
   logger: (method, error) => console.warn(`[admin] localStorage.${method} failed`, error)
 });

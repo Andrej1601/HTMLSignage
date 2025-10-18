@@ -49,6 +49,14 @@
   const resizeRegistry = createResizeRegistry();
   let heartbeatTimer = null;
   let pollTimer = null;
+  let liveSource = null;
+  let liveConfig = null;
+  let liveRetryTimer = null;
+  let liveRetryAttempts = 0;
+  const liveStateTokens = { config: null, device: null };
+  const LIVE_RETRY_BASE_DELAY = 2000;
+  const LIVE_RETRY_MAX_DELAY = 60000;
+  const LIVE_RETRY_MAX_ATTEMPTS = 5;
   let badgeLookupCache = null;
   let styleAutomationTimer = null;
   const STYLE_THEME_KEYS = [
@@ -182,6 +190,291 @@
     displayListeners.cancelFrame = null;
   }
 
+  function parseEventPayload(event){
+    if (!event || typeof event.data !== 'string') return null;
+    try {
+      return JSON.parse(event.data);
+    } catch (error) {
+      console.warn('[live] parse failed', error);
+      return null;
+    }
+  }
+
+  function resetLiveRetry(){
+    if (liveRetryTimer) {
+      clearTimeout(liveRetryTimer);
+      liveRetryTimer = null;
+    }
+  }
+
+  function clearLiveSource(options = {}){
+    const { clearConfig = false, resetAttempts = true } = options;
+    if (liveSource) {
+      try { liveSource.close(); } catch (error) { /* ignore */ }
+      liveSource = null;
+    }
+    resetLiveRetry();
+    if (resetAttempts) liveRetryAttempts = 0;
+    if (clearConfig) {
+      liveConfig = null;
+      liveStateTokens.config = null;
+      liveStateTokens.device = null;
+    }
+  }
+
+  function scheduleLiveRestart(reason = 'error'){
+    if (!liveConfig) return;
+    resetLiveRetry();
+    liveRetryAttempts += 1;
+    const maxAttempts = liveConfig.type === 'pair' ? 1 : LIVE_RETRY_MAX_ATTEMPTS;
+    if (liveRetryAttempts >= maxAttempts) {
+      if (typeof liveConfig.fallback === 'function') {
+        const context = liveConfig.type === 'pair' ? 'pair' : 'config';
+        const attemptMsg = `[live] falling back to polling after ${liveRetryAttempts} failed ${context} attempt(s)`;
+        console.warn(attemptMsg + (reason ? ` (${reason})` : ''));
+        liveConfig.fallback();
+      }
+      return;
+    }
+    const delay = Math.min(
+      LIVE_RETRY_BASE_DELAY * Math.pow(2, Math.max(0, liveRetryAttempts - 1)),
+      LIVE_RETRY_MAX_DELAY
+    );
+    liveRetryTimer = setTimeout(() => {
+      if (!liveConfig) return;
+      if (liveConfig.type === 'config') {
+        startConfigEventSource(liveConfig, { resetAttempts: false });
+      } else if (liveConfig.type === 'pair') {
+        startPairEventSource(liveConfig, { resetAttempts: false });
+      }
+    }, delay);
+  }
+
+  function startConfigEventSource(config, options = {}){
+    if (!config) return;
+    const { resetAttempts = true } = options;
+    if (resetAttempts) liveRetryAttempts = 0;
+    clearLiveSource({ resetAttempts: false });
+    if (typeof EventSource !== 'function') {
+      if (typeof config.fallback === 'function') config.fallback();
+      return;
+    }
+    const params = new URLSearchParams();
+    if (config.deviceMode && DEVICE_ID) {
+      params.set('device', DEVICE_ID);
+    }
+    const url = `/api/live.php${params.toString() ? `?${params.toString()}` : ''}`;
+    try {
+      const source = new EventSource(url);
+      liveSource = source;
+
+      source.addEventListener('state', (event) => {
+        const data = parseEventPayload(event);
+        if (!data || data.ok === false || !data.schedule || !data.settings) return;
+        const meta = data.meta || {};
+        const token = `${meta.scheduleVersion ?? ''}:${meta.settingsVersion ?? ''}:${meta.baseScheduleVersion ?? ''}`;
+        if (token && token === liveStateTokens.config) return;
+        liveStateTokens.config = token || null;
+        applyResolvedState(data.schedule, data.settings, { resetIndex: true })
+          .catch((error) => console.error('[live] config apply failed', error));
+      });
+
+      source.addEventListener('device', (event) => {
+        const data = parseEventPayload(event);
+        if (!data) return;
+        if (data.ok === false) {
+          if (data.status === 404) {
+            liveStateTokens.device = null;
+            clearLiveSource({ clearConfig: true });
+            stopAllStages();
+            showPairing();
+          }
+          return;
+        }
+        if (!data.schedule || !data.settings) return;
+        const meta = data.meta || {};
+        const token = `${meta.scheduleVersion ?? ''}:${meta.settingsVersion ?? ''}:${meta.overridesActive ? 1 : 0}`;
+        if (token && token === liveStateTokens.device) return;
+        liveStateTokens.device = token || null;
+        applyResolvedState(data.schedule, data.settings, { resetIndex: true })
+          .catch((error) => console.error('[live] device apply failed', error));
+      });
+
+      source.onerror = () => {
+        clearLiveSource({ resetAttempts: false });
+        scheduleLiveRestart('config-eventsource-error');
+      };
+    } catch (error) {
+      console.error('[live] event source failed', error);
+      if (typeof config.fallback === 'function') config.fallback();
+    }
+  }
+
+  function startPairEventSource(config, options = {}){
+    if (!config) return;
+    const { resetAttempts = true } = options;
+    if (resetAttempts) liveRetryAttempts = 0;
+    clearLiveSource({ resetAttempts: false });
+    if (typeof EventSource !== 'function') {
+      if (typeof config.fallback === 'function') config.fallback();
+      return;
+    }
+    const params = new URLSearchParams();
+    params.set('pair', config.code);
+    const url = `/api/live.php?${params.toString()}`;
+    try {
+      const source = new EventSource(url);
+      liveSource = source;
+
+      source.addEventListener('pair', (event) => {
+        const data = parseEventPayload(event);
+        if (!data || data.ok === false) return;
+        if (!data.exists) return;
+        if (data.paired && data.deviceId) {
+          clearLiveSource({ clearConfig: true });
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+          ls.remove('pairState');
+          ls.set('deviceId', data.deviceId);
+          fetch('/api/heartbeat.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device: data.deviceId })
+          }).catch((error) => console.error('[heartbeat] post-pair failed', error));
+          location.replace('/?device=' + encodeURIComponent(data.deviceId));
+        }
+      });
+
+      source.onerror = () => {
+        clearLiveSource({ resetAttempts: false });
+        scheduleLiveRestart('pair-eventsource-error');
+      };
+    } catch (error) {
+      console.error('[live] pair event source failed', error);
+      if (typeof config.fallback === 'function') config.fallback();
+    }
+  }
+
+  function startConfigPolling(deviceMode){
+    clearLiveSource({ clearConfig: true });
+    liveRetryAttempts = 0;
+    liveStateTokens.config = null;
+    if (!deviceMode) liveStateTokens.device = null;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    let lastSchedVer = schedule?.version || 0;
+    let lastSetVer = settings?.version || 0;
+    const intervalMs = deviceMode ? 10000 : 10000;
+    pollTimer = setInterval(async () => {
+      try {
+        if (deviceMode) {
+          const response = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, { cache: 'no-store' });
+          if (response.status === 404) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            stopAllStages();
+            showPairing();
+            return;
+          }
+          if (!response.ok) {
+            console.warn('[poll] http', response.status);
+            return;
+          }
+          const payload = await response.json();
+          if (!payload || payload.ok === false || !payload.schedule || !payload.settings) {
+            console.warn('[poll] payload invalid');
+            return;
+          }
+          const newSchedVer = payload.schedule?.version || 0;
+          const newSetVer = payload.settings?.version || 0;
+          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
+            await applyResolvedState(payload.schedule, payload.settings, { resetIndex: true });
+            lastSchedVer = newSchedVer;
+            lastSetVer = newSetVer;
+          }
+        } else {
+          const [nextSchedule, nextSettings] = await Promise.all([
+            loadJSON('/data/schedule.json'),
+            loadJSON('/data/settings.json')
+          ]);
+          const newSchedVer = nextSchedule?.version || 0;
+          const newSetVer = nextSettings?.version || 0;
+          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
+            await applyResolvedState(nextSchedule, nextSettings, { resetIndex: true });
+            lastSchedVer = newSchedVer;
+            lastSetVer = newSetVer;
+          }
+        }
+      } catch (error) {
+        console.warn('[poll] failed:', error);
+      }
+    }, intervalMs);
+  }
+
+  function startPairPolling(code){
+    clearLiveSource({ clearConfig: true });
+    liveRetryAttempts = 0;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    pollTimer = setInterval(async () => {
+      try {
+        const response = await fetch('/pair/poll?code=' + encodeURIComponent(code), { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (payload && payload.paired && payload.deviceId) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          ls.remove('pairState');
+          ls.set('deviceId', payload.deviceId);
+          fetch('/api/heartbeat.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device: payload.deviceId })
+          }).catch((error) => console.error('[heartbeat] post-pair failed', error));
+          location.replace('/?device=' + encodeURIComponent(payload.deviceId));
+        }
+      } catch (error) {
+        console.warn('[pair] poll failed', error);
+      }
+    }, 5000);
+  }
+
+  function startConfigLiveUpdates(deviceMode){
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    liveConfig = {
+      type: 'config',
+      deviceMode,
+      fallback: () => startConfigPolling(deviceMode)
+    };
+    if (deviceMode) {
+      liveStateTokens.device = null;
+    } else {
+      liveStateTokens.config = null;
+    }
+    startConfigEventSource(liveConfig);
+  }
+
+  function startPairLiveUpdates(code){
+    if (!code) return;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    liveConfig = {
+      type: 'pair',
+      code,
+      fallback: () => startPairPolling(code)
+    };
+    startPairEventSource(liveConfig);
+  }
+
+
   function toFiniteNumber(value){
     if (value == null) return null;
     const normalized = typeof value === 'string' ? value.trim() : value;
@@ -199,6 +492,7 @@
       clearInterval(pollTimer);
       pollTimer = null;
     }
+    clearLiveSource({ clearConfig: true });
     stopStyleAutomationTimer();
     cleanupDisplayListeners();
   });
@@ -4988,6 +5282,11 @@ function renderStorySlide(story = {}, region = 'left') {
 
 //Showpairing
 function showPairing(){
+  clearLiveSource({ clearConfig: true });
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
   stopAllStages();
   updateLayoutModeAttr('single');
   const box = document.createElement('div');
@@ -5037,29 +5336,7 @@ function showPairing(){
         clearInterval(heartbeatTimer);
         heartbeatTimer = null;
       }
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(async () => {
-        try {
-          const rr = await fetch('/pair/poll?code=' + encodeURIComponent(code), { cache: 'no-store' });
-          if (!rr.ok) return;
-          const jj = await rr.json();
-          if (jj && jj.paired && jj.deviceId) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-            ls.remove('pairState');
-            ls.set('deviceId', jj.deviceId);
-            // sofortigen Heartbeat absetzen und dann aktualisieren
-            fetch('/api/heartbeat.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ device: jj.deviceId })
-            }).then(r => {
-              if (!r.ok) throw new Error('heartbeat http ' + r.status);
-            }).catch(e => console.error('[heartbeat] post-pair failed', e));
-            location.replace('/?device=' + encodeURIComponent(jj.deviceId));
-          }
-        } catch {}
-      }, 3000);
+      startPairLiveUpdates(code);
     } catch (e) {
       const el = document.getElementById('code');
       if (el) el.textContent = (e && e.status) ? String(e.status) : 'NETZ-FEHLER';
@@ -5076,7 +5353,6 @@ async function bootstrap(){
   const data = ev?.data || {};
   if (data?.type !== 'preview') return;
   previewMode = true;
-  try { if (window.__pairTimer) clearInterval(window.__pairTimer); } catch {}
   const payload = data.payload || {};
   const nextSchedule = payload.schedule || schedule;
   const nextSettings = payload.settings || settings;
@@ -5152,59 +5428,9 @@ async function bootstrap(){
     preloadSlideImages();
   }
 
-  // Live-Reload: bei Device NUR resolve pollen
-  // Polling beibehalten, da Versionsänderungen zuverlässig erkannt werden
+  // Live-Reload: priorisiere EventStream, fallback auf Polling
   if (!previewMode) {
-    let lastSchedVer = schedule?.version || 0;
-    let lastSetVer   = settings?.version || 0;
-
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(async () => {
-      try {
-        if (deviceMode) {
-          const response = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, { cache: 'no-store' });
-          if (response.status === 404) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-            stopAllStages();
-            showPairing();
-            return;
-          }
-          if (!response.ok) {
-            console.warn('[poll] http', response.status);
-            return;
-          }
-          const payload = await response.json();
-          if (!payload || payload.ok === false || !payload.schedule || !payload.settings) {
-            console.warn('[poll] payload invalid');
-            return;
-          }
-
-          const newSchedVer = payload.schedule?.version || 0;
-          const newSetVer   = payload.settings?.version || 0;
-
-          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
-            await applyResolvedState(payload.schedule, payload.settings, { resetIndex: true });
-            lastSchedVer = newSchedVer;
-            lastSetVer = newSetVer;
-          }
-        } else {
-          const [nextSchedule, nextSettings] = await Promise.all([
-            loadJSON('/data/schedule.json'),
-            loadJSON('/data/settings.json')
-          ]);
-          const newSchedVer = nextSchedule?.version || 0;
-          const newSetVer = nextSettings?.version || 0;
-          if (newSchedVer !== lastSchedVer || newSetVer !== lastSetVer) {
-            await applyResolvedState(nextSchedule, nextSettings, { resetIndex: true });
-            lastSchedVer = newSchedVer;
-            lastSetVer = newSetVer;
-          }
-        }
-      } catch(error) {
-        console.warn('[poll] failed:', error);
-      }
-    }, 3000);
+    startConfigLiveUpdates(deviceMode);
   }
 }
 
