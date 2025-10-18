@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/storage.php';
 
+const DEVICES_STORAGE_KEY = 'devices.state';
 const DEVICES_ID_PATTERN = '/^dev_[a-f0-9]{12}$/';
 const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
 const DEVICES_HISTORY_LIMIT = 20;
@@ -687,7 +688,7 @@ function devices_normalize_state($state): array
     return $normalized;
 }
 
-function devices_load(): array
+function devices_load_from_file(): array
 {
     $path = devices_path();
     if (!is_file($path)) {
@@ -701,7 +702,7 @@ function devices_load(): array
     return devices_normalize_state($decoded);
 }
 
-function devices_save(array &$db): bool
+function devices_save_to_file(array &$db): bool
 {
     $db = devices_normalize_state($db);
     $path = devices_path();
@@ -715,6 +716,38 @@ function devices_save(array &$db): bool
     @chown($path, 'www-data');
     @chgrp($path, 'www-data');
     return true;
+}
+
+function devices_load(): array
+{
+    if (signage_db_available()) {
+        try {
+            $state = signage_kv_get(DEVICES_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return devices_normalize_state($state);
+            }
+        } catch (Throwable $exception) {
+            error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return devices_load_from_file();
+}
+
+function devices_save(array &$db): bool
+{
+    $db = devices_normalize_state($db);
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(DEVICES_STORAGE_KEY, $db);
+            return true;
+        } catch (Throwable $exception) {
+            error_log('Failed to persist devices to SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return devices_save_to_file($db);
 }
 
 function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool

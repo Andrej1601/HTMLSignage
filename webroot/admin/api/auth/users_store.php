@@ -8,6 +8,7 @@ require_once __DIR__ . '/../storage.php';
 
 const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
+const SIGNAGE_AUTH_USERS_STORAGE_KEY = 'auth.users';
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
 const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
 const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
@@ -196,7 +197,7 @@ function auth_users_normalize(array $state): array
     return $normalized;
 }
 
-function auth_users_load(): array
+function auth_users_load_from_file(): array
 {
     $path = auth_users_path();
     if (!is_file($path)) {
@@ -213,7 +214,7 @@ function auth_users_load(): array
     return auth_users_normalize($decoded);
 }
 
-function auth_users_save(array $state): void
+function auth_users_save_to_file(array $state): void
 {
     $normalized = auth_users_normalize($state);
     $path = auth_users_path();
@@ -224,6 +225,48 @@ function auth_users_save(array $state): void
     }
     @chmod($path, 0640);
     auth_basic_sync($normalized);
+}
+
+function auth_users_load(): array
+{
+    if (signage_db_available()) {
+        try {
+            $state = signage_kv_get(SIGNAGE_AUTH_USERS_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return auth_users_normalize($state);
+            }
+        } catch (Throwable $exception) {
+            error_log('Failed to load users from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return auth_users_load_from_file();
+}
+
+function auth_users_save(array $state): void
+{
+    $normalized = auth_users_normalize($state);
+    $errors = [];
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
+            auth_basic_sync($normalized);
+            return;
+        } catch (Throwable $exception) {
+            $errors[] = 'sqlite: ' . $exception->getMessage();
+            error_log('Failed to persist users to SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    try {
+        auth_users_save_to_file($normalized);
+        return;
+    } catch (Throwable $exception) {
+        $errors[] = 'file: ' . $exception->getMessage();
+    }
+
+    throw new RuntimeException('Unable to write users database (' . implode('; ', $errors) . ')');
 }
 
 function auth_basic_sync(array $state): void
@@ -465,6 +508,32 @@ function auth_verify_password(string $password, string $hash): bool
 
 function auth_append_audit(string $event, array $context = []): void
 {
+    $username = null;
+    if (isset($context['user']) && is_string($context['user'])) {
+        $username = $context['user'];
+    }
+
+    if (signage_db_available()) {
+        try {
+            signage_db_bootstrap();
+            $pdo = signage_db();
+            $payload = json_encode($context, SIGNAGE_JSON_FLAGS);
+            if ($payload === false) {
+                $payload = json_encode(['error' => 'json_encode failed'], JSON_UNESCAPED_SLASHES);
+            }
+            $stmt = $pdo->prepare('INSERT INTO audit_log(event, username, context, created_at) VALUES (:event, :username, :context, :created)');
+            $stmt->execute([
+                ':event' => $event,
+                ':username' => $username,
+                ':context' => $payload,
+                ':created' => time(),
+            ]);
+            return;
+        } catch (Throwable $exception) {
+            error_log('Failed to append audit entry to SQLite: ' . $exception->getMessage());
+        }
+    }
+
     $path = auth_audit_path();
     @mkdir(dirname($path), 02775, true);
     $row = [

@@ -7,6 +7,174 @@ declare(strict_types=1);
 
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
 
+function signage_db_path(): string
+{
+    $custom = getenv('SIGNAGE_DB_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['SIGNAGE_DB_PATH'])) {
+        return (string) $_ENV['SIGNAGE_DB_PATH'];
+    }
+    if (!empty($_SERVER['SIGNAGE_DB_PATH'])) {
+        return (string) $_SERVER['SIGNAGE_DB_PATH'];
+    }
+    return signage_data_path('signage.db');
+}
+
+function signage_db_available(): bool
+{
+    static $available;
+    if ($available !== null) {
+        return $available;
+    }
+    if (!class_exists('\\PDO')) {
+        return $available = false;
+    }
+    try {
+        $drivers = \PDO::getAvailableDrivers();
+    } catch (Throwable $exception) {
+        error_log('PDO drivers unavailable: ' . $exception->getMessage());
+        return $available = false;
+    }
+    if (!in_array('sqlite', $drivers, true)) {
+        return $available = false;
+    }
+    if (!extension_loaded('pdo_sqlite') && !extension_loaded('sqlite3')) {
+        return $available = false;
+    }
+    return $available = true;
+}
+
+function signage_db(): \PDO
+{
+    static $pdo = null;
+    if ($pdo instanceof \PDO) {
+        return $pdo;
+    }
+    if (!signage_db_available()) {
+        throw new RuntimeException('SQLite support is not available.');
+    }
+
+    $path = signage_db_path();
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        throw new RuntimeException('Unable to create SQLite directory: ' . $dir);
+    }
+
+    try {
+        $pdo = new \PDO('sqlite:' . $path, null, null, [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            \PDO::ATTR_EMULATE_PREPARES => false,
+        ]);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to open SQLite database: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    try {
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    } catch (Throwable $exception) {
+        error_log('Unable to enable SQLite foreign_keys pragma: ' . $exception->getMessage());
+    }
+
+    $pathExists = @file_exists($path);
+    if ($pathExists) {
+        @chmod($path, 0660);
+    }
+
+    return $pdo;
+}
+
+function signage_db_bootstrap(): void
+{
+    static $bootstrapped = false;
+    if ($bootstrapped) {
+        return;
+    }
+    $pdo = signage_db();
+    $queries = [
+        'CREATE TABLE IF NOT EXISTS kv_store (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+        'CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event TEXT NOT NULL,
+            username TEXT,
+            context TEXT,
+            created_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+    ];
+    try {
+        foreach ($queries as $sql) {
+            $pdo->exec($sql);
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to initialize SQLite schema: ' . $exception->getMessage(), 0, $exception);
+    }
+    $bootstrapped = true;
+}
+
+function signage_kv_get(string $key, mixed $default = null): mixed
+{
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT value FROM kv_store WHERE key = :key LIMIT 1');
+        $stmt->execute([':key' => $key]);
+        $value = $stmt->fetchColumn();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to load SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    if ($value === false || $value === null) {
+        return $default;
+    }
+
+    $decoded = json_decode((string) $value, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('SQLite JSON decode error for key ' . $key . ': ' . json_last_error_msg());
+        return $default;
+    }
+
+    return $decoded;
+}
+
+function signage_kv_set(string $key, mixed $value): void
+{
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $json = json_encode($value, SIGNAGE_JSON_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
+    }
+
+    $ts = time();
+    try {
+        $stmt = $pdo->prepare('INSERT INTO kv_store(key, value, updated_at) VALUES (:key, :value, :updated)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
+        $stmt->execute([
+            ':key' => $key,
+            ':value' => $json,
+            ':updated' => $ts,
+        ]);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to persist SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
+}
+
 function signage_default_schedule(): array
 {
     return [
