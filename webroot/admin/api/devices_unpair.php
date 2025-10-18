@@ -34,7 +34,14 @@ else {
   if (isset($db['devices'][$didIn]['overrides'])) unset($db['devices'][$didIn]['overrides']);
 }
 
-if (!devices_save($db)) { echo json_encode(['ok'=>false,'error'=>'save-failed']); exit; }
+try {
+  devices_save($db);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device unpair: ' . $e->getMessage());
+  echo json_encode(['ok'=>false,'error'=>'save-failed']);
+  exit;
+}
 auth_audit('device.unpair', [
   'deviceId' => $didIn,
   'purge' => $purge
