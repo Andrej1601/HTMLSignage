@@ -14,7 +14,7 @@ export const PROTECTED_ADMIN_USERNAME = 'admin';
 export const ROLE_META = {
   saunameister: {
     title: 'Saunameister',
-    description: 'Darf den Aufgussplan und Slides bearbeiten.'
+    description: 'Darf den Aufgussplan pflegen sowie Vorschau, Saunen, Fußnoten und Badges verwalten.'
   },
   editor: {
     title: 'Editor',
@@ -85,7 +85,7 @@ export const PERMISSION_META = {
 };
 
 export const ROLE_DEFAULT_PERMISSIONS = {
-  saunameister: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info'],
+  saunameister: ['cockpit', 'footnotes', 'badges'],
   editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
   admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
 };

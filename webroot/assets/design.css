@@ -24,7 +24,9 @@
   --chipFlameGapScale:0.14; /* Anteil der Chip-Höhe als Abstand */
   --chipFlameGap:calc(var(--chipH) * var(--chipFlameGapScale));
   --ovAuto:1; /* overview-only autoscale factor */
-  --ovTimeWidth:10ch;
+  --ovTimeWidthBase:10ch;
+  --ovTimeWidthScale:1;
+  --ovTimeWidth:calc(var(--ovTimeWidthBase) * var(--ovTimeWidthScale));
   --tileFlameGapPx:calc(10px*var(--vwScale));
   --saunaHeadingMaxWidth:100%;
 
