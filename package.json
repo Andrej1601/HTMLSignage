@@ -4,14 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
+    "test": "npm run test:frontend && composer test",
+    "test:frontend": "vitest run",
+    "test:backend": "composer test",
     "test:watch": "vitest",
     "lint": "eslint webroot/admin/js --ext .js"
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",
+    "@testing-library/dom": "^9.3.2",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
+    "jsdom": "^24.0.0",
     "vitest": "^1.6.0"
   }
 }
