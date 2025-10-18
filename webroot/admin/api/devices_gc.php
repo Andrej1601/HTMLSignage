@@ -38,7 +38,14 @@ foreach (($db['pairings'] ?? []) as $code => $row) {
  }
 }
 
-if (!devices_save($db)) { echo json_encode(['ok'=>false,'error'=>'save-failed']); exit; }
+try {
+  devices_save($db);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device GC results: ' . $e->getMessage());
+  echo json_encode(['ok'=>false,'error'=>'save-failed']);
+  exit;
+}
 auth_audit('device.gc', [
   'deletedDevices' => $deletedDevices,
   'deletedPairings' => $deletedPairings

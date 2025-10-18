@@ -8,6 +8,8 @@ log(){ printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
 error(){ printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
 
+FRESH_INSTALL=0
+
 declare -a CONFIG_KEYS=(
   SIGNAGE_PUBLIC_PORT
   SIGNAGE_ADMIN_PORT
@@ -42,6 +44,18 @@ require_root(){
     error "Run as root"
     exit 1
   fi
+}
+
+parse_args(){
+  FRESH_INSTALL=0
+  while (($#)); do
+    case "$1" in
+      --fresh)
+        FRESH_INSTALL=1
+        ;;
+    esac
+    shift || true
+  done
 }
 
 run_preflight(){
@@ -184,7 +198,27 @@ install_packages(){
 deploy_application(){
   log "Deploying application files"
   install -d "$APP_DIR"
-  rsync -a webroot/ "$APP_DIR"/
+  local rsync_args=(-a)
+  if [[ $FRESH_INSTALL -eq 1 ]]; then
+    log "Fresh installation requested; replacing existing application files"
+    rsync_args+=(--delete)
+  else
+    rsync_args+=(--exclude 'data/')
+  fi
+
+  rsync "${rsync_args[@]}" webroot/ "$APP_DIR"/
+
+  if [[ $FRESH_INSTALL -eq 1 ]]; then
+    rsync -a --delete webroot/data/ "$APP_DIR/data"/
+  else
+    if [[ -d "$APP_DIR/data" ]]; then
+      log "Preserving existing data directory (use --fresh to reinitialize)"
+    else
+      log "Seeding data directory with defaults"
+      rsync -a webroot/data/ "$APP_DIR/data"/
+    fi
+  fi
+
   chown -R www-data:www-data "$APP_DIR"
   find "$APP_DIR" -type d -exec chmod 2755 {} +
   find "$APP_DIR" -type f -exec chmod 0644 {} +
@@ -351,6 +385,7 @@ main(){
   require_root
   umask 022
 
+  parse_args "$@"
   run_preflight "$@"
 
   collect_settings

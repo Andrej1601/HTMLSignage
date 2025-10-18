@@ -37,8 +37,13 @@ if ($sch !== null) {
 
 $dev['devices'][$devId]['overrides']['settings'] = $set;
 
-if (!devices_save($dev)) {
-  echo json_encode(['ok'=>false, 'error'=>'write-failed']); exit;
+try {
+  devices_save($dev);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device overrides: ' . $e->getMessage());
+  echo json_encode(['ok'=>false, 'error'=>'write-failed']);
+  exit;
 }
 auth_audit('device.override', [
   'deviceId' => $devId,
