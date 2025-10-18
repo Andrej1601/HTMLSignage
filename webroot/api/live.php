@@ -30,38 +30,21 @@ function live_send_event(string $event, $data): void
     @flush();
 }
 
-function live_file_meta(string $path, ?array $previous = null): array
+function live_file_meta(string $path): array
 {
-    $meta = ['mtime' => 0, 'size' => 0, 'hash' => null];
+    $meta = ['mtime' => 0, 'hash' => null];
     if (!is_file($path)) {
         return $meta;
     }
-
     clearstatcache(false, $path);
-
     $mtime = @filemtime($path);
     if ($mtime !== false) {
         $meta['mtime'] = (int) $mtime;
     }
-
-    $size = @filesize($path);
-    if ($size !== false) {
-        $meta['size'] = (int) $size;
-    }
-
-    if ($previous !== null
-        && ($previous['mtime'] ?? null) === $meta['mtime']
-        && ($previous['size'] ?? null) === $meta['size']
-    ) {
-        $meta['hash'] = $previous['hash'] ?? null;
-        return $meta;
-    }
-
     $hash = @sha1_file($path);
     if ($hash !== false) {
         $meta['hash'] = $hash;
     }
-
     return $meta;
 }
 
@@ -200,12 +183,9 @@ while (!connection_aborted()) {
     $devicesChanged = false;
 
     foreach ($paths as $key => $path) {
-        $previous = $meta[$key] ?? ['mtime' => 0, 'size' => 0, 'hash' => null];
-        $current = live_file_meta($path, $previous);
-        if ($current['mtime'] !== $previous['mtime']
-            || $current['size'] !== $previous['size']
-            || $current['hash'] !== $previous['hash']
-        ) {
+        $current = live_file_meta($path);
+        $previous = $meta[$key] ?? ['mtime' => 0, 'hash' => null];
+        if ($current['mtime'] !== $previous['mtime'] || $current['hash'] !== $previous['hash']) {
             $meta[$key] = $current;
             if ($key === 'devices') {
                 $devicesChanged = true;
