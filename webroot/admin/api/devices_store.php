@@ -729,19 +729,18 @@ function devices_load(): array
         } catch (Throwable $exception) {
             error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
         }
-    }
 
-    $state = devices_load_from_file();
-
-    if (signage_db_available()) {
+        $import = devices_load_from_file();
         try {
-            signage_kv_set(DEVICES_STORAGE_KEY, $state);
+            signage_kv_set(DEVICES_STORAGE_KEY, $import);
         } catch (Throwable $exception) {
             error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
         }
+        devices_delete_file();
+        return devices_normalize_state($import);
     }
 
-    return $state;
+    return devices_load_from_file();
 }
 
 function devices_save(array &$db): bool
@@ -751,6 +750,7 @@ function devices_save(array &$db): bool
     if (signage_db_available()) {
         try {
             signage_kv_set(DEVICES_STORAGE_KEY, $db);
+            devices_delete_file();
             return true;
         } catch (Throwable $exception) {
             error_log('Failed to persist devices to SQLite: ' . $exception->getMessage());
@@ -758,6 +758,14 @@ function devices_save(array &$db): bool
     }
 
     return devices_save_to_file($db);
+}
+
+function devices_delete_file(): void
+{
+    $path = devices_path();
+    if (is_file($path)) {
+        @unlink($path);
+    }
 }
 
 function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool

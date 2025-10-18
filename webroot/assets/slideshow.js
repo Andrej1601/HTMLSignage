@@ -465,8 +465,8 @@
           }
         } else {
           const [nextSchedule, nextSettings] = await Promise.all([
-            loadJSON('/data/schedule.json'),
-            loadJSON('/data/settings.json')
+            loadJSON('/api/schedule.php'),
+            loadJSON('/api/settings.php')
           ]);
           const newSchedVer = nextSchedule?.version || 0;
           const newSetVer = nextSettings?.version || 0;

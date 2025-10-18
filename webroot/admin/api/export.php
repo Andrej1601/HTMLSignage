@@ -60,21 +60,12 @@ function gather_asset_paths($source): array {
   return array_keys($paths);
 }
 
-$settingsFile = signage_data_path('settings.json');
-$scheduleFile = signage_data_path('schedule.json');
 $include     = get_flag('include', 0);  // Bilder
 $incSettings = get_flag('settings', 1);
 $incSchedule = get_flag('schedule', 1);
 
 if (!export_sqlite_available()) {
   export_fail(500, ['ok' => false, 'error' => 'sqlite-unavailable']);
-}
-
-if (($incSettings || $include) && !is_file($settingsFile)) {
-  export_fail(404, ['ok' => false, 'error' => 'missing-settings']);
-}
-if (($incSchedule || $include) && !is_file($scheduleFile)) {
-  export_fail(404, ['ok' => false, 'error' => 'missing-schedule']);
 }
 
 $settings = ($incSettings || $include) ? signage_read_json('settings.json') : null;
