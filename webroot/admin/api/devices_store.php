@@ -689,31 +689,27 @@ function devices_normalize_state($state): array
 
 function devices_load(): array
 {
-    $path = devices_path();
-    if (!is_file($path)) {
-        return devices_default_state();
-    }
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
-        return devices_default_state();
-    }
-    $decoded = json_decode($raw, true);
-    return devices_normalize_state($decoded);
+    $state = signage_read_json('devices.json', devices_default_state());
+    return devices_normalize_state($state);
 }
 
 function devices_save(array &$db): bool
 {
     $db = devices_normalize_state($db);
-    $path = devices_path();
-    @mkdir(dirname($path), 02775, true);
-    $json = json_encode($db, SIGNAGE_JSON_FLAGS);
-    $bytes = @file_put_contents($path, $json, LOCK_EX);
-    if ($bytes === false) {
+    $error = null;
+    if (!signage_write_json('devices.json', $db, $error)) {
+        if ($error) {
+            throw new RuntimeException('Unable to write device database: ' . $error);
+        }
         throw new RuntimeException('Unable to write device database');
     }
-    @chmod($path, 0644);
-    @chown($path, 'www-data');
-    @chgrp($path, 'www-data');
+
+    if (signage_json_fallback_enabled()) {
+        $path = devices_path();
+        @chown($path, 'www-data');
+        @chgrp($path, 'www-data');
+    }
+
     return true;
 }
 

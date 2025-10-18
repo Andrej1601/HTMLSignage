@@ -198,31 +198,26 @@ function auth_users_normalize(array $state): array
 
 function auth_users_load(): array
 {
-    $path = auth_users_path();
-    if (!is_file($path)) {
-        return auth_users_default();
-    }
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
-        return auth_users_default();
-    }
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return auth_users_default();
-    }
-    return auth_users_normalize($decoded);
+    $state = signage_read_json(SIGNAGE_AUTH_USERS_FILE, auth_users_default());
+    return auth_users_normalize($state);
 }
 
 function auth_users_save(array $state): void
 {
     $normalized = auth_users_normalize($state);
-    $path = auth_users_path();
-    @mkdir(dirname($path), 02775, true);
-    $json = json_encode($normalized, SIGNAGE_JSON_FLAGS);
-    if (@file_put_contents($path, $json, LOCK_EX) === false) {
+    $error = null;
+    if (!signage_write_json(SIGNAGE_AUTH_USERS_FILE, $normalized, $error)) {
+        if ($error) {
+            throw new RuntimeException('Unable to write users database: ' . $error);
+        }
         throw new RuntimeException('Unable to write users database');
     }
-    @chmod($path, 0640);
+
+    if (signage_json_fallback_enabled()) {
+        $path = auth_users_path();
+        @chmod($path, 0640);
+    }
+
     auth_basic_sync($normalized);
 }
 
