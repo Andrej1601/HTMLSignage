@@ -1,11 +1,12 @@
 <?php
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/storage.php';
+
+auth_require_permission('system');
 
 header('Content-Type: application/json; charset=UTF-8');
 $imgDir = signage_assets_path('img');
 $mediaDir = signage_assets_path('media');
-$settingsFile = signage_data_path('settings.json');
-$scheduleFile = signage_data_path('schedule.json');
 
 if (!is_dir($imgDir) && !@mkdir($imgDir, 02775, true) && !is_dir($imgDir)) {
   echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit;
@@ -14,8 +15,8 @@ if (!is_dir($mediaDir) && !@mkdir($mediaDir, 02775, true) && !is_dir($mediaDir))
   echo json_encode(['ok'=>false,'error'=>'missing-assets-dir']); exit;
 }
 
-$cfg = is_file($settingsFile) ? json_decode(file_get_contents($settingsFile), true) : [];
-$schedule = is_file($scheduleFile) ? json_decode(file_get_contents($scheduleFile), true) : [];
+$cfg = signage_read_json('settings.json');
+$schedule = signage_read_json('schedule.json');
 $keep = [];
 
 $removeSauna = isset($_GET['sauna']) && $_GET['sauna'] === '1';
