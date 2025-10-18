@@ -4,7 +4,7 @@ import { fetchJson } from './utils.js';
 
 const API_BASE = '/admin/api/auth';
 const DEFAULT_ROLES = ['saunameister', 'editor', 'admin'];
-const DEFAULT_PERMISSIONS = ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'];
+const DEFAULT_PERMISSIONS = ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices', 'user-admin'];
 
 const normalizePermissionName = (permission) => {
   const name = String(permission || '').toLowerCase();

@@ -101,28 +101,8 @@ const PERMISSION_META = {
     description: 'Zugriff auf die Übersichtskacheln und Schnellaktionen.'
   },
   slides: {
-    title: 'Slideshow & Layout',
-    description: 'Allgemeine Slideshow-Einstellungen und Layout anpassen.'
-  },
-  'slides-flow': {
-    title: 'Ablauf & Zeiten',
-    description: 'Dauer, Übergänge und Wiedergabe-Verhalten konfigurieren.'
-  },
-  'slides-automation': {
-    title: 'Automationen',
-    description: 'Zeit- und Stil-Automationen verwalten.'
-  },
-  media: {
-    title: 'Medien',
-    description: 'Medien-Slides hinzufügen, sortieren und konfigurieren.'
-  },
-  footnotes: {
-    title: 'Fußnoten',
-    description: 'Fußnoten verwalten und Darstellung festlegen.'
-  },
-  badges: {
-    title: 'Badges',
-    description: 'Badge-Bibliothek mit Icons und Labels pflegen.'
+    title: 'Slides & Inhalte',
+    description: 'Aufgussplan, Slides und Automationen bearbeiten.'
   },
   'global-info': {
     title: 'Infobox',
@@ -147,9 +127,9 @@ const PERMISSION_META = {
 };
 
 const ROLE_DEFAULT_PERMISSIONS = {
-  saunameister: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info'],
-  editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
-  admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
+  saunameister: ['cockpit', 'slides', 'global-info'],
+  editor: ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices'],
+  admin: ['cockpit', 'slides', 'global-info', 'colors', 'system', 'devices', 'user-admin']
 };
 
 const normalizePermissionName = (permission) => {
@@ -721,22 +701,12 @@ function applyRoleRestrictions() {
   const slideshowBox = document.getElementById('boxSlidesText');
   const slidesFlowCard = document.getElementById('slidesFlowCard');
   const slidesAutomationCard = document.getElementById('slidesAutomationCard');
-  const mediaBox = document.getElementById('boxImages');
-  const footnoteBox = document.getElementById('boxFootnotes');
-  const footnoteSection = document.getElementById('footnoteSection');
-  const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
-  const badgeSection = document.getElementById('badgeLibrarySection');
   const colorsSection = document.getElementById('resetColors')?.closest('details');
   const systemSection = document.getElementById('btnExport')?.closest('details');
   const globalInfoBox = document.getElementById('boxStories');
 
   const canUseCockpit = hasPermission('cockpit');
   const canUseSlides = hasPermission('slides');
-  const canManageFlow = canUseSlides && hasPermission('slides-flow');
-  const canManageAutomation = canUseSlides && hasPermission('slides-automation');
-  const canManageMedia = canUseSlides && hasPermission('media');
-  const canManageFootnotes = canUseSlides && hasPermission('footnotes');
-  const canManageBadges = canUseSlides && hasPermission('badges');
   const canUseGlobalInfo = hasPermission('global-info');
   const canUseColors = hasPermission('colors');
   const canUseSystem = hasPermission('system');
@@ -746,12 +716,8 @@ function applyRoleRestrictions() {
   setHiddenState(cockpitToggle, !canUseCockpit);
   setHiddenState(cockpitSection, !canUseCockpit);
   setHiddenState(slideshowBox, !canUseSlides);
-  setHiddenState(slidesFlowCard, !canManageFlow);
-  setHiddenState(slidesAutomationCard, !canManageAutomation);
-  setHiddenState(mediaBox, !canManageMedia);
-  setHiddenState(footnoteSection, !canManageFootnotes);
-  setHiddenState(footnoteLayoutSection, !canManageFootnotes);
-  setHiddenState(badgeSection, !canManageBadges);
+  setHiddenState(slidesFlowCard, !canUseSlides);
+  setHiddenState(slidesAutomationCard, !canUseSlides);
   setHiddenState(globalInfoBox, !canUseGlobalInfo);
   setHiddenState(colorsSection, !canUseColors);
   setHiddenState(systemSection, !canUseSystem);
@@ -774,9 +740,6 @@ function applyRoleRestrictions() {
   if (!canUseGlobalInfo && globalInfoBox) {
     globalInfoBox.open = false;
   }
-
-  const hideFootnoteBox = !canUseSlides || (!canManageFootnotes && !canManageBadges);
-  setHiddenState(footnoteBox, hideFootnoteBox);
 
   if (!canManageDevices) {
     document.querySelectorAll('[data-devices]').forEach((element) => {
