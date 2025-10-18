@@ -489,25 +489,37 @@ function signage_write_json_file(string $file, $data, ?string &$error = null): b
 
 function signage_read_settings_from_db(array $default = []): array
 {
+    $fallback = function () use ($default) {
+        return signage_read_json_file('settings.json', $default);
+    };
+
+    if (!signage_db_available()) {
+        return $fallback();
+    }
+
     try {
         $pdo = signage_db();
     } catch (Throwable $exception) {
-        return $default;
+        return $fallback();
     }
 
     $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
     $stmt->execute([':key' => 'app_settings']);
     $json = $stmt->fetchColumn();
     if ($json === false || $json === null || $json === '') {
-        return $default;
+        return $fallback();
     }
 
     $decoded = json_decode((string) $json, true);
-    return is_array($decoded) ? $decoded : $default;
+    return is_array($decoded) ? $decoded : $fallback();
 }
 
 function signage_write_settings_to_db(array $settings, ?string &$error = null): bool
 {
+    if (!signage_db_available()) {
+        return signage_write_json_file('settings.json', $settings, $error);
+    }
+
     try {
         $pdo = signage_db();
     } catch (Throwable $exception) {
@@ -537,10 +549,19 @@ function signage_write_settings_to_db(array $settings, ?string &$error = null): 
 
 function signage_read_schedule_from_db(array $default = []): array
 {
+    $fallback = function () use ($default) {
+        $file = signage_read_json_file('schedule.json', $default);
+        return signage_normalize_schedule($file);
+    };
+
+    if (!signage_db_available()) {
+        return $fallback();
+    }
+
     try {
         $pdo = signage_db();
     } catch (Throwable $e) {
-        return signage_normalize_schedule($default);
+        return $fallback();
     }
 
     $stmt = $pdo->prepare('SELECT payload_json FROM settings WHERE key = :key LIMIT 1');
@@ -564,14 +585,19 @@ function signage_read_schedule_from_db(array $default = []): array
     }
     if ($rows) {
         $schedule['rows'] = $rows;
+        return $schedule;
     }
 
-    return $schedule;
+    return $fallback();
 }
 
 function signage_write_schedule_to_db(array $schedule, ?string &$error = null): bool
 {
     $normalized = signage_normalize_schedule($schedule);
+
+    if (!signage_db_available()) {
+        return signage_write_json_file('schedule.json', $normalized, $error);
+    }
 
     try {
         $pdo = signage_db();
