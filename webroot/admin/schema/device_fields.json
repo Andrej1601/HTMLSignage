@@ -1,0 +1,32 @@
+{
+  "status": {
+    "fields": [
+      { "name": "firmware", "type": "string", "maxLength": 100, "aliases": ["version"] },
+      { "name": "appVersion", "type": "string", "maxLength": 100, "aliases": ["player"] },
+      { "name": "ip", "type": "string", "maxLength": 64, "aliases": ["address"] },
+      { "name": "notes", "type": "string", "maxLength": 180 }
+    ]
+  },
+  "network": {
+    "fields": [
+      { "name": "type", "type": "string", "maxLength": 40, "aliases": ["interface"] },
+      { "name": "ssid", "type": "string", "maxLength": 64, "aliases": ["networkName"] },
+      { "name": "quality", "type": "number", "aliases": ["signalQuality", "linkQuality", "strength"], "min": 0, "max": 100, "round": "nearest", "integer": true },
+      { "name": "signal", "type": "number", "aliases": ["dbm", "wifiSignal", "strength", "rssi"] },
+      { "name": "rssi", "type": "number", "round": "nearest", "integer": true },
+      { "name": "latency", "type": "number", "min": 0 }
+    ]
+  },
+  "metrics": {
+    "fields": [
+      { "name": "cpuLoad", "type": "number", "aliases": ["cpu", "cpu_usage", "cpuPercent", "cpuLoadPercent"] },
+      { "name": "memoryUsage", "type": "number", "aliases": ["memory", "ram", "memoryPercent", "memUsage", "ramUsage"] },
+      { "name": "storageFree", "type": "number", "aliases": ["storage_free", "storageFreeMb", "diskFree", "diskFreeMb", "freeStorage"] },
+      { "name": "storageUsed", "type": "number", "aliases": ["storage_used", "storageUsedMb", "diskUsed", "diskUsedMb", "usedStorage"] },
+      { "name": "temperature", "type": "number", "aliases": ["temp", "temperatureC", "tempC"] },
+      { "name": "uptime", "type": "number", "aliases": ["upTimeSeconds", "uptimeSeconds", "uptimeSec"] },
+      { "name": "batteryLevel", "type": "number", "aliases": ["battery", "batteryPercent", "battery_level"] },
+      { "name": "latency", "type": "number", "aliases": ["ping"] }
+    ]
+  }
+}

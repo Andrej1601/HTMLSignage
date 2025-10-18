@@ -12,6 +12,179 @@ const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
 const DEVICES_HISTORY_LIMIT = 20;
 const DEVICES_MAX_ERRORS = 10;
 
+// >>> GENERATED: DEVICE_FIELD_CONFIG >>>
+const DEVICES_STATUS_FIELD_CONFIG = [
+    'firmware' => [
+        'type' => 'string',
+        'aliases' => [
+            'firmware',
+            'version',
+        ],
+        'maxLength' => 100,
+    ],
+    'appVersion' => [
+        'type' => 'string',
+        'aliases' => [
+            'appVersion',
+            'player',
+        ],
+        'maxLength' => 100,
+    ],
+    'ip' => [
+        'type' => 'string',
+        'aliases' => [
+            'ip',
+            'address',
+        ],
+        'maxLength' => 64,
+    ],
+    'notes' => [
+        'type' => 'string',
+        'aliases' => [
+            'notes',
+        ],
+        'maxLength' => 180,
+    ],
+];
+
+const DEVICES_NETWORK_FIELD_CONFIG = [
+    'type' => [
+        'type' => 'string',
+        'aliases' => [
+            'type',
+            'interface',
+        ],
+        'maxLength' => 40,
+    ],
+    'ssid' => [
+        'type' => 'string',
+        'aliases' => [
+            'ssid',
+            'networkName',
+        ],
+        'maxLength' => 64,
+    ],
+    'quality' => [
+        'type' => 'number',
+        'aliases' => [
+            'quality',
+            'signalQuality',
+            'linkQuality',
+            'strength',
+        ],
+        'min' => 0,
+        'max' => 100,
+        'integer' => true,
+        'round' => 'nearest',
+    ],
+    'signal' => [
+        'type' => 'number',
+        'aliases' => [
+            'signal',
+            'dbm',
+            'wifiSignal',
+            'strength',
+            'rssi',
+        ],
+    ],
+    'rssi' => [
+        'type' => 'number',
+        'aliases' => [
+            'rssi',
+        ],
+        'integer' => true,
+        'round' => 'nearest',
+    ],
+    'latency' => [
+        'type' => 'number',
+        'aliases' => [
+            'latency',
+        ],
+        'min' => 0,
+    ],
+];
+
+const DEVICES_METRIC_FIELD_CONFIG = [
+    'cpuLoad' => [
+        'type' => 'number',
+        'aliases' => [
+            'cpuLoad',
+            'cpu',
+            'cpu_usage',
+            'cpuPercent',
+            'cpuLoadPercent',
+        ],
+    ],
+    'memoryUsage' => [
+        'type' => 'number',
+        'aliases' => [
+            'memoryUsage',
+            'memory',
+            'ram',
+            'memoryPercent',
+            'memUsage',
+            'ramUsage',
+        ],
+    ],
+    'storageFree' => [
+        'type' => 'number',
+        'aliases' => [
+            'storageFree',
+            'storage_free',
+            'storageFreeMb',
+            'diskFree',
+            'diskFreeMb',
+            'freeStorage',
+        ],
+    ],
+    'storageUsed' => [
+        'type' => 'number',
+        'aliases' => [
+            'storageUsed',
+            'storage_used',
+            'storageUsedMb',
+            'diskUsed',
+            'diskUsedMb',
+            'usedStorage',
+        ],
+    ],
+    'temperature' => [
+        'type' => 'number',
+        'aliases' => [
+            'temperature',
+            'temp',
+            'temperatureC',
+            'tempC',
+        ],
+    ],
+    'uptime' => [
+        'type' => 'number',
+        'aliases' => [
+            'uptime',
+            'upTimeSeconds',
+            'uptimeSeconds',
+            'uptimeSec',
+        ],
+    ],
+    'batteryLevel' => [
+        'type' => 'number',
+        'aliases' => [
+            'batteryLevel',
+            'battery',
+            'batteryPercent',
+            'battery_level',
+        ],
+    ],
+    'latency' => [
+        'type' => 'number',
+        'aliases' => [
+            'latency',
+            'ping',
+        ],
+    ],
+];
+// <<< GENERATED: DEVICE_FIELD_CONFIG <<<
+
 function devices_truncate_string(string $value, int $length): string
 {
     if ($length <= 0) {
@@ -38,54 +211,95 @@ function devices_optional_string($value, int $maxLength = 120): ?string
     return devices_truncate_string($string, $maxLength);
 }
 
+function devices_optional_number($value, array $config)
+{
+    if (!is_numeric($value)) {
+        return null;
+    }
+
+    $number = (float) $value;
+
+    if (isset($config['min'])) {
+        $number = max((float) $config['min'], $number);
+    }
+
+    if (isset($config['max'])) {
+        $number = min((float) $config['max'], $number);
+    }
+
+    if (isset($config['round'])) {
+        switch ($config['round']) {
+            case 'nearest':
+                $number = round($number);
+                break;
+            case 'floor':
+                $number = floor($number);
+                break;
+            case 'ceil':
+                $number = ceil($number);
+                break;
+        }
+    }
+
+    if (!empty($config['integer'])) {
+        return (int) $number;
+    }
+
+    return $number;
+}
+
+function devices_sanitize_fields(array $input, array $fieldConfig): array
+{
+    $result = [];
+
+    foreach ($fieldConfig as $name => $config) {
+        if (!isset($config['aliases']) || !is_array($config['aliases'])) {
+            continue;
+        }
+        foreach ($config['aliases'] as $alias) {
+            if (!array_key_exists($alias, $input)) {
+                continue;
+            }
+            $raw = $input[$alias];
+            if ($config['type'] === 'string') {
+                $maxLength = $config['maxLength'] ?? 120;
+                $value = devices_optional_string($raw, (int) $maxLength);
+            } elseif ($config['type'] === 'number') {
+                $value = devices_optional_number($raw, $config);
+            } else {
+                $value = null;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $result[$name] = $value;
+            break;
+        }
+    }
+
+    return $result;
+}
+
 function devices_sanitize_network($value): array
 {
     if (!is_array($value)) {
         return [];
     }
 
-    $network = [];
-    $type = devices_optional_string($value['type'] ?? $value['interface'] ?? null, 40);
-    if ($type !== null) {
-        $network['type'] = $type;
-    }
-    $ssid = devices_optional_string($value['ssid'] ?? $value['networkName'] ?? null, 64);
-    if ($ssid !== null) {
-        $network['ssid'] = $ssid;
+    $network = devices_sanitize_fields($value, DEVICES_NETWORK_FIELD_CONFIG);
+
+    if (isset($network['signal']) && !is_float($network['signal'])) {
+        $network['signal'] = (float) $network['signal'];
     }
 
-    foreach (['quality', 'signalQuality', 'linkQuality', 'strength'] as $candidate) {
-        if (!isset($value[$candidate]) || !is_numeric($value[$candidate])) {
-            continue;
-        }
-        $quality = max(0, min(100, (int) round((float) $value[$candidate])));
-        $network['quality'] = $quality;
-        break;
+    if (isset($network['latency'])) {
+        $network['latency'] = max(0, (float) $network['latency']);
     }
 
-    $signalCaptured = false;
-    foreach (['signal', 'dbm', 'wifiSignal', 'strength', 'rssi'] as $candidate) {
-        if (!isset($value[$candidate]) || !is_numeric($value[$candidate])) {
-            continue;
-        }
-        $signal = (float) $value[$candidate];
-        $network['signal'] = $signal;
-        if ($candidate === 'rssi') {
-            $network['rssi'] = (int) round($signal);
-        }
-        $signalCaptured = true;
-        break;
-    }
-
-    if (!$signalCaptured && isset($value['rssi']) && is_numeric($value['rssi'])) {
-        $network['signal'] = (float) $value['rssi'];
-        $network['rssi'] = (int) round((float) $value['rssi']);
-    } elseif (!isset($network['rssi']) && isset($value['rssi']) && is_numeric($value['rssi'])) {
-        $network['rssi'] = (int) round((float) $value['rssi']);
-    }
-
-    if (isset($value['latency']) && is_numeric($value['latency'])) {
-        $network['latency'] = max(0, (float) $value['latency']);
+    if (isset($network['quality'])) {
+        $network['quality'] = (int) $network['quality'];
     }
 
     return $network;
@@ -136,33 +350,7 @@ function devices_sanitize_metrics($value): array
     if (!is_array($value)) {
         return [];
     }
-    $metrics = [];
-    $map = [
-        'cpuLoad' => ['cpuLoad', 'cpu', 'cpu_usage', 'cpuPercent', 'cpuLoadPercent'],
-        'memoryUsage' => ['memoryUsage', 'memory', 'ram', 'memoryPercent', 'memUsage', 'ramUsage'],
-        'storageFree' => ['storageFree', 'storage_free', 'storageFreeMb', 'diskFree', 'diskFreeMb', 'freeStorage'],
-        'storageUsed' => ['storageUsed', 'storage_used', 'storageUsedMb', 'diskUsed', 'diskUsedMb', 'usedStorage'],
-        'temperature' => ['temperature', 'temp', 'temperatureC', 'tempC'],
-        'uptime' => ['uptime', 'upTimeSeconds', 'uptimeSeconds', 'uptimeSec'],
-        'batteryLevel' => ['battery', 'batteryLevel', 'batteryPercent', 'battery_level'],
-        'latency' => ['latency', 'ping']
-    ];
-
-    foreach ($map as $target => $candidates) {
-        foreach ($candidates as $candidate) {
-            if (!array_key_exists($candidate, $value)) {
-                continue;
-            }
-            $raw = $value[$candidate];
-            if (!is_numeric($raw)) {
-                continue;
-            }
-            $metrics[$target] = (float) $raw;
-            break;
-        }
-    }
-
-    return $metrics;
+    return devices_sanitize_fields($value, DEVICES_METRIC_FIELD_CONFIG);
 }
 
 function devices_sanitize_status($value): array
@@ -171,27 +359,7 @@ function devices_sanitize_status($value): array
         return [];
     }
 
-    $status = [];
-
-    $firmware = devices_optional_string($value['firmware'] ?? $value['version'] ?? null, 100);
-    if ($firmware !== null) {
-        $status['firmware'] = $firmware;
-    }
-
-    $appVersion = devices_optional_string($value['appVersion'] ?? $value['player'] ?? null, 100);
-    if ($appVersion !== null) {
-        $status['appVersion'] = $appVersion;
-    }
-
-    $ip = devices_optional_string($value['ip'] ?? $value['address'] ?? null, 64);
-    if ($ip !== null) {
-        $status['ip'] = $ip;
-    }
-
-    $notes = devices_optional_string($value['notes'] ?? null, 180);
-    if ($notes !== null) {
-        $status['notes'] = $notes;
-    }
+    $status = devices_sanitize_fields($value, DEVICES_STATUS_FIELD_CONFIG);
 
     $networkSource = [];
     if (isset($value['network']) && is_array($value['network'])) {
@@ -282,7 +450,12 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     if (isset($telemetry['status']) && is_array($telemetry['status'])) {
         $statusInput = $telemetry['status'];
     }
-    foreach (['firmware', 'ip', 'network', 'errors', 'notes', 'appVersion'] as $key) {
+    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
+        if (isset($telemetry[$key]) && !isset($statusInput[$key])) {
+            $statusInput[$key] = $telemetry[$key];
+        }
+    }
+    foreach (['network', 'errors'] as $key) {
         if (isset($telemetry[$key]) && !isset($statusInput[$key])) {
             $statusInput[$key] = $telemetry[$key];
         }
@@ -293,7 +466,7 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
         $metricsInput = $telemetry['metrics'];
     }
 
-    foreach (['cpuLoad', 'memoryUsage', 'storageFree', 'storageUsed', 'temperature', 'uptime', 'batteryLevel', 'latency'] as $key) {
+    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
 
         if (isset($telemetry[$key]) && !isset($metricsInput[$key])) {
             $metricsInput[$key] = $telemetry[$key];
@@ -334,7 +507,7 @@ function devices_extract_telemetry_payload(array $payload): array
     $telemetry = [];
 
     $status = [];
-    foreach (['firmware', 'appVersion', 'ip', 'notes'] as $key) {
+    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
         if (isset($payload[$key])) {
             $status[$key] = $payload[$key];
         }
@@ -357,7 +530,7 @@ function devices_extract_telemetry_payload(array $payload): array
     if (isset($payload['metrics']) && is_array($payload['metrics'])) {
         $metrics = $payload['metrics'];
     }
-    foreach (['cpuLoad', 'memoryUsage', 'storageFree', 'storageUsed', 'temperature', 'uptime', 'batteryLevel'] as $key) {
+    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
         if (isset($payload[$key]) && !isset($metrics[$key])) {
             $metrics[$key] = $payload[$key];
         }
