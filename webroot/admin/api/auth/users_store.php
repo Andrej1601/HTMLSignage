@@ -240,7 +240,17 @@ function auth_users_load(): array
         }
     }
 
-    return auth_users_load_from_file();
+    $state = auth_users_load_from_file();
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $state);
+        } catch (Throwable $exception) {
+            error_log('Failed to import users into SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return $state;
 }
 
 function auth_users_save(array $state): void

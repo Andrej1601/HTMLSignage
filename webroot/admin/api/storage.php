@@ -6,6 +6,8 @@
 declare(strict_types=1);
 
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
+const SIGNAGE_SCHEDULE_STORAGE_KEY = 'schedule.state';
+const SIGNAGE_SETTINGS_STORAGE_KEY = 'settings.state';
 
 function signage_db_path(): string
 {
@@ -208,6 +210,217 @@ function signage_normalize_schedule($schedule): array
     return $schedule;
 }
 
+function signage_default_settings(): array
+{
+    return [
+        'version' => 1,
+        'theme' => [
+            'bg' => '#E8DEBD',
+            'fg' => '#5C3101',
+            'accent' => '#5C3101',
+            'gridBorder' => '#5C3101',
+            'gridTable' => '#5C3101',
+            'gridTableW' => 2,
+            'cellBg' => '#5C3101',
+            'boxFg' => '#FFFFFF',
+            'headRowBg' => '#E8DEBD',
+            'headRowFg' => '#5C3101',
+            'timeColBg' => '#E8DEBD',
+            'timeZebra1' => '#EAD9A0',
+            'timeZebra2' => '#E2CE91',
+            'zebra1' => '#EDDFAF',
+            'zebra2' => '#E6D6A1',
+            'cornerBg' => '#E8DEBD',
+            'cornerFg' => '#5C3101',
+            'tileBorder' => '#5C3101',
+            'chipBorder' => '#5C3101',
+            'chipBorderW' => 2,
+            'flame' => '#FFD166',
+            'saunaColor' => '#5C3101',
+        ],
+        'fonts' => [
+            'family' => "-apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif",
+            'scale' => 1,
+            'h1Scale' => 1,
+            'h2Scale' => 1,
+            'overviewTitleScale' => 1,
+            'overviewHeadScale' => 0.9,
+            'overviewCellScale' => 0.8,
+            'overviewTimeScale' => 0.8,
+            'tileTextScale' => 0.8,
+            'tileWeight' => 600,
+            'chipHeight' => 1,
+            'chipOverflowMode' => 'scale',
+            'flamePct' => 55,
+            'flameGapScale' => 0.14,
+        ],
+        'h2' => [
+            'mode' => 'text',
+            'text' => 'Aufgusszeiten',
+            'showOnOverview' => true,
+        ],
+        'display' => [
+            'fit' => 'cover',
+            'rightWidthPercent' => 38,
+            'cutTopPercent' => 28,
+            'cutBottomPercent' => 12,
+        ],
+        'slides' => [
+            'overviewDurationSec' => 10,
+            'saunaDurationSec' => 6,
+            'transitionMs' => 500,
+            'tileWidthPercent' => 45,
+            'tileMinScale' => 0.25,
+            'tileMaxScale' => 0.57,
+            'tileFlameSizeScale' => 1,
+            'tileFlameGapScale' => 1,
+            'durationMode' => 'uniform',
+            'globalDwellSec' => 6,
+            'loop' => true,
+            'order' => ['overview'],
+            'saunaTitleMaxWidthPercent' => 64,
+        ],
+        'assets' => [
+            'rightImages' => [],
+            'flameImage' => '/assets/img/flame_test.svg',
+        ],
+        'footnotes' => [
+            ['id' => 'star', 'label' => '*', 'text' => 'Nur am Fr und Sa'],
+        ],
+        'interstitials' => [],
+        'presets' => [],
+        'presetAuto' => false,
+    ];
+}
+
+function signage_normalize_settings($settings, ?array $fallback = null): array
+{
+    if (!is_array($settings)) {
+        return $fallback ?? signage_default_settings();
+    }
+    return $settings;
+}
+
+function signage_schedule_load(?array $fallback = null): array
+{
+    $default = $fallback ?? signage_default_schedule();
+
+    if (signage_db_available()) {
+        try {
+            $state = signage_kv_get(SIGNAGE_SCHEDULE_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return signage_normalize_schedule($state);
+            }
+        } catch (Throwable $exception) {
+            error_log('Failed to load schedule from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    $schedule = signage_read_json_file('schedule.json', $default);
+    $schedule = signage_normalize_schedule($schedule);
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $schedule);
+        } catch (Throwable $exception) {
+            error_log('Failed to import schedule into SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return $schedule;
+}
+
+function signage_settings_load(?array $fallback = null): array
+{
+    $default = $fallback ?? signage_default_settings();
+
+    if (signage_db_available()) {
+        try {
+            $state = signage_kv_get(SIGNAGE_SETTINGS_STORAGE_KEY, null);
+            if (is_array($state)) {
+                return signage_normalize_settings($state, $default);
+            }
+        } catch (Throwable $exception) {
+            error_log('Failed to load settings from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    $settings = signage_read_json_file('settings.json', $default);
+    $settings = signage_normalize_settings($settings, $default);
+
+    if (signage_db_available()) {
+        try {
+            signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $settings);
+        } catch (Throwable $exception) {
+            error_log('Failed to import settings into SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return $settings;
+}
+
+function signage_schedule_save($schedule, ?string &$error = null): bool
+{
+    $error = null;
+    $normalized = signage_normalize_schedule(is_array($schedule) ? $schedule : []);
+    $errors = [];
+
+    $hasSqlite = signage_db_available();
+    $sqliteOk = !$hasSqlite;
+    if ($hasSqlite) {
+        try {
+            signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $normalized);
+            $sqliteOk = true;
+        } catch (Throwable $exception) {
+            $sqliteOk = false;
+            $errors[] = 'sqlite: ' . $exception->getMessage();
+        }
+    }
+
+    $fileError = null;
+    $fileOk = signage_write_json_file('schedule.json', $normalized, $fileError);
+    if (!$fileOk) {
+        $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+    }
+
+    if ($errors) {
+        $error = implode('; ', $errors);
+    }
+
+    return $sqliteOk && $fileOk;
+}
+
+function signage_settings_save($settings, ?string &$error = null): bool
+{
+    $error = null;
+    $normalized = signage_normalize_settings($settings, signage_default_settings());
+    $errors = [];
+
+    $hasSqlite = signage_db_available();
+    $sqliteOk = !$hasSqlite;
+    if ($hasSqlite) {
+        try {
+            signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $normalized);
+            $sqliteOk = true;
+        } catch (Throwable $exception) {
+            $sqliteOk = false;
+            $errors[] = 'sqlite: ' . $exception->getMessage();
+        }
+    }
+
+    $fileError = null;
+    $fileOk = signage_write_json_file('settings.json', $normalized, $fileError);
+    if (!$fileOk) {
+        $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+    }
+
+    if ($errors) {
+        $error = implode('; ', $errors);
+    }
+
+    return $sqliteOk && $fileOk;
+}
+
 function signage_base_path(): string
 {
     static $base = null;
@@ -274,7 +487,7 @@ function signage_assets_path(string $path = ''): string
     return $dir . '/' . ltrim($path, '/');
 }
 
-function signage_read_json(string $file, array $default = []): array
+function signage_read_json_file(string $file, array $default = []): array
 {
     $path = signage_data_path($file);
     if (!is_file($path)) {
@@ -288,7 +501,19 @@ function signage_read_json(string $file, array $default = []): array
     return is_array($decoded) ? $decoded : $default;
 }
 
-function signage_write_json(string $file, $data, ?string &$error = null): bool
+function signage_read_json(string $file, array $default = []): array
+{
+    switch ($file) {
+        case 'schedule.json':
+            return signage_schedule_load($default ?: null);
+        case 'settings.json':
+            return signage_settings_load($default ?: null);
+        default:
+            return signage_read_json_file($file, $default);
+    }
+}
+
+function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $path = signage_data_path($file);
     $dir = dirname($path);
@@ -309,6 +534,18 @@ function signage_write_json(string $file, $data, ?string &$error = null): bool
     }
     @chmod($path, 0644);
     return true;
+}
+
+function signage_write_json(string $file, $data, ?string &$error = null): bool
+{
+    switch ($file) {
+        case 'schedule.json':
+            return signage_schedule_save($data, $error);
+        case 'settings.json':
+            return signage_settings_save($data, $error);
+        default:
+            return signage_write_json_file($file, $data, $error);
+    }
 }
 
 function signage_absolute_path(string $relative): string
