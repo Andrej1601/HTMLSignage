@@ -17,6 +17,7 @@ import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
+import { notifySuccess, notifyWarning } from '../core/notifications.js';
 import {
   ensureBadgeLibrary,
   createBadge,
@@ -572,7 +573,7 @@ function initWeekdayUI(){
     localStorage.setItem('settingsDraft', JSON.stringify(ctx.getSettings()));
     if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
 
-    alert('Wochentag gespeichert: ' + (DAY_LABELS[activeDayKey] || activeDayKey));
+    notifySuccess('Wochentag gespeichert: ' + (DAY_LABELS[activeDayKey] || activeDayKey));
   };
 }
 
@@ -1003,7 +1004,7 @@ if ($name && mode === 'normal') {
     // Duplikate im aktuellen Tag verhindern
     const existsIdx = (schedule.saunas||[]).findIndex((n,i)=> n===newName && i!==index);
     if (existsIdx !== -1){
-      alert('Es existiert bereits eine Sauna mit diesem Namen am aktuellen Tag.');
+      notifyWarning('Es existiert bereits eine Sauna mit diesem Namen am aktuellen Tag.');
       $name.value = old;
       return;
     }
@@ -2852,7 +2853,7 @@ export function renderSlidesMaster(){
   const requireSelectedStyleSet = () => {
     const id = getSelectedStyleSetId({ allowFallback: false });
     if (!id){
-      alert('Bitte zuerst eine Style-Palette auswählen.');
+      notifyWarning('Bitte zuerst eine Style-Palette auswählen.');
       return null;
     }
     return id;
@@ -2997,7 +2998,7 @@ export function renderSlidesMaster(){
       const currentId = requireSelectedStyleSet();
       if (!currentId || !styleSets[currentId]) return;
       if (Object.keys(styleSets).length <= 1){
-        alert('Mindestens eine Palette muss vorhanden sein.');
+        notifyWarning('Mindestens eine Palette muss vorhanden sein.');
         return;
       }
       if (!confirm('Palette wirklich löschen?')) return;
@@ -3130,7 +3131,7 @@ if (durPer) durPer.onchange = () => {
     if (!name) return;
     const all = getAllSaunas();
     if (all.includes(name)){
-      alert('Diesen Namen gibt es bereits im Inventar.');
+      notifyWarning('Diesen Namen gibt es bereits im Inventar.');
       return;
     }
     const s = ctx.getSettings();

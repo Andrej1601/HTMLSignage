@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/storage.php';
+require_once __DIR__ . '/devices_store.php';
+require_once __DIR__ . '/device_resolver.php';
 
 /**
  * File: /var/www/signage/admin/api/device_resolve.php
@@ -7,126 +9,36 @@ require_once __DIR__ . '/storage.php';
  * Warum wichtige Checks: Verhindert "undefined"-Geräte & sorgt für robuste Fallbacks.
  */
 
-require_once __DIR__ . '/devices_store.php';
-
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
-// --- kleine Helfer (nur "warum"-kritische Funktionalität) -------------------
-
-/** Rekursives Merge nur für assoziative Arrays; Geräte-Overrides haben Vorrang. */
-function merge_r($a, $b) {
-  if (!is_array($a)) $a = [];
-  if (!is_array($b)) return $a;
-  foreach ($b as $k => $v) {
-    $a[$k] = (is_array($v) && array_key_exists($k, $a) && is_array($a[$k]))
-      ? merge_r($a[$k], $v)
-      : $v;
-  }
-  return $a;
-}
-
-/** Aktueller Tag als Kurzschlüssel (Sun,Mon,...). */
-function day_key() {
-  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][intval(date('w'))] ?? 'Sun';
-}
-
-// --- Input ------------------------------------------------------------------
-
 $rawDevice = $_GET['device'] ?? '';
 $rawDevice = is_string($rawDevice) ? trim($rawDevice) : '';
-$devId = devices_normalize_device_id($rawDevice);
+
 if ($rawDevice === '') {
-  http_response_code(400);
-  echo json_encode(['ok'=>false, 'error'=>'missing-device'], JSON_UNESCAPED_SLASHES);
-  exit;
-}
-if ($devId === '') {
-  http_response_code(400);
-  echo json_encode(['ok'=>false, 'error'=>'invalid-device-format'], JSON_UNESCAPED_SLASHES);
-  exit;
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'missing-device'], JSON_UNESCAPED_SLASHES);
+    exit;
 }
 
-// --- DB & Gerät -------------------------------------------------------------
+$error = null;
+$payload = devices_resolve_payload($rawDevice, $error);
 
-$db  = devices_load();
-$dev = $db['devices'][$devId] ?? null;
-if (!$dev) {
-  http_response_code(404);
-  echo json_encode(['ok'=>false, 'error'=>'device-not-found'], JSON_UNESCAPED_SLASHES);
-  exit;
+if ($payload === null) {
+    $status = $error['status'] ?? 500;
+    $code = $error['code'] ?? 'resolve-failed';
+    http_response_code($status);
+    echo json_encode(['ok' => false, 'error' => $code], JSON_UNESCAPED_SLASHES);
+    exit;
 }
-
-// --- Pfade & Basiskonfiguration --------------------------------------------
-
-$baseSettings = signage_read_json('settings.json');
-$baseSchedule = signage_read_json('schedule.json');
-$baseScheduleVersion = intval($baseSchedule['version'] ?? 0);
-
-$overSettings = $dev['overrides']['settings'] ?? [];
-$overSchedule = $dev['overrides']['schedule'] ?? [];
-
-if (empty($dev['useOverrides'])) {
-  $overSettings = [];
-  $overSchedule = [];
-} else {
-  if (!is_array($overSettings)) $overSettings = [];
-  if (!is_array($overSchedule)) $overSchedule = [];
-}
-
-
-// --- Merge & Versionen ------------------------------------------------------
-
-$mergedSettings = merge_r($baseSettings, $overSettings);
-
-// Preset-Felder aus Basiskonfig übernehmen, falls Overrides sie weglassen
-if (!array_key_exists('presetAuto', $overSettings) || $overSettings['presetAuto'] === null || $overSettings['presetAuto'] === '') {
-  if (array_key_exists('presetAuto', $baseSettings)) {
-    $mergedSettings['presetAuto'] = $baseSettings['presetAuto'];
-  }
-}
-if (!array_key_exists('presets', $overSettings) || !is_array($overSettings['presets']) || count($overSettings['presets']) === 0) {
-  if (array_key_exists('presets', $baseSettings) && is_array($baseSettings['presets'])) {
-    $mergedSettings['presets'] = $baseSettings['presets'];
-  }
-}
-
-// Zeitplan ggf. anhand Preset automatisch ersetzen
-$schedule = $baseSchedule;
-if (!empty($mergedSettings['presetAuto']) && !empty($mergedSettings['presets']) && is_array($mergedSettings['presets'])) {
-  $presets = $mergedSettings['presets'];
-  $preset  = $presets[day_key()] ?? ($presets['Default'] ?? null);
-  if (is_array($preset) && isset($preset['saunas']) && isset($preset['rows']) && is_array($preset['rows'])) {
-    $schedule = $preset;
-  }
-}
-
-$useOverrides = !empty($dev['useOverrides']);
-if ($useOverrides && !empty($overSchedule)) {
-  $schedule = merge_r($schedule, $overSchedule);
-  $schedule['version'] = intval($overSchedule['version'] ?? 0);
-} else {
-  $schedule['version'] = $baseScheduleVersion;
-}
-
-// Version als Cache-Bremse; bei aktivem Override nur dessen Version nutzen
-if ($useOverrides && array_key_exists('version', $overSettings)) {
-  $mergedSettings['version'] = intval($overSettings['version']);
-} else {
-  $mergedSettings['version'] = intval($baseSettings['version'] ?? 0);
-}
-
-// --- Antwort ----------------------------------------------------------------
 
 $out = [
-  'ok'       => true,
-  'device'   => [
-    'id'   => $devId,
-    'name' => $dev['name'] ?? $devId,
-  ],
-  'settings' => $mergedSettings,
-  'schedule' => $schedule,
-  'now'      => time(),
+    'ok' => true,
+    'device' => $payload['device'],
+    'settings' => $payload['settings'],
+    'schedule' => $payload['schedule'],
+    'meta' => $payload['meta'] ?? [],
+    'now' => time(),
 ];
 
 echo json_encode($out, SIGNAGE_JSON_FLAGS);

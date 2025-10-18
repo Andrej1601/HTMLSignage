@@ -2,6 +2,7 @@
 // Minimaler, wiederverwendbarer Uploader (wie dein bisheriger uploadGeneric)
 
 import { fetchJson } from './utils.js';
+import { notifyError } from './notifications.js';
 
 export async function uploadGeneric(fileInput, onDone, thumbInput){
   if (!fileInput?.files || !fileInput.files[0]) return;
@@ -23,7 +24,7 @@ export async function uploadGeneric(fileInput, onDone, thumbInput){
     }
   } catch (error) {
     console.error('[admin] Upload fehlgeschlagen', error);
-    alert(error.message || 'Upload fehlgeschlagen.');
+    notifyError(error.message || 'Upload fehlgeschlagen.');
   } finally {
     try { fileInput.value = ''; } catch {}
     if (thumbInput) {

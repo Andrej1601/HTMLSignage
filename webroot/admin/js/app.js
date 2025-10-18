@@ -31,6 +31,7 @@ import {
 import { initBackupButtons } from './modules/backup.js';
 import { initCleanupInSystem } from './modules/system_cleanup.js';
 import { initUserAdmin } from './modules/user_admin.js';
+import { notifyError, notifyInfo, notifySuccess, notifyWarning } from './core/notifications.js';
 import {
   PAGE_CONTENT_TYPES,
   PAGE_CONTENT_TYPE_KEYS,
@@ -704,7 +705,7 @@ async function loadAll(){
     ]);
   } catch (error) {
     console.error('[admin] Laden der Basisdaten fehlgeschlagen', error);
-    alert('Fehler beim Laden der Daten: ' + error.message);
+    notifyError('Fehler beim Laden der Daten: ' + error.message);
     return;
   }
 
@@ -2960,10 +2961,10 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       updateBaseline(baseSchedule, baseSettings);
       clearDraftsIfPresent();
       setUnsavedState(false);
-      alert('Gespeichert (Global).');
+      notifySuccess('Gespeichert (Global).');
     } catch (error) {
       console.error('[admin] Speichern (global) fehlgeschlagen', error);
-      alert('Fehler: ' + error.message);
+      notifyError('Fehler: ' + error.message);
     }
   } else {
     // Geräte-Override speichern
@@ -2981,10 +2982,10 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       updateBaseline(deviceBaseSchedule, deviceBaseSettings);
       clearDraftsIfPresent();
       setUnsavedState(false);
-      alert('Gespeichert für Gerät: ' + (ctx.name || ctx.id));
+      notifySuccess('Gespeichert für Gerät: ' + (ctx.name || ctx.id));
     } catch (error) {
       console.error('[admin] Speichern (Gerät) fehlgeschlagen', error);
-      alert('Fehler: ' + error.message);
+      notifyError('Fehler: ' + error.message);
     }
   }
   });
@@ -3029,14 +3030,14 @@ async function claim(codeFromUI, nameFromUI) {
   const code = (codeFromUI || '').trim().toUpperCase();
   const name = (nameFromUI || '').trim() || ('Display ' + code.slice(-3));
   if (!/^[A-Z0-9]{6}$/.test(code)) {
-    alert('Bitte einen 6-stelligen Code eingeben.'); return;
+    notifyWarning('Bitte einen 6-stelligen Code eingeben.'); return;
   }
   let response;
   try {
     response = await claimDevice(code, name);
   } catch (error) {
     console.error('[admin] Pairing fehlgeschlagen', error);
-    alert('Fehler: ' + error.message);
+    notifyError('Fehler: ' + error.message);
     return;
   }
 
@@ -3047,7 +3048,7 @@ async function claim(codeFromUI, nameFromUI) {
   }
   // Pane neu laden (siehe createDevicesPane -> render)
   await refreshDevicesPane({ bypassCache: true });
-  alert('Gerät gekoppelt' + (response.already ? ' (war bereits gekoppelt)' : '') + '.');
+  notifySuccess('Gerät gekoppelt' + (response.already ? ' (war bereits gekoppelt)' : '') + '.');
 }
 
 async function createDevicesPane(){
@@ -3191,35 +3192,35 @@ async function createDevicesPane(){
             modeLabel.textContent = desiredMode ? 'Individuell' : 'Global';
             row.classList.toggle('ind', desiredMode);
             modeWrap.classList.toggle('ind-active', desiredMode);
-            try {
-              await setDeviceMode(device.id, mode);
-            } catch (error) {
-              console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
-              alert('Fehler: ' + error.message);
-              modeInput.checked = !desiredMode;
-              const rollback = !!modeInput.checked;
-              modeLabel.textContent = rollback ? 'Individuell' : 'Global';
-              row.classList.toggle('ind', rollback);
-              modeWrap.classList.toggle('ind-active', rollback);
-            }
-          });
+          try {
+            await setDeviceMode(device.id, mode);
+          } catch (error) {
+            console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
+            notifyError('Fehler: ' + error.message);
+            modeInput.checked = !desiredMode;
+            const rollback = !!modeInput.checked;
+            modeLabel.textContent = rollback ? 'Individuell' : 'Global';
+            row.classList.toggle('ind', rollback);
+            modeWrap.classList.toggle('ind-active', rollback);
+          }
+        });
 
-          row.querySelector('[data-unpair]')?.addEventListener('click', async () => {
-            if (!/^dev_/.test(String(device.id))) {
-              alert('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
-              return;
-            }
-            const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
-            if ((check || '').trim().toLowerCase() !== 'ja') return;
-            try {
-              await unpairDevice(device.id, { purge: true });
-              alert('Gerät getrennt.');
-              await render({ bypassCache: true });
-            } catch (error) {
-              console.error('[admin] Gerät trennen fehlgeschlagen', error);
-              alert('Fehler: ' + error.message);
-            }
-          });
+        row.querySelector('[data-unpair]')?.addEventListener('click', async () => {
+          if (!/^dev_/.test(String(device.id))) {
+            notifyWarning('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
+            return;
+          }
+          const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+          if ((check || '').trim().toLowerCase() !== 'ja') return;
+          try {
+            await unpairDevice(device.id, { purge: true });
+            notifySuccess('Gerät getrennt.');
+            await render({ bypassCache: true });
+          } catch (error) {
+            console.error('[admin] Gerät trennen fehlgeschlagen', error);
+            notifyError('Fehler: ' + error.message);
+          }
+        });
 
           row.querySelector('[data-view]')?.addEventListener('click', () => {
             selectRow(row);
@@ -3229,7 +3230,7 @@ async function createDevicesPane(){
             const url = SLIDESHOW_ORIGIN + '/?device=' + device.id;
             try {
               await navigator.clipboard.writeText(url);
-              alert('URL kopiert:\n' + url);
+              notifyInfo('URL kopiert: ' + url);
             } catch {
               prompt('URL kopieren:', url);
             }
@@ -3243,11 +3244,11 @@ async function createDevicesPane(){
             if (newName === null) return;
             try {
               await renameDevice(device.id, newName);
-              alert('Name gespeichert.');
+              notifySuccess('Name gespeichert.');
               await render({ bypassCache: true });
             } catch (error) {
               console.error('[admin] Gerät umbenennen fehlgeschlagen', error);
-              alert('Fehler: ' + error.message);
+              notifyError('Fehler: ' + error.message);
             }
           });
           tbody.appendChild(row);
@@ -3285,11 +3286,11 @@ async function createDevicesPane(){
       const result = await cleanupDevices();
       const deletedDevices = result?.deletedDevices ?? '?';
       const deletedPairings = result?.deletedPairings ?? '?';
-      alert(`Bereinigt: ${deletedDevices} Geräte, ${deletedPairings} Pairing-Codes.`);
+      notifySuccess(`Bereinigt: ${deletedDevices} Geräte, ${deletedPairings} Pairing-Codes.`);
       await triggerRender({ bypassCache: true });
     } catch (error) {
       console.error('[admin] Gerätebereinigung fehlgeschlagen', error);
-      alert('Fehler: ' + error.message);
+      notifyError('Fehler: ' + error.message);
     }
   });
 
@@ -3308,7 +3309,7 @@ function openDevicePreview(id, name){
   const f = document.getElementById('devPrevFrame');
   if (!m || !f) {
     console.error('[devPrev] Modal oder Frame nicht gefunden. Existieren #devPrevModal und #devPrevFrame als SIBLINGS von #prevModal?');
-    alert('Geräte-Vorschau nicht verfügbar (siehe Konsole).');
+    notifyWarning('Geräte-Vorschau nicht verfügbar (siehe Konsole).');
     return;
   }
   const t = m.querySelector('[data-devprev-title]');

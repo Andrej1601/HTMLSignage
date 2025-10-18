@@ -4,6 +4,7 @@
 
 import { $, $$, parseTime } from '../core/utils.js';
 import { sanitizeBadgeLibrary } from '../core/config.js';
+import { notifyWarning } from '../core/notifications.js';
 
 let ctx = null;           // { getSchedule, getSettings }
 let curRow = 0, curCol = 0;
@@ -424,7 +425,7 @@ export function renderGrid(){
       const t  = parseTime(inp.value);
       const sc2 = ctx.getSchedule();
       if (!t) {
-        alert('Bitte HH:MM');
+        notifyWarning('Bitte HH:MM');
         inp.value = sc2.rows[ri].time;
         return;
       }
@@ -522,7 +523,7 @@ function initOnce(){
       return list;
     })();
 
-    if (!newTime && title) { alert('Bitte Zeit HH:MM'); return; }
+    if (!newTime && title) { notifyWarning('Bitte Zeit HH:MM'); return; }
 
     const newCell = title ? { title, flames } : null;
     if (newCell && hasNote) newCell.noteId = noteId;

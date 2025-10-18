@@ -2255,3 +2255,106 @@ tr.offline .dev-name{ color:#dc2626; }
 }
 }
 
+
+/* --- Notifications -------------------------------------------------------- */
+.notify-host {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 4000;
+  pointer-events: none;
+  width: min(360px, calc(100vw - 32px));
+}
+
+.notify-item {
+  background: rgba(20, 24, 28, 0.95);
+  color: #fdfdfd;
+  border-radius: 12px;
+  padding: 14px 44px 14px 16px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transform: translateY(-12px) scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: auto;
+  position: relative;
+}
+
+.notify-item.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.notify-item.hide {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.94);
+}
+
+.notify-item.notify-success { background: rgba(18, 109, 57, 0.95); }
+.notify-item.notify-warning { background: rgba(156, 105, 18, 0.95); }
+.notify-item.notify-error { background: rgba(148, 32, 32, 0.95); }
+.notify-item.notify-info { background: rgba(28, 78, 126, 0.95); }
+
+body.theme-light .notify-item {
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+}
+
+body.theme-light .notify-item.notify-warning { background: rgba(178, 121, 20, 0.95); }
+body.theme-light .notify-item.notify-info { background: rgba(22, 96, 160, 0.95); }
+
+.notify-title {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.notify-description {
+  margin-top: 4px;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.notify-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notify-action {
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: inherit;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.notify-action:hover { background: rgba(255, 255, 255, 0.3); }
+
+.notify-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.notify-close:hover { opacity: 1; }
+
+@media (max-width: 600px) {
+  .notify-host {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
