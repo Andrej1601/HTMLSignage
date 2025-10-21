@@ -13,6 +13,10 @@ const SIGNAGE_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const SIGNAGE_AUDIT_LOG_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 const SIGNAGE_AUDIT_LOG_MAX_ROWS = 5000;
 const SIGNAGE_AUDIT_LOG_PRUNE_INTERVAL = 300;
+const SIGNAGE_JSON_MAX_TREE_NODES = 20000;
+const SIGNAGE_JSON_MAX_TREE_DEPTH = 16;
+const SIGNAGE_JSON_MAX_STRING_BYTES = 131072;
+const SIGNAGE_SCHEDULE_MAX_SLIDES = 2000;
 
 function signage_last_error_message(string $fallback): string
 {
@@ -83,6 +87,153 @@ function signage_read_file_locked(string $path, ?string &$error = null): ?string
     return $contents;
 }
 
+function signage_validate_json_tree($value, string $path, int $depth, array &$stats, ?string &$error = null): bool
+{
+    if ($depth > SIGNAGE_JSON_MAX_TREE_DEPTH) {
+        $error = 'depth-exceeded:' . $path;
+        return false;
+    }
+
+    $stats['nodes']++;
+    if ($stats['nodes'] > SIGNAGE_JSON_MAX_TREE_NODES) {
+        $error = 'node-limit-exceeded:' . $path;
+        return false;
+    }
+
+    if (is_array($value)) {
+        foreach ($value as $key => $child) {
+            if (!is_int($key) && !is_string($key)) {
+                $error = 'invalid-key:' . $path;
+                return false;
+            }
+            if (!signage_validate_json_tree($child, $path . '/' . (string) $key, $depth + 1, $stats, $error)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    if (is_string($value)) {
+        if (strlen($value) > SIGNAGE_JSON_MAX_STRING_BYTES) {
+            $error = 'string-too-long:' . $path;
+            return false;
+        }
+        return true;
+    }
+
+    if (is_int($value)) {
+        return true;
+    }
+
+    if (is_float($value)) {
+        if (!is_finite($value)) {
+            $error = 'invalid-number:' . $path;
+            return false;
+        }
+        return true;
+    }
+
+    if (is_bool($value) || $value === null) {
+        return true;
+    }
+
+    $error = 'unsupported-type:' . $path;
+    return false;
+}
+
+function signage_validate_json_document($document, string $context, ?string &$error = null, ?array &$stats = null): bool
+{
+    $treeStats = ['nodes' => 0];
+    $treeError = null;
+    if (!signage_validate_json_tree($document, $context, 0, $treeStats, $treeError)) {
+        $error = $context . '-' . ($treeError ?? 'invalid');
+        return false;
+    }
+
+    if (func_num_args() >= 4) {
+        $stats = $treeStats;
+    }
+
+    return true;
+}
+
+function signage_validate_schedule_payload($schedule, ?string &$error = null): bool
+{
+    if (!is_array($schedule)) {
+        $error = 'schedule-invalid-structure';
+        return false;
+    }
+
+    if (!array_key_exists('version', $schedule)) {
+        $error = 'schedule-version-missing';
+        return false;
+    }
+
+    $version = $schedule['version'];
+    if (!is_int($version)) {
+        if (is_numeric($version)) {
+            $version = (int) $version;
+        } else {
+            $error = 'schedule-version-invalid';
+            return false;
+        }
+    }
+
+    if ($version < 0 || $version > PHP_INT_MAX) {
+        $error = 'schedule-version-range';
+        return false;
+    }
+
+    if (isset($schedule['slides'])) {
+        if (!is_array($schedule['slides'])) {
+            $error = 'schedule-slides-invalid';
+            return false;
+        }
+        if (count($schedule['slides']) > SIGNAGE_SCHEDULE_MAX_SLIDES) {
+            $error = 'schedule-slides-too-many';
+            return false;
+        }
+        foreach ($schedule['slides'] as $index => $slide) {
+            if (!is_array($slide)) {
+                $error = 'schedule-slide-invalid-' . $index;
+                return false;
+            }
+        }
+    }
+
+    return signage_validate_json_document($schedule, 'schedule', $error);
+}
+
+function signage_validate_settings_payload($settings, ?string &$error = null): bool
+{
+    if (!is_array($settings)) {
+        $error = 'settings-invalid-structure';
+        return false;
+    }
+
+    if (!array_key_exists('version', $settings)) {
+        $error = 'settings-version-missing';
+        return false;
+    }
+
+    $version = $settings['version'];
+    if (!is_int($version)) {
+        if (is_numeric($version)) {
+            $version = (int) $version;
+        } else {
+            $error = 'settings-version-invalid';
+            return false;
+        }
+    }
+
+    if ($version < 0 || $version > PHP_INT_MAX) {
+        $error = 'settings-version-range';
+        return false;
+    }
+
+    return signage_validate_json_document($settings, 'settings', $error);
+}
+
 function signage_atomic_file_put_contents(string $path, string $contents, ?string &$error = null): bool
 {
     $error = null;
@@ -111,15 +262,25 @@ function signage_atomic_file_put_contents(string $path, string $contents, ?strin
 
     $bytesTotal = strlen($contents);
     $bytesWritten = 0;
+    $buffer = $contents;
     while ($bytesWritten < $bytesTotal) {
-        $chunk = @fwrite($handle, substr($contents, $bytesWritten));
+        $chunk = @fwrite($handle, $buffer);
         if ($chunk === false) {
             $error = 'unable to write to temporary file';
             @fclose($handle);
             @unlink($temp);
             return false;
         }
+        if ($chunk === 0) {
+            $error = 'unable to write to temporary file';
+            @fclose($handle);
+            @unlink($temp);
+            return false;
+        }
         $bytesWritten += $chunk;
+        if ($bytesWritten < $bytesTotal) {
+            $buffer = substr($buffer, $chunk);
+        }
     }
 
     if (!signage_flush_stream($handle, $error)) {
@@ -707,30 +868,46 @@ function signage_settings_load(?array $fallback = null): array
     return signage_normalize_settings($settings, $default);
 }
 
-function signage_schedule_save($schedule, ?string &$error = null): bool
+function signage_schedule_save($schedule, ?string &$error = null, ?array &$status = null): bool
 {
     $error = null;
     $normalized = signage_normalize_schedule(is_array($schedule) ? $schedule : []);
     $errors = [];
 
+    $statusMap = [
+        'sqlite' => ['attempted' => false, 'ok' => null, 'error' => null],
+        'file' => ['attempted' => false, 'ok' => null, 'error' => null],
+    ];
+
     $hasSqlite = signage_db_available();
     $sqliteOk = false;
 
     if ($hasSqlite) {
+        $statusMap['sqlite']['attempted'] = true;
         try {
             signage_kv_set(SIGNAGE_SCHEDULE_STORAGE_KEY, $normalized);
             $sqliteOk = true;
+            $statusMap['sqlite']['ok'] = true;
         } catch (Throwable $exception) {
             $errors[] = 'sqlite: ' . $exception->getMessage();
+            $statusMap['sqlite']['error'] = $exception->getMessage();
         }
     }
 
     $fileOk = true;
     if (!$hasSqlite || !$sqliteOk) {
         $fileError = null;
-        $fileOk = signage_write_json_file('schedule.json', $normalized, $fileError);
+        $statusMap['file']['attempted'] = true;
+        $fileStatus = null;
+        $fileOk = signage_write_json_file('schedule.json', $normalized, $fileError, $fileStatus);
+        if (is_array($fileStatus)) {
+            $statusMap['file'] = array_merge($statusMap['file'], $fileStatus);
+        }
         if (!$fileOk) {
             $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+            if ($statusMap['file']['error'] === null) {
+                $statusMap['file']['error'] = $fileError ?? 'write-failed';
+            }
         }
     } else {
         signage_delete_data_file('schedule.json');
@@ -740,33 +917,53 @@ function signage_schedule_save($schedule, ?string &$error = null): bool
         $error = implode('; ', $errors);
     }
 
+    if (func_num_args() >= 3) {
+        $status = $statusMap;
+    }
+
     return $hasSqlite ? $sqliteOk : $fileOk;
 }
 
-function signage_settings_save($settings, ?string &$error = null): bool
+function signage_settings_save($settings, ?string &$error = null, ?array &$status = null): bool
 {
     $error = null;
     $normalized = signage_normalize_settings($settings, signage_default_settings());
     $errors = [];
 
+    $statusMap = [
+        'sqlite' => ['attempted' => false, 'ok' => null, 'error' => null],
+        'file' => ['attempted' => false, 'ok' => null, 'error' => null],
+    ];
+
     $hasSqlite = signage_db_available();
     $sqliteOk = false;
 
     if ($hasSqlite) {
+        $statusMap['sqlite']['attempted'] = true;
         try {
             signage_kv_set(SIGNAGE_SETTINGS_STORAGE_KEY, $normalized);
             $sqliteOk = true;
+            $statusMap['sqlite']['ok'] = true;
         } catch (Throwable $exception) {
             $errors[] = 'sqlite: ' . $exception->getMessage();
+            $statusMap['sqlite']['error'] = $exception->getMessage();
         }
     }
 
     $fileOk = true;
     if (!$hasSqlite || !$sqliteOk) {
         $fileError = null;
-        $fileOk = signage_write_json_file('settings.json', $normalized, $fileError);
+        $statusMap['file']['attempted'] = true;
+        $fileStatus = null;
+        $fileOk = signage_write_json_file('settings.json', $normalized, $fileError, $fileStatus);
+        if (is_array($fileStatus)) {
+            $statusMap['file'] = array_merge($statusMap['file'], $fileStatus);
+        }
         if (!$fileOk) {
             $errors[] = 'file: ' . ($fileError ?? 'write-failed');
+            if ($statusMap['file']['error'] === null) {
+                $statusMap['file']['error'] = $fileError ?? 'write-failed';
+            }
         }
     } else {
         signage_delete_data_file('settings.json');
@@ -774,6 +971,10 @@ function signage_settings_save($settings, ?string &$error = null): bool
 
     if ($errors) {
         $error = implode('; ', $errors);
+    }
+
+    if (func_num_args() >= 3) {
+        $status = $statusMap;
     }
 
     return $hasSqlite ? $sqliteOk : $fileOk;
@@ -886,30 +1087,51 @@ function signage_read_json(string $file, array $default = []): array
     }
 }
 
-function signage_write_json_file(string $file, $data, ?string &$error = null): bool
+function signage_write_json_file(string $file, $data, ?string &$error = null, ?array &$status = null): bool
 {
     $path = signage_data_path($file);
     $json = json_encode($data, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
+        if (func_num_args() >= 4) {
+            $status = [
+                'attempted' => true,
+                'ok' => false,
+                'error' => $error,
+            ];
+        }
         return false;
     }
     if (!signage_atomic_file_put_contents($path, $json, $error)) {
+        if (func_num_args() >= 4) {
+            $status = [
+                'attempted' => true,
+                'ok' => false,
+                'error' => $error ?? 'write-failed',
+            ];
+        }
         return false;
     }
     @chmod($path, 0644);
+    if (func_num_args() >= 4) {
+        $status = [
+            'attempted' => true,
+            'ok' => true,
+            'error' => null,
+        ];
+    }
     return true;
 }
 
-function signage_write_json(string $file, $data, ?string &$error = null): bool
+function signage_write_json(string $file, $data, ?string &$error = null, ?array &$status = null): bool
 {
     switch ($file) {
         case 'schedule.json':
-            return signage_schedule_save($data, $error);
+            return signage_schedule_save($data, $error, $status);
         case 'settings.json':
-            return signage_settings_save($data, $error);
+            return signage_settings_save($data, $error, $status);
         default:
-            return signage_write_json_file($file, $data, $error);
+            return signage_write_json_file($file, $data, $error, $status);
     }
 }
 

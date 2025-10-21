@@ -220,8 +220,11 @@ if ($watchPair) {
 }
 
 $lastPing = time();
+$basePollInterval = 500000;
+$pollInterval = $basePollInterval;
+$maxPollInterval = 5000000;
+
 while (!connection_aborted()) {
-    clearstatcache();
     $configChanged = false;
     $devicesChanged = false;
 
@@ -265,5 +268,11 @@ while (!connection_aborted()) {
         $lastPing = $now;
     }
 
-    usleep(500000);
+    if ($configChanged || $devicesChanged) {
+        $pollInterval = $basePollInterval;
+    } else {
+        $pollInterval = min($pollInterval + 250000, $maxPollInterval);
+    }
+
+    usleep($pollInterval);
 }
