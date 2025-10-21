@@ -51,7 +51,6 @@ export function normalizeContextBadge(source) {
  * @param {() => void} deps.refreshAllUi
  * @param {(view: 'grid'|'preview') => Promise<void>|void} deps.showView
  * @param {(id: string) => Promise<any>} deps.loadDeviceById
- * @param {(event: { type: 'enter'|'exit', context: ReturnType<AppStateApi['getDeviceContext']> }) => void} [deps.onContextChange]
  * @returns {{enterDeviceContext: Function, exitDeviceContext: Function, renderContextBadge: Function, getDeviceContext: Function}}
  */
 export function createDeviceContextManager({
@@ -62,8 +61,7 @@ export function createDeviceContextManager({
   setUnsavedState,
   refreshAllUi,
   showView,
-  loadDeviceById,
-  onContextChange
+  loadDeviceById
 }) {
   const renderContextBadge = () => {
     const header = document?.querySelector('header');
@@ -192,8 +190,7 @@ export function createDeviceContextManager({
     state.setDeviceContext({
       id: deviceId,
       name: device?.name || fallbackName || deviceId,
-      badge: normalizeContextBadge(badgeSource),
-      overridesActive: !!device?.useOverrides
+      badge: normalizeContextBadge(badgeSource)
     });
     document?.body?.classList.add('device-mode');
 
@@ -210,20 +207,6 @@ export function createDeviceContextManager({
 
     refreshAllUi();
     if (typeof showView === 'function') showView('grid');
-    try {
-      if (document && typeof document.dispatchEvent === 'function') {
-        document.dispatchEvent(new CustomEvent('device-context-changed', {
-          detail: {
-            id: deviceId,
-            name: device?.name || fallbackName || deviceId,
-            overridesActive: !!device?.useOverrides
-          }
-        }));
-      }
-    } catch {}
-    if (typeof onContextChange === 'function') {
-      try { onContextChange({ type: 'enter', context: state.getDeviceContext() }); } catch {}
-    }
   };
 
   const exitDeviceContext = () => {
@@ -239,16 +222,6 @@ export function createDeviceContextManager({
     updateBaseline(baseSchedule, baseSettings);
     evaluateUnsavedState({ immediate: true });
     refreshAllUi();
-    try {
-      if (document && typeof document.dispatchEvent === 'function') {
-        document.dispatchEvent(new CustomEvent('device-context-changed', {
-          detail: { id: null }
-        }));
-      }
-    } catch {}
-    if (typeof onContextChange === 'function') {
-      try { onContextChange({ type: 'exit', context: state.getDeviceContext() }); } catch {}
-    }
   };
 
   return {
