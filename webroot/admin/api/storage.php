@@ -235,6 +235,46 @@ function signage_kv_set(string $key, mixed $value): void
     }
 }
 
+function signage_kv_patch(string $key, array $patch): bool
+{
+    if (empty($patch)) {
+        return false;
+    }
+
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $json = json_encode($patch, SIGNAGE_JSON_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
+    }
+
+    $ts = time();
+
+    try {
+        return signage_sqlite_retry(function () use ($pdo, $key, $json, $ts): bool {
+            $stmt = $pdo->prepare(
+                'UPDATE kv_store
+                 SET value = json_patch(COALESCE(value, "{}"), :patch), updated_at = :updated
+                 WHERE key = :key AND json_patch(COALESCE(value, "{}"), :patch) != value'
+            );
+            $stmt->execute([
+                ':key' => $key,
+                ':patch' => $json,
+                ':updated' => $ts,
+            ]);
+
+            return $stmt->rowCount() > 0;
+        });
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to patch SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
+}
+
 function signage_default_schedule(): array
 {
     return [
