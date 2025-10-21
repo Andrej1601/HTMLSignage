@@ -1,5 +1,4 @@
 (() => {
-  const CURRENT_SCRIPT = document.currentScript;
   const FITBOX = document.getElementById('fitbox');
   const CANVAS = document.getElementById('canvas');
   const STAGE  = document.getElementById('stage');
@@ -5492,195 +5491,6 @@ function showPairing(){
 }
 
 
- function createTelemetryProbe(){
-  const pickString = (...values) => {
-    for (const value of values) {
-      if (typeof value !== 'string') continue;
-      const trimmed = value.trim();
-      if (trimmed) return trimmed;
-    }
-    return null;
-  };
-
-  const globalVersion = (typeof window !== 'undefined' && window && typeof window.SLIDESHOW_VERSION === 'string')
-    ? window.SLIDESHOW_VERSION
-    : null;
-  const metaVersion = (() => {
-    const meta = document.querySelector('meta[name="slideshow-version"]')
-      || document.querySelector('meta[name="app-version"]');
-    return meta && typeof meta.content === 'string' ? meta.content : null;
-  })();
-  const datasetVersion = document.documentElement?.dataset?.slideshowVersion || null;
-  const scriptVersion = (CURRENT_SCRIPT && typeof CURRENT_SCRIPT.getAttribute === 'function')
-    ? CURRENT_SCRIPT.getAttribute('data-version')
-    : null;
-
-  const resolvedVersion = pickString(globalVersion, datasetVersion, metaVersion, scriptVersion) || 'slideshow/web';
-
-  const state = {
-    status: {
-      appVersion: resolvedVersion,
-      notes: (() => {
-        const ua = (typeof navigator !== 'undefined' && navigator && typeof navigator.userAgent === 'string')
-          ? navigator.userAgent.trim()
-          : '';
-        return ua ? ua.slice(0, 160) : null;
-      })(),
-      network: null
-    },
-    metrics: {
-      memoryUsage: null,
-      storageFree: null,
-      storageUsed: null,
-      batteryLevel: null,
-      latency: null,
-      uptime: null
-    },
-    connection: (typeof navigator !== 'undefined' && navigator)
-      ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection || null)
-      : null
-  };
-
-  const updateNetworkInfo = () => {
-    const connection = state.connection;
-    if (!connection) {
-      state.status.network = null;
-      state.metrics.latency = null;
-      return;
-    }
-    const network = {};
-    const type = connection.type || connection.effectiveType || null;
-    if (type) network.type = String(type);
-    const latency = (typeof connection.rtt === 'number' && Number.isFinite(connection.rtt))
-      ? Math.max(0, Math.round(connection.rtt))
-      : null;
-    if (latency !== null) {
-      network.latency = latency;
-      state.metrics.latency = latency;
-    } else {
-      state.metrics.latency = null;
-    }
-    state.status.network = Object.keys(network).length ? network : null;
-  };
-
-  updateNetworkInfo();
-  if (state.connection && typeof state.connection.addEventListener === 'function') {
-    state.connection.addEventListener('change', updateNetworkInfo);
-  }
-  if (typeof window !== 'undefined' && window && typeof window.addEventListener === 'function') {
-    window.addEventListener('online', updateNetworkInfo);
-    window.addEventListener('offline', updateNetworkInfo);
-  }
-
-  const updateStorageEstimate = async () => {
-    if (!navigator?.storage || typeof navigator.storage.estimate !== 'function') {
-      state.metrics.storageFree = null;
-      state.metrics.storageUsed = null;
-      return;
-    }
-    try {
-      const estimate = await navigator.storage.estimate();
-      const usage = typeof estimate.usage === 'number' ? estimate.usage : null;
-      const quota = typeof estimate.quota === 'number' ? estimate.quota : null;
-      if (usage !== null && quota !== null && quota > 0) {
-        const usedMb = usage / (1024 * 1024);
-        const freeMb = (quota - usage) / (1024 * 1024);
-        state.metrics.storageUsed = Number.isFinite(usedMb) ? Math.max(0, Math.round(usedMb * 10) / 10) : null;
-        state.metrics.storageFree = Number.isFinite(freeMb) ? Math.max(0, Math.round(freeMb * 10) / 10) : null;
-      } else {
-        state.metrics.storageFree = null;
-        state.metrics.storageUsed = null;
-      }
-    } catch (error) {
-      state.metrics.storageFree = null;
-      state.metrics.storageUsed = null;
-    }
-  };
-
-  if (navigator?.storage && typeof navigator.storage.estimate === 'function') {
-    updateStorageEstimate();
-    setInterval(updateStorageEstimate, 5 * 60 * 1000);
-  }
-
-  const applyBatteryState = (battery) => {
-    if (!battery || typeof battery.level !== 'number' || !Number.isFinite(battery.level)) {
-      state.metrics.batteryLevel = null;
-      return;
-    }
-    state.metrics.batteryLevel = Math.max(0, Math.min(100, Math.round(battery.level * 100)));
-  };
-
-  if (navigator && typeof navigator.getBattery === 'function') {
-    navigator.getBattery().then((battery) => {
-      applyBatteryState(battery);
-      const handleBattery = () => applyBatteryState(battery);
-      battery.addEventListener('levelchange', handleBattery);
-      battery.addEventListener('chargingchange', handleBattery);
-    }).catch(() => {});
-  }
-
-  const updateMemoryMetrics = () => {
-    if (typeof performance === 'object' && performance && performance.memory) {
-      const used = performance.memory.usedJSHeapSize;
-      const limit = performance.memory.jsHeapSizeLimit;
-      if (Number.isFinite(used) && Number.isFinite(limit) && limit > 0) {
-        const ratio = used / limit;
-        if (Number.isFinite(ratio)) {
-          state.metrics.memoryUsage = Math.max(0, Math.min(100, Math.round(ratio * 100)));
-          return;
-        }
-      }
-    }
-    state.metrics.memoryUsage = null;
-  };
-
-  const updateUptimeMetric = () => {
-    if (typeof performance === 'object' && performance && typeof performance.now === 'function') {
-      const seconds = performance.now() / 1000;
-      if (Number.isFinite(seconds)) {
-        state.metrics.uptime = Math.max(0, Math.round(seconds));
-        return;
-      }
-    }
-    state.metrics.uptime = null;
-  };
-
-  return {
-    collect() {
-      updateMemoryMetrics();
-      updateNetworkInfo();
-      updateUptimeMetric();
-
-      const statusOut = {};
-      if (state.status.appVersion) statusOut.appVersion = state.status.appVersion;
-      if (state.status.notes) statusOut.notes = state.status.notes;
-      if (state.status.network) {
-        const network = {};
-        if (state.status.network.type) network.type = state.status.network.type;
-        if (Number.isFinite(state.status.network.quality)) network.quality = state.status.network.quality;
-        if (Number.isFinite(state.status.network.signal)) network.signal = state.status.network.signal;
-        if (Number.isFinite(state.status.network.rssi)) network.rssi = state.status.network.rssi;
-        if (Number.isFinite(state.status.network.latency)) network.latency = state.status.network.latency;
-        if (Object.keys(network).length) statusOut.network = network;
-      }
-
-      const metricsOut = {};
-      if (Number.isFinite(state.metrics.memoryUsage)) metricsOut.memoryUsage = state.metrics.memoryUsage;
-      if (Number.isFinite(state.metrics.storageFree)) metricsOut.storageFree = state.metrics.storageFree;
-      if (Number.isFinite(state.metrics.storageUsed)) metricsOut.storageUsed = state.metrics.storageUsed;
-      if (Number.isFinite(state.metrics.batteryLevel)) metricsOut.batteryLevel = state.metrics.batteryLevel;
-      if (Number.isFinite(state.metrics.latency)) metricsOut.latency = state.metrics.latency;
-      if (Number.isFinite(state.metrics.uptime)) metricsOut.uptime = state.metrics.uptime;
-
-      const payload = {};
-      if (Object.keys(statusOut).length) payload.status = statusOut;
-      if (Object.keys(metricsOut).length) payload.metrics = metricsOut;
-      return payload;
-    }
-  };
- }
-
-
   // ---------- Bootstrap & live update ----------
 async function bootstrap(){
 // Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
@@ -5707,46 +5517,27 @@ async function bootstrap(){
         return; // HIER abbrechen, sonst bleibt die Stage leer
       }
 
-      const telemetryProbe = createTelemetryProbe();
+      const heartbeatPayload = JSON.stringify({ device: DEVICE_ID });
       const heartbeatHeaders = { 'Content-Type': 'application/json' };
-      const heartbeatUrl = '/api/heartbeat.php';
-
-      const buildHeartbeatPayload = () => {
-        const payload = { device: DEVICE_ID };
-        if (typeof navigator !== 'undefined' && navigator && 'onLine' in navigator) {
-          payload.online = navigator.onLine !== false;
-        }
-        const telemetryData = telemetryProbe.collect();
-        if (telemetryData?.status && Object.keys(telemetryData.status).length) {
-          payload.status = telemetryData.status;
-        }
-        if (telemetryData?.metrics && Object.keys(telemetryData.metrics).length) {
-          payload.metrics = telemetryData.metrics;
-        }
-        try {
-          return JSON.stringify(payload);
-        } catch (error) {
-          console.error('[heartbeat] payload encode failed', error);
-          return JSON.stringify({ device: DEVICE_ID });
-        }
-      };
+      let heartbeatBlob = null;
 
       const sendHeartbeat = () => {
-        const heartbeatJson = buildHeartbeatPayload();
         let sent = false;
         if (navigator.sendBeacon) {
           try {
-            const heartbeatBlob = new Blob([heartbeatJson], { type: 'application/json' });
-            sent = navigator.sendBeacon(heartbeatUrl, heartbeatBlob);
+            if (!heartbeatBlob) {
+              heartbeatBlob = new Blob([heartbeatPayload], { type: 'application/json' });
+            }
+            sent = navigator.sendBeacon('/api/heartbeat.php', heartbeatBlob);
           } catch (error) {
             console.error('[heartbeat] beacon failed', error);
           }
         }
         if (!sent) {
-          fetch(heartbeatUrl, {
+          fetch('/api/heartbeat.php', {
             method: 'POST',
             headers: heartbeatHeaders,
-            body: heartbeatJson
+            body: heartbeatPayload
           }).then((response) => {
             if (!response.ok) throw new Error('heartbeat http ' + response.status);
           }).catch((error) => console.error('[heartbeat] failed', error));

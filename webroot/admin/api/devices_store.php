@@ -1035,7 +1035,9 @@ function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $tel
     $ts = $timestamp ?? time();
     $db['devices'][$normalizedId]['lastSeen'] = $ts;
     $db['devices'][$normalizedId]['lastSeenAt'] = $ts;
-    devices_record_telemetry($db['devices'][$normalizedId], $telemetry, $ts);
+    if (!empty($telemetry)) {
+        devices_record_telemetry($db['devices'][$normalizedId], $telemetry, $ts);
+    }
     return true;
 }
 
