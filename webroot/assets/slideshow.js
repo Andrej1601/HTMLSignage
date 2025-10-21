@@ -1417,6 +1417,8 @@ async function loadDeviceResolved(id){
   }
 
   // ---------- Slide queue ----------
+  const WELLNESS_GLOBAL_ID = '__wellness_bundle__';
+
   function collectWellnessTips() {
     const list = Array.isArray(settings?.extras?.wellnessTips) ? settings.extras.wellnessTips : [];
     const normalized = [];
@@ -1440,7 +1442,7 @@ async function loadDeviceResolved(id){
         dwellSec
       });
     });
-    if (normalized.length <= 1) return normalized;
+    if (!normalized.length) return [];
 
     const items = normalized
       .map((entry) => ({
@@ -1456,7 +1458,7 @@ async function loadDeviceResolved(id){
     const dwellSec = dwellValues.length ? Math.max(...dwellValues) : null;
     return [{
       type: 'wellness-tip',
-      id: null,
+      id: WELLNESS_GLOBAL_ID,
       dwellSec,
       items
     }];

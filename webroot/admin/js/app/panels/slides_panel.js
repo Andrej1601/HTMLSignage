@@ -1110,17 +1110,24 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
           });
         } else if (entry.kind === 'wellness-tip') {
-          const tipId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
+          const data = entry.item || {};
+          const tipId = data.id != null ? String(data.id) : (entry.key || '');
           if (!tipId) return;
-          const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
+          const icon = data.icon ? `${data.icon} ` : '';
+          const baseLabel = (data.label || data.title || 'Wellness-Tipp').trim();
+          const count = Number(data.count);
+          const hasCount = Number.isFinite(count) && count >= 0;
+          const suffix = hasCount ? ` (${count})` : '';
+          const statusText = data.statusText || null;
+          const disabled = data.disabled === true;
           pushEntry({
             key: 'wellness:' + tipId,
             kind: 'wellness-tip',
             id: tipId,
-            label: icon + (entry.item?.title || 'Wellness-Tipp'),
+            label: icon + baseLabel + suffix,
             thumb: '',
-            disabled: false,
-            statusText: null
+            disabled,
+            statusText: disabled ? (statusText || 'Keine aktiven Tipps') : (statusText || null)
           });
         } else if (entry.kind === 'event-countdown') {
           const eventId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');

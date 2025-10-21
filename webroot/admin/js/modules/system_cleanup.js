@@ -12,26 +12,28 @@ export function initCleanupInSystem({ fetchJson }) {
   if (!btn) return;
 
   btn.onclick = async () => {
-    const delSauna = confirm('Sauna-Bilder löschen? OK = Ja, Abbrechen = Nein');
-    const delInter = confirm('Medien-Slides löschen? OK = Ja, Abbrechen = Nein');
-    const delFlame = confirm('Flammen-Bild löschen? OK = Ja, Abbrechen = Nein');
+    const confirmed = confirm('Nicht verwendete Medien löschen? Aktive Dateien bleiben erhalten.');
+    if (!confirmed) return;
 
-    const qs = new URLSearchParams({
-      sauna: delSauna ? '1' : '0',
-      inter: delInter ? '1' : '0',
-      flame: delFlame ? '1' : '0'
-    });
+    const qs = new URLSearchParams({ mode: 'unused' });
 
     try {
+      btn.disabled = true;
       const result = await fetchJson('/admin/api/cleanup_assets.php?' + qs.toString(), {
         okPredicate: (data) => data?.ok !== false,
         errorMessage: 'Bereinigung fehlgeschlagen.'
       });
-      const removed = result?.removed ?? '?';
-      notifySuccess(`Bereinigt: ${removed} Dateien entfernt.`);
+      const removedList = Array.isArray(result?.removed) ? result.removed : [];
+      const removedCount = Number.isInteger(result?.count) ? result.count : removedList.length;
+      const message = removedCount === 0
+        ? 'Bereinigt: Keine Dateien entfernt.'
+        : `Bereinigt: ${removedCount} Datei${removedCount === 1 ? '' : 'en'} entfernt.`;
+      notifySuccess(message);
     } catch (error) {
       console.error('[admin] Asset-Bereinigung fehlgeschlagen', error);
       notifyError('Fehler: ' + error.message);
+    } finally {
+      btn.disabled = false;
     }
   };
 }
