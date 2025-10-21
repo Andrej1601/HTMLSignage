@@ -5,4 +5,4 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 yarn.lock
-package-lock.json
+webroot/admin/dist/

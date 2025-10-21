@@ -3,6 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT=$(cd -- "${SCRIPT_DIR}/.." && pwd)
 
 log(){ printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn(){ printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
@@ -192,9 +193,29 @@ install_packages(){
     git
     rsync
     openssl
+    nodejs
+    npm
   )
   apt-get update -y
   apt-get install -y "${packages[@]}"
+}
+
+build_admin_assets(){
+  log "Building admin frontend bundle"
+  if ! command -v npm >/dev/null 2>&1; then
+    warn "npm not available; skipping admin build"
+    return
+  fi
+
+  pushd "$PROJECT_ROOT" >/dev/null
+  if [[ -f package-lock.json ]]; then
+    npm ci --no-audit --no-fund
+  else
+    npm install --no-audit --no-fund
+  fi
+  npm run build:admin
+  rm -rf node_modules
+  popd >/dev/null
 }
 
 prepare_database(){
@@ -423,6 +444,7 @@ main(){
   collect_settings
 
   install_packages
+  build_admin_assets
   deploy_application
   prepare_database
   deploy_nginx

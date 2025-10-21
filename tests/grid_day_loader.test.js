@@ -22,6 +22,7 @@ describe('grid day loader UI', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('renders select options using saved preference', () => {
@@ -40,8 +41,9 @@ describe('grid day loader UI', () => {
     expect(options).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
   });
 
-  it('alerts when preset for selected day is missing', () => {
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+  it('shows a warning when preset for selected day is missing', async () => {
+    const notifications = await import('../webroot/admin/js/core/notifications.js');
+    const warningSpy = vi.spyOn(notifications, 'notifyWarning').mockImplementation(() => {});
     const ctx = {
       getSettings: () => ({ presets: {} }),
       setSchedule: vi.fn()
@@ -52,8 +54,9 @@ describe('grid day loader UI', () => {
     const button = screen.getByRole('button', { name: 'Laden' });
     fireEvent.click(button);
 
-    expect(alertSpy).toHaveBeenCalledWith('Kein Preset für "Mon" vorhanden.');
-    alertSpy.mockRestore();
+    expect(warningSpy).toHaveBeenCalledTimes(1);
+    expect(warningSpy.mock.calls[0][0]).toMatch(/Kein Preset für/);
+    warningSpy.mockRestore();
   });
 
   it('loads preset and triggers downstream renderers', () => {
