@@ -15,13 +15,9 @@ export default defineConfig({
         admin: path.resolve(projectRoot, 'webroot/admin/js/app.js')
       },
       output: {
-        entryFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: ({ name }) => {
-          if (!name) return 'assets/[name][extname]';
-          const parsed = path.parse(name);
-          return `assets/${parsed.name}${parsed.ext}`;
-        }
+        assetFileNames: 'assets/[name]-[hash][extname]'
       }
     }
   },

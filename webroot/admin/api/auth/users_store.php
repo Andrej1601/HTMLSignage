@@ -540,6 +540,7 @@ function auth_append_audit(string $event, array $context = []): void
                     ':created' => time(),
                 ]);
             });
+            signage_audit_log_prune($pdo);
             return;
         } catch (Throwable $exception) {
             error_log('Failed to append audit entry to SQLite: ' . $exception->getMessage());

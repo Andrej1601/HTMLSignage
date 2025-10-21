@@ -503,6 +503,53 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $device['heartbeatHistory'] = $history;
 }
 
+function devices_prepare_sqlite_touch_payload(array $telemetry, int $timestamp): array
+{
+    $statusInput = [];
+    if (isset($telemetry['status']) && is_array($telemetry['status'])) {
+        $statusInput = $telemetry['status'];
+    }
+    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
+        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $statusInput)) {
+            $statusInput[$key] = $telemetry[$key];
+        }
+    }
+    foreach (['network', 'errors'] as $key) {
+        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $statusInput)) {
+            $statusInput[$key] = $telemetry[$key];
+        }
+    }
+
+    $metricsInput = [];
+    if (isset($telemetry['metrics']) && is_array($telemetry['metrics'])) {
+        $metricsInput = $telemetry['metrics'];
+    }
+    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
+        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $metricsInput)) {
+            $metricsInput[$key] = $telemetry[$key];
+        }
+    }
+
+    $status = devices_sanitize_status($statusInput);
+    $metrics = devices_sanitize_metrics($metricsInput);
+    $offlineFlag = array_key_exists('offline', $telemetry) ? (bool) $telemetry['offline'] : false;
+
+    $historyEntry = array_filter([
+        'ts' => $timestamp,
+        'offline' => $offlineFlag,
+        'status' => !empty($status) ? $status : null,
+        'metrics' => !empty($metrics) ? $metrics : null,
+    ], static function ($value) {
+        return $value !== null;
+    });
+
+    return [
+        'status' => $status,
+        'metrics' => $metrics,
+        'historyEntry' => $historyEntry,
+    ];
+}
+
 function devices_extract_telemetry_payload(array $payload): array
 {
     $telemetry = [];
@@ -855,50 +902,147 @@ function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry
         throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
     }
 
-    $path = '$.devices."' . $deviceId . '"';
-    try {
-        $stmt = $pdo->prepare('SELECT json_extract(value, :path) AS device FROM kv_store WHERE key = :key LIMIT 1');
-        $stmt->execute([
-            ':key' => DEVICES_STORAGE_KEY,
-            ':path' => $path,
-        ]);
-    } catch (Throwable $exception) {
-        throw new RuntimeException('Failed to read device from SQLite: ' . $exception->getMessage(), 0, $exception);
-    }
+    if (!signage_sqlite_supports_json_patch($pdo)) {
+        $path = '$.devices."' . $deviceId . '"';
+        try {
+            $stmt = $pdo->prepare('SELECT json_extract(value, :path) AS device FROM kv_store WHERE key = :key LIMIT 1');
+            $stmt->execute([
+                ':key' => DEVICES_STORAGE_KEY,
+                ':path' => $path,
+            ]);
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Failed to read device from SQLite: ' . $exception->getMessage(), 0, $exception);
+        }
 
-    $json = $stmt->fetchColumn();
-    if ($json === false || $json === null) {
-        return false;
-    }
+        $json = $stmt->fetchColumn();
+        if ($json === false || $json === null) {
+            return false;
+        }
 
-    $original = json_decode((string) $json, true);
-    if (!is_array($original)) {
-        return false;
-    }
+        $original = json_decode((string) $json, true);
+        if (!is_array($original)) {
+            return false;
+        }
 
-    $device = $original;
-    $device['id'] = $deviceId;
-    $device['lastSeen'] = $timestamp;
-    $device['lastSeenAt'] = $timestamp;
+        $device = $original;
+        $device['id'] = $deviceId;
+        $device['lastSeen'] = $timestamp;
+        $device['lastSeenAt'] = $timestamp;
 
-    if (!empty($telemetry)) {
-        devices_record_telemetry($device, $telemetry, $timestamp);
-    }
+        if (!empty($telemetry)) {
+            devices_record_telemetry($device, $telemetry, $timestamp);
+        }
 
-    $patch = devices_build_merge_patch($original, $device);
-    if (empty($patch)) {
+        $patch = devices_build_merge_patch($original, $device);
+        if (empty($patch)) {
+            return true;
+        }
+
+        $wrappedPatch = ['devices' => [$deviceId => $patch]];
+
+        try {
+            signage_kv_patch(DEVICES_STORAGE_KEY, $wrappedPatch);
+        } catch (RuntimeException $exception) {
+            throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
+        }
+
         return true;
     }
 
-    $wrappedPatch = ['devices' => [$deviceId => $patch]];
+    $updatePayload = devices_prepare_sqlite_touch_payload($telemetry, $timestamp);
 
-    try {
-        signage_kv_patch(DEVICES_STORAGE_KEY, $wrappedPatch);
-    } catch (RuntimeException $exception) {
-        throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
+    $devicePatch = [
+        'id' => $deviceId,
+        'lastSeen' => $timestamp,
+        'lastSeenAt' => $timestamp,
+    ];
+
+    if (!empty($updatePayload['status'])) {
+        $devicePatch['status'] = $updatePayload['status'];
+    }
+    if (!empty($updatePayload['metrics'])) {
+        $devicePatch['metrics'] = $updatePayload['metrics'];
     }
 
-    return true;
+    $patch = ['devices' => [$deviceId => $devicePatch]];
+    $patchJson = json_encode($patch, SIGNAGE_JSON_RESPONSE_FLAGS);
+    if ($patchJson === false) {
+        throw new RuntimeException('Failed to encode device patch: ' . json_last_error_msg());
+    }
+
+    $historyEntry = $updatePayload['historyEntry'];
+    $historyJson = json_encode($historyEntry, SIGNAGE_JSON_RESPONSE_FLAGS);
+    if ($historyJson === false) {
+        throw new RuntimeException('Failed to encode device history entry: ' . json_last_error_msg());
+    }
+
+    $devicePath = '$.devices."' . $deviceId . '"';
+    $historyPath = $devicePath . '.heartbeatHistory';
+
+    $sql = <<<SQL
+WITH prepared AS (
+    SELECT
+        json_patch(value, :patch) AS patched,
+        json_insert(
+            COALESCE(json_extract(value, :historyPath), '[]'),
+            '$[#]',
+            json(:historyEntry)
+        ) AS appended
+    FROM kv_store
+    WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL
+),
+trimmed AS (
+    WITH RECURSIVE shrink(history, remaining) AS (
+        SELECT appended,
+               MAX(json_array_length(appended) - :historyLimit, 0)
+        FROM prepared
+        UNION ALL
+        SELECT json_remove(history, '$[0]'), remaining - 1
+        FROM shrink
+        WHERE remaining > 0
+    )
+    SELECT history FROM shrink ORDER BY remaining LIMIT 1
+)
+UPDATE kv_store
+SET value = json_set(
+        (SELECT patched FROM prepared),
+        :historyPath,
+        COALESCE((SELECT history FROM trimmed), json(:emptyHistory))
+    ),
+    updated_at = :timestamp
+WHERE key = :key
+  AND json_extract(value, :devicePath) IS NOT NULL
+SQL;
+
+    try {
+        return signage_sqlite_retry(function () use ($pdo, $sql, $patchJson, $historyJson, $devicePath, $historyPath, $timestamp): bool {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                ':patch' => $patchJson,
+                ':historyPath' => $historyPath,
+                ':historyEntry' => $historyJson,
+                ':historyLimit' => DEVICES_HISTORY_LIMIT,
+                ':key' => DEVICES_STORAGE_KEY,
+                ':devicePath' => $devicePath,
+                ':emptyHistory' => '[]',
+                ':timestamp' => $timestamp,
+            ]);
+
+            if ($stmt->rowCount() > 0) {
+                return true;
+            }
+
+            $check = $pdo->prepare('SELECT 1 FROM kv_store WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL LIMIT 1');
+            $check->execute([
+                ':key' => DEVICES_STORAGE_KEY,
+                ':devicePath' => $devicePath,
+            ]);
+
+            return $check->fetchColumn() !== false;
+        });
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
 }
 
 function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool
