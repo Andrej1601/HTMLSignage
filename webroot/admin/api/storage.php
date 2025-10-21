@@ -695,6 +695,86 @@ function signage_kv_meta(string $key): array
     return $meta;
 }
 
+function signage_data_meta(string $file, string $key): array
+{
+    $meta = signage_kv_meta($key);
+
+    $path = signage_data_path($file);
+    if (is_file($path)) {
+        clearstatcache(false, $path);
+        $fileMtime = @filemtime($path);
+        if ($fileMtime !== false && ($meta['mtime'] ?? 0) <= 0) {
+            $meta['mtime'] = (int) $fileMtime;
+        }
+
+        $fileHash = @sha1_file($path);
+        if ($fileHash !== false && !isset($meta['hash'])) {
+            $meta['hash'] = $fileHash;
+        }
+    }
+
+    if (!isset($meta['mtime'])) {
+        $meta['mtime'] = 0;
+    }
+
+    if (!array_key_exists('hash', $meta)) {
+        $meta['hash'] = null;
+    }
+
+    return $meta;
+}
+
+function signage_format_http_date(int $timestamp): string
+{
+    if ($timestamp <= 0) {
+        $timestamp = 0;
+    }
+
+    return gmdate('D, d M Y H:i:s', $timestamp) . ' GMT';
+}
+
+function signage_should_return_not_modified(string $etag, int $mtime): bool
+{
+    $etag = trim($etag, "\" \t");
+
+    $ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+    if ($ifNoneMatch !== '') {
+        $values = explode(',', $ifNoneMatch);
+        foreach ($values as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($candidate === '*') {
+                return true;
+            }
+
+            if (strpos($candidate, 'W/') === 0) {
+                $candidate = substr($candidate, 2);
+                $candidate = ltrim($candidate);
+            }
+
+            $candidate = trim($candidate, "\" \t");
+            if ($candidate === $etag) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    $ifModifiedSince = $_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? '';
+    if ($ifModifiedSince !== '') {
+        $timestamp = strtotime($ifModifiedSince);
+        if ($timestamp !== false && $mtime <= $timestamp) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function signage_absolute_path(string $relative): string
 {
     if ($relative === '' || $relative[0] !== '/') {
