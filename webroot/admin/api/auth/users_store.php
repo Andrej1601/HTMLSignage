@@ -531,13 +531,15 @@ function auth_append_audit(string $event, array $context = []): void
             if ($payload === false) {
                 $payload = json_encode(['error' => 'json_encode failed'], JSON_UNESCAPED_SLASHES);
             }
-            $stmt = $pdo->prepare('INSERT INTO audit_log(event, username, context, created_at) VALUES (:event, :username, :context, :created)');
-            $stmt->execute([
-                ':event' => $event,
-                ':username' => $username,
-                ':context' => $payload,
-                ':created' => time(),
-            ]);
+            signage_sqlite_retry(function () use ($pdo, $event, $username, $payload): void {
+                $stmt = $pdo->prepare('INSERT INTO audit_log(event, username, context, created_at) VALUES (:event, :username, :context, :created)');
+                $stmt->execute([
+                    ':event' => $event,
+                    ':username' => $username,
+                    ':context' => $payload,
+                    ':created' => time(),
+                ]);
+            });
             return;
         } catch (Throwable $exception) {
             error_log('Failed to append audit entry to SQLite: ' . $exception->getMessage());

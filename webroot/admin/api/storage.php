@@ -8,6 +8,7 @@ declare(strict_types=1);
 const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
 const SIGNAGE_SCHEDULE_STORAGE_KEY = 'schedule.state';
 const SIGNAGE_SETTINGS_STORAGE_KEY = 'settings.state';
+const SIGNAGE_SQLITE_BUSY_TIMEOUT_MS = 5000;
 
 function signage_db_path(): string
 {
@@ -48,6 +49,63 @@ function signage_db_available(): bool
     return $available = true;
 }
 
+/**
+ * Apply connection-level pragmas to improve SQLite concurrency and durability.
+ */
+function signage_sqlite_configure(\PDO $pdo): void
+{
+    $pragmas = [
+        'journal_mode = WAL' => 'Unable to enable SQLite WAL mode',
+        'busy_timeout = ' . SIGNAGE_SQLITE_BUSY_TIMEOUT_MS => 'Unable to set SQLite busy_timeout pragma',
+        'synchronous = NORMAL' => 'Unable to set SQLite synchronous pragma',
+        'foreign_keys = ON' => 'Unable to enable SQLite foreign_keys pragma',
+    ];
+
+    foreach ($pragmas as $pragma => $message) {
+        try {
+            $pdo->exec('PRAGMA ' . $pragma);
+        } catch (Throwable $exception) {
+            error_log($message . ': ' . $exception->getMessage());
+        }
+    }
+}
+
+/**
+ * Retry transient write operations that fail with "database is locked".
+ */
+function signage_sqlite_retry(callable $operation, int $attempts = 5, int $sleepMs = 150): mixed
+{
+    $attempts = max(1, $attempts);
+    $sleepUs = max(0, $sleepMs) * 1000;
+    $lastException = null;
+
+    for ($i = 0; $i < $attempts; $i++) {
+        try {
+            return $operation();
+        } catch (Throwable $exception) {
+            $message = strtolower((string) $exception->getMessage());
+            if (strpos($message, 'database is locked') === false) {
+                throw $exception;
+            }
+
+            $lastException = $exception;
+            if ($i === $attempts - 1) {
+                break;
+            }
+
+            if ($sleepUs > 0) {
+                usleep($sleepUs);
+            }
+        }
+    }
+
+    if ($lastException instanceof Throwable) {
+        throw $lastException;
+    }
+
+    throw new RuntimeException('SQLite operation failed after retries.');
+}
+
 function signage_db(): \PDO
 {
     static $pdo = null;
@@ -74,11 +132,7 @@ function signage_db(): \PDO
         throw new RuntimeException('Unable to open SQLite database: ' . $exception->getMessage(), 0, $exception);
     }
 
-    try {
-        $pdo->exec('PRAGMA foreign_keys = ON');
-    } catch (Throwable $exception) {
-        error_log('Unable to enable SQLite foreign_keys pragma: ' . $exception->getMessage());
-    }
+    signage_sqlite_configure($pdo);
 
     $pathExists = @file_exists($path);
     if ($pathExists) {
@@ -111,7 +165,9 @@ function signage_db_bootstrap(): void
     ];
     try {
         foreach ($queries as $sql) {
-            $pdo->exec($sql);
+            signage_sqlite_retry(function () use ($pdo, $sql): void {
+                $pdo->exec($sql);
+            });
         }
     } catch (Throwable $exception) {
         throw new RuntimeException('Failed to initialize SQLite schema: ' . $exception->getMessage(), 0, $exception);
@@ -165,13 +221,15 @@ function signage_kv_set(string $key, mixed $value): void
 
     $ts = time();
     try {
-        $stmt = $pdo->prepare('INSERT INTO kv_store(key, value, updated_at) VALUES (:key, :value, :updated)
-            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
-        $stmt->execute([
-            ':key' => $key,
-            ':value' => $json,
-            ':updated' => $ts,
-        ]);
+        signage_sqlite_retry(function () use ($pdo, $key, $json, $ts): void {
+            $stmt = $pdo->prepare('INSERT INTO kv_store(key, value, updated_at) VALUES (:key, :value, :updated)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at');
+            $stmt->execute([
+                ':key' => $key,
+                ':value' => $json,
+                ':updated' => $ts,
+            ]);
+        });
     } catch (Throwable $exception) {
         throw new RuntimeException('Failed to persist SQLite value: ' . $exception->getMessage(), 0, $exception);
     }
