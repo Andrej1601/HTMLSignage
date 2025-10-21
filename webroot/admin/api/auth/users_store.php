@@ -219,7 +219,7 @@ function auth_users_save_to_file(array $state): void
     $normalized = auth_users_normalize($state);
     $path = auth_users_path();
     @mkdir(dirname($path), 02775, true);
-    $json = json_encode($normalized, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($normalized, SIGNAGE_JSON_STORAGE_FLAGS);
     if (@file_put_contents($path, $json, LOCK_EX) === false) {
         throw new RuntimeException('Unable to write users database');
     }
@@ -527,7 +527,7 @@ function auth_append_audit(string $event, array $context = []): void
         try {
             signage_db_bootstrap();
             $pdo = signage_db();
-            $payload = json_encode($context, SIGNAGE_JSON_FLAGS);
+            $payload = json_encode($context, SIGNAGE_JSON_STORAGE_FLAGS);
             if ($payload === false) {
                 $payload = json_encode(['error' => 'json_encode failed'], JSON_UNESCAPED_SLASHES);
             }

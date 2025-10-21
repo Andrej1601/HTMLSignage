@@ -5,7 +5,8 @@
 
 declare(strict_types=1);
 
-const SIGNAGE_JSON_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
+const SIGNAGE_JSON_RESPONSE_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+const SIGNAGE_JSON_STORAGE_FLAGS = SIGNAGE_JSON_RESPONSE_FLAGS | JSON_PRETTY_PRINT;
 const SIGNAGE_SCHEDULE_STORAGE_KEY = 'schedule.state';
 const SIGNAGE_SETTINGS_STORAGE_KEY = 'settings.state';
 const SIGNAGE_SQLITE_BUSY_TIMEOUT_MS = 5000;
@@ -214,7 +215,7 @@ function signage_kv_set(string $key, mixed $value): void
         throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
     }
 
-    $json = json_encode($value, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($value, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
     }
@@ -248,7 +249,7 @@ function signage_kv_patch(string $key, array $patch): bool
         throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
     }
 
-    $json = json_encode($patch, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($patch, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
     }
@@ -630,7 +631,7 @@ function signage_write_json_file(string $file, $data, ?string &$error = null): b
         $error = 'unable to create directory: ' . $dir;
         return false;
     }
-    $json = json_encode($data, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($data, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
         return false;

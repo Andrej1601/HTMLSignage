@@ -10,10 +10,10 @@ header('Pragma: no-cache');
 $state = devices_load();
 $state['now'] = time();
 
-$json = json_encode($state, SIGNAGE_JSON_FLAGS);
+$json = json_encode($state, SIGNAGE_JSON_RESPONSE_FLAGS);
 if ($json === false) {
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_FLAGS);
+    echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_RESPONSE_FLAGS);
     return;
 }
 

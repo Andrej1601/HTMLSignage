@@ -71,14 +71,14 @@ function auth_send_unauthorized(): void
 {
     header('WWW-Authenticate: Basic realm="' . SIGNAGE_AUTH_REALM . '", charset="UTF-8"');
     http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'auth-required']);
+    echo json_encode(['ok' => false, 'error' => 'auth-required'], SIGNAGE_JSON_RESPONSE_FLAGS);
     exit;
 }
 
 function auth_send_forbidden(): void
 {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'error' => 'forbidden']);
+    echo json_encode(['ok' => false, 'error' => 'forbidden'], SIGNAGE_JSON_RESPONSE_FLAGS);
     exit;
 }
 

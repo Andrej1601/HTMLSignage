@@ -17,7 +17,7 @@ $rawDevice = is_string($rawDevice) ? trim($rawDevice) : '';
 
 if ($rawDevice === '') {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'missing-device'], JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => false, 'error' => 'missing-device'], SIGNAGE_JSON_RESPONSE_FLAGS);
     exit;
 }
 
@@ -28,7 +28,7 @@ if ($payload === null) {
     $status = $error['status'] ?? 500;
     $code = $error['code'] ?? 'resolve-failed';
     http_response_code($status);
-    echo json_encode(['ok' => false, 'error' => $code], JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => false, 'error' => $code], SIGNAGE_JSON_RESPONSE_FLAGS);
     exit;
 }
 
@@ -41,4 +41,4 @@ $out = [
     'now' => time(),
 ];
 
-echo json_encode($out, SIGNAGE_JSON_FLAGS);
+echo json_encode($out, SIGNAGE_JSON_RESPONSE_FLAGS);

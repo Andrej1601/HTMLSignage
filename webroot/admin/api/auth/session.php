@@ -14,7 +14,7 @@ if (!auth_is_enabled()) {
             'displayName' => null,
             'roles' => ['admin']
         ]
-    ], SIGNAGE_JSON_FLAGS);
+    ], SIGNAGE_JSON_RESPONSE_FLAGS);
     exit;
 }
 
@@ -35,4 +35,4 @@ echo json_encode([
         'roles' => $roles,
         'permissions' => auth_user_permissions($user),
     ]
-], SIGNAGE_JSON_FLAGS);
+], SIGNAGE_JSON_RESPONSE_FLAGS);

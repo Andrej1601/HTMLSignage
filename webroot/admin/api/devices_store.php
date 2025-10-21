@@ -707,7 +707,7 @@ function devices_save_to_file(array &$db): bool
     $db = devices_normalize_state($db);
     $path = devices_path();
     @mkdir(dirname($path), 02775, true);
-    $json = json_encode($db, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($db, SIGNAGE_JSON_STORAGE_FLAGS);
     $existing = @file_get_contents($path);
     if ($existing !== false && $existing === $json) {
         return true;
