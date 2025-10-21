@@ -1,10 +1,20 @@
 <?php
+require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/storage.php';
+
+auth_require_permission('media');
 
 // Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos)
 // Hinweise: Nginx client_max_body_size & PHP upload_max_filesize/post_max_size müssen groß genug sein.
 
 header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+    || (isset($_SERVER['SERVER_PORT']) && (string) $_SERVER['SERVER_PORT'] === '443');
+if (!$isHttps) {
+  error_log('[signage] upload request received over non-HTTPS transport');
+}
 
 $fallbackThumb = '/assets/img/thumb_fallback.svg';
 
@@ -17,6 +27,13 @@ function fail($msg, $code=400, $detail=null){
 }
 
 if ($_SERVER['REQUEST_METHOD']!=='POST') fail('method');
+
+$maxBytes = 256*1024*1024; // 256MB
+$contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : null;
+if ($contentLength !== null && $contentLength > $maxBytes) {
+  fail('too-large (declared)', 413);
+}
+
 if (!isset($_FILES['file'])) fail('nofile');
 
 $u = $_FILES['file'];
@@ -24,7 +41,6 @@ if (!empty($u['error'])) fail('upload-error-'.$u['error']);
 if (!is_uploaded_file($u['tmp_name'])) fail('tmp-missing');
 
 // Limits (kann via PHP-INI/Nginx größer sein)
-$maxBytes = 256*1024*1024; // 256MB
 $fileSize = filesize($u['tmp_name']);
 if ($fileSize > $maxBytes) fail('too-large (server limit)');
 
