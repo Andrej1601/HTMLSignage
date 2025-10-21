@@ -454,9 +454,13 @@ export function syncActiveStyleSetSnapshot(settings, {
   const sectionsEnabled = includeTheme || includeFonts || includeSlides || includeDisplay;
   if (!sectionsEnabled) return false;
   settings.slides ||= {};
-  const sets = ensureStyleSets(settings);
   const activeId = settings.slides.activeStyleSet;
-  if (!activeId || !Object.prototype.hasOwnProperty.call(sets, activeId)) return false;
+  const existingSets = settings.slides.styleSets;
+  if (!activeId || !existingSets || !Object.prototype.hasOwnProperty.call(existingSets, activeId)) {
+    ensureStyleSets(settings);
+    return false;
+  }
+  const sets = ensureStyleSets(settings);
   const entry = sets[activeId];
   if (!entry || typeof entry !== 'object') return false;
   const snap = snapshotStyleSet(settings);
