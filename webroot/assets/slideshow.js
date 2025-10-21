@@ -1811,6 +1811,11 @@ async function loadDeviceResolved(id){
       : collectHeroTimelineData();
     const events = eventsInput.slice();
     const slidesCfg = settings?.slides || {};
+    const baseFillMs = (() => {
+      const raw = Number(slidesCfg.heroTimelineFillMs);
+      if (Number.isFinite(raw) && raw > 0) return Math.round(raw);
+      return 8000;
+    })();
     const heroScrollSpeed = (() => {
       const raw = Number(slidesCfg.heroTimelineScrollSpeed);
       if (Number.isFinite(raw) && raw > 0) return Math.max(4, Math.round(raw));
@@ -1836,6 +1841,15 @@ async function loadDeviceResolved(id){
       }
     })();
     const fallbackDwell = Number.isFinite(computedDwell) ? computedDwell : null;
+    let scrollDurationMs = null;
+    const applyProgressDuration = (ms) => {
+      if (!Number.isFinite(ms) || ms <= 0) return;
+      const ratio = Math.max(0.05, ms / (baseFillMs || 8000));
+      container.style.setProperty('--hero-duration-ratio', String(ratio));
+    };
+    if (!waitForScroll && Number.isFinite(fallbackDwell) && fallbackDwell > 0) {
+      applyProgressDuration(fallbackDwell);
+    }
     let advanceHelper = null;
     let cycleReached = !waitForScroll;
     const scheduleIfReady = () => {
@@ -1844,6 +1858,9 @@ async function loadDeviceResolved(id){
       const ms = Number.isFinite(advanceHelper.defaultMs) && advanceHelper.defaultMs > 0
         ? advanceHelper.defaultMs
         : (Number.isFinite(fallbackDwell) && fallbackDwell > 0 ? fallbackDwell : 8000);
+      if (!waitForScroll || !scrollDurationMs) {
+        applyProgressDuration(ms);
+      }
       advanceHelper.schedule(Math.max(1000, Math.round(ms)));
       advanceHelper = null;
     };
@@ -2042,6 +2059,20 @@ async function loadDeviceResolved(id){
     const body = h('div', { class: 'hero-body' }, [list]);
     container.appendChild(headingWrap);
     container.appendChild(body);
+    const recomputeScrollDuration = () => {
+      if (!waitForScroll) return null;
+      const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+      if (maxScroll <= 0) {
+        scrollDurationMs = null;
+        return null;
+      }
+      const travelMs = Math.round((maxScroll / Math.max(1, heroScrollSpeed)) * 1000);
+      const initialDelay = Math.round(Math.min(800, heroScrollPauseMs));
+      const total = Math.max(0, travelMs + initialDelay);
+      scrollDurationMs = total;
+      applyProgressDuration(total);
+      return total;
+    };
     const stopAutoScroll = enableAutoScroll(list, {
       axis: 'y',
       speed: heroScrollSpeed,
@@ -2051,7 +2082,13 @@ async function loadDeviceResolved(id){
         if (waitForScroll) markCycle();
       },
       onScrollableChange: (scrollable) => {
-        if (waitForScroll && !scrollable) markCycle();
+        if (!waitForScroll) return;
+        if (scrollable) {
+          recomputeScrollDuration();
+        } else {
+          scrollDurationMs = null;
+          markCycle();
+        }
       }
     });
     const handleManualScroll = () => {
@@ -2064,14 +2101,36 @@ async function loadDeviceResolved(id){
       }
     };
     list.addEventListener('scroll', handleManualScroll, { passive: true });
+    if (waitForScroll) {
+      const updateLater = () => {
+        try { recomputeScrollDuration(); } catch {}
+      };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(updateLater);
+      else updateLater();
+    }
     const cleanups = [];
     if (timer) cleanups.push(() => clearInterval(timer));
     if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
     cleanups.push(() => list.removeEventListener('scroll', handleManualScroll));
+    if (waitForScroll) {
+      let resizeObserver = null;
+      if (typeof ResizeObserver === 'function') {
+        try {
+          resizeObserver = new ResizeObserver(() => { recomputeScrollDuration(); });
+          resizeObserver.observe(list);
+        } catch {}
+      }
+      if (resizeObserver) {
+        cleanups.push(() => {
+          try { resizeObserver.disconnect(); } catch {}
+        });
+      }
+    }
     container.__cleanup = () => {
       cleanups.splice(0).forEach((fn) => {
         try { fn(); } catch {}
       });
+      container.style.removeProperty('--hero-duration-ratio');
     };
     return container;
   }
