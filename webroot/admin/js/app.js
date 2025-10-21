@@ -21,6 +21,10 @@ import { createUnsavedTracker } from './core/unsaved_state.js';
 import storage from './core/storage.js';
 import { createAppState } from './core/app_state.js';
 import { createDeviceContextManager } from './core/device_context.js';
+import { createLazyModuleManager } from './app/lazy_modules.js';
+import { registerStateAccess } from './app/state_store.js';
+import { createRoleRestrictionApplier } from './app/access_control.js';
+import { initSidebarResize as initSidebarResizeModule } from './app/sidebar_resize.js';
 import {
   mergeAvailablePermissions,
   resolvePermissionsForRoles,
@@ -81,148 +85,21 @@ let currentUserPermissions = createPermissionSet(currentUser.permissions);
 const hasRole = (role) => currentUserRoles.has(normalizeRoleName(role));
 const hasPermission = (permission) => currentUserPermissions.has(normalizePermissionName(permission));
 
-const lazyModuleState = {
-  backup: null,
-  cleanup: null,
-  userAdmin: null
-};
+const lazyModuleManager = createLazyModuleManager({
+  hasPermission,
+  fetchJson,
+  fetchUserAccounts,
+  saveUserAccount,
+  deleteUserAccount,
+  authRoles: AUTH_ROLES,
+  getAvailablePermissions: () => availablePermissions,
+  setAvailablePermissions: (permissions) => {
+    availablePermissions = permissions;
+  },
+  mergeAvailablePermissions
+});
 
-const ensureBackupToolsInitialized = () => {
-  if (lazyModuleState.backup) {
-    return lazyModuleState.backup;
-  }
-  lazyModuleState.backup = import('./modules/backup.js')
-    .then(({ initBackupButtons }) => {
-      initBackupButtons({ fetchJson });
-      return true;
-    })
-    .catch((error) => {
-      console.error('[admin] Backup-Modul konnte nicht geladen werden', error);
-      lazyModuleState.backup = null;
-      throw error;
-    });
-  return lazyModuleState.backup;
-};
-
-const ensureCleanupToolsInitialized = () => {
-  if (lazyModuleState.cleanup) {
-    return lazyModuleState.cleanup;
-  }
-  lazyModuleState.cleanup = import('./modules/system_cleanup.js')
-    .then(({ initCleanupInSystem }) => {
-      initCleanupInSystem({ fetchJson });
-      return true;
-    })
-    .catch((error) => {
-      console.error('[admin] Systembereinigung konnte nicht geladen werden', error);
-      lazyModuleState.cleanup = null;
-      throw error;
-    });
-  return lazyModuleState.cleanup;
-};
-
-const ensureUserAdminInitialized = () => {
-  if (lazyModuleState.userAdmin) {
-    return lazyModuleState.userAdmin;
-  }
-  lazyModuleState.userAdmin = import('./modules/user_admin.js')
-    .then(({ initUserAdmin }) => initUserAdmin({
-      hasPermission,
-      fetchUserAccounts,
-      saveUserAccount,
-      deleteUserAccount,
-      authRoles: AUTH_ROLES,
-      getAvailablePermissions: () => availablePermissions,
-      setAvailablePermissions: (permissions) => {
-        availablePermissions = mergeAvailablePermissions(permissions);
-      }
-    }))
-    .catch((error) => {
-      console.error('[admin] Benutzerverwaltung konnte nicht geladen werden', error);
-      lazyModuleState.userAdmin = null;
-      throw error;
-    });
-  return lazyModuleState.userAdmin;
-};
-
-const setupLazySystemTools = () => {
-  if (!hasPermission('system')) {
-    return;
-  }
-  const systemSection = document.getElementById('btnExport')?.closest('details');
-  const exportButton = document.getElementById('btnExport');
-  const importField = document.getElementById('importFile');
-  const cleanupButton = document.getElementById('btnCleanupSys');
-
-  const primeSystemTools = () => {
-    ensureBackupToolsInitialized().catch(() => {});
-    ensureCleanupToolsInitialized().catch(() => {});
-  };
-
-  if (systemSection) {
-    if (systemSection.open) {
-      primeSystemTools();
-    } else {
-      const handleToggle = () => {
-        if (systemSection.open) {
-          systemSection.removeEventListener('toggle', handleToggle);
-          primeSystemTools();
-        }
-      };
-      systemSection.addEventListener('toggle', handleToggle);
-    }
-  }
-
-  [exportButton, importField, cleanupButton].forEach((element) => {
-    if (!element) return;
-    const warmup = () => {
-      primeSystemTools();
-      element.removeEventListener('pointerenter', warmup);
-      element.removeEventListener('focus', warmup);
-    };
-    element.addEventListener('pointerenter', warmup);
-    element.addEventListener('focus', warmup);
-  });
-};
-
-const setupLazyUserAdmin = () => {
-  if (!hasPermission('user-admin')) {
-    return;
-  }
-  const btnUsers = document.getElementById('btnUsers');
-  if (!btnUsers) {
-    return;
-  }
-
-  const warmup = () => {
-    ensureUserAdminInitialized().catch(() => {});
-    btnUsers.removeEventListener('pointerenter', warmup);
-    btnUsers.removeEventListener('focus', warmup);
-  };
-
-  btnUsers.addEventListener('pointerenter', warmup);
-  btnUsers.addEventListener('focus', warmup);
-
-  const handleClick = async (event) => {
-    event.preventDefault();
-    try {
-      const controller = await ensureUserAdminInitialized();
-      if (controller && typeof controller.handleOpen === 'function') {
-        btnUsers.removeEventListener('click', handleClick);
-        await controller.handleOpen();
-      }
-    } catch (error) {
-      console.error('[admin] Benutzerverwaltung konnte nicht initialisiert werden', error);
-    }
-  };
-
-  btnUsers.addEventListener('click', handleClick);
-};
-
-const setupLazyAdminModules = () => {
-  setupLazySystemTools();
-  setupLazyUserAdmin();
-};
+const { setupLazyAdminModules } = lazyModuleManager;
 
 // === Global State ============================================================
 let schedule = null;
@@ -327,6 +204,42 @@ const deviceContextState = {
   setDevicesPane: (el) => appState.setDevicesPane(el),
   getDevicesPane: () => appState.getDevicesPane()
 };
+
+registerStateAccess({
+  getSchedule: () => schedule,
+  setSchedule: (next) => {
+    schedule = next;
+  },
+  getSettings: () => settings,
+  setSettings: (next) => {
+    settings = next;
+  },
+  setBaseState: (scheduleValue, settingsValue) => {
+    baseSchedule = scheduleValue;
+    baseSettings = settingsValue;
+  },
+  getBaseState: () => ({ schedule: baseSchedule, settings: baseSettings }),
+  setDeviceBaseState: (scheduleValue, settingsValue) => {
+    deviceBaseSchedule = scheduleValue;
+    deviceBaseSettings = settingsValue;
+  },
+  getDeviceBaseState: () => ({ schedule: deviceBaseSchedule, settings: deviceBaseSettings }),
+  clearDeviceBaseState: () => {
+    deviceBaseSchedule = null;
+    deviceBaseSettings = null;
+  },
+  setDeviceContext: (ctx) => deviceContextState.setDeviceContext(ctx),
+  getDeviceContext: () => deviceContextState.getDeviceContext(),
+  clearDeviceContext: () => deviceContextState.clearDeviceContext(),
+  setCurrentView: (view) => deviceContextState.setCurrentView(view),
+  getCurrentView: () => deviceContextState.getCurrentView(),
+  setDevicesPinned: (flag) => deviceContextState.setDevicesPinned(flag),
+  isDevicesPinned: () => deviceContextState.isDevicesPinned(),
+  setDockPane: (pane) => deviceContextState.setDockPane(pane),
+  getDockPane: () => deviceContextState.getDockPane(),
+  setDevicesPane: (pane) => deviceContextState.setDevicesPane(pane),
+  getDevicesPane: () => deviceContextState.getDevicesPane()
+});
 
 function createGridContext() {
   return {
@@ -519,172 +432,7 @@ if (unsavedBadgeResetBtn){
   });
 }
 
-function initSidebarResize(){
-  const resizer = document.getElementById('layoutResizer');
-  const rightbar = document.querySelector('.rightbar');
-  if (!resizer || !rightbar) return;
-
-  const root = document.documentElement;
-  const getNumberVar = (name, fallback) => {
-    const raw = getComputedStyle(root).getPropertyValue(name);
-    const num = Number.parseFloat(raw);
-    return Number.isFinite(num) ? num : fallback;
-  };
-
-  let minPx = 0;
-  let maxPx = 0;
-  let hitPx = 0;
-  const clampWidth = (value) => Math.min(maxPx, Math.max(minPx, value));
-  const media = window.matchMedia('(orientation: portrait),(max-width: 900px)');
-
-  const refreshBounds = () => {
-    minPx = getNumberVar('--sidebar-min', 280);
-    maxPx = getNumberVar('--sidebar-max', 920);
-    hitPx = Math.max(4, getNumberVar('--sidebar-resizer-hit', 18));
-  };
-  refreshBounds();
-
-  const readStoredWidth = () => {
-    const stored = Number.parseFloat(lsGet('sidebarWidthPx'));
-    return Number.isFinite(stored) ? clampWidth(stored) : null;
-  };
-
-  const updateAria = (width) => {
-    const current = Number.isFinite(width) ? width : rightbar.getBoundingClientRect().width;
-    resizer.setAttribute('aria-valuemin', String(Math.round(minPx)));
-    resizer.setAttribute('aria-valuemax', String(Math.round(maxPx)));
-    resizer.setAttribute('aria-valuenow', String(Math.round(current)));
-  };
-
-  const applyWidth = (width, { store = true } = {}) => {
-    const clamped = clampWidth(width);
-    root.style.setProperty('--sidebar-size', `${clamped}px`);
-    updateAria(clamped);
-    if (store) lsSet('sidebarWidthPx', String(Math.round(clamped)));
-  };
-
-  const resetWidth = () => {
-    root.style.removeProperty('--sidebar-size');
-    updateAria();
-  };
-
-  const isCollapsed = () => media.matches;
-
-  const syncState = () => {
-    if (isCollapsed()) {
-      resizer.setAttribute('aria-hidden', 'true');
-      resizer.setAttribute('tabindex', '-1');
-      resizer.classList.remove('is-active');
-      rightbar.classList.remove('resize-hover');
-      resetWidth();
-      return;
-    }
-    resizer.setAttribute('aria-hidden', 'false');
-    resizer.setAttribute('tabindex', '0');
-    refreshBounds();
-    const stored = readStoredWidth();
-    if (stored != null) {
-      applyWidth(stored, { store: false });
-    } else {
-      resetWidth();
-    }
-  };
-
-  media.addEventListener('change', syncState);
-  window.addEventListener('resize', () => {
-    refreshBounds();
-    if (!isCollapsed()) updateAria();
-  });
-
-  const dragState = { active: false, pointerId: null, startX: 0, startWidth: 0, captureTarget: null };
-
-  const handlePointerMove = (ev) => {
-    if (!dragState.active || ev.pointerId !== dragState.pointerId) return;
-    const delta = ev.clientX - dragState.startX;
-    applyWidth(dragState.startWidth - delta, { store: false });
-  };
-
-  const finishDrag = (store = true) => {
-    if (!dragState.active) return;
-    dragState.active = false;
-    const width = rightbar.getBoundingClientRect().width;
-    if (store) applyWidth(width);
-    const target = dragState.captureTarget;
-    dragState.captureTarget = null;
-    try {
-      if (target && dragState.pointerId !== null) target.releasePointerCapture(dragState.pointerId);
-    } catch {}
-    dragState.pointerId = null;
-    resizer.classList.remove('is-active');
-    rightbar.classList.remove('resize-hover');
-  };
-
-  const tryStartDrag = (target, ev) => {
-    if (!ev.isPrimary || isCollapsed()) return false;
-    dragState.active = true;
-    dragState.pointerId = ev.pointerId;
-    dragState.startX = ev.clientX;
-    dragState.startWidth = rightbar.getBoundingClientRect().width;
-    dragState.captureTarget = target;
-    try { target.setPointerCapture(ev.pointerId); } catch {}
-    resizer.classList.add('is-active');
-    ev.preventDefault();
-    ev.stopPropagation();
-    return true;
-  };
-
-  resizer.addEventListener('pointerdown', (ev) => {
-    tryStartDrag(resizer, ev);
-  });
-
-  rightbar.addEventListener('pointerdown', (ev) => {
-    if (dragState.active || !ev.isPrimary || isCollapsed()) return;
-    const rect = rightbar.getBoundingClientRect();
-    if ((ev.clientX - rect.left) > hitPx) return;
-    tryStartDrag(rightbar, ev);
-  });
-
-  rightbar.addEventListener('pointermove', (ev) => {
-    if (dragState.active || isCollapsed()) return;
-    const rect = rightbar.getBoundingClientRect();
-    const nearEdge = (ev.clientX - rect.left) <= hitPx;
-    rightbar.classList.toggle('resize-hover', nearEdge);
-  });
-  rightbar.addEventListener('pointerleave', () => {
-    if (!dragState.active) rightbar.classList.remove('resize-hover');
-  });
-
-  window.addEventListener('pointermove', handlePointerMove);
-  window.addEventListener('pointerup', (ev) => {
-    if (ev.pointerId === dragState.pointerId) finishDrag(true);
-  });
-  window.addEventListener('pointercancel', (ev) => {
-    if (ev.pointerId === dragState.pointerId) finishDrag(false);
-  });
-  resizer.addEventListener('lostpointercapture', () => finishDrag(false));
-  rightbar.addEventListener('lostpointercapture', () => finishDrag(false));
-
-  resizer.addEventListener('keydown', (ev) => {
-    if (isCollapsed()) return;
-    const baseWidth = rightbar.getBoundingClientRect().width;
-    const step = ev.shiftKey ? 48 : 24;
-    if (ev.key === 'ArrowLeft') {
-      ev.preventDefault();
-      applyWidth(baseWidth + step);
-    } else if (ev.key === 'ArrowRight') {
-      ev.preventDefault();
-      applyWidth(baseWidth - step);
-    } else if (ev.key === 'Home') {
-      ev.preventDefault();
-      applyWidth(minPx);
-    } else if (ev.key === 'End') {
-      ev.preventDefault();
-      applyWidth(maxPx);
-    }
-  });
-
-  syncState();
-}
+const initSidebarResize = () => initSidebarResizeModule({ lsGet, lsSet });
 
 // ============================================================================
 // 0) Zugriff & Rollensteuerung
@@ -735,147 +483,13 @@ async function resolveCurrentUser() {
   } catch {}
 }
 
-function applyRoleRestrictions() {
-  const setHiddenState = (element, shouldHide) => {
-    if (!element) return;
-    if (shouldHide) {
-      element.setAttribute('hidden', '');
-    } else {
-      element.removeAttribute('hidden');
-    }
-  };
-
-  const cockpitToggle = document.querySelector('.header-cockpit-controls');
-  const cockpitSection = document.querySelector('.workspace-overview');
-  const slideshowBox = document.getElementById('boxSlidesText');
-  const slidesFlowCard = document.getElementById('slidesFlowCard');
-  const slidesAutomationCard = document.getElementById('slidesAutomationCard');
-  const mediaBox = document.getElementById('boxImages');
-  const footnoteBox = document.getElementById('boxFootnotes');
-  const footnoteSection = document.getElementById('footnoteSection');
-  const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
-  const badgeSection = document.getElementById('badgeLibrarySection');
-  const colorsSection = document.getElementById('resetColors')?.closest('details');
-  const systemSection = document.getElementById('btnExport')?.closest('details');
-  const globalInfoBox = document.getElementById('boxStories');
-  const slidesMaster = document.getElementById('slidesMaster');
-
-  const cockpitCardFrom = (selector) => {
-    const control = document.querySelector(selector);
-    return control ? control.closest('.workspace-card') : null;
-  };
-
-  const slidesCockpitCard = cockpitCardFrom('[data-jump="slidesMaster"]');
-  const infoCockpitCard = cockpitCardFrom('[data-jump="boxStories"]');
-  const mediaLayoutCard = cockpitCardFrom('[data-jump="boxImages"]') || cockpitCardFrom('[data-jump="boxSlidesText"]');
-
-  const canUseCockpit = hasPermission('cockpit');
-  const canUseSlides = hasPermission('slides');
-  const canManageFlow = canUseSlides && hasPermission('slides-flow');
-  const canManageAutomation = canUseSlides && hasPermission('slides-automation');
-  const canManageMedia = canUseSlides && hasPermission('media');
-  const canManageFootnotes = hasPermission('footnotes');
-  const canManageBadges = hasPermission('badges');
-  const canUseGlobalInfo = hasPermission('global-info');
-  const canUseColors = hasPermission('colors');
-  const canUseSystem = hasPermission('system');
-  const canManageDevices = hasPermission('devices');
-  const canManageUsers = hasPermission('user-admin');
-
-  setHiddenState(cockpitToggle, !canUseCockpit);
-  setHiddenState(cockpitSection, !canUseCockpit);
-  setHiddenState(slideshowBox, !canUseSlides);
-  setHiddenState(slidesFlowCard, !canManageFlow);
-  setHiddenState(slidesAutomationCard, !canManageAutomation);
-  setHiddenState(mediaBox, !canManageMedia);
-  setHiddenState(footnoteSection, !canManageFootnotes);
-  setHiddenState(footnoteLayoutSection, !canManageFootnotes);
-  setHiddenState(badgeSection, !canManageBadges);
-  setHiddenState(globalInfoBox, !canUseGlobalInfo);
-  setHiddenState(colorsSection, !canUseColors);
-  setHiddenState(systemSection, !canUseSystem);
-
-  if (slidesMaster) {
-    if (!canUseSlides) {
-      slidesMaster.setAttribute('data-limited', 'true');
-      slidesMaster.open = true;
-    } else {
-      slidesMaster.removeAttribute('data-limited');
-    }
-  }
-
-  const showSlidesCard = canUseSlides || canManageFlow || canManageAutomation;
-  const showInfoCard = canUseGlobalInfo || canManageMedia;
-  const showMediaLayoutCard = canManageMedia || canUseColors || canUseSlides;
-
-  setHiddenState(slidesCockpitCard, !showSlidesCard);
-  setHiddenState(infoCockpitCard, !showInfoCard);
-  setHiddenState(mediaLayoutCard, !showMediaLayoutCard);
-
-  const hasFullAccess = availablePermissions.every((permission) => hasPermission(permission));
-  document.body?.classList.toggle('role-limited', !hasFullAccess);
-
-  if (!canUseSlides && slideshowBox) {
-    slideshowBox.open = false;
-  }
-
-  if (!canUseColors && colorsSection) {
-    colorsSection.open = false;
-  }
-
-  if (!canUseSystem && systemSection) {
-    systemSection.open = false;
-  }
-
-  if (!canUseGlobalInfo && globalInfoBox) {
-    globalInfoBox.open = false;
-  }
-
-  const hideFootnoteBox = (!canManageFootnotes && !canManageBadges);
-  setHiddenState(footnoteBox, hideFootnoteBox);
-
-  if (!canManageDevices) {
-    document.querySelectorAll('[data-devices]').forEach((element) => {
-      element.remove();
-    });
-
-    const btnDevices = document.getElementById('btnDevices');
-    if (btnDevices) {
-      btnDevices.remove();
-    }
-
-    setDevicesPinned(false);
-    lsRemove('devicesPinned');
-    document.body?.classList.remove('devices-pinned');
-    destroyDevicesPane();
-
-    const devicesPane = document.getElementById('devicesPane');
-    if (devicesPane) {
-      devicesPane.remove();
-    }
-
-    const devicesDock = document.getElementById('devicesDock');
-    if (devicesDock) {
-      devicesDock.remove();
-    }
-
-    const devPrevModal = document.getElementById('devPrevModal');
-    if (devPrevModal) {
-      devPrevModal.remove();
-    }
-  }
-
-  if (!canManageUsers) {
-    const btnUsers = document.getElementById('btnUsers');
-    if (btnUsers) {
-      btnUsers.remove();
-    }
-    const userModal = document.getElementById('userModal');
-    if (userModal) {
-      userModal.remove();
-    }
-  }
-}
+const applyRoleRestrictions = createRoleRestrictionApplier({
+  hasPermission,
+  getAvailablePermissions: () => availablePermissions,
+  setDevicesPinned,
+  lsRemove,
+  destroyDevicesPane
+});
 
 // ============================================================================
 // 1) Bootstrap: Laden + Initialisieren
