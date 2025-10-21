@@ -204,6 +204,7 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .hero-timeline-list.is-scrollable::-webkit-scrollbar{display:none}
 .hero-timeline{--heroTimelineThumb:calc(120px*var(--vwScale));--heroTimelineRadius:calc(18px*var(--vwScale));--heroTimelineGap:calc(16px*var(--vwScale));}
 .hero-timeline .timeline-item{
+  flex:0 0 auto;
   position:relative;
   padding:calc(24px*var(--vwScale));
   border-radius:var(--tileRadiusPx, calc(22px*var(--vwScale)));
