@@ -118,6 +118,34 @@ const appState = createAppState({
 });
 document.body?.classList.toggle('devices-pinned', appState.isDevicesPinned());
 
+let setUnsavedStateImpl = () => {};
+const setUnsavedState = (state, options) => setUnsavedStateImpl(state, options);
+let unsavedHasChangesImpl = () => false;
+const unsavedHasChanges = () => unsavedHasChangesImpl();
+let resetUnsavedBaselineImpl = () => {};
+const resetUnsavedBaseline = (options) => resetUnsavedBaselineImpl(options);
+let queueUnsavedEvaluationImpl = () => {};
+const queueUnsavedEvaluation = (options) => queueUnsavedEvaluationImpl(options);
+
+const OVERVIEW_TIME_BASE_CH = 10;
+const OVERVIEW_TIME_SCALE_MIN = 0.5;
+const OVERVIEW_TIME_SCALE_MAX = 3;
+
+const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
+
+const resolveOverviewTimeWidthScale = (fonts = {}, { fallback = 1 } = {}) => {
+  const rawScale = Number(fonts?.overviewTimeWidthScale);
+  if (Number.isFinite(rawScale) && rawScale > 0) {
+    return clampNumber(rawScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+  }
+  const legacyWidth = Number(fonts?.overviewTimeWidthCh);
+  if (Number.isFinite(legacyWidth) && legacyWidth > 0) {
+    const legacyScale = legacyWidth / OVERVIEW_TIME_BASE_CH;
+    return clampNumber(legacyScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+  }
+  return clampNumber(fallback, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
+};
+
 const stateAccess = {
   getSchedule: () => schedule,
   getSettings: () => settings,
@@ -173,25 +201,6 @@ const setCurrentView = (view) => deviceContextState.setCurrentView(view);
 const isDevicesPinned = () => deviceContextState.isDevicesPinned();
 const setDevicesPinned = (flag) => {
   deviceContextState.setDevicesPinned(flag);
-};
-
-const OVERVIEW_TIME_BASE_CH = 10;
-const OVERVIEW_TIME_SCALE_MIN = 0.5;
-const OVERVIEW_TIME_SCALE_MAX = 3;
-
-const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
-
-const resolveOverviewTimeWidthScale = (fonts = {}, { fallback = 1 } = {}) => {
-  const rawScale = Number(fonts?.overviewTimeWidthScale);
-  if (Number.isFinite(rawScale) && rawScale > 0) {
-    return clampNumber(rawScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
-  }
-  const legacyWidth = Number(fonts?.overviewTimeWidthCh);
-  if (Number.isFinite(legacyWidth) && legacyWidth > 0) {
-    const legacyScale = legacyWidth / OVERVIEW_TIME_BASE_CH;
-    return clampNumber(legacyScale, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
-  }
-  return clampNumber(fallback, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
 };
 
 const deviceContextState = {
@@ -405,10 +414,10 @@ const unsavedTracker = createUnsavedTracker({
 
 const updateBaseline = unsavedTracker.setBaseline;
 const evaluateUnsavedState = unsavedTracker.evaluate;
-const setUnsavedState = (state, options) => unsavedTracker.setUnsavedState(state, options);
+setUnsavedStateImpl = (state, options) => unsavedTracker.setUnsavedState(state, options);
 const restoreFromBaseline = unsavedTracker.restoreBaseline;
 const ensureUnsavedChangeListener = unsavedTracker.ensureListeners;
-const queueUnsavedEvaluation = (options) => unsavedTracker.queueEvaluation(options || {});
+queueUnsavedEvaluationImpl = (options) => unsavedTracker.queueEvaluation(options || {});
 
 if (typeof window === 'object') {
   const originalQueueUnsaved = window.__queueUnsaved;
@@ -426,8 +435,8 @@ if (typeof window === 'object') {
     window.__queueUnsavedPatched = true;
   }
 }
-const unsavedHasChanges = () => unsavedTracker.hasUnsaved();
-const resetUnsavedBaseline = ({ skipDraftClear = true } = {}) => {
+unsavedHasChangesImpl = () => unsavedTracker.hasUnsaved();
+resetUnsavedBaselineImpl = ({ skipDraftClear = true } = {}) => {
   updateBaseline(stateAccess.getSchedule(), stateAccess.getSettings());
   setUnsavedState(false, { skipDraftClear });
 };
