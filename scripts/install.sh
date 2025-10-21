@@ -207,13 +207,20 @@ build_admin_assets(){
     return
   fi
 
+  local -a npm_env=(
+    "NPM_CONFIG_AUDIT=false"
+    "NPM_CONFIG_FUND=false"
+    "NPM_CONFIG_LOGLEVEL=error"
+    "NPM_CONFIG_UPDATE_NOTIFIER=false"
+  )
+
   pushd "$PROJECT_ROOT" >/dev/null
   if [[ -f package-lock.json ]]; then
-    npm ci --no-audit --no-fund
+    env "${npm_env[@]}" npm ci --progress=false
   else
-    npm install --no-audit --no-fund
+    env "${npm_env[@]}" npm install --progress=false
   fi
-  npm run build:admin
+  env "${npm_env[@]}" npm run build:admin
   rm -rf node_modules
   popd >/dev/null
 }
