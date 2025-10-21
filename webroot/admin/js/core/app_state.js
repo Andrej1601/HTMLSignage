@@ -9,6 +9,7 @@
  * @property {string|null} id
  * @property {string|null} name
  * @property {import('./config.js').BadgeMeta|null} badge
+ * @property {boolean} [overridesActive]
  */
 
 /**
@@ -56,6 +57,7 @@ export function createAppState(options = {}) {
     deviceCtx: null,
     deviceName: null,
     deviceBadge: null,
+    deviceOverridesActive: false,
     currentView: initialView,
     devicesPinned: !!options.devicesPinned,
     dockPane: null,
@@ -82,20 +84,23 @@ export function createAppState(options = {}) {
       state.deviceBaseSchedule = null;
       state.deviceBaseSettings = null;
     },
-    setDeviceContext: ({ id, name, badge }) => {
+    setDeviceContext: ({ id, name, badge, overridesActive }) => {
       state.deviceCtx = id || null;
       state.deviceName = name || null;
       state.deviceBadge = badge || null;
+      state.deviceOverridesActive = !!overridesActive;
     },
     getDeviceContext: () => ({
       id: state.deviceCtx,
       name: state.deviceName,
-      badge: state.deviceBadge
+      badge: state.deviceBadge,
+      overridesActive: state.deviceOverridesActive
     }),
     clearDeviceContext: () => {
       state.deviceCtx = null;
       state.deviceName = null;
       state.deviceBadge = null;
+      state.deviceOverridesActive = false;
     },
     setCurrentView: (view) => {
       state.currentView = view === 'preview' ? 'preview' : 'grid';
