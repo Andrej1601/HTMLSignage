@@ -1420,6 +1420,7 @@ async function loadDeviceResolved(id){
   function collectWellnessTips() {
     const list = Array.isArray(settings?.extras?.wellnessTips) ? settings.extras.wellnessTips : [];
     const normalized = [];
+    const dwellValues = [];
     list.forEach((entry) => {
       if (!entry || typeof entry !== 'object') return;
       if (entry.enabled === false) return;
@@ -1428,16 +1429,37 @@ async function loadDeviceResolved(id){
       const title = typeof entry.title === 'string' ? entry.title.trim() : '';
       const text = typeof entry.text === 'string' ? entry.text.trim() : '';
       if (!title && !text) return;
+      const dwellSec = Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null;
+      if (Number.isFinite(dwellSec)) dwellValues.push(dwellSec);
       normalized.push({
         type: 'wellness-tip',
         id: id || null,
         icon,
         title,
         text,
-        dwellSec: Number.isFinite(+entry.dwellSec) ? Math.max(1, Math.round(+entry.dwellSec)) : null
+        dwellSec
       });
     });
-    return normalized;
+    if (normalized.length <= 1) return normalized;
+
+    const items = normalized
+      .map((entry) => ({
+        id: entry.id != null ? entry.id : null,
+        icon: entry.icon,
+        title: entry.title,
+        text: entry.text
+      }))
+      .filter(item => (item.title && item.title.length) || (item.text && item.text.length));
+
+    if (!items.length) return [];
+
+    const dwellSec = dwellValues.length ? Math.max(...dwellValues) : null;
+    return [{
+      type: 'wellness-tip',
+      id: null,
+      dwellSec,
+      items
+    }];
   }
 
   function collectEventCountdowns() {
@@ -1727,15 +1749,44 @@ async function loadDeviceResolved(id){
     const eyebrow = h('div', { class: 'extra-eyebrow' }, 'Wellness-Tipp');
     const content = h('div', { class: 'extra-content' });
 
-    if (item.icon) {
+    const items = Array.isArray(item.items)
+      ? item.items
+        .map((entry) => {
+          if (!entry || typeof entry !== 'object') return null;
+          const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+          const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+          const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+          if (!title && !text) return null;
+          return { title, text, icon };
+        })
+        .filter(Boolean)
+      : [];
+
+    const hasList = items.length > 0;
+
+    if (!hasList && item.icon) {
       content.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, item.icon));
     }
 
     const body = h('div', { class: 'extra-body-wrap' });
-    const titleText = typeof item.title === 'string' ? item.title.trim() : '';
-    if (titleText) body.appendChild(h('h2', { class: 'extra-title' }, titleText));
-    const text = typeof item.text === 'string' ? item.text.trim() : '';
-    if (text) body.appendChild(h('p', { class: 'extra-text' }, text));
+    if (hasList) {
+      const listEl = h('ul', { class: 'extra-list' });
+      items.forEach((entry) => {
+        const li = h('li');
+        if (entry.icon) {
+          li.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, entry.icon));
+        }
+        if (entry.title) li.appendChild(h('h3', { class: 'extra-title' }, entry.title));
+        if (entry.text) li.appendChild(h('p', { class: 'extra-text' }, entry.text));
+        listEl.appendChild(li);
+      });
+      body.appendChild(listEl);
+    } else {
+      const titleText = typeof item.title === 'string' ? item.title.trim() : '';
+      if (titleText) body.appendChild(h('h2', { class: 'extra-title' }, titleText));
+      const text = typeof item.text === 'string' ? item.text.trim() : '';
+      if (text) body.appendChild(h('p', { class: 'extra-text' }, text));
+    }
     content.appendChild(body);
 
     container.appendChild(eyebrow);

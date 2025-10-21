@@ -165,6 +165,8 @@ body[data-layout='single'][data-layout-profile='asymmetric'] #stage-left{grid-co
 .extra-text,.extra-textline{margin:0; font-size:calc(24px*var(--scale)); line-height:1.45; opacity:.9;}
 .extra-list{margin:0; padding-left:1.4em; display:flex; flex-direction:column; gap:calc(8px*var(--vwScale)); font-size:calc(24px*var(--scale));}
 .extra-list li{margin:0;}
+.extra-list .extra-icon{font-size:calc(48px*var(--scale)); filter:drop-shadow(0 8px 18px rgba(0,0,0,.3));}
+.extra-list .extra-title{font-size:calc(36px*var(--scale));}
 .extra-content.extra-countdown{align-items:flex-start;}
 .extra-countdown-display{display:flex; flex-direction:column; gap:calc(8px*var(--vwScale)); margin-top:calc(12px*var(--vwScale));}
 .extra-countdown-value{font-size:calc(72px*var(--scale)); font-weight:800; letter-spacing:.02em;}
