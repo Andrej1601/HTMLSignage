@@ -6,10 +6,24 @@
 
 </head>
 <body class="theme-light">
-  <header>
-    <div class="header-title">
-      <h1>Anzeigensteuerung – Admin</h1>
-      <label class="toggle" title="Hell/Dunkel">
+  <header class="app-header" data-role="app-header">
+    <div class="app-shell-row app-shell-row-top">
+      <div class="header-title app-shell-brand">
+        <span class="app-shell-logo" aria-hidden="true">🌿</span>
+        <div class="app-shell-title-group">
+          <p class="app-shell-eyebrow">Aufguss Cockpit</p>
+          <h1>Anzeigensteuerung – Admin</h1>
+          <p class="app-shell-subtitle">Planung, Inhalte und Geräte in einem Arbeitsbereich</p>
+        </div>
+      </div>
+      <nav class="app-shell-nav" aria-label="Bereiche">
+        <a class="app-shell-navlink" href="#gridPane">Planung</a>
+        <a class="app-shell-navlink" href="#slidesMaster">Slides</a>
+        <a class="app-shell-navlink" href="#boxSaunas">Saunen</a>
+        <a class="app-shell-navlink" href="#boxFootnotes">Badges</a>
+        <a class="app-shell-navlink" href="#boxImages">Medien</a>
+      </nav>
+      <label class="toggle app-shell-toggle" title="Hell/Dunkel">
         <input type="checkbox" id="themeMode">
         <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="4" fill="currentColor"/>
@@ -29,32 +43,37 @@
         </svg>
       </label>
     </div>
-    <div class="header-actions">
-      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff" hidden>
-        <div class="header-cockpit-toggle">
-          <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
-            <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
-          </button>
-          <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
-            <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
-            <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
-          </button>
+    <div class="app-shell-row app-shell-row-bottom">
+      <div class="app-shell-actions">
+        <div class="app-shell-actions-secondary">
+          <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff" hidden>
+            <div class="header-cockpit-toggle">
+              <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
+                <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+                <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
+              </button>
+              <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
+                <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+                <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
+              </button>
+            </div>
+          </div>
+          <button class="btn" id="btnDevices">Geräte</button>
+          <div class="menuwrap" id="viewMenuWrap">
+            <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+              Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+            </button>
+            <div class="dropdown" id="viewMenu" role="menu" hidden>
+              <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+              <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
+            </div>
+          </div>
+        </div>
+        <div class="app-shell-actions-primary">
+          <button class="btn" id="btnOpen">Slideshow öffnen</button>
+          <button class="btn primary" id="btnSave">Speichern</button>
         </div>
       </div>
-      <!-- Ansicht-Menü -->
-      <button class="btn" id="btnDevices">Geräte</button>
-      <div class="menuwrap" id="viewMenuWrap">
-        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-        </button>
-      <div class="dropdown" id="viewMenu" role="menu" hidden>
-        <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-        <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-      </div>
-    </div>
-      <button class="btn" id="btnOpen">Slideshow öffnen</button>
-      <button class="btn primary" id="btnSave">Speichern</button>
       <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
         <span class="unsaved-badge-icon" aria-hidden="true"></span>
         <span class="unsaved-badge-content">
