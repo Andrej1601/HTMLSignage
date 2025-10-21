@@ -26,4 +26,4 @@ require __DIR__ . '/../../../webroot/admin/api/auth/guard.php';
 
 auth_require_permission('devices');
 
-echo json_encode(['ok' => true]);
+echo json_encode(['ok' => true], SIGNAGE_JSON_RESPONSE_FLAGS);

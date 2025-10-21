@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/../../webroot/admin/api/storage.php';
+
 final class AuthGuardTest extends TestCase
 {
     private function createUsersFile(array $users): string
@@ -13,7 +15,7 @@ final class AuthGuardTest extends TestCase
             $this->fail('Unable to create temporary users file');
         }
         $payload = ['users' => $users];
-        file_put_contents($path, json_encode($payload, JSON_PRETTY_PRINT));
+        file_put_contents($path, json_encode($payload, SIGNAGE_JSON_STORAGE_FLAGS));
         return $path;
     }
 

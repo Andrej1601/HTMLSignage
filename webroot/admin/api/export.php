@@ -8,7 +8,7 @@ function export_fail(int $status, array $payload): void
 {
   http_response_code($status);
   header('Content-Type: application/json; charset=UTF-8');
-  echo json_encode($payload, SIGNAGE_JSON_FLAGS);
+  echo json_encode($payload, SIGNAGE_JSON_RESPONSE_FLAGS);
   exit;
 }
 
@@ -150,14 +150,14 @@ try {
   }
 
   if ($incSettings && is_array($settings)) {
-    $json = json_encode($settings, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($settings, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json !== false) {
       $stateStmt = $pdo->prepare('INSERT INTO export_state(section, json) VALUES (:section, :json)');
       $stateStmt->execute([':section' => 'settings', ':json' => $json]);
     }
   }
   if ($incSchedule && is_array($schedule)) {
-    $json = json_encode($schedule, SIGNAGE_JSON_FLAGS);
+    $json = json_encode($schedule, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json !== false) {
       $stateStmt = $pdo->prepare('INSERT INTO export_state(section, json) VALUES (:section, :json)');
       $stateStmt->execute([':section' => 'schedule', ':json' => $json]);

@@ -8,10 +8,10 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 
 $schedule = signage_read_json('schedule.json', signage_default_schedule());
-$json = json_encode($schedule, SIGNAGE_JSON_FLAGS);
+$json = json_encode($schedule, SIGNAGE_JSON_RESPONSE_FLAGS);
 if ($json === false) {
     http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_FLAGS);
+    echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_RESPONSE_FLAGS);
     return;
 }
 
