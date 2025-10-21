@@ -14,6 +14,135 @@ const SIGNAGE_AUDIT_LOG_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 const SIGNAGE_AUDIT_LOG_MAX_ROWS = 5000;
 const SIGNAGE_AUDIT_LOG_PRUNE_INTERVAL = 300;
 
+function signage_last_error_message(string $fallback): string
+{
+    $error = error_get_last();
+    if (is_array($error) && isset($error['message']) && $error['message'] !== '') {
+        return $error['message'];
+    }
+
+    return $fallback;
+}
+
+function signage_flush_stream($handle, ?string &$error = null): bool
+{
+    if (!is_resource($handle)) {
+        $error = 'invalid stream resource';
+        return false;
+    }
+
+    if (!@fflush($handle)) {
+        $error = 'fflush failed';
+        return false;
+    }
+
+    if (function_exists('fsync') && !@fsync($handle)) {
+        $error = signage_last_error_message('fsync failed');
+        return false;
+    }
+
+    return true;
+}
+
+function signage_read_file_locked(string $path, ?string &$error = null): ?string
+{
+    $error = null;
+
+    if (!is_file($path)) {
+        return null;
+    }
+
+    if (function_exists('error_clear_last')) {
+        error_clear_last();
+    }
+
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) {
+        $error = signage_last_error_message('unable to open file for reading');
+        return null;
+    }
+
+    $locked = @flock($handle, LOCK_SH);
+    if (!$locked) {
+        $error = 'unable to acquire shared lock';
+        fclose($handle);
+        return null;
+    }
+
+    $contents = stream_get_contents($handle);
+    if ($contents === false) {
+        $error = 'unable to read from file';
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return null;
+    }
+
+    flock($handle, LOCK_UN);
+    fclose($handle);
+
+    return $contents;
+}
+
+function signage_atomic_file_put_contents(string $path, string $contents, ?string &$error = null): bool
+{
+    $error = null;
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        $error = 'unable to create directory: ' . $dir;
+        return false;
+    }
+
+    if (function_exists('error_clear_last')) {
+        error_clear_last();
+    }
+
+    $temp = @tempnam($dir, basename($path) . '.tmp');
+    if ($temp === false) {
+        $error = 'unable to create temporary file in ' . $dir;
+        return false;
+    }
+
+    $handle = @fopen($temp, 'wb');
+    if ($handle === false) {
+        $error = signage_last_error_message('unable to open temporary file for writing');
+        @unlink($temp);
+        return false;
+    }
+
+    $bytesTotal = strlen($contents);
+    $bytesWritten = 0;
+    while ($bytesWritten < $bytesTotal) {
+        $chunk = @fwrite($handle, substr($contents, $bytesWritten));
+        if ($chunk === false) {
+            $error = 'unable to write to temporary file';
+            @fclose($handle);
+            @unlink($temp);
+            return false;
+        }
+        $bytesWritten += $chunk;
+    }
+
+    if (!signage_flush_stream($handle, $error)) {
+        @fclose($handle);
+        @unlink($temp);
+        return false;
+    }
+
+    @fclose($handle);
+
+    if (function_exists('error_clear_last')) {
+        error_clear_last();
+    }
+
+    if (!@rename($temp, $path)) {
+        $error = signage_last_error_message('unable to replace target file');
+        @unlink($temp);
+        return false;
+    }
+
+    return true;
+}
+
 function signage_db_path(): string
 {
     $custom = getenv('SIGNAGE_DB_PATH');
@@ -91,9 +220,18 @@ function signage_sqlite_supports_json_patch(\PDO $pdo): bool
         return $supported = true;
     } catch (Throwable $exception) {
         $supported = false;
-        error_log('SQLite json_patch unavailable, falling back to PHP merge: ' . $exception->getMessage());
+        error_log('SQLite json_patch unavailable: ' . $exception->getMessage());
         return false;
     }
+}
+
+function signage_require_sqlite_json_patch(\PDO $pdo): void
+{
+    if (signage_sqlite_supports_json_patch($pdo)) {
+        return;
+    }
+
+    throw new RuntimeException('SQLite json_patch() support is required. Please upgrade to SQLite 3.38+ with the JSON1 extension.');
 }
 
 function signage_array_is_list(array $value): bool
@@ -316,24 +454,14 @@ function signage_kv_patch(string $key, array $patch): bool
         throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
     }
 
+    signage_require_sqlite_json_patch($pdo);
+
     $json = json_encode($patch, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         throw new RuntimeException('json_encode failed: ' . json_last_error_msg());
     }
 
     $ts = time();
-
-    if (!signage_sqlite_supports_json_patch($pdo)) {
-        $current = signage_kv_get($key, []);
-        $current = is_array($current) ? $current : [];
-        $merged = signage_array_merge_patch($current, $patch);
-        if ($merged === $current) {
-            return false;
-        }
-
-        signage_kv_set($key, $merged);
-        return true;
-    }
 
     try {
         return signage_sqlite_retry(function () use ($pdo, $key, $json, $ts): bool {
@@ -723,12 +851,27 @@ function signage_read_json_file(string $file, array $default = []): array
     if (!is_file($path)) {
         return $default;
     }
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
+    $error = null;
+    $raw = signage_read_file_locked($path, $error);
+    if ($raw === null) {
+        if ($error !== null) {
+            error_log('Failed to read JSON file ' . $path . ': ' . $error);
+        }
+        return $default;
+    }
+    if ($raw === '') {
         return $default;
     }
     $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : $default;
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('Invalid JSON in ' . $path . ': ' . json_last_error_msg());
+        return $default;
+    }
+    if (!is_array($decoded)) {
+        error_log('Unexpected JSON structure in ' . $path . ', falling back to default data');
+        return $default;
+    }
+    return $decoded;
 }
 
 function signage_read_json(string $file, array $default = []): array
@@ -746,20 +889,12 @@ function signage_read_json(string $file, array $default = []): array
 function signage_write_json_file(string $file, $data, ?string &$error = null): bool
 {
     $path = signage_data_path($file);
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
-        $error = 'unable to create directory: ' . $dir;
-        return false;
-    }
     $json = json_encode($data, SIGNAGE_JSON_STORAGE_FLAGS);
     if ($json === false) {
         $error = 'json_encode failed: ' . json_last_error_msg();
         return false;
     }
-    $bytes = @file_put_contents($path, $json, LOCK_EX);
-    if ($bytes === false) {
-        $err = error_get_last();
-        $error = $err['message'] ?? 'file_put_contents failed';
+    if (!signage_atomic_file_put_contents($path, $json, $error)) {
         return false;
     }
     @chmod($path, 0644);

@@ -741,11 +741,22 @@ function devices_load_from_file(): array
     if (!is_file($path)) {
         return devices_default_state();
     }
-    $raw = @file_get_contents($path);
-    if ($raw === false || $raw === '') {
+    $error = null;
+    $raw = signage_read_file_locked($path, $error);
+    if ($raw === null) {
+        if ($error !== null) {
+            error_log('Failed to read devices JSON ' . $path . ': ' . $error);
+        }
+        return devices_default_state();
+    }
+    if ($raw === '') {
         return devices_default_state();
     }
     $decoded = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('Invalid JSON in devices store ' . $path . ': ' . json_last_error_msg());
+        return devices_default_state();
+    }
     return devices_normalize_state($decoded);
 }
 
@@ -753,15 +764,26 @@ function devices_save_to_file(array &$db): bool
 {
     $db = devices_normalize_state($db);
     $path = devices_path();
-    @mkdir(dirname($path), 02775, true);
     $json = json_encode($db, SIGNAGE_JSON_STORAGE_FLAGS);
-    $existing = @file_get_contents($path);
-    if ($existing !== false && $existing === $json) {
+    if ($json === false) {
+        throw new RuntimeException('Unable to encode device database: ' . json_last_error_msg());
+    }
+
+    $existing = null;
+    $existingError = null;
+    if (is_file($path)) {
+        $existing = signage_read_file_locked($path, $existingError);
+        if ($existing === null && $existingError !== null) {
+            error_log('Failed to read existing devices JSON ' . $path . ': ' . $existingError);
+        }
+    }
+
+    if ($existing !== null && $existing === $json) {
         return true;
     }
-    $bytes = @file_put_contents($path, $json, LOCK_EX);
-    if ($bytes === false) {
-        throw new RuntimeException('Unable to write device database');
+    $error = null;
+    if (!signage_atomic_file_put_contents($path, $json, $error)) {
+        throw new RuntimeException('Unable to write device database: ' . ($error ?? 'unknown error'));
     }
     @chmod($path, 0644);
     @chown($path, 'www-data');
@@ -902,51 +924,10 @@ function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry
         throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
     }
 
-    if (!signage_sqlite_supports_json_patch($pdo)) {
-        $path = '$.devices."' . $deviceId . '"';
-        try {
-            $stmt = $pdo->prepare('SELECT json_extract(value, :path) AS device FROM kv_store WHERE key = :key LIMIT 1');
-            $stmt->execute([
-                ':key' => DEVICES_STORAGE_KEY,
-                ':path' => $path,
-            ]);
-        } catch (Throwable $exception) {
-            throw new RuntimeException('Failed to read device from SQLite: ' . $exception->getMessage(), 0, $exception);
-        }
-
-        $json = $stmt->fetchColumn();
-        if ($json === false || $json === null) {
-            return false;
-        }
-
-        $original = json_decode((string) $json, true);
-        if (!is_array($original)) {
-            return false;
-        }
-
-        $device = $original;
-        $device['id'] = $deviceId;
-        $device['lastSeen'] = $timestamp;
-        $device['lastSeenAt'] = $timestamp;
-
-        if (!empty($telemetry)) {
-            devices_record_telemetry($device, $telemetry, $timestamp);
-        }
-
-        $patch = devices_build_merge_patch($original, $device);
-        if (empty($patch)) {
-            return true;
-        }
-
-        $wrappedPatch = ['devices' => [$deviceId => $patch]];
-
-        try {
-            signage_kv_patch(DEVICES_STORAGE_KEY, $wrappedPatch);
-        } catch (RuntimeException $exception) {
-            throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
-        }
-
-        return true;
+    try {
+        signage_require_sqlite_json_patch($pdo);
+    } catch (RuntimeException $exception) {
+        throw new RuntimeException('SQLite json_patch() support is required for device updates: ' . $exception->getMessage(), 0, $exception);
     }
 
     $updatePayload = devices_prepare_sqlite_touch_payload($telemetry, $timestamp);
