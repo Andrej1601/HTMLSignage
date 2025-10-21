@@ -152,6 +152,21 @@
     </section>
 
     <section class="leftcol">
+    <div class="card" id="deviceDiffCard" hidden>
+        <div class="content">
+          <div class="card-head device-diff-head">
+            <div class="card-title">Geräte-Overrides</div>
+            <div class="device-diff-controls">
+              <label class="sr-only" for="deviceDiffFilter">Bereich filtern</label>
+              <select id="deviceDiffFilter" class="device-diff-filter" aria-label="Bereich filtern" disabled></select>
+              <button class="btn xs ghost" id="deviceDiffReset" type="button">Filter zurücksetzen</button>
+            </div>
+          </div>
+          <div class="device-diff-summary" id="deviceDiffSummary"></div>
+          <div class="device-diff-empty mut" id="deviceDiffEmpty" hidden></div>
+          <div class="device-diff-list" id="deviceDiffList"></div>
+        </div>
+      </div>
     <div class="card" id="gridPane" data-jump-target>
         <div class="content" style="padding-bottom:0">
 <div class="row" id="planHead" style="justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
@@ -166,6 +181,13 @@
     <span class="mut">Ausgewählte Zeit:</span> <span id="selTime" style="font-weight:700">—</span>
   </div>
 </div>
+          <div id="conflictPanel" class="conflict-panel" hidden>
+            <div class="conflict-panel-head">
+              <div class="conflict-panel-title" id="conflictPanelSummary"></div>
+              <button class="btn xs ghost" type="button" id="conflictPanelToggle" aria-expanded="false">Bericht anzeigen</button>
+            </div>
+            <div class="conflict-panel-body" id="conflictPanelBody" hidden></div>
+          </div>
           <table id="grid" class="tbl"></table>
           <div class="row" style="margin:12px 0 4px">
             <button class="btn sm" id="btnAddAbove">Zeile darüber +</button>
