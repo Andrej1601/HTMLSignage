@@ -10,6 +10,9 @@ const SIGNAGE_JSON_STORAGE_FLAGS = SIGNAGE_JSON_RESPONSE_FLAGS | JSON_PRETTY_PRI
 const SIGNAGE_SCHEDULE_STORAGE_KEY = 'schedule.state';
 const SIGNAGE_SETTINGS_STORAGE_KEY = 'settings.state';
 const SIGNAGE_SQLITE_BUSY_TIMEOUT_MS = 5000;
+const SIGNAGE_AUDIT_LOG_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
+const SIGNAGE_AUDIT_LOG_MAX_ROWS = 5000;
+const SIGNAGE_AUDIT_LOG_PRUNE_INTERVAL = 300;
 
 function signage_db_path(): string
 {
@@ -69,6 +72,69 @@ function signage_sqlite_configure(\PDO $pdo): void
             error_log($message . ': ' . $exception->getMessage());
         }
     }
+
+    signage_sqlite_supports_json_patch($pdo);
+}
+
+function signage_sqlite_supports_json_patch(\PDO $pdo): bool
+{
+    static $supported;
+    if ($supported !== null) {
+        return $supported;
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT json_patch('{}', '{}')");
+        if ($stmt !== false) {
+            $stmt->fetchColumn();
+        }
+        return $supported = true;
+    } catch (Throwable $exception) {
+        $supported = false;
+        error_log('SQLite json_patch unavailable, falling back to PHP merge: ' . $exception->getMessage());
+        return false;
+    }
+}
+
+function signage_array_is_list(array $value): bool
+{
+    if (function_exists('array_is_list')) {
+        return array_is_list($value);
+    }
+
+    $expected = 0;
+    foreach ($value as $key => $_) {
+        if ($key !== $expected) {
+            return false;
+        }
+        $expected++;
+    }
+
+    return true;
+}
+
+function signage_array_merge_patch(mixed $document, array $patch): array
+{
+    $document = is_array($document) ? $document : [];
+
+    foreach ($patch as $key => $value) {
+        if ($value === null) {
+            unset($document[$key]);
+            continue;
+        }
+
+        if (is_array($value) && !signage_array_is_list($value)) {
+            $base = $document[$key] ?? [];
+            $document[$key] = signage_array_merge_patch($base, $value);
+            continue;
+        }
+
+        $document[$key] = is_array($value) && signage_array_is_list($value)
+            ? array_values($value)
+            : $value;
+    }
+
+    return $document;
 }
 
 /**
@@ -163,6 +229,7 @@ function signage_db_bootstrap(): void
             context TEXT,
             created_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
         )',
+        'CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC, id DESC)',
     ];
     try {
         foreach ($queries as $sql) {
@@ -256,6 +323,18 @@ function signage_kv_patch(string $key, array $patch): bool
 
     $ts = time();
 
+    if (!signage_sqlite_supports_json_patch($pdo)) {
+        $current = signage_kv_get($key, []);
+        $current = is_array($current) ? $current : [];
+        $merged = signage_array_merge_patch($current, $patch);
+        if ($merged === $current) {
+            return false;
+        }
+
+        signage_kv_set($key, $merged);
+        return true;
+    }
+
     try {
         return signage_sqlite_retry(function () use ($pdo, $key, $json, $ts): bool {
             $stmt = $pdo->prepare(
@@ -273,6 +352,47 @@ function signage_kv_patch(string $key, array $patch): bool
         });
     } catch (Throwable $exception) {
         throw new RuntimeException('Failed to patch SQLite value: ' . $exception->getMessage(), 0, $exception);
+    }
+}
+
+function signage_audit_log_prune(\PDO $pdo): void
+{
+    static $lastRun = 0;
+    $now = time();
+    if ($now - $lastRun < SIGNAGE_AUDIT_LOG_PRUNE_INTERVAL) {
+        return;
+    }
+
+    $lastRun = $now;
+
+    $threshold = $now - SIGNAGE_AUDIT_LOG_MAX_AGE_SECONDS;
+
+    if ($threshold > 0) {
+        try {
+            signage_sqlite_retry(function () use ($pdo, $threshold): void {
+                $stmt = $pdo->prepare('DELETE FROM audit_log WHERE created_at < :cutoff');
+                $stmt->execute([':cutoff' => $threshold]);
+            });
+        } catch (Throwable $exception) {
+            error_log('Failed to prune old audit entries: ' . $exception->getMessage());
+        }
+    }
+
+    if (SIGNAGE_AUDIT_LOG_MAX_ROWS > 0) {
+        try {
+            signage_sqlite_retry(function () use ($pdo): void {
+                $stmt = $pdo->prepare(
+                    'DELETE FROM audit_log
+                     WHERE id NOT IN (
+                        SELECT id FROM audit_log ORDER BY created_at DESC, id DESC LIMIT :limit
+                     )'
+                );
+                $stmt->bindValue(':limit', SIGNAGE_AUDIT_LOG_MAX_ROWS, \PDO::PARAM_INT);
+                $stmt->execute();
+            });
+        } catch (Throwable $exception) {
+            error_log('Failed to enforce audit log size limit: ' . $exception->getMessage());
+        }
     }
 }
 
