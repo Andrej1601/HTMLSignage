@@ -1773,10 +1773,16 @@ async function loadDeviceResolved(id){
       const listEl = h('ul', { class: 'extra-list' });
       items.forEach((entry) => {
         const li = h('li');
+        const header = h('div', { class: 'extra-item-header' });
         if (entry.icon) {
-          li.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, entry.icon));
+          header.appendChild(h('div', { class: 'extra-icon', 'aria-hidden': 'true' }, entry.icon));
         }
-        if (entry.title) li.appendChild(h('h3', { class: 'extra-title' }, entry.title));
+        if (entry.title) {
+          header.appendChild(h('h3', { class: 'extra-title' }, entry.title));
+        }
+        if (header.childNodes.length) {
+          li.appendChild(header);
+        }
         if (entry.text) li.appendChild(h('p', { class: 'extra-text' }, entry.text));
         listEl.appendChild(li);
       });
