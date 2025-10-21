@@ -8,10 +8,17 @@ export function createRoleRestrictionApplier({
   return function applyRoleRestrictions() {
     const setHiddenState = (element, shouldHide) => {
       if (!element) return;
-      if (shouldHide) {
-        element.setAttribute('hidden', '');
+      const hide = !!shouldHide;
+      if (hide) {
+        element.hidden = true;
+        element.setAttribute('aria-hidden', 'true');
+        element.classList.add('is-access-hidden');
+        element.style.setProperty('display', 'none');
       } else {
-        element.removeAttribute('hidden');
+        element.hidden = false;
+        element.removeAttribute('aria-hidden');
+        element.classList.remove('is-access-hidden');
+        element.style.removeProperty('display');
       }
     };
 
