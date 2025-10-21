@@ -708,6 +708,10 @@ function devices_save_to_file(array &$db): bool
     $path = devices_path();
     @mkdir(dirname($path), 02775, true);
     $json = json_encode($db, SIGNAGE_JSON_FLAGS);
+    $existing = @file_get_contents($path);
+    if ($existing !== false && $existing === $json) {
+        return true;
+    }
     $bytes = @file_put_contents($path, $json, LOCK_EX);
     if ($bytes === false) {
         throw new RuntimeException('Unable to write device database');
@@ -766,6 +770,135 @@ function devices_delete_file(): void
     if (is_file($path)) {
         @unlink($path);
     }
+}
+
+function devices_array_is_list(array $value): bool
+{
+    if (function_exists('array_is_list')) {
+        return array_is_list($value);
+    }
+
+    $expected = 0;
+    foreach ($value as $key => $_) {
+        if ($key !== $expected) {
+            return false;
+        }
+        $expected++;
+    }
+
+    return true;
+}
+
+function devices_build_merge_patch($original, $updated)
+{
+    if ($original === $updated) {
+        return [];
+    }
+
+    if (!is_array($original) || !is_array($updated)) {
+        return $updated;
+    }
+
+    if (devices_array_is_list($original) || devices_array_is_list($updated)) {
+        return $original === $updated ? [] : array_values($updated);
+    }
+
+    $patch = [];
+    $keys = array_unique(array_merge(array_keys($original), array_keys($updated)));
+    foreach ($keys as $key) {
+        $hasOriginal = array_key_exists($key, $original);
+        $hasUpdated = array_key_exists($key, $updated);
+
+        if (!$hasUpdated) {
+            if ($hasOriginal) {
+                $patch[$key] = null;
+            }
+            continue;
+        }
+
+        $origValue = $hasOriginal ? $original[$key] : null;
+        $newValue = $updated[$key];
+
+        if (is_array($origValue) && is_array($newValue) && !devices_array_is_list($origValue) && !devices_array_is_list($newValue)) {
+            $child = devices_build_merge_patch($origValue, $newValue);
+            if (!empty($child)) {
+                $patch[$key] = $child;
+            }
+            continue;
+        }
+
+        if ($hasOriginal && $origValue === $newValue) {
+            continue;
+        }
+
+        $patch[$key] = $newValue;
+    }
+
+    return $patch;
+}
+
+function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry = []): ?bool
+{
+    if (!signage_db_available()) {
+        return null;
+    }
+
+    $deviceId = devices_normalize_device_id($id);
+    if ($deviceId === '') {
+        return false;
+    }
+
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $path = '$.devices."' . $deviceId . '"';
+    try {
+        $stmt = $pdo->prepare('SELECT json_extract(value, :path) AS device FROM kv_store WHERE key = :key LIMIT 1');
+        $stmt->execute([
+            ':key' => DEVICES_STORAGE_KEY,
+            ':path' => $path,
+        ]);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to read device from SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    $json = $stmt->fetchColumn();
+    if ($json === false || $json === null) {
+        return false;
+    }
+
+    $original = json_decode((string) $json, true);
+    if (!is_array($original)) {
+        return false;
+    }
+
+    $device = $original;
+    $device['id'] = $deviceId;
+    $device['lastSeen'] = $timestamp;
+    $device['lastSeenAt'] = $timestamp;
+
+    if (!empty($telemetry)) {
+        devices_record_telemetry($device, $telemetry, $timestamp);
+    }
+
+    $patch = devices_build_merge_patch($original, $device);
+    if (empty($patch)) {
+        return true;
+    }
+
+    $wrappedPatch = ['devices' => [$deviceId => $patch]];
+
+    try {
+        signage_kv_patch(DEVICES_STORAGE_KEY, $wrappedPatch);
+    } catch (RuntimeException $exception) {
+        throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    return true;
 }
 
 function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool
