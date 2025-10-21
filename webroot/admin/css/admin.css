@@ -368,239 +368,67 @@ details > summary.jump-flash{
 }
 
 /* ---------- Header ---------- */
-.app-header{
-  position:sticky;
-  top:0;
-  z-index:60;
-  display:flex;
-  flex-direction:column;
-  gap:18px;
-  padding:18px clamp(16px, 4vw, 32px);
-  border-bottom:1px solid color-mix(in oklab, var(--border) 75%, transparent);
-  background:
-    linear-gradient(135deg,
-      color-mix(in oklab, var(--panel) 92%, var(--btn-accent) 8%),
-      color-mix(in oklab, var(--panel) 86%, var(--btn-primary) 9%)
-    );
-  box-shadow:0 18px 38px rgba(15, 23, 42, 0.08);
-  backdrop-filter:blur(10px);
+header{
+  position:sticky; top:0; z-index:60;
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  flex-wrap:wrap;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+  background: color-mix(in oklab, var(--panel) 85%, transparent);
+  backdrop-filter: blur(8px);
 }
+h1{ margin:0; font-size:16px; letter-spacing:.3px; }
 
-.app-shell-row{
+header .header-title{
   display:flex;
   align-items:center;
-  gap:16px;
+  gap:12px;
   flex-wrap:wrap;
+  flex:1;
 }
 
-.app-shell-row-top{
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:clamp(16px, 4vw, 32px);
-}
-
-.app-shell-brand{
-  display:flex;
-  align-items:flex-start;
-  gap:14px;
-  flex:1 1 320px;
-  min-width:220px;
-}
-
-.app-shell-logo{
-  display:grid;
-  place-items:center;
-  width:46px;
-  height:46px;
-  border-radius:16px;
-  font-size:24px;
-  background:linear-gradient(135deg,
-    color-mix(in oklab, var(--btn-accent) 72%, transparent),
-    color-mix(in oklab, var(--btn-primary) 46%, transparent)
-  );
-  color:var(--btn-accent-fg);
-  box-shadow:0 18px 36px rgba(124, 58, 237, .18);
-}
-
-.app-shell-title-group{
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-
-.app-shell-eyebrow{
-  margin:0;
-  font-size:12px;
-  letter-spacing:0.24em;
-  text-transform:uppercase;
-  font-weight:700;
-  color:color-mix(in oklab, var(--muted) 60%, var(--fg));
-}
-
-.app-shell-title-group h1{
-  margin:0;
-  font-size:22px;
-  line-height:1.35;
-  letter-spacing:.02em;
-}
-
-.app-shell-subtitle{
-  margin:0;
-  font-size:13px;
-  color:color-mix(in oklab, var(--muted) 65%, var(--fg));
-  max-width:38ch;
-}
-
-.app-shell-nav{
+.header-actions{
   display:flex;
   align-items:center;
   gap:10px;
-  padding:8px 12px;
-  background:color-mix(in oklab, var(--panel) 86%, transparent);
-  border:1px solid color-mix(in oklab, var(--border) 70%, transparent);
-  border-radius:999px;
-  box-shadow:0 12px 24px rgba(15, 23, 42, 0.12);
-  flex-wrap:wrap;
-}
-
-.app-shell-navlink{
-  padding:8px 16px;
-  border-radius:999px;
-  font-size:13px;
-  font-weight:600;
-  color:color-mix(in oklab, var(--fg) 85%, var(--btn-accent));
-  border:1px solid color-mix(in oklab, var(--border) 72%, transparent);
-  background:color-mix(in oklab, var(--panel) 92%, transparent);
-  transition:color .18s ease, background-color .18s ease, border-color .18s ease, transform .18s ease;
-  white-space:nowrap;
-}
-
-.app-shell-navlink:hover,
-.app-shell-navlink:focus-visible{
-  color:color-mix(in oklab, var(--btn-accent) 80%, var(--fg));
-  background:color-mix(in oklab, var(--btn-accent) 12%, var(--panel));
-  border-color:color-mix(in oklab, var(--btn-accent) 45%, transparent);
-  transform:translateY(-1px);
-}
-
-.app-shell-navlink:focus-visible{
-  outline:2px solid color-mix(in oklab, var(--btn-accent) 60%, transparent);
-  outline-offset:2px;
-}
-
-.app-shell-toggle{
   margin-left:auto;
-  background:color-mix(in oklab, var(--panel) 92%, transparent);
-  padding:6px 8px;
-  border-radius:999px;
-  border:1px solid color-mix(in oklab, var(--border) 68%, transparent);
-  box-shadow:0 8px 16px rgba(15, 23, 42, 0.08);
-}
-
-.app-shell-row-bottom{
-  justify-content:space-between;
-  align-items:center;
-  gap:16px;
-}
-
-.app-shell-actions{
-  display:flex;
-  align-items:center;
-  gap:18px;
   flex-wrap:wrap;
-  flex:1 1 auto;
+  justify-content:flex-end;
 }
-
-.app-shell-actions-secondary,
-.app-shell-actions-primary{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-}
-
-.app-shell-actions-secondary{
-  min-width:220px;
-}
-
-.app-shell-actions-primary{
-  margin-left:auto;
-}
-
-.app-shell-row-bottom > #unsavedBadge{
-  margin-left:auto;
-}
-
-@media (max-width: 900px){
-  .app-shell-row-top{
-    flex-direction:column;
-    align-items:flex-start;
-  }
-
-  .app-shell-nav{
-    width:100%;
-    justify-content:flex-start;
-  }
-
-  .app-shell-toggle{
-    align-self:flex-end;
-  }
-
-  .app-shell-row-bottom{
-    flex-direction:column;
-    align-items:flex-start;
-  }
-
-  .app-shell-actions{
-    width:100%;
-  }
-
-  .app-shell-actions-primary{
-    margin-left:0;
-  }
-
-  .app-shell-row-bottom > #unsavedBadge{
-    margin-left:0;
-  }
-}
-
 .header-cockpit-controls{
   display:flex;
   align-items:center;
-  padding:2px;
-  border-radius:16px;
-  border:1px solid color-mix(in oklab, var(--border) 65%, transparent);
-  background:color-mix(in oklab, var(--panel) 95%, transparent);
-  box-shadow:0 12px 24px rgba(15, 23, 42, 0.08);
+  padding-right:10px;
+  margin-right:6px;
+  border-right:1px solid color-mix(in oklab, var(--border) 75%, transparent);
 }
-
 .header-cockpit-toggle{
   display:flex;
   align-items:center;
   gap:0;
-  border-radius:12px;
+  background:color-mix(in oklab, var(--panel) 92%, var(--btn-accent) 8%);
+  border-radius:999px;
+  border:1px solid color-mix(in oklab, var(--btn-accent) 32%, var(--border));
+  box-shadow:0 10px 24px -18px rgba(124,58,237,.45);
   overflow:hidden;
 }
-
 .header-cockpit-btn{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  padding:8px 14px;
+  padding:6px 14px;
+  border-radius:999px 0 0 999px;
   border:0;
   background:transparent;
+  color:inherit;
   font-size:13px;
   font-weight:600;
-  color:inherit;
 }
-
 .header-cockpit-btn .header-cockpit-icon{ font-size:13px; }
 .header-cockpit-pinstate{ font-size:14px; line-height:1; filter:drop-shadow(0 0 4px color-mix(in oklab, currentColor 65%, transparent)); }
-
 .header-cockpit-pin{
-  border-radius:0 12px 12px 0;
+  border-radius:0 999px 999px 0;
   border:0;
-  padding:8px 10px;
+  padding:6px 10px;
   font-size:13px;
   background:color-mix(in oklab, var(--panel) 90%, transparent);
   color:inherit;
@@ -608,36 +436,27 @@ details > summary.jump-flash{
   align-items:center;
   gap:4px;
 }
-
 .header-cockpit-pin .header-cockpit-icon{ font-size:14px; }
 .header-cockpit-pin.is-active{
-  background:color-mix(in oklab, var(--btn-primary) 30%, var(--panel));
-  color:color-mix(in oklab, var(--btn-primary) 80%, var(--fg));
+  background:color-mix(in oklab, var(--btn-primary) 32%, transparent);
+  color:color-mix(in oklab, var(--btn-primary) 70%, var(--fg));
 }
-
 .header-cockpit-toggle .btn{
   border:none;
   box-shadow:none;
 }
-
 .header-cockpit-toggle .btn:hover,
 .header-cockpit-toggle .btn:focus-visible{
-  background:color-mix(in oklab, var(--btn-accent) 14%, transparent);
+  background:color-mix(in oklab, var(--btn-accent) 18%, transparent);
 }
-
 .header-cockpit-toggle.is-pinned{
   border-color:color-mix(in oklab, var(--btn-primary) 35%, var(--btn-accent));
   background:color-mix(in oklab, var(--btn-primary) 24%, var(--panel));
 }
-
-.header-cockpit-toggle.is-pinned .header-cockpit-pinstate{
-  color:color-mix(in oklab, var(--btn-primary) 75%, var(--fg));
-}
-
+.header-cockpit-toggle.is-pinned .header-cockpit-pinstate{ color:color-mix(in oklab, var(--btn-primary) 75%, var(--fg)); }
 .header-cockpit-toggle .btn.is-pinned{
   background:color-mix(in oklab, var(--btn-primary) 16%, transparent);
 }
-
 .header-cockpit-toggle .btn.is-active{
   background:color-mix(in oklab, var(--btn-accent) 12%, transparent);
 }
@@ -723,13 +542,13 @@ details > summary.jump-flash{
   display:none;
 }
 
-body.has-unsaved-changes .app-header{
+body.has-unsaved-changes header{
   border-bottom-color: color-mix(in oklab, var(--unsaved-bg) 55%, var(--border));
   box-shadow:0 18px 36px color-mix(in oklab, var(--unsaved-bg) 22%, transparent);
   background:color-mix(in oklab, var(--panel) 88%, var(--unsaved-bg) 12%);
 }
 
-body.has-unsaved-changes .app-header::after{
+body.has-unsaved-changes header::after{
   content:"";
   position:absolute;
   inset:auto 16px -6px 16px;
@@ -739,7 +558,7 @@ body.has-unsaved-changes .app-header::after{
   box-shadow:0 0 0 4px color-mix(in oklab, var(--unsaved-glow) 45%, transparent);
 }
 
-body.has-unsaved-changes .app-shell-title-group h1{
+body.has-unsaved-changes .header-title h1{
   color:color-mix(in oklab, var(--unsaved-bg) 65%, var(--fg));
 }
 
@@ -751,7 +570,7 @@ body.has-unsaved-changes #unsavedBadge{
   animation:unsavedBadgePulse 2.2s ease-in-out infinite;
 }
 
-body.device-mode .app-header{
+body.device-mode header{
   background: var(--btn-primary);
   color: var(--btn-primary-fg);
 }
