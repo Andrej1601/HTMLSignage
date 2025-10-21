@@ -19,9 +19,14 @@ $cfg = signage_read_json('settings.json');
 $schedule = signage_normalize_schedule(signage_read_json('schedule.json', signage_default_schedule()));
 $keep = [];
 
-$removeSauna = isset($_GET['sauna']) && $_GET['sauna'] === '1';
-$removeInter = isset($_GET['inter']) && $_GET['inter'] === '1';
-$removeFlame = isset($_GET['flame']) && $_GET['flame'] === '1';
+$mode = isset($_GET['mode']) ? trim((string)$_GET['mode']) : 'unused';
+$mode = strtolower($mode);
+if ($mode === '') $mode = 'unused';
+$purgeMode = $mode === 'purge';
+
+$removeSauna = $purgeMode && isset($_GET['sauna']) && $_GET['sauna'] === '1';
+$removeInter = $purgeMode && isset($_GET['inter']) && $_GET['inter'] === '1';
+$removeFlame = $purgeMode && isset($_GET['flame']) && $_GET['flame'] === '1';
 
 function stripCacheSimple($url){
   if (!is_string($url)) return '';
@@ -118,4 +123,5 @@ foreach ($directories as $dir) {
   }
 }
 
-echo json_encode(['ok'=>true,'removed'=>$removed]);
+$removedCount = count($removed);
+echo json_encode(['ok'=>true,'removed'=>$removed,'count'=>$removedCount,'mode'=>$mode]);

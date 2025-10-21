@@ -9,6 +9,8 @@ import { deepClone, genId } from './utils.js';
 
 export { sanitizeBadgeLibrary } from './badge_library.js';
 
+export const WELLNESS_GLOBAL_ID = '__wellness_bundle__';
+
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
 const OVERVIEW_TIME_BASE_CH = 10;
@@ -136,7 +138,7 @@ export function playlistKeyFromSanitizedEntry(entry) {
     case 'media':
       return entry.id != null ? 'media:' + String(entry.id) : null;
     case 'wellness-tip':
-      return entry.id != null ? 'wellness:' + String(entry.id) : null;
+      return 'wellness:' + WELLNESS_GLOBAL_ID;
     case 'event-countdown':
       return entry.id != null ? 'event:' + String(entry.id) : null;
     case 'gastronomy-highlight':
@@ -170,8 +172,7 @@ function playlistEntryKey(entry) {
       return rawId != null ? 'media:' + String(rawId) : null;
     }
     case 'wellness-tip': {
-      const rawId = entry.id ?? entry.tipId;
-      return rawId != null ? 'wellness:' + String(rawId) : null;
+      return 'wellness:' + WELLNESS_GLOBAL_ID;
     }
     case 'event-countdown': {
       const rawId = entry.id ?? entry.eventId;
@@ -219,9 +220,9 @@ export function sanitizePagePlaylist(list = []) {
         }
         break;
       case 'wellness':
-        if (rest) {
-          normalized.push({ type: 'wellness-tip', id: rest });
-          seen.add(key);
+        if (!seen.has('wellness:' + WELLNESS_GLOBAL_ID)) {
+          normalized.push({ type: 'wellness-tip', id: WELLNESS_GLOBAL_ID });
+          seen.add('wellness:' + WELLNESS_GLOBAL_ID);
         }
         break;
       case 'event':

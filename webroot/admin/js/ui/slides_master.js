@@ -18,6 +18,7 @@ import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
 import { notifySuccess, notifyWarning } from '../core/notifications.js';
+import { WELLNESS_GLOBAL_ID } from '../core/config.js';
 import {
   ensureBadgeLibrary,
   createBadge,
@@ -2018,9 +2019,26 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     key: item?.id != null ? String(item.id) : 'story_idx_' + i
   }));
   const extrasRaw = (settings.extras && typeof settings.extras === 'object') ? settings.extras : {};
-  const wellness = Array.isArray(extrasRaw.wellnessTips)
-    ? extrasRaw.wellnessTips.map((item, idx) => ({ kind: 'wellness-tip', item, key: item?.id != null ? String(item.id) : 'well_' + idx }))
-    : [];
+  const wellnessSource = Array.isArray(extrasRaw.wellnessTips) ? extrasRaw.wellnessTips : [];
+  const wellnessActive = wellnessSource.filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    if (entry.enabled === false) return false;
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    return Boolean(title || text);
+  });
+  const wellnessCount = wellnessActive.length;
+  const wellnessItem = {
+    id: WELLNESS_GLOBAL_ID,
+    title: 'Wellness-Tipps',
+    label: 'Wellness-Tipps',
+    count: wellnessCount
+  };
+  if (!wellnessCount) {
+    wellnessItem.disabled = true;
+    wellnessItem.statusText = 'Keine aktiven Tipps';
+  }
+  const wellness = [{ kind: 'wellness-tip', item: wellnessItem, key: 'wellness_all' }];
   const eventItems = Array.isArray(extrasRaw.eventCountdowns) ? extrasRaw.eventCountdowns : [];
   const events = eventItems.length
     ? [{ kind: 'event-countdown', item: { id: 'event-countdown', entries: eventItems.slice() }, key: 'event-countdown' }]
@@ -2122,6 +2140,14 @@ export function renderSlideOrderView(){
     if (!statusEl && (isDisabledMedia || isDisabledStory)){
       applyStatus('Deaktiviert', 'hidden');
     }
+    const isWellnessDisabled = entry.kind === 'wellness-tip' && entry.item?.disabled === true;
+    if (isWellnessDisabled) {
+      const message = entry.item?.statusText || 'Keine aktiven Tipps';
+      if (!statusEl && message) applyStatus(message, 'hidden');
+      tile.classList.add('is-disabled');
+    } else if (entry.kind === 'wellness-tip' && entry.item?.statusText && !statusEl) {
+      applyStatus(entry.item.statusText, 'info');
+    }
     const isEventDisabled = entry.kind === 'event-countdown' && !heroEnabled;
     if (isEventDisabled) {
       if (!statusEl) applyStatus('Ausgeblendet', 'hidden');
@@ -2151,9 +2177,18 @@ export function renderSlideOrderView(){
     } else if (entry.kind === 'wellness-tip') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
       const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
-      title.textContent = icon + (entry.item?.title || 'Wellness-Tipp');
+      const baseLabel = (entry.item?.label || entry.item?.title || 'Wellness-Tipp').trim();
+      const count = Number(entry.item?.count);
+      const hasCount = Number.isFinite(count) && count >= 0;
+      title.textContent = icon + baseLabel;
       tile.appendChild(title);
       if (statusEl) tile.appendChild(statusEl);
+      if (hasCount) {
+        const info = document.createElement('div');
+        info.className = 'tile-meta';
+        info.textContent = count === 1 ? '1 Tipp' : `${count} Tipps`;
+        tile.appendChild(info);
+      }
     } else if (entry.kind === 'event-countdown') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
       title.textContent = 'Event Countdown';
