@@ -89,9 +89,9 @@ npm test
 The admin interface now exposes a “Benutzer” button in the header that opens a
 modal to create, edit and remove accounts as well as assign roles. New passwords
 can be set or rotated directly from the UI, and attempts to delete the final
-admin account are blocked to prevent lock-outs. All changes are persisted to
-`data/users.json` and logged in `data/audit.log` together with the acting user
-for auditing.
+admin account are blocked to prevent lock-outs. All changes are persisted in the
+SQLite database at `data/signage.db` and logged in `data/audit.log` together with
+the acting user for auditing.
 
 The PHP helper is still available for automation or bootstrapping:
 
