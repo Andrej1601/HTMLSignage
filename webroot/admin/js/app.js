@@ -159,6 +159,7 @@ const stateAccess = {
   setSettings: (next) => {
     settings = next;
     appState.setSettings(next);
+    try { notifyDeviceDiffChanged(); } catch {}
     if (typeof window === 'object') {
       try { window.__queueUnsaved?.(); } catch {}
     }
@@ -187,6 +188,9 @@ const { renderFootnotes } = createFootnotesPanel({
 });
 
 
+let notifyDeviceDiffChanged = () => {};
+
+
 
 let renderContextBadge = () => {};
 let enterDeviceContext = async () => {};
@@ -212,6 +216,7 @@ const deviceContextState = {
     baseSchedule = scheduleValue;
     baseSettings = settingsValue;
     appState.setBaseState(scheduleValue, settingsValue);
+    try { notifyDeviceDiffChanged(); } catch {}
   },
   getBaseState: () => ({ schedule: baseSchedule, settings: baseSettings }),
   setDeviceBaseState: (scheduleValue, settingsValue) => {
@@ -250,6 +255,7 @@ registerStateAccess({
   setBaseState: (scheduleValue, settingsValue) => {
     baseSchedule = scheduleValue;
     baseSettings = settingsValue;
+    try { notifyDeviceDiffChanged(); } catch {}
   },
   getBaseState: () => ({ schedule: baseSchedule, settings: baseSettings }),
   setDeviceBaseState: (scheduleValue, settingsValue) => {
@@ -449,8 +455,20 @@ const deviceContextManager = createDeviceContextManager({
   setUnsavedState,
   refreshAllUi,
   showView,
-  loadDeviceById
+  loadDeviceById,
+  onContextChange: () => {
+    try { notifyDeviceDiffChanged(); } catch {}
+  }
 });
+
+const deviceDiffViewer = createDeviceDiffViewer({
+  getDeviceContext: () => deviceContextManager.getDeviceContext(),
+  getGlobalSettings: () => deviceContextState.getBaseState()?.settings,
+  getCurrentSettings: () => stateAccess.getSettings(),
+  sanitizeSettings: sanitizeSettingsForCompare
+});
+notifyDeviceDiffChanged = () => deviceDiffViewer.markDirty();
+deviceDiffViewer.render();
 
 renderContextBadge = deviceContextManager.renderContextBadge;
 enterDeviceContext = deviceContextManager.enterDeviceContext;
@@ -549,6 +567,7 @@ async function loadAll(){
   deviceContextState.setBaseState(baseSchedule, baseSettings);
   deviceContextState.clearDeviceBaseState();
   updateBaseline(baseSchedule, baseSettings);
+  try { notifyDeviceDiffChanged(); } catch {}
 
   try {
     const draft = lsGet('scheduleDraft');
@@ -883,6 +902,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       deviceContextState.setBaseState(baseSchedule, baseSettings);
       deviceContextState.clearDeviceBaseState();
       updateBaseline(baseSchedule, baseSettings);
+      try { notifyDeviceDiffChanged(); } catch {}
       clearDraftsIfPresent();
       setUnsavedState(false);
       notifySuccess('Gespeichert (Global).');
@@ -904,6 +924,7 @@ $('#btnSave')?.addEventListener('click', async ()=>{
       deviceBaseSettings = deepClone(settings);
       deviceContextState.setDeviceBaseState(deviceBaseSchedule, deviceBaseSettings);
       updateBaseline(deviceBaseSchedule, deviceBaseSettings);
+      try { notifyDeviceDiffChanged(); } catch {}
       clearDraftsIfPresent();
       setUnsavedState(false);
       notifySuccess('Gespeichert für Gerät: ' + (ctx.name || ctx.id));
@@ -1001,23 +1022,420 @@ async function createDevicesPane(){
         <div id="devPairedList" class="kv"></div>
       </div>
 
+      <div id="devTelemetryWrap" class="devices-telemetry" hidden>
+        <div class="devices-telemetry-head">
+          <div class="devices-telemetry-title" id="devTelemetryTitle">Geräte-Health</div>
+          <div class="devices-telemetry-badges" id="devTelemetryBadges"></div>
+        </div>
+        <div class="devices-telemetry-body">
+          <div class="devices-telemetry-meta" id="devTelemetryMeta"></div>
+          <div class="devices-telemetry-kpis" id="devTelemetryKpis"></div>
+          <div class="devices-telemetry-network" id="devTelemetryNetwork"></div>
+          <div class="devices-telemetry-errors" id="devTelemetryErrors"></div>
+          <div class="devices-telemetry-history" id="devTelemetryHistoryWrap">
+            <div class="devices-telemetry-note" id="devTelemetryHistoryNote"></div>
+            <ul class="devices-telemetry-history-list" id="devTelemetryHistory"></ul>
+          </div>
+        </div>
+      </div>
+
       <small class="mut">Tipp: Rufe auf dem TV die Standard-URL auf – es erscheint ein Pairing-Code. Codes werden nach 15 Minuten Inaktivität neu erzeugt.</small>
     </div>`;
 
   host?.insertBefore(card, host.firstChild);
 
-  const formatRelativeSeconds = (seconds) => {
+  const telemetryState = {
+    selectedId: null,
+    manualSelection: false,
+    devices: [],
+    nowSeconds: null
+  };
+
+  const telemetryWrap = card.querySelector('#devTelemetryWrap');
+  const telemetryTitle = card.querySelector('#devTelemetryTitle');
+  const telemetryBadges = card.querySelector('#devTelemetryBadges');
+  const telemetryMeta = card.querySelector('#devTelemetryMeta');
+  const telemetryKpis = card.querySelector('#devTelemetryKpis');
+  const telemetryNetwork = card.querySelector('#devTelemetryNetwork');
+  const telemetryErrors = card.querySelector('#devTelemetryErrors');
+  const telemetryHistoryWrap = card.querySelector('#devTelemetryHistoryWrap');
+  const telemetryHistoryNote = card.querySelector('#devTelemetryHistoryNote');
+  const telemetryHistoryList = card.querySelector('#devTelemetryHistory');
+
+  function formatNumber(value, { decimals = 0 } = {}) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    return num.toFixed(decimals);
+  }
+
+  function formatStorage(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return null;
+    if (Math.abs(num) >= 1024) {
+      const gb = num / 1024;
+      return `${gb >= 10 ? gb.toFixed(0) : gb.toFixed(1)} GB`;
+    }
+    return `${Math.round(num)} MB`;
+  }
+
+  function formatUptime(value) {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return null;
+    if (seconds >= 86400) {
+      const days = Math.floor(seconds / 86400);
+      const hours = Math.floor((seconds % 86400) / 3600);
+      return `${days} d ${hours} h`;
+    }
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return `${hours} h ${minutes} min`;
+    }
+    const minutes = Math.max(1, Math.floor(seconds / 60));
+    return `${minutes} min`;
+  }
+
+  const KPI_FIELDS = [
+    { key: 'cpuLoad', label: 'CPU', unit: '%', decimals: 0, trend: true },
+    { key: 'memoryUsage', label: 'RAM', unit: '%', decimals: 0, trend: true },
+    { key: 'temperature', label: 'Temperatur', unit: '°C', decimals: 1, trend: true },
+    { key: 'latency', label: 'Latenz', unit: 'ms', decimals: 0, trend: true },
+    { key: 'storageFree', label: 'Frei', formatter: formatStorage, trend: true },
+    { key: 'storageUsed', label: 'Belegt', formatter: formatStorage, trend: true },
+    { key: 'batteryLevel', label: 'Akku', unit: '%', decimals: 0, trend: true },
+    { key: 'uptime', label: 'Uptime', formatter: formatUptime, trend: false }
+  ];
+
+  const KPI_TREND_THRESHOLDS = {
+    cpuLoad: 2,
+    memoryUsage: 2,
+    temperature: 0.5,
+    storageFree: 20,
+    storageUsed: 20,
+    latency: 10,
+    batteryLevel: 5
+  };
+
+  function computeMetricTrend(device, key) {
+    const metrics = device?.metrics || {};
+    const current = Number(metrics[key]);
+    if (!Number.isFinite(current)) return null;
+    const history = Array.isArray(device?.heartbeatHistory) ? device.heartbeatHistory : [];
+    let previous = null;
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+      const value = Number(history[i]?.metrics?.[key]);
+      if (!Number.isFinite(value)) continue;
+      if (previous === null && value === current) continue;
+      previous = value;
+      if (value !== current) break;
+    }
+    if (previous === null) return { direction: 'flat', delta: 0 };
+    const delta = current - previous;
+    const threshold = KPI_TREND_THRESHOLDS[key] ?? 1;
+    if (Math.abs(delta) < threshold) {
+      return { direction: 'flat', delta };
+    }
+    return { direction: delta > 0 ? 'up' : 'down', delta };
+  }
+
+  function formatTrendDelta(config, delta) {
+    if (!Number.isFinite(delta)) return '';
+    if (config.formatter === formatStorage) {
+      const sign = delta > 0 ? '+' : '';
+      const absVal = Math.abs(delta);
+      if (absVal >= 1024) {
+        const gb = absVal / 1024;
+        return `${sign}${gb >= 10 ? gb.toFixed(0) : gb.toFixed(1)} GB`;
+      }
+      return `${sign}${Math.round(delta)} MB`;
+    }
+    if (config.key === 'uptime') return '';
+    if (config.unit === '%' || config.label === 'Temperatur') {
+      return `${delta > 0 ? '+' : ''}${delta.toFixed(Math.abs(delta) < 10 ? 1 : 0)}${config.unit || ''}`;
+    }
+    if (config.unit === 'ms') {
+      return `${delta > 0 ? '+' : ''}${Math.round(delta)} ms`;
+    }
+    return `${delta > 0 ? '+' : ''}${Math.round(delta)}${config.unit ? ` ${config.unit}` : ''}`;
+  }
+
+  function formatRelativeSeconds(seconds) {
     if (!Number.isFinite(seconds)) return 'unbekannt';
     if (seconds < 45) return 'vor Sekunden';
     if (seconds < 3600) return `vor ${Math.round(seconds / 60)} min`;
     if (seconds < 86400) return `vor ${Math.round(seconds / 3600)} h`;
     return `vor ${Math.round(seconds / 86400)} Tagen`;
+  }
+
+  function renderTelemetryPanel() {
+    if (!telemetryWrap) return;
+    const devices = telemetryState.devices || [];
+    if (!telemetryState.selectedId) {
+      if (devices.length) {
+        telemetryWrap.hidden = false;
+        if (telemetryTitle) telemetryTitle.textContent = 'Geräte-Health';
+        if (telemetryBadges) telemetryBadges.innerHTML = '';
+        if (telemetryMeta) {
+          telemetryMeta.innerHTML = '';
+          const info = document.createElement('div');
+          info.className = 'devices-telemetry-empty';
+          info.textContent = 'Gerät auswählen, um Telemetriedaten anzuzeigen.';
+          telemetryMeta.appendChild(info);
+        }
+        if (telemetryKpis) telemetryKpis.innerHTML = '';
+        if (telemetryNetwork) telemetryNetwork.innerHTML = '';
+        if (telemetryErrors) telemetryErrors.innerHTML = '';
+        if (telemetryHistoryNote) telemetryHistoryNote.textContent = '';
+        if (telemetryHistoryList) telemetryHistoryList.innerHTML = '';
+        if (telemetryHistoryWrap) telemetryHistoryWrap.hidden = true;
+      } else {
+        telemetryWrap.hidden = true;
+      }
+      return;
+    }
+
+    const device = devices.find((entry) => entry && entry.id === telemetryState.selectedId);
+    if (!device) {
+      if (devices.length) {
+        telemetryState.selectedId = devices[0]?.id || null;
+        telemetryState.manualSelection = false;
+        renderTelemetryPanel();
+      } else {
+        telemetryWrap.hidden = true;
+      }
+      return;
+    }
+
+    telemetryWrap.hidden = false;
+    const deviceName = device.name || device.id;
+    if (telemetryTitle) telemetryTitle.textContent = `Geräte-Health · ${deviceName}`;
+
+    if (telemetryBadges) {
+      telemetryBadges.innerHTML = '';
+      const nowSeconds = telemetryState.nowSeconds;
+      const lastSeenAt = Number(device.lastSeenAt) || 0;
+      const badgeList = [];
+      if (lastSeenAt) {
+        const badge = document.createElement('span');
+        badge.className = 'devices-telemetry-badge';
+        const timeLabel = new Date(lastSeenAt * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        const relative = Number.isFinite(nowSeconds) ? formatRelativeSeconds(Math.max(0, nowSeconds - lastSeenAt)) : '';
+        badge.textContent = `Zuletzt ${timeLabel}`;
+        if (relative) badge.title = relative;
+        badgeList.push(badge);
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'devices-telemetry-badge';
+        badge.textContent = 'Keine Heartbeats';
+        badgeList.push(badge);
+      }
+      if (device.offline) {
+        const badge = document.createElement('span');
+        badge.className = 'devices-telemetry-badge offline';
+        badge.textContent = 'Offline erkannt';
+        badgeList.push(badge);
+      }
+      if (device.useOverrides) {
+        const badge = document.createElement('span');
+        badge.className = 'devices-telemetry-badge';
+        badge.textContent = 'Overrides aktiv';
+        badgeList.push(badge);
+      }
+      const ctx = getDeviceContext();
+      if (ctx?.id && ctx.id === device.id) {
+        const badge = document.createElement('span');
+        badge.className = 'devices-telemetry-badge';
+        badge.textContent = 'Im Editor geöffnet';
+        badgeList.push(badge);
+      }
+      badgeList.forEach((badge) => telemetryBadges.appendChild(badge));
+    }
+
+    if (telemetryMeta) {
+      telemetryMeta.innerHTML = '';
+      const status = device.status || {};
+      const metaLines = [];
+      if (status.firmware) metaLines.push(`Firmware: ${status.firmware}`);
+      if (status.appVersion) metaLines.push(`Player: ${status.appVersion}`);
+      if (status.ip) metaLines.push(`IP: ${status.ip}`);
+      if (status.notes) metaLines.push(status.notes);
+      if (!metaLines.length) {
+        const empty = document.createElement('div');
+        empty.className = 'devices-telemetry-empty';
+        empty.textContent = 'Keine Statusdaten gemeldet.';
+        telemetryMeta.appendChild(empty);
+      } else {
+        metaLines.forEach((line) => {
+          const div = document.createElement('div');
+          div.textContent = line;
+          telemetryMeta.appendChild(div);
+        });
+      }
+    }
+
+    if (telemetryKpis) {
+      telemetryKpis.innerHTML = '';
+      const metrics = device.metrics || {};
+      const cards = [];
+      KPI_FIELDS.forEach((config) => {
+        let displayValue = null;
+        if (config.formatter) {
+          displayValue = config.formatter(metrics[config.key]);
+        } else {
+          const formatted = formatNumber(metrics[config.key], { decimals: config.decimals ?? 0 });
+          if (formatted !== null) displayValue = config.unit ? `${formatted}${config.unit}` : formatted;
+        }
+        if (!displayValue) return;
+        const cardEl = document.createElement('div');
+        cardEl.className = 'devices-telemetry-kpi';
+        const valueEl = document.createElement('strong');
+        valueEl.textContent = displayValue;
+        cardEl.appendChild(valueEl);
+        const labelEl = document.createElement('div');
+        labelEl.className = 'mut';
+        labelEl.textContent = config.label;
+        cardEl.appendChild(labelEl);
+        if (config.trend) {
+          const trend = computeMetricTrend(device, config.key);
+          if (trend && trend.direction !== 'flat' && Number.isFinite(trend.delta)) {
+            const trendEl = document.createElement('div');
+            trendEl.className = 'devices-telemetry-trend';
+            trendEl.dataset.dir = trend.direction;
+            trendEl.textContent = `${trend.direction === 'up' ? '▲' : '▼'} ${formatTrendDelta(config, trend.delta)}`.trim();
+            cardEl.appendChild(trendEl);
+          }
+        }
+        cards.push(cardEl);
+      });
+      if (!cards.length) {
+        const empty = document.createElement('div');
+        empty.className = 'devices-telemetry-empty';
+        empty.textContent = 'Keine Metriken gemeldet.';
+        telemetryKpis.appendChild(empty);
+      } else {
+        cards.forEach((cardEl) => telemetryKpis.appendChild(cardEl));
+      }
+    }
+
+    if (telemetryNetwork) {
+      telemetryNetwork.innerHTML = '';
+      const network = (device.status && device.status.network) || {};
+      const fields = [];
+      if (network.type) fields.push({ label: 'Netzwerk', value: network.type });
+      if (network.ssid) fields.push({ label: 'SSID', value: network.ssid });
+      if (Number.isFinite(Number(network.signal))) fields.push({ label: 'Signal', value: `${Math.round(Number(network.signal))} dBm` });
+      if (Number.isFinite(Number(network.quality))) fields.push({ label: 'Qualität', value: `${Math.round(Number(network.quality))}%` });
+      if (Number.isFinite(Number(network.latency))) fields.push({ label: 'Latenz', value: `${Math.round(Number(network.latency))} ms` });
+      if (!fields.length) {
+        const empty = document.createElement('div');
+        empty.className = 'devices-telemetry-empty';
+        empty.textContent = 'Keine Netzwerkdaten vorhanden.';
+        telemetryNetwork.appendChild(empty);
+      } else {
+        fields.forEach((entry) => {
+          const field = document.createElement('div');
+          field.className = 'devices-telemetry-field';
+          const label = document.createElement('span');
+          label.className = 'devices-telemetry-field-label';
+          label.textContent = entry.label;
+          const value = document.createElement('span');
+          value.textContent = entry.value;
+          field.appendChild(label);
+          field.appendChild(value);
+          telemetryNetwork.appendChild(field);
+        });
+      }
+    }
+
+    if (telemetryErrors) {
+      telemetryErrors.innerHTML = '';
+      const errors = Array.isArray(device.status?.errors) ? device.status.errors : [];
+      if (!errors.length) {
+        const empty = document.createElement('div');
+        empty.className = 'devices-telemetry-empty';
+        empty.textContent = 'Keine Fehler gemeldet.';
+        telemetryErrors.appendChild(empty);
+      } else {
+        const title = document.createElement('strong');
+        title.textContent = `${errors.length} Fehler gemeldet:`;
+        telemetryErrors.appendChild(title);
+        const list = document.createElement('ul');
+        errors.forEach((entry) => {
+          const li = document.createElement('li');
+          const parts = [];
+          if (entry.code) parts.push(entry.code);
+          if (entry.message) parts.push(entry.message);
+          if (entry.ts) {
+            const ts = new Date(entry.ts * 1000).toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            parts.push(`(${ts})`);
+          }
+          li.textContent = parts.join(' · ');
+          list.appendChild(li);
+        });
+        telemetryErrors.appendChild(list);
+      }
+    }
+
+    if (telemetryHistoryWrap && telemetryHistoryNote && telemetryHistoryList) {
+      const history = Array.isArray(device.heartbeatHistory) ? device.heartbeatHistory.slice() : [];
+      telemetryHistoryList.innerHTML = '';
+      if (!history.length) {
+        telemetryHistoryWrap.hidden = false;
+        telemetryHistoryNote.textContent = 'Noch keine Heartbeats gespeichert.';
+      } else {
+        const recent = history.slice().reverse().slice(0, 6);
+        telemetryHistoryWrap.hidden = false;
+        telemetryHistoryNote.textContent = `Letzte ${recent.length} Heartbeats (neu → alt)`;
+        recent.forEach((entry) => {
+          const item = document.createElement('li');
+          item.className = 'devices-telemetry-history-item';
+          if (entry.offline) item.classList.add('offline');
+          const info = document.createElement('div');
+          info.textContent = entry.offline ? 'Offline' : 'Online';
+          const meta = document.createElement('div');
+          meta.className = 'devices-telemetry-history-meta';
+          const timestamp = new Date(entry.ts * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          const ago = Number.isFinite(entry.ago) ? formatRelativeSeconds(entry.ago) : '';
+          meta.textContent = ago ? `${timestamp} · ${ago}` : timestamp;
+          if (entry.metrics) {
+            const metricsParts = [];
+            if (Number.isFinite(Number(entry.metrics.cpuLoad))) metricsParts.push(`CPU ${Math.round(Number(entry.metrics.cpuLoad))}%`);
+            if (Number.isFinite(Number(entry.metrics.temperature))) metricsParts.push(`${Math.round(Number(entry.metrics.temperature))}°C`);
+            if (metricsParts.length) {
+              meta.textContent += ` · ${metricsParts.join(', ')}`;
+            }
+          }
+          item.appendChild(info);
+          item.appendChild(meta);
+          telemetryHistoryList.appendChild(item);
+        });
+      }
+    }
+  }
+
+  function setTelemetrySelection(deviceId, { manual } = {}) {
+    if (!deviceId) return;
+    telemetryState.selectedId = deviceId;
+    if (manual === true) telemetryState.manualSelection = true;
+    if (manual === false) telemetryState.manualSelection = false;
+    renderTelemetryPanel();
+  }
+
+  const contextHandler = (event) => {
+    const ctxId = event?.detail?.id;
+    if (!ctxId) return;
+    setTelemetrySelection(ctxId, { manual: false });
   };
+
+  card.__telemetryContextHandler = contextHandler;
+  document.addEventListener('device-context-changed', contextHandler);
 
   async function render(options = {}) {
     const { bypassCache = false } = options || {};
     const snapshot = await loadDeviceSnapshots({ bypassCache });
     const nowSeconds = resolveNowSeconds(snapshot?.now);
+
+    telemetryState.nowSeconds = nowSeconds;
 
     const pendingHost = document.getElementById('devPendingList');
     if (pendingHost) {
@@ -1049,10 +1467,26 @@ async function createDevicesPane(){
       }
     }
 
+    const devices = Array.isArray(snapshot?.devices) ? snapshot.devices : [];
+    telemetryState.devices = devices;
+
+    if (!telemetryState.manualSelection && getDeviceContext().id) {
+      telemetryState.selectedId = getDeviceContext().id;
+    }
+    if (telemetryState.selectedId && !devices.some((entry) => entry && entry.id === telemetryState.selectedId)) {
+      telemetryState.selectedId = devices.length ? devices[0].id : null;
+      telemetryState.manualSelection = false;
+    } else if (!telemetryState.selectedId && devices.length) {
+      telemetryState.selectedId = devices[0].id;
+    }
+    if (!devices.length) {
+      telemetryState.selectedId = null;
+      telemetryState.manualSelection = false;
+    }
+
     const pairedHost = document.getElementById('devPairedList');
     if (pairedHost) {
       pairedHost.innerHTML = '';
-      const devices = Array.isArray(snapshot?.devices) ? snapshot.devices : [];
       if (!devices.length) {
         pairedHost.innerHTML = '<div class="mut">Noch keine Geräte gekoppelt.</div>';
       } else {
@@ -1116,38 +1550,43 @@ async function createDevicesPane(){
             modeLabel.textContent = desiredMode ? 'Individuell' : 'Global';
             row.classList.toggle('ind', desiredMode);
             modeWrap.classList.toggle('ind-active', desiredMode);
-          try {
-            await setDeviceMode(device.id, mode);
-          } catch (error) {
-            console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
-            notifyError('Fehler: ' + error.message);
-            modeInput.checked = !desiredMode;
-            const rollback = !!modeInput.checked;
-            modeLabel.textContent = rollback ? 'Individuell' : 'Global';
-            row.classList.toggle('ind', rollback);
-            modeWrap.classList.toggle('ind-active', rollback);
-          }
-        });
+            try {
+              await setDeviceMode(device.id, mode);
+            } catch (error) {
+              console.error('[admin] Geräte-Modus wechseln fehlgeschlagen', error);
+              notifyError('Fehler: ' + error.message);
+              modeInput.checked = !desiredMode;
+              const rollback = !!modeInput.checked;
+              modeLabel.textContent = rollback ? 'Individuell' : 'Global';
+              row.classList.toggle('ind', rollback);
+              modeWrap.classList.toggle('ind-active', rollback);
+            }
+          });
 
-        row.querySelector('[data-unpair]')?.addEventListener('click', async () => {
-          if (!/^dev_/.test(String(device.id))) {
-            notifyWarning('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
-            return;
-          }
-          const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
-          if ((check || '').trim().toLowerCase() !== 'ja') return;
-          try {
-            await unpairDevice(device.id, { purge: true });
-            notifySuccess('Gerät getrennt.');
-            await render({ bypassCache: true });
-          } catch (error) {
-            console.error('[admin] Gerät trennen fehlgeschlagen', error);
-            notifyError('Fehler: ' + error.message);
-          }
-        });
+          row.querySelector('[data-unpair]')?.addEventListener('click', async () => {
+            if (!/^dev_/.test(String(device.id))) {
+              notifyWarning('Dieses Gerät hat eine alte/ungültige ID. Bitte ein neues Gerät koppeln und das alte ignorieren.');
+              return;
+            }
+            const check = prompt('Wirklich trennen? Tippe „Ja“ zum Bestätigen:');
+            if ((check || '').trim().toLowerCase() !== 'ja') return;
+            try {
+              await unpairDevice(device.id, { purge: true });
+              notifySuccess('Gerät getrennt.');
+              await render({ bypassCache: true });
+            } catch (error) {
+              console.error('[admin] Gerät trennen fehlgeschlagen', error);
+              notifyError('Fehler: ' + error.message);
+            }
+          });
+
+          const applySelection = (options) => {
+            setTelemetrySelection(device.id, options);
+            selectRow(row);
+          };
 
           row.querySelector('[data-view]')?.addEventListener('click', () => {
-            selectRow(row);
+            applySelection({ manual: true });
             openDevicePreview(device.id, device.name || device.id);
           });
           row.querySelector('[data-url]')?.addEventListener('click', async () => {
@@ -1160,10 +1599,11 @@ async function createDevicesPane(){
             }
           });
           row.querySelector('[data-edit]')?.addEventListener('click', () => {
-            selectRow(row);
+            applySelection({ manual: true });
             enterDeviceContext(device);
           });
           row.querySelector('[data-rename]')?.addEventListener('click', async () => {
+            applySelection({ manual: true });
             const newName = prompt('Neuer Gerätename:', device.name || '');
             if (newName === null) return;
             try {
@@ -1175,18 +1615,27 @@ async function createDevicesPane(){
               notifyError('Fehler: ' + error.message);
             }
           });
+          row.querySelector('.dev-name')?.addEventListener('click', () => applySelection({ manual: true }));
+          row.addEventListener('click', (event) => {
+            if (event.target.closest('button') || event.target.closest('label') || event.target.closest('input')) return;
+            applySelection({ manual: true });
+          });
+
           tbody.appendChild(row);
+          if (device.id === telemetryState.selectedId) selectRow(row);
         });
       }
     }
 
     const ts = card.querySelector('#devLastUpdate');
     if (ts) {
-      const tsSeconds = nowSeconds || resolveNowSeconds(Date.now());
+      const tsSeconds = telemetryState.nowSeconds || resolveNowSeconds(Date.now());
       const tsDate = new Date(tsSeconds * 1000);
       ts.textContent = tsDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       ts.title = 'Stand: ' + tsDate.toLocaleString('de-DE');
     }
+
+    renderTelemetryPanel();
   }
 
   card.querySelector('#devPairManual')?.addEventListener('click', async () => {
@@ -1225,6 +1674,379 @@ async function createDevicesPane(){
   };
 
   return card;
+}
+
+
+
+function createDeviceDiffViewer({
+  getDeviceContext,
+  getGlobalSettings,
+  getCurrentSettings,
+  sanitizeSettings
+}) {
+  const card = document.getElementById('deviceDiffCard');
+  const filterSelect = document.getElementById('deviceDiffFilter');
+  const resetButton = document.getElementById('deviceDiffReset');
+  const summaryEl = document.getElementById('deviceDiffSummary');
+  const emptyEl = document.getElementById('deviceDiffEmpty');
+  const listEl = document.getElementById('deviceDiffList');
+
+  if (!card) {
+    return {
+      markDirty: () => {},
+      render: () => {}
+    };
+  }
+
+  const CATEGORY_LABELS = {
+    fonts: 'Typografie & Raster',
+    slides: 'Slides & Layout',
+    colors: 'Farben',
+    highlight: 'Highlight',
+    footnotes: 'Fußnoten',
+    extras: 'Extras',
+    automation: 'Automatisierung',
+    pages: 'Seiten',
+    theme: 'Theme',
+    root: 'Allgemein'
+  };
+
+  const state = {
+    filter: 'all',
+    currentDeviceId: null
+  };
+
+  let dirty = true;
+  let renderQueued = false;
+
+  const labelForCategory = (slug) => {
+    const key = String(slug || 'root');
+    return CATEGORY_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
+  };
+
+  const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+
+  const deepEqual = (a, b) => {
+    if (a === b) return true;
+    if (typeof a !== typeof b) return false;
+    if (a == null || b == null) return false;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        if (!deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    if (isPlainObject(a) && isPlainObject(b)) {
+      const aKeys = Object.keys(a);
+      const bKeys = Object.keys(b);
+      if (aKeys.length !== bKeys.length) return false;
+      for (const key of aKeys) {
+        if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+        if (!deepEqual(a[key], b[key])) return false;
+      }
+      return true;
+    }
+    if (typeof a === 'number' && typeof b === 'number') {
+      if (Number.isNaN(a) && Number.isNaN(b)) return true;
+    }
+    return false;
+  };
+
+  const diffSettings = (base, device) => {
+    const diffs = [];
+    const walk = (baseValue, deviceValue, path) => {
+      if (deepEqual(baseValue, deviceValue)) return;
+      const baseIsObj = isPlainObject(baseValue);
+      const deviceIsObj = isPlainObject(deviceValue);
+      if (baseIsObj && deviceIsObj) {
+        const keys = new Set([...Object.keys(baseValue), ...Object.keys(deviceValue)]);
+        keys.forEach((key) => {
+          walk(baseValue[key], deviceValue[key], path.concat(key));
+        });
+        return;
+      }
+      const baseIsArr = Array.isArray(baseValue);
+      const deviceIsArr = Array.isArray(deviceValue);
+      if (baseIsArr && deviceIsArr) {
+        if (baseValue.length === deviceValue.length && baseValue.every((entry, idx) => deepEqual(entry, deviceValue[idx]))) {
+          return;
+        }
+        diffs.push({ path, baseValue, deviceValue });
+        return;
+      }
+      diffs.push({ path, baseValue, deviceValue });
+    };
+    walk(base, device, []);
+    return diffs;
+  };
+
+  const formatValue = (value) => {
+    if (value == null) return '—';
+    if (typeof value === 'boolean') return value ? 'aktiv' : 'inaktiv';
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') return value === '' ? '„“' : value;
+    if (Array.isArray(value)) {
+      if (!value.length) return '[]';
+      const simple = value.every((entry) => entry == null || ['string', 'number', 'boolean'].includes(typeof entry));
+      if (simple) {
+        return value.map((entry) => (entry == null ? '—' : formatValue(entry))).join(', ');
+      }
+      try {
+        const serialized = JSON.stringify(value);
+        return serialized.length > 120 ? `${serialized.slice(0, 117)}…` : serialized;
+      } catch (error) {
+        return '[…]';
+      }
+    }
+    if (isPlainObject(value)) {
+      const keys = Object.keys(value);
+      if (!keys.length) return '{}';
+      try {
+        const serialized = JSON.stringify(value);
+        return serialized.length > 120 ? `${serialized.slice(0, 117)}…` : serialized;
+      } catch (error) {
+        return '{…}';
+      }
+    }
+    return String(value);
+  };
+
+  const describeValue = (value) => {
+    if (value == null) return '—';
+    if (typeof value === 'string') return value;
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (error) {
+      return String(value);
+    }
+  };
+
+  const scheduleRender = () => {
+    if (renderQueued) return;
+    renderQueued = true;
+    Promise.resolve().then(() => {
+      renderQueued = false;
+      if (!dirty) return;
+      dirty = false;
+      renderInternal();
+    });
+  };
+
+  const renderInternal = () => {
+    if (!card) return;
+    const ctx = typeof getDeviceContext === 'function' ? getDeviceContext() : null;
+    const deviceId = ctx?.id || null;
+    if (!deviceId) {
+      card.hidden = true;
+      state.currentDeviceId = null;
+      state.filter = 'all';
+      if (filterSelect) {
+        filterSelect.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = 'all';
+        opt.textContent = 'Alle Bereiche';
+        filterSelect.appendChild(opt);
+        filterSelect.value = 'all';
+        filterSelect.disabled = true;
+      }
+      if (resetButton) resetButton.disabled = true;
+      if (summaryEl) summaryEl.textContent = '';
+      if (emptyEl) {
+        emptyEl.hidden = true;
+        emptyEl.textContent = '';
+      }
+      if (listEl) listEl.innerHTML = '';
+      return;
+    }
+
+    card.hidden = false;
+
+    if (state.currentDeviceId !== deviceId) {
+      state.currentDeviceId = deviceId;
+      state.filter = 'all';
+    }
+
+    const baseSettingsRaw = typeof getGlobalSettings === 'function' ? getGlobalSettings() : null;
+    const deviceSettingsRaw = typeof getCurrentSettings === 'function' ? getCurrentSettings() : null;
+
+    const baseSettings = typeof sanitizeSettings === 'function'
+      ? sanitizeSettings(deepClone(baseSettingsRaw || {}))
+      : deepClone(baseSettingsRaw || {});
+    const deviceSettings = typeof sanitizeSettings === 'function'
+      ? sanitizeSettings(deepClone(deviceSettingsRaw || {}))
+      : deepClone(deviceSettingsRaw || {});
+
+    const diffEntries = diffSettings(baseSettings, deviceSettings);
+
+    if (!diffEntries.length) {
+      if (summaryEl) {
+        const deviceLabel = ctx?.name || ctx?.id || 'Gerät';
+        summaryEl.textContent = ctx?.overridesActive
+          ? `${deviceLabel} überschreibt aktuell keine Werte.`
+          : `${deviceLabel} verwendet die globalen Einstellungen.`;
+      }
+      if (emptyEl) {
+        emptyEl.hidden = false;
+        emptyEl.textContent = 'Keine Overrides aktiv – Änderungen erscheinen hier.';
+      }
+      if (listEl) listEl.innerHTML = '';
+      if (filterSelect) {
+        filterSelect.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = 'all';
+        opt.textContent = 'Alle Bereiche';
+        filterSelect.appendChild(opt);
+        filterSelect.value = 'all';
+        filterSelect.disabled = true;
+      }
+      if (resetButton) resetButton.disabled = true;
+      return;
+    }
+
+    if (emptyEl) emptyEl.hidden = true;
+
+    const groupsMap = new Map();
+    diffEntries.forEach((entry) => {
+      const slug = entry.path[0] || 'root';
+      if (!groupsMap.has(slug)) groupsMap.set(slug, []);
+      const displayPath = entry.path.length ? entry.path.join(' › ') : labelForCategory(slug);
+      groupsMap.get(slug).push({
+        path: entry.path,
+        displayPath,
+        baseValue: entry.baseValue,
+        deviceValue: entry.deviceValue,
+        baseDisplay: formatValue(entry.baseValue),
+        deviceDisplay: formatValue(entry.deviceValue),
+        baseTitle: describeValue(entry.baseValue),
+        deviceTitle: describeValue(entry.deviceValue)
+      });
+    });
+
+    const groups = Array.from(groupsMap.entries()).map(([slug, entries]) => ({
+      slug,
+      label: labelForCategory(slug),
+      entries: entries.sort((a, b) => a.displayPath.localeCompare(b.displayPath, 'de', { sensitivity: 'base' }))
+    })).sort((a, b) => a.label.localeCompare(b.label, 'de', { sensitivity: 'base' }));
+
+    const categories = groups.map((group) => group.slug);
+    if (state.filter !== 'all' && !categories.includes(state.filter)) {
+      state.filter = 'all';
+    }
+
+    if (summaryEl) {
+      const overridesCount = diffEntries.length;
+      const areaCount = groups.length;
+      const valueLabel = overridesCount === 1 ? 'Wert' : 'Werte';
+      const areaLabel = areaCount === 1 ? 'Bereich' : 'Bereichen';
+      summaryEl.textContent = `${overridesCount} ${valueLabel} in ${areaCount} ${areaLabel} weichen vom globalen Stand ab.`;
+    }
+
+    if (filterSelect) {
+      filterSelect.innerHTML = '';
+      const optAll = document.createElement('option');
+      optAll.value = 'all';
+      optAll.textContent = 'Alle Bereiche';
+      filterSelect.appendChild(optAll);
+      groups.forEach((group) => {
+        const option = document.createElement('option');
+        option.value = group.slug;
+        option.textContent = group.label;
+        filterSelect.appendChild(option);
+      });
+      filterSelect.value = state.filter;
+      filterSelect.disabled = groups.length <= 1;
+    }
+
+    if (resetButton) {
+      resetButton.disabled = state.filter === 'all' || groups.length <= 1;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = '';
+      const selectedCategories = state.filter === 'all'
+        ? categories.slice()
+        : categories.filter((slug) => slug === state.filter);
+      if (!selectedCategories.length) selectedCategories.push(...categories);
+      selectedCategories.forEach((slug) => {
+        const group = groups.find((entry) => entry.slug === slug);
+        if (!group) return;
+        const details = document.createElement('details');
+        details.className = 'device-diff-group';
+        if (state.filter !== 'all' || listEl.children.length === 0) {
+          details.open = true;
+        }
+        const summary = document.createElement('summary');
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = group.label;
+        const countSpan = document.createElement('span');
+        countSpan.className = 'device-diff-count';
+        countSpan.textContent = String(group.entries.length);
+        summary.appendChild(labelSpan);
+        summary.appendChild(countSpan);
+        details.appendChild(summary);
+        const entryList = document.createElement('ul');
+        entryList.className = 'device-diff-entries';
+        group.entries.forEach((entry) => {
+          const item = document.createElement('li');
+          item.className = 'device-diff-entry';
+          const pathEl = document.createElement('div');
+          pathEl.className = 'device-diff-path';
+          pathEl.textContent = entry.displayPath;
+          item.appendChild(pathEl);
+          const valuesEl = document.createElement('div');
+          valuesEl.className = 'device-diff-values';
+          const baseEl = document.createElement('span');
+          baseEl.className = 'device-diff-value';
+          baseEl.textContent = entry.baseDisplay;
+          if (entry.baseTitle && entry.baseTitle !== entry.baseDisplay) baseEl.title = entry.baseTitle;
+          const arrowEl = document.createElement('span');
+          arrowEl.className = 'device-diff-arrow';
+          arrowEl.textContent = '→';
+          const deviceEl = document.createElement('span');
+          deviceEl.className = 'device-diff-value device';
+          deviceEl.textContent = entry.deviceDisplay;
+          if (entry.deviceTitle && entry.deviceTitle !== entry.deviceDisplay) deviceEl.title = entry.deviceTitle;
+          valuesEl.appendChild(baseEl);
+          valuesEl.appendChild(arrowEl);
+          valuesEl.appendChild(deviceEl);
+          item.appendChild(valuesEl);
+          entryList.appendChild(item);
+        });
+        details.appendChild(entryList);
+        listEl.appendChild(details);
+      });
+    }
+  };
+
+  const markDirty = () => {
+    dirty = true;
+    scheduleRender();
+  };
+
+  const renderNow = () => {
+    dirty = false;
+    renderInternal();
+  };
+
+  if (filterSelect) {
+    filterSelect.addEventListener('change', () => {
+      state.filter = filterSelect.value || 'all';
+      markDirty();
+    });
+  }
+
+  if (resetButton) {
+    resetButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (state.filter === 'all') return;
+      state.filter = 'all';
+      if (filterSelect) filterSelect.value = 'all';
+      markDirty();
+    });
+  }
+
+  return { markDirty, render: renderNow };
 }
 
 // Geräte‑Vorschau (neues Modal)
@@ -1300,6 +2122,9 @@ function destroyDevicesPane(){
   if (pane){
     clearInterval(pane.__refreshInterval);
     window.__refreshDevicesPane = undefined;
+    if (pane.__telemetryContextHandler) {
+      try { document.removeEventListener('device-context-changed', pane.__telemetryContextHandler); } catch {}
+    }
     pane.remove();
     setDevicesPane(null);
   }
