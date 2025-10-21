@@ -1,6 +1,6 @@
 <?php
 // Nutzer- und Rollenverwaltung für das Admin-Interface
-// Persistiert Benutzer in data/users.json und bietet Hilfsfunktionen für die APIs.
+// Persistiert Benutzer im SQLite-Backend und bietet Hilfsfunktionen für die APIs.
 
 declare(strict_types=1);
 
@@ -199,7 +199,7 @@ function auth_users_normalize(array $state): array
     return $normalized;
 }
 
-function auth_users_load_from_file(): array
+function auth_users_legacy_load_from_file(): array
 {
     $path = auth_users_path();
     if (!is_file($path)) {
@@ -216,69 +216,73 @@ function auth_users_load_from_file(): array
     return auth_users_normalize($decoded);
 }
 
-function auth_users_save_to_file(array $state): void
+function auth_users_require_sqlite(): void
 {
-    $normalized = auth_users_normalize($state);
-    $path = auth_users_path();
-    @mkdir(dirname($path), 02775, true);
-    $json = json_encode($normalized, SIGNAGE_JSON_STORAGE_FLAGS);
-    if (@file_put_contents($path, $json, LOCK_EX) === false) {
-        throw new RuntimeException('Unable to write users database');
+    if (!signage_db_available()) {
+        throw new RuntimeException('SQLite support is required for user storage.');
     }
-    @chmod($path, 0640);
+}
+
+function auth_users_import_legacy_store(): ?array
+{
+    $path = auth_users_path();
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $state = auth_users_legacy_load_from_file();
+    $normalized = auth_users_normalize($state);
+
+    try {
+        signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to migrate legacy users from file storage: ' . $exception->getMessage(), 0, $exception);
+    }
+
     auth_basic_sync($normalized);
+
+    if (!@unlink($path)) {
+        error_log('Unable to remove legacy users.json after migration. Please delete it manually: ' . $path);
+    }
+
+    return $normalized;
 }
 
 function auth_users_load(): array
 {
-    if (signage_db_available()) {
-        try {
-            $state = signage_kv_get(SIGNAGE_AUTH_USERS_STORAGE_KEY, null);
-            if (is_array($state)) {
-                return auth_users_normalize($state);
-            }
-        } catch (Throwable $exception) {
-            error_log('Failed to load users from SQLite: ' . $exception->getMessage());
-        }
+    auth_users_require_sqlite();
+
+    $migrated = auth_users_import_legacy_store();
+    if (is_array($migrated)) {
+        return $migrated;
     }
 
-    $state = auth_users_load_from_file();
-
-    if (signage_db_available()) {
-        try {
-            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $state);
-        } catch (Throwable $exception) {
-            error_log('Failed to import users into SQLite: ' . $exception->getMessage());
-        }
+    try {
+        $state = signage_kv_get(SIGNAGE_AUTH_USERS_STORAGE_KEY, null);
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to load users from SQLite: ' . $exception->getMessage(), 0, $exception);
     }
 
-    return $state;
+    if (!is_array($state)) {
+        $state = auth_users_default();
+    }
+
+    return auth_users_normalize($state);
 }
 
 function auth_users_save(array $state): void
 {
-    $normalized = auth_users_normalize($state);
-    $errors = [];
+    auth_users_require_sqlite();
 
-    if (signage_db_available()) {
-        try {
-            signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
-            auth_basic_sync($normalized);
-            return;
-        } catch (Throwable $exception) {
-            $errors[] = 'sqlite: ' . $exception->getMessage();
-            error_log('Failed to persist users to SQLite: ' . $exception->getMessage());
-        }
-    }
+    $normalized = auth_users_normalize($state);
 
     try {
-        auth_users_save_to_file($normalized);
-        return;
+        signage_kv_set(SIGNAGE_AUTH_USERS_STORAGE_KEY, $normalized);
     } catch (Throwable $exception) {
-        $errors[] = 'file: ' . $exception->getMessage();
+        throw new RuntimeException('Failed to persist users to SQLite: ' . $exception->getMessage(), 0, $exception);
     }
 
-    throw new RuntimeException('Unable to write users database (' . implode('; ', $errors) . ')');
+    auth_basic_sync($normalized);
 }
 
 function auth_basic_sync(array $state): void

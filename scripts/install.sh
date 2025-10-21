@@ -375,16 +375,16 @@ seed_admin_user(){
   : >"$seed_log" 2>/dev/null || true
   rm -f "$seed_log"
 
-  local users_file="$APP_DIR/data/users.json"
-  if [[ -f "$users_file" ]]; then
-    chown www-data:www-data "$users_file" 2>/dev/null || true
-    chmod 640 "$users_file" 2>/dev/null || true
-  fi
-
   local audit_file="$APP_DIR/data/audit.log"
   if [[ -f "$audit_file" ]]; then
     chown www-data:www-data "$audit_file" 2>/dev/null || true
     chmod 640 "$audit_file" 2>/dev/null || true
+  fi
+
+  local db_file="$APP_DIR/data/signage.db"
+  if [[ -f "$db_file" ]]; then
+    chown www-data:www-data "$db_file" 2>/dev/null || true
+    chmod 660 "$db_file" 2>/dev/null || true
   fi
 }
 
