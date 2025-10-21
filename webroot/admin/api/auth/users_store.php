@@ -10,6 +10,8 @@ const SIGNAGE_AUTH_USERS_FILE = 'users.json';
 const SIGNAGE_AUTH_AUDIT_FILE = 'audit.log';
 const SIGNAGE_AUTH_USERS_STORAGE_KEY = 'auth.users';
 const SIGNAGE_AUTH_BASIC_FILE = '.htpasswd';
+const SIGNAGE_AUTH_AUDIT_FILE_MAX_BYTES = 1048576; // 1 MiB
+const SIGNAGE_AUTH_AUDIT_FILE_TRIM_TO_BYTES = 786432; // 768 KiB
 const SIGNAGE_AUTH_ROLES = ['saunameister', 'editor', 'admin'];
 const SIGNAGE_AUTH_DEFAULT_ROLE = 'saunameister';
 const SIGNAGE_AUTH_ROLE_ALIASES = [
@@ -516,6 +518,86 @@ function auth_verify_password(string $password, string $hash): bool
     return password_verify($password, $hash);
 }
 
+function auth_flush_audit_stream($handle, string $path): void
+{
+    $error = null;
+    if (!signage_flush_stream($handle, $error) && $error !== null) {
+        error_log('Failed to flush audit log ' . $path . ': ' . $error);
+    }
+}
+
+function auth_trim_audit_log_locked($handle, string $path): void
+{
+    $maxBytes = SIGNAGE_AUTH_AUDIT_FILE_MAX_BYTES;
+    if ($maxBytes <= 0) {
+        auth_flush_audit_stream($handle, $path);
+        return;
+    }
+
+    $size = ftell($handle);
+    if ($size === false) {
+        auth_flush_audit_stream($handle, $path);
+        return;
+    }
+
+    if ($size <= $maxBytes) {
+        auth_flush_audit_stream($handle, $path);
+        return;
+    }
+
+    $target = SIGNAGE_AUTH_AUDIT_FILE_TRIM_TO_BYTES;
+    if ($target <= 0 || $target >= $maxBytes) {
+        $target = (int) floor($maxBytes * 0.75);
+    }
+    $target = max(1024, min($target, $maxBytes));
+
+    $offset = max(0, $size - $target);
+    if (fseek($handle, $offset, SEEK_SET) !== 0) {
+        auth_flush_audit_stream($handle, $path);
+        return;
+    }
+
+    $data = stream_get_contents($handle);
+    if ($data === false) {
+        auth_flush_audit_stream($handle, $path);
+        return;
+    }
+
+    if ($offset > 0) {
+        $newlinePos = strpos($data, "\n");
+        if ($newlinePos !== false) {
+            $data = substr($data, $newlinePos + 1);
+        } else {
+            $data = '';
+        }
+    }
+
+    ftruncate($handle, 0);
+    rewind($handle);
+
+    if ($data !== '') {
+        $written = 0;
+        $length = strlen($data);
+        while ($written < $length) {
+            $chunk = @fwrite($handle, substr($data, $written));
+            if ($chunk === false) {
+                error_log('Failed to rewrite trimmed audit log ' . $path);
+                break;
+            }
+            $written += $chunk;
+        }
+    }
+
+    auth_flush_audit_stream($handle, $path);
+
+    $newSize = ftell($handle);
+    if ($newSize !== false) {
+        error_log(sprintf('Trimmed audit log %s to %d bytes (was %d bytes)', $path, $newSize, $size));
+    }
+
+    fseek($handle, 0, SEEK_END);
+}
+
 function auth_append_audit(string $event, array $context = []): void
 {
     $username = null;
@@ -548,12 +630,63 @@ function auth_append_audit(string $event, array $context = []): void
     }
 
     $path = auth_audit_path();
-    @mkdir(dirname($path), 02775, true);
+    $dir = dirname($path);
+    if (!is_dir($dir) && !@mkdir($dir, 02775, true) && !is_dir($dir)) {
+        error_log('Failed to create audit directory ' . $dir);
+        return;
+    }
+
     $row = [
         'ts' => time(),
         'event' => $event,
         'context' => $context,
     ];
     $line = json_encode($row, JSON_UNESCAPED_SLASHES) . "\n";
-    @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
+    if (function_exists('error_clear_last')) {
+        error_clear_last();
+    }
+
+    $handle = @fopen($path, 'c+');
+    if ($handle === false) {
+        error_log('Unable to open audit log ' . $path . ': ' . signage_last_error_message('open failed'));
+        return;
+    }
+
+    $locked = @flock($handle, LOCK_EX);
+    if (!$locked) {
+        error_log('Unable to lock audit log ' . $path);
+        fclose($handle);
+        return;
+    }
+
+    $writeFailed = false;
+    if (@fseek($handle, 0, SEEK_END) !== 0) {
+        error_log('Unable to seek audit log ' . $path);
+        $writeFailed = true;
+    }
+
+    if (!$writeFailed) {
+        $length = strlen($line);
+        $written = 0;
+        while ($written < $length) {
+            $chunk = @fwrite($handle, substr($line, $written));
+            if ($chunk === false) {
+                error_log('Failed to append to audit log ' . $path);
+                $writeFailed = true;
+                break;
+            }
+            $written += $chunk;
+        }
+    }
+
+    if (!$writeFailed) {
+        auth_trim_audit_log_locked($handle, $path);
+    } else {
+        auth_flush_audit_stream($handle, $path);
+    }
+
+    flock($handle, LOCK_UN);
+    fclose($handle);
+
+    @chmod($path, 0640);
 }
