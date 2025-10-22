@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev:admin": "vite --config vite.config.admin.js",
+    "dev:player": "vite --config vite.config.player.js",
     "preview:admin": "vite preview --config vite.config.admin.js --host",
+    "preview:player": "vite preview --config vite.config.player.js --host",
     "build:admin": "vite build --config vite.config.admin.js",
-    "test": "npm run build:admin && npm run test:frontend && npm run test:perf && composer test",
+    "build:player": "vite build --config vite.config.player.js",
+    "test": "npm run build:admin && npm run build:player && npm run test:frontend && npm run test:perf && composer test",
     "test:frontend": "vitest run",
     "test:backend": "composer test",
     "test:watch": "vitest",
