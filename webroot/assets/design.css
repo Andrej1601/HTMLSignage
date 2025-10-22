@@ -347,11 +347,11 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
 }
 
 body[data-layout='split'] #stage-left .sauna-info-box{
-  margin-right:calc(18px*var(--vwScale));
+  margin-right:calc(32px*var(--vwScale));
 }
 
 body[data-layout='split'] #stage-right .sauna-info-box{
-  margin-left:calc(18px*var(--vwScale));
+  margin-left:calc(32px*var(--vwScale));
 }
 .sauna-info-box__line{
   display:flex;
