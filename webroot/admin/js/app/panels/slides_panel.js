@@ -1019,6 +1019,127 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         }
       }
     };
+
+    const renderBackgroundAudioControls = () => {
+      const defaults = DEFAULTS.audio?.background || {};
+      settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
+      const audioState = (() => {
+        const state = settings.audio.background && typeof settings.audio.background === 'object'
+          ? settings.audio.background
+          : (settings.audio.background = {});
+        state.src = typeof state.src === 'string' ? state.src.trim() : '';
+        const fallbackVolume = Number(defaults.volume ?? 1);
+        const volumeRaw = Number(state.volume);
+        const normalizedVolume = Number.isFinite(volumeRaw)
+          ? Math.min(1, Math.max(0, volumeRaw))
+          : (Number.isFinite(fallbackVolume) ? Math.min(1, Math.max(0, fallbackVolume)) : 1);
+        state.volume = normalizedVolume;
+        state.loop = state.loop === false ? false : (defaults.loop === false ? false : true);
+        if (!state.src) state.enabled = false; else state.enabled = state.enabled !== false;
+        return state;
+      })();
+
+      const enabledInput = document.getElementById('bgAudioEnabled');
+      const srcInput = document.getElementById('bgAudioSrc');
+      const uploadBtn = document.getElementById('bgAudioUpload');
+      const clearBtn = document.getElementById('bgAudioClear');
+      const volumeInput = document.getElementById('bgAudioVolume');
+      const loopInput = document.getElementById('bgAudioLoop');
+
+      const applyStateToInputs = () => {
+        if (enabledInput) enabledInput.checked = !!(audioState.enabled && audioState.src);
+        if (srcInput) srcInput.value = audioState.src || '';
+        if (volumeInput) {
+          const volumePercent = Math.round(Math.min(1, Math.max(0, Number(audioState.volume))) * 100);
+          volumeInput.value = String(volumePercent);
+        }
+        if (loopInput) loopInput.checked = audioState.loop !== false;
+      };
+
+      applyStateToInputs();
+
+      if (enabledInput && !enabledInput.dataset.bound) {
+        enabledInput.dataset.bound = '1';
+        enabledInput.addEventListener('change', () => {
+          audioState.enabled = !!enabledInput.checked && !!audioState.src;
+          if (enabledInput.checked && !audioState.src) {
+            enabledInput.checked = false;
+            audioState.enabled = false;
+          }
+          notifySettingsChanged();
+        });
+      }
+
+      if (srcInput && !srcInput.dataset.bound) {
+        srcInput.dataset.bound = '1';
+        srcInput.addEventListener('change', () => {
+          audioState.src = srcInput.value.trim();
+          if (!audioState.src) {
+            audioState.enabled = false;
+            if (enabledInput) enabledInput.checked = false;
+          } else if (enabledInput && enabledInput.checked) {
+            audioState.enabled = true;
+          }
+          applyStateToInputs();
+          notifySettingsChanged();
+        });
+      }
+
+      if (volumeInput && !volumeInput.dataset.bound) {
+        volumeInput.dataset.bound = '1';
+        volumeInput.addEventListener('change', () => {
+          const raw = Number(volumeInput.value);
+          if (Number.isFinite(raw)) {
+            const percent = Math.max(0, Math.min(100, Math.round(raw)));
+            volumeInput.value = String(percent);
+            audioState.volume = percent / 100;
+          } else {
+            const fallbackPercent = Math.round(Math.min(1, Math.max(0, Number(defaults.volume ?? 1))) * 100);
+            volumeInput.value = String(fallbackPercent);
+            audioState.volume = fallbackPercent / 100;
+          }
+          notifySettingsChanged();
+        });
+      }
+
+      if (loopInput && !loopInput.dataset.bound) {
+        loopInput.dataset.bound = '1';
+        loopInput.addEventListener('change', () => {
+          audioState.loop = !!loopInput.checked;
+          notifySettingsChanged();
+        });
+      }
+
+      if (uploadBtn && !uploadBtn.dataset.bound) {
+        uploadBtn.dataset.bound = '1';
+        uploadBtn.addEventListener('click', () => {
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'audio/*';
+          fileInput.onchange = () => {
+            uploadGeneric(fileInput, (path) => {
+              if (!path) return;
+              audioState.src = path;
+              audioState.enabled = true;
+              applyStateToInputs();
+              notifySettingsChanged();
+            });
+          };
+          fileInput.click();
+        });
+      }
+
+      if (clearBtn && !clearBtn.dataset.bound) {
+        clearBtn.dataset.bound = '1';
+        clearBtn.addEventListener('click', () => {
+          audioState.src = '';
+          audioState.enabled = false;
+          applyStateToInputs();
+          notifySettingsChanged();
+        });
+      }
+    };
+
     const renderPagePlaylist = (hostId, playlistList = [], { pageKey = 'left' } = {}) => {
       const host = document.getElementById(hostId);
       if (!host) return;
@@ -1590,6 +1711,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     renderStyleAutomationControls();
     renderExtrasEditor();
     renderHeroTimelineControls();
+    renderBackgroundAudioControls();
 
     // Reset-Button (nur Felder dieser Box)
     const reset = document.querySelector('#resetSlides');
@@ -1636,6 +1758,27 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       setC('#tileOverlayEnabled', DEFAULTS.slides.tileOverlayEnabled);
       setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
       applyOverlayState(DEFAULTS.slides.tileOverlayEnabled !== false);
+
+      const audioDefaults = DEFAULTS.audio?.background || {};
+      settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
+      const audioState = settings.audio.background && typeof settings.audio.background === 'object'
+        ? settings.audio.background
+        : (settings.audio.background = {});
+      audioState.src = typeof audioDefaults.src === 'string' ? audioDefaults.src : '';
+      audioState.enabled = !!(audioDefaults.enabled !== false && audioState.src);
+      const defaultVolume = Number(audioDefaults.volume ?? 1);
+      audioState.volume = Number.isFinite(defaultVolume)
+        ? Math.min(1, Math.max(0, defaultVolume))
+        : 1;
+      audioState.loop = audioDefaults.loop === false ? false : true;
+      const audioEnabledInput = document.getElementById('bgAudioEnabled');
+      if (audioEnabledInput) audioEnabledInput.checked = audioState.enabled;
+      const audioSrcInput = document.getElementById('bgAudioSrc');
+      if (audioSrcInput) audioSrcInput.value = audioState.src || '';
+      const audioVolumeInput = document.getElementById('bgAudioVolume');
+      if (audioVolumeInput) audioVolumeInput.value = String(Math.round(audioState.volume * 100));
+      const audioLoopInput = document.getElementById('bgAudioLoop');
+      if (audioLoopInput) audioLoopInput.checked = audioState.loop !== false;
 
       setV('#rightW',   DEFAULTS.display.rightWidthPercent);
       setV('#cutTop',   DEFAULTS.display.cutTopPercent);

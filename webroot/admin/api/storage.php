@@ -873,6 +873,15 @@ function signage_default_settings(): array
             'rightImages' => [],
             'flameImage' => '/assets/img/flame_test.svg',
         ],
+        'audio' => [
+            'background' => [
+                'enabled' => false,
+                'src' => '',
+                'volume' => 0.5,
+                'loop' => true,
+                'fadeMs' => 0,
+            ],
+        ],
         'footnotes' => [
             ['id' => 'star', 'label' => '*', 'text' => 'Nur am Fr und Sa'],
         ],
@@ -887,7 +896,56 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     if (!is_array($settings)) {
         return $fallback ?? signage_default_settings();
     }
-    return $settings;
+
+    $baseDefault = $fallback ?? signage_default_settings();
+    $normalized = $settings;
+
+    $audioDefaults = $baseDefault['audio']['background'] ?? signage_default_settings()['audio']['background'];
+    $audioState = isset($normalized['audio']) && is_array($normalized['audio']) ? $normalized['audio'] : [];
+    $background = $audioState['background'] ?? [];
+    $audioState['background'] = signage_normalize_background_audio($background, $audioDefaults);
+    $normalized['audio'] = $audioState;
+
+    return $normalized;
+}
+
+function signage_normalize_background_audio($input, array $default): array
+{
+    $state = is_array($input) ? $input : [];
+    $src = isset($state['src']) && is_string($state['src']) ? trim($state['src']) : '';
+    $enabled = $src !== '' && ($state['enabled'] ?? true) !== false;
+
+    $volumeRaw = $state['volume'] ?? ($default['volume'] ?? 1.0);
+    $volume = (float) $volumeRaw;
+    if (!is_finite($volume)) {
+        $volume = (float) ($default['volume'] ?? 1.0);
+    }
+    $volume = max(0.0, min(1.0, $volume));
+
+    $loop = array_key_exists('loop', $state)
+        ? ($state['loop'] !== false)
+        : (($default['loop'] ?? true) !== false);
+
+    $normalized = [
+        'enabled' => $enabled,
+        'src' => $src,
+        'volume' => $volume,
+        'loop' => $loop,
+    ];
+
+    $fadeRaw = $state['fadeMs'] ?? ($default['fadeMs'] ?? 0);
+    if (is_numeric($fadeRaw)) {
+        $fade = (int) round($fadeRaw);
+        if ($fade > 0) {
+            $normalized['fadeMs'] = max(0, min(60000, $fade));
+        }
+    }
+
+    if (!$enabled) {
+        $normalized['enabled'] = false;
+    }
+
+    return $normalized;
 }
 
 function signage_schedule_load(?array $fallback = null): array

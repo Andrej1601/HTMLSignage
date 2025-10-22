@@ -13,6 +13,25 @@ export const WELLNESS_GLOBAL_ID = '__wellness_bundle__';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
+function sanitizeBackgroundAudio(input = {}, defaults = {}) {
+  const cfg = input && typeof input === 'object' ? input : {};
+  const def = defaults && typeof defaults === 'object' ? defaults : {};
+  const src = typeof cfg.src === 'string' ? cfg.src.trim() : '';
+  const enabled = !!src && cfg.enabled !== false;
+  const rawVolume = Number(cfg.volume);
+  const defVolume = Number(def.volume ?? 1);
+  const volume = Number.isFinite(rawVolume)
+    ? clamp(0, rawVolume, 1)
+    : (Number.isFinite(defVolume) ? clamp(0, defVolume, 1) : 1);
+  const loop = cfg.loop === false ? false : (def.loop === false ? false : true);
+  const result = { enabled, src, volume, loop };
+  const fadeRaw = Number(cfg.fadeMs ?? def.fadeMs);
+  if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
+    result.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+  }
+  return result;
+}
+
 const OVERVIEW_TIME_BASE_CH = 10;
 const OVERVIEW_TIME_SCALE_MIN = 0.5;
 const OVERVIEW_TIME_SCALE_MAX = 3;
@@ -240,6 +259,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   src.assets = { ...DEFAULTS.assets, ...(src.assets || {}) };
   src.h2 = { ...DEFAULTS.h2, ...(src.h2 || {}) };
   src.highlightNext = { ...DEFAULTS.highlightNext, ...(src.highlightNext || {}) };
+  src.audio = { ...DEFAULTS.audio, ...(src.audio || {}) };
 
   const fonts = src.fonts || {};
   const defaultTimeWidthScale = Number(DEFAULTS.fonts?.overviewTimeWidthScale ?? 1);
@@ -330,6 +350,10 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
         return next;
       })
     : [];
+  const audioDefaults = DEFAULTS.audio?.background || {};
+  const audioCfg = src.audio && typeof src.audio === 'object' ? src.audio : {};
+  audioCfg.background = sanitizeBackgroundAudio(audioCfg.background, audioDefaults);
+  src.audio = audioCfg;
   src.presets = src.presets || {};
 
   const defaultDisplayPages = DEFAULTS.display?.pages || {};

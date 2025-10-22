@@ -563,6 +563,40 @@
               </div>
             </div>
 
+            <div class="settings-card" id="backgroundAudioCard">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Hintergrundmusik</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioEnabled" type="checkbox">
+                    <span>Hintergrundmusik abspielen</span>
+                  </label>
+                </div>
+                <div class="kv">
+                  <label>Quelle</label>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                    <input id="bgAudioSrc" class="input" type="text" placeholder="/assets/media/audio/datei.mp3">
+                    <button class="btn sm" id="bgAudioUpload" type="button">Upload</button>
+                    <button class="btn sm ghost" id="bgAudioClear" type="button">Entfernen</button>
+                  </div>
+                  <div class="help">Unterstützt MP3- und OGG-Dateien. Bei leerem Feld bleibt die Musik deaktiviert.</div>
+                </div>
+                <div class="kv">
+                  <label>Lautstärke (%)</label>
+                  <input id="bgAudioVolume" class="input num3" type="number" min="0" max="100" step="5" placeholder="100">
+                  <div class="help">0 = stumm, 100 = volle Lautstärke.</div>
+                </div>
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioLoop" type="checkbox">
+                    <span>Automatisch wiederholen</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Typografie – Basis</div>

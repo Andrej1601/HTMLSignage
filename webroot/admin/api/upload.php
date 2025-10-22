@@ -51,7 +51,11 @@ $allowed = [
   'image/jpeg'       => ['ext'=>'jpg',  'dir'=>'img'],
   'image/webp'       => ['ext'=>'webp', 'dir'=>'img'],
   'image/svg+xml'    => ['ext'=>'svg',  'dir'=>'img'],
-  'video/mp4'        => ['ext'=>'mp4',  'dir'=>'video']
+  'video/mp4'        => ['ext'=>'mp4',  'dir'=>'video'],
+  'audio/mpeg'       => ['ext'=>'mp3',  'dir'=>'audio'],
+  'audio/ogg'        => ['ext'=>'ogg',  'dir'=>'audio'],
+  'audio/wav'        => ['ext'=>'wav',  'dir'=>'audio'],
+  'audio/mp4'        => ['ext'=>'m4a',  'dir'=>'audio']
 ];
 if (!isset($allowed[$mime])) fail('unsupported-type: '.$mime);
 

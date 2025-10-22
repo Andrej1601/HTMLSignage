@@ -87,6 +87,14 @@ const displayListeners = {
 
 let saunaStatusState = { map: new Map(), hidden: new Set() };
 
+let backgroundAudioEl = null;
+const backgroundAudioState = {
+  config: { enabled: false, src: '', volume: 1, loop: true },
+  loadedSrc: null,
+  suspenders: new Set(),
+  desiredPlaying: false
+};
+
 function ensureSaunaStatusState(force = false){
   if (!settings || !schedule) return saunaStatusState;
   if (force || !saunaStatusState.map || !saunaStatusState.map.size){
@@ -119,6 +127,100 @@ function cleanupDisplayListeners(){
   }
   displayListeners.resizeRaf = null;
   displayListeners.cancelFrame = null;
+}
+
+function ensureBackgroundAudioElement() {
+  if (backgroundAudioEl && backgroundAudioEl instanceof HTMLAudioElement) {
+    return backgroundAudioEl;
+  }
+  if (typeof document === 'undefined') return null;
+  const audio = document.createElement('audio');
+  audio.setAttribute('aria-hidden', 'true');
+  audio.setAttribute('preload', 'auto');
+  audio.setAttribute('playsinline', '');
+  audio.loop = true;
+  audio.controls = false;
+  audio.style.display = 'none';
+  if (document.body) {
+    document.body.appendChild(audio);
+  }
+  backgroundAudioEl = audio;
+  return audio;
+}
+
+function normalizeBackgroundAudioConfig(config = {}) {
+  const cfg = config && typeof config === 'object' ? config : {};
+  const src = typeof cfg.src === 'string' ? cfg.src.trim() : '';
+  const enabled = !!src && cfg.enabled !== false;
+  const rawVolume = Number(cfg.volume);
+  const volume = Number.isFinite(rawVolume) ? clampNumber(0, rawVolume, 1) : 1;
+  const loop = cfg.loop === false ? false : true;
+  const normalized = { enabled, src, volume, loop };
+  const fadeRaw = Number(cfg.fadeMs);
+  if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
+    normalized.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+  }
+  return normalized;
+}
+
+function stopBackgroundAudio({ dropSrc = false } = {}) {
+  if (!backgroundAudioEl) return;
+  try { backgroundAudioEl.pause(); } catch {}
+  if (dropSrc) {
+    backgroundAudioEl.removeAttribute('src');
+    try { backgroundAudioEl.load(); } catch {}
+    backgroundAudioState.loadedSrc = null;
+  }
+}
+
+function maybeUpdateBackgroundAudioPlayback() {
+  if (!backgroundAudioState.config.enabled) {
+    stopBackgroundAudio({ dropSrc: false });
+    backgroundAudioState.desiredPlaying = false;
+    return;
+  }
+  const audioEl = ensureBackgroundAudioElement();
+  if (!audioEl) return;
+  const shouldPlay = backgroundAudioState.desiredPlaying
+    && backgroundAudioState.suspenders.size === 0
+    && backgroundAudioState.config.src;
+  if (!shouldPlay) {
+    stopBackgroundAudio({ dropSrc: false });
+    return;
+  }
+  if (backgroundAudioState.loadedSrc !== backgroundAudioState.config.src) {
+    audioEl.src = backgroundAudioState.config.src;
+    backgroundAudioState.loadedSrc = backgroundAudioState.config.src;
+  }
+  audioEl.loop = backgroundAudioState.config.loop !== false;
+  audioEl.volume = clampNumber(0, backgroundAudioState.config.volume ?? 1, 1);
+  const playResult = audioEl.play();
+  if (playResult && typeof playResult.catch === 'function') {
+    playResult.catch((error) => console.warn('[audio] background playback failed', error));
+  }
+}
+
+function applyBackgroundAudio(config = {}) {
+  backgroundAudioState.config = normalizeBackgroundAudioConfig(config);
+  backgroundAudioState.desiredPlaying = backgroundAudioState.config.enabled;
+  if (!backgroundAudioState.config.enabled) {
+    stopBackgroundAudio({ dropSrc: true });
+    return;
+  }
+  maybeUpdateBackgroundAudioPlayback();
+}
+
+function suspendBackgroundAudio(key) {
+  if (!key) return;
+  backgroundAudioState.suspenders.add(key);
+  maybeUpdateBackgroundAudioPlayback();
+}
+
+function resumeBackgroundAudio(key) {
+  if (!key) return;
+  if (backgroundAudioState.suspenders.delete(key)) {
+    maybeUpdateBackgroundAudioPlayback();
+  }
 }
 
 function parseEventPayload(event){
@@ -598,6 +700,8 @@ function sanitizeSettingsPayload(payload){
   const cfg = (payload && typeof payload === 'object') ? payload : {};
   const slides = (cfg.slides && typeof cfg.slides === 'object') ? cfg.slides : (cfg.slides = {});
   slides.badgeLibrary = sanitizeBadgeLibrary(slides.badgeLibrary);
+  const audioCfg = (cfg.audio && typeof cfg.audio === 'object') ? cfg.audio : (cfg.audio = {});
+  audioCfg.background = normalizeBackgroundAudioConfig(audioCfg.background);
   return cfg;
 }
 
@@ -617,6 +721,7 @@ async function applyResolvedState(nextSchedule, nextSettings, options = {}){
 
   schedule = nextSchedule;
   settings = sanitizeSettingsPayload(nextSettings);
+  applyBackgroundAudio(settings?.audio?.background);
   saunaStatusState = computeSaunaStatusState(settings, schedule);
   badgeLookupCache = null;
 
@@ -3056,6 +3161,18 @@ v.autoplay = true;
 if (opts.muted !== undefined) v.muted = !!opts.muted;
 else v.muted = true;
 v.playsInline = true;
+const hasAudio = opts.muted === false;
+const backgroundAudioKey = hasAudio ? Symbol('video-audio') : null;
+let backgroundAudioActive = false;
+if (backgroundAudioKey) {
+  suspendBackgroundAudio(backgroundAudioKey);
+  backgroundAudioActive = true;
+}
+const releaseBackgroundAudio = () => {
+  if (!backgroundAudioKey || !backgroundAudioActive) return;
+  backgroundAudioActive = false;
+  resumeBackgroundAudio(backgroundAudioKey);
+};
 const advance = typeof ctx.advance === 'function' ? ctx.advance : null;
 const scheduleAdvance = typeof ctx.scheduleAdvance === 'function' ? ctx.scheduleAdvance : null;
 const clearScheduledAdvance = typeof ctx.clearScheduledAdvance === 'function' ? ctx.clearScheduledAdvance : null;
@@ -3072,6 +3189,7 @@ if (v.readyState >= 1) fit(); else v.addEventListener('loadedmetadata', fit);
 v.addEventListener('canplay', () => v.play());
 v.addEventListener('error', (e) => {
   console.error('[video] error', e);
+  releaseBackgroundAudio();
   const srcUrl = v.src;
   v.remove();
   if (srcUrl.startsWith('blob:')) URL.revokeObjectURL(srcUrl);
@@ -3079,6 +3197,11 @@ v.addEventListener('error', (e) => {
   c.appendChild(fallback);
   if (advance) advance();
 });
+if (backgroundAudioKey) {
+  v.addEventListener('ended', releaseBackgroundAudio, { once: true });
+  v.addEventListener('pause', () => { if (!v.ended) releaseBackgroundAudio(); });
+  v.addEventListener('abort', releaseBackgroundAudio, { once: true });
+}
 if (settings?.slides?.waitForVideo) {
   const done = () => {
     if (done.called) return;
@@ -3098,11 +3221,21 @@ if (settings?.slides?.waitForVideo) {
 const c = h('div', { class: 'container videoslide fade show', style: 'aspect-ratio:' + disp });
 c.appendChild(v);
 
+if (backgroundAudioKey) {
+  c.__cleanup = () => {
+    releaseBackgroundAudio();
+    if (typeof v.pause === 'function') {
+      try { v.pause(); } catch {}
+    }
+  };
+}
+
 fetch(src, { method: 'HEAD' }).then(res => {
   if (!res.ok) {
     v.remove();
     const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
     c.appendChild(fallback);
+    releaseBackgroundAudio();
     if (advance) advance();
     return;
   }
@@ -3111,6 +3244,7 @@ fetch(src, { method: 'HEAD' }).then(res => {
   v.remove();
   const fallback = h('div', { class: 'video-error', style: 'padding:1em;color:#fff;text-align:center' }, 'Video konnte nicht geladen werden');
   c.appendChild(fallback);
+  releaseBackgroundAudio();
   if (advance) advance();
 });
 
@@ -5397,6 +5531,7 @@ function refreshStageQueues({ resetIndex = true, autoplay = true } = {}){
   const masterQueue = buildMasterQueue();
   applyStagePlaylists(masterQueue, { resetIndex });
   if (autoplay) stageControllers.forEach(ctrl => ctrl.play());
+  maybeUpdateBackgroundAudioPlayback();
   return masterQueue;
 }
 
@@ -5408,6 +5543,8 @@ if (pollTimer) {
   pollTimer = null;
 }
 stopAllStages();
+backgroundAudioState.desiredPlaying = false;
+stopBackgroundAudio({ dropSrc: false });
 updateLayoutModeAttr('single');
 const box = document.createElement('div');
 box.className = 'container fade show';
