@@ -27,11 +27,35 @@ Run the installer as root:
 sudo scripts/install.sh
 ```
 
+The installer is idempotent and inspects the host before calling `apt-get`.
+Only missing packages are installed and the log reports which packages were
+skipped because they are already present. To customise the behaviour, the
+following optional flags are available:
+
+- `--skip-package-group <name>` (or `--skip-package-group=name`): omit one or
+  more package groups during installation. Supported group names are listed in
+  the table below and the flag can be provided multiple times.
+- `--force-package-reinstall`: reinstall every package in the selected groups
+  even if it is already available.
+- `--install-missing-only`: explicitly request the default behaviour of only
+  installing missing packages (useful for scripts that want to state the mode
+  explicitly).
+
+| Group     | Packages                                                                      |
+|-----------|-------------------------------------------------------------------------------|
+| `web`     | `nginx`                                                                        |
+| `php`     | `php8.3-fpm`, `php8.3-cli`, `php8.3-sqlite3`, `php8.3-xml`, `php8.3-mbstring`, |
+|           | `php8.3-curl`, `php8.3-gd`                                                     |
+| `database`| `sqlite3`                                                                      |
+| `tools`   | `jq`, `unzip`, `curl`, `git`, `rsync`, `openssl`                               |
+| `node`    | `nodejs`, `npm`                                                                |
+
 When executed interactively the installer prompts for the network ports and
 admin username, then generates a random administrator password using
 `openssl rand`. The password is printed once during the run, so copy it to a
 safe place before closing the terminal. Non-interactive usage (for example in
 CI) must provide `SIGNAGE_ADMIN_PASS` explicitly, otherwise the script aborts.
+See `docs/deployment.md` for additional deployment tips and examples.
 Environment variables such as `SIGNAGE_PUBLIC_PORT`, `SIGNAGE_ADMIN_PORT` and
 `SIGNAGE_ADMIN_USER` can still be set to override the defaults, and
 `SIGNAGE_ADMIN_PASS` may be provided to supply a custom password in either
