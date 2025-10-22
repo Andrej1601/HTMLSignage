@@ -299,7 +299,6 @@ export const DEFAULTS = {
     infoPanelWidthPercent:32,
     bannerTopPercent:60,
     infoBannerHeightPercent:10,
-    infoBannerLengthPercent:100,
     infoBannerMode:'full',
     cutTopPercent:28,
     cutBottomPercent:12,
