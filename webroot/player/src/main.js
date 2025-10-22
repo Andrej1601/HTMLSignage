@@ -29,6 +29,7 @@ const CANVAS = document.getElementById('canvas');
 const STAGE  = document.getElementById('stage');
 const STAGE_LEFT  = document.getElementById('stage-left');
 const STAGE_RIGHT = document.getElementById('stage-right');
+const INFO_BANNER = document.getElementById('info-banner-area');
 const Q = new URLSearchParams(location.search);
 const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
 const ls = createSafeLocalStorage({
@@ -1301,7 +1302,7 @@ const wellnessTips = collectWellnessTips();
 const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(it.id), it]));
 const eventCountdowns = collectEventCountdowns();
 const infoModules = collectInfoModules();
-const infoModuleMap = new Map(infoModules.filter(it => it.id).map(it => [String(it.id), it]));
+applyInfoBannerModules(infoModules);
 
 if (sortOrder && sortOrder.length) {
   const queue = [];
@@ -1312,7 +1313,6 @@ if (sortOrder && sortOrder.length) {
   const usedMedia = new Set();
   const usedStories = new Set();
   const usedWellness = new Set();
-  const usedInfo = new Set();
   for (const entry of sortOrder) {
     if (entry.type === 'sauna') {
       const name = entry.name;
@@ -1356,15 +1356,6 @@ if (sortOrder && sortOrder.length) {
       }
       continue;
     }
-    if (entry.type === 'info-module') {
-      const key = String(entry.id ?? '');
-      const module = infoModuleMap.get(key);
-      if (module) {
-        queue.push({ ...module, moduleId: key });
-        usedInfo.add(key);
-      }
-      continue;
-    }
   }
   for (const s of allSaunas) {
     if (!usedSaunas.has(s) && !hidden.has(s)) queue.push({ type: 'sauna', sauna: s });
@@ -1394,12 +1385,6 @@ if (sortOrder && sortOrder.length) {
       queue.push({ ...tip, tipId: key });
     }
   }
-  for (const module of infoModules) {
-    const key = module.id != null ? String(module.id) : null;
-    if (!key || !usedInfo.has(key)) {
-      queue.push({ ...module, moduleId: key });
-    }
-  }
   const clean = [];
   for (const q of queue) {
     if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
@@ -1410,9 +1395,6 @@ if (sortOrder && sortOrder.length) {
     } else if (q.type === 'wellness-tip') {
       const id = q.tipId ?? q.id;
       if (id != null && wellnessMap.has(String(id))) clean.push({ type: 'wellness-tip', id: String(id) });
-    } else if (q.type === 'info-module') {
-      const id = q.moduleId ?? q.id;
-      if (id != null && infoModuleMap.has(String(id))) clean.push({ type: 'info-module', id: String(id) });
     }
   }
   settings.slides.sortOrder = clean;
@@ -1481,9 +1463,6 @@ for (const entry of storyEntriesEnabled) {
 
 wellnessTips.forEach((tip) => {
   queue.push({ ...tip, tipId: tip.id != null ? String(tip.id) : null });
-});
-infoModules.forEach((module) => {
-  queue.push({ ...module, moduleId: module.id != null ? String(module.id) : null });
 });
 
 // Falls nichts bleibt, notfalls Übersicht zeigen
@@ -2092,6 +2071,18 @@ function renderInfoModule(item = {}, region = 'left') {
   ticker.appendChild(track);
   container.appendChild(ticker);
   return container;
+}
+
+function applyInfoBannerModules(modules = []) {
+  if (!INFO_BANNER) return;
+  const active = modules.find((entry) => Array.isArray(entry.items) && entry.items.length);
+  INFO_BANNER.dataset.empty = 'true';
+  cleanupChildNodes(INFO_BANNER);
+  INFO_BANNER.innerHTML = '';
+  if (!active) return;
+  const node = renderInfoModule(active, 'full');
+  INFO_BANNER.appendChild(node);
+  INFO_BANNER.dataset.empty = 'false';
 }
 
 // ---------- DOM helpers ----------
@@ -4594,11 +4585,11 @@ const EMPTY_STAGE_MESSAGES = {
   right: 'Keine Inhalte für rechte Seite definiert.'
 };
 
-const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip','info-module'];
-const MEDIA_TYPES = ['image','video','url','wellness-tip','info-module'];
+const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip'];
+const MEDIA_TYPES = ['image','video','url','wellness-tip'];
 const PAGE_DEFAULTS = {
-  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','info-module','image','video','url'], playlist:[] },
-  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','info-module','image','video','url'], playlist:[] }
+  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','image','video','url'], playlist:[] },
+  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','image','video','url'], playlist:[] }
 };
 const SOURCE_FILTERS = {
   master: null,
@@ -4683,7 +4674,7 @@ function dwellMsForItem(item, pageConfig) {
     return sec(fallback) * 1000;
   }
 
-  if (item.type === 'wellness-tip' || item.type === 'info-module') {
+  if (item.type === 'wellness-tip') {
     const base = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
     const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
     return sec(v) * 1000;
@@ -4961,8 +4952,6 @@ function renderSlideNode(item, ctx){
       return renderHeroTimeline(region, ctx);
     case 'wellness-tip':
       return renderWellnessTip(item, region);
-    case 'info-module':
-      return renderInfoModule(item, region);
     default:
       return renderImage(item.src || item.url || '', region, ctx);
   }
@@ -4999,10 +4988,6 @@ function playlistEntryKeyFromConfig(entry){
     case 'wellness-tip': {
       const rawId = entry.id ?? entry.tipId;
       return rawId != null ? 'wellness:' + String(rawId) : null;
-    }
-    case 'info-module': {
-      const rawId = entry.id ?? entry.moduleId;
-      return rawId != null ? 'info:' + String(rawId) : null;
     }
     default:
       return null;
@@ -5044,12 +5029,6 @@ function sanitizePlaylistConfig(list){
       case 'wellness':
         if (rest) {
           normalized.push({ type: 'wellness-tip', id: rest });
-          seen.add(key);
-        }
-        break;
-      case 'info':
-        if (rest) {
-          normalized.push({ type: 'info-module', id: rest });
           seen.add(key);
         }
         break;
@@ -5095,10 +5074,6 @@ function playlistKeyForQueueItem(item){
   if (item.type === 'wellness-tip') {
     const id = item.tipId ?? item.id ?? null;
     return id != null ? 'wellness:' + String(id) : null;
-  }
-  if (item.type === 'info-module') {
-    const id = item.moduleId ?? item.id ?? null;
-    return id != null ? 'info:' + String(id) : null;
   }
   return null;
 }
