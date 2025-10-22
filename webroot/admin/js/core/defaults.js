@@ -306,13 +306,13 @@ export const DEFAULTS = {
       left:{
         source:'master',
         timerSec:null,
-        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
+        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','info-module','image','video','url'],
         playlist:[]
       },
       right:{
         source:'media',
         timerSec:null,
-        contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
+        contentTypes:['wellness-tip','info-module','image','video','url'],
         playlist:[]
       }
     }
@@ -332,20 +332,12 @@ export const DEFAULTS = {
     eventCountdowns:[
       { id:'event_moonlight', title:'Moonlight-Special', subtitle:'Heute Abend', target:'2024-12-24T20:00', style:'celebration', image:'', imageThumb:'' }
     ],
-    gastronomyHighlights:[
-      { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.', dwellSec: null }
-    ],
     infoModules:[
       {
-        id:'info_capacity',
-        title:'Auslastung',
-        subtitle:'Live-Status',
-        icon:'📊',
-        layout:'metrics',
-        items:[
-          { id:'metric_sauna', label:'Sauna', value:'78%', trend:'up' },
-          { id:'metric_pool', label:'Pool', value:'42%', trend:'steady' }
-        ]
+        id:'info_welcome',
+        icon:'ℹ️',
+        text:'Willkommen in der Spa-Oase – wir wünschen einen entspannten Aufenthalt!',
+        enabled:true
       }
     ]
   }

@@ -2071,14 +2071,17 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     wellnessItem.statusText = 'Keine aktiven Tipps';
   }
   const wellness = [{ kind: 'wellness-tip', item: wellnessItem, key: 'wellness_all' }];
-  const eventItems = Array.isArray(extrasRaw.eventCountdowns) ? extrasRaw.eventCountdowns : [];
-  const events = eventItems.length
-    ? [{ kind: 'event-countdown', item: { id: 'event-countdown', entries: eventItems.slice() }, key: 'event-countdown' }]
+  const infoSource = Array.isArray(extrasRaw.infoModules) ? extrasRaw.infoModules : [];
+  const infoActive = infoSource.filter((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    if (entry.enabled === false) return false;
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+    return Boolean(text);
+  });
+  const infoExtras = infoSource.length
+    ? [{ kind: 'info-module', item: { id: 'info-banner', activeCount: infoActive.length }, key: 'info-banner' }]
     : [];
-  const gastronomy = Array.isArray(extrasRaw.gastronomyHighlights)
-    ? extrasRaw.gastronomyHighlights.map((item, idx) => ({ kind: 'gastronomy-highlight', item, key: item?.id != null ? String(item.id) : 'gas_' + idx }))
-    : [];
-  const extrasCombined = wellness.concat(events, gastronomy);
+  const extrasCombined = wellness.concat(infoExtras);
 
   let combined = [];
   const ord = settings?.slides?.sortOrder;
@@ -2119,8 +2122,7 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     stories,
     extras: {
       wellness,
-      events,
-      gastronomy
+      info: infoExtras
     },
     hiddenSaunas,
     statusBySauna
@@ -2180,9 +2182,9 @@ export function renderSlideOrderView(){
     } else if (entry.kind === 'wellness-tip' && entry.item?.statusText && !statusEl) {
       applyStatus(entry.item.statusText, 'info');
     }
-    const isEventDisabled = entry.kind === 'event-countdown' && !heroEnabled;
-    if (isEventDisabled) {
-      if (!statusEl) applyStatus('Ausgeblendet', 'hidden');
+    const isInfoDisabled = entry.kind === 'info-module' && (!Number(entry.item?.activeCount));
+    if (isInfoDisabled) {
+      if (!statusEl) applyStatus('Keine aktiven Hinweise', 'hidden');
       tile.classList.add('is-disabled');
     }
     if (entry.kind === 'sauna'){
@@ -2221,22 +2223,18 @@ export function renderSlideOrderView(){
         info.textContent = count === 1 ? '1 Tipp' : `${count} Tipps`;
         tile.appendChild(info);
       }
-    } else if (entry.kind === 'event-countdown') {
+    } else if (entry.kind === 'info-module') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
-      title.textContent = 'Event Countdown';
+      title.textContent = 'Info-Banner';
       tile.appendChild(title);
       if (statusEl) tile.appendChild(statusEl);
-      const count = Array.isArray(settings?.extras?.eventCountdowns) ? settings.extras.eventCountdowns.length : 0;
+      const activeCount = Number(entry.item?.activeCount) || 0;
       const info = document.createElement('div');
       info.className = 'tile-meta';
-      info.textContent = count === 1 ? '1 Event' : `${count} Events`;
+      info.textContent = activeCount === 0
+        ? 'Keine Hinweise'
+        : (activeCount === 1 ? '1 Hinweis' : `${activeCount} Hinweise`);
       tile.appendChild(info);
-    } else if (entry.kind === 'gastronomy-highlight') {
-      tile.dataset.extraId = entry.item?.id || entry.key || '';
-      const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
-      title.textContent = icon + (entry.item?.title || 'Gastronomie');
-      tile.appendChild(title);
-      if (statusEl) tile.appendChild(statusEl);
     } else {
       tile.dataset.storyId = entry.item?.id || entry.key || '';
       title.textContent = entry.item?.title || 'Story-Slide';

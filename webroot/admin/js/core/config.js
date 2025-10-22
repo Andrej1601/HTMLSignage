@@ -107,8 +107,6 @@ export const PAGE_CONTENT_TYPES = [
   ['hero-timeline', 'Event Countdown'],
   ['story', 'Erklärungen'],
   ['wellness-tip', 'Wellness-Tipps'],
-  ['event-countdown', 'Event-Countdown'],
-  ['gastronomy-highlight', 'Gastronomie'],
   ['info-module', 'Info-Module'],
   ['image', 'Bilder'],
   ['video', 'Videos'],
@@ -140,10 +138,6 @@ export function playlistKeyFromSanitizedEntry(entry) {
       return entry.id != null ? 'media:' + String(entry.id) : null;
     case 'wellness-tip':
       return 'wellness:' + WELLNESS_GLOBAL_ID;
-    case 'event-countdown':
-      return entry.id != null ? 'event:' + String(entry.id) : null;
-    case 'gastronomy-highlight':
-      return entry.id != null ? 'gastro:' + String(entry.id) : null;
     case 'info-module':
       return entry.id != null ? 'info:' + String(entry.id) : null;
     default:
@@ -176,14 +170,6 @@ function playlistEntryKey(entry) {
     }
     case 'wellness-tip': {
       return 'wellness:' + WELLNESS_GLOBAL_ID;
-    }
-    case 'event-countdown': {
-      const rawId = entry.id ?? entry.eventId;
-      return rawId != null ? 'event:' + String(rawId) : null;
-    }
-    case 'gastronomy-highlight': {
-      const rawId = entry.id ?? entry.highlightId;
-      return rawId != null ? 'gastro:' + String(rawId) : null;
     }
     case 'info-module': {
       const rawId = entry.id ?? entry.moduleId;
@@ -230,18 +216,6 @@ export function sanitizePagePlaylist(list = []) {
         if (!seen.has('wellness:' + WELLNESS_GLOBAL_ID)) {
           normalized.push({ type: 'wellness-tip', id: WELLNESS_GLOBAL_ID });
           seen.add('wellness:' + WELLNESS_GLOBAL_ID);
-        }
-        break;
-      case 'event':
-        if (rest) {
-          normalized.push({ type: 'event-countdown', id: rest });
-          seen.add(key);
-        }
-        break;
-      case 'gastro':
-        if (rest) {
-          normalized.push({ type: 'gastronomy-highlight', id: rest });
-          seen.add(key);
         }
         break;
       case 'info':
@@ -482,7 +456,6 @@ function sanitizeExtras(extras, defaults){
   return {
     wellnessTips: sanitizeWellnessTips(src.wellnessTips, fallback.wellnessTips),
     eventCountdowns: sanitizeEventCountdowns(src.eventCountdowns, fallback.eventCountdowns),
-    gastronomyHighlights: sanitizeGastronomyHighlights(src.gastronomyHighlights, fallback.gastronomyHighlights),
     infoModules: sanitizeInfoModules(src.infoModules, fallback.infoModules)
   };
 }
@@ -535,33 +508,6 @@ function sanitizeEventCountdowns(list, fallback){
   return normalized;
 }
 
-function sanitizeGastronomyHighlights(list, fallback){
-  const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
-  const normalized = [];
-  const seen = new Set();
-  source.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') return;
-    let id = entry.id != null ? String(entry.id).trim() : '';
-    if (!id) id = genId('gas_');
-    if (seen.has(id)) return;
-    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
-    const description = typeof entry.description === 'string' ? entry.description.trim() : '';
-    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
-    const details = Array.isArray(entry.items)
-      ? entry.items.map((it) => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
-      : [];
-    const textList = Array.isArray(entry.textLines)
-      ? entry.textLines.map((it) => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
-      : [];
-    const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
-    const record = { id, title, description, icon, items: details, textLines: textList };
-    if (dwellSec != null) record.dwellSec = dwellSec;
-    normalized.push(record);
-    seen.add(id);
-  });
-  return normalized;
-}
-
 function sanitizeInfoModules(list, fallback){
   const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
   const normalized = [];
@@ -571,40 +517,11 @@ function sanitizeInfoModules(list, fallback){
     let id = entry.id != null ? String(entry.id).trim() : '';
     if (!id) id = genId('info_');
     if (seen.has(id)) return;
-    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
-    const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
-    const note = typeof entry.note === 'string' ? entry.note.trim() : '';
     const enabled = entry.enabled !== false;
-    const layout = (() => {
-      const value = typeof entry.layout === 'string' ? entry.layout.trim().toLowerCase() : '';
-      return ['cards', 'metrics', 'ticker'].includes(value) ? value : 'metrics';
-    })();
-    const region = (() => {
-      const value = typeof entry.region === 'string' ? entry.region.trim().toLowerCase() : '';
-      return ['left', 'right', 'full'].includes(value) ? value : 'right';
-    })();
-    const dwell = sanitizeDwellSeconds(entry.dwellSec);
-    const itemsSource = Array.isArray(entry.items) ? entry.items : [];
-    const items = itemsSource.map((item) => {
-      if (!item || typeof item !== 'object') return null;
-      const label = typeof item.label === 'string' ? item.label.trim() : '';
-      const value = typeof item.value === 'string' ? item.value.trim() : '';
-      const text = typeof item.text === 'string' ? item.text.trim() : '';
-      const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
-      const badge = typeof item.badge === 'string' ? item.badge.trim() : '';
-      const trendRaw = typeof item.trend === 'string' ? item.trend.trim().toLowerCase() : '';
-      const trend = ['up', 'down', 'steady'].includes(trendRaw) ? trendRaw : null;
-      if (!label && !value && !text && !badge) return null;
-      const normalizedItem = { label, value, text, icon, badge };
-      if (trend) normalizedItem.trend = trend;
-      if (item.id != null) normalizedItem.id = String(item.id);
-      return normalizedItem;
-    }).filter(Boolean);
-    if (!title && !subtitle && !items.length && !note) return;
-    const record = { id, title, subtitle, icon, layout, region, note, items };
+    const record = { id, text, icon };
     if (!enabled) record.enabled = false;
-    if (dwell != null) record.dwellSec = dwell;
     normalized.push(record);
     seen.add(id);
   });
