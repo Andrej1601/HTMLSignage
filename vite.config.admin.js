@@ -9,6 +9,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(projectRoot, 'webroot/admin/dist'),
     emptyOutDir: true,
+    manifest: 'manifest.json',
     sourcemap: true,
     rollupOptions: {
       input: {

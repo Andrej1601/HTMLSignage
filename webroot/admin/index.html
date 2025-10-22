@@ -1258,6 +1258,61 @@
   })();
 
 </script>
-<script type="module" src="/admin/dist/assets/admin-C_YBILxW.js"></script>
+<script>
+  (function bootstrapAdminApp() {
+    var manifestUrl = '/admin/dist/manifest.json';
+    var head = document.head || document.getElementsByTagName('head')[0];
+
+    function showBootstrapError(message) {
+      var container = document.createElement('div');
+      container.setAttribute('role', 'alert');
+      container.style.margin = '16px';
+      container.style.padding = '12px 16px';
+      container.style.background = 'rgba(220, 53, 69, 0.12)';
+      container.style.border = '1px solid rgba(220, 53, 69, 0.35)';
+      container.style.borderRadius = '8px';
+      container.style.color = '#7a1b1b';
+      container.style.fontWeight = '600';
+      container.style.textAlign = 'center';
+      container.textContent = message;
+      document.body.insertBefore(container, document.body.firstChild);
+    }
+
+    fetch(manifestUrl, { cache: 'no-cache' })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error('Manifest konnte nicht geladen werden: ' + response.status + ' ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then(function (manifest) {
+        var entry = manifest['webroot/admin/js/app.js'];
+        if (!entry || !entry.file) {
+          throw new Error('Manifest enthält keinen gültigen Eintrag für die Admin-App.');
+        }
+
+        if (Array.isArray(entry.css)) {
+          entry.css.forEach(function (cssFile) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = '/admin/dist/' + cssFile;
+            head.appendChild(link);
+          });
+        }
+
+        var script = document.createElement('script');
+        script.type = 'module';
+        script.src = '/admin/dist/' + entry.file;
+        script.onerror = function () {
+          showBootstrapError('Fehler beim Laden der Admin-Oberfläche. Bitte die Seite neu laden oder den Support kontaktieren.');
+        };
+        head.appendChild(script);
+      })
+      .catch(function (error) {
+        console.error('Admin-Bootstrap fehlgeschlagen:', error);
+        showBootstrapError('Die Admin-Oberfläche konnte nicht automatisch initialisiert werden. Bitte Seite neu laden oder Support kontaktieren.');
+      });
+  })();
+</script>
 </body>
 </html>
