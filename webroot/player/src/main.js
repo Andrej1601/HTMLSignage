@@ -32,7 +32,7 @@ const STAGE_RIGHT = document.getElementById('stage-right');
 const INFO_BANNER = document.getElementById('info-banner-area');
 const INFO_BANNER_MODES = new Set(['full', 'left', 'right']);
 const INFO_BANNER_DEFAULT_HEIGHT = 10;
-const INFO_BANNER_MIN_HEIGHT = 2;
+const INFO_BANNER_MIN_HEIGHT = 1;
 const INFO_BANNER_MAX_HEIGHT = 40;
 const Q = new URLSearchParams(location.search);
 const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
@@ -77,6 +77,7 @@ const styleAutomationState = {
   activeStyle: null
 };
 let infoBannerMode = 'full';
+let infoBannerSpacingFrame = 0;
 const displayListeners = {
   resizeHandler: null,
   resizeObserver: null,
@@ -900,6 +901,68 @@ function resolveInfoBannerMode(display = {}) {
   return 'full';
 }
 
+function clearInfoBannerStageSpacing() {
+  [STAGE_LEFT, STAGE_RIGHT].forEach((node) => {
+    if (!node) return;
+    node.style.removeProperty('--infoBannerReservedPx');
+    node.classList.remove('has-info-banner');
+  });
+}
+
+function applyInfoBannerStageSpacing(region = 'full', heightPx = 0) {
+  const assign = (node, active) => {
+    if (!node) return;
+    if (active && heightPx > 0) {
+      node.style.setProperty('--infoBannerReservedPx', `${Math.round(heightPx)}px`);
+      node.classList.add('has-info-banner');
+    } else {
+      node.style.removeProperty('--infoBannerReservedPx');
+      node.classList.remove('has-info-banner');
+    }
+  };
+
+  if (region === 'full') {
+    assign(STAGE_LEFT, true);
+    assign(STAGE_RIGHT, true);
+    return;
+  }
+
+  const isRight = region === 'right';
+  assign(STAGE_LEFT, !isRight);
+  assign(STAGE_RIGHT, isRight);
+}
+
+function scheduleInfoBannerStageSpacing() {
+  if (!INFO_BANNER) return;
+
+  const requestFrame = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
+    ? window.requestAnimationFrame.bind(window)
+    : (fn) => setTimeout(fn, 16);
+  const cancelFrame = (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function')
+    ? window.cancelAnimationFrame.bind(window)
+    : (id) => clearTimeout(id);
+
+  if (infoBannerSpacingFrame) {
+    cancelFrame(infoBannerSpacingFrame);
+    infoBannerSpacingFrame = 0;
+  }
+
+  infoBannerSpacingFrame = requestFrame(() => {
+    infoBannerSpacingFrame = 0;
+    if (!INFO_BANNER || INFO_BANNER.dataset.empty === 'true') {
+      clearInfoBannerStageSpacing();
+      return;
+    }
+    const rect = INFO_BANNER.getBoundingClientRect();
+    const height = rect && Number.isFinite(rect.height) ? rect.height : 0;
+    if (height > 0) {
+      applyInfoBannerStageSpacing(infoBannerMode || 'full', height);
+    } else {
+      clearInfoBannerStageSpacing();
+    }
+  });
+}
+
 function updateInfoBannerColumnWidth() {
   if (!INFO_BANNER) return;
   if (infoBannerMode === 'full') {
@@ -914,6 +977,16 @@ function updateInfoBannerColumnWidth() {
   } else {
     INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
   }
+}
+
+function updateInfoBannerMetrics() {
+  if (!INFO_BANNER) return;
+  if (infoBannerMode === 'full') {
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
+  } else {
+    updateInfoBannerColumnWidth();
+  }
+  scheduleInfoBannerStageSpacing();
 }
 
 function applyInfoBannerLayout(display = {}, docStyle = document.documentElement?.style) {
@@ -932,14 +1005,8 @@ function applyInfoBannerLayout(display = {}, docStyle = document.documentElement
 
   infoBannerMode = resolveInfoBannerMode(display);
   INFO_BANNER.dataset.mode = infoBannerMode;
-
-  if (infoBannerMode === 'full') {
-    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
-    resizeRegistry.set('info-banner', null);
-  } else {
-    updateInfoBannerColumnWidth();
-    resizeRegistry.set('info-banner', updateInfoBannerColumnWidth);
-  }
+  updateInfoBannerMetrics();
+  resizeRegistry.set('info-banner', updateInfoBannerMetrics);
 }
 
 function applyTheme() {
@@ -2140,12 +2207,16 @@ function applyInfoBannerModules(modules = []) {
   INFO_BANNER.dataset.empty = 'true';
   cleanupChildNodes(INFO_BANNER);
   INFO_BANNER.innerHTML = '';
-  if (!active) return;
+  clearInfoBannerStageSpacing();
+  if (!active) {
+    scheduleInfoBannerStageSpacing();
+    return;
+  }
   const region = infoBannerMode || 'full';
   const node = renderInfoModule(active, region);
   INFO_BANNER.appendChild(node);
   INFO_BANNER.dataset.empty = 'false';
-  if (infoBannerMode !== 'full') updateInfoBannerColumnWidth();
+  updateInfoBannerMetrics();
 }
 
 // ---------- DOM helpers ----------
