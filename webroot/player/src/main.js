@@ -22,6 +22,8 @@ import {
 import { toFiniteNumber } from './numbers.js';
 import { createImagePreloader } from './preload.js';
 
+const IS_VITEST = typeof process !== 'undefined' && !!process.env?.VITEST_WORKER_ID;
+
 const FITBOX = document.getElementById('fitbox');
 const CANVAS = document.getElementById('canvas');
 const STAGE  = document.getElementById('stage');
@@ -1008,6 +1010,8 @@ function applyDisplay() {
   };
 
   setPercentProperty('--rightW', d.rightWidthPercent);
+  setPercentProperty('--infoPanelW', d.infoPanelWidthPercent ?? d.rightWidthPercent);
+  setPercentProperty('--bannerTop', d.bannerTopPercent);
 
   const topPercent = toFiniteNumber(d.cutTopPercent);
   if (topPercent !== null) {
@@ -1273,6 +1277,67 @@ function collectGastronomyHighlights() {
   return normalized;
 }
 
+function collectInfoModules() {
+  const list = Array.isArray(settings?.extras?.infoModules) ? settings.extras.infoModules : [];
+  const normalized = [];
+  list.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    if (entry.enabled === false) return;
+    const id = entry.id != null ? String(entry.id).trim() : '';
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const note = typeof entry.note === 'string' ? entry.note.trim() : '';
+    const layout = (() => {
+      const value = typeof entry.layout === 'string' ? entry.layout.trim().toLowerCase() : '';
+      return ['cards', 'metrics', 'ticker'].includes(value) ? value : 'metrics';
+    })();
+    const region = (() => {
+      const value = typeof entry.region === 'string' ? entry.region.trim().toLowerCase() : '';
+      return ['left', 'right', 'full'].includes(value) ? value : 'right';
+    })();
+    const dwellSec = Number.isFinite(+entry.dwellSec) && +entry.dwellSec > 0
+      ? Math.max(1, Math.round(+entry.dwellSec))
+      : null;
+    const itemsInput = Array.isArray(entry.items) ? entry.items : [];
+    const items = itemsInput.map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const label = typeof item.label === 'string' ? item.label.trim() : '';
+      const value = typeof item.value === 'string' ? item.value.trim() : '';
+      const text = typeof item.text === 'string' ? item.text.trim() : '';
+      const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
+      const badge = typeof item.badge === 'string' ? item.badge.trim() : '';
+      const trendRaw = typeof item.trend === 'string' ? item.trend.trim().toLowerCase() : '';
+      const trend = ['up', 'down', 'steady'].includes(trendRaw) ? trendRaw : null;
+      if (!label && !value && !text && !badge) return null;
+      return {
+        id: item.id != null ? String(item.id) : null,
+        label,
+        value,
+        text,
+        icon,
+        badge,
+        trend
+      };
+    }).filter(Boolean);
+    if (!title && !subtitle && !items.length && !note) return;
+    const module = {
+      type: 'info-module',
+      id: id || null,
+      title,
+      subtitle,
+      icon,
+      layout,
+      region,
+      items,
+      note
+    };
+    if (dwellSec != null) module.dwellSec = dwellSec;
+    normalized.push(module);
+  });
+  return normalized;
+}
+
 function buildMasterQueue() {
   maybeApplyPreset();
 
@@ -1311,6 +1376,8 @@ const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(i
 const eventCountdowns = collectEventCountdowns();
 const gastronomyHighlights = collectGastronomyHighlights();
 const gastroMap = new Map(gastronomyHighlights.filter(it => it.id).map(it => [String(it.id), it]));
+const infoModules = collectInfoModules();
+const infoModuleMap = new Map(infoModules.filter(it => it.id).map(it => [String(it.id), it]));
 
 if (sortOrder && sortOrder.length) {
   const queue = [];
@@ -1323,6 +1390,7 @@ if (sortOrder && sortOrder.length) {
   const usedWellness = new Set();
   let eventSlideAdded = false;
   const usedGastro = new Set();
+  const usedInfo = new Set();
   for (const entry of sortOrder) {
     if (entry.type === 'sauna') {
       const name = entry.name;
@@ -1342,6 +1410,7 @@ if (sortOrder && sortOrder.length) {
         if (it.url) {
           if (it.type === 'url') node.url = it.url; else node.src = it.url;
         }
+        if (it.type === 'video') node.muted = !(it.audio === true);
         queue.push(node);
         usedMedia.add(String(it.id));
       }
@@ -1380,6 +1449,16 @@ if (sortOrder && sortOrder.length) {
         queue.push({ ...highlight, highlightId: key });
         usedGastro.add(key);
       }
+      continue;
+    }
+    if (entry.type === 'info-module') {
+      const key = String(entry.id ?? '');
+      const module = infoModuleMap.get(key);
+      if (module) {
+        queue.push({ ...module, moduleId: key });
+        usedInfo.add(key);
+      }
+      continue;
     }
   }
   for (const s of allSaunas) {
@@ -1395,6 +1474,7 @@ if (sortOrder && sortOrder.length) {
       if (it.url) {
         if (it.type === 'url') node.url = it.url; else node.src = it.url;
       }
+      if (it.type === 'video') node.muted = !(it.audio === true);
       queue.push(node);
     }
   }
@@ -1420,6 +1500,12 @@ if (sortOrder && sortOrder.length) {
       queue.push({ ...highlight, highlightId: key });
     }
   }
+  for (const module of infoModules) {
+    const key = module.id != null ? String(module.id) : null;
+    if (!key || !usedInfo.has(key)) {
+      queue.push({ ...module, moduleId: key });
+    }
+  }
   const clean = [];
   for (const q of queue) {
     if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
@@ -1437,6 +1523,9 @@ if (sortOrder && sortOrder.length) {
     } else if (q.type === 'gastronomy-highlight') {
       const id = q.highlightId ?? q.id;
       if (id != null && gastroMap.has(String(id))) clean.push({ type: 'gastronomy-highlight', id: String(id) });
+    } else if (q.type === 'info-module') {
+      const id = q.moduleId ?? q.id;
+      if (id != null && infoModuleMap.has(String(id))) clean.push({ type: 'info-module', id: String(id) });
     }
   }
   settings.slides.sortOrder = clean;
@@ -1468,7 +1557,8 @@ const mediaAll = Array.isArray(settings?.interstitials) ? settings.interstitials
 const media = [];
 for (const it of mediaAll) {
   if (!it || !it.enabled) continue;
-  const base = { ...it };
+  const audioEnabled = it.audio === true;
+  const base = { ...it, audio: audioEnabled };
   switch (it.type) {
     case 'video':
     case 'image':
@@ -1493,6 +1583,7 @@ for (const it of media) {
   const node = { type: it.type, dwell, __id: it.id || null };
   if (it.src) node.src = it.src;
   if (it.url && it.type === 'url') node.url = it.url;
+  if (it.type === 'video') node.muted = !(it.audio === true);
   queue.splice(insPos++, 0, node);
 }
 
@@ -1510,6 +1601,9 @@ if (heroEnabled && eventCountdowns.length) {
 }
 gastronomyHighlights.forEach((entry) => {
   queue.push({ ...entry, highlightId: entry.id != null ? String(entry.id) : null });
+});
+infoModules.forEach((module) => {
+  queue.push({ ...module, moduleId: module.id != null ? String(module.id) : null });
 });
 
 // Falls nichts bleibt, notfalls Übersicht zeigen
@@ -2124,6 +2218,96 @@ function renderGastronomyHighlight(item = {}, region = 'left') {
   content.appendChild(body);
   container.appendChild(eyebrow);
   container.appendChild(content);
+  return container;
+}
+
+function renderInfoModule(item = {}, region = 'left') {
+  const layoutRaw = typeof item.layout === 'string' ? item.layout.trim().toLowerCase() : '';
+  const layout = ['cards', 'metrics', 'ticker'].includes(layoutRaw) ? layoutRaw : 'metrics';
+  const container = h('div', { class: `container extra extra-info fade show extra-info--${layout}` });
+  container.dataset.region = region;
+  if (item.id != null) container.dataset.extraId = String(item.id);
+
+  const header = h('div', { class: 'extra-info-header' });
+  const headerIcon = typeof item.icon === 'string' ? item.icon.trim() : '';
+  if (headerIcon) header.appendChild(h('div', { class: 'extra-info-icon', 'aria-hidden': 'true' }, headerIcon));
+  const title = typeof item.title === 'string' ? item.title.trim() : '';
+  if (title) header.appendChild(h('h2', { class: 'extra-info-title' }, title));
+  const subtitle = typeof item.subtitle === 'string' ? item.subtitle.trim() : '';
+  if (subtitle) header.appendChild(h('p', { class: 'extra-info-subtitle' }, subtitle));
+  if (header.childNodes.length) container.appendChild(header);
+
+  const items = Array.isArray(item.items) ? item.items : [];
+  const body = h('div', { class: 'extra-info-body' });
+
+  if (layout === 'cards' && items.length) {
+    const grid = h('div', { class: 'extra-info-grid' });
+    items.forEach((entry) => {
+      const card = h('div', { class: 'extra-info-card' });
+      const badge = typeof entry.badge === 'string' ? entry.badge.trim() : '';
+      if (badge) card.appendChild(h('div', { class: 'extra-info-pill' }, badge));
+      const cardIcon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      if (cardIcon) card.appendChild(h('div', { class: 'extra-info-icon', 'aria-hidden': 'true' }, cardIcon));
+      const cardTitle = typeof entry.label === 'string' ? entry.label.trim() : '';
+      if (cardTitle) card.appendChild(h('h3', {}, cardTitle));
+      const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+      if (value) card.appendChild(h('div', { class: 'extra-info-metric-value' }, value));
+      const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+      if (text) card.appendChild(h('p', {}, text));
+      grid.appendChild(card);
+    });
+    if (grid.childNodes.length) body.appendChild(grid);
+  } else if (layout === 'metrics' && items.length) {
+    const metrics = h('div', { class: 'extra-info-metrics' });
+    items.forEach((entry) => {
+      const metric = h('div', { class: 'extra-info-metric' });
+      const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+      if (icon) metric.appendChild(h('div', { class: 'extra-info-icon', 'aria-hidden': 'true' }, icon));
+      const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+      if (value) metric.appendChild(h('div', { class: 'extra-info-metric-value' }, value));
+      const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+      if (label) metric.appendChild(h('div', { class: 'extra-info-metric-label' }, label));
+      const trend = typeof entry.trend === 'string' ? entry.trend : null;
+      if (trend) {
+        const trendMap = { up: ['↑', 'Steigend'], down: ['↓', 'Sinkend'], steady: ['→', 'Stabil'] };
+        const [symbol, text] = trendMap[trend] || ['→', 'Stabil'];
+        metric.appendChild(h('div', { class: 'extra-info-trend', 'data-trend': trend }, `${symbol} ${text}`));
+      }
+      const note = typeof entry.text === 'string' ? entry.text.trim() : '';
+      if (note) metric.appendChild(h('div', { class: 'extra-info-note' }, note));
+      metrics.appendChild(metric);
+    });
+    if (metrics.childNodes.length) body.appendChild(metrics);
+  } else if (layout === 'ticker' && items.length) {
+    const ticker = h('div', { class: 'extra-info-ticker' });
+    const track = h('div', { class: 'extra-info-ticker-track' });
+    const appendSequence = (useClones = false) => {
+      items.forEach((entry, idx) => {
+        const itemNode = h('div', { class: 'extra-info-ticker-item' });
+        const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+        if (icon) itemNode.appendChild(h('span', { class: 'extra-info-pill' }, icon));
+        const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+        const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+        const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+        if (label) itemNode.appendChild(h('strong', {}, label));
+        if (value) itemNode.appendChild(h('span', {}, value));
+        else if (text) itemNode.appendChild(h('span', {}, text));
+        track.appendChild(useClones ? itemNode.cloneNode(true) : itemNode);
+        if (idx < items.length - 1) {
+          track.appendChild(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
+        }
+      });
+    };
+    appendSequence(false);
+    if (items.length > 1) appendSequence(true);
+    ticker.appendChild(track);
+    body.appendChild(ticker);
+  }
+
+  const note = typeof item.note === 'string' ? item.note.trim() : '';
+  if (note) body.appendChild(h('div', { class: 'extra-info-note' }, note));
+
+  if (body.childNodes.length) container.appendChild(body);
   return container;
 }
 
@@ -2786,10 +2970,26 @@ const footNodes = [];
 const order = (settings?.footnotes||[]).map(fn=>fn.id);
 for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
 const layout = (settings?.footnoteLayout ?? 'one-line');
-const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : 'fn-one');
+const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : layout==='ticker' ? 'fn-ticker' : layout==='split' ? 'fn-split' : 'fn-one');
 if (footNodes.length){
+  if (layout === 'ticker') {
+    const track = h('div', { class: 'fn-track' });
+    const appendSequence = (useClones = false) => {
+      footNodes.forEach((node, idx) => {
+        const entry = useClones ? node.cloneNode(true) : node;
+        track.appendChild(entry);
+        if (idx < footNodes.length - 1) {
+          track.appendChild(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
+        }
+      });
+    };
+    appendSequence(false);
+    if (footNodes.length > 1) appendSequence(true);
+    return h('div', {}, [ t, h('div', { class: fnClass }, [track]) ]);
+  }
+  const includeSeparator = layout !== 'stacked' && layout !== 'split';
   const nodes = [];
-  footNodes.forEach((n,i)=>{ if (i>0 && layout!=='stacked') nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
+  footNodes.forEach((n,i)=>{ if (i>0 && includeSeparator) nodes.push(h('span',{class:'fnsep','aria-hidden':'true'}, '•')); nodes.push(n); });
   return h('div', {}, [ t, h('div', { class: fnClass }, nodes) ]);
 }
 return h('div', {}, [ t ]);
@@ -4562,14 +4762,31 @@ function renderSauna(name, region = 'left') {
     }
   }
   const layout = (settings?.footnoteLayout ?? 'one-line');
-  const fnClass = 'footer-note ' + (layout === 'multi' ? 'fn-multi' : layout === 'stacked' ? 'fn-stack' : 'fn-one');
+  const fnClass = 'footer-note ' + (layout === 'multi' ? 'fn-multi' : layout === 'stacked' ? 'fn-stack' : layout === 'ticker' ? 'fn-ticker' : layout === 'split' ? 'fn-split' : 'fn-one');
   if (footNodes.length) {
-    const nodes = [];
-    footNodes.forEach((n, i) => {
-      if (i > 0 && layout !== 'stacked') nodes.push(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
-      nodes.push(n);
-    });
-    c.appendChild(h('div', { class: fnClass }, nodes));
+    if (layout === 'ticker') {
+      const track = h('div', { class: 'fn-track' });
+      const appendSequence = (useClones = false) => {
+        footNodes.forEach((node, idx) => {
+          const entry = useClones ? node.cloneNode(true) : node;
+          track.appendChild(entry);
+          if (idx < footNodes.length - 1) {
+            track.appendChild(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
+          }
+        });
+      };
+      appendSequence(false);
+      if (footNodes.length > 1) appendSequence(true);
+      c.appendChild(h('div', { class: fnClass }, [track]));
+    } else {
+      const includeSeparator = layout !== 'stacked' && layout !== 'split';
+      const nodes = [];
+      footNodes.forEach((n, i) => {
+        if (i > 0 && includeSeparator) nodes.push(h('span', { class: 'fnsep', 'aria-hidden': 'true' }, '•'));
+        nodes.push(n);
+      });
+      c.appendChild(h('div', { class: fnClass }, nodes));
+    }
   }
 
   const pager = ensureTilePager(list);
@@ -4593,11 +4810,11 @@ const EMPTY_STAGE_MESSAGES = {
   right: 'Keine Inhalte für rechte Seite definiert.'
 };
 
-const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip','event-countdown','gastronomy-highlight'];
-const MEDIA_TYPES = ['image','video','url','wellness-tip','event-countdown','gastronomy-highlight'];
+const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip','event-countdown','gastronomy-highlight','info-module'];
+const MEDIA_TYPES = ['image','video','url','wellness-tip','event-countdown','gastronomy-highlight','info-module'];
 const PAGE_DEFAULTS = {
-  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','image','video','url'], playlist:[] },
-  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','image','video','url'], playlist:[] }
+  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'], playlist:[] },
+  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'], playlist:[] }
 };
 const SOURCE_FILTERS = {
   master: null,
@@ -4964,6 +5181,8 @@ function renderSlideNode(item, ctx){
       return renderEventCountdown(item, region, ctx);
     case 'gastronomy-highlight':
       return renderGastronomyHighlight(item, region);
+    case 'info-module':
+      return renderInfoModule(item, region);
     default:
       return renderImage(item.src || item.url || '', region, ctx);
   }
@@ -5008,6 +5227,10 @@ function playlistEntryKeyFromConfig(entry){
     case 'gastronomy-highlight': {
       const rawId = entry.id ?? entry.highlightId;
       return rawId != null ? 'gastro:' + String(rawId) : null;
+    }
+    case 'info-module': {
+      const rawId = entry.id ?? entry.moduleId;
+      return rawId != null ? 'info:' + String(rawId) : null;
     }
     default:
       return null;
@@ -5058,15 +5281,21 @@ function sanitizePlaylistConfig(list){
           seen.add(key);
         }
         break;
-      case 'gastro':
-        if (rest) {
-          normalized.push({ type: 'gastronomy-highlight', id: rest });
-          seen.add(key);
-        }
-        break;
-      default:
-        break;
-    }
+    case 'gastro':
+      if (rest) {
+        normalized.push({ type: 'gastronomy-highlight', id: rest });
+        seen.add(key);
+      }
+      break;
+    case 'info':
+      if (rest) {
+        normalized.push({ type: 'info-module', id: rest });
+        seen.add(key);
+      }
+      break;
+    default:
+      break;
+  }
   }
   return normalized;
 }
@@ -5115,6 +5344,10 @@ function playlistKeyForQueueItem(item){
     const id = item.highlightId ?? item.id ?? null;
     return id != null ? 'gastro:' + String(id) : null;
   }
+  if (item.type === 'info-module') {
+    const id = item.moduleId ?? item.id ?? null;
+    return id != null ? 'info:' + String(id) : null;
+  }
   return null;
 }
 
@@ -5129,7 +5362,18 @@ function filterQueueForPage(masterQueue, pageConfig){
     if (!allowedTypes) allowedTypes = new Set();
     playlistTypes.forEach(type => allowedTypes.add(type));
   }
-  const base = allowedTypes ? masterQueue.filter(item => allowedTypes.has(item.type)) : masterQueue.slice();
+  const stageId = pageConfig?.id === 'right' ? 'right' : 'left';
+  const layoutMode = settings?.display?.layoutMode === 'split' ? 'split' : 'single';
+  const matchesRegion = (item) => {
+    if (!item || typeof item.region !== 'string') return true;
+    const region = item.region;
+    if (!region || region === 'full') return true;
+    if (region === stageId) return true;
+    if (stageId === 'left' && layoutMode !== 'split' && region === 'right') return true;
+    return false;
+  };
+  const base = (allowedTypes ? masterQueue.filter(item => allowedTypes.has(item.type)) : masterQueue.slice())
+    .filter(matchesRegion);
   if (playlist.length){
     const buckets = new Map();
     base.forEach(item => {
@@ -5413,4 +5657,16 @@ if (!previewMode) {
 }
 }
 
-bootstrap();
+if (!IS_VITEST && !(import.meta && import.meta.vitest)) {
+  bootstrap();
+}
+
+export {
+  collectInfoModules,
+  renderInfoModule,
+  __setTestSettings
+};
+
+function __setTestSettings(value) {
+  settings = value;
+}
