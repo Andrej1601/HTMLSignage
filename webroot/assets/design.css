@@ -360,14 +360,6 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
   max-width:min(100%, var(--saunaHeadingMaxWidth, 100%));
   width:fit-content;
 }
-
-body[data-layout='split'] #stage-left .sauna-info-box{
-  margin-right:calc(18px*var(--vwScale));
-}
-
-body[data-layout='split'] #stage-right .sauna-info-box{
-  margin-left:calc(18px*var(--vwScale));
-}
 .sauna-info-box__line{
   display:flex;
   flex-wrap:wrap;
