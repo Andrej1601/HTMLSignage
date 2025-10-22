@@ -2969,9 +2969,10 @@ t.appendChild(tb);
 const footNodes = [];
 const order = (settings?.footnotes||[]).map(fn=>fn.id);
 for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-const layout = (settings?.footnoteLayout ?? 'one-line');
-const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : layout==='ticker' ? 'fn-ticker' : layout==='split' ? 'fn-split' : 'fn-one');
-if (footNodes.length){
+const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
+if (showOverviewFootnotes && footNodes.length){
+  const layout = (settings?.footnoteLayout ?? 'one-line');
+  const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : layout==='ticker' ? 'fn-ticker' : layout==='split' ? 'fn-split' : 'fn-one');
   if (layout === 'ticker') {
     const track = h('div', { class: 'fn-track' });
     const appendSequence = (useClones = false) => {

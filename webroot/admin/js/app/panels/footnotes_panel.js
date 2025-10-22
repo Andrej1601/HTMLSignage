@@ -44,6 +44,13 @@ export function createFootnotesPanel({ getSettings }) {
     host.innerHTML='';
     const layoutSel = document.getElementById('footnoteLayout');
     if (layoutSel){ layoutSel.value = settings.footnoteLayout || 'one-line'; layoutSel.onchange = ()=>{ settings.footnoteLayout = layoutSel.value; }; }
+    const overviewToggle = document.getElementById('footnoteOverviewToggle');
+    if (overviewToggle) {
+      overviewToggle.checked = settings.footnotesShowOnOverview !== false;
+      overviewToggle.onchange = () => {
+        settings.footnotesShowOnOverview = !!overviewToggle.checked;
+      };
+    }
     const list = settings.footnotes || [];
     if (section) section.classList.toggle('has-items', list.length > 0);
     list.forEach((entry,i)=> host.appendChild(fnRow(settings, entry, i, renderFootnotes)));
