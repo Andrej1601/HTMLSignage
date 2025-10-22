@@ -996,31 +996,34 @@ WHERE key = :key
 SQL;
 
     try {
-        return signage_sqlite_retry(function () use ($pdo, $sql, $patchJson, $historyJson, $devicePath, $historyPath, $timestamp): bool {
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
-                ':patch' => $patchJson,
-                ':historyPath' => $historyPath,
-                ':historyEntry' => $historyJson,
-                ':historyLimit' => DEVICES_HISTORY_LIMIT,
-                ':key' => DEVICES_STORAGE_KEY,
-                ':devicePath' => $devicePath,
-                ':emptyHistory' => '[]',
-                ':timestamp' => $timestamp,
-            ]);
+        return signage_sqlite_with_transaction(
+            $pdo,
+            static function (\PDO $transaction) use ($sql, $patchJson, $historyJson, $devicePath, $historyPath, $timestamp): bool {
+                $stmt = $transaction->prepare($sql);
+                $stmt->execute([
+                    ':patch' => $patchJson,
+                    ':historyPath' => $historyPath,
+                    ':historyEntry' => $historyJson,
+                    ':historyLimit' => DEVICES_HISTORY_LIMIT,
+                    ':key' => DEVICES_STORAGE_KEY,
+                    ':devicePath' => $devicePath,
+                    ':emptyHistory' => '[]',
+                    ':timestamp' => $timestamp,
+                ]);
 
-            if ($stmt->rowCount() > 0) {
-                return true;
+                if ($stmt->rowCount() > 0) {
+                    return true;
+                }
+
+                $check = $transaction->prepare('SELECT 1 FROM kv_store WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL LIMIT 1');
+                $check->execute([
+                    ':key' => DEVICES_STORAGE_KEY,
+                    ':devicePath' => $devicePath,
+                ]);
+
+                return $check->fetchColumn() !== false;
             }
-
-            $check = $pdo->prepare('SELECT 1 FROM kv_store WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL LIMIT 1');
-            $check->execute([
-                ':key' => DEVICES_STORAGE_KEY,
-                ':devicePath' => $devicePath,
-            ]);
-
-            return $check->fetchColumn() !== false;
-        });
+        );
     } catch (Throwable $exception) {
         throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
     }

@@ -26,21 +26,35 @@ if ($deviceId === '') {
 $telemetry = devices_extract_telemetry_payload($payload);
 $timestamp = time();
 
-if (signage_db_available()) {
-  try {
-    $result = devices_touch_entry_sqlite($deviceId, $timestamp, $telemetry);
-    if ($result !== null) {
-      if ($result === false) {
-        echo json_encode(['ok' => false, 'error' => 'unknown-device']);
-        exit;
-      }
+$sqliteAvailable = signage_db_available();
+$sqliteResult = null;
 
-      echo json_encode(['ok' => true]);
-      exit;
-    }
+if ($sqliteAvailable) {
+  try {
+    $sqliteResult = devices_touch_entry_sqlite($deviceId, $timestamp, $telemetry);
   } catch (RuntimeException $exception) {
+    http_response_code(503);
     error_log('SQLite device touch failed: ' . $exception->getMessage());
+    echo json_encode(['ok' => false, 'error' => 'storage-unavailable']);
+    exit;
   }
+}
+
+if ($sqliteResult === true) {
+  echo json_encode(['ok' => true]);
+  exit;
+}
+
+if ($sqliteResult === false) {
+  echo json_encode(['ok' => false, 'error' => 'unknown-device']);
+  exit;
+}
+
+if ($sqliteAvailable && $sqliteResult !== null) {
+  http_response_code(500);
+  error_log('Unexpected SQLite device touch state for device ' . $deviceId);
+  echo json_encode(['ok' => false, 'error' => 'storage-failed']);
+  exit;
 }
 
 $db = devices_load();

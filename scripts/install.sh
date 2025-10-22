@@ -247,12 +247,27 @@ CREATE TABLE IF NOT EXISTS audit_log (
   context TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
+CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON audit_log (created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS kv_store_updated_idx ON kv_store (updated_at DESC);
 EOSQL
 
   install -d -m 2775 "$APP_DIR/data"
   ln -snf "$db_path" "$APP_DIR/data/signage.db"
   chown www-data:www-data "$db_path" 2>/dev/null || true
   chmod 0660 "$db_path" 2>/dev/null || true
+
+  local php_cli=""
+  if command -v php >/dev/null 2>&1; then
+    php_cli=$(command -v php)
+  elif command -v php8.3 >/dev/null 2>&1; then
+    php_cli=$(command -v php8.3)
+  fi
+
+  if [[ -n $php_cli && -x "$SCRIPT_DIR/migrate.php" ]]; then
+    if ! SIGNAGE_DB_PATH="$db_path" "$php_cli" "$SCRIPT_DIR/migrate.php" --quiet; then
+      warn "PHP migration helper failed; database schema may be incomplete"
+    fi
+  fi
 }
 
 deploy_application(){
