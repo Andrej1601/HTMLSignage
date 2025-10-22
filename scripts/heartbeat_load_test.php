@@ -66,11 +66,15 @@ $pdo->exec('PRAGMA synchronous = NORMAL');
 $pdo->exec('PRAGMA cache_size = -40000');
 
 if ($options['reset']) {
-    $pdo->exec('DELETE FROM kv_store');
+    devices_sqlite_replace_state(devices_default_state());
 }
 
-$state = signage_kv_get(DEVICES_STORAGE_KEY, devices_default_state());
-$state = is_array($state) ? $state : devices_default_state();
+try {
+    $state = devices_sqlite_fetch_state();
+} catch (Throwable $exception) {
+    fwrite(STDERR, 'Unable to load device state: ' . $exception->getMessage() . "\n");
+    exit(1);
+}
 
 if (!isset($state['devices']) || !is_array($state['devices'])) {
     $state['devices'] = [];
@@ -91,7 +95,7 @@ if ($options['reset'] || count($deviceIds) < $options['devices']) {
         ];
         $deviceIds[$i] = $deviceId;
     }
-    signage_kv_set(DEVICES_STORAGE_KEY, $state);
+    devices_sqlite_replace_state($state);
 } else {
     $deviceIds = array_values(array_slice($deviceIds, 0, $options['devices']));
 }

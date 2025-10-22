@@ -587,6 +587,21 @@ function signage_db_bootstrap(): void
             value TEXT NOT NULL,
             updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
         )',
+        'CREATE TABLE IF NOT EXISTS device_store (
+            id TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+        'CREATE TABLE IF NOT EXISTS device_pairings (
+            code TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
+        'CREATE TABLE IF NOT EXISTS device_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\'))
+        )',
         'CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event TEXT NOT NULL,

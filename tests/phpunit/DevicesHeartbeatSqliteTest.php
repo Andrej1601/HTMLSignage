@@ -33,17 +33,13 @@ final class DevicesHeartbeatSqliteTest extends TestCase
         }
 
         signage_db_bootstrap();
-        $pdo = signage_db();
-        $pdo->exec('DELETE FROM kv_store');
-
-        $state = devices_default_state();
-        signage_kv_set(DEVICES_STORAGE_KEY, $state);
+        devices_sqlite_replace_state(devices_default_state());
     }
 
     public function testSqliteHeartbeatUpdatesDeviceState(): void
     {
         $deviceId = 'dev_abcdef123456';
-        $state = signage_kv_get(DEVICES_STORAGE_KEY, []);
+        $state = devices_sqlite_fetch_state();
         $state['devices'][$deviceId] = [
             'id' => $deviceId,
             'name' => 'Spa Display',
@@ -57,7 +53,7 @@ final class DevicesHeartbeatSqliteTest extends TestCase
             'lastSeen' => 50,
             'lastSeenAt' => 50,
         ];
-        signage_kv_set(DEVICES_STORAGE_KEY, $state);
+        devices_sqlite_replace_state($state);
 
         $timestamp = 1700000000;
         $telemetry = [
@@ -70,7 +66,7 @@ final class DevicesHeartbeatSqliteTest extends TestCase
         $result = devices_touch_entry_sqlite($deviceId, $timestamp, $telemetry);
         $this->assertTrue($result);
 
-        $updated = signage_kv_get(DEVICES_STORAGE_KEY, []);
+        $updated = devices_sqlite_fetch_state();
         $this->assertArrayHasKey($deviceId, $updated['devices']);
         $device = $updated['devices'][$deviceId];
 
