@@ -30,6 +30,10 @@ const STAGE  = document.getElementById('stage');
 const STAGE_LEFT  = document.getElementById('stage-left');
 const STAGE_RIGHT = document.getElementById('stage-right');
 const INFO_BANNER = document.getElementById('info-banner-area');
+const INFO_BANNER_MODES = new Set(['full', 'left', 'right']);
+const INFO_BANNER_DEFAULT_HEIGHT = 10;
+const INFO_BANNER_MIN_HEIGHT = 2;
+const INFO_BANNER_MAX_HEIGHT = 40;
 const Q = new URLSearchParams(location.search);
 const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
 const ls = createSafeLocalStorage({
@@ -72,6 +76,7 @@ const styleAutomationState = {
   baseSlides: null,
   activeStyle: null
 };
+let infoBannerMode = 'full';
 const displayListeners = {
   resizeHandler: null,
   resizeObserver: null,
@@ -882,6 +887,61 @@ function ensureFontFamily() {
 }
 function setVars(map){ for (const [k,v] of Object.entries(map)) if (v!==undefined && v!==null) document.documentElement.style.setProperty(k, String(v)); }
 
+function resolveInfoBannerMode(display = {}) {
+  const raw = typeof display.infoBannerMode === 'string' ? display.infoBannerMode.toLowerCase() : '';
+  if (raw === 'left' || raw === 'right') {
+    if (raw === 'right') {
+      const layoutMode = display.layoutMode === 'split' ? 'split' : 'single';
+      if (layoutMode !== 'split') return 'full';
+    }
+    return raw;
+  }
+  if (INFO_BANNER_MODES.has(raw)) return raw;
+  return 'full';
+}
+
+function updateInfoBannerColumnWidth() {
+  if (!INFO_BANNER) return;
+  if (infoBannerMode === 'full') {
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
+    return;
+  }
+  const target = infoBannerMode === 'left' ? STAGE_LEFT : STAGE_RIGHT;
+  const rect = target ? target.getBoundingClientRect() : null;
+  const width = rect ? Math.max(0, rect.width || 0) : 0;
+  if (width > 0) {
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', `${Math.round(width)}px`);
+  } else {
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
+  }
+}
+
+function applyInfoBannerLayout(display = {}, docStyle = document.documentElement?.style) {
+  if (!INFO_BANNER || !docStyle) return;
+
+  const heightPercent = toFiniteNumber(display.infoBannerHeightPercent);
+  if (heightPercent !== null) {
+    const clamped = Math.max(INFO_BANNER_MIN_HEIGHT, Math.min(INFO_BANNER_MAX_HEIGHT, heightPercent));
+    docStyle.setProperty('--infoBannerHeightVh', String(clamped));
+    const padScale = Math.max(0.4, Math.min(2, clamped / INFO_BANNER_DEFAULT_HEIGHT));
+    docStyle.setProperty('--infoBannerPadScale', padScale.toFixed(3));
+  } else {
+    docStyle.removeProperty('--infoBannerHeightVh');
+    docStyle.removeProperty('--infoBannerPadScale');
+  }
+
+  infoBannerMode = resolveInfoBannerMode(display);
+  INFO_BANNER.dataset.mode = infoBannerMode;
+
+  if (infoBannerMode === 'full') {
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
+    resizeRegistry.set('info-banner', null);
+  } else {
+    updateInfoBannerColumnWidth();
+    resizeRegistry.set('info-banner', updateInfoBannerColumnWidth);
+  }
+}
+
 function applyTheme() {
   const t = settings?.theme || {};
   const fonts = settings?.fonts || {};
@@ -1013,6 +1073,7 @@ function applyDisplay() {
   setPercentProperty('--rightW', d.rightWidthPercent);
   setPercentProperty('--infoPanelW', d.infoPanelWidthPercent ?? d.rightWidthPercent);
   setPercentProperty('--bannerTop', d.bannerTopPercent);
+  applyInfoBannerLayout(d, docStyle);
 
   const topPercent = toFiniteNumber(d.cutTopPercent);
   if (topPercent !== null) {
@@ -2080,9 +2141,11 @@ function applyInfoBannerModules(modules = []) {
   cleanupChildNodes(INFO_BANNER);
   INFO_BANNER.innerHTML = '';
   if (!active) return;
-  const node = renderInfoModule(active, 'full');
+  const region = infoBannerMode || 'full';
+  const node = renderInfoModule(active, region);
   INFO_BANNER.appendChild(node);
   INFO_BANNER.dataset.empty = 'false';
+  if (infoBannerMode !== 'full') updateInfoBannerColumnWidth();
 }
 
 // ---------- DOM helpers ----------
