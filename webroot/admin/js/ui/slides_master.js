@@ -1149,10 +1149,6 @@ function interRow(i){
       <input type="checkbox" />
       <span>Ton an</span>
     </label>
-    <label id="wait_${id}" class="wait-toggle" title="Bis zum Ende des Videos warten">
-      <input type="checkbox" />
-      <span>Warten</span>
-    </label>
     <span id="m_${id}" class="media-field"></span>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <input id="en_${id}" type="checkbox" />
@@ -1164,8 +1160,6 @@ function interRow(i){
   const $sec   = wrap.querySelector('#sec_'+id);
   const $audioWrap = wrap.querySelector('#aud_'+id);
   const $audioToggle = $audioWrap ? $audioWrap.querySelector('input') : null;
-  const $waitWrap = wrap.querySelector('#wait_'+id);
-  const $waitToggle = $waitWrap ? $waitWrap.querySelector('input') : null;
   const $media = wrap.querySelector('#m_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $en    = wrap.querySelector('#en_'+id);
@@ -1210,23 +1204,6 @@ function interRow(i){
 
   updateAudioToggle();
 
-  const updateWaitToggle = () => {
-    if (!$waitWrap || !$waitToggle) return;
-    const isVideo = ($type?.value === 'video');
-    if (!isVideo) {
-      $waitToggle.checked = false;
-      $waitToggle.disabled = true;
-      $waitWrap.classList.add('is-disabled');
-      delete it.waitForEnd;
-      return;
-    }
-    $waitToggle.disabled = false;
-    $waitWrap.classList.remove('is-disabled');
-    $waitToggle.checked = it.waitForEnd === true;
-  };
-
-  updateWaitToggle();
-
   if ($sec){
     $sec.value = Number.isFinite(+it.dwellSec)
       ? +it.dwellSec
@@ -1237,13 +1214,6 @@ function interRow(i){
     $audioToggle.onchange = () => {
       if ($audioToggle.checked) it.audio = true;
       else delete it.audio;
-    };
-  }
-
-  if ($waitToggle) {
-    $waitToggle.onchange = () => {
-      if ($waitToggle.checked) it.waitForEnd = true;
-      else delete it.waitForEnd;
     };
   }
 
@@ -1331,7 +1301,6 @@ function interRow(i){
     updatePrev('');
     renderMediaField();
     updateAudioToggle();
-    updateWaitToggle();
     renderSlidesMaster();
   };
 
@@ -2116,7 +2085,7 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
   if (Array.isArray(ord) && ord.length){
     const mapS = new Map(saunas.map(s => [s.name, s]));
     const mapM = new Map(media.map(m => [String(m.item.id), m]));
-    const mapStories = new Map(stories.map(story => [story.key, story]));
+    const mapStory = new Map(stories.map(st => [st.key, st]));
     for (const o of ord){
       if (o.type === 'sauna' && mapS.has(o.name)){
         combined.push(mapS.get(o.name));
@@ -2124,36 +2093,23 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
       } else if (o.type === 'media' && mapM.has(String(o.id))){
         combined.push(mapM.get(String(o.id)));
         mapM.delete(String(o.id));
-      } else if (o.type === 'story') {
-        const sid = String(o.id ?? '');
-        if (sid && mapStories.has(sid)) {
-          combined.push(mapStories.get(sid));
-          mapStories.delete(sid);
-        }
+      } else if (o.type === 'story' && mapStory.has(String(o.id))){
+        combined.push(mapStory.get(String(o.id)));
+        mapStory.delete(String(o.id));
       }
     }
-    combined = combined.concat(
-      Array.from(mapS.values()),
-      Array.from(mapStories.values()),
-      Array.from(mapM.values()),
-      extrasCombined
-    );
+    combined = combined.concat(Array.from(mapS.values()), Array.from(mapM.values()), Array.from(mapStory.values()), extrasCombined);
     if (normalizeSortOrder){
       settings.slides.sortOrder = combined
         .filter(e => e && (e.kind === 'sauna' || e.kind === 'media' || e.kind === 'story'))
         .map(e => {
           if (e.kind === 'sauna') return { type: 'sauna', name: e.name };
           if (e.kind === 'media') return { type: 'media', id: e.item.id };
-          if (e.kind === 'story') {
-            const id = e.item?.id != null ? String(e.item.id) : (e.key || '');
-            return id ? { type: 'story', id } : null;
-          }
-          return null;
+          return { type: 'story', id: e.item?.id ?? e.key };
         });
-      settings.slides.sortOrder = settings.slides.sortOrder.filter(Boolean);
     }
   } else {
-    combined = saunas.concat(stories, media, extrasCombined);
+    combined = saunas.concat(media, stories, extrasCombined);
   }
 
   return {
@@ -2173,7 +2129,6 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
 
 export function renderSlideOrderView(){
   const settings = ctx.getSettings();
-  const schedule = ctx.getSchedule();
   const heroEnabled = !!settings?.slides?.heroEnabled;
   const host = document.getElementById('slideOrderGrid');
   if (!host) return;
@@ -2183,7 +2138,6 @@ export function renderSlideOrderView(){
 
   host.innerHTML = '';
   combined.forEach((entry, idx) => {
-    if (!entry) return;
     const tile = document.createElement('div');
     tile.className = 'slide-order-tile';
     tile.draggable = true;
@@ -2195,8 +2149,10 @@ export function renderSlideOrderView(){
       : SAUNA_STATUS.ACTIVE;
     const isHiddenSauna = entry.kind === 'sauna' && hiddenSaunas.has(entry.name);
     const isDisabledMedia = entry.kind === 'media' && entry.item?.enabled === false;
+    const isDisabledStory = entry.kind === 'story' && entry.item?.enabled === false;
     if (isHiddenSauna) tile.classList.add('is-hidden');
-    if (isHiddenSauna || isDisabledMedia) tile.classList.add('is-disabled');
+    if (isHiddenSauna || isDisabledMedia || isDisabledStory) tile.classList.add('is-disabled');
+
     const title = document.createElement('div');
     title.className = 'title';
     let statusEl = null;
@@ -2213,13 +2169,8 @@ export function renderSlideOrderView(){
       const state = saunaStatus === SAUNA_STATUS.HIDDEN ? 'hidden' : 'inactive';
       applyStatus(SAUNA_STATUS_TEXT[saunaStatus] || 'Ausgeblendet', state);
     }
-    if (!statusEl && isDisabledMedia){
+    if (!statusEl && (isDisabledMedia || isDisabledStory)){
       applyStatus('Deaktiviert', 'hidden');
-    }
-    const isStoryDisabled = entry.kind === 'story' && entry.item?.enabled === false;
-    if (isStoryDisabled) {
-      applyStatus('Deaktiviert', 'hidden');
-      tile.classList.add('is-disabled');
     }
     const isWellnessDisabled = entry.kind === 'wellness-tip' && entry.item?.disabled === true;
     if (isWellnessDisabled) {
@@ -2255,32 +2206,6 @@ export function renderSlideOrderView(){
       img.src = entry.item.thumb || entry.item.url || '';
       img.alt = entry.item.name || '';
       tile.appendChild(img);
-    } else if (entry.kind === 'story') {
-      const id = entry.item?.id != null ? String(entry.item.id) : entry.key || '';
-      tile.dataset.storyId = id;
-      const heading = String(entry.item?.heading || entry.item?.title || '').trim();
-      title.textContent = heading || 'Information';
-      tile.appendChild(title);
-      if (statusEl) tile.appendChild(statusEl);
-      const meta = document.createElement('div');
-      meta.className = 'tile-meta';
-      const saunas = Array.isArray(entry.item?.saunas)
-        ? entry.item.saunas.map(name => String(name || '').trim()).filter(Boolean)
-        : [];
-      if (saunas.length) {
-        meta.textContent = saunas.join(', ');
-        tile.appendChild(meta);
-      } else if (entry.item?.layout) {
-        meta.textContent = entry.item.layout === 'double' ? 'Zweispaltig' : 'Einspaltig';
-        tile.appendChild(meta);
-      }
-      const heroUrl = typeof entry.item?.heroUrl === 'string' ? entry.item.heroUrl.trim() : '';
-      if (heroUrl) {
-        const img = document.createElement('img');
-        img.src = heroUrl;
-        img.alt = heading || 'Story';
-        tile.appendChild(img);
-      }
     } else if (entry.kind === 'wellness-tip') {
       tile.dataset.extraId = entry.item?.id || entry.key || '';
       const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
@@ -2312,6 +2237,15 @@ export function renderSlideOrderView(){
       title.textContent = icon + (entry.item?.title || 'Gastronomie');
       tile.appendChild(title);
       if (statusEl) tile.appendChild(statusEl);
+    } else {
+      tile.dataset.storyId = entry.item?.id || entry.key || '';
+      title.textContent = entry.item?.title || 'Story-Slide';
+      tile.appendChild(title);
+      if (statusEl) tile.appendChild(statusEl);
+      const img = document.createElement('img');
+      img.src = entry.item?.heroUrl || FALLBACK_HERO;
+      img.alt = entry.item?.heroAlt || '';
+      tile.appendChild(img);
     }
 
     const controls = document.createElement('div');
@@ -2390,6 +2324,7 @@ export function renderSlideOrderView(){
 
     const newSaunas = [];
     const newMedia = [];
+    const newStories = [];
     const sortOrder = [];
     for (const entry of reordered){
       if (entry.kind === 'sauna'){
@@ -2399,12 +2334,13 @@ export function renderSlideOrderView(){
         newMedia.push(entry.item);
         sortOrder.push({ type:'media', id: entry.item.id });
       } else if (entry.kind === 'story') {
-        const storyId = entry.item?.id != null ? String(entry.item.id) : entry.key;
-        if (storyId) sortOrder.push({ type: 'story', id: storyId });
+        newStories.push(entry.item);
+        sortOrder.push({ type:'story', id: entry.item?.id ?? entry.key });
       }
     }
     schedule.saunas = newSaunas;
     settings.interstitials = newMedia;
+    settings.slides.storySlides = newStories;
     settings.slides ||= {};
     settings.slides.sortOrder = sortOrder;
     window.__queueUnsaved?.();
@@ -2483,21 +2419,6 @@ export function renderSlidesMaster(){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
 
-  if (settings?.slides?.waitForVideo) {
-    let migrated = false;
-    const interstitials = Array.isArray(settings.interstitials) ? settings.interstitials : [];
-    interstitials.forEach((entry) => {
-      if (!entry || entry.type !== 'video') return;
-      if (entry.waitForEnd === true) return;
-      entry.waitForEnd = true;
-      migrated = true;
-    });
-    delete settings.slides.waitForVideo;
-    if (migrated && typeof ctx.queueUnsavedEvaluation === 'function') {
-      ctx.queueUnsavedEvaluation({ source: 'media-wait-migration' });
-    }
-  }
-
   const statusState = computeSaunaStatusState(settings, schedule, { autoAssign: true });
   if (statusState.changed && ctx && typeof ctx.refreshSlidesBox === 'function'){
     try {
@@ -2524,6 +2445,13 @@ export function renderSlidesMaster(){
     autoEl.checked = !!settings.presetAuto;
     autoEl.onchange = () => { settings.presetAuto = !!autoEl.checked; };
   }
+
+  const waitEl = $('#waitForVideo');
+  if (waitEl){
+    waitEl.checked = !!settings.slides?.waitForVideo;
+    waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
+  }
+
 
   const heroToggle = $('#heroTimelineEnabled');
   const heroSettingsRow = $('#heroTimelineSettings');
@@ -3261,6 +3189,7 @@ if (durPer) durPer.onchange = () => {
     settings.slides.transitionMs = 500;
     settings.slides.durationMode = 'uniform';
     settings.slides.globalDwellSec = 6;
+    settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaStatus = {};
     settings.slides.saunaDurations = {};

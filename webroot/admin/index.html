@@ -222,6 +222,10 @@
             <input id="transMs2" class="input" type="number" min="0" value="500">
           </div>
 
+          <div class="kv">
+            <label>Weiter erst nach Video-Ende</label>
+            <input id="waitForVideo" type="checkbox">
+          </div>
         </div>
       </div>
 
@@ -459,7 +463,6 @@
     <span class="col-prev">Preview</span>
     <span class="col-dur" id="headImgDur">Dauer (s)</span>
     <span class="col-audio">Ton</span>
-    <span class="col-wait">Nach Video</span>
     <span class="col-up">Upload</span>
     <span class="col-del">✕</span>
     <span class="col-vis">Anzeigen</span>
@@ -503,6 +506,7 @@
                     <option value="triple">Triple-Column</option>
                     <option value="asymmetric">Asymmetrisch</option>
                     <option value="info-panel">Info-Panel (Seitenleiste)</option>
+                    <option value="banner">Banner (Top/Bottom)</option>
                   </select>
                 </div>
                 <div class="layout-display-columns">
