@@ -472,6 +472,51 @@ function signage_sqlite_retry(callable $operation, int $attempts = 5, int $sleep
     throw new RuntimeException('SQLite operation failed after retries.');
 }
 
+function signage_sqlite_with_transaction(\PDO $pdo, callable $callback, string $mode = 'IMMEDIATE'): mixed
+{
+    $mode = strtoupper($mode);
+    $validModes = ['DEFERRED', 'IMMEDIATE', 'EXCLUSIVE'];
+    $begin = in_array($mode, $validModes, true)
+        ? 'BEGIN ' . $mode . ' TRANSACTION'
+        : 'BEGIN TRANSACTION';
+
+    return signage_sqlite_retry(static function () use ($pdo, $callback, $begin) {
+        $committed = false;
+        $rolledBack = false;
+
+        try {
+            $pdo->exec($begin);
+            $result = $callback($pdo);
+            $pdo->exec('COMMIT');
+            $committed = true;
+
+            return $result;
+        } catch (Throwable $exception) {
+            if (!$committed && !$rolledBack) {
+                try {
+                    $pdo->exec('ROLLBACK');
+                    $rolledBack = true;
+                } catch (Throwable $rollbackException) {
+                    error_log('SQLite rollback failed: ' . $rollbackException->getMessage());
+                }
+            }
+
+            throw $exception;
+        } finally {
+            if (!$committed && !$rolledBack) {
+                try {
+                    $pdo->exec('ROLLBACK');
+                } catch (Throwable $rollbackException) {
+                    $message = strtolower((string) $rollbackException->getMessage());
+                    if (strpos($message, 'no transaction') === false) {
+                        error_log('SQLite rollback cleanup failed: ' . $rollbackException->getMessage());
+                    }
+                }
+            }
+        }
+    });
+}
+
 function signage_db(): \PDO
 {
     static $pdo = null;
