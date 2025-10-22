@@ -914,6 +914,19 @@ function collectSettings(){
         rightWidthPercent:+($('#rightW').value||38),
         cutTopPercent:+($('#cutTop').value||28),
         cutBottomPercent:+($('#cutBottom').value||12),
+        infoBannerHeightPercent:(() => {
+          const el = document.getElementById('infoBannerHeight');
+          const fallback = settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return Math.round(fallback);
+          return Math.round(clamp(2, raw, 40));
+        })(),
+        infoBannerMode:(() => {
+          const el = document.getElementById('infoBannerMode');
+          const fallback = (settings.display?.infoBannerMode || DEFAULTS.display?.infoBannerMode || 'full').toLowerCase();
+          const raw = typeof el?.value === 'string' ? el.value.toLowerCase() : fallback;
+          return ['full','left','right'].includes(raw) ? raw : fallback;
+        })(),
         layoutMode:(document.getElementById('layoutMode')?.value === 'split') ? 'split' : 'single',
         layoutProfile: document.getElementById('layoutProfile')?.value || settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape',
         pages:{

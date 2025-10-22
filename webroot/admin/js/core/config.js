@@ -276,12 +276,22 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   };
   const defaultInfoPanel = Number(DEFAULTS.display?.infoPanelWidthPercent);
   const defaultBannerTop = Number(DEFAULTS.display?.bannerTopPercent);
+  const defaultBannerHeight = Number(DEFAULTS.display?.infoBannerHeightPercent);
   const infoPanelPercent = normalizePercentValue(src.display?.infoPanelWidthPercent, defaultInfoPanel);
   if (infoPanelPercent != null) src.display.infoPanelWidthPercent = infoPanelPercent;
   else delete src.display.infoPanelWidthPercent;
   const bannerPercent = normalizePercentValue(src.display?.bannerTopPercent, defaultBannerTop);
   if (bannerPercent != null) src.display.bannerTopPercent = bannerPercent;
   else delete src.display.bannerTopPercent;
+  const bannerHeightPercent = normalizePercentValue(src.display?.infoBannerHeightPercent, defaultBannerHeight);
+  if (bannerHeightPercent != null) {
+    src.display.infoBannerHeightPercent = Math.max(2, Math.min(40, bannerHeightPercent));
+  } else {
+    delete src.display.infoBannerHeightPercent;
+  }
+  const rawBannerMode = typeof src.display?.infoBannerMode === 'string' ? src.display.infoBannerMode.toLowerCase() : '';
+  if (['full', 'left', 'right'].includes(rawBannerMode)) src.display.infoBannerMode = rawBannerMode;
+  else delete src.display.infoBannerMode;
 
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
   src.footnotesShowOnOverview = src.footnotesShowOnOverview !== false;

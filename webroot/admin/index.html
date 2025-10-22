@@ -497,6 +497,19 @@
                     <option value="banner">Banner (Top/Bottom)</option>
                   </select>
                 </div>
+                <div class="kv">
+                  <label>Info-Banner Platzierung</label>
+                  <select id="infoBannerMode" class="input">
+                    <option value="full">Über gesamte Breite</option>
+                    <option value="left">Linke Spalte</option>
+                    <option value="right">Rechte Spalte</option>
+                  </select>
+                </div>
+                <div class="kv">
+                  <label>Info-Banner Höhe (% vom Bildschirm)</label>
+                  <input id="infoBannerHeight" class="input num3" type="number" min="2" max="40" step="1" placeholder="10">
+                  <div class="help">Steuert den reservierten Bereich für den laufenden Hinweisbanner.</div>
+                </div>
                 <div class="layout-display-columns">
                   <div class="fieldset layout-page" id="layoutLeft">
                     <div class="legend">Linke Seite</div>

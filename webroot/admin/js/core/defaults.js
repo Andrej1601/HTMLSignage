@@ -298,6 +298,8 @@ export const DEFAULTS = {
     rightWidthPercent:38,
     infoPanelWidthPercent:32,
     bannerTopPercent:60,
+    infoBannerHeightPercent:10,
+    infoBannerMode:'full',
     cutTopPercent:28,
     cutBottomPercent:12,
     layoutMode:'single',
