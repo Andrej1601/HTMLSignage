@@ -3622,30 +3622,7 @@ const appendSectionNode = (section, context, parent) => {
   return true;
 };
 
-const isSplitLayout = settings?.display?.layoutMode === 'split';
-const filterColumnsByRegion = (columns, layout, regionName, splitLayout) => {
-  const list = Array.isArray(columns) ? columns : [];
-  if (layout !== 'double' || !splitLayout) return list.slice();
-  const target = String(regionName || '').trim().toLowerCase();
-  if (target !== 'left' && target !== 'right') return list.slice();
-  const main = [];
-  const extras = [];
-  list.forEach((column) => {
-    const role = String(column?.role || '').trim().toLowerCase();
-    if (role === 'left' || role === 'right') {
-      main.push({ role, column });
-    } else {
-      extras.push(column);
-    }
-  });
-  const selected = main.filter(entry => entry.role === target).map(entry => entry.column);
-  const fallback = selected.length ? selected : main.map(entry => entry.column);
-  const base = fallback.length ? fallback : [];
-  return base.concat(extras);
-};
-
-const rawColumnsList = Array.isArray(normalized.columns) ? normalized.columns : [];
-const columnsList = filterColumnsByRegion(rawColumnsList, normalized.layout, region, isSplitLayout);
+const columnsList = Array.isArray(normalized.columns) ? normalized.columns : [];
 if (normalized.layout === 'double') {
   sectionsWrap.classList.add('story-sections--double');
   columnsList.forEach((column, columnIndex) => {
@@ -3699,14 +3676,7 @@ container.appendChild(sectionsWrap);
 container.dataset.storySectionCount = String(sectionCount);
 container.style.setProperty('--story-section-count', String(Math.max(sectionCount, 1)));
 const rawColumnCount = columnsList.length;
-const regionKey = String(region || '').trim().toLowerCase();
-const enforceSingleColumnMin = normalized.layout === 'double'
-  && isSplitLayout
-  && (regionKey === 'left' || regionKey === 'right');
-const minColumns = enforceSingleColumnMin ? 1 : 2;
-const columnCount = normalized.layout === 'double'
-  ? Math.max(rawColumnCount || 0, minColumns)
-  : Math.max(rawColumnCount || 0, 1);
+const columnCount = normalized.layout === 'double' ? Math.max(rawColumnCount || 0, 2) : Math.max(rawColumnCount || 0, 1);
 container.dataset.storyColumnCount = String(columnCount);
 container.style.setProperty('--story-column-count', String(columnCount));
 const maxPerColumnRaw = columnSectionCounts.reduce((max, value) => Math.max(max, value || 0), 0);
