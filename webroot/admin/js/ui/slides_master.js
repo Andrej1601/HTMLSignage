@@ -30,7 +30,7 @@ let ctx = null; // { getSchedule, getSettings, setSchedule, setSettings }
 let wiredStatic = false;
 let selectedStyleSetId = null;
 
-const COMPONENT_KEYS = ['title','description','badges'];
+const COMPONENT_KEYS = ['title','description','infoBox','badges'];
 
 const STYLE_THEME_KEYS = [
   'bg','fg','accent','gridBorder','gridTable','gridTableW','cellBg','boxFg','headRowBg','headRowFg',
@@ -637,7 +637,13 @@ function deleteSaunaEverywhere(name){
     delete settings.slides.saunaDurations[name];
   }
 
-  // 6) Sichtbarkeit
+  // 6) Infofeld-Inhalte
+  if (settings.slides?.saunaInfo && Object.prototype.hasOwnProperty.call(settings.slides.saunaInfo, name)){
+    delete settings.slides.saunaInfo[name];
+    if (!Object.keys(settings.slides.saunaInfo).length) delete settings.slides.saunaInfo;
+  }
+
+  // 7) Sichtbarkeit
   if (settings.slides?.hiddenSaunas){
     settings.slides.hiddenSaunas = settings.slides.hiddenSaunas.filter(n => n !== name);
   }
@@ -680,6 +686,14 @@ function renameSaunaEverywhere(oldName, newName){
   if (settings.slides?.saunaDurations && (oldName in settings.slides.saunaDurations)){
     settings.slides.saunaDurations[newName] = settings.slides.saunaDurations[oldName];
     delete settings.slides.saunaDurations[oldName];
+  }
+
+  if (settings.slides?.saunaInfo && Object.prototype.hasOwnProperty.call(settings.slides.saunaInfo, oldName)){
+    const val = settings.slides.saunaInfo[oldName];
+    delete settings.slides.saunaInfo[oldName];
+    if (val){
+      settings.slides.saunaInfo[newName] = val;
+    }
   }
 
   // Sichtbarkeit
@@ -910,6 +924,45 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
   const $mv     = wrap.querySelector('#mv_'+id);
   const $delinv = wrap.querySelector('#delinv_'+id);
   const $status = wrap.querySelector('#st_'+id);
+
+  if (mode === 'normal'){
+    const infoWrap = document.createElement('div');
+    infoWrap.className = 'sauna-info-editor';
+    infoWrap.innerHTML = `
+      <label class="sauna-info-editor__label" for="info_${id}">Infofeld (optional)</label>
+      <textarea id="info_${id}" class="input sauna-info-editor__input" rows="2" placeholder="z. B. 85 °C · 30 Plätze · 10 % Luftfeuchte"></textarea>
+      <div class="sauna-info-editor__hint">Leer lassen, um kein Infofeld anzuzeigen.</div>
+    `;
+    wrap.appendChild(infoWrap);
+
+    const $info = infoWrap.querySelector('#info_'+id);
+    if ($info instanceof HTMLTextAreaElement){
+      const infoMap = (settings.slides?.saunaInfo && typeof settings.slides.saunaInfo === 'object') ? settings.slides.saunaInfo : {};
+      const currentInfo = typeof infoMap[name] === 'string' ? infoMap[name] : '';
+      $info.value = currentInfo;
+      const commitInfo = () => {
+        const raw = ($info.value || '').replace(/\r\n/g, '\n');
+        const normalized = raw
+          .split('\n')
+          .map(line => line.trim())
+          .filter(Boolean)
+          .join('\n');
+        settings.slides ||= {};
+        if (normalized){
+          settings.slides.saunaInfo ||= {};
+          settings.slides.saunaInfo[name] = normalized;
+        } else if (settings.slides.saunaInfo){
+          delete settings.slides.saunaInfo[name];
+          if (!Object.keys(settings.slides.saunaInfo).length) delete settings.slides.saunaInfo;
+        }
+        window.__queueUnsaved?.();
+        window.__markUnsaved?.();
+        if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      };
+      $info.addEventListener('input', commitInfo);
+      $info.addEventListener('blur', commitInfo);
+    }
+  }
 
   // Bild-Preview
   const url = (settings.assets?.rightImages?.[name]) || '';

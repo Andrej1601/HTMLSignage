@@ -1549,6 +1549,33 @@ body.mode-uniform #ovSec{ display:none !important; }
 /* Kein Überlaufen der Grids in der Sidebar */
 .saunarow > *, .mediarow > *{ min-width:0; }
 
+.sauna-info-editor{
+  grid-column:1 / -1;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px 14px;
+  margin-top:8px;
+  background:var(--panel);
+  border:1px solid var(--inbr);
+  border-radius:12px;
+}
+.sauna-info-editor__label{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.sauna-info-editor__input{
+  min-height:64px;
+  resize:vertical;
+}
+.sauna-info-editor__hint{
+  font-size:11px;
+  color:var(--muted);
+}
+
 /* --- Wunschanpassungen: Breiten innerhalb der Spalten ----------------------- */
 /* Sauna-Namen 20% schmaler (lässt innen Luft im Spaltenbereich) */
 .saunarow .input.name{ width:80%; }

@@ -2285,7 +2285,7 @@ function noteSup(cell, notes) {
   return h('sup', { class: 'note' }, String(fn.label || '*'));
 }
 
-const SLIDE_COMPONENT_DEFAULTS = { title:true, description:true, aromas:true, facts:true, badges:true };
+const SLIDE_COMPONENT_DEFAULTS = { title:true, description:true, aromas:true, facts:true, infoBox:true, badges:true };
 
 function getSlideComponentFlags(){
   const src = settings?.slides?.enabledComponents;
@@ -2531,6 +2531,33 @@ function collectCellDetails(cell){
   const facts = gatherList(cell.facts, cell.details, cell.detailsList, cell.tags, cell.chips, cell.meta, cell.badges);
   const badges = collectCellBadges(cell);
   return { description, aromas, facts, badges };
+}
+
+function createSaunaInfoBox(text){
+  const str = typeof text === 'string' ? text : '';
+  const normalized = str
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!normalized.length) return null;
+  const lines = normalized.map(line => {
+    const parts = line.split(':');
+    if (parts.length > 1){
+      const label = parts.shift()?.trim() || '';
+      const value = parts.join(':').trim();
+      if (label && value){
+        return h('div', { class: 'sauna-info-box__line' }, [
+          h('span', { class: 'sauna-info-box__label', 'data-has-value': 'true' }, label),
+          h('span', { class: 'sauna-info-box__value' }, value)
+        ]);
+      }
+    }
+    return h('div', { class: 'sauna-info-box__line' }, [
+      h('span', { class: 'sauna-info-box__value' }, line)
+    ]);
+  });
+  return h('div', { class: 'sauna-info-box' }, lines);
 }
 
 function createDescriptionNode(text, className){
@@ -4360,11 +4387,20 @@ function renderSauna(name, region = 'left') {
   const body = h('div', { class: 'body' });
   const list = h('div', { class: 'list' });
 
-  const notes = footnoteMap();
   const colIdx = (schedule.saunas || []).indexOf(name);
   const saunaStatus = getSaunaStatus(name);
   const hideForStatus = saunaStatus !== SAUNA_STATUS.ACTIVE;
   const componentFlags = getSlideComponentFlags();
+  const saunaInfoMap = (settings?.slides?.saunaInfo && typeof settings.slides.saunaInfo === 'object')
+    ? settings.slides.saunaInfo
+    : null;
+  const saunaInfoText = typeof saunaInfoMap?.[name] === 'string' ? saunaInfoMap[name] : '';
+  const saunaInfoNode = componentFlags.infoBox !== false ? createSaunaInfoBox(saunaInfoText) : null;
+  if (saunaInfoNode) {
+    body.appendChild(saunaInfoNode);
+    c.classList.add('has-sauna-info');
+  }
+  const notes = footnoteMap();
   const showSaunaFlames = settings?.slides?.showSaunaFlames !== false;
   const inlineBadgeColumn = settings?.slides?.badgeInlineColumn === true;
   const iconVariantMap = (settings?.slides?.iconVariants && typeof settings.slides.iconVariants === 'object')
