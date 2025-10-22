@@ -59,17 +59,28 @@ function live_file_meta(string $path): array
     if ($mtime !== false) {
         $meta['mtime'] = (int) $mtime;
     }
-    $hash = @sha1_file($path);
-    if ($hash !== false) {
-        $meta['hash'] = $hash;
+    $size = @filesize($path);
+    if ($size !== false) {
+        $meta['hash'] = $meta['mtime'] . ':' . (int) $size;
     }
     return $meta;
 }
 
-function live_build_global_state(): array
+function live_load_globals(): array
 {
-    $schedule = signage_read_json('schedule.json');
-    $settings = signage_read_json('settings.json');
+    return [
+        'schedule' => signage_read_json('schedule.json'),
+        'settings' => signage_read_json('settings.json'),
+    ];
+}
+
+function live_build_global_state(?array $globals = null): array
+{
+    if ($globals === null) {
+        $globals = live_load_globals();
+    }
+    $schedule = $globals['schedule'] ?? [];
+    $settings = $globals['settings'] ?? [];
     return [
         'ok' => true,
         'schedule' => $schedule,
@@ -82,10 +93,15 @@ function live_build_global_state(): array
     ];
 }
 
-function live_build_device_state(string $deviceId): array
+function live_build_device_state(string $deviceId, ?array $globals = null): array
 {
     $error = null;
-    $payload = devices_resolve_payload($deviceId, $error);
+    if ($globals === null) {
+        $globals = live_load_globals();
+    }
+    $baseSettings = $globals['settings'] ?? null;
+    $baseSchedule = $globals['schedule'] ?? null;
+    $payload = devices_resolve_payload($deviceId, $error, is_array($baseSettings) ? $baseSettings : null, is_array($baseSchedule) ? $baseSchedule : null);
     if ($payload === null) {
         return [
             'ok' => false,
@@ -191,6 +207,11 @@ foreach ($metaResolvers as $key => $resolver) {
     $meta[$key] = $resolver();
 }
 
+$currentGlobals = null;
+if ($watchGlobals || $watchDevice) {
+    $currentGlobals = live_load_globals();
+}
+
 echo "retry: 5000\n\n";
 @ob_flush();
 @flush();
@@ -202,12 +223,12 @@ live_send_event('ready', [
 ]);
 
 if ($watchGlobals) {
-    live_send_event('state', live_build_global_state());
+    live_send_event('state', live_build_global_state($currentGlobals));
 }
 
 $lastDeviceState = null;
 if ($watchDevice) {
-    $deviceState = live_build_device_state($deviceId);
+    $deviceState = live_build_device_state($deviceId, $currentGlobals);
     $lastDeviceState = $deviceState;
     live_send_event('device', $deviceState);
 }
@@ -241,24 +262,31 @@ while (!connection_aborted()) {
         }
     }
 
-    if ($configChanged && $watchGlobals) {
-        live_send_event('state', live_build_global_state());
+    if ($configChanged && ($watchGlobals || $watchDevice)) {
+        $currentGlobals = live_load_globals();
     }
 
-    if ($devicesChanged) {
-        if ($watchDevice) {
-            $deviceState = live_build_device_state($deviceId);
-            if ($deviceState !== $lastDeviceState) {
-                $lastDeviceState = $deviceState;
-                live_send_event('device', $deviceState);
-            }
+    if ($configChanged && $watchGlobals) {
+        live_send_event('state', live_build_global_state($currentGlobals));
+    }
+
+    $shouldRefreshDevice = ($configChanged && $watchDevice) || ($devicesChanged && $watchDevice);
+    if ($shouldRefreshDevice) {
+        if ($currentGlobals === null) {
+            $currentGlobals = live_load_globals();
         }
-        if ($watchPair) {
-            $pairState = live_resolve_pairing($pairCode);
-            if ($pairState !== $lastPairState) {
-                $lastPairState = $pairState;
-                live_send_event('pair', $pairState);
-            }
+        $deviceState = live_build_device_state($deviceId, $currentGlobals);
+        if ($deviceState !== $lastDeviceState) {
+            $lastDeviceState = $deviceState;
+            live_send_event('device', $deviceState);
+        }
+    }
+
+    if ($devicesChanged && $watchPair) {
+        $pairState = live_resolve_pairing($pairCode);
+        if ($pairState !== $lastPairState) {
+            $lastPairState = $pairState;
+            live_send_event('pair', $pairState);
         }
     }
 
