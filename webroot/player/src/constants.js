@@ -47,7 +47,8 @@ export const LAYOUT_PROFILES = new Set([
   'portrait-split',
   'triple',
   'asymmetric',
-  'info-panel'
+  'info-panel',
+  'banner'
 ]);
 
 export const LIVE_RETRY_BASE_DELAY = 2000;
