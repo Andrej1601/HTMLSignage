@@ -10,6 +10,9 @@ export default defineConfig({
     outDir: path.resolve(projectRoot, 'webroot/player/dist'),
     emptyOutDir: true,
     sourcemap: true,
+    // Downlevel modern syntax like optional chaining for the player WebViews
+    // (they still run a Chrome 69 equivalent without native support).
+    target: 'es2018',
     rollupOptions: {
       input: {
         player: path.resolve(projectRoot, 'webroot/player/src/main.js')
@@ -20,8 +23,5 @@ export default defineConfig({
         assetFileNames: 'assets/[name][extname]'
       }
     }
-  },
-  esbuild: {
-    target: 'es2019'
   }
 });
