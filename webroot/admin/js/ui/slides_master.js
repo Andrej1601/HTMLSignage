@@ -926,27 +926,53 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
   const $status = wrap.querySelector('#st_'+id);
 
   if (mode === 'normal'){
-    const infoWrap = document.createElement('div');
+    const infoWrap = document.createElement('details');
     infoWrap.className = 'sauna-info-editor';
     infoWrap.innerHTML = `
-      <label class="sauna-info-editor__label" for="info_${id}">Infofeld (optional)</label>
-      <textarea id="info_${id}" class="input sauna-info-editor__input" rows="2" placeholder="z. B. 85 °C · 30 Plätze · 10 % Luftfeuchte"></textarea>
-      <div class="sauna-info-editor__hint">Leer lassen, um kein Infofeld anzuzeigen.</div>
+      <summary class="sauna-info-editor__summary">
+        <div class="sauna-info-editor__summary-text">
+          <span class="sauna-info-editor__summary-title">Infofeld (optional)</span>
+          <span class="sauna-info-editor__preview" data-empty="true">Keine Informationen hinterlegt</span>
+        </div>
+        <span class="sauna-info-editor__chevron" aria-hidden="true"></span>
+      </summary>
+      <div class="sauna-info-editor__body">
+        <label class="sauna-info-editor__label" for="info_${id}">Infofeld (optional)</label>
+        <textarea id="info_${id}" class="input sauna-info-editor__input" rows="2" placeholder="z. B. 85 °C · 30 Plätze · 10 % Luftfeuchte"></textarea>
+        <div class="sauna-info-editor__hint">Leer lassen, um kein Infofeld anzuzeigen.</div>
+      </div>
     `;
     wrap.appendChild(infoWrap);
 
     const $info = infoWrap.querySelector('#info_'+id);
+    const $preview = infoWrap.querySelector('.sauna-info-editor__preview');
     if ($info instanceof HTMLTextAreaElement){
       const infoMap = (settings.slides?.saunaInfo && typeof settings.slides.saunaInfo === 'object') ? settings.slides.saunaInfo : {};
       const currentInfo = typeof infoMap[name] === 'string' ? infoMap[name] : '';
       $info.value = currentInfo;
-      const commitInfo = () => {
+      const normalizeValue = () => {
         const raw = ($info.value || '').replace(/\r\n/g, '\n');
         const normalized = raw
           .split('\n')
           .map(line => line.trim())
           .filter(Boolean)
           .join('\n');
+        if ($preview){
+          if (normalized){
+            const [firstLine] = normalized.split('\n');
+            $preview.textContent = firstLine;
+            $preview.dataset.empty = 'false';
+          } else {
+            $preview.textContent = 'Keine Informationen hinterlegt';
+            $preview.dataset.empty = 'true';
+          }
+        }
+        infoWrap.dataset.hasContent = normalized ? 'true' : 'false';
+        return normalized;
+      };
+      normalizeValue();
+      const commitInfo = () => {
+        const normalized = normalizeValue();
         settings.slides ||= {};
         if (normalized){
           settings.slides.saunaInfo ||= {};
@@ -961,6 +987,13 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
       };
       $info.addEventListener('input', commitInfo);
       $info.addEventListener('blur', commitInfo);
+      infoWrap.addEventListener('toggle', () => {
+        infoWrap.classList.toggle('is-open', infoWrap.open);
+        if (infoWrap.open){
+          requestAnimationFrame(() => { $info.focus(); });
+        }
+      });
+      infoWrap.classList.toggle('is-open', infoWrap.open);
     }
   }
 

@@ -4468,7 +4468,7 @@ function renderSauna(name, region = 'left') {
   const saunaInfoText = typeof saunaInfoMap?.[name] === 'string' ? saunaInfoMap[name] : '';
   const saunaInfoNode = componentFlags.infoBox !== false ? createSaunaInfoBox(saunaInfoText) : null;
   if (saunaInfoNode) {
-    body.appendChild(saunaInfoNode);
+    headingWrap.appendChild(saunaInfoNode);
     c.classList.add('has-sauna-info');
   }
   const notes = footnoteMap();
