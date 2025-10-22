@@ -3041,6 +3041,7 @@ if (!schedule) {
 }
 
 const notes = footnoteMap();
+const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
 const showFlames = (settings?.fonts?.overviewShowFlames !== false);
 const statusStateLocal = ensureSaunaStatusState();
 const saunas = Array.isArray(schedule?.saunas) ? schedule.saunas : [];
@@ -3095,8 +3096,10 @@ const tb = h('tbody');
       const title = String(cell.title).replace(/\*+$/, '');
       const hasStarInText = /\*$/.test(cell.title || '');
       const txt = h('div', { class: 'chip-text' }, title);
-      if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
-      const supNote = noteSup(cell, notes);
+      if (showOverviewFootnotes && hasStarInText) {
+        txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
+      }
+      const supNote = showOverviewFootnotes ? noteSup(cell, notes) : null;
       if (supNote) {
         txt.appendChild(h('span', { class: 'notewrap' }, [supNote]));
         usedSet.add(cell.noteId);
@@ -3122,7 +3125,6 @@ t.appendChild(tb);
 const footNodes = [];
 const order = (settings?.footnotes||[]).map(fn=>fn.id);
 for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
 if (showOverviewFootnotes && footNodes.length){
   const layout = (settings?.footnoteLayout ?? 'one-line');
   const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : layout==='ticker' ? 'fn-ticker' : layout==='split' ? 'fn-split' : 'fn-one');
