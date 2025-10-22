@@ -296,6 +296,8 @@ export const DEFAULTS = {
     baseW:1920,
     baseH:1080,
     rightWidthPercent:38,
+    infoPanelWidthPercent:32,
+    bannerTopPercent:60,
     cutTopPercent:28,
     cutBottomPercent:12,
     layoutMode:'single',
@@ -304,13 +306,13 @@ export const DEFAULTS = {
       left:{
         source:'master',
         timerSec:null,
-        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','image','video','url'],
+        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
         playlist:[]
       },
       right:{
         source:'media',
         timerSec:null,
-        contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','image','video','url'],
+        contentTypes:['wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
         playlist:[]
       }
     }
@@ -331,6 +333,19 @@ export const DEFAULTS = {
     ],
     gastronomyHighlights:[
       { id:'bar_vital', title:'Vital-Bar', description:'Hausgemachtes Ingwerwasser und frische Obstspieße im Ruhebereich.', dwellSec: null }
+    ],
+    infoModules:[
+      {
+        id:'info_capacity',
+        title:'Auslastung',
+        subtitle:'Live-Status',
+        icon:'📊',
+        layout:'metrics',
+        items:[
+          { id:'metric_sauna', label:'Sauna', value:'78%', trend:'up' },
+          { id:'metric_pool', label:'Pool', value:'42%', trend:'steady' }
+        ]
+      }
     ]
   }
 };

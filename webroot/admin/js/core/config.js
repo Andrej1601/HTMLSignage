@@ -109,6 +109,7 @@ export const PAGE_CONTENT_TYPES = [
   ['wellness-tip', 'Wellness-Tipps'],
   ['event-countdown', 'Event-Countdown'],
   ['gastronomy-highlight', 'Gastronomie'],
+  ['info-module', 'Info-Module'],
   ['image', 'Bilder'],
   ['video', 'Videos'],
   ['url', 'Webseiten']
@@ -143,6 +144,8 @@ export function playlistKeyFromSanitizedEntry(entry) {
       return entry.id != null ? 'event:' + String(entry.id) : null;
     case 'gastronomy-highlight':
       return entry.id != null ? 'gastro:' + String(entry.id) : null;
+    case 'info-module':
+      return entry.id != null ? 'info:' + String(entry.id) : null;
     default:
       return null;
   }
@@ -181,6 +184,10 @@ function playlistEntryKey(entry) {
     case 'gastronomy-highlight': {
       const rawId = entry.id ?? entry.highlightId;
       return rawId != null ? 'gastro:' + String(rawId) : null;
+    }
+    case 'info-module': {
+      const rawId = entry.id ?? entry.moduleId;
+      return rawId != null ? 'info:' + String(rawId) : null;
     }
     default:
       return null;
@@ -237,6 +244,12 @@ export function sanitizePagePlaylist(list = []) {
           seen.add(key);
         }
         break;
+      case 'info':
+        if (rest) {
+          normalized.push({ type: 'info-module', id: rest });
+          seen.add(key);
+        }
+        break;
       default:
         break;
     }
@@ -281,6 +294,21 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   }
   delete fonts.overviewTimeWidthCh;
 
+  const normalizePercentValue = (value, fallback) => {
+    const fallbackValue = Number.isFinite(fallback) ? fallback : null;
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return fallbackValue;
+    return Math.max(1, Math.min(100, Math.round(num)));
+  };
+  const defaultInfoPanel = Number(DEFAULTS.display?.infoPanelWidthPercent);
+  const defaultBannerTop = Number(DEFAULTS.display?.bannerTopPercent);
+  const infoPanelPercent = normalizePercentValue(src.display?.infoPanelWidthPercent, defaultInfoPanel);
+  if (infoPanelPercent != null) src.display.infoPanelWidthPercent = infoPanelPercent;
+  else delete src.display.infoPanelWidthPercent;
+  const bannerPercent = normalizePercentValue(src.display?.bannerTopPercent, defaultBannerTop);
+  if (bannerPercent != null) src.display.bannerTopPercent = bannerPercent;
+  else delete src.display.bannerTopPercent;
+
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
   src.extras = sanitizeExtras(src.extras, DEFAULTS.extras);
   const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);
@@ -312,6 +340,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
           thumb: it?.thumb || it?.url || '',
           dwellSec: Number.isFinite(it?.dwellSec) ? it.dwellSec : 6
         };
+        if (it?.audio === true) next.audio = true;
         if (!next.id && assignMissingIds) next.id = genId('im_');
         return next;
       })
@@ -344,7 +373,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
 
   const pagesRaw = src.display?.pages || {};
   src.display.layoutMode = (src.display.layoutMode === 'split') ? 'split' : 'single';
-  const allowedProfiles = new Set(['landscape','portrait','portrait-split','triple','asymmetric']);
+  const allowedProfiles = new Set(['landscape','portrait','portrait-split','triple','asymmetric','info-panel','banner']);
   const rawProfile = typeof src.display.layoutProfile === 'string' ? src.display.layoutProfile : 'landscape';
   src.display.layoutProfile = allowedProfiles.has(rawProfile) ? rawProfile : 'landscape';
   src.display.pages = {
@@ -452,7 +481,8 @@ function sanitizeExtras(extras, defaults){
   return {
     wellnessTips: sanitizeWellnessTips(src.wellnessTips, fallback.wellnessTips),
     eventCountdowns: sanitizeEventCountdowns(src.eventCountdowns, fallback.eventCountdowns),
-    gastronomyHighlights: sanitizeGastronomyHighlights(src.gastronomyHighlights, fallback.gastronomyHighlights)
+    gastronomyHighlights: sanitizeGastronomyHighlights(src.gastronomyHighlights, fallback.gastronomyHighlights),
+    infoModules: sanitizeInfoModules(src.infoModules, fallback.infoModules)
   };
 }
 
@@ -466,9 +496,9 @@ function sanitizeWellnessTips(list, fallback){
     if (!id) id = genId('well_');
     if (seen.has(id)) return;
     const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const enabled = entry.enabled !== false;
     const title = typeof entry.title === 'string' ? entry.title.trim() : '';
     const text = typeof entry.text === 'string' ? entry.text.trim() : '';
-    const enabled = entry.enabled !== false;
     const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
     const record = { id, icon, title, text };
     if (!enabled) record.enabled = false;
@@ -525,6 +555,55 @@ function sanitizeGastronomyHighlights(list, fallback){
     const dwellSec = sanitizeDwellSeconds(entry.dwellSec);
     const record = { id, title, description, icon, items: details, textLines: textList };
     if (dwellSec != null) record.dwellSec = dwellSec;
+    normalized.push(record);
+    seen.add(id);
+  });
+  return normalized;
+}
+
+function sanitizeInfoModules(list, fallback){
+  const source = Array.isArray(list) ? list : (Array.isArray(fallback) ? fallback : []);
+  const normalized = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    let id = entry.id != null ? String(entry.id).trim() : '';
+    if (!id) id = genId('info_');
+    if (seen.has(id)) return;
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const subtitle = typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '';
+    const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+    const note = typeof entry.note === 'string' ? entry.note.trim() : '';
+    const enabled = entry.enabled !== false;
+    const layout = (() => {
+      const value = typeof entry.layout === 'string' ? entry.layout.trim().toLowerCase() : '';
+      return ['cards', 'metrics', 'ticker'].includes(value) ? value : 'metrics';
+    })();
+    const region = (() => {
+      const value = typeof entry.region === 'string' ? entry.region.trim().toLowerCase() : '';
+      return ['left', 'right', 'full'].includes(value) ? value : 'right';
+    })();
+    const dwell = sanitizeDwellSeconds(entry.dwellSec);
+    const itemsSource = Array.isArray(entry.items) ? entry.items : [];
+    const items = itemsSource.map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const label = typeof item.label === 'string' ? item.label.trim() : '';
+      const value = typeof item.value === 'string' ? item.value.trim() : '';
+      const text = typeof item.text === 'string' ? item.text.trim() : '';
+      const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
+      const badge = typeof item.badge === 'string' ? item.badge.trim() : '';
+      const trendRaw = typeof item.trend === 'string' ? item.trend.trim().toLowerCase() : '';
+      const trend = ['up', 'down', 'steady'].includes(trendRaw) ? trendRaw : null;
+      if (!label && !value && !text && !badge) return null;
+      const normalizedItem = { label, value, text, icon, badge };
+      if (trend) normalizedItem.trend = trend;
+      if (item.id != null) normalizedItem.id = String(item.id);
+      return normalizedItem;
+    }).filter(Boolean);
+    if (!title && !subtitle && !items.length && !note) return;
+    const record = { id, title, subtitle, icon, layout, region, note, items };
+    if (!enabled) record.enabled = false;
+    if (dwell != null) record.dwellSec = dwell;
     normalized.push(record);
     seen.add(id);
   });

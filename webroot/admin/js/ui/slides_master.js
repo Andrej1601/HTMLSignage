@@ -1145,6 +1145,10 @@ function interRow(i){
     </select>
     <img id="p_${id}" class="prev" alt="" title=""/>
     <input id="sec_${id}" class="input num3 dur intSec" type="number" min="1" max="60" step="1" />
+    <label id="aud_${id}" class="audio-toggle" title="Video-Ton abspielen">
+      <input type="checkbox" />
+      <span>Ton an</span>
+    </label>
     <span id="m_${id}" class="media-field"></span>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <input id="en_${id}" type="checkbox" />
@@ -1154,6 +1158,8 @@ function interRow(i){
   const $type  = wrap.querySelector('#t_'+id);
   const $prev  = wrap.querySelector('#p_'+id);
   const $sec   = wrap.querySelector('#sec_'+id);
+  const $audioWrap = wrap.querySelector('#aud_'+id);
+  const $audioToggle = $audioWrap ? $audioWrap.querySelector('input') : null;
   const $media = wrap.querySelector('#m_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $en    = wrap.querySelector('#en_'+id);
@@ -1180,10 +1186,35 @@ function interRow(i){
   // Werte
   if ($type) $type.value = it.type || 'image';
   if ($en) $en.checked = !!it.enabled;
+
+  const updateAudioToggle = () => {
+    if (!$audioWrap || !$audioToggle) return;
+    const isVideo = ($type?.value === 'video');
+    if (!isVideo) {
+      $audioToggle.checked = false;
+      $audioToggle.disabled = true;
+      $audioWrap.classList.add('is-disabled');
+      delete it.audio;
+      return;
+    }
+    $audioToggle.disabled = false;
+    $audioWrap.classList.remove('is-disabled');
+    $audioToggle.checked = it.audio === true;
+  };
+
+  updateAudioToggle();
+
   if ($sec){
     $sec.value = Number.isFinite(+it.dwellSec)
       ? +it.dwellSec
       : (ctx.getSettings().slides?.imageDurationSec ?? ctx.getSettings().slides?.saunaDurationSec ?? 6);
+  }
+
+  if ($audioToggle) {
+    $audioToggle.onchange = () => {
+      if ($audioToggle.checked) it.audio = true;
+      else delete it.audio;
+    };
   }
 
   const FALLBACK_THUMB = '/assets/img/thumb_fallback.svg';
@@ -1269,6 +1300,7 @@ function interRow(i){
     it.thumb = '';
     updatePrev('');
     renderMediaField();
+    updateAudioToggle();
     renderSlidesMaster();
   };
 

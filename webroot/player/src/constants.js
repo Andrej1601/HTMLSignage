@@ -41,7 +41,15 @@ export const STYLE_SLIDE_KEYS = [
   'heroTimelineItemDelayMs','heroTimelineFillMs','heroTimelineDelayMs','tileEnterMs','tileStaggerMs','showSaunaFlames'
 ];
 
-export const LAYOUT_PROFILES = new Set(['landscape', 'portrait', 'portrait-split', 'triple', 'asymmetric']);
+export const LAYOUT_PROFILES = new Set([
+  'landscape',
+  'portrait',
+  'portrait-split',
+  'triple',
+  'asymmetric',
+  'info-panel',
+  'banner'
+]);
 
 export const LIVE_RETRY_BASE_DELAY = 2000;
 export const LIVE_RETRY_MAX_DELAY = 60000;
