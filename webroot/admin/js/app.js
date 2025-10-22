@@ -184,6 +184,27 @@ const resolveOverviewTimeWidthScale = (fonts = {}, { fallback = 1 } = {}) => {
   return clampNumber(fallback, OVERVIEW_TIME_SCALE_MIN, OVERVIEW_TIME_SCALE_MAX);
 };
 
+const createEmptySchedule = () => ({
+  version: 1,
+  saunas: [],
+  rows: [],
+  meta: []
+});
+
+const sanitizeScheduleState = (source) => {
+  if (!source || typeof source !== 'object') {
+    return createEmptySchedule();
+  }
+  const schedule = { ...source };
+  const version = Number(schedule.version);
+  schedule.version = Number.isFinite(version) ? version : 1;
+  schedule.saunas = Array.isArray(schedule.saunas) ? schedule.saunas : [];
+  schedule.rows = Array.isArray(schedule.rows) ? schedule.rows : [];
+  const metaRaw = schedule.meta;
+  schedule.meta = (Array.isArray(metaRaw) || (metaRaw && typeof metaRaw === 'object')) ? metaRaw : [];
+  return schedule;
+};
+
 const stateAccess = {
   getSchedule: () => schedule,
   getSettings: () => settings,
@@ -568,21 +589,37 @@ const applyRoleRestrictions = createRoleRestrictionApplier({
 // ============================================================================
 async function loadAll(){
   let unsavedFromDraft = false;
-  let s;
-  let cfg;
-  try {
-    [s, cfg] = await Promise.all([
-      fetchJson('/admin/api/load.php', { cache: 'no-store' }),
-      fetchJson('/admin/api/load_settings.php', { cache: 'no-store' })
-    ]);
-  } catch (error) {
-    console.error('[admin] Laden der Basisdaten fehlgeschlagen', error);
-    notifyError('Fehler beim Laden der Daten: ' + error.message);
-    return;
+  const [scheduleResult, settingsResult] = await Promise.allSettled([
+    fetchJson('/admin/api/load.php', { cache: 'no-store' }),
+    fetchJson('/admin/api/load_settings.php', { cache: 'no-store' })
+  ]);
+
+  const fetchErrors = [];
+  let schedulePayload = null;
+  if (scheduleResult.status === 'fulfilled') {
+    schedulePayload = scheduleResult.value;
+  } else {
+    fetchErrors.push(scheduleResult.reason);
+  }
+  let settingsPayload = null;
+  if (settingsResult.status === 'fulfilled') {
+    settingsPayload = settingsResult.value;
+  } else {
+    fetchErrors.push(settingsResult.reason);
   }
 
-  stateAccess.setSchedule(deepClone(s || {}));
-  stateAccess.setSettings(normalizeSettings(cfg || {}, { assignMissingIds: true }));
+  if (fetchErrors.length) {
+    const errorMessages = fetchErrors
+      .map((error) => (error && typeof error.message === 'string') ? error.message.trim() : '')
+      .filter(Boolean)
+      .join(' · ');
+    console.error('[admin] Laden der Basisdaten fehlgeschlagen', fetchErrors);
+    const message = errorMessages ? `Fehler beim Laden der Daten: ${errorMessages}` : 'Fehler beim Laden der Daten.';
+    notifyError(message, { persistent: true });
+  }
+
+  stateAccess.setSchedule(deepClone(sanitizeScheduleState(schedulePayload)));
+  stateAccess.setSettings(normalizeSettings(settingsPayload || {}, { assignMissingIds: true }));
   baseSchedule = deepClone(schedule);
   baseSettings = deepClone(settings);
   deviceContextState.setBaseState(baseSchedule, baseSettings);
