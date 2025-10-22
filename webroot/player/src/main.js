@@ -1565,7 +1565,10 @@ if (sortOrder && sortOrder.length) {
         if (it.url) {
           if (it.type === 'url') node.url = it.url; else node.src = it.url;
         }
-        if (it.type === 'video') node.muted = !(it.audio === true);
+        if (it.type === 'video') {
+          node.muted = !(it.audio === true);
+          if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+        }
         queue.push(node);
         usedMedia.add(String(it.id));
       }
@@ -1603,7 +1606,10 @@ if (sortOrder && sortOrder.length) {
       if (it.url) {
         if (it.type === 'url') node.url = it.url; else node.src = it.url;
       }
-      if (it.type === 'video') node.muted = !(it.audio === true);
+      if (it.type === 'video') {
+        node.muted = !(it.audio === true);
+        if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+      }
       queue.push(node);
     }
   }
@@ -1685,7 +1691,10 @@ for (const it of media) {
   const node = { type: it.type, dwell, __id: it.id || null };
   if (it.src) node.src = it.src;
   if (it.url && it.type === 'url') node.url = it.url;
-  if (it.type === 'video') node.muted = !(it.audio === true);
+  if (it.type === 'video') {
+    node.muted = !(it.audio === true);
+    if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+  }
   queue.splice(insPos++, 0, node);
 }
 
@@ -3152,6 +3161,14 @@ img.src = url;
 return c;
 }
 
+function shouldWaitForVideoEnd(entry){
+  if (!entry || entry.type !== 'video') return false;
+  if (Object.prototype.hasOwnProperty.call(entry, 'waitForEnd')) {
+    return entry.waitForEnd === true;
+  }
+  return settings?.slides?.waitForVideo === true;
+}
+
 // ---------- Interstitial video slide ----------
 function renderVideo(src, opts = {}, region = 'left', ctx = {}) {
 const disp = getDisplayRatio();
@@ -3202,7 +3219,7 @@ if (backgroundAudioKey) {
   v.addEventListener('pause', () => { if (!v.ended) releaseBackgroundAudio(); });
   v.addEventListener('abort', releaseBackgroundAudio, { once: true });
 }
-if (settings?.slides?.waitForVideo) {
+if (shouldWaitForVideoEnd(opts)) {
   const done = () => {
     if (done.called) return;
     done.called = true;
@@ -5159,7 +5176,7 @@ function createStageController(id, element){
     last = key;
     updateActiveState();
     const dwell = dwellMsForItem(item, config);
-    if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
+    if (!shouldWaitForVideoEnd(item)) {
       let handled = false;
       if (typeof deferAdvanceHandler === 'function') {
         try {

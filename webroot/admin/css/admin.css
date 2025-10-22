@@ -32,7 +32,7 @@
   --grid-cell-bg:#f2f5fb;  /* Tabellenzelle */
   --grid-entry-bg:#ffffff; /* Button in Zelle (.cellbtn) */
 
-  /* „Kein Aufguss“-Pillen (Light) */
+  /* Inventar-Pillen (Light) */
   --pill-bg:#edf1f7;
 
   /* Unsaved Badge */
@@ -54,7 +54,13 @@
   /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
   --col-name:minmax(140px,0.9fr);
   --col-type:8ch;
-  --col-prev:64px; --col-dur:70px; --col-audio:86px; --col-btn:28px; --col-del:28px; --col-vis:minmax(150px, 1fr);
+  --col-prev:64px;
+  --col-dur:70px;
+  --col-audio:86px;
+  --col-wait:clamp(90px, 18ch, 168px);
+  --col-btn:28px;
+  --col-del:28px;
+  --col-vis:minmax(150px, 1fr);
 
   /* Preview-Größe */
   --prev-w:60px; --prev-h:42px;
@@ -167,6 +173,9 @@ a{ color: color-mix(in oklab, var(--btn-accent) 70%, #1e3a8a); text-decoration:n
 .layout-display-fold[open] .layout-display-chev{ transform:rotate(180deg); }
 .layout-display-body{ padding:12px 16px 14px; display:grid; gap:12px; }
 .layout-display-columns{ display:grid; gap:12px; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
+.layout-flow-section{ display:flex; flex-direction:column; gap:12px; margin:12px 0 4px; }
+.layout-flow-section .kv{ margin-bottom:0; }
+.layout-flow-section .kv + .kv{ margin-top:0; }
 .mut,.help{ color:var(--muted); }
 
 /* Utility classes for headings and toolbars */
@@ -1509,7 +1518,7 @@ table.tbl{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 .sl-head.sl-images, .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-audio) var(--col-btn) var(--col-del) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-audio) var(--col-wait) var(--col-btn) var(--col-del) var(--col-vis);
 }
 
 /* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
@@ -1518,7 +1527,7 @@ body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-audio) var(--col-btn) var(--col-del) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-audio) var(--col-wait) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
 body.mode-uniform #ovSec{ display:none !important; }
@@ -1539,9 +1548,21 @@ body.mode-uniform #ovSec{ display:none !important; }
   width:clamp(120px, 18ch, 100%);
   justify-self:start;
 }
-.audio-toggle{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--muted);} 
-.audio-toggle input{margin:0;}
-.audio-toggle.is-disabled{opacity:.35;pointer-events:none;}
+.audio-toggle,
+.video-wait-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  font-size:12px;
+  color:var(--muted);
+}
+.audio-toggle input,
+.video-wait-toggle input{margin:0;}
+.audio-toggle.is-disabled,
+.video-wait-toggle.is-disabled{opacity:.35;pointer-events:none;}
+.video-wait-toggle span{white-space:nowrap;}
+.video-wait-toggle.is-hidden{visibility:hidden;}
 
 /* Upload/Default Buttons kompakt */
 .btn.icon{ width:28px; height:28px; }
@@ -1640,10 +1661,10 @@ body.mode-uniform #ovSec{ display:none !important; }
 .saunarow .input.name{ width:80%; }
 
 /* Medien-Slides: Name 30% schmaler */
-.mediarow .input.name{ width:50%; }
+.mediarow .input.name{ width:45%; }
 
 
-/* „Kein Aufguss“-Pillen – kleiner, mehr Abstand */
+/* Inventar-Pillen – kleiner, mehr Abstand */
 .pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .pill{
   font-size:10.5px; line-height:1; padding:2px 6px;
