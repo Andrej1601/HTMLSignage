@@ -45,7 +45,8 @@ import {
   sanitizeScheduleForCompare,
   sanitizeSettingsForCompare,
   normalizeSaunaHeadingWidth,
-  SAUNA_HEADING_WIDTH_LIMITS
+  SAUNA_HEADING_WIDTH_LIMITS,
+  sanitizeBackgroundAudio
 } from './core/config.js';
 import {
   loadDeviceSnapshots,
@@ -949,29 +950,10 @@ function collectSettings(){
       footnotes: settings.footnotes,
       extras: deepClone(settings.extras || {}),
       audio: (() => {
-        const current = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
+        const current = (settings.audio && typeof settings.audio === 'object') ? deepClone(settings.audio) : {};
         const backgroundDefaults = DEFAULTS.audio?.background || {};
-        const enabledInput = document.getElementById('bgAudioEnabled');
-        const srcInput = document.getElementById('bgAudioSrc');
-        const volumeInput = document.getElementById('bgAudioVolume');
-        const loopInput = document.getElementById('bgAudioLoop');
-        const rawSrc = typeof srcInput?.value === 'string' ? srcInput.value.trim() : '';
-        const isEnabled = !!(enabledInput?.checked && rawSrc);
-        const rawVolume = Number(volumeInput?.value);
-        const fallbackVolume = Number(backgroundDefaults.volume ?? 1);
-        const normalizedVolume = Number.isFinite(rawVolume)
-          ? Math.max(0, Math.min(100, Math.round(rawVolume))) / 100
-          : (Number.isFinite(fallbackVolume) ? Math.min(1, Math.max(0, fallbackVolume)) : 1);
-        const loop = loopInput ? loopInput.checked : (backgroundDefaults.loop === false ? false : true);
-        const background = {
-          ...(current.background && typeof current.background === 'object' ? current.background : {}),
-          enabled: isEnabled,
-          src: rawSrc,
-          volume: normalizedVolume,
-          loop
-        };
-        if (!rawSrc) background.enabled = false;
-        return { ...current, background };
+        current.background = sanitizeBackgroundAudio(current.background, backgroundDefaults);
+        return current;
       })(),
       interstitials: (settings.interstitials || []).map(({after, afterRef, ...rest}) => rest),
       presets: settings.presets || {},

@@ -13,22 +13,116 @@ export const WELLNESS_GLOBAL_ID = '__wellness_bundle__';
 
 const clamp = (min, val, max) => Math.min(Math.max(val, min), max);
 
-function sanitizeBackgroundAudio(input = {}, defaults = {}) {
+export function sanitizeBackgroundAudio(input = {}, defaults = {}) {
   const cfg = input && typeof input === 'object' ? input : {};
   const def = defaults && typeof defaults === 'object' ? defaults : {};
-  const src = typeof cfg.src === 'string' ? cfg.src.trim() : '';
-  const enabled = !!src && cfg.enabled !== false;
-  const rawVolume = Number(cfg.volume);
-  const defVolume = Number(def.volume ?? 1);
-  const volume = Number.isFinite(rawVolume)
-    ? clamp(0, rawVolume, 1)
-    : (Number.isFinite(defVolume) ? clamp(0, defVolume, 1) : 1);
-  const loop = cfg.loop === false ? false : (def.loop === false ? false : true);
-  const result = { enabled, src, volume, loop };
-  const fadeRaw = Number(cfg.fadeMs ?? def.fadeMs);
-  if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
-    result.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+
+  const sanitizeTrack = (track = {}, fallback = {}) => {
+    const raw = track && typeof track === 'object' ? track : {};
+    const fb = fallback && typeof fallback === 'object' ? fallback : {};
+    const result = {};
+    const labelRaw = typeof raw.label === 'string' ? raw.label.trim() : (typeof fb.label === 'string' ? fb.label.trim() : '');
+    if (labelRaw) result.label = labelRaw;
+    const src = typeof raw.src === 'string' ? raw.src.trim() : (typeof fb.src === 'string' ? fb.src.trim() : '');
+    result.src = src;
+    const fallbackVolume = Number(fb.volume ?? def.volume ?? 1);
+    const rawVolume = Number(raw.volume);
+    const volume = Number.isFinite(rawVolume)
+      ? clamp(0, rawVolume, 1)
+      : (Number.isFinite(fallbackVolume) ? clamp(0, fallbackVolume, 1) : 1);
+    result.volume = volume;
+    const loop = raw.loop === false
+      ? false
+      : (fb.loop === false ? false : (def.loop === false ? false : true));
+    result.loop = loop;
+    const fadeRaw = Number(raw.fadeMs ?? fb.fadeMs ?? def.fadeMs);
+    if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
+      result.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+    }
+    return result;
+  };
+
+  const defaultTracks = def.tracks && typeof def.tracks === 'object' ? def.tracks : {};
+  const rawTracks = cfg.tracks && typeof cfg.tracks === 'object' ? cfg.tracks : {};
+  const tracks = {};
+  const seen = new Set();
+  const addTrack = (id, track, fallback) => {
+    if (id == null) return;
+    const key = String(id).trim();
+    if (!key || seen.has(key)) return;
+    tracks[key] = sanitizeTrack(track, fallback);
+    seen.add(key);
+  };
+
+  Object.entries(rawTracks).forEach(([id, track]) => {
+    addTrack(id, track, defaultTracks[id] || {});
+  });
+
+  const legacySrc = typeof cfg.src === 'string' ? cfg.src.trim() : '';
+  if (!seen.size && legacySrc) {
+    const legacyTrackId = typeof cfg.activeTrack === 'string' && cfg.activeTrack.trim()
+      ? cfg.activeTrack.trim()
+      : 'default';
+    addTrack(legacyTrackId, {
+      label: cfg.trackLabel,
+      src: legacySrc,
+      volume: cfg.volume,
+      loop: cfg.loop,
+      fadeMs: cfg.fadeMs
+    }, defaultTracks[legacyTrackId] || {});
   }
+
+  if (!seen.size) {
+    Object.entries(defaultTracks).forEach(([id, track]) => addTrack(id, track, track));
+  }
+
+  if (!seen.size) {
+    addTrack('default', {
+      label: 'Standard',
+      src: '',
+      volume: def.volume ?? 1,
+      loop: def.loop === false ? false : true,
+      fadeMs: def.fadeMs
+    }, {});
+  }
+
+  let activeTrack = typeof cfg.activeTrack === 'string' ? cfg.activeTrack.trim() : '';
+  if (!activeTrack || !tracks[activeTrack]) {
+    const defActive = typeof def.activeTrack === 'string' ? def.activeTrack.trim() : '';
+    if (defActive && tracks[defActive]) {
+      activeTrack = defActive;
+    } else {
+      activeTrack = Object.keys(tracks)[0] || '';
+    }
+  }
+
+  const desiredEnabled = cfg.enabled !== false;
+  const activeEntry = activeTrack && tracks[activeTrack] ? tracks[activeTrack] : null;
+  const enabled = !!(desiredEnabled && activeEntry && activeEntry.src);
+
+  const result = {
+    enabled,
+    activeTrack,
+    tracks
+  };
+
+  if (activeEntry) {
+    result.src = activeEntry.src || '';
+    result.volume = clamp(0, Number(activeEntry.volume ?? 1), 1);
+    result.loop = activeEntry.loop === false ? false : true;
+    if (typeof activeEntry.label === 'string' && activeEntry.label) {
+      result.trackLabel = activeEntry.label;
+    }
+    if (activeEntry.fadeMs != null) {
+      result.fadeMs = activeEntry.fadeMs;
+    }
+  } else {
+    const fallbackVolume = Number(def.volume ?? 1);
+    result.src = '';
+    result.volume = Number.isFinite(fallbackVolume) ? clamp(0, fallbackVolume, 1) : 1;
+    result.loop = def.loop === false ? false : true;
+  }
+
   return result;
 }
 
@@ -606,6 +700,11 @@ function sanitizeStyleAutomation(settings){
   const slides = settings?.slides || {};
   const styleSets = slides.styleSets && typeof slides.styleSets === 'object' ? slides.styleSets : {};
   const availableStyles = new Set(Object.keys(styleSets));
+  const background = settings?.audio?.background && typeof settings.audio.background === 'object'
+    ? settings.audio.background
+    : {};
+  const backgroundTracks = background.tracks && typeof background.tracks === 'object' ? background.tracks : {};
+  const availableTracks = new Set(Object.keys(backgroundTracks));
   const defaults = DEFAULTS.slides?.styleAutomation || {};
   const raw = slides.styleAutomation && typeof slides.styleAutomation === 'object'
     ? slides.styleAutomation
@@ -616,8 +715,23 @@ function sanitizeStyleAutomation(settings){
     fallbackStyle: availableStyles.has(raw.fallbackStyle)
       ? raw.fallbackStyle
       : (availableStyles.has(defaults.fallbackStyle) ? defaults.fallbackStyle : Array.from(availableStyles)[0] || ''),
+    fallbackTrack: '',
     timeSlots: []
   };
+
+  const fallbackTrackCandidates = [raw.fallbackTrack, defaults.fallbackTrack, background.activeTrack];
+  for (const candidate of fallbackTrackCandidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed && availableTracks.has(trimmed)) {
+        normalized.fallbackTrack = trimmed;
+        break;
+      }
+    }
+  }
+  if (!normalized.fallbackTrack && availableTracks.size > 0) {
+    normalized.fallbackTrack = Array.from(availableTracks)[0];
+  }
 
   const slotSource = Array.isArray(raw.timeSlots) && raw.timeSlots.length
     ? raw.timeSlots
@@ -629,6 +743,8 @@ function sanitizeStyleAutomation(settings){
     if (seen.has(id)) return;
     const label = typeof entry.label === 'string' ? entry.label.trim() : '';
     const style = availableStyles.has(entry.style) ? entry.style : normalized.fallbackStyle;
+    const trackCandidate = typeof entry.track === 'string' ? entry.track.trim() : '';
+    const track = trackCandidate && availableTracks.has(trackCandidate) ? trackCandidate : (normalized.fallbackTrack || '');
     const mode = entry.mode === 'range' || (entry.startDateTime && entry.endDateTime)
       ? 'range'
       : 'daily';
@@ -642,12 +758,13 @@ function sanitizeStyleAutomation(settings){
         style,
         mode: 'range',
         startDateTime: startInfo.iso,
-        endDateTime: endInfo.iso
+        endDateTime: endInfo.iso,
+        track
       });
     } else {
       const start = normalizeTimeString(entry.start || entry.startTime || '');
       if (!start) return;
-      normalized.timeSlots.push({ id, label, start, style, mode: 'daily' });
+      normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track });
     }
     seen.add(id);
   });
