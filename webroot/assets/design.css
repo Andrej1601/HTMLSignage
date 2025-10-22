@@ -278,6 +278,44 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
 .overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
 /* overview-only multiply with --ovAuto */
 .ovbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%;margin:0 0 10px}
+.sauna-info-box{
+  display:inline-flex;
+  flex-direction:column;
+  align-items:flex-start;
+  align-self:flex-start;
+  gap:calc(10px*var(--vwScale));
+  padding:calc(18px*var(--vwScale)) calc(22px*var(--vwScale));
+  border-radius:calc(22px*var(--vwScale));
+  background:color-mix(in srgb, var(--boxfg) 18%, transparent);
+  border:1px solid color-mix(in srgb, var(--boxfg) 32%, transparent);
+  box-shadow:0 28px 48px rgba(0,0,0,.18);
+  color:var(--boxfg);
+  margin:0 0 calc(18px*var(--vwScale));
+  max-width:min(100%, var(--saunaHeadingMaxWidth, 100%));
+  width:fit-content;
+}
+.sauna-info-box__line{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:baseline;
+  gap:calc(12px*var(--vwScale));
+  font-size:calc(22px*var(--scale));
+}
+.sauna-info-box__label{
+  font-size:calc(16px*var(--scale));
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:color-mix(in srgb, var(--boxfg) 82%, transparent);
+}
+.sauna-info-box__label[data-has-value="true"]::after{
+  content:':';
+  margin-left:calc(4px*var(--vwScale));
+  opacity:.8;
+}
+.sauna-info-box__value{
+  font-weight:600;
+}
 .overview .h1{line-height:1.1;font-size:calc(56px*var(--scale)*var(--ovTitleScale)*var(--ovAuto))}
 .overview .h2{font-size:calc(36px*var(--scale)*var(--h2Scale)*var(--ovAuto))}
 .caption{opacity:.85;font-size:calc(20px*var(--scale))}
@@ -472,7 +510,7 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
 }
 
 /* content area under headings is vertically centered */
-.body{flex:1; display:flex}
+.body{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:flex-start;}
 .list{display:flex;flex-direction:column;gap:calc(18px*var(--vwScale));width:100%;align-items:flex-start;justify-content:center;position:relative}
 .list.is-paged{--tileEnterDelay:0ms}
 
