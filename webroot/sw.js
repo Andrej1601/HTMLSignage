@@ -1,8 +1,10 @@
 const STATIC_CACHE_PREFIX = 'signage-static-';
 const FALLBACK_STATIC_CACHE = `${STATIC_CACHE_PREFIX}fallback`;
-const DATA_CACHE = 'signage-data-v1';
+const DATA_CACHE_PREFIX = 'signage-data-';
+const FALLBACK_DATA_CACHE = `${DATA_CACHE_PREFIX}fallback`;
 const OFFLINE_URL = '/offline.html';
 const MANIFEST_URL = '/api/cache-manifest.php';
+const SETTINGS_URL = '/api/settings.php';
 
 const DATA_URLS = new Set(['/api/schedule.php', '/api/settings.php']);
 
@@ -25,6 +27,62 @@ let staticCacheReady = (async () => {
 
 async function resolveStaticCacheName() {
   return staticCacheReady;
+}
+
+let dataCacheName = FALLBACK_DATA_CACHE;
+let dataCacheInitialized = false;
+let dataCacheReady = Promise.resolve(dataCacheName);
+
+async function resolveDataCacheName() {
+  if (!dataCacheInitialized) {
+    await prepareDataCache();
+  }
+  return dataCacheReady;
+}
+
+async function fetchSettingsVersion() {
+  const response = await fetch(SETTINGS_URL, { cache: 'no-store' });
+  if (!response || !response.ok) {
+    throw new Error(`settings-response-${response ? response.status : 'missing'}`);
+  }
+  let payload;
+  try {
+    payload = await response.clone().json();
+  } catch (error) {
+    throw new Error('settings-invalid-json');
+  }
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('settings-invalid-payload');
+  }
+  const { version } = payload;
+  if (typeof version === 'number' && Number.isFinite(version)) {
+    return String(version);
+  }
+  if (typeof version === 'string' && version !== '') {
+    return version;
+  }
+  throw new Error('settings-missing-version');
+}
+
+async function prepareDataCache() {
+  dataCacheInitialized = true;
+  dataCacheReady = (async () => {
+    let version = null;
+    try {
+      version = await fetchSettingsVersion();
+    } catch (error) {
+      console.error('[sw] Unable to determine settings version', error);
+    }
+    const targetName = version ? `${DATA_CACHE_PREFIX}${version}` : FALLBACK_DATA_CACHE;
+    dataCacheName = targetName;
+    try {
+      await caches.open(targetName);
+    } catch (error) {
+      console.error('[sw] Failed to open data cache', targetName, error);
+    }
+    return dataCacheName;
+  })();
+  return dataCacheReady;
 }
 
 async function fetchPrecacheManifest() {
@@ -74,6 +132,7 @@ self.addEventListener('install', event => {
       console.error('[sw] Unable to fetch precache manifest', error);
       await populateStaticCache(null);
     }
+    await prepareDataCache();
   })());
   self.skipWaiting();
 });
@@ -81,10 +140,14 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const currentStatic = await resolveStaticCacheName();
+    const currentData = await resolveDataCacheName();
     const keys = await caches.keys();
-    const allowed = new Set([currentStatic, DATA_CACHE]);
+    const allowed = new Set([currentStatic, currentData]);
     if (currentStatic !== FALLBACK_STATIC_CACHE) {
       allowed.add(FALLBACK_STATIC_CACHE);
+    }
+    if (currentData !== FALLBACK_DATA_CACHE) {
+      allowed.add(FALLBACK_DATA_CACHE);
     }
     await Promise.all(keys.filter(key => !allowed.has(key)).map(key => caches.delete(key)));
     await self.clients.claim();
@@ -104,7 +167,7 @@ self.addEventListener('fetch', event => {
 
   if (DATA_URLS.has(url.pathname)) {
     event.respondWith((async () => {
-      const cache = await caches.open(DATA_CACHE);
+      const cache = await caches.open(await resolveDataCacheName());
       try {
         const response = await fetch(request, { cache: 'no-store' });
         if (response && response.ok) {
