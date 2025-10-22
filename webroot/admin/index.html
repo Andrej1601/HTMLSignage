@@ -5,67 +5,76 @@
 <link rel="stylesheet" href="/admin/css/admin.css">
 
 </head>
- <body class="theme-light">
-  <header class="app-header">
-    <div class="header-primary">
-      <div class="header-brand">
-        <h1>Anzeigensteuerung – Admin</h1>
-        <div class="header-meta">
-          <span class="header-subtitle">Planen, steuern und ausspielen – alles an einem Ort.</span>
-          <label class="toggle" title="Hell/Dunkel">
-            <input type="checkbox" id="themeMode">
-            <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="4" fill="currentColor"/>
-              <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="12" y1="2" x2="12" y2="4"/>
-                <line x1="12" y1="20" x2="12" y2="22"/>
-                <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
-                <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
-                <line x1="2" y1="12" x2="4" y2="12"/>
-                <line x1="20" y1="12" x2="22" y2="12"/>
-                <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
-                <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
-              </g>
-            </svg>
-            <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
-            </svg>
-          </label>
+<body class="theme-light">
+  <header>
+    <div class="header-title">
+      <h1>Anzeigensteuerung – Admin</h1>
+      <label class="toggle" title="Hell/Dunkel">
+        <input type="checkbox" id="themeMode">
+        <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="4" fill="currentColor"/>
+          <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="12" y1="2" x2="12" y2="4"/>
+            <line x1="12" y1="20" x2="12" y2="22"/>
+            <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+            <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+            <line x1="2" y1="12" x2="4" y2="12"/>
+            <line x1="20" y1="12" x2="22" y2="12"/>
+            <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+            <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+          </g>
+        </svg>
+        <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor"/>
+        </svg>
+      </label>
+    </div>
+    <div class="header-actions">
+      <div class="header-cockpit-controls" role="group" aria-label="Cockpit-Schnellzugriff" hidden>
+        <div class="header-cockpit-toggle">
+          <button type="button" class="btn ghost sm header-cockpit-btn" data-action="toggle" data-cockpit-control="toggle" data-title-expanded="Cockpit ausblenden" data-title-collapsed="Cockpit anzeigen" aria-controls="adminCockpitBody" aria-expanded="true" aria-label="Cockpit ein-/ausblenden" title="Cockpit ein-/ausblenden">
+            <span class="header-cockpit-icon" data-role="icon" data-icon-expanded="▾" data-icon-collapsed="▸" aria-hidden="true">▾</span>
+            <span class="header-cockpit-label" data-role="label" data-label-expanded="Cockpit" data-label-collapsed="Cockpit">Cockpit</span>
+          </button>
+          <button type="button" class="btn ghost xs header-cockpit-pin" data-action="pin" data-cockpit-control="pin" aria-pressed="false" aria-label="Cockpit anheften" title="Cockpit anheften">
+            <span class="header-cockpit-icon" data-role="icon" data-icon-pinned="📍" data-icon-unpinned="📌" aria-hidden="true">📌</span>
+            <span class="sr-only" data-role="label" data-label-pinned="Angeheftet" data-label-unpinned="Nicht angeheftet">Nicht angeheftet</span>
+          </button>
         </div>
       </div>
-      <div class="header-primary-actions" role="toolbar" aria-label="Schnellaktionen">
-        <button class="btn" id="btnOpen">Vorschau öffnen</button>
-        <button class="btn primary" id="btnSave">Speichern</button>
+      <!-- Ansicht-Menü -->
+      <button class="btn" id="btnDevices">Geräte</button>
+      <div class="menuwrap" id="viewMenuWrap">
+        <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
+          Ansicht: <span id="viewMenuLabel">Grid</span> ▾
+        </button>
+      <div class="dropdown" id="viewMenu" role="menu" hidden>
+        <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
+        <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
       </div>
     </div>
-    <div class="header-secondary" role="toolbar" aria-label="Arbeitsbereich auswählen">
-      <div class="header-secondary-group">
-        <button class="btn" id="btnDevices">Geräte</button>
-        <div class="menuwrap" id="viewMenuWrap">
-          <button class="btn" id="viewMenuBtn" aria-haspopup="menu" aria-expanded="false">
-            Ansicht: <span id="viewMenuLabel">Grid</span> ▾
-          </button>
-          <div class="dropdown" id="viewMenu" role="menu" hidden>
-            <button class="dd-item" role="menuitemradio" data-view="grid" aria-checked="true">▦ Grid</button>
-            <button class="dd-item" role="menuitemradio" data-view="preview" aria-checked="false">▶ Vorschau</button>
-          </div>
-        </div>
-      </div>
-      <div class="header-secondary-help">
-        <p>Wähle die gewünschte Ansicht oder steuere Geräte direkt.</p>
-      </div>
+      <button class="btn" id="btnOpen">Slideshow öffnen</button>
+      <button class="btn primary" id="btnSave">Speichern</button>
+      <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
+        <span class="unsaved-badge-icon" aria-hidden="true"></span>
+        <span class="unsaved-badge-content">
+          <span class="unsaved-badge-title" data-role="unsaved-title">Änderungen nicht gespeichert</span>
+          <span class="unsaved-badge-detail" data-role="unsaved-detail">Lokal geänderte Inhalte warten auf das Speichern.</span>
+        </span>
+        <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
+      </span>
     </div>
   </header>
+
   <main class="layout">
-    <nav class="workspace-overview workspace-nav" aria-label="Arbeitsbereiche" data-collapsed="false" data-pinned="true">
+    <section class="workspace-overview cockpit-compact" aria-label="Cockpit-Schnellzugriff" data-collapsed="false" data-pinned="false" hidden>
       <header class="workspace-toolbar">
-        <h2 class="workspace-title">Arbeitsbereiche</h2>
-        <p class="workspace-subtitle">Direkter Zugriff auf Planung, Inhalte und Gerätesteuerung.</p>
+        <p class="workspace-subtitle">Schnellzugriff auf Vorschau, Geräte, Planung und Inhalte.</p>
       </header>
 
       <div class="workspace-body" id="adminCockpitBody">
-        <ul class="workspace-grid" role="list">
-          <li class="workspace-card" role="listitem">
+        <div class="workspace-grid" role="list">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🖥️</span>
               <h3>Vorschau &amp; Geräte</h3>
@@ -75,9 +84,9 @@
               <button type="button" class="workspace-card-btn" data-devices="toggle" data-highlight="devicesPane">Geräte</button>
               <button type="button" class="workspace-card-btn" data-devices="refresh" data-highlight="devicesPane">Status aktualisieren</button>
             </div>
-          </li>
+          </article>
 
-          <li class="workspace-card" role="listitem">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🗓️</span>
               <h3>Tagesplan &amp; Wochenablauf</h3>
@@ -85,9 +94,9 @@
             <div class="workspace-card-actions">
               <button type="button" class="workspace-card-btn primary" data-view="grid" data-jump="gridPane" aria-controls="gridPane">Plan bearbeiten</button>
             </div>
-          </li>
+          </article>
 
-          <li class="workspace-card" role="listitem">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🔥</span>
               <h3>Saunen &amp; Hinweise</h3>
@@ -97,9 +106,9 @@
               <button type="button" class="workspace-card-btn" data-jump="boxFootnotes" aria-controls="boxFootnotes">Fußnoten &amp; Badges</button>
               <button type="button" class="workspace-card-btn" data-jump="badgeLibrarySection" aria-controls="badgeLibrarySection">Badge-Bibliothek</button>
             </div>
-          </li>
+          </article>
 
-          <li class="workspace-card" role="listitem">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🎬</span>
               <h3>Slides &amp; Automationen</h3>
@@ -109,9 +118,9 @@
               <button type="button" class="workspace-card-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
               <button type="button" class="workspace-card-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
             </div>
-          </li>
+          </article>
 
-          <li class="workspace-card" role="listitem">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🖼️</span>
               <h3>Infos &amp; Story-Slides</h3>
@@ -124,9 +133,9 @@
               <button type="button" class="workspace-card-btn" data-jump="heroTimelineEnabled" aria-controls="infoEvents">Hero-Timeline</button>
               <button type="button" class="workspace-card-btn" data-jump="infoStories" aria-controls="infoStories">Story-Slides</button>
             </div>
-          </li>
+          </article>
 
-          <li class="workspace-card" role="listitem">
+          <article class="workspace-card" role="listitem">
             <div class="workspace-card-head">
               <span class="workspace-card-icon" aria-hidden="true">🎨</span>
               <h3>Medien &amp; Layout</h3>
@@ -137,10 +146,10 @@
               <button type="button" class="workspace-card-btn" data-jump="displayLayoutFold" aria-controls="displayLayoutFold">Darstellung &amp; Seiten</button>
               <button type="button" class="workspace-card-btn" data-jump="styleSetControls" aria-controls="styleSetControls">Style-Paletten</button>
             </div>
-          </li>
-        </ul>
+          </article>
+        </div>
       </div>
-    </nav>
+    </section>
 
     <section class="leftcol">
     <div class="card" id="gridPane" data-jump-target>
@@ -788,17 +797,7 @@
     </aside>
   </main>
 
-  <footer class="app-status" aria-live="polite">
-    <span class="app-status-note">© Andrej Soennecken</span>
-    <span id="unsavedBadge" class="unsaved-badge" hidden role="status">
-      <span class="unsaved-badge-icon" aria-hidden="true"></span>
-      <span class="unsaved-badge-content">
-        <span class="unsaved-badge-title" data-role="unsaved-title">Änderungen nicht gespeichert</span>
-        <span class="unsaved-badge-detail" data-role="unsaved-detail">Lokal geänderte Inhalte warten auf das Speichern.</span>
-      </span>
-      <button type="button" class="unsaved-badge-btn" id="unsavedBadgeReset" aria-label="Änderungen verwerfen">⟳</button>
-    </span>
-  </footer>
+  <footer>© Andrej Soennecken</footer>
 
   <!-- Dialog Zelle -->
   <div id="modal" class="modal">
