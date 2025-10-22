@@ -1,6 +1,6 @@
 // /admin/js/ui/slides_master.js
 // ============================================================================
-// Master-Panel: Saunen (inkl. „Kein Aufguss“), Übersicht-Row, Medien-Slides,
+// Master-Panel: Saunen (inkl. Inventar), Übersicht-Row, Medien-Slides,
 // Dauer-Modus (einheitlich/individuell), Presets & Wochentage.
 // ----------------------------------------------------------------------------
 // Abhängigkeiten:
@@ -722,14 +722,14 @@ function removeSaunaFromActive(name){
   const schedule = ctx.getSchedule();
   const idx = (schedule.saunas || []).indexOf(name);
   if (idx === -1) return;
-  if (!confirm(`Sauna "${name}" für ${DAY_LABELS[activeDayKey] || activeDayKey} auf „Kein Aufguss“ verschieben?\nDie Spalte wird gelöscht.`)) return;
+  if (!confirm(`Sauna "${name}" für ${DAY_LABELS[activeDayKey] || activeDayKey} ins Inventar verschieben?\nDie Spalte wird gelöscht.`)) return;
   schedule.saunas.splice(idx,1);
   schedule.rows.forEach(r => r.entries.splice(idx,1));
   renderSlidesMaster();
   renderGridUI();
 }
 
-// Für Markierungen der „Kein Aufguss“-Liste
+// Für Markierungen der Inventar-Liste
 function computePresetSaunaDays(){
   const settings = ctx.getSettings();
   const map = new Map();
@@ -898,7 +898,7 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
     <button class="btn sm ghost icon" id="d_${id}" title="Default">⟳</button>
     ${
       mode === 'normal'
-        ? `<button class="btn sm ghost icon" id="x_${id}" title="Kein Aufguss (Spalte für diesen Tag entfernen)">✕</button>`
+        ? `<button class="btn sm ghost icon" id="x_${id}" title="Inventar (Spalte für diesen Tag entfernen)">✕</button>`
         : `<div class="row" style="gap:6px">
              <button class="btn sm ghost icon" id="mv_${id}" title="Zu Aufguss hinzufügen">➕</button>
              <button class="btn sm ghost icon" id="delinv_${id}" title="Dauerhaft löschen">🗑</button>
@@ -1186,7 +1186,7 @@ function enableSaunaOrder(){
 }
 
 // ============================================================================
-// 5) „Kein Aufguss“ / Inventar
+// 5) Inventar (kein Aufguss)
 // ============================================================================
 function renderSaunaOffList(){
   const schedule = ctx.getSchedule();
@@ -1235,6 +1235,10 @@ function interRow(i){
       <input type="checkbox" />
       <span>Ton an</span>
     </label>
+    <label id="wait_${id}" class="video-wait-toggle" title="Weiter erst nach Video-Ende">
+      <input type="checkbox" />
+      <span>Abwarten</span>
+    </label>
     <span id="m_${id}" class="media-field"></span>
     <button class="btn sm ghost icon" id="x_${id}" title="Entfernen">✕</button>
     <input id="en_${id}" type="checkbox" />
@@ -1246,6 +1250,8 @@ function interRow(i){
   const $sec   = wrap.querySelector('#sec_'+id);
   const $audioWrap = wrap.querySelector('#aud_'+id);
   const $audioToggle = $audioWrap ? $audioWrap.querySelector('input') : null;
+  const $waitWrap = wrap.querySelector('#wait_'+id);
+  const $waitToggle = $waitWrap ? $waitWrap.querySelector('input') : null;
   const $media = wrap.querySelector('#m_'+id);
   const $del   = wrap.querySelector('#x_'+id);
   const $en    = wrap.querySelector('#en_'+id);
@@ -1289,6 +1295,23 @@ function interRow(i){
   };
 
   updateAudioToggle();
+
+  const updateWaitToggle = () => {
+    if (!$waitWrap || !$waitToggle) return;
+    const isVideo = ($type?.value === 'video');
+    if (!isVideo) {
+      $waitToggle.checked = false;
+      $waitToggle.disabled = true;
+      $waitWrap.classList.add('is-disabled', 'is-hidden');
+      delete it.waitForEnd;
+      return;
+    }
+    $waitToggle.disabled = false;
+    $waitWrap.classList.remove('is-disabled', 'is-hidden');
+    $waitToggle.checked = it.waitForEnd === true;
+  };
+
+  updateWaitToggle();
 
   if ($sec){
     $sec.value = Number.isFinite(+it.dwellSec)
@@ -1387,11 +1410,19 @@ function interRow(i){
     updatePrev('');
     renderMediaField();
     updateAudioToggle();
+    updateWaitToggle();
     renderSlidesMaster();
   };
 
   if ($en)  $en.onchange  = () => { it.enabled = !!$en.checked; };
   if ($sec) $sec.onchange = () => { it.dwellSec = Math.max(1, Math.min(60, +$sec.value || 6)); };
+
+  if ($waitToggle) {
+    $waitToggle.onchange = () => {
+      if ($waitToggle.checked) it.waitForEnd = true;
+      else delete it.waitForEnd;
+    };
+  }
 
   if ($del) $del.onclick = () => { ctx.getSettings().interstitials.splice(i,1); renderSlidesMaster(); };
 
@@ -1401,10 +1432,25 @@ function interRow(i){
 function renderInterstitialsPanel(hostId='interList2'){
   const settings = ctx.getSettings();
   const list = Array.isArray(settings.interstitials) ? settings.interstitials : [];
+  const globalWait = settings.slides?.waitForVideo === true;
+  let appliedGlobalWait = false;
   settings.interstitials = list.map(it => {
-    const { after, afterRef, ...rest } = it || {};
-    return ({ type:'image', thumb:'', ...rest });
+    const src = (it && typeof it === 'object') ? it : {};
+    const { after, afterRef, ...rest } = src;
+    const hasExplicitWait = Object.prototype.hasOwnProperty.call(src, 'waitForEnd');
+    const entry = { type: 'image', thumb: '', waitForEnd: false, ...rest };
+    entry.type = entry.type || 'image';
+    entry.thumb = entry.thumb || '';
+    entry.waitForEnd = entry.waitForEnd === true;
+    if (globalWait && entry.type === 'video' && !hasExplicitWait && !entry.waitForEnd) {
+      entry.waitForEnd = true;
+      appliedGlobalWait = true;
+    }
+    return entry;
   });
+  if (globalWait && appliedGlobalWait && settings.slides) {
+    delete settings.slides.waitForVideo;
+  }
 
   const host = document.getElementById(hostId);
   if (!host) return;
@@ -1421,7 +1467,8 @@ function renderInterstitialsPanel(hostId='interList2'){
       type:'image',
       url:'',
       thumb:'',
-      dwellSec:6
+      dwellSec:6,
+      waitForEnd:false
     });
     renderSlidesMaster();
   };
@@ -2530,12 +2577,6 @@ export function renderSlidesMaster(){
     autoEl.onchange = () => { settings.presetAuto = !!autoEl.checked; };
   }
 
-  const waitEl = $('#waitForVideo');
-  if (waitEl){
-    waitEl.checked = !!settings.slides?.waitForVideo;
-    waitEl.onchange = () => { (settings.slides ||= {}).waitForVideo = !!waitEl.checked; };
-  }
-
 
   const heroToggle = $('#heroTimelineEnabled');
   const heroSettingsRow = $('#heroTimelineSettings');
@@ -3199,7 +3240,7 @@ if (sHost){
   enableSaunaOrder();
 }
 
-// --- „Kein Aufguss“ + Drag&Drop ---
+// --- Inventar + Drag&Drop ---
 renderSaunaOffList();
 applyDnD();
 
@@ -3273,10 +3314,12 @@ if (durPer) durPer.onchange = () => {
     settings.slides.transitionMs = 500;
     settings.slides.durationMode = 'uniform';
     settings.slides.globalDwellSec = 6;
-    settings.slides.waitForVideo = false;
     settings.slides.hiddenSaunas = [];
     settings.slides.saunaStatus = {};
     settings.slides.saunaDurations = {};
+    if (Array.isArray(settings.interstitials)) {
+      settings.interstitials = settings.interstitials.map(entry => ({ ...entry, waitForEnd: false }));
+    }
     renderSlidesMaster();
   };
 
@@ -3291,7 +3334,7 @@ if (durPer) durPer.onchange = () => {
     }
     const s = ctx.getSettings();
     s.allSaunas = all.concat(name).sort((a,b)=> a.localeCompare(b,'de'));
-    renderSlidesMaster(); // erscheint unter „Kein Aufguss“
+    renderSlidesMaster(); // erscheint unter „Inventar“
   };
 }
 
