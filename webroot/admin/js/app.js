@@ -731,6 +731,12 @@ function collectSettings(){
     settings: {
       ...settings,
       footnoteLayout: document.getElementById('footnoteLayout')?.value || settings.footnoteLayout || 'one-line',
+      footnotesShowOnOverview: (() => {
+        const el = document.getElementById('footnoteOverviewToggle');
+        if (el) return !!el.checked;
+        if (settings.footnotesShowOnOverview === false) return false;
+        return true;
+      })(),
       fonts:{
         family: $('#fontFamily').value,
         scale: +($('#fontScale')?.value||1),

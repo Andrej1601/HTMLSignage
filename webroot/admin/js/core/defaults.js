@@ -322,6 +322,7 @@ export const DEFAULTS = {
   fonts:{ ...DEFAULT_FONTS },
   h2:{ mode:'text', text:'Aufgusszeiten', showOnOverview:true },
   assets:{ flameImage:'/assets/img/flame_test.svg' },
+  footnotesShowOnOverview:true,
   footnotes:[ { id:'star', label:'*', text:'Nur am Fr und Sa' } ],
   extras:{
     wellnessTips:[

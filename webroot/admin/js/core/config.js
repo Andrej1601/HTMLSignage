@@ -310,6 +310,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   else delete src.display.bannerTopPercent;
 
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
+  src.footnotesShowOnOverview = src.footnotesShowOnOverview !== false;
   src.extras = sanitizeExtras(src.extras, DEFAULTS.extras);
   const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);
   src.slides.styleSets = styleSetState.sets;
