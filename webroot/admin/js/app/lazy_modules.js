@@ -19,7 +19,7 @@ export function createLazyModuleManager({
     if (lazyModuleState.backup) {
       return lazyModuleState.backup;
     }
-    lazyModuleState.backup = import('../modules/backup.js')
+    lazyModuleState.backup = import(/* webpackChunkName: "vendor-backup" */ '../modules/backup.js')
       .then(({ initBackupButtons }) => {
         initBackupButtons({ fetchJson });
         return true;
@@ -36,7 +36,7 @@ export function createLazyModuleManager({
     if (lazyModuleState.cleanup) {
       return lazyModuleState.cleanup;
     }
-    lazyModuleState.cleanup = import('../modules/system_cleanup.js')
+    lazyModuleState.cleanup = import(/* webpackChunkName: "vendor-backup" */ '../modules/system_cleanup.js')
       .then(({ initCleanupInSystem }) => {
         initCleanupInSystem({ fetchJson });
         return true;
@@ -53,7 +53,7 @@ export function createLazyModuleManager({
     if (lazyModuleState.userAdmin) {
       return lazyModuleState.userAdmin;
     }
-    lazyModuleState.userAdmin = import('../modules/user_admin.js')
+    lazyModuleState.userAdmin = import(/* webpackChunkName: "vendor-users" */ '../modules/user_admin.js')
       .then(({ initUserAdmin }) => initUserAdmin({
         hasPermission,
         fetchUserAccounts,
