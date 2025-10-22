@@ -1538,18 +1538,11 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
     setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
     setV('#infoBannerHeight', settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10);
-    setV('#infoBannerLength', settings.display?.infoBannerLengthPercent ?? DEFAULTS.display?.infoBannerLengthPercent ?? 100);
 
     const infoBannerHeightInput = document.getElementById('infoBannerHeight');
     if (infoBannerHeightInput && !infoBannerHeightInput.dataset.bound) {
       infoBannerHeightInput.addEventListener('input', notifySettingsChanged);
       infoBannerHeightInput.dataset.bound = '1';
-    }
-
-    const infoBannerLengthInput = document.getElementById('infoBannerLength');
-    if (infoBannerLengthInput && !infoBannerLengthInput.dataset.bound) {
-      infoBannerLengthInput.addEventListener('input', notifySettingsChanged);
-      infoBannerLengthInput.dataset.bound = '1';
     }
 
     const infoBannerModeSelect = document.getElementById('infoBannerMode');
@@ -1648,7 +1641,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       setV('#cutTop',   DEFAULTS.display.cutTopPercent);
       setV('#cutBottom',DEFAULTS.display.cutBottomPercent);
       setV('#infoBannerHeight', DEFAULTS.display.infoBannerHeightPercent);
-      setV('#infoBannerLength', DEFAULTS.display.infoBannerLengthPercent);
       const bannerModeSelect = document.getElementById('infoBannerMode');
       if (bannerModeSelect) {
         const defMode = (DEFAULTS.display.infoBannerMode || 'full').toLowerCase();
