@@ -295,9 +295,10 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
 /* overview-only multiply with --ovAuto */
 .ovbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;width:100%;margin:0 0 10px}
 .sauna-info-box{
-  display:flex;
+  display:inline-flex;
   flex-direction:column;
   align-items:flex-start;
+  align-self:flex-start;
   gap:calc(10px*var(--vwScale));
   padding:calc(18px*var(--vwScale)) calc(22px*var(--vwScale));
   border-radius:calc(22px*var(--vwScale));
@@ -307,6 +308,7 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(12
   color:var(--boxfg);
   margin:0 0 calc(18px*var(--vwScale));
   max-width:min(100%, var(--saunaHeadingMaxWidth, 100%));
+  width:fit-content;
 }
 .sauna-info-box__line{
   display:flex;

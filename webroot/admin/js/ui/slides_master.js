@@ -937,7 +937,7 @@ function saunaRow({ name, index = null, mode = 'normal', dayLabels = [] }){
         <span class="sauna-info-editor__chevron" aria-hidden="true"></span>
       </summary>
       <div class="sauna-info-editor__body">
-        <label class="sauna-info-editor__label" for="info_${id}">Infofeld (optional)</label>
+        <label class="sauna-info-editor__label sr-only" for="info_${id}">Infofeld (optional)</label>
         <textarea id="info_${id}" class="input sauna-info-editor__input" rows="2" placeholder="z. B. 85 °C · 30 Plätze · 10 % Luftfeuchte"></textarea>
         <div class="sauna-info-editor__hint">Leer lassen, um kein Infofeld anzuzeigen.</div>
       </div>
