@@ -268,20 +268,49 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   }
   delete fonts.overviewTimeWidthCh;
 
-  const normalizePercentValue = (value, fallback) => {
-    const fallbackValue = Number.isFinite(fallback) ? fallback : null;
+  const normalizePercentValue = (value, fallback, options = {}) => {
+    const { min = 1, max = 100, round = true } = options;
+    const fallbackNum = Number(fallback);
+    const hasFallback = fallback != null && Number.isFinite(fallbackNum);
+    const fallbackValue = hasFallback ? clamp(min, fallbackNum, max) : null;
     const num = Number(value);
     if (!Number.isFinite(num) || num <= 0) return fallbackValue;
-    return Math.max(1, Math.min(100, Math.round(num)));
+    const clamped = clamp(min, num, max);
+    return round ? Math.round(clamped) : clamped;
   };
   const defaultInfoPanel = Number(DEFAULTS.display?.infoPanelWidthPercent);
   const defaultBannerTop = Number(DEFAULTS.display?.bannerTopPercent);
+  const defaultBannerHeight = Number(DEFAULTS.display?.infoBannerHeightPercent);
+  const defaultBannerLength = Number(DEFAULTS.display?.infoBannerLengthPercent);
   const infoPanelPercent = normalizePercentValue(src.display?.infoPanelWidthPercent, defaultInfoPanel);
   if (infoPanelPercent != null) src.display.infoPanelWidthPercent = infoPanelPercent;
   else delete src.display.infoPanelWidthPercent;
   const bannerPercent = normalizePercentValue(src.display?.bannerTopPercent, defaultBannerTop);
   if (bannerPercent != null) src.display.bannerTopPercent = bannerPercent;
   else delete src.display.bannerTopPercent;
+  const bannerHeightPercent = normalizePercentValue(
+    src.display?.infoBannerHeightPercent,
+    defaultBannerHeight,
+    { min: 0.5, max: 40, round: false }
+  );
+  if (bannerHeightPercent != null) {
+    src.display.infoBannerHeightPercent = Math.max(0.5, Math.min(40, bannerHeightPercent));
+  } else {
+    delete src.display.infoBannerHeightPercent;
+  }
+  const bannerLengthPercent = normalizePercentValue(
+    src.display?.infoBannerLengthPercent,
+    defaultBannerLength,
+    { min: 5, max: 100, round: false }
+  );
+  if (bannerLengthPercent != null) {
+    src.display.infoBannerLengthPercent = Math.max(5, Math.min(100, bannerLengthPercent));
+  } else {
+    delete src.display.infoBannerLengthPercent;
+  }
+  const rawBannerMode = typeof src.display?.infoBannerMode === 'string' ? src.display.infoBannerMode.toLowerCase() : '';
+  if (['full', 'left', 'right'].includes(rawBannerMode)) src.display.infoBannerMode = rawBannerMode;
+  else delete src.display.infoBannerMode;
 
   src.footnotes = Array.isArray(src.footnotes) ? src.footnotes : (DEFAULTS.footnotes || []);
   src.footnotesShowOnOverview = src.footnotesShowOnOverview !== false;

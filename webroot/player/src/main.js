@@ -29,6 +29,12 @@ const CANVAS = document.getElementById('canvas');
 const STAGE  = document.getElementById('stage');
 const STAGE_LEFT  = document.getElementById('stage-left');
 const STAGE_RIGHT = document.getElementById('stage-right');
+const INFO_BANNER = document.getElementById('info-banner-area');
+const INFO_BANNER_MODES = new Set(['full', 'left', 'right']);
+const INFO_BANNER_DEFAULT_HEIGHT = 10;
+const INFO_BANNER_MIN_HEIGHT = 0.5;
+const INFO_BANNER_MAX_HEIGHT = 40;
+const INFO_BANNER_MIN_LENGTH_PERCENT = 5;
 const Q = new URLSearchParams(location.search);
 const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
 const ls = createSafeLocalStorage({
@@ -71,6 +77,8 @@ const styleAutomationState = {
   baseSlides: null,
   activeStyle: null
 };
+let infoBannerMode = 'full';
+let infoBannerLengthRatio = 1;
 const displayListeners = {
   resizeHandler: null,
   resizeObserver: null,
@@ -881,6 +889,107 @@ function ensureFontFamily() {
 }
 function setVars(map){ for (const [k,v] of Object.entries(map)) if (v!==undefined && v!==null) document.documentElement.style.setProperty(k, String(v)); }
 
+function resolveInfoBannerMode(display = {}) {
+  const raw = typeof display.infoBannerMode === 'string' ? display.infoBannerMode.toLowerCase() : '';
+  if (raw === 'left' || raw === 'right') {
+    if (raw === 'right') {
+      const layoutMode = display.layoutMode === 'split' ? 'split' : 'single';
+      if (layoutMode !== 'split') return 'full';
+    }
+    return raw;
+  }
+  if (INFO_BANNER_MODES.has(raw)) return raw;
+  return 'full';
+}
+
+function updateInfoBannerMetrics() {
+  if (!INFO_BANNER) return;
+
+  const target = (() => {
+    switch (infoBannerMode) {
+      case 'left':
+        return STAGE_LEFT;
+      case 'right':
+        return STAGE_RIGHT;
+      default:
+        return STAGE;
+    }
+  })();
+
+  const rect = target ? target.getBoundingClientRect() : null;
+  const width = rect ? Math.max(0, rect.width || 0) : 0;
+
+  if (width > 0) {
+    const rounded = Math.round(width);
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', `${rounded}px`);
+    const ratio = Math.max(INFO_BANNER_MIN_LENGTH_PERCENT / 100, Math.min(1, infoBannerLengthRatio || 0));
+    if (ratio >= 0.999) {
+      INFO_BANNER.style.removeProperty('--infoBannerWidth');
+    } else {
+      INFO_BANNER.style.setProperty('--infoBannerWidth', `${Math.round(rounded * ratio)}px`);
+    }
+  } else {
+    INFO_BANNER.style.removeProperty('--infoBannerWidth');
+    INFO_BANNER.style.removeProperty('--infoBannerColumnWidth');
+  }
+}
+
+function placeInfoBannerRegion(region) {
+  if (!INFO_BANNER) return;
+  const targetParent = (() => {
+    switch (region) {
+      case 'left':
+        return STAGE_LEFT || CANVAS;
+      case 'right':
+        return STAGE_RIGHT || CANVAS;
+      default:
+        return CANVAS;
+    }
+  })();
+
+  if (targetParent && INFO_BANNER.parentElement !== targetParent) {
+    targetParent.appendChild(INFO_BANNER);
+  }
+
+  STAGE_LEFT?.classList.toggle('stage-area--has-banner', region === 'left' || region === 'full');
+  STAGE_RIGHT?.classList.toggle('stage-area--has-banner', region === 'right' || region === 'full');
+}
+
+function applyInfoBannerLayout(display = {}, docStyle = document.documentElement?.style) {
+  if (!INFO_BANNER || !docStyle) return;
+
+  const heightPercent = toFiniteNumber(display.infoBannerHeightPercent);
+  if (heightPercent !== null) {
+    const clamped = Math.max(INFO_BANNER_MIN_HEIGHT, Math.min(INFO_BANNER_MAX_HEIGHT, heightPercent));
+    docStyle.setProperty('--infoBannerHeightVh', String(clamped));
+    const minScale = INFO_BANNER_MIN_HEIGHT / INFO_BANNER_DEFAULT_HEIGHT;
+    const scale = Math.max(minScale, Math.min(2, clamped / INFO_BANNER_DEFAULT_HEIGHT));
+    const fixedScale = scale.toFixed(3);
+    docStyle.setProperty('--infoBannerPadScale', fixedScale);
+    docStyle.setProperty('--infoBannerFontScale', fixedScale);
+  } else {
+    docStyle.removeProperty('--infoBannerHeightVh');
+    docStyle.removeProperty('--infoBannerPadScale');
+    docStyle.removeProperty('--infoBannerFontScale');
+  }
+
+  const lengthPercent = toFiniteNumber(display.infoBannerLengthPercent);
+  if (lengthPercent !== null) {
+    const clampedLength = Math.max(INFO_BANNER_MIN_LENGTH_PERCENT, Math.min(100, lengthPercent));
+    docStyle.setProperty('--infoBannerLengthPercent', String(clampedLength));
+    infoBannerLengthRatio = clampedLength / 100;
+  } else {
+    docStyle.removeProperty('--infoBannerLengthPercent');
+    infoBannerLengthRatio = 1;
+  }
+
+  infoBannerMode = resolveInfoBannerMode(display);
+  INFO_BANNER.dataset.mode = infoBannerMode;
+  placeInfoBannerRegion(infoBannerMode);
+  updateInfoBannerMetrics();
+  resizeRegistry.set('info-banner', updateInfoBannerMetrics);
+}
+
 function applyTheme() {
   const t = settings?.theme || {};
   const fonts = settings?.fonts || {};
@@ -1012,6 +1121,7 @@ function applyDisplay() {
   setPercentProperty('--rightW', d.rightWidthPercent);
   setPercentProperty('--infoPanelW', d.infoPanelWidthPercent ?? d.rightWidthPercent);
   setPercentProperty('--bannerTop', d.bannerTopPercent);
+  applyInfoBannerLayout(d, docStyle);
 
   const topPercent = toFiniteNumber(d.cutTopPercent);
   if (topPercent !== null) {
@@ -1301,7 +1411,7 @@ const wellnessTips = collectWellnessTips();
 const wellnessMap = new Map(wellnessTips.filter(it => it.id).map(it => [String(it.id), it]));
 const eventCountdowns = collectEventCountdowns();
 const infoModules = collectInfoModules();
-const infoModuleMap = new Map(infoModules.filter(it => it.id).map(it => [String(it.id), it]));
+applyInfoBannerModules(infoModules);
 
 if (sortOrder && sortOrder.length) {
   const queue = [];
@@ -1312,7 +1422,6 @@ if (sortOrder && sortOrder.length) {
   const usedMedia = new Set();
   const usedStories = new Set();
   const usedWellness = new Set();
-  const usedInfo = new Set();
   for (const entry of sortOrder) {
     if (entry.type === 'sauna') {
       const name = entry.name;
@@ -1356,15 +1465,6 @@ if (sortOrder && sortOrder.length) {
       }
       continue;
     }
-    if (entry.type === 'info-module') {
-      const key = String(entry.id ?? '');
-      const module = infoModuleMap.get(key);
-      if (module) {
-        queue.push({ ...module, moduleId: key });
-        usedInfo.add(key);
-      }
-      continue;
-    }
   }
   for (const s of allSaunas) {
     if (!usedSaunas.has(s) && !hidden.has(s)) queue.push({ type: 'sauna', sauna: s });
@@ -1394,12 +1494,6 @@ if (sortOrder && sortOrder.length) {
       queue.push({ ...tip, tipId: key });
     }
   }
-  for (const module of infoModules) {
-    const key = module.id != null ? String(module.id) : null;
-    if (!key || !usedInfo.has(key)) {
-      queue.push({ ...module, moduleId: key });
-    }
-  }
   const clean = [];
   for (const q of queue) {
     if (q.type === 'sauna') clean.push({ type: 'sauna', name: q.sauna });
@@ -1410,9 +1504,6 @@ if (sortOrder && sortOrder.length) {
     } else if (q.type === 'wellness-tip') {
       const id = q.tipId ?? q.id;
       if (id != null && wellnessMap.has(String(id))) clean.push({ type: 'wellness-tip', id: String(id) });
-    } else if (q.type === 'info-module') {
-      const id = q.moduleId ?? q.id;
-      if (id != null && infoModuleMap.has(String(id))) clean.push({ type: 'info-module', id: String(id) });
     }
   }
   settings.slides.sortOrder = clean;
@@ -1481,9 +1572,6 @@ for (const entry of storyEntriesEnabled) {
 
 wellnessTips.forEach((tip) => {
   queue.push({ ...tip, tipId: tip.id != null ? String(tip.id) : null });
-});
-infoModules.forEach((module) => {
-  queue.push({ ...module, moduleId: module.id != null ? String(module.id) : null });
 });
 
 // Falls nichts bleibt, notfalls Übersicht zeigen
@@ -2092,6 +2180,20 @@ function renderInfoModule(item = {}, region = 'left') {
   ticker.appendChild(track);
   container.appendChild(ticker);
   return container;
+}
+
+function applyInfoBannerModules(modules = []) {
+  if (!INFO_BANNER) return;
+  const active = modules.find((entry) => Array.isArray(entry.items) && entry.items.length);
+  INFO_BANNER.dataset.empty = 'true';
+  cleanupChildNodes(INFO_BANNER);
+  INFO_BANNER.innerHTML = '';
+  if (!active) return;
+  const region = infoBannerMode || 'full';
+  const node = renderInfoModule(active, region);
+  INFO_BANNER.appendChild(node);
+  INFO_BANNER.dataset.empty = 'false';
+  updateInfoBannerMetrics();
 }
 
 // ---------- DOM helpers ----------
@@ -4594,11 +4696,11 @@ const EMPTY_STAGE_MESSAGES = {
   right: 'Keine Inhalte für rechte Seite definiert.'
 };
 
-const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip','info-module'];
-const MEDIA_TYPES = ['image','video','url','wellness-tip','info-module'];
+const VALID_CONTENT_TYPES = ['overview','sauna','hero-timeline','image','video','url','story','wellness-tip'];
+const MEDIA_TYPES = ['image','video','url','wellness-tip'];
 const PAGE_DEFAULTS = {
-  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','info-module','image','video','url'], playlist:[] },
-  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','info-module','image','video','url'], playlist:[] }
+  left: { source:'master', timerSec:null, contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','image','video','url'], playlist:[] },
+  right:{ source:'media',  timerSec:null, contentTypes:['wellness-tip','image','video','url'], playlist:[] }
 };
 const SOURCE_FILTERS = {
   master: null,
@@ -4683,7 +4785,7 @@ function dwellMsForItem(item, pageConfig) {
     return sec(fallback) * 1000;
   }
 
-  if (item.type === 'wellness-tip' || item.type === 'info-module') {
+  if (item.type === 'wellness-tip') {
     const base = slides.storyDurationSec ?? slides.globalDwellSec ?? slides.saunaDurationSec ?? 8;
     const v = Number.isFinite(+item.dwellSec) ? +item.dwellSec : base;
     return sec(v) * 1000;
@@ -4961,8 +5063,6 @@ function renderSlideNode(item, ctx){
       return renderHeroTimeline(region, ctx);
     case 'wellness-tip':
       return renderWellnessTip(item, region);
-    case 'info-module':
-      return renderInfoModule(item, region);
     default:
       return renderImage(item.src || item.url || '', region, ctx);
   }
@@ -4999,10 +5099,6 @@ function playlistEntryKeyFromConfig(entry){
     case 'wellness-tip': {
       const rawId = entry.id ?? entry.tipId;
       return rawId != null ? 'wellness:' + String(rawId) : null;
-    }
-    case 'info-module': {
-      const rawId = entry.id ?? entry.moduleId;
-      return rawId != null ? 'info:' + String(rawId) : null;
     }
     default:
       return null;
@@ -5044,12 +5140,6 @@ function sanitizePlaylistConfig(list){
       case 'wellness':
         if (rest) {
           normalized.push({ type: 'wellness-tip', id: rest });
-          seen.add(key);
-        }
-        break;
-      case 'info':
-        if (rest) {
-          normalized.push({ type: 'info-module', id: rest });
           seen.add(key);
         }
         break;
@@ -5095,10 +5185,6 @@ function playlistKeyForQueueItem(item){
   if (item.type === 'wellness-tip') {
     const id = item.tipId ?? item.id ?? null;
     return id != null ? 'wellness:' + String(id) : null;
-  }
-  if (item.type === 'info-module') {
-    const id = item.moduleId ?? item.id ?? null;
-    return id != null ? 'info:' + String(id) : null;
   }
   return null;
 }

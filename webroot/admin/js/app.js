@@ -914,6 +914,30 @@ function collectSettings(){
         rightWidthPercent:+($('#rightW').value||38),
         cutTopPercent:+($('#cutTop').value||28),
         cutBottomPercent:+($('#cutBottom').value||12),
+        infoBannerHeightPercent:(() => {
+          const el = document.getElementById('infoBannerHeight');
+          const fallback = settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10;
+          const fallbackNum = Number(fallback);
+          const resolvedFallback = Number.isFinite(fallbackNum) ? fallbackNum : 10;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return clamp(0.5, resolvedFallback, 40);
+          return clamp(0.5, raw, 40);
+        })(),
+        infoBannerLengthPercent:(() => {
+          const el = document.getElementById('infoBannerLength');
+          const fallback = settings.display?.infoBannerLengthPercent ?? DEFAULTS.display?.infoBannerLengthPercent ?? 100;
+          const fallbackNum = Number(fallback);
+          const resolvedFallback = Number.isFinite(fallbackNum) ? fallbackNum : 100;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return clamp(5, resolvedFallback, 100);
+          return clamp(5, raw, 100);
+        })(),
+        infoBannerMode:(() => {
+          const el = document.getElementById('infoBannerMode');
+          const fallback = (settings.display?.infoBannerMode || DEFAULTS.display?.infoBannerMode || 'full').toLowerCase();
+          const raw = typeof el?.value === 'string' ? el.value.toLowerCase() : fallback;
+          return ['full','left','right'].includes(raw) ? raw : fallback;
+        })(),
         layoutMode:(document.getElementById('layoutMode')?.value === 'split') ? 'split' : 'single',
         layoutProfile: document.getElementById('layoutProfile')?.value || settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape',
         pages:{
