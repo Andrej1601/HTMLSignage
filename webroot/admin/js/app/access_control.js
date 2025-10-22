@@ -22,7 +22,8 @@ export function createRoleRestrictionApplier({
       }
     };
 
-    const cockpitNav = document.querySelector('.workspace-nav');
+    const cockpitToggle = document.querySelector('.header-cockpit-controls');
+    const cockpitSection = document.querySelector('.workspace-overview');
     const slideshowBox = document.getElementById('boxSlidesText');
     const slidesFlowCard = document.getElementById('slidesFlowCard');
     const slidesAutomationCard = document.getElementById('slidesAutomationCard');
@@ -58,7 +59,8 @@ export function createRoleRestrictionApplier({
     const canManageDevices = hasPermission('devices');
     const canManageUsers = hasPermission('user-admin');
 
-    setHiddenState(cockpitNav, !canUseCockpit);
+    setHiddenState(cockpitToggle, !canUseCockpit);
+    setHiddenState(cockpitSection, !canUseCockpit);
     setHiddenState(slideshowBox, !canUseSlides);
     setHiddenState(slidesFlowCard, !canManageFlow);
     setHiddenState(slidesAutomationCard, !canManageAutomation);
