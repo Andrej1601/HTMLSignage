@@ -21,7 +21,6 @@ import { createUnsavedTracker } from './core/unsaved_state.js';
 import storage from './core/storage.js';
 import { createAppState } from './core/app_state.js';
 import { createDeviceContextManager } from './core/device_context.js';
-import { createLazyModuleManager } from './app/lazy_modules.js';
 import { registerStateAccess } from './app/state_store.js';
 import { createRoleRestrictionApplier } from './app/access_control.js';
 import { initSidebarResize as initSidebarResizeModule } from './app/sidebar_resize.js';
@@ -86,21 +85,44 @@ let currentUserPermissions = createPermissionSet(currentUser.permissions);
 const hasRole = (role) => currentUserRoles.has(normalizeRoleName(role));
 const hasPermission = (permission) => currentUserPermissions.has(normalizePermissionName(permission));
 
-const lazyModuleManager = createLazyModuleManager({
-  hasPermission,
-  fetchJson,
-  fetchUserAccounts,
-  saveUserAccount,
-  deleteUserAccount,
-  authRoles: AUTH_ROLES,
-  getAvailablePermissions: () => availablePermissions,
-  setAvailablePermissions: (permissions) => {
-    availablePermissions = permissions;
-  },
-  mergeAvailablePermissions
-});
+let lazyModuleManagerPromise = null;
 
-const { setupLazyAdminModules } = lazyModuleManager;
+const ensureLazyModuleManager = async () => {
+  if (!lazyModuleManagerPromise) {
+    lazyModuleManagerPromise = import('./app/lazy_modules.js')
+      .then(({ createLazyModuleManager }) => createLazyModuleManager({
+        hasPermission,
+        fetchJson,
+        fetchUserAccounts,
+        saveUserAccount,
+        deleteUserAccount,
+        authRoles: AUTH_ROLES,
+        getAvailablePermissions: () => availablePermissions,
+        setAvailablePermissions: (permissions) => {
+          availablePermissions = permissions;
+        },
+        mergeAvailablePermissions
+      }))
+      .catch((error) => {
+        console.error('[admin] Lazy-Module konnten nicht vorbereitet werden', error);
+        lazyModuleManagerPromise = null;
+        throw error;
+      });
+  }
+  return lazyModuleManagerPromise;
+};
+
+const setupLazyAdminModules = async () => {
+  if (!hasPermission('system') && !hasPermission('user-admin')) {
+    return;
+  }
+  try {
+    const manager = await ensureLazyModuleManager();
+    manager.setupLazyAdminModules();
+  } catch (error) {
+    console.error('[admin] Lazy-Module konnten nicht initialisiert werden', error);
+  }
+};
 
 // === Global State ============================================================
 let schedule = null;
@@ -583,7 +605,7 @@ async function loadAll(){
 
   // --- globale UI-Schalter (Theme/Backup/Cleanup) ---------------------------
   initThemeToggle();
-  setupLazyAdminModules();
+  await setupLazyAdminModules();
   initViewMenu();
   initSidebarResize();
 }
