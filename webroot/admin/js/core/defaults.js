@@ -344,6 +344,14 @@ export const DEFAULTS = {
         enabled:true
       }
     ]
+  },
+  audio:{
+    background:{
+      enabled:false,
+      src:'',
+      volume:0.5,
+      loop:true
+    }
   }
 };
 
