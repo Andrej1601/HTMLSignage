@@ -87,8 +87,7 @@ export async function fetchJson(url, options = {}) {
   let text = '';
   try {
     text = await response.text();
-    const trimmed = text.trim();
-    if (trimmed) payload = JSON.parse(trimmed);
+    if (/[\S]/.test(text)) payload = JSON.parse(text);
   } catch (cause) {
     throw createApiError(errorMessage || 'Server-Antwort ist kein gültiges JSON.', {
       status: response.status,

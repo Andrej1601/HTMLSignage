@@ -33,7 +33,7 @@ function devices_resolver_day_key(): string
  * @param array|null $error Wird bei Fehlern mit ['status'=>int,'code'=>string] befüllt.
  * @return array|null
  */
-function devices_resolve_payload(string $deviceId, ?array &$error = null): ?array
+function devices_resolve_payload(string $deviceId, ?array &$error = null, ?array $baseSettings = null, ?array $baseSchedule = null): ?array
 {
     $normalized = devices_normalize_device_id($deviceId);
     if ($normalized === '') {
@@ -48,8 +48,12 @@ function devices_resolve_payload(string $deviceId, ?array &$error = null): ?arra
         return null;
     }
 
-    $baseSettings = signage_read_json('settings.json');
-    $baseSchedule = signage_read_json('schedule.json');
+    if ($baseSettings === null) {
+        $baseSettings = signage_read_json('settings.json');
+    }
+    if ($baseSchedule === null) {
+        $baseSchedule = signage_read_json('schedule.json');
+    }
     $baseScheduleVersion = (int) ($baseSchedule['version'] ?? 0);
 
     $useOverrides = !empty($device['useOverrides']);

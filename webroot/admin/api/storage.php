@@ -1154,15 +1154,18 @@ function signage_kv_meta(string $key): array
     try {
         signage_db_bootstrap();
         $pdo = signage_db();
-        $stmt = $pdo->prepare('SELECT updated_at, value FROM kv_store WHERE key = :key LIMIT 1');
+        $stmt = $pdo->prepare('SELECT updated_at, length(value) AS size FROM kv_store WHERE key = :key LIMIT 1');
         $stmt->execute([':key' => $key]);
         $row = $stmt->fetch();
         if (!$row) {
             return $meta;
         }
         $meta['mtime'] = isset($row['updated_at']) ? (int) $row['updated_at'] : 0;
-        if (isset($row['value'])) {
-            $meta['hash'] = sha1((string) $row['value']);
+        if (isset($row['size'])) {
+            $size = (int) $row['size'];
+            if ($size >= 0) {
+                $meta['hash'] = $meta['mtime'] . ':' . $size;
+            }
         }
         return $meta;
     } catch (Throwable $exception) {
@@ -1184,9 +1187,9 @@ function signage_data_meta(string $file, string $key): array
             $meta['mtime'] = (int) $fileMtime;
         }
 
-        $fileHash = @sha1_file($path);
-        if ($fileHash !== false && !isset($meta['hash'])) {
-            $meta['hash'] = $fileHash;
+        $fileSize = @filesize($path);
+        if ($fileSize !== false && !isset($meta['hash'])) {
+            $meta['hash'] = ($meta['mtime'] ?? 0) . ':' . (int) $fileSize;
         }
     }
 
