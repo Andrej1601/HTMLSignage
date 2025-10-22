@@ -30,6 +30,7 @@ const DEFAULT_FONTS = {
 const DEFAULT_ENABLED_COMPONENTS = {
   title:true,
   description:true,
+  infoBox:true,
   badges:true
 };
 
@@ -278,6 +279,7 @@ export const DEFAULTS = {
     heroTimelineWaitForScroll:false,
     heroTimelineScrollSpeed:28,
     heroTimelineScrollPauseMs:4000,
+    saunaInfo:{},
     enabledComponents:{ ...DEFAULT_ENABLED_COMPONENTS },
     styleSets:{ ...DEFAULT_STYLE_SETS },
     activeStyleSet:'classic',
