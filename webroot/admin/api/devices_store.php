@@ -503,53 +503,6 @@ function devices_record_telemetry(array &$device, array $telemetry, int $timesta
     $device['heartbeatHistory'] = $history;
 }
 
-function devices_prepare_sqlite_touch_payload(array $telemetry, int $timestamp): array
-{
-    $statusInput = [];
-    if (isset($telemetry['status']) && is_array($telemetry['status'])) {
-        $statusInput = $telemetry['status'];
-    }
-    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
-        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $statusInput)) {
-            $statusInput[$key] = $telemetry[$key];
-        }
-    }
-    foreach (['network', 'errors'] as $key) {
-        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $statusInput)) {
-            $statusInput[$key] = $telemetry[$key];
-        }
-    }
-
-    $metricsInput = [];
-    if (isset($telemetry['metrics']) && is_array($telemetry['metrics'])) {
-        $metricsInput = $telemetry['metrics'];
-    }
-    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
-        if (array_key_exists($key, $telemetry) && !array_key_exists($key, $metricsInput)) {
-            $metricsInput[$key] = $telemetry[$key];
-        }
-    }
-
-    $status = devices_sanitize_status($statusInput);
-    $metrics = devices_sanitize_metrics($metricsInput);
-    $offlineFlag = array_key_exists('offline', $telemetry) ? (bool) $telemetry['offline'] : false;
-
-    $historyEntry = array_filter([
-        'ts' => $timestamp,
-        'offline' => $offlineFlag,
-        'status' => !empty($status) ? $status : null,
-        'metrics' => !empty($metrics) ? $metrics : null,
-    ], static function ($value) {
-        return $value !== null;
-    });
-
-    return [
-        'status' => $status,
-        'metrics' => $metrics,
-        'historyEntry' => $historyEntry,
-    ];
-}
-
 function devices_extract_telemetry_payload(array $payload): array
 {
     $telemetry = [];
@@ -791,26 +744,326 @@ function devices_save_to_file(array &$db): bool
     return true;
 }
 
+function devices_sqlite_tables_empty(\PDO $pdo): bool
+{
+    $tables = ['device_store', 'device_pairings', 'device_metadata'];
+    foreach ($tables as $table) {
+        try {
+            $stmt = $pdo->query('SELECT COUNT(*) FROM ' . $table);
+            if ($stmt !== false && (int) $stmt->fetchColumn() > 0) {
+                return false;
+            }
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Unable to inspect SQLite table ' . $table . ': ' . $exception->getMessage(), 0, $exception);
+        }
+    }
+
+    return true;
+}
+
+function devices_sqlite_read_raw(\PDO $pdo): array
+{
+    $raw = [
+        'meta' => [],
+        'pairings' => [],
+        'devices' => [],
+    ];
+
+    try {
+        $metaStmt = $pdo->query('SELECT key, value FROM device_metadata');
+        if ($metaStmt !== false) {
+            while ($row = $metaStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['value'], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    error_log('Failed to decode device metadata for key ' . $row['key'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['meta'][(string) $row['key']] = $decoded;
+            }
+        }
+
+        $pairStmt = $pdo->query('SELECT code, payload FROM device_pairings');
+        if ($pairStmt !== false) {
+            while ($row = $pairStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['payload'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    error_log('Failed to decode device pairing ' . $row['code'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['pairings'][(string) $row['code']] = $decoded;
+            }
+        }
+
+        $deviceStmt = $pdo->query('SELECT id, payload FROM device_store');
+        if ($deviceStmt !== false) {
+            while ($row = $deviceStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['payload'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    error_log('Failed to decode device entry ' . $row['id'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['devices'][(string) $row['id']] = $decoded;
+            }
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to read devices from SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    return $raw;
+}
+
+function devices_sqlite_build_state_from_raw(array $raw): array
+{
+    $state = devices_default_state();
+
+    foreach (($raw['meta'] ?? []) as $key => $value) {
+        if ($key === 'version') {
+            $state['version'] = (int) $value;
+            continue;
+        }
+        $state[$key] = $value;
+    }
+
+    foreach (($raw['pairings'] ?? []) as $code => $row) {
+        $state['pairings'][$code] = $row;
+    }
+
+    foreach (($raw['devices'] ?? []) as $id => $row) {
+        $state['devices'][$id] = $row;
+    }
+
+    return devices_normalize_state($state);
+}
+
+function devices_sqlite_fetch_state_from_pdo(\PDO $pdo): array
+{
+    $raw = devices_sqlite_read_raw($pdo);
+    return devices_sqlite_build_state_from_raw($raw);
+}
+
+function devices_sqlite_fetch_state(): array
+{
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    return devices_sqlite_fetch_state_from_pdo($pdo);
+}
+
+function devices_sqlite_replace_state(array $state): void
+{
+    $normalized = devices_normalize_state($state);
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    $timestamp = time();
+
+    signage_sqlite_with_transaction(
+        $pdo,
+        static function (\PDO $transaction) use ($normalized, $timestamp): void {
+            $transaction->exec('DELETE FROM device_store');
+            $transaction->exec('DELETE FROM device_pairings');
+            $transaction->exec('DELETE FROM device_metadata');
+
+            $metaStmt = $transaction->prepare('INSERT INTO device_metadata(key, value, updated_at) VALUES (:key, :value, :updated)');
+            $pairStmt = $transaction->prepare('INSERT INTO device_pairings(code, payload, updated_at) VALUES (:code, :payload, :updated)');
+            $deviceStmt = $transaction->prepare('INSERT INTO device_store(id, payload, updated_at) VALUES (:id, :payload, :updated)');
+
+            foreach ($normalized as $key => $value) {
+                if ($key === 'devices' || $key === 'pairings') {
+                    continue;
+                }
+                $json = json_encode($value, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device metadata ' . $key . ': ' . json_last_error_msg());
+                }
+                $metaStmt->execute([
+                    ':key' => $key,
+                    ':value' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+
+            foreach (($normalized['pairings'] ?? []) as $code => $row) {
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device pairing ' . $code . ': ' . json_last_error_msg());
+                }
+                $pairStmt->execute([
+                    ':code' => $code,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+
+            foreach (($normalized['devices'] ?? []) as $id => $row) {
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device entry ' . $id . ': ' . json_last_error_msg());
+                }
+                $deviceStmt->execute([
+                    ':id' => $id,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+        }
+    );
+}
+
+function devices_sqlite_upsert_state(array $state): bool
+{
+    $normalized = devices_normalize_state($state);
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    $timestamp = time();
+
+    $raw = devices_sqlite_read_raw($pdo);
+    $currentMeta = $raw['meta'];
+    $currentPairings = $raw['pairings'];
+    $currentDevices = $raw['devices'];
+
+    $nextMeta = [];
+    foreach ($normalized as $key => $value) {
+        if ($key === 'devices' || $key === 'pairings') {
+            continue;
+        }
+        $nextMeta[$key] = $value;
+    }
+
+    $nextPairings = $normalized['pairings'] ?? [];
+    $nextDevices = $normalized['devices'] ?? [];
+
+    return (bool) signage_sqlite_with_transaction(
+        $pdo,
+        static function (\PDO $transaction) use (
+            $timestamp,
+            $currentMeta,
+            $currentPairings,
+            $currentDevices,
+            $nextMeta,
+            $nextPairings,
+            $nextDevices
+        ): bool {
+            $changed = false;
+
+            $metaUpsert = $transaction->prepare(
+                'INSERT INTO device_metadata(key, value, updated_at) VALUES (:key, :value, :updated)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+            );
+            foreach ($nextMeta as $key => $value) {
+                $current = $currentMeta[$key] ?? null;
+                if ($current === $value) {
+                    continue;
+                }
+                $json = json_encode($value, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device metadata ' . $key . ': ' . json_last_error_msg());
+                }
+                $metaUpsert->execute([
+                    ':key' => $key,
+                    ':value' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $metaDelete = $transaction->prepare('DELETE FROM device_metadata WHERE key = :key');
+            foreach ($currentMeta as $key => $_) {
+                if (!array_key_exists($key, $nextMeta)) {
+                    $metaDelete->execute([':key' => $key]);
+                    if ($metaDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            $pairUpsert = $transaction->prepare(
+                'INSERT INTO device_pairings(code, payload, updated_at) VALUES (:code, :payload, :updated)
+                 ON CONFLICT(code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at'
+            );
+            foreach ($nextPairings as $code => $row) {
+                $current = $currentPairings[$code] ?? null;
+                if ($current === $row) {
+                    continue;
+                }
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device pairing ' . $code . ': ' . json_last_error_msg());
+                }
+                $pairUpsert->execute([
+                    ':code' => $code,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $pairDelete = $transaction->prepare('DELETE FROM device_pairings WHERE code = :code');
+            foreach ($currentPairings as $code => $_) {
+                if (!array_key_exists($code, $nextPairings)) {
+                    $pairDelete->execute([':code' => $code]);
+                    if ($pairDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            $deviceUpsert = $transaction->prepare(
+                'INSERT INTO device_store(id, payload, updated_at) VALUES (:id, :payload, :updated)
+                 ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at'
+            );
+            foreach ($nextDevices as $id => $row) {
+                $current = $currentDevices[$id] ?? null;
+                if ($current === $row) {
+                    continue;
+                }
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device entry ' . $id . ': ' . json_last_error_msg());
+                }
+                $deviceUpsert->execute([
+                    ':id' => $id,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $deviceDelete = $transaction->prepare('DELETE FROM device_store WHERE id = :id');
+            foreach ($currentDevices as $id => $_) {
+                if (!array_key_exists($id, $nextDevices)) {
+                    $deviceDelete->execute([':id' => $id]);
+                    if ($deviceDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            return $changed;
+        }
+    );
+}
+
 function devices_load(): array
 {
     if (signage_db_available()) {
         try {
-            $state = signage_kv_get(DEVICES_STORAGE_KEY, null);
-            if (is_array($state)) {
-                return devices_normalize_state($state);
+            signage_db_bootstrap();
+            $pdo = signage_db();
+
+            if (devices_sqlite_tables_empty($pdo)) {
+                $import = devices_load_from_file();
+                try {
+                    devices_sqlite_replace_state($import);
+                } catch (Throwable $exception) {
+                    error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
+                }
+                devices_delete_file();
+                return devices_normalize_state($import);
             }
+
+            return devices_sqlite_fetch_state_from_pdo($pdo);
         } catch (Throwable $exception) {
             error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
         }
-
-        $import = devices_load_from_file();
-        try {
-            signage_kv_set(DEVICES_STORAGE_KEY, $import);
-        } catch (Throwable $exception) {
-            error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
-        }
-        devices_delete_file();
-        return devices_normalize_state($import);
     }
 
     return devices_load_from_file();
@@ -822,7 +1075,7 @@ function devices_save(array &$db): bool
 
     if (signage_db_available()) {
         try {
-            signage_kv_set(DEVICES_STORAGE_KEY, $db);
+            devices_sqlite_upsert_state($db);
             devices_delete_file();
             return true;
         } catch (Throwable $exception) {
@@ -925,101 +1178,54 @@ function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry
     }
 
     try {
-        signage_require_sqlite_json_patch($pdo);
-    } catch (RuntimeException $exception) {
-        throw new RuntimeException('SQLite json_patch() support is required for device updates: ' . $exception->getMessage(), 0, $exception);
+        $stmt = $pdo->prepare('SELECT payload FROM device_store WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $deviceId]);
+        $payload = $stmt->fetchColumn();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to load device from SQLite: ' . $exception->getMessage(), 0, $exception);
     }
 
-    $updatePayload = devices_prepare_sqlite_touch_payload($telemetry, $timestamp);
-
-    $devicePatch = [
-        'id' => $deviceId,
-        'lastSeen' => $timestamp,
-        'lastSeenAt' => $timestamp,
-    ];
-
-    if (!empty($updatePayload['status'])) {
-        $devicePatch['status'] = $updatePayload['status'];
-    }
-    if (!empty($updatePayload['metrics'])) {
-        $devicePatch['metrics'] = $updatePayload['metrics'];
+    if ($payload === false || $payload === null) {
+        return false;
     }
 
-    $patch = ['devices' => [$deviceId => $devicePatch]];
-    $patchJson = json_encode($patch, SIGNAGE_JSON_RESPONSE_FLAGS);
-    if ($patchJson === false) {
-        throw new RuntimeException('Failed to encode device patch: ' . json_last_error_msg());
+    $device = json_decode((string) $payload, true);
+    if (!is_array($device)) {
+        return false;
     }
 
-    $historyEntry = $updatePayload['historyEntry'];
-    $historyJson = json_encode($historyEntry, SIGNAGE_JSON_RESPONSE_FLAGS);
-    if ($historyJson === false) {
-        throw new RuntimeException('Failed to encode device history entry: ' . json_last_error_msg());
+    $device['id'] = $deviceId;
+    $device['lastSeen'] = $timestamp;
+    $device['lastSeenAt'] = $timestamp;
+
+    if (!empty($telemetry)) {
+        devices_record_telemetry($device, $telemetry, $timestamp);
+    } elseif (isset($device['heartbeatHistory'])) {
+        $device['heartbeatHistory'] = devices_sanitize_history($device['heartbeatHistory']);
     }
 
-    $devicePath = '$.devices."' . $deviceId . '"';
-    $historyPath = $devicePath . '.heartbeatHistory';
-
-    $sql = <<<SQL
-WITH prepared AS (
-    SELECT
-        json_patch(value, :patch) AS patched,
-        json_insert(
-            COALESCE(json_extract(value, :historyPath), '[]'),
-            '$[#]',
-            json(:historyEntry)
-        ) AS appended
-    FROM kv_store
-    WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL
-),
-trimmed AS (
-    WITH RECURSIVE shrink(history, remaining) AS (
-        SELECT appended,
-               MAX(json_array_length(appended) - :historyLimit, 0)
-        FROM prepared
-        UNION ALL
-        SELECT json_remove(history, '$[0]'), remaining - 1
-        FROM shrink
-        WHERE remaining > 0
-    )
-    SELECT history FROM shrink ORDER BY remaining LIMIT 1
-)
-UPDATE kv_store
-SET value = json_set(
-        (SELECT patched FROM prepared),
-        :historyPath,
-        COALESCE((SELECT history FROM trimmed), json(:emptyHistory))
-    ),
-    updated_at = :timestamp
-WHERE key = :key
-  AND json_extract(value, :devicePath) IS NOT NULL
-SQL;
+    $json = json_encode($device, SIGNAGE_JSON_STORAGE_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('Failed to encode device entry ' . $deviceId . ': ' . json_last_error_msg());
+    }
 
     try {
         return signage_sqlite_with_transaction(
             $pdo,
-            static function (\PDO $transaction) use ($sql, $patchJson, $historyJson, $devicePath, $historyPath, $timestamp): bool {
-                $stmt = $transaction->prepare($sql);
-                $stmt->execute([
-                    ':patch' => $patchJson,
-                    ':historyPath' => $historyPath,
-                    ':historyEntry' => $historyJson,
-                    ':historyLimit' => DEVICES_HISTORY_LIMIT,
-                    ':key' => DEVICES_STORAGE_KEY,
-                    ':devicePath' => $devicePath,
-                    ':emptyHistory' => '[]',
-                    ':timestamp' => $timestamp,
+            static function (\PDO $transaction) use ($deviceId, $json, $timestamp): bool {
+                $update = $transaction->prepare('UPDATE device_store SET payload = :payload, updated_at = :updated WHERE id = :id');
+                $update->execute([
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                    ':id' => $deviceId,
                 ]);
 
-                if ($stmt->rowCount() > 0) {
+                if ($update->rowCount() > 0) {
                     return true;
                 }
 
-                $check = $transaction->prepare('SELECT 1 FROM kv_store WHERE key = :key AND json_extract(value, :devicePath) IS NOT NULL LIMIT 1');
-                $check->execute([
-                    ':key' => DEVICES_STORAGE_KEY,
-                    ':devicePath' => $devicePath,
-                ]);
+                $check = $transaction->prepare('SELECT 1 FROM device_store WHERE id = :id LIMIT 1');
+                $check->execute([':id' => $deviceId]);
 
                 return $check->fetchColumn() !== false;
             }
