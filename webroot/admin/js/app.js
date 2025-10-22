@@ -58,14 +58,27 @@ import {
   resolveNowSeconds,
   OFFLINE_AFTER_MIN
 } from './core/device_service.js';
-import {
-  fetchUsers as fetchUserAccounts,
-  saveUser as saveUserAccount,
-  deleteUser as deleteUserAccount,
-  fetchSession as fetchCurrentUserSession,
-  AVAILABLE_ROLES as AUTH_ROLES,
-  AVAILABLE_PERMISSIONS as AUTH_PERMISSIONS
-} from './core/auth_service.js';
+let authServiceModulePromise = null;
+let authServiceCatalogInitialized = false;
+let authRolesCatalog = ['saunameister', 'editor', 'admin'];
+
+const ensureAuthServiceModule = () => {
+  if (!authServiceModulePromise) {
+    authServiceModulePromise = import('./core/auth_service.js').then((module) => {
+      if (!authServiceCatalogInitialized) {
+        authServiceCatalogInitialized = true;
+        if (Array.isArray(module.AVAILABLE_PERMISSIONS) && module.AVAILABLE_PERMISSIONS.length) {
+          availablePermissions = mergeAvailablePermissions(module.AVAILABLE_PERMISSIONS);
+        }
+      }
+      if (Array.isArray(module.AVAILABLE_ROLES) && module.AVAILABLE_ROLES.length) {
+        authRolesCatalog = module.AVAILABLE_ROLES.slice();
+      }
+      return module;
+    });
+  }
+  return authServiceModulePromise;
+};
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
@@ -75,7 +88,7 @@ const lsSet = (key, value) => storage.set(key, value);
 const lsRemove = (key) => storage.remove(key);
 
 
-let availablePermissions = mergeAvailablePermissions(AUTH_PERMISSIONS);
+let availablePermissions = mergeAvailablePermissions();
 const defaultAdminPermissions = resolvePermissionsForRoles(['admin']);
 
 let currentUser = { username: null, displayName: null, roles: ['admin'], permissions: defaultAdminPermissions };
@@ -89,14 +102,17 @@ let lazyModuleManagerPromise = null;
 
 const ensureLazyModuleManager = async () => {
   if (!lazyModuleManagerPromise) {
-    lazyModuleManagerPromise = import('./app/lazy_modules.js')
-      .then(({ createLazyModuleManager }) => createLazyModuleManager({
+    lazyModuleManagerPromise = Promise.all([
+      import('./app/lazy_modules.js'),
+      ensureAuthServiceModule()
+    ])
+      .then(([{ createLazyModuleManager }, authService]) => createLazyModuleManager({
         hasPermission,
         fetchJson,
-        fetchUserAccounts,
-        saveUserAccount,
-        deleteUserAccount,
-        authRoles: AUTH_ROLES,
+        fetchUserAccounts: authService.fetchUsers,
+        saveUserAccount: authService.saveUser,
+        deleteUserAccount: authService.deleteUser,
+        authRoles: authRolesCatalog,
         getAvailablePermissions: () => availablePermissions,
         setAvailablePermissions: (permissions) => {
           availablePermissions = permissions;
@@ -493,8 +509,9 @@ const initSidebarResize = () => initSidebarResizeModule({ lsGet, lsSet });
 // 0) Zugriff & Rollensteuerung
 // ============================================================================
 async function resolveCurrentUser() {
+  const authService = await ensureAuthServiceModule();
   try {
-    const session = await fetchCurrentUserSession();
+    const session = await authService.fetchSession();
     const payload = session?.user || {};
     const normalizedRoles = Array.isArray(payload.roles)
       ? payload.roles
