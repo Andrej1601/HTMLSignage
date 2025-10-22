@@ -3,7 +3,7 @@
 Diese Notizen fassen die wichtigsten Stellen mit Optimierungspotenzial oder Laufzeitrisiken aus dem aktuellen Stand des Repos zusammen. Die Punkte sind nach Priorität sortiert.
 
 ## 1. Installer überschreibt produktive Daten (hoch)
-Das Installationsskript synchronisiert den kompletten Inhalt von `webroot/` per `rsync -a` in das Zielverzeichnis. Dabei wird auch der Ordner `webroot/data` mitsamt Beispiel-Schedule und -Settings übertragen und vorhandene Dateien im Ziel überschrieben.【F:scripts/install.sh†L184-L193】 In einer bestehenden Installation führt ein erneuter Lauf des Skripts so zu Datenverlust.
+Das Installationsskript synchronisiert den kompletten Inhalt von `webroot/` per `rsync -a` in das Zielverzeichnis. Dabei wird auch der Ordner `webroot/data` mitsamt Beispiel-Schedule und -Settings übertragen und vorhandene Dateien im Ziel überschrieben.【F:scripts/install.sh†L365-L387】 In einer bestehenden Installation führt ein erneuter Lauf des Skripts so zu Datenverlust.
 
 **Vorschlag:** Beim Kopieren den Datenordner explizit ausschließen (z. B. `rsync -a --exclude 'data/'`), bzw. nur dann initial befüllen, wenn die Dateien im Ziel noch fehlen. Zusätzlich sollte der Schritt im Log darauf hinweisen, falls bestehende Dateien ausgelassen werden.
 

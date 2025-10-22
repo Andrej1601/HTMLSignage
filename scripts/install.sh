@@ -10,6 +10,9 @@ warn(){ printf '\033[1;33m[WARN]\033[0m %s\n' "$*"; }
 error(){ printf '\033[1;31m[ERR ]\033[0m %s\n' "$*" >&2; }
 
 FRESH_INSTALL=0
+INSTALL_MISSING_PACKAGES=1
+
+declare -a SKIP_PACKAGE_GROUPS=()
 
 declare -a CONFIG_KEYS=(
   SIGNAGE_PUBLIC_PORT
@@ -49,14 +52,76 @@ require_root(){
 
 parse_args(){
   FRESH_INSTALL=0
+  INSTALL_MISSING_PACKAGES=1
+  SKIP_PACKAGE_GROUPS=()
+
   while (($#)); do
     case "$1" in
       --fresh)
         FRESH_INSTALL=1
         ;;
+      --install-missing-packages-only|--install-missing-only)
+        INSTALL_MISSING_PACKAGES=1
+        ;;
+      --force-package-reinstall)
+        INSTALL_MISSING_PACKAGES=0
+        ;;
+      --skip-package-group)
+        if [[ $# -lt 2 ]]; then
+          error "Missing value for --skip-package-group"
+          exit 1
+        fi
+        SKIP_PACKAGE_GROUPS+=("$2")
+        shift
+        ;;
+      --skip-package-group=*)
+        SKIP_PACKAGE_GROUPS+=("${1#*=}")
+        ;;
     esac
     shift || true
   done
+}
+
+declare -a PACKAGE_GROUP_ORDER=(
+  web
+  php
+  database
+  tools
+  node
+)
+
+declare -A PACKAGE_GROUPS=(
+  [web]="nginx"
+  [php]="php8.3-fpm php8.3-cli php8.3-sqlite3 php8.3-xml php8.3-mbstring php8.3-curl php8.3-gd"
+  [database]="sqlite3"
+  [tools]="jq unzip curl git rsync openssl"
+  [node]="nodejs npm"
+)
+
+declare -A PACKAGE_GROUP_LABELS=(
+  [web]="Web server"
+  [php]="PHP runtime"
+  [database]="Database tools"
+  [tools]="Utility tools"
+  [node]="Node.js toolchain"
+)
+
+package_installed(){
+  local pkg=$1
+  if dpkg -s "$pkg" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  case "$pkg" in
+    nodejs)
+      command -v node >/dev/null 2>&1 && return 0
+      ;;
+    npm)
+      command -v npm >/dev/null 2>&1 && return 0
+      ;;
+  esac
+
+  return 1
 }
 
 run_preflight(){
@@ -177,27 +242,52 @@ install_template(){
 install_packages(){
   log "Installing packages"
   export DEBIAN_FRONTEND=noninteractive
-  local packages=(
-    nginx
-    php8.3-fpm
-    php8.3-cli
-    php8.3-sqlite3
-    php8.3-xml
-    php8.3-mbstring
-    php8.3-curl
-    php8.3-gd
-    sqlite3
-    jq
-    unzip
-    curl
-    git
-    rsync
-    openssl
-    nodejs
-    npm
-  )
+
+  if [[ $INSTALL_MISSING_PACKAGES -eq 0 ]]; then
+    log "Forcing package reinstall as requested"
+  fi
+
+  declare -A skip_groups=()
+  local group
+  for group in "${SKIP_PACKAGE_GROUPS[@]}"; do
+    if [[ -z ${PACKAGE_GROUPS[$group]:-} ]]; then
+      warn "Unknown package group '$group'; skipping"
+      continue
+    fi
+    skip_groups[$group]=1
+  done
+
+  local -a packages_to_install=()
+  for group in "${PACKAGE_GROUP_ORDER[@]}"; do
+    if [[ -n ${skip_groups[$group]:-} ]]; then
+      log "Skipping package group '$group' (${PACKAGE_GROUP_LABELS[$group]})"
+      continue
+    fi
+
+    local pkg
+    log "Processing package group '$group' (${PACKAGE_GROUP_LABELS[$group]})"
+    for pkg in ${PACKAGE_GROUPS[$group]}; do
+      if package_installed "$pkg"; then
+        log "Package '$pkg' already installed"
+        if [[ $INSTALL_MISSING_PACKAGES -eq 0 ]]; then
+          packages_to_install+=("$pkg")
+        fi
+      else
+        log "Package '$pkg' missing"
+        packages_to_install+=("$pkg")
+      fi
+    done
+  done
+
+  if [[ ${#packages_to_install[@]} -eq 0 ]]; then
+    log "All required packages are already installed"
+    return
+  fi
+
+  log "Running apt-get update"
   apt-get update -y
-  apt-get install -y "${packages[@]}"
+  log "Installing missing packages: ${packages_to_install[*]}"
+  apt-get install -y "${packages_to_install[@]}"
 }
 
 build_frontend_assets(){
