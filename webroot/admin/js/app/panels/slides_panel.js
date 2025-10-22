@@ -1,7 +1,7 @@
 import { deepClone, genId } from '../../core/utils.js';
 import { DEFAULTS } from '../../core/defaults.js';
 import { uploadGeneric } from '../../core/upload.js';
-import { sanitizePagePlaylist, playlistKeyFromSanitizedEntry, mapSaunaHeadingWidthToInput, SAUNA_HEADING_WIDTH_LIMITS } from '../../core/config.js';
+import { sanitizePagePlaylist, playlistKeyFromSanitizedEntry, mapSaunaHeadingWidthToInput, SAUNA_HEADING_WIDTH_LIMITS, sanitizeBackgroundAudio } from '../../core/config.js';
 import { collectSlideOrderStream, SAUNA_STATUS, SAUNA_STATUS_TEXT } from '../../ui/slides_master.js';
 
 export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState, resolveOverviewTimeWidthScale }) {
@@ -77,6 +77,12 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const styleSets = (settings.slides.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
       const available = Object.keys(styleSets);
       const defaults = DEFAULTS.slides?.styleAutomation || {};
+      settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
+      const backgroundDefaults = DEFAULTS.audio?.background || {};
+      const backgroundState = sanitizeBackgroundAudio(settings.audio.background, backgroundDefaults);
+      settings.audio.background = backgroundState;
+      const trackEntries = Object.entries(backgroundState.tracks || {});
+      const availableTracks = trackEntries.map(([id]) => id);
       const current = (settings.slides.styleAutomation && typeof settings.slides.styleAutomation === 'object')
         ? deepClone(settings.slides.styleAutomation)
         : {};
@@ -84,11 +90,26 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const normalized = {
         enabled: current.enabled !== false,
         fallbackStyle: '',
+        fallbackTrack: '',
         timeSlots: []
       };
 
       const fallbackCandidate = current.fallbackStyle || defaults.fallbackStyle || settings.slides.activeStyleSet || available[0] || '';
       normalized.fallbackStyle = available.includes(fallbackCandidate) ? fallbackCandidate : (available[0] || '');
+
+      const fallbackTrackCandidates = [current.fallbackTrack, defaults.fallbackTrack, backgroundState.activeTrack];
+      for (const candidate of fallbackTrackCandidates) {
+        if (typeof candidate === 'string') {
+          const trimmed = candidate.trim();
+          if (trimmed && availableTracks.includes(trimmed)) {
+            normalized.fallbackTrack = trimmed;
+            break;
+          }
+        }
+      }
+      if (!normalized.fallbackTrack && availableTracks.length) {
+        normalized.fallbackTrack = availableTracks[0];
+      }
 
       const slotSource = Array.isArray(current.timeSlots) && current.timeSlots.length
         ? current.timeSlots
@@ -102,6 +123,10 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         if (seen.has(id)) return;
         const label = typeof slot.label === 'string' ? slot.label.trim() : '';
         const style = available.includes(slot.style) ? slot.style : normalized.fallbackStyle;
+        const trackCandidate = typeof slot.track === 'string' ? slot.track.trim() : '';
+        const track = trackCandidate && availableTracks.includes(trackCandidate)
+          ? trackCandidate
+          : (normalized.fallbackTrack || '');
         const mode = slot.mode === 'range' || (slot.startDateTime && slot.endDateTime)
           ? 'range'
           : 'daily';
@@ -115,12 +140,13 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             style,
             mode: 'range',
             startDateTime: startInfo.iso,
-            endDateTime: endInfo.iso
+            endDateTime: endInfo.iso,
+            track
           });
         } else {
           const start = normalizeTime(slot.start || slot.startTime || '');
           if (!start) return;
-          normalized.timeSlots.push({ id, label, start, style, mode: 'daily' });
+          normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track });
         }
         seen.add(id);
       };
@@ -211,6 +237,13 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const automation = ensureStyleAutomationState();
       const styleSets = (settings.slides?.styleSets && typeof settings.slides.styleSets === 'object') ? settings.slides.styleSets : {};
       const styleOptions = Object.entries(styleSets).map(([id, value]) => ({ id, label: value?.label || id }));
+      const backgroundState = (settings.audio?.background && typeof settings.audio.background === 'object')
+        ? settings.audio.background
+        : { tracks: {} };
+      const trackOptions = Object.entries(backgroundState.tracks || {}).map(([id, value]) => ({
+        id,
+        label: (typeof value?.label === 'string' && value.label.trim()) ? value.label.trim() : id
+      }));
 
       const enabledInput = document.getElementById('styleAutoEnabled');
       if (enabledInput) {
@@ -242,6 +275,42 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           automation.timeSlots.forEach(slot => {
             if (!styleOptions.some(opt => opt.id === slot.style)) {
               slot.style = automation.fallbackStyle;
+            }
+          });
+          renderStyleAutomationControls();
+          notifySettingsChanged();
+        };
+      }
+
+      const fallbackTrackSelect = document.getElementById('styleAutoFallbackTrack');
+      if (fallbackTrackSelect) {
+        fallbackTrackSelect.innerHTML = '';
+        if (!trackOptions.length) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Keine Musik-Presets verfügbar';
+          fallbackTrackSelect.appendChild(opt);
+          fallbackTrackSelect.disabled = true;
+          automation.fallbackTrack = '';
+        } else {
+          fallbackTrackSelect.disabled = false;
+          trackOptions.forEach(({ id, label }) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = label;
+            fallbackTrackSelect.appendChild(opt);
+          });
+          if (!automation.fallbackTrack || !trackOptions.some(opt => opt.id === automation.fallbackTrack)) {
+            automation.fallbackTrack = trackOptions[0].id;
+          }
+          fallbackTrackSelect.value = automation.fallbackTrack || trackOptions[0].id;
+        }
+        fallbackTrackSelect.onchange = () => {
+          const next = fallbackTrackSelect.value || '';
+          automation.fallbackTrack = next;
+          automation.timeSlots.forEach(slot => {
+            if (!trackOptions.some(opt => opt.id === slot.track)) {
+              slot.track = next;
             }
           });
           renderStyleAutomationControls();
@@ -396,6 +465,40 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           styleWrap.append(styleLabel, styleSelect);
           row.appendChild(styleWrap);
 
+          const trackWrap = document.createElement('div');
+          trackWrap.className = 'style-auto-field';
+          const trackLabel = document.createElement('label');
+          trackLabel.textContent = 'Musik';
+          const trackSelect = document.createElement('select');
+          trackSelect.className = 'input';
+          if (!trackOptions.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Keine Presets';
+            trackSelect.appendChild(opt);
+            trackSelect.disabled = true;
+            slot.track = '';
+          } else {
+            trackOptions.forEach(({ id, label }) => {
+              const opt = document.createElement('option');
+              opt.value = id;
+              opt.textContent = label;
+              trackSelect.appendChild(opt);
+            });
+            if (slot.track && trackOptions.some(opt => opt.id === slot.track)) {
+              trackSelect.value = slot.track;
+            } else {
+              slot.track = automation.fallbackTrack || trackOptions[0].id;
+              trackSelect.value = slot.track;
+            }
+          }
+          trackSelect.onchange = () => {
+            slot.track = trackSelect.value || automation.fallbackTrack || '';
+            notifySettingsChanged();
+          };
+          trackWrap.append(trackLabel, trackSelect);
+          row.appendChild(trackWrap);
+
           const labelWrap = document.createElement('div');
           labelWrap.className = 'style-auto-field';
           const labelLabel = document.createElement('label');
@@ -433,7 +536,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           const state = ensureStyleAutomationState();
           const last = state.timeSlots[state.timeSlots.length - 1];
           const start = last && last.mode === 'daily' ? last.start : '06:00';
-          state.timeSlots.push({ id: genId('sty_'), mode: 'daily', start: start || '06:00', label: '', style: state.fallbackStyle });
+          state.timeSlots.push({ id: genId('sty_'), mode: 'daily', start: start || '06:00', label: '', style: state.fallbackStyle, track: state.fallbackTrack });
           state.timeSlots.sort(compareAutomationSlots);
           renderStyleAutomationControls();
           notifySettingsChanged();
@@ -1023,89 +1126,209 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     const renderBackgroundAudioControls = () => {
       const defaults = DEFAULTS.audio?.background || {};
       settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
-      const audioState = (() => {
-        const state = settings.audio.background && typeof settings.audio.background === 'object'
-          ? settings.audio.background
-          : (settings.audio.background = {});
-        state.src = typeof state.src === 'string' ? state.src.trim() : '';
-        const fallbackVolume = Number(defaults.volume ?? 1);
-        const volumeRaw = Number(state.volume);
-        const normalizedVolume = Number.isFinite(volumeRaw)
-          ? Math.min(1, Math.max(0, volumeRaw))
-          : (Number.isFinite(fallbackVolume) ? Math.min(1, Math.max(0, fallbackVolume)) : 1);
-        state.volume = normalizedVolume;
-        state.loop = state.loop === false ? false : (defaults.loop === false ? false : true);
-        if (!state.src) state.enabled = false; else state.enabled = state.enabled !== false;
-        return state;
-      })();
+      let backgroundState = sanitizeBackgroundAudio(settings.audio.background, defaults);
+      settings.audio.background = backgroundState;
 
       const enabledInput = document.getElementById('bgAudioEnabled');
+      const trackSelect = document.getElementById('bgAudioTrackSelect');
+      const labelInput = document.getElementById('bgAudioTrackLabel');
       const srcInput = document.getElementById('bgAudioSrc');
       const uploadBtn = document.getElementById('bgAudioUpload');
       const clearBtn = document.getElementById('bgAudioClear');
       const volumeInput = document.getElementById('bgAudioVolume');
       const loopInput = document.getElementById('bgAudioLoop');
+      const applyBtn = document.getElementById('bgAudioTrackApply');
+      const saveBtn = document.getElementById('bgAudioTrackSave');
+      const createBtn = document.getElementById('bgAudioTrackCreate');
+      const deleteBtn = document.getElementById('bgAudioTrackDelete');
 
-      const applyStateToInputs = () => {
-        if (enabledInput) enabledInput.checked = !!(audioState.enabled && audioState.src);
-        if (srcInput) srcInput.value = audioState.src || '';
-        if (volumeInput) {
-          const volumePercent = Math.round(Math.min(1, Math.max(0, Number(audioState.volume))) * 100);
-          volumeInput.value = String(volumePercent);
-        }
-        if (loopInput) loopInput.checked = audioState.loop !== false;
+      const trackIds = Object.keys(backgroundState.tracks || {});
+      let currentTrackId = backgroundState.activeTrack && backgroundState.tracks?.[backgroundState.activeTrack]
+        ? backgroundState.activeTrack
+        : (trackIds[0] || '');
+
+      const getTracks = () => (backgroundState.tracks && typeof backgroundState.tracks === 'object') ? backgroundState.tracks : {};
+      const getTrack = (id) => {
+        if (!id) return null;
+        const track = getTracks()[id];
+        return track && typeof track === 'object' ? track : null;
       };
 
-      applyStateToInputs();
+      const updateDeleteState = () => {
+        if (!deleteBtn) return;
+        deleteBtn.disabled = Object.keys(getTracks()).length <= 1;
+      };
 
-      if (enabledInput && !enabledInput.dataset.bound) {
-        enabledInput.dataset.bound = '1';
-        enabledInput.addEventListener('change', () => {
-          audioState.enabled = !!enabledInput.checked && !!audioState.src;
-          if (enabledInput.checked && !audioState.src) {
-            enabledInput.checked = false;
-            audioState.enabled = false;
+      const ensureEnabledState = () => {
+        const active = getTrack(backgroundState.activeTrack);
+        const isEnabled = !!(backgroundState.enabled && active && active.src);
+        backgroundState.enabled = isEnabled;
+        if (enabledInput) enabledInput.checked = isEnabled;
+      };
+
+      const refreshTrackSelect = () => {
+        if (!trackSelect) return;
+        const tracks = getTracks();
+        const ids = Object.keys(tracks);
+        if (!tracks[currentTrackId]) {
+          currentTrackId = backgroundState.activeTrack && tracks[backgroundState.activeTrack]
+            ? backgroundState.activeTrack
+            : (ids[0] || '');
+        }
+        trackSelect.innerHTML = '';
+        if (!ids.length) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Keine Presets';
+          trackSelect.appendChild(opt);
+          trackSelect.value = '';
+          trackSelect.disabled = true;
+          return;
+        }
+        ids.forEach((id) => {
+          const track = tracks[id] || {};
+          const label = typeof track.label === 'string' && track.label.trim() ? track.label.trim() : id;
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = label;
+          trackSelect.appendChild(opt);
+        });
+        trackSelect.disabled = false;
+        trackSelect.value = currentTrackId;
+      };
+
+      const updateInputs = () => {
+        const track = getTrack(currentTrackId) || {};
+        if (labelInput) labelInput.value = typeof track.label === 'string' ? track.label : '';
+        if (srcInput) srcInput.value = typeof track.src === 'string' ? track.src : '';
+        if (volumeInput) {
+          const volume = Number(track.volume);
+          const fallbackVolume = Number(defaults.volume ?? 1);
+          const normalized = Number.isFinite(volume)
+            ? Math.min(1, Math.max(0, volume))
+            : (Number.isFinite(fallbackVolume) ? Math.min(1, Math.max(0, fallbackVolume)) : 1);
+          volumeInput.value = String(Math.round(normalized * 100));
+        }
+        if (loopInput) loopInput.checked = track.loop === false ? false : true;
+      };
+
+      const syncUI = () => {
+        refreshTrackSelect();
+        updateInputs();
+        ensureEnabledState();
+        updateDeleteState();
+      };
+
+      const sanitizeAndSync = () => {
+        backgroundState = sanitizeBackgroundAudio(backgroundState, defaults);
+        settings.audio.background = backgroundState;
+        if (!getTrack(currentTrackId)) {
+          const tracks = getTracks();
+          currentTrackId = backgroundState.activeTrack && tracks[backgroundState.activeTrack]
+            ? backgroundState.activeTrack
+            : (Object.keys(tracks)[0] || '');
+        }
+        syncUI();
+      };
+
+      syncUI();
+
+      if (trackSelect && !trackSelect.dataset.bound) {
+        trackSelect.dataset.bound = '1';
+        trackSelect.addEventListener('change', () => {
+          const nextId = trackSelect.value;
+          if (nextId && getTrack(nextId)) {
+            currentTrackId = nextId;
           }
+          updateInputs();
+        });
+      }
+
+      if (labelInput && !labelInput.dataset.bound) {
+        labelInput.dataset.bound = '1';
+        labelInput.addEventListener('input', () => {
+          const track = getTrack(currentTrackId);
+          if (!track) return;
+          track.label = labelInput.value;
+          refreshTrackSelect();
           notifySettingsChanged();
         });
+        const commitLabel = () => {
+          const track = getTrack(currentTrackId);
+          if (!track) return;
+          track.label = labelInput.value;
+          sanitizeAndSync();
+          renderStyleAutomationControls();
+        };
+        labelInput.addEventListener('change', commitLabel);
+        labelInput.addEventListener('blur', commitLabel);
       }
 
       if (srcInput && !srcInput.dataset.bound) {
         srcInput.dataset.bound = '1';
-        srcInput.addEventListener('change', () => {
-          audioState.src = srcInput.value.trim();
-          if (!audioState.src) {
-            audioState.enabled = false;
-            if (enabledInput) enabledInput.checked = false;
-          } else if (enabledInput && enabledInput.checked) {
-            audioState.enabled = true;
+        const commitSrc = () => {
+          const track = getTrack(currentTrackId);
+          if (!track) return;
+          track.src = typeof srcInput.value === 'string' ? srcInput.value.trim() : '';
+          if (backgroundState.activeTrack === currentTrackId && !track.src) {
+            backgroundState.enabled = false;
           }
-          applyStateToInputs();
+          sanitizeAndSync();
           notifySettingsChanged();
-        });
+          renderStyleAutomationControls();
+        };
+        srcInput.addEventListener('change', commitSrc);
+        srcInput.addEventListener('blur', commitSrc);
       }
 
       if (volumeInput && !volumeInput.dataset.bound) {
         volumeInput.dataset.bound = '1';
-        volumeInput.addEventListener('change', () => {
+        const commitVolume = () => {
+          const track = getTrack(currentTrackId);
+          if (!track) return;
           const raw = Number(volumeInput.value);
           if (Number.isFinite(raw)) {
             const percent = Math.max(0, Math.min(100, Math.round(raw)));
             volumeInput.value = String(percent);
-            audioState.volume = percent / 100;
+            track.volume = percent / 100;
           } else {
             const fallbackPercent = Math.round(Math.min(1, Math.max(0, Number(defaults.volume ?? 1))) * 100);
             volumeInput.value = String(fallbackPercent);
-            audioState.volume = fallbackPercent / 100;
+            track.volume = fallbackPercent / 100;
           }
+          sanitizeAndSync();
           notifySettingsChanged();
-        });
+        };
+        volumeInput.addEventListener('change', commitVolume);
+        volumeInput.addEventListener('blur', commitVolume);
       }
 
       if (loopInput && !loopInput.dataset.bound) {
         loopInput.dataset.bound = '1';
         loopInput.addEventListener('change', () => {
-          audioState.loop = !!loopInput.checked;
+          const track = getTrack(currentTrackId);
+          if (!track) return;
+          track.loop = !!loopInput.checked;
+          sanitizeAndSync();
+          notifySettingsChanged();
+        });
+      }
+
+      if (enabledInput && !enabledInput.dataset.bound) {
+        enabledInput.dataset.bound = '1';
+        enabledInput.addEventListener('change', () => {
+          if (enabledInput.checked) {
+            const active = getTrack(backgroundState.activeTrack);
+            if (!active || !active.src) {
+              enabledInput.checked = false;
+              backgroundState.enabled = false;
+            } else {
+              backgroundState.enabled = true;
+            }
+          } else {
+            backgroundState.enabled = false;
+          }
+          ensureEnabledState();
           notifySettingsChanged();
         });
       }
@@ -1113,16 +1336,20 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       if (uploadBtn && !uploadBtn.dataset.bound) {
         uploadBtn.dataset.bound = '1';
         uploadBtn.addEventListener('click', () => {
+          const track = getTrack(currentTrackId);
+          if (!track) return;
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
           fileInput.accept = 'audio/*';
           fileInput.onchange = () => {
             uploadGeneric(fileInput, (path) => {
               if (!path) return;
-              audioState.src = path;
-              audioState.enabled = true;
-              applyStateToInputs();
+              track.src = path;
+              backgroundState.activeTrack = currentTrackId;
+              backgroundState.enabled = true;
+              sanitizeAndSync();
               notifySettingsChanged();
+              renderStyleAutomationControls();
             });
           };
           fileInput.click();
@@ -1132,10 +1359,72 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       if (clearBtn && !clearBtn.dataset.bound) {
         clearBtn.dataset.bound = '1';
         clearBtn.addEventListener('click', () => {
-          audioState.src = '';
-          audioState.enabled = false;
-          applyStateToInputs();
+          const track = getTrack(currentTrackId);
+          if (!track) return;
+          track.src = '';
+          if (backgroundState.activeTrack === currentTrackId) {
+            backgroundState.enabled = false;
+          }
+          sanitizeAndSync();
           notifySettingsChanged();
+        });
+      }
+
+      if (applyBtn && !applyBtn.dataset.bound) {
+        applyBtn.dataset.bound = '1';
+        applyBtn.addEventListener('click', () => {
+          if (!currentTrackId || !getTrack(currentTrackId)) return;
+          backgroundState.activeTrack = currentTrackId;
+          ensureEnabledState();
+          notifySettingsChanged();
+          renderStyleAutomationControls();
+        });
+      }
+
+      if (saveBtn && !saveBtn.dataset.bound) {
+        saveBtn.dataset.bound = '1';
+        saveBtn.addEventListener('click', () => {
+          sanitizeAndSync();
+          notifySettingsChanged();
+          renderStyleAutomationControls();
+        });
+      }
+
+      if (createBtn && !createBtn.dataset.bound) {
+        createBtn.dataset.bound = '1';
+        createBtn.addEventListener('click', () => {
+          const tracks = getTracks();
+          const newId = genId('bgm_');
+          const baseVolume = Math.min(1, Math.max(0, Number(defaults.volume ?? 1) || 1));
+          tracks[newId] = {
+            label: 'Neue Musik',
+            src: '',
+            volume: baseVolume,
+            loop: defaults.loop === false ? false : true
+          };
+          backgroundState.activeTrack = backgroundState.activeTrack || newId;
+          currentTrackId = newId;
+          sanitizeAndSync();
+          notifySettingsChanged();
+          renderStyleAutomationControls();
+        });
+      }
+
+      if (deleteBtn && !deleteBtn.dataset.bound) {
+        deleteBtn.dataset.bound = '1';
+        deleteBtn.addEventListener('click', () => {
+          const tracks = getTracks();
+          if (Object.keys(tracks).length <= 1) return;
+          delete tracks[currentTrackId];
+          if (backgroundState.activeTrack === currentTrackId) {
+            backgroundState.activeTrack = Object.keys(tracks)[0] || '';
+          }
+          currentTrackId = backgroundState.activeTrack && tracks[backgroundState.activeTrack]
+            ? backgroundState.activeTrack
+            : (Object.keys(tracks)[0] || '');
+          sanitizeAndSync();
+          notifySettingsChanged();
+          renderStyleAutomationControls();
         });
       }
     };
@@ -1759,26 +2048,11 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       setV('#tileOverlayStrength', Math.round((DEFAULTS.slides.tileOverlayStrength ?? 1) * 100));
       applyOverlayState(DEFAULTS.slides.tileOverlayEnabled !== false);
 
-      const audioDefaults = DEFAULTS.audio?.background || {};
+      const audioDefaults = sanitizeBackgroundAudio(DEFAULTS.audio?.background, DEFAULTS.audio?.background || {});
       settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
-      const audioState = settings.audio.background && typeof settings.audio.background === 'object'
-        ? settings.audio.background
-        : (settings.audio.background = {});
-      audioState.src = typeof audioDefaults.src === 'string' ? audioDefaults.src : '';
-      audioState.enabled = !!(audioDefaults.enabled !== false && audioState.src);
-      const defaultVolume = Number(audioDefaults.volume ?? 1);
-      audioState.volume = Number.isFinite(defaultVolume)
-        ? Math.min(1, Math.max(0, defaultVolume))
-        : 1;
-      audioState.loop = audioDefaults.loop === false ? false : true;
-      const audioEnabledInput = document.getElementById('bgAudioEnabled');
-      if (audioEnabledInput) audioEnabledInput.checked = audioState.enabled;
-      const audioSrcInput = document.getElementById('bgAudioSrc');
-      if (audioSrcInput) audioSrcInput.value = audioState.src || '';
-      const audioVolumeInput = document.getElementById('bgAudioVolume');
-      if (audioVolumeInput) audioVolumeInput.value = String(Math.round(audioState.volume * 100));
-      const audioLoopInput = document.getElementById('bgAudioLoop');
-      if (audioLoopInput) audioLoopInput.checked = audioState.loop !== false;
+      settings.audio.background = deepClone(audioDefaults);
+      renderBackgroundAudioControls();
+      renderStyleAutomationControls();
 
       setV('#rightW',   DEFAULTS.display.rightWidthPercent);
       setV('#cutTop',   DEFAULTS.display.cutTopPercent);

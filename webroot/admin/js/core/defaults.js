@@ -286,10 +286,11 @@ export const DEFAULTS = {
     styleAutomation:{
       enabled:true,
       fallbackStyle:'classic',
+      fallbackTrack:'default',
       timeSlots:[
-        { id:'morning', label:'Vormittag', mode:'daily', start:'06:00', style:'classic' },
-        { id:'evening', label:'Abend', mode:'daily', start:'18:00', style:'sunset' },
-        { id:'night', label:'Nacht', mode:'daily', start:'21:30', style:'midnight' }
+        { id:'morning', label:'Vormittag', mode:'daily', start:'06:00', style:'classic', track:'default' },
+        { id:'evening', label:'Abend', mode:'daily', start:'18:00', style:'sunset', track:'default' },
+        { id:'night', label:'Nacht', mode:'daily', start:'21:30', style:'midnight', track:'default' }
       ]
     }
   },
@@ -348,9 +349,18 @@ export const DEFAULTS = {
   audio:{
     background:{
       enabled:false,
+      activeTrack:'default',
       src:'',
       volume:0.5,
-      loop:true
+      loop:true,
+      tracks:{
+        default:{
+          label:'Standard',
+          src:'',
+          volume:0.5,
+          loop:true
+        }
+      }
     }
   }
 };
