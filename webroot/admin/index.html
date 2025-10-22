@@ -190,45 +190,6 @@
   </summary>
   <div class="content">
     <div class="settings-stack">
-      <div class="settings-card" id="slidesFlowCard" data-jump-target hidden>
-        <div class="settings-card-head">
-          <div class="settings-card-title">Ablauf &amp; Zeitsteuerung</div>
-          <p class="settings-card-description">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
-        </div>
-        <div class="settings-card-body">
-          <!-- Dauer-Modus (global, gilt für Saunen + Bilder) -->
-          <div class="kv" id="rowDurMode">
-            <label>Dauer-Modus</label>
-            <div class="row">
-              <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
-              <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
-            </div>
-          </div>
-
-          <div class="kv" id="rowDwellAll">
-            <label>Dauer (einheitlich)</label>
-            <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-              <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
-              <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
-
-              <span class="mut" style="min-width:10ch;">Übersicht</span>
-              <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
-            </div>
-          </div>
-
-          <!-- Transition -->
-          <div class="kv">
-            <label>Transition (ms)</label>
-            <input id="transMs2" class="input" type="number" min="0" value="500">
-          </div>
-
-          <div class="kv">
-            <label>Weiter erst nach Video-Ende</label>
-            <input id="waitForVideo" type="checkbox">
-          </div>
-        </div>
-      </div>
-
       <div class="settings-card" id="slidesAutomationCard" data-jump-target hidden>
         <div class="settings-card-head">
           <div class="settings-card-title">Automatisierung</div>
@@ -300,7 +261,7 @@
         
 	<!-- kein Aufguss -->
 	<div id="saunaList"></div>
-	<div class="subh" id="extraTitle" style="display:none">Heute kein Aufguss</div>
+        <div class="subh" id="extraTitle" style="display:none">Inventar</div>
         <div id="extraSaunaList"></div>
 
         <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
@@ -455,6 +416,7 @@
     <span class="col-prev">Preview</span>
     <span class="col-dur" id="headImgDur">Dauer (s)</span>
     <span class="col-audio">Ton</span>
+    <span class="col-wait">Video-Ende</span>
     <span class="col-up">Upload</span>
     <span class="col-del">✕</span>
     <span class="col-vis">Anzeigen</span>
@@ -513,6 +475,31 @@
                   <label>Info-Banner Höhe (% vom Bildschirm)</label>
                   <input id="infoBannerHeight" class="input num3" type="number" min="2" max="40" step="1" placeholder="10">
                   <div class="help">Steuert den reservierten Bereich für den laufenden Hinweisbanner.</div>
+                </div>
+                <div class="divider"></div>
+                <div class="layout-flow-section">
+                  <div class="subh">Ablauf &amp; Zeitsteuerung</div>
+                  <p class="help" style="margin-top:-4px">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
+                  <div class="kv" id="rowDurMode">
+                    <label>Dauer-Modus</label>
+                    <div class="row">
+                      <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
+                      <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
+                    </div>
+                  </div>
+                  <div class="kv" id="rowDwellAll">
+                    <label>Dauer (einheitlich)</label>
+                    <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                      <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
+                      <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
+                      <span class="mut" style="min-width:10ch;">Übersicht</span>
+                      <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
+                    </div>
+                  </div>
+                  <div class="kv">
+                    <label>Transition (ms)</label>
+                    <input id="transMs2" class="input" type="number" min="0" value="500">
+                  </div>
                 </div>
                 <div class="layout-display-columns">
                   <div class="fieldset layout-page" id="layoutLeft">

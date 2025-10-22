@@ -1675,7 +1675,10 @@ if (sortOrder && sortOrder.length) {
         if (it.url) {
           if (it.type === 'url') node.url = it.url; else node.src = it.url;
         }
-        if (it.type === 'video') node.muted = !(it.audio === true);
+        if (it.type === 'video') {
+          node.muted = !(it.audio === true);
+          if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+        }
         queue.push(node);
         usedMedia.add(String(it.id));
       }
@@ -1713,7 +1716,10 @@ if (sortOrder && sortOrder.length) {
       if (it.url) {
         if (it.type === 'url') node.url = it.url; else node.src = it.url;
       }
-      if (it.type === 'video') node.muted = !(it.audio === true);
+      if (it.type === 'video') {
+        node.muted = !(it.audio === true);
+        if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+      }
       queue.push(node);
     }
   }
@@ -1795,7 +1801,10 @@ for (const it of media) {
   const node = { type: it.type, dwell, __id: it.id || null };
   if (it.src) node.src = it.src;
   if (it.url && it.type === 'url') node.url = it.url;
-  if (it.type === 'video') node.muted = !(it.audio === true);
+  if (it.type === 'video') {
+    node.muted = !(it.audio === true);
+    if (shouldWaitForVideoEnd(it)) node.waitForEnd = true;
+  }
   queue.splice(insPos++, 0, node);
 }
 
@@ -3038,6 +3047,7 @@ if (!schedule) {
 }
 
 const notes = footnoteMap();
+const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
 const showFlames = (settings?.fonts?.overviewShowFlames !== false);
 const statusStateLocal = ensureSaunaStatusState();
 const saunas = Array.isArray(schedule?.saunas) ? schedule.saunas : [];
@@ -3092,8 +3102,10 @@ const tb = h('tbody');
       const title = String(cell.title).replace(/\*+$/, '');
       const hasStarInText = /\*$/.test(cell.title || '');
       const txt = h('div', { class: 'chip-text' }, title);
-      if (hasStarInText) txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
-      const supNote = noteSup(cell, notes);
+      if (showOverviewFootnotes && hasStarInText) {
+        txt.appendChild(h('span', { class: 'notewrap' }, [h('sup', { class: 'note legacy' }, '*')]));
+      }
+      const supNote = showOverviewFootnotes ? noteSup(cell, notes) : null;
       if (supNote) {
         txt.appendChild(h('span', { class: 'notewrap' }, [supNote]));
         usedSet.add(cell.noteId);
@@ -3119,7 +3131,6 @@ t.appendChild(tb);
 const footNodes = [];
 const order = (settings?.footnotes||[]).map(fn=>fn.id);
 for (const id of order){ if (usedSet.has(id)){ const v = notes.get(id); if (v) footNodes.push(h('div',{class:'fnitem'}, [h('sup',{class:'note'}, String(v.label||'*')), ' ', v.text])); } }
-const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
 if (showOverviewFootnotes && footNodes.length){
   const layout = (settings?.footnoteLayout ?? 'one-line');
   const fnClass = 'footer-note ' + (layout==='multi' ? 'fn-multi' : layout==='stacked' ? 'fn-stack' : layout==='ticker' ? 'fn-ticker' : layout==='split' ? 'fn-split' : 'fn-one');
@@ -3262,6 +3273,14 @@ img.src = url;
 return c;
 }
 
+function shouldWaitForVideoEnd(entry){
+  if (!entry || entry.type !== 'video') return false;
+  if (Object.prototype.hasOwnProperty.call(entry, 'waitForEnd')) {
+    return entry.waitForEnd === true;
+  }
+  return settings?.slides?.waitForVideo === true;
+}
+
 // ---------- Interstitial video slide ----------
 function renderVideo(src, opts = {}, region = 'left', ctx = {}) {
 const disp = getDisplayRatio();
@@ -3312,7 +3331,7 @@ if (backgroundAudioKey) {
   v.addEventListener('pause', () => { if (!v.ended) releaseBackgroundAudio(); });
   v.addEventListener('abort', releaseBackgroundAudio, { once: true });
 }
-if (settings?.slides?.waitForVideo) {
+if (shouldWaitForVideoEnd(opts)) {
   const done = () => {
     if (done.called) return;
     done.called = true;
@@ -5269,7 +5288,7 @@ function createStageController(id, element){
     last = key;
     updateActiveState();
     const dwell = dwellMsForItem(item, config);
-    if (!(settings?.slides?.waitForVideo && item.type === 'video')) {
+    if (!shouldWaitForVideoEnd(item)) {
       let handled = false;
       if (typeof deferAdvanceHandler === 'function') {
         try {
