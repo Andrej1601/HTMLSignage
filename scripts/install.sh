@@ -200,10 +200,10 @@ install_packages(){
   apt-get install -y "${packages[@]}"
 }
 
-build_admin_assets(){
+build_frontend_assets(){
   log "Building admin frontend bundle"
   if ! command -v npm >/dev/null 2>&1; then
-    warn "npm not available; skipping admin build"
+    warn "npm not available; skipping frontend builds"
     return
   fi
 
@@ -221,6 +221,8 @@ build_admin_assets(){
     env "${npm_env[@]}" npm install --progress=false
   fi
   env "${npm_env[@]}" npm run build:admin
+  log "Building slideshow player bundle"
+  env "${npm_env[@]}" npm run build:player
   rm -rf node_modules
   popd >/dev/null
 }
@@ -466,7 +468,7 @@ main(){
   collect_settings
 
   install_packages
-  build_admin_assets
+  build_frontend_assets
   deploy_application
   prepare_database
   deploy_nginx
