@@ -876,10 +876,18 @@ function signage_default_settings(): array
         'audio' => [
             'background' => [
                 'enabled' => false,
+                'activeTrack' => 'default',
                 'src' => '',
                 'volume' => 0.5,
                 'loop' => true,
-                'fadeMs' => 0,
+                'tracks' => [
+                    'default' => [
+                        'label' => 'Standard',
+                        'src' => '',
+                        'volume' => 0.5,
+                        'loop' => true,
+                    ],
+                ],
             ],
         ],
         'footnotes' => [
@@ -909,40 +917,141 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     return $normalized;
 }
 
-function signage_normalize_background_audio($input, array $default): array
+function signage_normalize_audio_track($input, array $fallback, array $global): array
 {
-    $state = is_array($input) ? $input : [];
-    $src = isset($state['src']) && is_string($state['src']) ? trim($state['src']) : '';
-    $enabled = $src !== '' && ($state['enabled'] ?? true) !== false;
+    $track = is_array($input) ? $input : [];
+    $fb = $fallback;
+    $result = [];
 
-    $volumeRaw = $state['volume'] ?? ($default['volume'] ?? 1.0);
+    $label = isset($track['label']) && is_string($track['label']) ? trim($track['label']) : '';
+    if ($label === '' && isset($fb['label']) && is_string($fb['label'])) {
+        $label = trim($fb['label']);
+    }
+    if ($label !== '') {
+        $result['label'] = $label;
+    }
+
+    $src = isset($track['src']) && is_string($track['src']) ? trim($track['src']) : '';
+    if ($src === '' && isset($fb['src']) && is_string($fb['src'])) {
+        $src = trim($fb['src']);
+    }
+    $result['src'] = $src;
+
+    $volumeRaw = $track['volume'] ?? ($fb['volume'] ?? ($global['volume'] ?? 1.0));
     $volume = (float) $volumeRaw;
     if (!is_finite($volume)) {
-        $volume = (float) ($default['volume'] ?? 1.0);
+        $volume = (float) ($fb['volume'] ?? ($global['volume'] ?? 1.0));
     }
     $volume = max(0.0, min(1.0, $volume));
+    $result['volume'] = $volume;
 
-    $loop = array_key_exists('loop', $state)
-        ? ($state['loop'] !== false)
-        : (($default['loop'] ?? true) !== false);
+    $loop = array_key_exists('loop', $track)
+        ? ($track['loop'] !== false)
+        : (array_key_exists('loop', $fb)
+            ? ($fb['loop'] !== false)
+            : (($global['loop'] ?? true) !== false));
+    $result['loop'] = $loop;
 
-    $normalized = [
-        'enabled' => $enabled,
-        'src' => $src,
-        'volume' => $volume,
-        'loop' => $loop,
-    ];
-
-    $fadeRaw = $state['fadeMs'] ?? ($default['fadeMs'] ?? 0);
+    $fadeRaw = $track['fadeMs'] ?? ($fb['fadeMs'] ?? ($global['fadeMs'] ?? null));
     if (is_numeric($fadeRaw)) {
         $fade = (int) round($fadeRaw);
         if ($fade > 0) {
-            $normalized['fadeMs'] = max(0, min(60000, $fade));
+            $result['fadeMs'] = max(0, min(60000, $fade));
         }
     }
 
-    if (!$enabled) {
-        $normalized['enabled'] = false;
+    return $result;
+}
+
+function signage_normalize_background_audio($input, array $default): array
+{
+    $state = is_array($input) ? $input : [];
+    $defaultTracks = isset($default['tracks']) && is_array($default['tracks']) ? $default['tracks'] : [];
+
+    $tracksInput = isset($state['tracks']) && is_array($state['tracks']) ? $state['tracks'] : [];
+    if (empty($tracksInput) && isset($state['src'])) {
+        $trackId = isset($state['activeTrack']) && is_string($state['activeTrack']) && trim($state['activeTrack']) !== ''
+            ? trim($state['activeTrack'])
+            : 'default';
+        $tracksInput = [
+            $trackId => [
+                'label' => $state['trackLabel'] ?? '',
+                'src' => $state['src'] ?? '',
+                'volume' => $state['volume'] ?? null,
+                'loop' => $state['loop'] ?? null,
+                'fadeMs' => $state['fadeMs'] ?? null,
+            ],
+        ];
+    }
+
+    if (empty($tracksInput)) {
+        $tracksInput = $defaultTracks;
+    }
+
+    if (empty($tracksInput)) {
+        $tracksInput = [
+            'default' => [
+                'label' => 'Standard',
+                'src' => '',
+                'volume' => $default['volume'] ?? 1.0,
+                'loop' => ($default['loop'] ?? true) !== false,
+                'fadeMs' => $default['fadeMs'] ?? null,
+            ],
+        ];
+    }
+
+    $tracks = [];
+    foreach ($tracksInput as $id => $track) {
+        if (!is_string($id) && !is_int($id)) {
+            continue;
+        }
+        $key = trim((string) $id);
+        if ($key === '') {
+            continue;
+        }
+        $fallback = isset($defaultTracks[$key]) && is_array($defaultTracks[$key]) ? $defaultTracks[$key] : [];
+        $tracks[$key] = signage_normalize_audio_track($track, $fallback, $default);
+    }
+
+    $activeTrack = isset($state['activeTrack']) && is_string($state['activeTrack']) ? trim($state['activeTrack']) : '';
+    if ($activeTrack === '' || !isset($tracks[$activeTrack])) {
+        $defaultActive = isset($default['activeTrack']) && is_string($default['activeTrack']) ? trim($default['activeTrack']) : '';
+        if ($defaultActive !== '' && isset($tracks[$defaultActive])) {
+            $activeTrack = $defaultActive;
+        } else {
+            $keys = array_keys($tracks);
+            $activeTrack = $keys ? $keys[0] : '';
+        }
+    }
+
+    $desiredEnabled = ($state['enabled'] ?? true) !== false;
+    $activeEntry = ($activeTrack !== '' && isset($tracks[$activeTrack])) ? $tracks[$activeTrack] : null;
+    $enabled = $desiredEnabled && $activeEntry && $activeEntry['src'] !== '';
+
+    $normalized = [
+        'enabled' => $enabled,
+        'activeTrack' => $activeTrack,
+        'tracks' => $tracks,
+    ];
+
+    if ($activeEntry) {
+        $normalized['src'] = $activeEntry['src'];
+        $normalized['volume'] = $activeEntry['volume'];
+        $normalized['loop'] = $activeEntry['loop'];
+        if (isset($activeEntry['fadeMs'])) {
+            $normalized['fadeMs'] = $activeEntry['fadeMs'];
+        }
+        if (!empty($activeEntry['label'])) {
+            $normalized['trackLabel'] = $activeEntry['label'];
+        }
+    } else {
+        $normalized['src'] = '';
+        $volume = (float) ($default['volume'] ?? 1.0);
+        if (!is_finite($volume)) {
+            $volume = 1.0;
+        }
+        $normalized['volume'] = max(0.0, min(1.0, $volume));
+        $normalized['loop'] = ($default['loop'] ?? true) !== false;
     }
 
     return $normalized;

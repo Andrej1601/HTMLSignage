@@ -215,6 +215,10 @@
               <label>Fallback-Stil</label>
               <select id="styleAutoFallback" class="input"></select>
             </div>
+            <div class="kv">
+              <label>Fallback-Musik</label>
+              <select id="styleAutoFallbackTrack" class="input"></select>
+            </div>
             <div class="style-auto-list" id="styleAutoList"></div>
             <div class="row style-auto-actions">
               <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
@@ -560,6 +564,22 @@
                     <input id="bgAudioEnabled" type="checkbox">
                     <span>Hintergrundmusik abspielen</span>
                   </label>
+                </div>
+                <div class="kv">
+                  <label>Musik-Preset</label>
+                  <div class="style-set-controls" id="bgAudioTrackControls" data-jump-target>
+                    <select id="bgAudioTrackSelect" class="input"></select>
+                    <div class="row" style="gap:6px;flex-wrap:wrap">
+                      <button class="btn sm" id="bgAudioTrackApply" type="button">Aktivieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackSave" type="button">Aktualisieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackCreate" type="button">Neu</button>
+                      <button class="btn sm ghost" id="bgAudioTrackDelete" type="button">Löschen</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="kv">
+                  <label>Bezeichnung</label>
+                  <input id="bgAudioTrackLabel" class="input" type="text" placeholder="z. B. Lobby">
                 </div>
                 <div class="kv">
                   <label>Quelle</label>
