@@ -32,8 +32,9 @@ const STAGE_RIGHT = document.getElementById('stage-right');
 const INFO_BANNER = document.getElementById('info-banner-area');
 const INFO_BANNER_MODES = new Set(['full', 'left', 'right']);
 const INFO_BANNER_DEFAULT_HEIGHT = 10;
-const INFO_BANNER_MIN_HEIGHT = 2;
+const INFO_BANNER_MIN_HEIGHT = 0.5;
 const INFO_BANNER_MAX_HEIGHT = 40;
+const INFO_BANNER_MIN_LENGTH_PERCENT = 5;
 const Q = new URLSearchParams(location.search);
 const IS_PREVIEW = Q.get('preview') === '1'; // NEU: Admin-Dock
 const ls = createSafeLocalStorage({
@@ -77,6 +78,7 @@ const styleAutomationState = {
   activeStyle: null
 };
 let infoBannerMode = 'full';
+let infoBannerLengthRatio = 1;
 const displayListeners = {
   resizeHandler: null,
   resizeObserver: null,
@@ -900,20 +902,57 @@ function resolveInfoBannerMode(display = {}) {
   return 'full';
 }
 
-function updateInfoBannerColumnWidth() {
+function updateInfoBannerMetrics() {
   if (!INFO_BANNER) return;
-  if (infoBannerMode === 'full') {
-    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
-    return;
-  }
-  const target = infoBannerMode === 'left' ? STAGE_LEFT : STAGE_RIGHT;
+
+  const target = (() => {
+    switch (infoBannerMode) {
+      case 'left':
+        return STAGE_LEFT;
+      case 'right':
+        return STAGE_RIGHT;
+      default:
+        return STAGE;
+    }
+  })();
+
   const rect = target ? target.getBoundingClientRect() : null;
   const width = rect ? Math.max(0, rect.width || 0) : 0;
+
   if (width > 0) {
-    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', `${Math.round(width)}px`);
+    const rounded = Math.round(width);
+    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', `${rounded}px`);
+    const ratio = Math.max(INFO_BANNER_MIN_LENGTH_PERCENT / 100, Math.min(1, infoBannerLengthRatio || 0));
+    if (ratio >= 0.999) {
+      INFO_BANNER.style.removeProperty('--infoBannerWidth');
+    } else {
+      INFO_BANNER.style.setProperty('--infoBannerWidth', `${Math.round(rounded * ratio)}px`);
+    }
   } else {
-    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
+    INFO_BANNER.style.removeProperty('--infoBannerWidth');
+    INFO_BANNER.style.removeProperty('--infoBannerColumnWidth');
   }
+}
+
+function placeInfoBannerRegion(region) {
+  if (!INFO_BANNER) return;
+  const targetParent = (() => {
+    switch (region) {
+      case 'left':
+        return STAGE_LEFT || CANVAS;
+      case 'right':
+        return STAGE_RIGHT || CANVAS;
+      default:
+        return CANVAS;
+    }
+  })();
+
+  if (targetParent && INFO_BANNER.parentElement !== targetParent) {
+    targetParent.appendChild(INFO_BANNER);
+  }
+
+  STAGE_LEFT?.classList.toggle('stage-area--has-banner', region === 'left' || region === 'full');
+  STAGE_RIGHT?.classList.toggle('stage-area--has-banner', region === 'right' || region === 'full');
 }
 
 function applyInfoBannerLayout(display = {}, docStyle = document.documentElement?.style) {
@@ -923,23 +962,32 @@ function applyInfoBannerLayout(display = {}, docStyle = document.documentElement
   if (heightPercent !== null) {
     const clamped = Math.max(INFO_BANNER_MIN_HEIGHT, Math.min(INFO_BANNER_MAX_HEIGHT, heightPercent));
     docStyle.setProperty('--infoBannerHeightVh', String(clamped));
-    const padScale = Math.max(0.4, Math.min(2, clamped / INFO_BANNER_DEFAULT_HEIGHT));
-    docStyle.setProperty('--infoBannerPadScale', padScale.toFixed(3));
+    const minScale = INFO_BANNER_MIN_HEIGHT / INFO_BANNER_DEFAULT_HEIGHT;
+    const scale = Math.max(minScale, Math.min(2, clamped / INFO_BANNER_DEFAULT_HEIGHT));
+    const fixedScale = scale.toFixed(3);
+    docStyle.setProperty('--infoBannerPadScale', fixedScale);
+    docStyle.setProperty('--infoBannerFontScale', fixedScale);
   } else {
     docStyle.removeProperty('--infoBannerHeightVh');
     docStyle.removeProperty('--infoBannerPadScale');
+    docStyle.removeProperty('--infoBannerFontScale');
+  }
+
+  const lengthPercent = toFiniteNumber(display.infoBannerLengthPercent);
+  if (lengthPercent !== null) {
+    const clampedLength = Math.max(INFO_BANNER_MIN_LENGTH_PERCENT, Math.min(100, lengthPercent));
+    docStyle.setProperty('--infoBannerLengthPercent', String(clampedLength));
+    infoBannerLengthRatio = clampedLength / 100;
+  } else {
+    docStyle.removeProperty('--infoBannerLengthPercent');
+    infoBannerLengthRatio = 1;
   }
 
   infoBannerMode = resolveInfoBannerMode(display);
   INFO_BANNER.dataset.mode = infoBannerMode;
-
-  if (infoBannerMode === 'full') {
-    INFO_BANNER.style.setProperty('--infoBannerColumnWidth', 'none');
-    resizeRegistry.set('info-banner', null);
-  } else {
-    updateInfoBannerColumnWidth();
-    resizeRegistry.set('info-banner', updateInfoBannerColumnWidth);
-  }
+  placeInfoBannerRegion(infoBannerMode);
+  updateInfoBannerMetrics();
+  resizeRegistry.set('info-banner', updateInfoBannerMetrics);
 }
 
 function applyTheme() {
@@ -2145,7 +2193,7 @@ function applyInfoBannerModules(modules = []) {
   const node = renderInfoModule(active, region);
   INFO_BANNER.appendChild(node);
   INFO_BANNER.dataset.empty = 'false';
-  if (infoBannerMode !== 'full') updateInfoBannerColumnWidth();
+  updateInfoBannerMetrics();
 }
 
 // ---------- DOM helpers ----------

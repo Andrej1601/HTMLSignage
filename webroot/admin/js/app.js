@@ -917,9 +917,20 @@ function collectSettings(){
         infoBannerHeightPercent:(() => {
           const el = document.getElementById('infoBannerHeight');
           const fallback = settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10;
+          const fallbackNum = Number(fallback);
+          const resolvedFallback = Number.isFinite(fallbackNum) ? fallbackNum : 10;
           const raw = Number(el?.value);
-          if (!Number.isFinite(raw)) return Math.round(fallback);
-          return Math.round(clamp(2, raw, 40));
+          if (!Number.isFinite(raw)) return clamp(0.5, resolvedFallback, 40);
+          return clamp(0.5, raw, 40);
+        })(),
+        infoBannerLengthPercent:(() => {
+          const el = document.getElementById('infoBannerLength');
+          const fallback = settings.display?.infoBannerLengthPercent ?? DEFAULTS.display?.infoBannerLengthPercent ?? 100;
+          const fallbackNum = Number(fallback);
+          const resolvedFallback = Number.isFinite(fallbackNum) ? fallbackNum : 100;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return clamp(5, resolvedFallback, 100);
+          return clamp(5, raw, 100);
         })(),
         infoBannerMode:(() => {
           const el = document.getElementById('infoBannerMode');
