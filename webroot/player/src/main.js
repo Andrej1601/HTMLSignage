@@ -198,12 +198,18 @@ function normalizeBackgroundAudioConfig(config = {}) {
   const activeEntry = activeTrack && trackMap.get(activeTrack) ? trackMap.get(activeTrack) : null;
   const enabled = !!(desiredEnabled && activeEntry && activeEntry.src);
 
+  const tracks = {};
+  trackMap.forEach((value, key) => {
+    tracks[key] = { ...value };
+  });
+
   const normalized = {
     enabled,
     src: activeEntry ? activeEntry.src : '',
     volume: activeEntry ? activeEntry.volume : 1,
     loop: activeEntry ? (activeEntry.loop !== false) : true,
-    activeTrack
+    activeTrack,
+    tracks
   };
   if (activeEntry && activeEntry.fadeMs != null) {
     normalized.fadeMs = activeEntry.fadeMs;
