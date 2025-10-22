@@ -1549,6 +1549,92 @@ body.mode-uniform #ovSec{ display:none !important; }
 /* Kein Überlaufen der Grids in der Sidebar */
 .saunarow > *, .mediarow > *{ min-width:0; }
 
+.sauna-info-editor{
+  grid-column:1 / -1;
+  margin-top:4px;
+  background:color-mix(in oklab, var(--panel) 96%, transparent);
+  border:1px solid var(--inbr);
+  border-radius:10px;
+  overflow:hidden;
+}
+.sauna-info-editor__summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 12px;
+  list-style:none;
+  cursor:pointer;
+  user-select:none;
+  transition:background-color .15s ease;
+}
+.sauna-info-editor__summary:focus-visible{
+  outline:2px solid var(--btn-accent);
+  outline-offset:2px;
+}
+.sauna-info-editor__summary:hover{
+  background:color-mix(in srgb, var(--panel) 75%, var(--bg));
+}
+.sauna-info-editor__summary::-webkit-details-marker{display:none;}
+.sauna-info-editor__summary-text{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-width:0;
+}
+.sauna-info-editor__summary-title,
+.sauna-info-editor__label{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.sauna-info-editor__preview{
+  font-size:11px;
+  color:var(--muted);
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.sauna-info-editor__preview[data-empty="true"]{
+  font-style:italic;
+}
+.sauna-info-editor[data-has-content="true"] .sauna-info-editor__preview[data-empty="false"]{
+  color:var(--fg);
+}
+.sauna-info-editor.is-open .sauna-info-editor__preview{
+  display:none;
+}
+.sauna-info-editor__chevron::before{
+  content:'▾';
+  display:inline-block;
+  font-size:11px;
+  color:var(--muted);
+  transition:transform .2s ease;
+}
+.sauna-info-editor.is-open .sauna-info-editor__summary{
+  border-bottom:1px solid var(--inbr);
+}
+.sauna-info-editor.is-open .sauna-info-editor__chevron::before{
+  transform:rotate(180deg);
+}
+.sauna-info-editor__body{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:10px 12px 12px;
+}
+.sauna-info-editor__input{
+  min-height:52px;
+  resize:vertical;
+}
+.sauna-info-editor__hint{
+  font-size:10px;
+  color:var(--muted);
+}
+
 /* --- Wunschanpassungen: Breiten innerhalb der Spalten ----------------------- */
 /* Sauna-Namen 20% schmaler (lässt innen Luft im Spaltenbereich) */
 .saunarow .input.name{ width:80%; }
