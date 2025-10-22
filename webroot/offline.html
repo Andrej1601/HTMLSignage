@@ -94,14 +94,20 @@
     const extras = settings.extras || {};
     const wellnessCount = Array.isArray(extras.wellnessTips) ? extras.wellnessTips.length : 0;
     const eventCount = Array.isArray(extras.eventCountdowns) ? extras.eventCountdowns.length : 0;
-    const gastroCount = Array.isArray(extras.gastronomyHighlights) ? extras.gastronomyHighlights.length : 0;
+    const infoModules = Array.isArray(extras.infoModules) ? extras.infoModules : [];
+    const infoCount = infoModules.reduce((count, entry) => {
+      if (!entry || typeof entry !== 'object') return count;
+      if (entry.enabled === false) return count;
+      const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+      return text ? count + 1 : count;
+    }, 0);
 
     const metaItems = [
       ['Layout', `${layoutMode} · Profil: ${layoutProfile}`],
       ['Style-Set', activeStyle],
       ['Wellness-Tipps', String(wellnessCount)],
       ['Events', String(eventCount)],
-      ['Gastronomie', String(gastroCount)]
+      ['Info-Banner', String(infoCount)]
     ];
     metaItems.forEach(([label, value]) => {
       const span = document.createElement('span');

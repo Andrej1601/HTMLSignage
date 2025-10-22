@@ -194,62 +194,13 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         return result;
       });
 
-      extras.gastronomyHighlights = sanitizeList(extras.gastronomyHighlights, defaults.gastronomyHighlights, (entry) => {
-        const items = Array.isArray(entry.items)
-          ? entry.items.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
-          : [];
-        const textLines = Array.isArray(entry.textLines)
-          ? entry.textLines.map(it => (typeof it === 'string' ? it.trim() : '')).filter(Boolean)
-          : [];
-        const dwell = toDwellSeconds(entry.dwellSec);
-        const result = {
-          id: entry.id,
-          title: typeof entry.title === 'string' ? entry.title.trim() : '',
-          description: typeof entry.description === 'string' ? entry.description.trim() : '',
-          icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
-          items,
-          textLines
-        };
-        if (dwell != null) result.dwellSec = dwell;
-        return result;
-      });
-
       extras.infoModules = sanitizeList(extras.infoModules, defaults.infoModules, (entry) => {
-        const dwell = toDwellSeconds(entry.dwellSec);
-        const layoutRaw = typeof entry.layout === 'string' ? entry.layout.trim().toLowerCase() : '';
-        const layout = ['cards', 'metrics', 'ticker'].includes(layoutRaw) ? layoutRaw : 'metrics';
-        const regionRaw = typeof entry.region === 'string' ? entry.region.trim().toLowerCase() : '';
-        const region = ['left', 'right', 'full'].includes(regionRaw) ? regionRaw : 'right';
-        const note = typeof entry.note === 'string' ? entry.note.trim() : '';
-        const items = Array.isArray(entry.items)
-          ? entry.items.map((item) => {
-              if (!item || typeof item !== 'object') return null;
-              const label = typeof item.label === 'string' ? item.label.trim() : '';
-              const value = typeof item.value === 'string' ? item.value.trim() : '';
-              const text = typeof item.text === 'string' ? item.text.trim() : '';
-              const icon = typeof item.icon === 'string' ? item.icon.trim() : '';
-              const badge = typeof item.badge === 'string' ? item.badge.trim() : '';
-              const trendRaw = typeof item.trend === 'string' ? item.trend.trim().toLowerCase() : '';
-              const trend = ['up', 'down', 'steady'].includes(trendRaw) ? trendRaw : null;
-              if (!label && !value && !text && !badge) return null;
-              const infoItem = { label, value, text, icon, badge };
-              if (trend) infoItem.trend = trend;
-              if (item.id != null) infoItem.id = String(item.id);
-              return infoItem;
-            }).filter(Boolean)
-          : [];
         const result = {
           id: entry.id,
-          title: typeof entry.title === 'string' ? entry.title.trim() : '',
-          subtitle: typeof entry.subtitle === 'string' ? entry.subtitle.trim() : '',
           icon: typeof entry.icon === 'string' ? entry.icon.trim() : '',
-          layout,
-          region,
-          note,
-          items,
+          text: typeof entry.text === 'string' ? entry.text.trim() : '',
           enabled: entry.enabled !== false
         };
-        if (dwell != null) result.dwellSec = dwell;
         return result;
       });
 
@@ -768,139 +719,23 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         });
       }
 
-      const gastroHost = document.getElementById('extrasGastroList');
-      if (gastroHost) {
-        gastroHost.innerHTML = '';
-        extras.gastronomyHighlights.forEach((entry, index) => {
-          const row = document.createElement('div');
-          row.className = 'extras-item';
-
-          const header = document.createElement('div');
-          header.className = 'extras-item-header extras-inline';
-
-          const iconInput = document.createElement('input');
-          iconInput.className = 'input';
-          iconInput.placeholder = 'Icon (optional)';
-          iconInput.value = entry.icon || '';
-          iconInput.oninput = () => {
-            entry.icon = iconInput.value.trim();
-            notifySettingsChanged();
-          };
-
-          const titleInput = document.createElement('input');
-          titleInput.className = 'input';
-          titleInput.placeholder = 'Titel';
-          titleInput.value = entry.title || '';
-          titleInput.oninput = () => {
-            entry.title = titleInput.value.trim();
-            notifySettingsChanged();
-          };
-
-          header.append(iconInput, titleInput);
-
-          const body = document.createElement('div');
-          body.className = 'extras-item-body';
-
-          const descArea = document.createElement('textarea');
-          descArea.className = 'input';
-          descArea.placeholder = 'Beschreibung';
-          descArea.value = entry.description || '';
-          descArea.oninput = () => {
-            entry.description = descArea.value.trim();
-            notifySettingsChanged();
-          };
-
-          const itemsArea = document.createElement('textarea');
-          itemsArea.className = 'input';
-          itemsArea.placeholder = 'Bullet-Points (jede Zeile ein Punkt)';
-          itemsArea.value = (entry.items || []).join('\n');
-          itemsArea.oninput = () => {
-            entry.items = itemsArea.value.split('\n').map(line => line.trim()).filter(Boolean);
-            notifySettingsChanged();
-          };
-
-          body.append(descArea, itemsArea);
-
-          const dwellRow = document.createElement('div');
-          dwellRow.className = 'extras-inline';
-          const dwellLabel = document.createElement('label');
-          dwellLabel.textContent = 'Anzeige (Sek.)';
-          const dwellInput = document.createElement('input');
-          dwellInput.className = 'input num3';
-          dwellInput.type = 'number';
-          dwellInput.min = '1';
-          dwellInput.max = '600';
-          dwellInput.placeholder = 'Standard';
-          dwellInput.value = entry.dwellSec != null ? String(entry.dwellSec) : '';
-          dwellInput.onchange = () => {
-            const num = Number(dwellInput.value);
-            if (Number.isFinite(num) && num > 0) {
-              entry.dwellSec = Math.max(1, Math.round(num));
-            } else {
-              delete entry.dwellSec;
-              dwellInput.value = '';
-            }
-            notifySettingsChanged();
-          };
-          dwellRow.append(dwellLabel, dwellInput);
-          body.appendChild(dwellRow);
-
-          const actions = document.createElement('div');
-          actions.className = 'extras-item-actions';
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'btn sm ghost';
-          removeBtn.type = 'button';
-          removeBtn.textContent = 'Entfernen';
-          removeBtn.onclick = () => {
-            extras.gastronomyHighlights.splice(index, 1);
-            renderExtrasEditor();
-            notifySettingsChanged();
-          };
-          actions.appendChild(removeBtn);
-
-          row.append(header, body, actions);
-          gastroHost.appendChild(row);
-        });
-      }
-
-      const addGastroBtn = document.getElementById('extrasGastroAdd');
-      if (addGastroBtn && !addGastroBtn.dataset.bound) {
-        addGastroBtn.dataset.bound = '1';
-        addGastroBtn.addEventListener('click', () => {
-          extras.gastronomyHighlights.push({ id: genId('gas_'), title: '', description: '', icon: '', items: [], textLines: [], dwellSec: null });
-          renderExtrasEditor();
-          notifySettingsChanged();
-        });
-      }
-
       const infoHost = document.getElementById('extrasInfoModuleList');
       if (infoHost) {
         infoHost.innerHTML = '';
-        extras.infoModules.forEach((module, moduleIndex) => {
+        extras.infoModules.forEach((entry, entryIndex) => {
           const row = document.createElement('div');
-          row.className = 'extras-item extras-info-module';
+          row.className = 'extras-item extras-info-entry';
 
           const header = document.createElement('div');
           header.className = 'extras-item-header extras-inline';
 
-          const iconInput = document.createElement('input');
-          iconInput.className = 'input';
-          iconInput.placeholder = 'Icon';
-          iconInput.maxLength = 6;
-          iconInput.value = module.icon || '';
-          iconInput.oninput = () => {
-            module.icon = iconInput.value.trim();
-            notifySettingsChanged();
-          };
-
-          const titleInput = document.createElement('input');
-          titleInput.className = 'input';
-          titleInput.placeholder = 'Titel';
-          titleInput.value = module.title || '';
-          titleInput.oninput = () => {
-            module.title = titleInput.value.trim();
-            notifySettingsChanged();
-          };
+          const preview = document.createElement('div');
+          preview.className = 'extras-info-preview';
+          const previewIcon = document.createElement('span');
+          previewIcon.className = 'extras-info-preview-icon';
+          const previewText = document.createElement('span');
+          previewText.className = 'extras-info-preview-text';
+          preview.append(previewIcon, previewText);
 
           const enabledToggle = document.createElement('label');
           enabledToggle.className = 'toggle extras-toggle';
@@ -909,262 +744,84 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           const enabledText = document.createElement('span');
           enabledText.className = 'extras-toggle-label';
           enabledToggle.append(enabledInput, enabledText);
+
+          header.append(preview, enabledToggle);
+          row.appendChild(header);
+
+          const body = document.createElement('div');
+          body.className = 'extras-item-body extras-info-body';
+
+          const iconInput = document.createElement('input');
+          iconInput.className = 'input';
+          iconInput.placeholder = 'Icon (optional)';
+          iconInput.maxLength = 6;
+          iconInput.value = entry.icon || '';
+
+          const textArea = document.createElement('textarea');
+          textArea.className = 'input';
+          textArea.placeholder = 'Hinweistext';
+          textArea.rows = 3;
+          textArea.value = entry.text || '';
+
+          const applyPreview = () => {
+            const icon = typeof entry.icon === 'string' ? entry.icon.trim() : '';
+            const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+            previewIcon.textContent = icon || '';
+            const short = text.length > 60 ? text.slice(0, 57) + '…' : text;
+            previewText.textContent = short || 'Neuer Hinweis';
+          };
+
+          iconInput.oninput = () => {
+            entry.icon = iconInput.value.trim();
+            applyPreview();
+            notifySettingsChanged();
+          };
+
+          textArea.oninput = () => {
+            entry.text = textArea.value;
+            applyPreview();
+            notifySettingsChanged();
+          };
+
+          body.append(iconInput, textArea);
+
+          const actions = document.createElement('div');
+          actions.className = 'extras-item-actions';
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn sm ghost';
+          removeBtn.type = 'button';
+          removeBtn.textContent = 'Eintrag entfernen';
+          removeBtn.onclick = () => {
+            extras.infoModules.splice(entryIndex, 1);
+            renderExtrasEditor();
+            notifySettingsChanged();
+          };
+          actions.appendChild(removeBtn);
+          body.appendChild(actions);
+          row.appendChild(body);
+
           const applyEnabled = (shouldNotify = false) => {
             const active = !!enabledInput.checked;
-            module.enabled = active;
+            entry.enabled = active;
             enabledText.textContent = active ? 'Aktiv' : 'Ausgeblendet';
             row.classList.toggle('is-disabled', !active);
             if (shouldNotify) notifySettingsChanged();
           };
-          enabledInput.checked = module.enabled !== false;
-          applyEnabled(false);
+
+          enabledInput.checked = entry.enabled !== false;
           enabledInput.addEventListener('change', () => applyEnabled(true));
 
-          header.append(iconInput, titleInput, enabledToggle);
-          row.appendChild(header);
+          applyPreview();
+          applyEnabled(false);
 
-          const body = document.createElement('div');
-          body.className = 'extras-item-body';
-
-          const subtitleInput = document.createElement('input');
-          subtitleInput.className = 'input';
-          subtitleInput.placeholder = 'Untertitel';
-          subtitleInput.value = module.subtitle || '';
-          subtitleInput.oninput = () => {
-            module.subtitle = subtitleInput.value.trim();
-            notifySettingsChanged();
-          };
-          body.appendChild(subtitleInput);
-
-          const noteArea = document.createElement('textarea');
-          noteArea.className = 'input';
-          noteArea.placeholder = 'Hinweis oder Beschreibung';
-          noteArea.value = module.note || '';
-          noteArea.oninput = () => {
-            module.note = noteArea.value.trim();
-            notifySettingsChanged();
-          };
-          body.appendChild(noteArea);
-
-          const metaRow = document.createElement('div');
-          metaRow.className = 'extras-inline extras-info-meta';
-
-          const layoutSelect = document.createElement('select');
-          layoutSelect.className = 'input';
-          [
-            ['metrics', 'Kennzahlen'],
-            ['cards', 'Karten'],
-            ['ticker', 'Ticker']
-          ].forEach(([value, label]) => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = label;
-            layoutSelect.appendChild(opt);
-          });
-          layoutSelect.value = module.layout || 'metrics';
-          layoutSelect.onchange = () => {
-            module.layout = layoutSelect.value;
-            notifySettingsChanged();
-          };
-
-          const regionSelect = document.createElement('select');
-          regionSelect.className = 'input';
-          [
-            ['right', 'Rechte Seite'],
-            ['left', 'Linke Seite'],
-            ['full', 'Ganzflächig']
-          ].forEach(([value, label]) => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = label;
-            regionSelect.appendChild(opt);
-          });
-          regionSelect.value = module.region || 'right';
-          regionSelect.onchange = () => {
-            module.region = regionSelect.value;
-            notifySettingsChanged();
-          };
-
-          const dwellInput = document.createElement('input');
-          dwellInput.className = 'input num3';
-          dwellInput.type = 'number';
-          dwellInput.min = '1';
-          dwellInput.max = '600';
-          dwellInput.placeholder = 'Sek.';
-          dwellInput.value = module.dwellSec != null ? String(module.dwellSec) : '';
-          dwellInput.onchange = () => {
-            const num = Number(dwellInput.value);
-            if (Number.isFinite(num) && num > 0) {
-              module.dwellSec = Math.max(1, Math.round(num));
-            } else {
-              delete module.dwellSec;
-              dwellInput.value = '';
-            }
-            notifySettingsChanged();
-          };
-
-          const metaWrap = document.createElement('div');
-          metaWrap.className = 'extras-info-meta-row';
-
-          const layoutField = document.createElement('label');
-          layoutField.className = 'extras-info-meta-field';
-          layoutField.textContent = 'Layout';
-          layoutField.appendChild(layoutSelect);
-
-          const regionField = document.createElement('label');
-          regionField.className = 'extras-info-meta-field';
-          regionField.textContent = 'Bereich';
-          regionField.appendChild(regionSelect);
-
-          const dwellField = document.createElement('label');
-          dwellField.className = 'extras-info-meta-field';
-          dwellField.textContent = 'Dauer (Sek.)';
-          dwellField.appendChild(dwellInput);
-
-          metaWrap.append(layoutField, regionField, dwellField);
-          metaRow.appendChild(metaWrap);
-          body.appendChild(metaRow);
-
-          const itemsHeader = document.createElement('div');
-          itemsHeader.className = 'extras-info-items-head';
-          const itemsTitle = document.createElement('div');
-          itemsTitle.className = 'extras-info-items-title';
-          itemsTitle.textContent = 'Einträge';
-          const addItemBtn = document.createElement('button');
-          addItemBtn.className = 'btn sm ghost';
-          addItemBtn.type = 'button';
-          addItemBtn.textContent = 'Eintrag hinzufügen';
-          addItemBtn.onclick = () => {
-            (module.items ||= []).push({ id: genId('info_item_'), label: '', value: '', text: '', icon: '', badge: '', trend: '' });
-            renderExtrasEditor();
-            notifySettingsChanged();
-          };
-          itemsHeader.append(itemsTitle, addItemBtn);
-          body.appendChild(itemsHeader);
-
-          const itemsList = document.createElement('div');
-          itemsList.className = 'extras-info-items';
-          (module.items || []).forEach((item, itemIndex) => {
-            const itemRow = document.createElement('div');
-            itemRow.className = 'extras-info-item';
-
-            const labelInput = document.createElement('input');
-            labelInput.className = 'input';
-            labelInput.placeholder = 'Label';
-            labelInput.value = item.label || '';
-            labelInput.oninput = () => {
-              item.label = labelInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const valueInput = document.createElement('input');
-            valueInput.className = 'input';
-            valueInput.placeholder = 'Wert';
-            valueInput.value = item.value || '';
-            valueInput.oninput = () => {
-              item.value = valueInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const textInput = document.createElement('input');
-            textInput.className = 'input';
-            textInput.placeholder = 'Text';
-            textInput.value = item.text || '';
-            textInput.oninput = () => {
-              item.text = textInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const itemIconInput = document.createElement('input');
-            itemIconInput.className = 'input';
-            itemIconInput.placeholder = 'Icon';
-            itemIconInput.maxLength = 6;
-            itemIconInput.value = item.icon || '';
-            itemIconInput.oninput = () => {
-              item.icon = itemIconInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const badgeInput = document.createElement('input');
-            badgeInput.className = 'input';
-            badgeInput.placeholder = 'Badge';
-            badgeInput.value = item.badge || '';
-            badgeInput.oninput = () => {
-              item.badge = badgeInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const trendSelect = document.createElement('select');
-            trendSelect.className = 'input';
-            [
-              ['', 'Trend (–)'],
-              ['up', 'Steigend'],
-              ['steady', 'Stabil'],
-              ['down', 'Sinkend']
-            ].forEach(([value, label]) => {
-              const opt = document.createElement('option');
-              opt.value = value;
-              opt.textContent = label;
-              trendSelect.appendChild(opt);
-            });
-            trendSelect.value = item.trend || '';
-            trendSelect.onchange = () => {
-              const val = trendSelect.value;
-              if (val) item.trend = val;
-              else delete item.trend;
-              notifySettingsChanged();
-            };
-
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'btn sm ghost';
-            removeBtn.type = 'button';
-            removeBtn.textContent = 'Entfernen';
-            removeBtn.onclick = () => {
-              module.items.splice(itemIndex, 1);
-              renderExtrasEditor();
-              notifySettingsChanged();
-            };
-
-            itemRow.append(labelInput, valueInput, textInput, itemIconInput, badgeInput, trendSelect, removeBtn);
-            itemsList.appendChild(itemRow);
-          });
-          body.appendChild(itemsList);
-
-          const actions = document.createElement('div');
-          actions.className = 'extras-item-actions';
-          const removeModuleBtn = document.createElement('button');
-          removeModuleBtn.className = 'btn sm ghost';
-          removeModuleBtn.type = 'button';
-          removeModuleBtn.textContent = 'Modul entfernen';
-          removeModuleBtn.onclick = () => {
-            extras.infoModules.splice(moduleIndex, 1);
-            renderExtrasEditor();
-            notifySettingsChanged();
-          };
-          actions.appendChild(removeModuleBtn);
-
-          body.appendChild(actions);
-          row.appendChild(body);
           infoHost.appendChild(row);
         });
       }
-
       const addInfoBtn = document.getElementById('extrasInfoModuleAdd');
       if (addInfoBtn && !addInfoBtn.dataset.bound) {
         addInfoBtn.dataset.bound = '1';
         addInfoBtn.addEventListener('click', () => {
-          extras.infoModules.push({
-            id: genId('info_'),
-            title: '',
-            subtitle: '',
-            icon: '',
-            layout: 'metrics',
-            region: 'right',
-            note: '',
-            items: [],
-            dwellSec: null,
-            enabled: true
-          });
+          extras.infoModules.push({ id: genId('info_'), icon: '', text: '', enabled: true });
           renderExtrasEditor();
           notifySettingsChanged();
         });
@@ -1465,30 +1122,16 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             disabled,
             statusText: disabled ? (statusText || 'Keine aktiven Tipps') : (statusText || null)
           });
-        } else if (entry.kind === 'event-countdown') {
-          const eventId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
-          if (!eventId) return;
+        } else if (entry.kind === 'info-module') {
+          const activeCount = Number(entry.item?.activeCount) || 0;
           pushEntry({
-            key: 'event:' + eventId,
-            kind: 'event-countdown',
-            id: eventId,
-            label: entry.item?.title || 'Event',
+            key: 'info:info-banner',
+            kind: 'info-module',
+            id: 'info-banner',
+            label: 'Info-Banner',
             thumb: '',
-            disabled: false,
-            statusText: null
-          });
-        } else if (entry.kind === 'gastronomy-highlight') {
-          const gastroId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
-          if (!gastroId) return;
-          const icon = entry.item?.icon ? `${entry.item.icon} ` : '';
-          pushEntry({
-            key: 'gastro:' + gastroId,
-            kind: 'gastronomy-highlight',
-            id: gastroId,
-            label: icon + (entry.item?.title || 'Gastronomie'),
-            thumb: '',
-            disabled: false,
-            statusText: null
+            disabled: activeCount === 0,
+            statusText: activeCount > 0 ? null : 'Keine aktiven Hinweise'
           });
         }
       });
@@ -1576,11 +1219,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             case 'wellness-tip':
               next.push({ type: 'wellness-tip', id: entry.id });
               break;
-            case 'event-countdown':
-              next.push({ type: 'event-countdown', id: entry.id });
-              break;
-            case 'gastronomy-highlight':
-              next.push({ type: 'gastronomy-highlight', id: entry.id });
+            case 'info-module':
+              next.push({ type: 'info-module', id: entry.id });
               break;
             default:
               break;
