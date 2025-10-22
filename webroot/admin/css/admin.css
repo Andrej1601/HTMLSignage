@@ -54,7 +54,7 @@
   /* Slides: Spaltenbreiten (gemeinsam für Header & Zeilen) */
   --col-name:minmax(140px,0.9fr);
   --col-type:8ch;
-  --col-prev:64px; --col-dur:70px; --col-audio:86px; --col-btn:28px; --col-del:28px; --col-vis:minmax(150px, 1fr);
+  --col-prev:64px; --col-dur:70px; --col-audio:86px; --col-wait:110px; --col-btn:28px; --col-del:28px; --col-vis:minmax(150px, 1fr);
 
   /* Preview-Größe */
   --prev-w:60px; --prev-h:42px;
@@ -759,21 +759,21 @@ body.devices-pinned #devicesPane{
 .extras-thumb.is-empty{ object-fit:contain; opacity:.6; }
 .extras-item small.help{ color:var(--muted); font-size:12px; }
 .extras-info-module .extras-item-body{ gap:12px; }
-.extras-info-meta{ display:flex; flex-direction:column; gap:8px; }
-.extras-info-meta-row{ display:flex; flex-wrap:wrap; gap:12px; }
-.extras-info-meta-field{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:600; color:var(--muted); min-width:140px; }
-.extras-info-meta-field .input{ font-size:13px; font-weight:500; }
+.extras-info-banner-hint{ font-size:12px; color:var(--muted); }
+.extras-info-dwell{ display:flex; align-items:center; gap:8px; }
 .extras-info-items-head{ display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
 .extras-info-items-title{ font-weight:700; font-size:13px; }
 .extras-info-items{ display:flex; flex-direction:column; gap:8px; }
-.extras-info-item{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; align-items:center; }
+.extras-info-banner-items{ display:flex; flex-direction:column; gap:8px; }
+.extras-info-item{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .extras-info-item .input{ min-width:0; }
-.extras-info-item .btn{ justify-self:flex-start; }
-.extras-info-item .audio-toggle{ justify-self:flex-start; }
+.extras-info-item .btn{ flex:0 0 auto; }
+.extras-info-item-icon{ flex:0 0 72px; }
+.extras-info-item-text{ flex:1 1 220px; }
 
 @media (max-width: 720px){
-  .extras-info-item{ grid-template-columns:minmax(0,1fr); }
-  .extras-info-item .btn{ justify-self:stretch; }
+  .extras-info-item{ flex-direction:column; align-items:stretch; }
+  .extras-info-item .btn{ align-self:flex-start; }
 }
 .style-auto-fold{ border:1px solid color-mix(in srgb, var(--border) 85%, transparent); border-radius:12px; background:color-mix(in srgb, var(--panel) 96%, var(--fg) 3%); }
 .style-auto-fold > summary{ list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; cursor:pointer; font-weight:600; font-size:13px; color:var(--fg); }
@@ -1520,7 +1520,7 @@ table.tbl{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-dur) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 .sl-head.sl-images, .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-audio) var(--col-btn) var(--col-del) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-dur) var(--col-audio) var(--col-wait) var(--col-btn) var(--col-del) var(--col-vis);
 }
 
 /* Uniform-Modus: Dauer-Spalte komplett entfernen (Header + Rows) */
@@ -1529,7 +1529,7 @@ body.mode-uniform .sl-head.sl-saunas, body.mode-uniform .saunarow{
   grid-template-columns: var(--col-name) var(--col-prev) var(--col-btn) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .sl-head.sl-images, body.mode-uniform .mediarow{
-  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-audio) var(--col-btn) var(--col-del) var(--col-vis);
+  grid-template-columns: var(--col-name) var(--col-type) var(--col-prev) var(--col-audio) var(--col-wait) var(--col-btn) var(--col-del) var(--col-vis);
 }
 body.mode-uniform .intSec{ display:none !important; }
 body.mode-uniform #ovSec{ display:none !important; }
@@ -1550,9 +1550,9 @@ body.mode-uniform #ovSec{ display:none !important; }
   width:clamp(120px, 18ch, 100%);
   justify-self:start;
 }
-.audio-toggle{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--muted);} 
-.audio-toggle input{margin:0;}
-.audio-toggle.is-disabled{opacity:.35;pointer-events:none;}
+.audio-toggle, .wait-toggle{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--muted);}
+.audio-toggle input, .wait-toggle input{margin:0;}
+.audio-toggle.is-disabled, .wait-toggle.is-disabled{opacity:.35;pointer-events:none;}
 
 /* Upload/Default Buttons kompakt */
 .btn.icon{ width:28px; height:28px; }

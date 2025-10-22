@@ -297,7 +297,6 @@ export const DEFAULTS = {
     baseH:1080,
     rightWidthPercent:38,
     infoPanelWidthPercent:32,
-    bannerTopPercent:60,
     cutTopPercent:28,
     cutBottomPercent:12,
     layoutMode:'single',
@@ -306,7 +305,7 @@ export const DEFAULTS = {
       left:{
         source:'master',
         timerSec:null,
-        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
+        contentTypes:['overview','sauna','hero-timeline','wellness-tip','event-countdown','gastronomy-highlight','info-module','image','video','url'],
         playlist:[]
       },
       right:{
@@ -337,14 +336,16 @@ export const DEFAULTS = {
     infoModules:[
       {
         id:'info_capacity',
-        title:'Auslastung',
-        subtitle:'Live-Status',
-        icon:'📊',
-        layout:'metrics',
+        title:'Aktuelle Hinweise',
+        subtitle:'Stand heute',
+        icon:'ℹ️',
+        layout:'banner',
+        region:'left',
         items:[
-          { id:'metric_sauna', label:'Sauna', value:'78%', trend:'up' },
-          { id:'metric_pool', label:'Pool', value:'42%', trend:'steady' }
-        ]
+          { id:'info_msg_sauna', text:'Sauna-Aufguss 18:00 entfällt', icon:'🔥' },
+          { id:'info_msg_pool', text:'Poolreinigung ab 21:30', icon:'💧' }
+        ],
+        note:'Weitere Updates folgen in Kürze.'
       }
     ]
   }
