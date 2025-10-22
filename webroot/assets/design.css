@@ -115,29 +115,6 @@ body[data-layout='split'] .stage-area{display:flex}
 body[data-layout='single'] .stage{gap:0;}
 body[data-layout='single'] #stage-right{display:none;}
 
-body[data-layout='split']:not([data-layout-profile='portrait']):not([data-layout-profile='portrait-split']) .stage-area{
-  position:relative;
-}
-body[data-layout='split']:not([data-layout-profile='portrait']):not([data-layout-profile='portrait-split']) #stage-left::after,
-body[data-layout='split']:not([data-layout-profile='portrait']):not([data-layout-profile='portrait-split']) #stage-right::before{
-  content:"";
-  position:absolute;
-  top:0;
-  bottom:0;
-  width:var(--split-fade-width, clamp(40px, 8vw, 160px));
-  pointer-events:none;
-  opacity:.88;
-  transition:opacity .25s ease;
-}
-body[data-layout='split']:not([data-layout-profile='portrait']):not([data-layout-profile='portrait-split']) #stage-left::after{
-  right:0;
-  background:linear-gradient(to right, transparent, color-mix(in srgb, var(--bg) 78%, transparent));
-}
-body[data-layout='split']:not([data-layout-profile='portrait']):not([data-layout-profile='portrait-split']) #stage-right::before{
-  left:0;
-  background:linear-gradient(to left, transparent, color-mix(in srgb, var(--cell) 42%, transparent));
-}
-
 body[data-layout-profile='portrait'] .stage,
 body[data-layout-profile='portrait-split'] .stage{flex-direction:column; align-items:stretch;}
 body[data-layout-profile='portrait'] .stage-area,
