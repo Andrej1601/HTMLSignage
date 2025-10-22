@@ -33,7 +33,6 @@
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
   --infoPanelW:32%;
-  --bannerTop:60%;
   --cutTopRatio:0.28; --cutBottomRatio:0.12;
 
   /* sauna tile clamp (JS sets --tileTargetPx and baseW) */
@@ -136,12 +135,6 @@ body[data-layout-profile='info-panel'] #stage-left{grid-column:1;}
 body[data-layout-profile='info-panel'] #stage-right{grid-column:2;}
 body[data-layout='single'][data-layout-profile='info-panel'] #stage-left{grid-column:1 / -1;}
 
-body[data-layout-profile='banner'] .stage{display:grid; grid-template-rows:minmax(0,var(--bannerTop,60%)) minmax(0,1fr); grid-auto-flow:row; align-items:stretch;}
-body[data-layout-profile='banner'] .stage-area{min-height:0;}
-body[data-layout-profile='banner'] #stage-left{grid-row:1;}
-body[data-layout-profile='banner'] #stage-right{grid-row:2;}
-body[data-layout='single'][data-layout-profile='banner'] #stage-left{grid-row:1 / -1;}
-
 .fade{opacity:0;transition:opacity .5s}
 .fade.show{opacity:1}
 
@@ -188,40 +181,20 @@ body[data-layout='single'][data-layout-profile='banner'] #stage-left{grid-row:1 
 .extra-event.is-live .extra-countdown-value{color:var(--accent);}
 .extra-event.is-soon:not(.is-live) .extra-countdown-value{color:color-mix(in srgb, var(--accent) 70%, #fff 30%);}
 
-.container.extra.extra-info{gap:calc(28px*var(--vwScale));}
-.extra-info-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:calc(16px*var(--vwScale));}
-.extra-info-icon{font-size:calc(64px*var(--scale));line-height:1;filter:drop-shadow(0 10px 28px rgba(0,0,0,.28));}
-.extra-info-card .extra-info-icon{font-size:calc(40px*var(--scale));}
-.extra-info-metric .extra-info-icon{font-size:calc(36px*var(--scale));}
-.extra-info-title{margin:0;font-size:calc(48px*var(--scale));font-weight:800;letter-spacing:.01em;}
-.extra-info-subtitle{margin:0;font-size:calc(24px*var(--scale));opacity:.78;}
-.extra-info-body{display:flex;flex-direction:column;gap:calc(20px*var(--vwScale));width:100%;}
-.extra-info-grid,.extra-info-metrics,.extra-info-ticker{display:none;}
-.extra-info-grid{gap:calc(18px*var(--vwScale));grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
-.extra-info-card{padding:calc(22px*var(--vwScale));border-radius:calc(22px*var(--vwScale));background:color-mix(in srgb,var(--boxfg) 88%, transparent);color:inherit;box-shadow:0 18px 48px rgba(0,0,0,.26);display:flex;flex-direction:column;gap:calc(10px*var(--vwScale));}
-.extra-info-card h3{margin:0;font-size:calc(24px*var(--scale));font-weight:700;}
-.extra-info-card p{margin:0;font-size:calc(20px*var(--scale));opacity:.88;}
-.extra-info-metrics{gap:calc(18px*var(--vwScale));grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
-.extra-info-metric{display:flex;flex-direction:column;gap:calc(6px*var(--vwScale));}
-.extra-info-metric-value{font-size:calc(42px*var(--scale));font-weight:800;line-height:1;}
-.extra-info-metric-label{font-size:calc(20px*var(--scale));opacity:.72;}
-.extra-info-trend{font-size:calc(18px*var(--scale));font-weight:600;text-transform:uppercase;letter-spacing:.12em;opacity:.9;}
-.extra-info-trend[data-trend='up']{color:#7bd88f;}
-.extra-info-trend[data-trend='down']{color:#ff8a7a;}
-.extra-info-trend[data-trend='steady']{color:color-mix(in srgb,var(--boxfg) 85%, transparent);}
-.extra-info-ticker{align-items:center;gap:calc(18px*var(--vwScale));white-space:nowrap;overflow:hidden;}
-.extra-info-ticker-item{display:inline-flex;align-items:baseline;gap:calc(10px*var(--vwScale));font-size:calc(22px*var(--scale));}
-.extra-info-ticker .fnsep{margin:0 calc(12px*var(--vwScale));opacity:.7;}
-.extra-info-pill{display:inline-flex;align-items:center;gap:calc(6px*var(--vwScale));border-radius:999px;padding:calc(6px*var(--vwScale)) calc(12px*var(--vwScale));background:color-mix(in srgb,var(--boxfg) 80%, transparent);font-size:calc(18px*var(--scale));}
-.extra-info-note{font-size:calc(18px*var(--scale));opacity:.75;}
-.extra-info-ticker-track{display:inline-flex;align-items:center;gap:calc(18px*var(--vwScale));min-width:100%;animation:infoTicker 32s linear infinite;}
-.extra-info--ticker .extra-info-ticker-track:hover{animation-play-state:paused;}
-.extra-info--cards .extra-info-grid{display:grid;}
-.extra-info--cards .extra-info-metrics{display:none;}
-.extra-info--metrics .extra-info-metrics{display:grid;}
-.extra-info--metrics .extra-info-grid{display:none;}
-.extra-info--ticker .extra-info-ticker{display:flex;}
-.extra-info--ticker .extra-info-grid,.extra-info--ticker .extra-info-metrics{display:none;}
+.container.extra.extra-info{gap:calc(16px*var(--vwScale));}
+.extra-info--banner{margin-top:auto;width:100%;}
+.extra-info-banner{display:flex;align-items:center;gap:calc(20px*var(--vwScale));padding:calc(18px*var(--vwScale)) calc(28px*var(--vwScale));background:color-mix(in srgb,var(--boxfg) 85%, transparent);border-radius:calc(24px*var(--vwScale));box-shadow:0 18px 48px rgba(0,0,0,.28);min-height:calc(88px*var(--vwScale));}
+.extra-info-banner-lead{display:flex;align-items:center;gap:calc(12px*var(--vwScale));font-size:calc(24px*var(--scale));font-weight:600;letter-spacing:.02em;}
+.extra-info-banner-icon{font-size:calc(42px*var(--scale));line-height:1;filter:drop-shadow(0 10px 28px rgba(0,0,0,.28));}
+.extra-info-banner-title{font-size:calc(30px*var(--scale));font-weight:800;letter-spacing:.01em;}
+.extra-info-banner-subtitle{font-size:calc(20px*var(--scale));opacity:.72;}
+.extra-info-banner-messages{display:flex;align-items:center;gap:calc(16px*var(--vwScale));flex:1 1 auto;flex-wrap:wrap;font-size:calc(22px*var(--scale));font-weight:600;letter-spacing:.01em;}
+.extra-info-banner-item{display:flex;align-items:center;gap:calc(10px*var(--vwScale));}
+.extra-info-banner-item-icon{font-weight:600;font-size:calc(22px*var(--scale));}
+.extra-info-banner-text{display:inline-block;}
+.extra-info-banner-sep{opacity:.35;font-size:calc(18px*var(--scale));}
+.extra-info-banner-note{flex:0 0 auto;font-size:calc(20px*var(--scale));opacity:.7;font-weight:500;}
+.extra-info-banner-empty{min-height:1px;}
 
 .headings{width:min(100%, var(--saunaHeadingMaxWidth, 100%));}
 .container.has-right .headings{

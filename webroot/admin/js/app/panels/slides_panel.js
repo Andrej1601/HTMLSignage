@@ -596,6 +596,16 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           dwellRow.append(dwellLabel, dwellInput);
           body.appendChild(dwellRow);
 
+          const noteArea = document.createElement('textarea');
+          noteArea.className = 'input';
+          noteArea.placeholder = 'Hinweis (optional)';
+          noteArea.value = module.note || '';
+          noteArea.oninput = () => {
+            module.note = noteArea.value.trim();
+            notifySettingsChanged();
+          };
+          body.appendChild(noteArea);
+
           const actions = document.createElement('div');
           actions.className = 'extras-item-actions';
           const removeBtn = document.createElement('button');
@@ -845,6 +855,16 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           dwellRow.append(dwellLabel, dwellInput);
           body.appendChild(dwellRow);
 
+          const noteArea = document.createElement('textarea');
+          noteArea.className = 'input';
+          noteArea.placeholder = 'Hinweis (optional)';
+          noteArea.value = module.note || '';
+          noteArea.oninput = () => {
+            module.note = noteArea.value.trim();
+            notifySettingsChanged();
+          };
+          body.appendChild(noteArea);
+
           const actions = document.createElement('div');
           actions.className = 'extras-item-actions';
           const removeBtn = document.createElement('button');
@@ -936,61 +956,21 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           };
           body.appendChild(subtitleInput);
 
-          const noteArea = document.createElement('textarea');
-          noteArea.className = 'input';
-          noteArea.placeholder = 'Hinweis oder Beschreibung';
-          noteArea.value = module.note || '';
-          noteArea.oninput = () => {
-            module.note = noteArea.value.trim();
-            notifySettingsChanged();
-          };
-          body.appendChild(noteArea);
+          const bannerHint = document.createElement('div');
+          bannerHint.className = 'extras-info-banner-hint';
+          bannerHint.textContent = 'Wird als schmale Info-Leiste am unteren Rand angezeigt.';
+          body.appendChild(bannerHint);
 
-          const metaRow = document.createElement('div');
-          metaRow.className = 'extras-inline extras-info-meta';
-
-          const layoutSelect = document.createElement('select');
-          layoutSelect.className = 'input';
-          [
-            ['metrics', 'Kennzahlen'],
-            ['cards', 'Karten'],
-            ['ticker', 'Ticker']
-          ].forEach(([value, label]) => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = label;
-            layoutSelect.appendChild(opt);
-          });
-          layoutSelect.value = module.layout || 'metrics';
-          layoutSelect.onchange = () => {
-            module.layout = layoutSelect.value;
-            notifySettingsChanged();
-          };
-
-          const regionSelect = document.createElement('select');
-          regionSelect.className = 'input';
-          [
-            ['right', 'Rechte Seite'],
-            ['left', 'Linke Seite'],
-            ['full', 'Ganzflächig']
-          ].forEach(([value, label]) => {
-            const opt = document.createElement('option');
-            opt.value = value;
-            opt.textContent = label;
-            regionSelect.appendChild(opt);
-          });
-          regionSelect.value = module.region || 'right';
-          regionSelect.onchange = () => {
-            module.region = regionSelect.value;
-            notifySettingsChanged();
-          };
-
+          const dwellRow = document.createElement('div');
+          dwellRow.className = 'extras-inline extras-info-dwell';
+          const dwellLabel = document.createElement('label');
+          dwellLabel.textContent = 'Anzeige (Sek.)';
           const dwellInput = document.createElement('input');
           dwellInput.className = 'input num3';
           dwellInput.type = 'number';
           dwellInput.min = '1';
           dwellInput.max = '600';
-          dwellInput.placeholder = 'Sek.';
+          dwellInput.placeholder = 'Standard';
           dwellInput.value = module.dwellSec != null ? String(module.dwellSec) : '';
           dwellInput.onchange = () => {
             const num = Number(dwellInput.value);
@@ -1002,40 +982,30 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             }
             notifySettingsChanged();
           };
+          dwellRow.append(dwellLabel, dwellInput);
+          body.appendChild(dwellRow);
 
-          const metaWrap = document.createElement('div');
-          metaWrap.className = 'extras-info-meta-row';
-
-          const layoutField = document.createElement('label');
-          layoutField.className = 'extras-info-meta-field';
-          layoutField.textContent = 'Layout';
-          layoutField.appendChild(layoutSelect);
-
-          const regionField = document.createElement('label');
-          regionField.className = 'extras-info-meta-field';
-          regionField.textContent = 'Bereich';
-          regionField.appendChild(regionSelect);
-
-          const dwellField = document.createElement('label');
-          dwellField.className = 'extras-info-meta-field';
-          dwellField.textContent = 'Dauer (Sek.)';
-          dwellField.appendChild(dwellInput);
-
-          metaWrap.append(layoutField, regionField, dwellField);
-          metaRow.appendChild(metaWrap);
-          body.appendChild(metaRow);
+          const noteArea = document.createElement('textarea');
+          noteArea.className = 'input';
+          noteArea.placeholder = 'Hinweis (optional)';
+          noteArea.value = module.note || '';
+          noteArea.oninput = () => {
+            module.note = noteArea.value.trim();
+            notifySettingsChanged();
+          };
+          body.appendChild(noteArea);
 
           const itemsHeader = document.createElement('div');
           itemsHeader.className = 'extras-info-items-head';
           const itemsTitle = document.createElement('div');
           itemsTitle.className = 'extras-info-items-title';
-          itemsTitle.textContent = 'Einträge';
+          itemsTitle.textContent = 'Banner-Nachrichten';
           const addItemBtn = document.createElement('button');
           addItemBtn.className = 'btn sm ghost';
           addItemBtn.type = 'button';
-          addItemBtn.textContent = 'Eintrag hinzufügen';
+          addItemBtn.textContent = 'Nachricht hinzufügen';
           addItemBtn.onclick = () => {
-            (module.items ||= []).push({ id: genId('info_item_'), label: '', value: '', text: '', icon: '', badge: '', trend: '' });
+            (module.items ||= []).push({ id: genId('info_item_'), text: '', icon: '' });
             renderExtrasEditor();
             notifySettingsChanged();
           };
@@ -1043,75 +1013,33 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           body.appendChild(itemsHeader);
 
           const itemsList = document.createElement('div');
-          itemsList.className = 'extras-info-items';
-          (module.items || []).forEach((item, itemIndex) => {
+          itemsList.className = 'extras-info-items extras-info-banner-items';
+          const itemsData = Array.isArray(module.items) ? module.items : [];
+          module.items = itemsData;
+          itemsData.forEach((item, itemIndex) => {
+            if (!item || typeof item !== 'object') return;
+            if (!item.id) item.id = genId('info_item_');
             const itemRow = document.createElement('div');
-            itemRow.className = 'extras-info-item';
+            itemRow.className = 'extras-info-item extras-info-banner-item';
 
-            const labelInput = document.createElement('input');
-            labelInput.className = 'input';
-            labelInput.placeholder = 'Label';
-            labelInput.value = item.label || '';
-            labelInput.oninput = () => {
-              item.label = labelInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const valueInput = document.createElement('input');
-            valueInput.className = 'input';
-            valueInput.placeholder = 'Wert';
-            valueInput.value = item.value || '';
-            valueInput.oninput = () => {
-              item.value = valueInput.value.trim();
+            const iconInput = document.createElement('input');
+            iconInput.className = 'input extras-info-item-icon';
+            iconInput.placeholder = 'Icon';
+            iconInput.maxLength = 6;
+            iconInput.value = item.icon || '';
+            iconInput.oninput = () => {
+              const val = iconInput.value.trim();
+              if (val) item.icon = val;
+              else delete item.icon;
               notifySettingsChanged();
             };
 
             const textInput = document.createElement('input');
-            textInput.className = 'input';
+            textInput.className = 'input extras-info-item-text';
             textInput.placeholder = 'Text';
             textInput.value = item.text || '';
             textInput.oninput = () => {
               item.text = textInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const itemIconInput = document.createElement('input');
-            itemIconInput.className = 'input';
-            itemIconInput.placeholder = 'Icon';
-            itemIconInput.maxLength = 6;
-            itemIconInput.value = item.icon || '';
-            itemIconInput.oninput = () => {
-              item.icon = itemIconInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const badgeInput = document.createElement('input');
-            badgeInput.className = 'input';
-            badgeInput.placeholder = 'Badge';
-            badgeInput.value = item.badge || '';
-            badgeInput.oninput = () => {
-              item.badge = badgeInput.value.trim();
-              notifySettingsChanged();
-            };
-
-            const trendSelect = document.createElement('select');
-            trendSelect.className = 'input';
-            [
-              ['', 'Trend (–)'],
-              ['up', 'Steigend'],
-              ['steady', 'Stabil'],
-              ['down', 'Sinkend']
-            ].forEach(([value, label]) => {
-              const opt = document.createElement('option');
-              opt.value = value;
-              opt.textContent = label;
-              trendSelect.appendChild(opt);
-            });
-            trendSelect.value = item.trend || '';
-            trendSelect.onchange = () => {
-              const val = trendSelect.value;
-              if (val) item.trend = val;
-              else delete item.trend;
               notifySettingsChanged();
             };
 
@@ -1120,12 +1048,12 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             removeBtn.type = 'button';
             removeBtn.textContent = 'Entfernen';
             removeBtn.onclick = () => {
-              module.items.splice(itemIndex, 1);
+              itemsData.splice(itemIndex, 1);
               renderExtrasEditor();
               notifySettingsChanged();
             };
 
-            itemRow.append(labelInput, valueInput, textInput, itemIconInput, badgeInput, trendSelect, removeBtn);
+            itemRow.append(iconInput, textInput, removeBtn);
             itemsList.appendChild(itemRow);
           });
           body.appendChild(itemsList);
@@ -1158,8 +1086,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             title: '',
             subtitle: '',
             icon: '',
-            layout: 'metrics',
-            region: 'right',
+            layout: 'banner',
+            region: 'left',
             note: '',
             items: [],
             dwellSec: null,
@@ -1433,18 +1361,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             disabled: entry.item?.enabled === false,
             statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
           });
-        } else if (entry.kind === 'story') {
-          const storyId = entry.item?.id != null ? String(entry.item.id) : (entry.key || '');
-          if (!storyId) return;
-          pushEntry({
-            key: 'story:' + storyId,
-            kind: 'story',
-            id: storyId,
-            label: entry.item?.title || 'Story-Slide',
-            thumb: entry.item?.heroUrl || thumbFallback,
-            disabled: entry.item?.enabled === false,
-            statusText: entry.item?.enabled === false ? 'Deaktiviert' : null
-          });
         } else if (entry.kind === 'wellness-tip') {
           const data = entry.item || {};
           const tipId = data.id != null ? String(data.id) : (entry.key || '');
@@ -1570,9 +1486,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             case 'media':
               next.push({ type: 'media', id: entry.id });
               break;
-            case 'story':
-              next.push({ type: 'story', id: entry.id });
-              break;
             case 'wellness-tip':
               next.push({ type: 'wellness-tip', id: entry.id });
               break;
@@ -1600,8 +1513,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
                 sortOrder.push({ type: 'sauna', name: entry.name });
               } else if (entry.type === 'media' && entry.id != null) {
                 sortOrder.push({ type: 'media', id: entry.id });
-              } else if (entry.type === 'story' && entry.id != null) {
-                sortOrder.push({ type: 'story', id: entry.id });
               }
             });
             const prevSortStr = JSON.stringify(Array.isArray(settings.slides?.sortOrder) ? settings.slides.sortOrder : []);
