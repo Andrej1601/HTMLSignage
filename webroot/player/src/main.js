@@ -74,7 +74,9 @@ const styleAutomationState = {
   baseTheme: null,
   baseFonts: null,
   baseSlides: null,
-  activeStyle: null
+  activeStyle: null,
+  baseAudioTrack: null,
+  activeTrack: null
 };
 let infoBannerMode = 'full';
 let infoBannerSpacingFrame = 0;
@@ -150,15 +152,70 @@ function ensureBackgroundAudioElement() {
 
 function normalizeBackgroundAudioConfig(config = {}) {
   const cfg = config && typeof config === 'object' ? config : {};
-  const src = typeof cfg.src === 'string' ? cfg.src.trim() : '';
-  const enabled = !!src && cfg.enabled !== false;
-  const rawVolume = Number(cfg.volume);
-  const volume = Number.isFinite(rawVolume) ? clampNumber(0, rawVolume, 1) : 1;
-  const loop = cfg.loop === false ? false : true;
-  const normalized = { enabled, src, volume, loop };
-  const fadeRaw = Number(cfg.fadeMs);
-  if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
-    normalized.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+
+  const sanitizeTrack = (track = {}) => {
+    const src = typeof track.src === 'string' ? track.src.trim() : '';
+    const rawVolume = Number(track.volume);
+    const volume = Number.isFinite(rawVolume) ? clampNumber(0, rawVolume, 1) : 1;
+    const loop = track.loop === false ? false : true;
+    const normalized = { src, volume, loop };
+    if (typeof track.label === 'string' && track.label.trim()) {
+      normalized.label = track.label.trim();
+    }
+    const fadeRaw = Number(track.fadeMs);
+    if (Number.isFinite(fadeRaw) && fadeRaw > 0) {
+      normalized.fadeMs = Math.min(60000, Math.max(0, Math.round(fadeRaw)));
+    }
+    return normalized;
+  };
+
+  const trackMap = new Map();
+  if (cfg.tracks && typeof cfg.tracks === 'object') {
+    Object.entries(cfg.tracks).forEach(([id, track]) => {
+      const key = typeof id === 'string' ? id.trim() : '';
+      if (!key) return;
+      trackMap.set(key, sanitizeTrack(track));
+    });
+  }
+
+  const legacySrc = typeof cfg.src === 'string' ? cfg.src.trim() : '';
+  if (!trackMap.size && legacySrc) {
+    trackMap.set('default', sanitizeTrack({
+      src: legacySrc,
+      volume: cfg.volume,
+      loop: cfg.loop,
+      fadeMs: cfg.fadeMs,
+      label: cfg.trackLabel
+    }));
+  }
+
+  let activeTrack = typeof cfg.activeTrack === 'string' ? cfg.activeTrack.trim() : '';
+  if (!activeTrack || !trackMap.has(activeTrack)) {
+    activeTrack = trackMap.size ? trackMap.keys().next().value : '';
+  }
+
+  const desiredEnabled = cfg.enabled !== false;
+  const activeEntry = activeTrack && trackMap.get(activeTrack) ? trackMap.get(activeTrack) : null;
+  const enabled = !!(desiredEnabled && activeEntry && activeEntry.src);
+
+  const tracks = {};
+  trackMap.forEach((value, key) => {
+    tracks[key] = { ...value };
+  });
+
+  const normalized = {
+    enabled,
+    src: activeEntry ? activeEntry.src : '',
+    volume: activeEntry ? activeEntry.volume : 1,
+    loop: activeEntry ? (activeEntry.loop !== false) : true,
+    activeTrack,
+    tracks
+  };
+  if (activeEntry && activeEntry.fadeMs != null) {
+    normalized.fadeMs = activeEntry.fadeMs;
+  }
+  if (activeEntry && activeEntry.label) {
+    normalized.trackLabel = activeEntry.label;
   }
   return normalized;
 }
@@ -810,6 +867,7 @@ function snapshotStyleAutomationBase() {
   styleAutomationState.baseFonts = cloneSubset(settings?.fonts || {}, STYLE_FONT_KEYS);
   styleAutomationState.baseSlides = cloneSubset(settings?.slides || {}, STYLE_SLIDE_KEYS);
   styleAutomationState.activeStyle = settings?.slides?.activeStyleSet || null;
+  styleAutomationState.baseAudioTrack = settings?.audio?.background?.activeTrack || null;
 }
 
 function getStyleSets() {
@@ -822,7 +880,12 @@ function getAutomationConfig() {
   return (cfg && typeof cfg === 'object') ? cfg : null;
 }
 
-function resolveTimeSlotStyle(styleSets, automation) {
+function getBackgroundTracks() {
+  const tracks = settings?.audio?.background?.tracks;
+  return (tracks && typeof tracks === 'object') ? tracks : {};
+}
+
+function resolveTimeSlotSelection(styleSets, automation, tracks) {
   if (!automation || automation.enabled === false) return null;
   const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
   if (!slots.length) return null;
@@ -831,10 +894,10 @@ function resolveTimeSlotStyle(styleSets, automation) {
     if (!slot || typeof slot !== 'object') return;
     if (slot.mode === 'range') return;
     const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
-    if (!styleKey) return;
     const minutes = parseHM(slot.start || slot.startTime || '');
     if (minutes === null) return;
-    valid.push({ minutes, style: styleKey });
+    const trackKey = slot.track && tracks[slot.track] ? slot.track : null;
+    valid.push({ minutes, style: styleKey, track: trackKey });
   });
   if (!valid.length) return null;
   valid.sort((a, b) => a.minutes - b.minutes);
@@ -846,10 +909,10 @@ function resolveTimeSlotStyle(styleSets, automation) {
   if (!selected) {
     selected = valid[valid.length - 1];
   }
-  return selected ? selected.style : null;
+  return selected ? { style: selected.style, track: selected.track } : null;
 }
 
-function resolveRangeSlotStyle(styleSets, automation) {
+function resolveRangeSlotSelection(styleSets, automation, tracks) {
   if (!automation || automation.enabled === false) return null;
   const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
   if (!slots.length) return null;
@@ -859,43 +922,64 @@ function resolveRangeSlotStyle(styleSets, automation) {
     if (!slot || typeof slot !== 'object') return;
     if (slot.mode !== 'range' && !(slot.startDateTime && slot.endDateTime)) return;
     const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
-    if (!styleKey) return;
+    const trackKey = slot.track && tracks[slot.track] ? slot.track : null;
     const startInfo = parseDateTimeLocal(slot.startDateTime || slot.start);
     const endInfo = parseDateTimeLocal(slot.endDateTime || slot.end);
     if (!startInfo || !endInfo) return;
     if (endInfo.ms < startInfo.ms) return;
     if (now < startInfo.ms || now > endInfo.ms) return;
     if (!selected || startInfo.ms >= selected.startMs) {
-      selected = { style: styleKey, startMs: startInfo.ms };
+      selected = { style: styleKey, track: trackKey, startMs: startInfo.ms };
     }
   });
-  return selected ? selected.style : null;
+  return selected ? { style: selected.style, track: selected.track } : null;
 }
 
-function resolveAutomationStyle() {
+function resolveAutomationSelection() {
   const styleSets = getStyleSets();
   const availableIds = Object.keys(styleSets);
-  if (!availableIds.length) return { style: null, reason: 'none' };
+  if (!availableIds.length) return { style: null, track: null, reason: 'none' };
+  const backgroundTracks = getBackgroundTracks();
+  const trackIds = Object.keys(backgroundTracks);
   const slidesCfg = settings?.slides || {};
   const automation = getAutomationConfig();
   const savedActive = slidesCfg.activeStyleSet && styleSets[slidesCfg.activeStyleSet]
     ? slidesCfg.activeStyleSet
     : null;
-  const fallback = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
+  const fallbackStyle = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
     ? automation.fallbackStyle
     : (savedActive || availableIds[0]);
+  const trackCandidates = [automation?.fallbackTrack, settings?.audio?.background?.activeTrack, styleAutomationState.baseAudioTrack];
+  let fallbackTrack = null;
+  for (const candidate of trackCandidates) {
+    if (candidate && backgroundTracks[candidate]) {
+      fallbackTrack = candidate;
+      break;
+    }
+  }
+  if (!fallbackTrack && trackIds.length) {
+    fallbackTrack = trackIds[0];
+  }
   if (!automation || automation.enabled === false) {
-    return { style: fallback, reason: 'disabled' };
+    return { style: fallbackStyle, track: fallbackTrack, reason: 'disabled' };
   }
-  const rangeStyle = resolveRangeSlotStyle(styleSets, automation);
-  if (rangeStyle) {
-    return { style: rangeStyle, reason: 'range' };
+  const rangeSelection = resolveRangeSlotSelection(styleSets, automation, backgroundTracks);
+  if (rangeSelection && (rangeSelection.style || rangeSelection.track)) {
+    return {
+      style: rangeSelection.style || fallbackStyle,
+      track: rangeSelection.track || fallbackTrack,
+      reason: 'range'
+    };
   }
-  const slotStyle = resolveTimeSlotStyle(styleSets, automation);
-  if (slotStyle) {
-    return { style: slotStyle, reason: 'time' };
+  const timeSelection = resolveTimeSlotSelection(styleSets, automation, backgroundTracks);
+  if (timeSelection && (timeSelection.style || timeSelection.track)) {
+    return {
+      style: timeSelection.style || fallbackStyle,
+      track: timeSelection.track || fallbackTrack,
+      reason: 'time'
+    };
   }
-  return { style: fallback, reason: 'fallback' };
+  return { style: fallbackStyle, track: fallbackTrack, reason: 'fallback' };
 }
 
 function applyStyleAutomation() {
@@ -910,36 +994,62 @@ function applyStyleAutomation() {
     snapshotStyleAutomationBase();
   }
 
-  const { style } = resolveAutomationStyle();
-  const styleId = style && styleSets[style] ? style : availableIds[0];
+  const selection = resolveAutomationSelection();
+  const styleId = selection.style && styleSets[selection.style] ? selection.style : availableIds[0];
   if (!styleId) {
     styleAutomationState.activeStyle = null;
     return { changed: false, style: null };
   }
 
-  if (styleAutomationState.activeStyle === styleId) {
-    return { changed: false, style: styleId };
+  const backgroundTracks = getBackgroundTracks();
+  const trackIds = Object.keys(backgroundTracks);
+  let trackId = selection.track && backgroundTracks[selection.track] ? selection.track : null;
+  if (!trackId && trackIds.length) {
+    const candidates = [styleAutomationState.activeTrack, settings?.audio?.background?.activeTrack];
+    trackId = candidates.find((candidate) => candidate && backgroundTracks[candidate]) || trackIds[0];
   }
 
-  const entry = styleSets[styleId] || {};
-  const themeBase = styleAutomationState.baseTheme || {};
-  const fontsBase = styleAutomationState.baseFonts || {};
-  const slidesBase = styleAutomationState.baseSlides || {};
+  let trackChanged = false;
+  if (trackId) {
+    settings.audio = (settings.audio && typeof settings.audio === 'object') ? settings.audio : {};
+    settings.audio.background = (settings.audio.background && typeof settings.audio.background === 'object')
+      ? settings.audio.background
+      : {};
+    if (settings.audio.background.activeTrack !== trackId) {
+      settings.audio.background.activeTrack = trackId;
+      trackChanged = true;
+    }
+  }
 
-  const nextTheme = assignSubset({ ...themeBase }, entry.theme || {});
-  const nextFonts = assignSubset({ ...fontsBase }, entry.fonts || {});
-  const nextSlideStyles = assignSubset({ ...deepClone(slidesBase) }, entry.slides || {});
+  let styleChanged = false;
+  if (styleAutomationState.activeStyle !== styleId) {
+    const entry = styleSets[styleId] || {};
+    const themeBase = styleAutomationState.baseTheme || {};
+    const fontsBase = styleAutomationState.baseFonts || {};
+    const slidesBase = styleAutomationState.baseSlides || {};
 
-  const mergedTheme = assignSubset({ ...(settings?.theme || {}) }, nextTheme);
-  const mergedFonts = assignSubset({ ...(settings?.fonts || {}) }, nextFonts);
-  const slidesAll = { ...(settings?.slides || {}) };
-  assignSubset(slidesAll, nextSlideStyles);
-  slidesAll.activeStyleSet = styleId;
-  settings.theme = mergedTheme;
-  settings.fonts = mergedFonts;
-  settings.slides = slidesAll;
-  styleAutomationState.activeStyle = styleId;
-  return { changed: true, style: styleId };
+    const nextTheme = assignSubset({ ...themeBase }, entry.theme || {});
+    const nextFonts = assignSubset({ ...fontsBase }, entry.fonts || {});
+    const nextSlideStyles = assignSubset({ ...deepClone(slidesBase) }, entry.slides || {});
+
+    const mergedTheme = assignSubset({ ...(settings?.theme || {}) }, nextTheme);
+    const mergedFonts = assignSubset({ ...(settings?.fonts || {}) }, nextFonts);
+    const slidesAll = { ...(settings?.slides || {}) };
+    assignSubset(slidesAll, nextSlideStyles);
+    slidesAll.activeStyleSet = styleId;
+    settings.theme = mergedTheme;
+    settings.fonts = mergedFonts;
+    settings.slides = slidesAll;
+    styleAutomationState.activeStyle = styleId;
+    styleChanged = true;
+  }
+
+  styleAutomationState.activeTrack = trackId || null;
+  if (trackChanged && settings?.audio?.background) {
+    applyBackgroundAudio(settings.audio.background);
+  }
+
+  return { changed: styleChanged, style: styleId };
 }
 
 function stopStyleAutomationTimer() {
