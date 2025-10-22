@@ -9,6 +9,8 @@ const SIGNAGE_JSON_RESPONSE_FLAGS = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNIC
 const SIGNAGE_JSON_STORAGE_FLAGS = SIGNAGE_JSON_RESPONSE_FLAGS | JSON_PRETTY_PRINT;
 const SIGNAGE_SCHEDULE_STORAGE_KEY = 'schedule.state';
 const SIGNAGE_SETTINGS_STORAGE_KEY = 'settings.state';
+const SIGNAGE_CACHE_SCHEDULE_KEY = 'cache.schedule.state';
+const SIGNAGE_CACHE_SCHEDULE_TTL = 30;
 const SIGNAGE_SQLITE_BUSY_TIMEOUT_MS = 5000;
 const SIGNAGE_AUDIT_LOG_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
 const SIGNAGE_AUDIT_LOG_MAX_ROWS = 5000;
@@ -26,6 +28,25 @@ function signage_last_error_message(string $fallback): string
     }
 
     return $fallback;
+}
+
+function signage_ini_bool(string $key, bool $default = false): bool
+{
+    $value = ini_get($key);
+    if ($value === false) {
+        return $default;
+    }
+
+    $value = strtolower((string) $value);
+    if ($value === '1' || $value === 'on' || $value === 'yes' || $value === 'true') {
+        return true;
+    }
+
+    if ($value === '' || $value === '0' || $value === 'off' || $value === 'no' || $value === 'false') {
+        return false;
+    }
+
+    return $default;
 }
 
 function signage_flush_stream($handle, ?string &$error = null): bool
@@ -966,7 +987,12 @@ function signage_schedule_save($schedule, ?string &$error = null, ?array &$statu
         $status = $statusMap;
     }
 
-    return $hasSqlite ? $sqliteOk : $fileOk;
+    $ok = $hasSqlite ? $sqliteOk : $fileOk;
+    if ($ok) {
+        signage_schedule_cache_clear();
+    }
+
+    return $ok;
 }
 
 function signage_settings_save($settings, ?string &$error = null, ?array &$status = null): bool
@@ -1247,6 +1273,149 @@ function signage_data_meta(string $file, string $key): array
     }
 
     return $meta;
+}
+
+function signage_cache_backend(): string
+{
+    static $backend = null;
+    if ($backend !== null) {
+        return $backend;
+    }
+
+    $useApcu = function_exists('apcu_fetch') && signage_ini_bool('apc.enabled', true);
+    if ($useApcu && PHP_SAPI === 'cli' && !signage_ini_bool('apc.enable_cli')) {
+        $useApcu = false;
+    }
+
+    if ($useApcu) {
+        return $backend = 'apcu';
+    }
+
+    return $backend = 'file';
+}
+
+function signage_cache_file_path(string $key): string
+{
+    return signage_data_path('cache/' . sha1($key) . '.cache');
+}
+
+function signage_cache_get(string $key)
+{
+    $backend = signage_cache_backend();
+    if ($backend === 'apcu') {
+        $success = false;
+        $value = apcu_fetch($key, $success);
+        if ($success) {
+            return $value;
+        }
+    }
+
+    $path = signage_cache_file_path($key);
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $payload = @file_get_contents($path);
+    if ($payload === false || $payload === '') {
+        return null;
+    }
+
+    $data = @unserialize($payload);
+    if (!is_array($data) || !array_key_exists('value', $data)) {
+        @unlink($path);
+        return null;
+    }
+
+    $expiresAt = $data['expires_at'] ?? null;
+    if (is_int($expiresAt) && $expiresAt > 0 && $expiresAt < time()) {
+        @unlink($path);
+        return null;
+    }
+
+    return $data['value'];
+}
+
+function signage_cache_set(string $key, $value, int $ttl = 0): bool
+{
+    $backend = signage_cache_backend();
+    $ok = true;
+
+    if ($backend === 'apcu') {
+        $ok = apcu_store($key, $value, $ttl);
+    }
+
+    $path = signage_cache_file_path($key);
+    $payload = serialize([
+        'value' => $value,
+        'expires_at' => $ttl > 0 ? time() + $ttl : null,
+    ]);
+    $error = null;
+    if (!signage_atomic_file_put_contents($path, $payload, $error)) {
+        error_log('Failed to write cache file ' . $path . ': ' . ($error ?? 'write-failed'));
+        $ok = false;
+    }
+
+    return $ok;
+}
+
+function signage_cache_delete(string $key): void
+{
+    $backend = signage_cache_backend();
+    if ($backend === 'apcu') {
+        apcu_delete($key);
+    }
+
+    $path = signage_cache_file_path($key);
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
+
+function signage_schedule_state(): array
+{
+    $cached = signage_cache_get(SIGNAGE_CACHE_SCHEDULE_KEY);
+    if (is_array($cached) && isset($cached['data'], $cached['meta'])) {
+        if (!isset($cached['json']) || !is_string($cached['json'])) {
+            $encoded = json_encode($cached['data'], SIGNAGE_JSON_RESPONSE_FLAGS);
+            $cached['json'] = $encoded === false ? null : $encoded;
+            signage_cache_set(SIGNAGE_CACHE_SCHEDULE_KEY, $cached, SIGNAGE_CACHE_SCHEDULE_TTL);
+        }
+
+        if (!isset($cached['meta']['hash']) || $cached['meta']['hash'] === null) {
+            $cached['meta']['hash'] = sha1(is_string($cached['json']) ? $cached['json'] : serialize($cached['data']));
+            signage_cache_set(SIGNAGE_CACHE_SCHEDULE_KEY, $cached, SIGNAGE_CACHE_SCHEDULE_TTL);
+        }
+
+        return $cached;
+    }
+
+    $data = signage_schedule_load();
+    $encoded = json_encode($data, SIGNAGE_JSON_RESPONSE_FLAGS);
+    $json = $encoded === false ? null : $encoded;
+
+    $meta = signage_data_meta('schedule.json', SIGNAGE_SCHEDULE_STORAGE_KEY);
+    if (!isset($meta['mtime']) || !is_int($meta['mtime'])) {
+        $meta['mtime'] = 0;
+    }
+
+    if (!isset($meta['hash']) || $meta['hash'] === null) {
+        $meta['hash'] = sha1(is_string($json) ? $json : serialize($data));
+    }
+
+    $state = [
+        'data' => $data,
+        'meta' => $meta,
+        'json' => $json,
+    ];
+
+    signage_cache_set(SIGNAGE_CACHE_SCHEDULE_KEY, $state, SIGNAGE_CACHE_SCHEDULE_TTL);
+
+    return $state;
+}
+
+function signage_schedule_cache_clear(): void
+{
+    signage_cache_delete(SIGNAGE_CACHE_SCHEDULE_KEY);
 }
 
 function signage_format_http_date(int $timestamp): string
