@@ -5831,19 +5831,33 @@ function showPairing(){
 
 // ---------- Bootstrap & live update ----------
 async function bootstrap(){
-// Preview-Bridge: Admin sendet {type:'preview', payload:{schedule,settings}}
- window.addEventListener('message', (ev) => {
-const data = ev?.data || {};
-if (data?.type !== 'preview') return;
-previewMode = true;
-const payload = data.payload || {};
-const nextSchedule = payload.schedule || schedule;
-const nextSettings = payload.settings || settings;
-if (!nextSchedule || !nextSettings) return;
-applyResolvedState(nextSchedule, nextSettings, { resetIndex: true })
-  .catch((error) => console.error('[preview] state apply failed', error));
-});
-const deviceMode = !!DEVICE_ID;
+  function handlePreviewMessage(message) {
+    if (!message || message.type !== 'preview') {
+      return;
+    }
+    previewMode = true;
+    const payload = message.payload || {};
+    const nextSchedule = payload.schedule || schedule;
+    const nextSettings = payload.settings || settings;
+    if (!nextSchedule || !nextSettings) {
+      return;
+    }
+    applyResolvedState(nextSchedule, nextSettings, { resetIndex: true })
+      .catch((error) => console.error('[preview] state apply failed', error));
+  }
+
+  const previewBridge = typeof window !== 'undefined' ? window.__playerPreviewBridge : null;
+  if (previewBridge && typeof previewBridge.subscribe === 'function') {
+    try {
+      previewBridge.subscribe(handlePreviewMessage);
+    } catch (error) {
+      console.error('[preview] failed to subscribe to bridge', error);
+      window.addEventListener('message', (event) => handlePreviewMessage(event?.data));
+    }
+  } else {
+    window.addEventListener('message', (event) => handlePreviewMessage(event?.data));
+  }
+  const deviceMode = !!DEVICE_ID;
 
 if (!previewMode) {
   if (deviceMode) {
