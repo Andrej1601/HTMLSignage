@@ -61,13 +61,14 @@ let cachedDisp = null;
 const stageControllers = [];
 const resizeRegistry = createResizeRegistry();
 let heartbeatTimer = null;
-let pollTimer = null;
+let pollController = null;
 let liveSource = null;
 let liveConfig = null;
 let liveRetryTimer = null;
 let liveRetryAttempts = 0;
 const liveStateTokens = { config: null, device: null };
 const eventStreamProbeCache = new Map();
+const jsonRequestCache = new Map();
 let badgeLookupCache = null;
 let styleAutomationTimer = null;
 const styleAutomationState = {
@@ -503,7 +504,7 @@ async function startPairEventSource(config, options = {}){
       if (!data.exists) return;
       if (data.paired && data.deviceId) {
         clearLiveSource({ clearConfig: true });
-        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        stopPollingLoop();
         ls.remove('pairState');
         ls.set('deviceId', data.deviceId);
         fetch('/api/heartbeat.php', {
@@ -525,37 +526,95 @@ async function startPairEventSource(config, options = {}){
   }
 }
 
+function stopPollingLoop(){
+  if (pollController) {
+    pollController.stop();
+    pollController = null;
+  }
+}
+
+function createPollingLoop(task, {
+  interval = 10000,
+  maxInterval = 60000,
+  backoffFactor = 2,
+  jitter = 0.2
+} = {}) {
+  let stopped = false;
+  let delay = interval;
+  let timer = null;
+
+  const scheduleNext = (customDelay) => {
+    if (stopped) return;
+    const baseDelay = typeof customDelay === 'number' ? customDelay : delay;
+    const hasJitter = jitter > 0 && baseDelay > 0;
+    const randomFactor = hasJitter ? (Math.random() * 2 - 1) * jitter : 0;
+    const finalDelay = Math.max(250, Math.round(baseDelay + baseDelay * randomFactor));
+    timer = setTimeout(run, Math.max(0, finalDelay));
+  };
+
+  const run = async () => {
+    if (stopped) {
+      return;
+    }
+    let success = true;
+    try {
+      const result = await task();
+      success = result !== false;
+    } catch (error) {
+      success = false;
+    }
+
+    if (success) {
+      delay = interval;
+    } else {
+      delay = Math.min(maxInterval, Math.max(interval, delay * backoffFactor));
+    }
+
+    if (!stopped) {
+      scheduleNext();
+    }
+  };
+
+  scheduleNext(0);
+
+  return {
+    stop() {
+      stopped = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+  };
+}
+
 function startConfigPolling(deviceMode){
   clearLiveSource({ clearConfig: true });
   liveRetryAttempts = 0;
   liveStateTokens.config = null;
   if (!deviceMode) liveStateTokens.device = null;
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  stopPollingLoop();
   let lastSchedVer = schedule?.version || 0;
   let lastSetVer = settings?.version || 0;
   const intervalMs = deviceMode ? 10000 : 10000;
-  pollTimer = setInterval(async () => {
+  pollController = createPollingLoop(async () => {
     try {
       if (deviceMode) {
-        const response = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}&t=${Date.now()}`, { cache: 'no-store' });
+        const response = await fetch(`/pair/resolve?device=${encodeURIComponent(DEVICE_ID)}`, { cache: 'no-store' });
         if (response.status === 404) {
-          clearInterval(pollTimer);
-          pollTimer = null;
+          stopPollingLoop();
           stopAllStages();
           showPairing();
           return;
         }
         if (!response.ok) {
           console.warn('[poll] http', response.status);
-          return;
+          return false;
         }
         const payload = await response.json();
         if (!payload || payload.ok === false || !payload.schedule || !payload.settings) {
           console.warn('[poll] payload invalid');
-          return;
+          return false;
         }
         const newSchedVer = payload.schedule?.version || 0;
         const newSetVer = payload.settings?.version || 0;
@@ -579,25 +638,23 @@ function startConfigPolling(deviceMode){
       }
     } catch (error) {
       console.warn('[poll] failed:', error);
+      return false;
     }
-  }, intervalMs);
+    return true;
+  }, { interval: intervalMs, maxInterval: 60000, backoffFactor: 2, jitter: 0.2 });
 }
 
 function startPairPolling(code){
   clearLiveSource({ clearConfig: true });
   liveRetryAttempts = 0;
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-  pollTimer = setInterval(async () => {
+  stopPollingLoop();
+  pollController = createPollingLoop(async () => {
     try {
       const response = await fetch('/pair/poll?code=' + encodeURIComponent(code), { cache: 'no-store' });
       if (!response.ok) return;
       const payload = await response.json();
       if (payload && payload.paired && payload.deviceId) {
-        clearInterval(pollTimer);
-        pollTimer = null;
+        stopPollingLoop();
         ls.remove('pairState');
         ls.set('deviceId', payload.deviceId);
         fetch('/api/heartbeat.php', {
@@ -609,15 +666,14 @@ function startPairPolling(code){
       }
     } catch (error) {
       console.warn('[pair] poll failed', error);
+      return false;
     }
-  }, 5000);
+    return true;
+  }, { interval: 5000, maxInterval: 30000, backoffFactor: 2, jitter: 0.2 });
 }
 
 function startConfigLiveUpdates(deviceMode){
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  stopPollingLoop();
   liveConfig = {
     type: 'config',
     deviceMode,
@@ -633,10 +689,7 @@ function startConfigLiveUpdates(deviceMode){
 
 function startPairLiveUpdates(code){
   if (!code) return;
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  stopPollingLoop();
   liveConfig = {
     type: 'pair',
     code,
@@ -651,10 +704,7 @@ window.addEventListener('beforeunload', () => {
     clearInterval(heartbeatTimer);
     heartbeatTimer = null;
   }
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
+  stopPollingLoop();
   clearLiveSource({ clearConfig: true });
   stopStyleAutomationTimer();
   cleanupDisplayListeners();
@@ -1100,7 +1150,45 @@ await applyResolvedState(payload.schedule, payload.settings, {
 
 
 // ---------- IO ----------
-async function loadJSON(u) { const r = await fetch(u + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + u); return await r.json(); }
+async function loadJSON(url) {
+  const cached = jsonRequestCache.get(url);
+  const headers = {};
+  if (cached?.etag) {
+    headers['If-None-Match'] = cached.etag;
+  }
+  if (cached?.lastModified) {
+    headers['If-Modified-Since'] = cached.lastModified;
+  }
+
+  let response;
+  try {
+    response = await fetch(url, Object.keys(headers).length ? { headers } : undefined);
+  } catch (error) {
+    jsonRequestCache.delete(url);
+    throw error;
+  }
+
+  if (response.status === 304) {
+    if (cached && cached.data !== undefined) {
+      return cached.data;
+    }
+    response = await fetch(url, { cache: 'reload' });
+  }
+
+  if (!response.ok) {
+    throw new Error('HTTP ' + response.status + ' for ' + url);
+  }
+
+  const data = await response.json();
+  const etag = response.headers.get('ETag');
+  const lastModified = response.headers.get('Last-Modified');
+  if (etag || lastModified) {
+    jsonRequestCache.set(url, { etag, lastModified, data });
+  } else {
+    jsonRequestCache.delete(url);
+  }
+  return data;
+}
 
 // ---------- Theme & Display ----------
 function ensureFontFamily() {
@@ -5678,69 +5766,66 @@ function refreshStageQueues({ resetIndex = true, autoplay = true } = {}){
 
 //Showpairing
 function showPairing(){
-clearLiveSource({ clearConfig: true });
-if (pollTimer) {
-  clearInterval(pollTimer);
-  pollTimer = null;
-}
-stopAllStages();
-backgroundAudioState.desiredPlaying = false;
-stopBackgroundAudio({ dropSrc: false });
-updateLayoutModeAttr('single');
-const box = document.createElement('div');
-box.className = 'container fade show';
-box.style.cssText = 'display:flex;align-items:center;justify-content:center;';
-box.innerHTML = `
-  <div style="background:rgba(0,0,0,.55);color:#fff;padding:28px 32px;border-radius:16px;max-width:90vw;text-align:center">
-    <div style="font-weight:800;font-size:28px;margin-bottom:10px">Gerät koppeln</div>
-    <div id="code" style="font-size:42px;font-weight:900;letter-spacing:4px;background:rgba(255,255,255,.1);padding:8px 14px;border-radius:12px;display:inline-block;min-width:12ch">…</div>
-    <div style="margin-top:10px;opacity:.9">Öffne im Admin „Geräte“ und gib den Code ein.</div>
-  </div>`;
+  clearLiveSource({ clearConfig: true });
+  stopPollingLoop();
+  stopAllStages();
+  backgroundAudioState.desiredPlaying = false;
+  stopBackgroundAudio({ dropSrc: false });
+  updateLayoutModeAttr('single');
+  const box = document.createElement('div');
+  box.className = 'container fade show';
+  box.style.cssText = 'display:flex;align-items:center;justify-content:center;';
+  box.innerHTML = `
+    <div style="background:rgba(0,0,0,.55);color:#fff;padding:28px 32px;border-radius:16px;max-width:90vw;text-align:center">
+      <div style="font-weight:800;font-size:28px;margin-bottom:10px">Gerät koppeln</div>
+      <div id="code" style="font-size:42px;font-weight:900;letter-spacing:4px;background:rgba(255,255,255,.1);padding:8px 14px;border-radius:12px;display:inline-block;min-width:12ch">…</div>
+      <div style="margin-top:10px;opacity:.9">Öffne im Admin „Geräte“ und gib den Code ein.</div>
+    </div>`;
 
-if (stageLeftController) stageLeftController.showCustom(box);
-else if (STAGE_LEFT || STAGE) {
-  const target = STAGE_LEFT || STAGE;
-  if (target) {
-    target.innerHTML = '';
-    target.appendChild(box);
-    requestAnimationFrame(() => box.classList.add('show'));
+  if (stageLeftController) stageLeftController.showCustom(box);
+  else if (STAGE_LEFT || STAGE) {
+    const target = STAGE_LEFT || STAGE;
+    if (target) {
+      target.innerHTML = '';
+      target.appendChild(box);
+      requestAnimationFrame(() => box.classList.add('show'));
+    }
   }
-}
-if (stageRightController) stageRightController.showCustom(null);
+  if (stageRightController) stageRightController.showCustom(null);
 
-(async ()=>{
-  try {
-    // Bestehenden Code (localStorage) wiederverwenden – Tabs teilen den Code
-    let st = null; try { st = JSON.parse(ls.get('pairState')||'null'); } catch {}
-    let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
+  (async ()=>{
+    try {
+      // Bestehenden Code (localStorage) wiederverwenden – Tabs teilen den Code
+      let st = null; try { st = JSON.parse(ls.get('pairState')||'null'); } catch {}
+      let code = (st && st.code && (Date.now() - (st.createdAt||0) < 15*60*1000)) ? st.code : null;
 
-    if (!code) {
-      const r = await fetch('/pair/begin', { method:'POST', headers:{'X-Pair-Request':'1'} });
-      if (!r.ok){
-        const err = new Error('begin http '+r.status);
-        err.status = r.status;
-        throw err;
+      if (!code) {
+        const r = await fetch('/pair/begin', { method:'POST', headers:{'X-Pair-Request':'1'} });
+        if (!r.ok){
+          const err = new Error('begin http '+r.status);
+          err.status = r.status;
+          throw err;
+        }
+        const j0 = await r.json();
+        if (!j0 || !j0.code) throw new Error('begin payload');
+        code = j0.code;
+        ls.set('pairState', JSON.stringify({ code, createdAt: Date.now() }));
       }
-      const j0 = await r.json();
-      if (!j0 || !j0.code) throw new Error('begin payload');
-      code = j0.code;
-      ls.set('pairState', JSON.stringify({ code, createdAt: Date.now() }));
-    }
 
-    const el = document.getElementById('code');
-    if (el) el.textContent = code;
+      const el = document.getElementById('code');
+      if (el) el.textContent = code;
 
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+      startPairLiveUpdates(code);
+    } catch (e) {
+      const el = document.getElementById('code');
+      if (el) el.textContent = (e && e.status) ? String(e.status) : 'NETZ-FEHLER';
+      console.error('[pair] begin failed', e);
     }
-    startPairLiveUpdates(code);
-  } catch (e) {
-    const el = document.getElementById('code');
-    if (el) el.textContent = (e && e.status) ? String(e.status) : 'NETZ-FEHLER';
-    console.error('[pair] begin failed', e);
-  }
-})();
+  })();
 }
 
 
