@@ -406,6 +406,134 @@ function refreshAllUi({ reinitSlidesMaster = true } = {}) {
   refreshDevicesPane();
 }
 
+function initSidebarNavigator() {
+  const scrollContainer = document.querySelector('.rightbar');
+  if (!scrollContainer) return;
+  const nav = scrollContainer.querySelector('.sidebar-nav');
+  if (!nav) return;
+  const sections = Array.from(scrollContainer.querySelectorAll('[data-sidebar-section]'));
+  if (!sections.length) return;
+
+  const buttons = sections.map((section) => {
+    const id = section.id;
+    if (!id) return null;
+    const button = nav.querySelector(`[data-scroll-target="${id}"]`);
+    if (!button) return null;
+    button.setAttribute('aria-controls', id);
+    return { id, section, button };
+  }).filter(Boolean);
+
+  if (!buttons.length) return;
+
+  let currentActive = null;
+  const setActive = (id, { force = false } = {}) => {
+    if (!id) return;
+    if (!force && currentActive === id) return;
+    currentActive = id;
+    buttons.forEach(({ button, id: btnId }) => {
+      const isActive = btnId === id;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  };
+
+  const hasMatchMedia = typeof window === 'object' && typeof window.matchMedia === 'function';
+  const prefersReducedMotion = hasMatchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const scrollToSection = (section) => {
+    if (!section) return;
+    const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+    try {
+      section.scrollIntoView({ behavior, block: 'start', inline: 'nearest' });
+    } catch (error) {
+      section.scrollIntoView(true);
+    }
+  };
+
+  nav.addEventListener('click', (event) => {
+    const button = event.target.closest('.sidebar-nav-btn');
+    if (!button) return;
+    const entry = buttons.find(({ button: candidate }) => candidate === button);
+    if (!entry) return;
+    event.preventDefault();
+    scrollToSection(entry.section);
+    setActive(entry.id, { force: true });
+  });
+
+  nav.addEventListener('keydown', (event) => {
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    const index = buttons.findIndex(({ button }) => button === document.activeElement);
+    if (index === -1) return;
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (index - 1 + buttons.length) % buttons.length;
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (index + 1) % buttons.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = buttons.length - 1;
+    }
+    buttons[nextIndex].button.focus();
+  });
+
+  const initialActive = buttons.find(({ button }) => button.classList.contains('is-active'))
+    || buttons[0];
+  if (initialActive) {
+    setActive(initialActive.id, { force: true });
+  }
+
+  const hasIntersectionObserver = typeof window === 'object' && 'IntersectionObserver' in window;
+  if (hasIntersectionObserver) {
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting && entry.target?.id)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      if (!visible.length) return;
+      const activeId = visible[0].target.id;
+      setActive(activeId);
+    }, {
+      root: scrollContainer,
+      rootMargin: '-15% 0px -60% 0px',
+      threshold: [0.1, 0.25, 0.5]
+    });
+    buttons.forEach(({ section }) => observer.observe(section));
+  } else {
+    let scheduled = false;
+    const updateActive = () => {
+      scheduled = false;
+      let candidate = null;
+      let minOffset = Number.POSITIVE_INFINITY;
+      buttons.forEach(({ section }) => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top < 0) return;
+        if (rect.top < minOffset) {
+          minOffset = rect.top;
+          candidate = section;
+        }
+      });
+      if (!candidate) {
+        const last = buttons[buttons.length - 1];
+        if (last) setActive(last.id);
+        return;
+      }
+      if (candidate.id) setActive(candidate.id);
+    };
+    scrollContainer.addEventListener('scroll', () => {
+      if (scheduled) return;
+      scheduled = true;
+      if ('requestAnimationFrame' in window) {
+        window.requestAnimationFrame(updateActive);
+      } else {
+        setTimeout(updateActive, 100);
+      }
+    }, { passive: true });
+  }
+}
+
 function safeInvoke(label, fn) {
   try {
     fn();
@@ -683,6 +811,7 @@ async function loadAll(){
   queueLazyAdminModulesSetup();
   initViewMenu();
   initSidebarResize();
+  initSidebarNavigator();
 }
 
 // ============================================================================
