@@ -33,94 +33,160 @@ function devices_apcu_enabled(): bool
     return $enabled;
 }
 
-function devices_state_cache_path(): string
+final class DevicesStateCache
 {
-    static $path = null;
-    if ($path === null) {
-        $directory = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
-        $path = $directory . DIRECTORY_SEPARATOR . 'htmlsignage_devices_state.cache';
+    private string $path;
+
+    private bool $apcuEnabled;
+
+    public function __construct(?string $path = null, ?bool $apcuEnabled = null)
+    {
+        $this->path = $path ?? $this->resolvePath();
+        $this->apcuEnabled = $apcuEnabled ?? devices_apcu_enabled();
     }
 
-    return $path;
+    public function fetch(int $ttl = DEVICES_STATE_CACHE_TTL): ?array
+    {
+        if ($ttl <= 0) {
+            return null;
+        }
+
+        $state = $this->readFromApcu();
+        if ($state !== null) {
+            return $state;
+        }
+
+        return $this->readFromFile();
+    }
+
+    public function store(array $state, int $ttl = DEVICES_STATE_CACHE_TTL): void
+    {
+        if ($ttl <= 0) {
+            $this->invalidate();
+            return;
+        }
+
+        $payload = [
+            'expires' => microtime(true) + $ttl,
+            'state' => $state,
+        ];
+
+        if ($this->apcuEnabled) {
+            apcu_store(DEVICES_STATE_CACHE_KEY, $payload, $ttl);
+        }
+
+        $encoded = @serialize($payload);
+        if (!is_string($encoded) || $encoded === '') {
+            return;
+        }
+
+        @file_put_contents($this->path, $encoded, LOCK_EX);
+    }
+
+    public function invalidate(): void
+    {
+        if ($this->apcuEnabled) {
+            apcu_delete(DEVICES_STATE_CACHE_KEY);
+        }
+
+        $this->deleteFile();
+    }
+
+    private function readFromApcu(): ?array
+    {
+        if (!$this->apcuEnabled) {
+            return null;
+        }
+
+        $success = false;
+        $payload = apcu_fetch(DEVICES_STATE_CACHE_KEY, $success);
+        if (!$success) {
+            return null;
+        }
+
+        $state = $this->extractState($payload);
+        if ($state === null) {
+            apcu_delete(DEVICES_STATE_CACHE_KEY);
+        }
+
+        return $state;
+    }
+
+    private function readFromFile(): ?array
+    {
+        if (!is_file($this->path)) {
+            return null;
+        }
+
+        $contents = @file_get_contents($this->path);
+        if ($contents === false || $contents === '') {
+            $this->deleteFile();
+            return null;
+        }
+
+        $payload = @unserialize($contents, ['allowed_classes' => false]);
+        $state = $this->extractState($payload);
+        if ($state === null) {
+            $this->deleteFile();
+        }
+
+        return $state;
+    }
+
+    private function extractState(mixed $payload): ?array
+    {
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $expires = isset($payload['expires']) ? (float) $payload['expires'] : 0.0;
+        if ($expires <= microtime(true)) {
+            return null;
+        }
+
+        $state = $payload['state'] ?? null;
+        return is_array($state) ? $state : null;
+    }
+
+    private function deleteFile(): void
+    {
+        if (is_file($this->path)) {
+            @unlink($this->path);
+        }
+    }
+
+    private function resolvePath(): string
+    {
+        $directory = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+
+        return $directory . DIRECTORY_SEPARATOR . 'htmlsignage_devices_state.cache';
+    }
+}
+
+function devices_state_cache(): DevicesStateCache
+{
+    static $cache = null;
+
+    if ($cache === null) {
+        $cache = new DevicesStateCache();
+    }
+
+    return $cache;
 }
 
 function devices_state_cache_fetch(int $ttl = DEVICES_STATE_CACHE_TTL): ?array
 {
-    if ($ttl <= 0) {
-        return null;
-    }
-
-    if (devices_apcu_enabled()) {
-        $success = false;
-        $cached = apcu_fetch(DEVICES_STATE_CACHE_KEY, $success);
-        if ($success && is_array($cached)) {
-            $expires = isset($cached['expires']) ? (float) $cached['expires'] : 0.0;
-            if ($expires > microtime(true) && isset($cached['state']) && is_array($cached['state'])) {
-                return $cached['state'];
-            }
-        }
-    }
-
-    $path = devices_state_cache_path();
-    if (!is_file($path)) {
-        return null;
-    }
-
-    $contents = @file_get_contents($path);
-    if ($contents === false || $contents === '') {
-        return null;
-    }
-
-    $payload = @unserialize($contents, ['allowed_classes' => false]);
-    if (!is_array($payload)) {
-        @unlink($path);
-        return null;
-    }
-
-    $expires = isset($payload['expires']) ? (float) $payload['expires'] : 0.0;
-    if ($expires <= microtime(true)) {
-        @unlink($path);
-        return null;
-    }
-
-    $state = $payload['state'] ?? null;
-    return is_array($state) ? $state : null;
+    return devices_state_cache()->fetch($ttl);
 }
 
 function devices_state_cache_store(array $state, int $ttl = DEVICES_STATE_CACHE_TTL): void
 {
-    if ($ttl <= 0) {
-        devices_state_cache_invalidate();
-        return;
-    }
-
-    $payload = [
-        'expires' => microtime(true) + $ttl,
-        'state' => $state,
-    ];
-
-    if (devices_apcu_enabled()) {
-        apcu_store(DEVICES_STATE_CACHE_KEY, $payload, $ttl);
-    }
-
-    $encoded = @serialize($payload);
-    if ($encoded === false) {
-        return;
-    }
-
-    @file_put_contents(devices_state_cache_path(), $encoded, LOCK_EX);
+    devices_state_cache()->store($state, $ttl);
 }
 
 function devices_state_cache_invalidate(): void
 {
-    if (devices_apcu_enabled()) {
-        apcu_delete(DEVICES_STATE_CACHE_KEY);
-    }
-
-    $path = devices_state_cache_path();
-    if (is_file($path)) {
-        @unlink($path);
-    }
+    devices_state_cache()->invalidate();
 }
 
 // >>> GENERATED: DEVICE_FIELD_CONFIG >>>
