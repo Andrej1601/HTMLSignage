@@ -20,6 +20,58 @@
   <script type="module">
     const manifestUrl = '/player/dist/manifest.json';
 
+    (() => {
+      const listeners = new Set();
+      let lastMessage = null;
+
+      function publish(message) {
+        lastMessage = message;
+        for (const listener of listeners) {
+          try {
+            listener(message);
+          } catch (error) {
+            console.error('[slideshow] preview listener failed', error);
+          }
+        }
+      }
+
+      const bridge = {
+        subscribe(listener) {
+          if (typeof listener !== 'function') {
+            return () => {};
+          }
+          listeners.add(listener);
+          if (lastMessage) {
+            try {
+              listener(lastMessage);
+            } catch (error) {
+              console.error('[slideshow] preview listener failed', error);
+            }
+          }
+          return () => {
+            listeners.delete(listener);
+          };
+        },
+        publish,
+      };
+
+      try {
+        window.__playerPreviewBridge = bridge;
+      } catch (error) {
+        console.error('[slideshow] failed to expose preview bridge', error);
+      }
+
+      window.addEventListener('message', (event) => {
+        const data = event?.data;
+        if (!data || data.type !== 'preview') {
+          return;
+        }
+        publish(data);
+      });
+
+      return bridge;
+    })();
+
     async function loadPlayer() {
       try {
         const response = await fetch(manifestUrl, { cache: 'no-store' });
