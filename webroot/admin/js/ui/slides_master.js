@@ -2204,17 +2204,7 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     wellnessItem.statusText = 'Keine aktiven Tipps';
   }
   const wellness = [{ kind: 'wellness-tip', item: wellnessItem, key: 'wellness_all' }];
-  const infoSource = Array.isArray(extrasRaw.infoModules) ? extrasRaw.infoModules : [];
-  const infoActive = infoSource.filter((entry) => {
-    if (!entry || typeof entry !== 'object') return false;
-    if (entry.enabled === false) return false;
-    const text = typeof entry.text === 'string' ? entry.text.trim() : '';
-    return Boolean(text);
-  });
-  const infoExtras = infoSource.length
-    ? [{ kind: 'info-module', item: { id: 'info-banner', activeCount: infoActive.length }, key: 'info-banner' }]
-    : [];
-  const extrasCombined = wellness.concat(infoExtras);
+  const extrasCombined = wellness;
 
   let combined = [];
   const ord = settings?.slides?.sortOrder;
@@ -2254,8 +2244,7 @@ export function collectSlideOrderStream({ normalizeSortOrder = true } = {}){
     media,
     stories,
     extras: {
-      wellness,
-      info: infoExtras
+      wellness
     },
     hiddenSaunas,
     statusBySauna
@@ -2315,11 +2304,6 @@ export function renderSlideOrderView(){
     } else if (entry.kind === 'wellness-tip' && entry.item?.statusText && !statusEl) {
       applyStatus(entry.item.statusText, 'info');
     }
-    const isInfoDisabled = entry.kind === 'info-module' && (!Number(entry.item?.activeCount));
-    if (isInfoDisabled) {
-      if (!statusEl) applyStatus('Keine aktiven Hinweise', 'hidden');
-      tile.classList.add('is-disabled');
-    }
     if (entry.kind === 'sauna'){
       tile.dataset.name = entry.name;
       title.textContent = entry.name;
@@ -2356,18 +2340,6 @@ export function renderSlideOrderView(){
         info.textContent = count === 1 ? '1 Tipp' : `${count} Tipps`;
         tile.appendChild(info);
       }
-    } else if (entry.kind === 'info-module') {
-      tile.dataset.extraId = entry.item?.id || entry.key || '';
-      title.textContent = 'Info-Banner';
-      tile.appendChild(title);
-      if (statusEl) tile.appendChild(statusEl);
-      const activeCount = Number(entry.item?.activeCount) || 0;
-      const info = document.createElement('div');
-      info.className = 'tile-meta';
-      info.textContent = activeCount === 0
-        ? 'Keine Hinweise'
-        : (activeCount === 1 ? '1 Hinweis' : `${activeCount} Hinweise`);
-      tile.appendChild(info);
     } else {
       tile.dataset.storyId = entry.item?.id || entry.key || '';
       title.textContent = entry.item?.title || 'Story-Slide';

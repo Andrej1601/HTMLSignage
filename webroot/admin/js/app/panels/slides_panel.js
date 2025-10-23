@@ -1532,17 +1532,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             disabled,
             statusText: disabled ? (statusText || 'Keine aktiven Tipps') : (statusText || null)
           });
-        } else if (entry.kind === 'info-module') {
-          const activeCount = Number(entry.item?.activeCount) || 0;
-          pushEntry({
-            key: 'info:info-banner',
-            kind: 'info-module',
-            id: 'info-banner',
-            label: 'Info-Banner',
-            thumb: '',
-            disabled: activeCount === 0,
-            statusText: activeCount > 0 ? null : 'Keine aktiven Hinweise'
-          });
         }
       });
 
@@ -1568,17 +1557,9 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         if (seenKeys.has(key)) selected.add(key);
       });
 
-      const hasDynamicSelection = (() => {
-        if (!selected.size) return false;
-        for (const key of selected) {
-          if (!key) continue;
-          if (key === 'overview' || key === 'hero-timeline') continue;
-          return true;
-        }
-        return false;
-      })();
+      const hasStoredSelection = Array.isArray(playlistList) ? playlistList.length > 0 : Array.isArray(pageState.playlist) && pageState.playlist.length > 0;
 
-      if (!selected.size || !hasDynamicSelection) {
+      if (!selected.size && !hasStoredSelection) {
         orderList.forEach(entry => {
           if (!entry || entry.disabled) return;
           selected.add(entry.key);
@@ -1628,9 +1609,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
               break;
             case 'wellness-tip':
               next.push({ type: 'wellness-tip', id: entry.id });
-              break;
-            case 'info-module':
-              next.push({ type: 'info-module', id: entry.id });
               break;
             default:
               break;
