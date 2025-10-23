@@ -1330,11 +1330,21 @@ function signage_asset_canonical_path($value): ?string
 
 function signage_asset_exists(string $path): bool
 {
+    static $cache = [];
+
     $absolute = signage_absolute_path($path);
     if ($absolute === '') {
         return false;
     }
-    return @is_file($absolute);
+
+    if (array_key_exists($absolute, $cache)) {
+        return $cache[$absolute];
+    }
+
+    $exists = @is_file($absolute);
+    $cache[$absolute] = $exists;
+
+    return $exists;
 }
 
 function signage_prune_missing_asset_paths(&$value): void

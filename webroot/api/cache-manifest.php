@@ -11,6 +11,14 @@ header('X-Content-Type-Options: nosniff');
 $assetsDir = signage_assets_path();
 $urls = [];
 $hashContext = hash_init('sha256');
+$cacheKey = 'cache-manifest.v1';
+$cachedManifest = signage_cache_get($cacheKey);
+$previousFiles = [];
+if (is_array($cachedManifest) && isset($cachedManifest['files']) && is_array($cachedManifest['files'])) {
+    $previousFiles = $cachedManifest['files'];
+}
+
+$filesMeta = [];
 
 if (is_dir($assetsDir)) {
     $iterator = new RecursiveIteratorIterator(
@@ -29,11 +37,27 @@ if (is_dir($assetsDir)) {
         }
         $url = '/assets/' . $relativePath;
         $urls[] = $url;
-        $hash = @hash_file('sha256', $fileInfo->getPathname());
-        if ($hash === false) {
-            $mtime = @filemtime($fileInfo->getPathname());
-            $hash = $mtime !== false ? (string) $mtime : 'missing';
+
+        $currentMeta = [
+            'mtime' => $fileInfo->getMTime(),
+            'size' => $fileInfo->getSize(),
+        ];
+        $previousMeta = $previousFiles[$relativePath] ?? null;
+        if (is_array($previousMeta)
+            && isset($previousMeta['mtime'], $previousMeta['size'], $previousMeta['hash'])
+            && (int) $previousMeta['mtime'] === (int) $currentMeta['mtime']
+            && (int) $previousMeta['size'] === (int) $currentMeta['size']
+        ) {
+            $hash = (string) $previousMeta['hash'];
+        } else {
+            $hash = @hash_file('sha256', $fileInfo->getPathname());
+            if ($hash === false) {
+                $mtime = $currentMeta['mtime'];
+                $hash = $mtime !== false ? (string) $mtime : 'missing';
+            }
         }
+        $currentMeta['hash'] = $hash;
+        $filesMeta[$relativePath] = $currentMeta;
         hash_update($hashContext, $url . ':' . $hash);
     }
 }
@@ -41,11 +65,26 @@ if (is_dir($assetsDir)) {
 $offlinePath = signage_base_path() . '/offline.html';
 if (is_file($offlinePath)) {
     $urls[] = '/offline.html';
-    $hash = @hash_file('sha256', $offlinePath);
-    if ($hash === false) {
-        $mtime = @filemtime($offlinePath);
-        $hash = $mtime !== false ? (string) $mtime : 'missing';
+    $currentMeta = [
+        'mtime' => @filemtime($offlinePath) ?: null,
+        'size' => @filesize($offlinePath) ?: null,
+    ];
+    $previousMeta = $previousFiles['__offline__'] ?? null;
+    if (is_array($previousMeta)
+        && isset($previousMeta['mtime'], $previousMeta['size'], $previousMeta['hash'])
+        && (int) ($previousMeta['mtime'] ?? 0) === (int) ($currentMeta['mtime'] ?? 0)
+        && (int) ($previousMeta['size'] ?? -1) === (int) ($currentMeta['size'] ?? -1)
+    ) {
+        $hash = (string) $previousMeta['hash'];
+    } else {
+        $hash = @hash_file('sha256', $offlinePath);
+        if ($hash === false) {
+            $mtime = $currentMeta['mtime'];
+            $hash = $mtime !== null ? (string) $mtime : 'missing';
+        }
     }
+    $currentMeta['hash'] = $hash;
+    $filesMeta['__offline__'] = $currentMeta;
     hash_update($hashContext, '/offline.html:' . $hash);
 }
 
@@ -57,8 +96,17 @@ if (!is_string($version) || $version === '') {
     $version = sha1((string) microtime(true));
 }
 
-echo json_encode([
+$payload = [
     'ok' => true,
     'version' => $version,
     'urls' => $urls,
-], SIGNAGE_JSON_RESPONSE_FLAGS);
+];
+
+echo json_encode($payload, SIGNAGE_JSON_RESPONSE_FLAGS);
+
+signage_cache_set($cacheKey, [
+    'version' => $version,
+    'urls' => $urls,
+    'files' => $filesMeta,
+    'generated_at' => time(),
+]);
