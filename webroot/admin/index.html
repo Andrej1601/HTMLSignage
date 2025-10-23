@@ -1302,13 +1302,12 @@
   })();
 
 </script>
-<script>
+<script type="module">
   (function bootstrapAdminApp() {
-    var manifestUrl = '/admin/dist/manifest.json';
-    var head = document.head || document.getElementsByTagName('head')[0];
+    const APP_ENTRY = '/admin/js/app.js';
 
     function showBootstrapError(message) {
-      var container = document.createElement('div');
+      const container = document.createElement('div');
       container.setAttribute('role', 'alert');
       container.style.margin = '16px';
       container.style.padding = '12px 16px';
@@ -1322,40 +1321,40 @@
       document.body.insertBefore(container, document.body.firstChild);
     }
 
-    fetch(manifestUrl, { cache: 'no-cache' })
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error('Manifest konnte nicht geladen werden: ' + response.status + ' ' + response.statusText);
-        }
-        return response.json();
-      })
-      .then(function (manifest) {
-        var entry = manifest['webroot/admin/js/app.js'];
-        if (!entry || !entry.file) {
-          throw new Error('Manifest enthält keinen gültigen Eintrag für die Admin-App.');
-        }
+    function diagnoseError(error) {
+      if (!error) {
+        return 'Unbekannter Fehler beim Initialisieren der Admin-Oberfläche.';
+      }
+      const message = String(error && error.message ? error.message : error).toLowerCase();
 
-        if (Array.isArray(entry.css)) {
-          entry.css.forEach(function (cssFile) {
-            var link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = '/admin/dist/' + cssFile;
-            head.appendChild(link);
-          });
-        }
+      if (message.includes('failed to fetch dynamically imported module')) {
+        return 'Admin-Module konnten nicht geladen werden. Bitte Netzwerkverbindung prüfen und Seite neu laden.';
+      }
 
-        var script = document.createElement('script');
-        script.type = 'module';
-        script.src = '/admin/dist/' + entry.file;
-        script.onerror = function () {
-          showBootstrapError('Fehler beim Laden der Admin-Oberfläche. Bitte die Seite neu laden oder den Support kontaktieren.');
-        };
-        head.appendChild(script);
-      })
-      .catch(function (error) {
-        console.error('Admin-Bootstrap fehlgeschlagen:', error);
-        showBootstrapError('Die Admin-Oberfläche konnte nicht automatisch initialisiert werden. Bitte Seite neu laden oder Support kontaktieren.');
-      });
+      if (message.includes('mime type') && message.includes('text/html')) {
+        return 'Der Server lieferte statt des Admin-Moduls eine HTML-Seite zurück. Bitte Deployment prüfen oder Seite neu laden.';
+      }
+
+      if (message.includes('unexpected token')) {
+        return 'Die geladene Admin-Datei ist beschädigt oder unvollständig. Bitte Seite neu laden oder Support informieren.';
+      }
+
+      if (message.includes('script error')) {
+        return 'Das Admin-Modul konnte nicht ausgeführt werden. Prüfe Browser-Konsole für Details und kontaktiere ggf. den Support.';
+      }
+
+      return 'Die Admin-Oberfläche konnte nicht automatisch initialisiert werden. Bitte Seite neu laden oder Support kontaktieren.';
+    }
+
+    if (!('noModule' in HTMLScriptElement.prototype)) {
+      showBootstrapError('Dieser Browser unterstützt keine modernen Module. Bitte einen aktuellen Browser verwenden.');
+      return;
+    }
+
+    import(APP_ENTRY).catch((error) => {
+      console.error('Admin-Bootstrap fehlgeschlagen:', error);
+      showBootstrapError(diagnoseError(error));
+    });
   })();
 </script>
 </body>

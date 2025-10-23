@@ -141,6 +141,18 @@ const setupLazyAdminModules = async () => {
   }
 };
 
+const queueLazyAdminModulesSetup = () => {
+  const run = () => {
+    void setupLazyAdminModules();
+  };
+
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(run, { timeout: 2000 });
+  } else {
+    window.setTimeout(run, 0);
+  }
+};
+
 // === Global State ============================================================
 let schedule = null;
 let settings = null;
@@ -627,23 +639,31 @@ async function loadAll(){
   deviceContextState.clearDeviceBaseState();
   updateBaseline(baseSchedule, baseSettings);
 
-  try {
-    const draft = lsGet('scheduleDraft');
-    if (draft) {
-      stateAccess.setSchedule(JSON.parse(draft));
+  const scheduleDraftRaw = lsGet('scheduleDraft');
+  if (scheduleDraftRaw) {
+    try {
+      stateAccess.setSchedule(JSON.parse(scheduleDraftRaw));
       unsavedFromDraft = true;
+    } catch (error) {
+      console.warn('[admin] Lokaler Schedule-Entwurf konnte nicht wiederhergestellt werden', error);
+      lsRemove('scheduleDraft');
+      notifyWarning('Lokaler Entwurf des Aufgussplans war beschädigt und wurde entfernt.');
     }
-  } catch {}
+  }
 
-  try {
-    const draft = lsGet('settingsDraft');
-    if (draft) {
-      const parsed = JSON.parse(draft);
+  const settingsDraftRaw = lsGet('settingsDraft');
+  if (settingsDraftRaw) {
+    try {
+      const parsed = JSON.parse(settingsDraftRaw);
       stripBadgeDraftArtifacts(parsed);
       stateAccess.setSettings(mergeDeep(settings, parsed));
       unsavedFromDraft = true;
+    } catch (error) {
+      console.warn('[admin] Lokaler Einstellungen-Entwurf konnte nicht wiederhergestellt werden', error);
+      lsRemove('settingsDraft');
+      notifyWarning('Lokaler Entwurf der Einstellungen war beschädigt und wurde entfernt.');
     }
-  } catch {}
+  }
   stateAccess.setSettings(normalizeSettings(settings, { assignMissingIds: false }));
 
   setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
@@ -660,7 +680,7 @@ async function loadAll(){
 
   // --- globale UI-Schalter (Theme/Backup/Cleanup) ---------------------------
   initThemeToggle();
-  await setupLazyAdminModules();
+  queueLazyAdminModulesSetup();
   initViewMenu();
   initSidebarResize();
 }
