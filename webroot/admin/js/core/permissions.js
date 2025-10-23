@@ -30,9 +30,7 @@ export const PERMISSION_ALIASES = {
   overview: 'cockpit',
   slideshows: 'slides',
   info: 'global-info',
-  users: 'user-admin',
-  colors: 'design-editor',
-  'slides-automation': 'style'
+  users: 'user-admin'
 };
 
 export const PERMISSION_META = {
@@ -41,16 +39,16 @@ export const PERMISSION_META = {
     description: 'Zugriff auf die Übersichtskacheln und Schnellaktionen.'
   },
   slides: {
-    title: 'Slideshow',
+    title: 'Slideshow & Layout',
     description: 'Allgemeine Slideshow-Einstellungen und Layout anpassen.'
   },
   'slides-flow': {
     title: 'Ablauf & Zeiten',
     description: 'Dauer, Übergänge und Wiedergabe-Verhalten konfigurieren.'
   },
-  style: {
-    title: 'Style & Automation',
-    description: 'Fallback-Stil, Hintergrundmusik und Style-Zeitfenster verwalten.'
+  'slides-automation': {
+    title: 'Automationen',
+    description: 'Zeit- und Stil-Automationen verwalten.'
   },
   media: {
     title: 'Medien',
@@ -68,9 +66,9 @@ export const PERMISSION_META = {
     title: 'Infobox',
     description: 'Globale Informationen und Hinweise pflegen.'
   },
-  'design-editor': {
-    title: 'Design-Editor',
-    description: 'Typografie, Komponenten, Layout und Farben konfigurieren.'
+  colors: {
+    title: 'Farben & Layout',
+    description: 'Farbpaletten, Schriftvarianten und Layout-Einstellungen anpassen.'
   },
   system: {
     title: 'System & Wartung',
@@ -88,8 +86,8 @@ export const PERMISSION_META = {
 
 export const ROLE_DEFAULT_PERMISSIONS = {
   saunameister: ['cockpit', 'footnotes', 'badges'],
-  editor: ['cockpit', 'slides', 'slides-flow', 'style', 'media', 'footnotes', 'badges', 'global-info', 'design-editor', 'system', 'devices'],
-  admin: ['cockpit', 'slides', 'slides-flow', 'style', 'media', 'footnotes', 'badges', 'global-info', 'design-editor', 'system', 'devices', 'user-admin']
+  editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
+  admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
 };
 
 export const normalizeRoleName = (role) => {
