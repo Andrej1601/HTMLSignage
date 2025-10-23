@@ -24,17 +24,15 @@ export function createRoleRestrictionApplier({
 
     const cockpitToggle = document.querySelector('.header-cockpit-controls');
     const cockpitSection = document.querySelector('.workspace-overview');
-    const slideshowBox = document.getElementById('boxSlideshow');
+    const slideshowBox = document.getElementById('boxSlidesText');
     const slidesFlowCard = document.getElementById('slidesFlowCard');
-    const styleBox = document.getElementById('boxStyle');
-    const styleAutomationCard = document.getElementById('styleAutomationCard');
+    const slidesAutomationCard = document.getElementById('slidesAutomationCard');
     const mediaBox = document.getElementById('boxImages');
-    const designEditorBox = document.getElementById('boxDesignEditor');
     const footnoteBox = document.getElementById('boxFootnotes');
     const footnoteSection = document.getElementById('footnoteSection');
     const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
     const badgeSection = document.getElementById('badgeLibrarySection');
-    const colorsSection = document.getElementById('designColors');
+    const colorsSection = document.getElementById('resetColors')?.closest('details');
     const systemSection = document.getElementById('btnExport')?.closest('details');
     const globalInfoBox = document.getElementById('boxStories');
     const slidesMaster = document.getElementById('slidesMaster');
@@ -46,21 +44,17 @@ export function createRoleRestrictionApplier({
 
     const slidesCockpitCard = cockpitCardFrom('[data-jump="slidesMaster"]');
     const infoCockpitCard = cockpitCardFrom('[data-jump="boxStories"]');
-    const mediaLayoutCard =
-      cockpitCardFrom('[data-jump="boxImages"]') ||
-      cockpitCardFrom('[data-jump="boxSlideshow"]') ||
-      cockpitCardFrom('[data-jump="boxStyle"]') ||
-      cockpitCardFrom('[data-jump="boxDesignEditor"]');
+    const mediaLayoutCard = cockpitCardFrom('[data-jump="boxImages"]') || cockpitCardFrom('[data-jump="boxSlidesText"]');
 
     const canUseCockpit = hasPermission('cockpit');
     const canUseSlides = hasPermission('slides');
     const canManageFlow = canUseSlides && hasPermission('slides-flow');
-    const canManageStyle = hasPermission('style');
+    const canManageAutomation = canUseSlides && hasPermission('slides-automation');
     const canManageMedia = canUseSlides && hasPermission('media');
     const canManageFootnotes = hasPermission('footnotes');
     const canManageBadges = hasPermission('badges');
     const canUseGlobalInfo = hasPermission('global-info');
-    const canUseDesignEditor = hasPermission('design-editor');
+    const canUseColors = hasPermission('colors');
     const canUseSystem = hasPermission('system');
     const canManageDevices = hasPermission('devices');
     const canManageUsers = hasPermission('user-admin');
@@ -69,15 +63,13 @@ export function createRoleRestrictionApplier({
     setHiddenState(cockpitSection, !canUseCockpit);
     setHiddenState(slideshowBox, !canUseSlides);
     setHiddenState(slidesFlowCard, !canManageFlow);
-    setHiddenState(styleBox, !canManageStyle);
-    setHiddenState(styleAutomationCard, !canManageStyle);
+    setHiddenState(slidesAutomationCard, !canManageAutomation);
     setHiddenState(mediaBox, !canManageMedia);
-    setHiddenState(designEditorBox, !canUseDesignEditor);
     setHiddenState(footnoteSection, !canManageFootnotes);
     setHiddenState(footnoteLayoutSection, !canManageFootnotes);
     setHiddenState(badgeSection, !canManageBadges);
     setHiddenState(globalInfoBox, !canUseGlobalInfo);
-    setHiddenState(colorsSection, !canUseDesignEditor);
+    setHiddenState(colorsSection, !canUseColors);
     setHiddenState(systemSection, !canUseSystem);
 
     if (slidesMaster) {
@@ -89,9 +81,9 @@ export function createRoleRestrictionApplier({
       }
     }
 
-    const showSlidesCard = canUseSlides || canManageFlow || canManageStyle;
+    const showSlidesCard = canUseSlides || canManageFlow || canManageAutomation;
     const showInfoCard = canUseGlobalInfo || canManageMedia;
-    const showMediaLayoutCard = canManageMedia || canUseDesignEditor || canUseSlides || canManageStyle;
+    const showMediaLayoutCard = canManageMedia || canUseColors || canUseSlides;
 
     setHiddenState(slidesCockpitCard, !showSlidesCard);
     setHiddenState(infoCockpitCard, !showInfoCard);
@@ -107,7 +99,7 @@ export function createRoleRestrictionApplier({
       slideshowBox.open = false;
     }
 
-    if (!canUseDesignEditor && colorsSection) {
+    if (!canUseColors && colorsSection) {
       colorsSection.open = false;
     }
 
