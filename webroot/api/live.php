@@ -31,6 +31,38 @@ while (ob_get_level() > 0) {
 @ob_implicit_flush(1);
 
 define('LIVE_JSON_FLAGS', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+const LIVE_META_CACHE_TTL_MICROS = 1_000_000;
+const LIVE_FILE_META_TTL_MICROS = 1_000_000;
+const LIVE_POLL_BASE_MICROS = 500_000;
+const LIVE_POLL_MAX_MICROS = 15_000_000;
+const LIVE_POLL_BACKOFF_FACTOR = 1.6;
+const LIVE_POLL_JITTER_MAX = 250_000;
+
+function live_cached_meta(string $cacheKey, callable $resolver, int $ttlMicros = LIVE_META_CACHE_TTL_MICROS): array
+{
+    static $cache = [];
+    $nowMicros = (int) floor(microtime(true) * 1_000_000);
+    $entry = $cache[$cacheKey] ?? null;
+    if (is_array($entry)
+        && isset($entry['value'], $entry['expires'])
+        && is_int($entry['expires'])
+        && $entry['expires'] > $nowMicros
+    ) {
+        return is_array($entry['value']) ? $entry['value'] : [];
+    }
+
+    $value = $resolver();
+    if (!is_array($value)) {
+        $value = [];
+    }
+
+    $cache[$cacheKey] = [
+        'expires' => $nowMicros + max($ttlMicros, 0),
+        'value' => $value,
+    ];
+
+    return $value;
+}
 
 function live_send_event(string $event, $data): void
 {
@@ -50,20 +82,22 @@ function live_send_event(string $event, $data): void
 
 function live_file_meta(string $path): array
 {
-    $meta = ['mtime' => 0, 'hash' => null];
-    if (!is_file($path)) {
+    return live_cached_meta('file:' . $path, function () use ($path): array {
+        $meta = ['mtime' => 0, 'hash' => null];
+        if (!is_file($path)) {
+            return $meta;
+        }
+        clearstatcache(false, $path);
+        $mtime = @filemtime($path);
+        if ($mtime !== false) {
+            $meta['mtime'] = (int) $mtime;
+        }
+        $size = @filesize($path);
+        if ($size !== false) {
+            $meta['hash'] = $meta['mtime'] . ':' . (int) $size;
+        }
         return $meta;
-    }
-    clearstatcache(false, $path);
-    $mtime = @filemtime($path);
-    if ($mtime !== false) {
-        $meta['mtime'] = (int) $mtime;
-    }
-    $size = @filesize($path);
-    if ($size !== false) {
-        $meta['hash'] = $meta['mtime'] . ':' . (int) $size;
-    }
-    return $meta;
+    }, LIVE_FILE_META_TTL_MICROS);
 }
 
 function live_load_globals(): array
@@ -172,15 +206,21 @@ $metaResolvers = [];
 if (signage_db_available()) {
     if ($watchGlobals || $watchDevice) {
         $metaResolvers['settings'] = function (): array {
-            return signage_kv_meta(SIGNAGE_SETTINGS_STORAGE_KEY);
+            return live_cached_meta('kv:settings', function (): array {
+                return signage_kv_meta(SIGNAGE_SETTINGS_STORAGE_KEY);
+            });
         };
         $metaResolvers['schedule'] = function (): array {
-            return signage_kv_meta(SIGNAGE_SCHEDULE_STORAGE_KEY);
+            return live_cached_meta('kv:schedule', function (): array {
+                return signage_kv_meta(SIGNAGE_SCHEDULE_STORAGE_KEY);
+            });
         };
     }
     if ($watchDevice || $watchPair) {
         $metaResolvers['devices'] = function (): array {
-            return signage_kv_meta(DEVICES_STORAGE_KEY);
+            return live_cached_meta('kv:devices', function (): array {
+                return signage_kv_meta(DEVICES_STORAGE_KEY);
+            });
         };
     }
 } else {
@@ -241,9 +281,9 @@ if ($watchPair) {
 }
 
 $lastPing = time();
-$basePollInterval = 500000;
+$basePollInterval = LIVE_POLL_BASE_MICROS;
 $pollInterval = $basePollInterval;
-$maxPollInterval = 5000000;
+$maxPollInterval = LIVE_POLL_MAX_MICROS;
 
 while (!connection_aborted()) {
     $configChanged = false;
@@ -299,8 +339,23 @@ while (!connection_aborted()) {
     if ($configChanged || $devicesChanged) {
         $pollInterval = $basePollInterval;
     } else {
-        $pollInterval = min($pollInterval + 250000, $maxPollInterval);
+        $nextInterval = (int) max($basePollInterval, (int) ($pollInterval * LIVE_POLL_BACKOFF_FACTOR));
+        if ($nextInterval > $maxPollInterval) {
+            $nextInterval = $maxPollInterval;
+        }
+        $pollInterval = $nextInterval;
     }
 
-    usleep($pollInterval);
+    $sleepMicros = $pollInterval;
+    if ($pollInterval > $basePollInterval && LIVE_POLL_JITTER_MAX > 0) {
+        try {
+            $sleepMicros = min($maxPollInterval, $pollInterval + random_int(0, LIVE_POLL_JITTER_MAX));
+        } catch (\Throwable $randomError) {
+            $sleepMicros = min($maxPollInterval, $pollInterval + mt_rand(0, LIVE_POLL_JITTER_MAX));
+        }
+    }
+
+    if ($sleepMicros > 0) {
+        usleep($sleepMicros);
+    }
 }

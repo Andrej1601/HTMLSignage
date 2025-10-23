@@ -7,7 +7,7 @@ import { gzipSync } from 'node:zlib';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 const distDir = path.resolve(projectRoot, 'webroot/admin/dist');
-const assetsDir = path.join(distDir, 'assets');
+const manifestPath = path.join(distDir, 'manifest.json');
 
 function formatBytes(bytes) {
   const units = ['B', 'KB', 'MB'];
@@ -20,31 +20,59 @@ function formatBytes(bytes) {
   return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-async function collectFiles() {
-  let entries;
+async function readManifest() {
+  let contents;
   try {
-    entries = await fs.readdir(assetsDir);
+    contents = await fs.readFile(manifestPath, 'utf8');
   } catch (error) {
-    console.error('Admin dist assets directory not found. Run "npm run build:admin" first.');
+    console.error('Admin build manifest not found. Run "npm run build:admin" first.');
     throw error;
   }
 
-  const entryFile = entries.find((file) => file === 'admin.js');
-  if (!entryFile) {
-    throw new Error('admin.js entry bundle missing from dist output.');
+  try {
+    return JSON.parse(contents);
+  } catch (error) {
+    throw new Error('Admin build manifest is not valid JSON.');
+  }
+}
+
+async function collectFiles() {
+  const manifest = await readManifest();
+  const manifestEntries = Object.values(manifest || {});
+  if (manifestEntries.length === 0) {
+    throw new Error('Admin build manifest is empty.');
   }
 
-  const chunkFiles = entries.filter((file) => file.endsWith('.js') && file !== entryFile);
+  const entryRecord = manifestEntries.find((entry) => entry && entry.isEntry);
+  if (!entryRecord || typeof entryRecord.file !== 'string') {
+    throw new Error('Entry bundle missing from build manifest.');
+  }
+
+  const entryFile = entryRecord.file;
+  const cssFiles = [
+    ...new Set(
+      manifestEntries
+        .flatMap((entry) => (Array.isArray(entry?.css) ? entry.css : []))
+        .filter((file) => typeof file === 'string' && file !== '')
+    )
+  ];
+
+  const chunkFiles = [...new Set(
+    manifestEntries
+      .filter((entry) => entry && typeof entry.file === 'string' && entry.file !== entryFile)
+      .map((entry) => entry.file)
+      .filter((file) => file.endsWith('.js'))
+  )];
+
   if (chunkFiles.length === 0) {
     throw new Error('No code-split chunks detected. Dynamic import configuration may be missing.');
   }
 
-  const cssFiles = entries.filter((file) => file.endsWith('.css'));
   return { entryFile, chunkFiles, cssFiles };
 }
 
 async function readFileInfo(fileName) {
-  const fullPath = path.join(assetsDir, fileName);
+  const fullPath = path.join(distDir, fileName);
   const buffer = await fs.readFile(fullPath);
   const gzipSize = gzipSync(buffer).length;
   return {

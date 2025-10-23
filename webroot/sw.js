@@ -206,20 +206,40 @@ async function prepareDataCache({ force = false, scheduleSignature, settingsVers
     let resolvedSettings = settingsVersion;
     let resolvedSchedule = scheduleSignature;
 
+    const pending = [];
     if (resolvedSettings === undefined) {
-      try {
-        resolvedSettings = await fetchSettingsVersion();
-      } catch (error) {
-        console.error('[sw] Unable to determine settings version', error);
-        resolvedSettings = null;
-      }
+      pending.push(
+        fetchSettingsVersion()
+          .then((value) => ({ kind: 'settings', value }))
+          .catch((error) => ({ kind: 'settings', error }))
+      );
     }
     if (resolvedSchedule === undefined) {
-      try {
-        resolvedSchedule = await fetchScheduleSignature();
-      } catch (error) {
-        console.error('[sw] Unable to determine schedule signature', error);
-        resolvedSchedule = null;
+      pending.push(
+        fetchScheduleSignature()
+          .then((value) => ({ kind: 'schedule', value }))
+          .catch((error) => ({ kind: 'schedule', error }))
+      );
+    }
+
+    if (pending.length > 0) {
+      const results = await Promise.all(pending);
+      for (const result of results) {
+        if (result.kind === 'settings') {
+          if ('error' in result) {
+            console.error('[sw] Unable to determine settings version', result.error);
+            resolvedSettings = null;
+          } else {
+            resolvedSettings = result.value;
+          }
+        } else if (result.kind === 'schedule') {
+          if ('error' in result) {
+            console.error('[sw] Unable to determine schedule signature', result.error);
+            resolvedSchedule = null;
+          } else {
+            resolvedSchedule = result.value;
+          }
+        }
       }
     }
 
@@ -292,26 +312,34 @@ async function populateStaticCache(manifest) {
       urls.add(url);
     }
   }
+  const tasks = [];
   for (const url of urls) {
-    try {
-      await cache.add(url);
-    } catch (error) {
-      console.error('[sw] Failed to precache', url, error);
-    }
+    tasks.push((async () => {
+      try {
+        await cache.add(url);
+      } catch (error) {
+        console.error('[sw] Failed to precache', url, error);
+      }
+    })());
   }
+  await Promise.all(tasks);
   return staticCacheName;
 }
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    try {
-      const manifest = await fetchPrecacheManifest();
-      await populateStaticCache(manifest);
-    } catch (error) {
+    const manifestPromise = fetchPrecacheManifest().catch((error) => {
       console.error('[sw] Unable to fetch precache manifest', error);
-      await populateStaticCache(null);
-    }
-    await prepareDataCache();
+      return null;
+    });
+
+    const dataCachePromise = prepareDataCache().catch((error) => {
+      console.error('[sw] Failed to prepare data cache during install', error);
+    });
+
+    const manifest = await manifestPromise;
+    await populateStaticCache(manifest);
+    await dataCachePromise;
   })());
   self.skipWaiting();
 });
