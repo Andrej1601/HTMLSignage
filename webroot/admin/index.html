@@ -116,7 +116,7 @@
             <div class="workspace-card-actions">
               <button type="button" class="workspace-card-btn primary" data-jump="slidesMaster" aria-controls="slidesMaster">Ablauf steuern</button>
               <button type="button" class="workspace-card-btn" data-jump="slidesFlowCard" aria-controls="slidesFlowCard">Zeitsteuerung</button>
-              <button type="button" class="workspace-card-btn" data-jump="slidesAutomationCard" aria-controls="slidesAutomationCard">Automatisierung</button>
+              <button type="button" class="workspace-card-btn" data-jump="boxStyle" aria-controls="boxStyle">Style</button>
             </div>
           </article>
 
@@ -142,9 +142,9 @@
             </div>
             <div class="workspace-card-actions">
               <button type="button" class="workspace-card-btn primary" data-jump="boxImages" aria-controls="boxImages">Medienbereich</button>
-              <button type="button" class="workspace-card-btn" data-jump="boxSlidesText" aria-controls="boxSlidesText">Slideshow &amp; Text</button>
-              <button type="button" class="workspace-card-btn" data-jump="displayLayoutFold" aria-controls="displayLayoutFold">Darstellung &amp; Seiten</button>
-              <button type="button" class="workspace-card-btn" data-jump="styleSetControls" aria-controls="styleSetControls">Style-Paletten</button>
+              <button type="button" class="workspace-card-btn" data-jump="boxSlideshow" aria-controls="boxSlideshow">Slideshow</button>
+              <button type="button" class="workspace-card-btn" data-jump="boxStyle" aria-controls="boxStyle">Style</button>
+              <button type="button" class="workspace-card-btn" data-jump="boxDesignEditor" aria-controls="boxDesignEditor">Design-Editor</button>
             </div>
           </article>
         </div>
@@ -183,58 +183,27 @@
 <!-- Slides – Masterbox -->
 <details class="ac full" open id="slidesMaster" data-jump-target>
   <summary>
-    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
+    <div class="ttl">▶<span class="chev">⮞</span> Inhalt</div>
     <div class="actions">
       <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
     </div>
   </summary>
   <div class="content">
-    <div class="settings-stack">
-      <div class="settings-card" id="slidesAutomationCard" data-jump-target hidden>
-        <div class="settings-card-head">
-          <div class="settings-card-title">Automatisierung</div>
-          <p class="settings-card-description">Lädt zu Start oder Tab-Wechsel automatisch passende Voreinstellungen.</p>
-        </div>
-        <details class="settings-card-body style-auto-fold" id="styleAutomationFold" open>
-          <summary class="style-auto-summary">
-            <span class="style-auto-summary-text">Automatisierung konfigurieren</span>
-            <span class="style-auto-summary-chev" aria-hidden="true">▾</span>
-          </summary>
-          <div class="style-auto-inner">
-            <div class="kv">
-              <label>Auto je Wochentag</label>
-              <input id="presetAuto" type="checkbox">
-            </div>
-            <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
-            <div class="divider"></div>
-            <div class="kv">
-              <label>Style-Automation aktiv</label>
-              <input id="styleAutoEnabled" type="checkbox">
-            </div>
-            <div class="kv">
-              <label>Fallback-Stil</label>
-              <select id="styleAutoFallback" class="input"></select>
-            </div>
-            <div class="kv">
-              <label>Fallback-Musik</label>
-              <select id="styleAutoFallbackTrack" class="input"></select>
-            </div>
-            <div class="style-auto-list" id="styleAutoList"></div>
-            <div class="row style-auto-actions">
-              <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
-            </div>
-          </div>
-        </details>
-      </div>
-
-    </div>
-
     <!-- Unterbox 1: Saunen & Übersicht -->
     <details class="ac sub" open id="boxSaunas" data-jump-target>
       <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
  <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
-</summary>      
+</summary>
 <div class="content">
+
+        <div class="fieldset" style="margin-bottom:12px" id="saunaAutomationBox">
+          <div class="legend">Automatisierung</div>
+          <label class="row" style="gap:8px;align-items:center">
+            <input id="presetAuto" type="checkbox">
+            <span>Auto je Wochentag</span>
+          </label>
+          <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+        </div>
 
         <!-- Übersicht im Saunen-Stil -->
         <div class="fieldset" style="margin-bottom:10px">
@@ -428,12 +397,79 @@
   </div>
 </details>
 
- <details class="ac full" id="boxSlidesText" data-jump-target>
+ <details class="ac full" id="boxSlideshow" data-jump-target>
         <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
+          <div class="ttl">▶<span class="chev">⮞</span> Slideshow</div>
           <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
         </summary>
         <div class="content">
+          <div class="settings-grid two-col slideshow-style-intro">
+            <div class="settings-card" id="styleFallbackCard">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Style-Fallback</div>
+                <p class="settings-card-description">Standardstil und Musik, wenn keine Style-Zeitfenster aktiv sind.</p>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv">
+                  <label>Fallback-Stil</label>
+                  <select id="styleAutoFallback" class="input"></select>
+                </div>
+                <div class="kv">
+                  <label>Fallback-Musik</label>
+                  <select id="styleAutoFallbackTrack" class="input"></select>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card" id="backgroundAudioCard">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Hintergrundmusik</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioEnabled" type="checkbox">
+                    <span>Hintergrundmusik abspielen</span>
+                  </label>
+                </div>
+                <div class="kv">
+                  <label>Musik-Preset</label>
+                  <div class="style-set-controls" id="bgAudioTrackControls" data-jump-target>
+                    <select id="bgAudioTrackSelect" class="input"></select>
+                    <div class="row" style="gap:6px;flex-wrap:wrap">
+                      <button class="btn sm" id="bgAudioTrackApply" type="button">Aktivieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackSave" type="button">Aktualisieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackCreate" type="button">Neu</button>
+                      <button class="btn sm ghost" id="bgAudioTrackDelete" type="button">Löschen</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="kv">
+                  <label>Bezeichnung</label>
+                  <input id="bgAudioTrackLabel" class="input" type="text" placeholder="z. B. Lobby">
+                </div>
+                <div class="kv">
+                  <label>Quelle</label>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                    <input id="bgAudioSrc" class="input" type="text" placeholder="/assets/media/audio/datei.mp3">
+                    <button class="btn sm" id="bgAudioUpload" type="button">Upload</button>
+                    <button class="btn sm ghost" id="bgAudioClear" type="button">Entfernen</button>
+                  </div>
+                  <div class="help">Unterstützt MP3- und OGG-Dateien. Bei leerem Feld bleibt die Musik deaktiviert.</div>
+                </div>
+                <div class="kv">
+                  <label>Lautstärke (%)</label>
+                  <input id="bgAudioVolume" class="input num3" type="number" min="0" max="100" step="5" placeholder="100">
+                  <div class="help">0 = stumm, 100 = volle Lautstärke.</div>
+                </div>
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioLoop" type="checkbox">
+                    <span>Automatisch wiederholen</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="layout-display-block">
             <details class="layout-display-fold" id="displayLayoutFold" open data-jump-target>
               <summary class="layout-display-summary">
@@ -477,7 +513,7 @@
                   <div class="help">Steuert den reservierten Bereich für den laufenden Hinweisbanner.</div>
                 </div>
                 <div class="divider"></div>
-                <div class="layout-flow-section">
+                <div class="layout-flow-section" id="slidesFlowCard">
                   <div class="subh">Ablauf &amp; Zeitsteuerung</div>
                   <p class="help" style="margin-top:-4px">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
                   <div class="kv" id="rowDurMode">
@@ -531,7 +567,56 @@
               </div>
             </details>
           </div>
-          <div class="settings-grid two-col">
+          
+        </div>
+</details>
+
+      
+
+
+      <details class="ac sub" id="boxStyle" data-jump-target>
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Style</div>
+        </summary>
+        <div class="content">
+          <div class="settings-stack">
+            <div class="settings-card" id="styleAutomationCard" data-jump-target hidden>
+              <div class="settings-card-head">
+                <div class="settings-card-title">Style-Automation</div>
+                <p class="settings-card-description">Plane zeitgesteuerte Style- und Musikwechsel.</p>
+              </div>
+              <details class="settings-card-body style-auto-fold" id="styleAutomationFold" open>
+                <summary class="style-auto-summary">
+                  <span class="style-auto-summary-text">Style-Automation konfigurieren</span>
+                  <span class="style-auto-summary-chev" aria-hidden="true">▾</span>
+                </summary>
+                <div class="style-auto-inner">
+                  <div class="kv">
+                    <label>Style-Automation aktiv</label>
+                    <input id="styleAutoEnabled" type="checkbox">
+                  </div>
+                  <div class="help">Aktiviere automatische Wechsel anhand definierter Zeitfenster.</div>
+                  <div class="help">Fallback-Stil und Musik verwaltest du oben in der Slideshow.</div>
+                  <div class="style-auto-list" id="styleAutoList"></div>
+                  <div class="row style-auto-actions">
+                    <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </details>
+
+
+      
+
+      <details class="ac sub" id="boxDesignEditor" data-jump-target>
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Design-Editor</div>
+        </summary>
+        <div class="content">
+          <div class="settings-grid">
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Style Paletten</div>
@@ -553,57 +638,9 @@
                 <div class="help">Paletten speichern Farben, Typografie und Badge-Optionen. „Aktivieren“ übernimmt die Auswahl in die aktuellen Einstellungen.</div>
               </div>
             </div>
-
-            <div class="settings-card" id="backgroundAudioCard">
-              <div class="settings-card-head">
-                <div class="settings-card-title">Hintergrundmusik</div>
-              </div>
-              <div class="settings-card-body">
-                <div class="kv">
-                  <label class="row" style="gap:8px;align-items:center">
-                    <input id="bgAudioEnabled" type="checkbox">
-                    <span>Hintergrundmusik abspielen</span>
-                  </label>
-                </div>
-                <div class="kv">
-                  <label>Musik-Preset</label>
-                  <div class="style-set-controls" id="bgAudioTrackControls" data-jump-target>
-                    <select id="bgAudioTrackSelect" class="input"></select>
-                    <div class="row" style="gap:6px;flex-wrap:wrap">
-                      <button class="btn sm" id="bgAudioTrackApply" type="button">Aktivieren</button>
-                      <button class="btn sm ghost" id="bgAudioTrackSave" type="button">Aktualisieren</button>
-                      <button class="btn sm ghost" id="bgAudioTrackCreate" type="button">Neu</button>
-                      <button class="btn sm ghost" id="bgAudioTrackDelete" type="button">Löschen</button>
-                    </div>
-                  </div>
-                </div>
-                <div class="kv">
-                  <label>Bezeichnung</label>
-                  <input id="bgAudioTrackLabel" class="input" type="text" placeholder="z. B. Lobby">
-                </div>
-                <div class="kv">
-                  <label>Quelle</label>
-                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                    <input id="bgAudioSrc" class="input" type="text" placeholder="/assets/media/audio/datei.mp3">
-                    <button class="btn sm" id="bgAudioUpload" type="button">Upload</button>
-                    <button class="btn sm ghost" id="bgAudioClear" type="button">Entfernen</button>
-                  </div>
-                  <div class="help">Unterstützt MP3- und OGG-Dateien. Bei leerem Feld bleibt die Musik deaktiviert.</div>
-                </div>
-                <div class="kv">
-                  <label>Lautstärke (%)</label>
-                  <input id="bgAudioVolume" class="input num3" type="number" min="0" max="100" step="5" placeholder="100">
-                  <div class="help">0 = stumm, 100 = volle Lautstärke.</div>
-                </div>
-                <div class="kv">
-                  <label class="row" style="gap:8px;align-items:center">
-                    <input id="bgAudioLoop" type="checkbox">
-                    <span>Automatisch wiederholen</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
+          
+          
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Typografie – Basis</div>
@@ -621,7 +658,7 @@
                 <div class="kv"><label>Globaler Scale</label><input id="fontScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
               </div>
             </div>
-
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Typografie – Überschriften</div>
@@ -643,7 +680,7 @@
                 <div class="kv"><label>H2 in Übersicht anzeigen</label><input id="h2ShowOverview" type="checkbox" checked></div>
               </div>
             </div>
-
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Übersicht (Tabelle)</div>
@@ -671,7 +708,7 @@
                 </div>
               </div>
             </div>
-
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Saunafolien &amp; Komponenten</div>
@@ -718,7 +755,7 @@
                 </div>
               </div>
             </div>
-
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Bildspalte &amp; Layout</div>
@@ -730,7 +767,7 @@
                 <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
               </div>
             </div>
-
+          
             <div class="settings-card">
               <div class="settings-card-head">
                 <div class="settings-card-title">Flammen / Hervorhebungen</div>
@@ -751,15 +788,14 @@
               </div>
             </div>
           </div>
+          <details class="ac sub" id="designColors" data-jump-target>
+            <summary>
+              <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht &amp; Zeitspalte)</div>
+              <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
+            </summary>
+            <div class="content color-cols" id="colorList"></div>
+          </details>
         </div>
-</details>
-
-      <details class="ac full">
-        <summary>
-          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
-          <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
-        </summary>
-        <div class="content color-cols" id="colorList"></div>
       </details>
 
       <details class="ac">
