@@ -11,7 +11,7 @@ header('X-Content-Type-Options: nosniff');
 $assetsDir = signage_assets_path();
 $urls = [];
 $hashContext = hash_init('sha256');
-$cacheKey = 'cache-manifest.v1';
+$cacheKey = 'cache-manifest.v2';
 $cachedManifest = signage_cache_get($cacheKey);
 $previousFiles = [];
 if (is_array($cachedManifest) && isset($cachedManifest['files']) && is_array($cachedManifest['files'])) {
@@ -20,29 +20,54 @@ if (is_array($cachedManifest) && isset($cachedManifest['files']) && is_array($ca
 
 $filesMeta = [];
 
-if (is_dir($assetsDir)) {
+function cache_manifest_collect_directory(
+    string $keyPrefix,
+    string $directory,
+    string $urlPrefix,
+    array &$urls,
+    array &$filesMeta,
+    array $previousFiles,
+    $hashContext,
+    ?callable $filter = null
+): void {
+    if (!is_dir($directory)) {
+        return;
+    }
+
+    $normalizedDirectory = str_replace('\\', '/', rtrim($directory, '/'));
+    $baseLength = strlen($normalizedDirectory);
+
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator(
-            $assetsDir,
+            $normalizedDirectory,
             FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS
         )
     );
+
     foreach ($iterator as $fileInfo) {
         if (!$fileInfo->isFile()) {
             continue;
         }
-        $relativePath = ltrim(str_replace('\\', '/', substr($fileInfo->getPathname(), strlen($assetsDir))), '/');
-        if ($relativePath === '' || strncmp($relativePath, 'media/', 6) === 0) {
+
+        $absolutePath = str_replace('\\', '/', $fileInfo->getPathname());
+        $relativePath = ltrim(substr($absolutePath, $baseLength), '/');
+        if ($relativePath === '') {
             continue;
         }
-        $url = '/assets/' . $relativePath;
+
+        if ($filter !== null && !$filter($relativePath, $fileInfo)) {
+            continue;
+        }
+
+        $url = $urlPrefix . $relativePath;
         $urls[] = $url;
 
+        $metaKey = $keyPrefix . ':' . $relativePath;
         $currentMeta = [
             'mtime' => $fileInfo->getMTime(),
             'size' => $fileInfo->getSize(),
         ];
-        $previousMeta = $previousFiles[$relativePath] ?? null;
+        $previousMeta = $previousFiles[$metaKey] ?? $previousFiles[$relativePath] ?? null;
         if (is_array($previousMeta)
             && isset($previousMeta['mtime'], $previousMeta['size'], $previousMeta['hash'])
             && (int) $previousMeta['mtime'] === (int) $currentMeta['mtime']
@@ -56,11 +81,51 @@ if (is_dir($assetsDir)) {
                 $hash = $mtime !== false ? (string) $mtime : 'missing';
             }
         }
+
         $currentMeta['hash'] = $hash;
-        $filesMeta[$relativePath] = $currentMeta;
+        $filesMeta[$metaKey] = $currentMeta;
         hash_update($hashContext, $url . ':' . $hash);
     }
 }
+
+cache_manifest_collect_directory(
+    'assets',
+    $assetsDir,
+    '/assets/',
+    $urls,
+    $filesMeta,
+    $previousFiles,
+    $hashContext,
+    function (string $relativePath): bool {
+        return strncmp($relativePath, 'media/', 6) !== 0;
+    }
+);
+
+$basePath = signage_base_path();
+cache_manifest_collect_directory(
+    'player',
+    $basePath . '/player/dist',
+    '/player/dist/',
+    $urls,
+    $filesMeta,
+    $previousFiles,
+    $hashContext,
+    function (string $relativePath): bool {
+        return substr($relativePath, -4) !== '.map';
+    }
+);
+cache_manifest_collect_directory(
+    'admin',
+    $basePath . '/admin/dist',
+    '/admin/dist/',
+    $urls,
+    $filesMeta,
+    $previousFiles,
+    $hashContext,
+    function (string $relativePath): bool {
+        return substr($relativePath, -4) !== '.map';
+    }
+);
 
 $offlinePath = signage_base_path() . '/offline.html';
 if (is_file($offlinePath)) {
