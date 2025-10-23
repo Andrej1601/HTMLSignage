@@ -311,13 +311,13 @@ export const DEFAULTS = {
       left:{
         source:'master',
         timerSec:null,
-        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','info-module','image','video','url'],
+        contentTypes:['overview','sauna','hero-timeline','story','wellness-tip','image','video','url'],
         playlist:[]
       },
       right:{
         source:'media',
         timerSec:null,
-        contentTypes:['wellness-tip','info-module','image','video','url'],
+        contentTypes:['wellness-tip','image','video','url'],
         playlist:[]
       }
     }

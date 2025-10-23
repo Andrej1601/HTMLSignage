@@ -220,7 +220,6 @@ export const PAGE_CONTENT_TYPES = [
   ['hero-timeline', 'Event Countdown'],
   ['story', 'Erklärungen'],
   ['wellness-tip', 'Wellness-Tipps'],
-  ['info-module', 'Info-Module'],
   ['image', 'Bilder'],
   ['video', 'Videos'],
   ['url', 'Webseiten']
@@ -251,8 +250,6 @@ export function playlistKeyFromSanitizedEntry(entry) {
       return entry.id != null ? 'media:' + String(entry.id) : null;
     case 'wellness-tip':
       return 'wellness:' + WELLNESS_GLOBAL_ID;
-    case 'info-module':
-      return entry.id != null ? 'info:' + String(entry.id) : null;
     default:
       return null;
   }
@@ -283,10 +280,6 @@ function playlistEntryKey(entry) {
     }
     case 'wellness-tip': {
       return 'wellness:' + WELLNESS_GLOBAL_ID;
-    }
-    case 'info-module': {
-      const rawId = entry.id ?? entry.moduleId;
-      return rawId != null ? 'info:' + String(rawId) : null;
     }
     default:
       return null;
@@ -329,12 +322,6 @@ export function sanitizePagePlaylist(list = []) {
         if (!seen.has('wellness:' + WELLNESS_GLOBAL_ID)) {
           normalized.push({ type: 'wellness-tip', id: WELLNESS_GLOBAL_ID });
           seen.add('wellness:' + WELLNESS_GLOBAL_ID);
-        }
-        break;
-      case 'info':
-        if (rest) {
-          normalized.push({ type: 'info-module', id: rest });
-          seen.add(key);
         }
         break;
       default:
