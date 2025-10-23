@@ -179,543 +179,666 @@
 
     <aside class="rightbar">
       <div class="layout-resizer" id="layoutResizer" role="separator" aria-orientation="vertical" aria-label="Sidebar-Größe anpassen" tabindex="0" aria-hidden="false"></div>
-      <div class="rightbar-inner">
-        <header class="sidebar-header">
-          <div class="sidebar-header-text">
-            <h2 class="sidebar-title">Einstellungen &amp; Inhalte</h2>
-            <p class="sidebar-subtitle">Strukturiere Ablauf, Aufgüsse, Zusatzinformationen und Layout-Anpassungen zentral.</p>
+      <div class="rightbar-columns">
+<!-- Slides – Masterbox -->
+<details class="ac full" open id="slidesMaster" data-jump-target>
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
+    <div class="actions">
+      <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
+    </div>
+  </summary>
+  <div class="content">
+    <div class="settings-stack">
+      <div class="settings-card" id="slidesAutomationCard" data-jump-target hidden>
+        <div class="settings-card-head">
+          <div class="settings-card-title">Automatisierung</div>
+          <p class="settings-card-description">Lädt zu Start oder Tab-Wechsel automatisch passende Voreinstellungen.</p>
+        </div>
+        <details class="settings-card-body style-auto-fold" id="styleAutomationFold" open>
+          <summary class="style-auto-summary">
+            <span class="style-auto-summary-text">Automatisierung konfigurieren</span>
+            <span class="style-auto-summary-chev" aria-hidden="true">▾</span>
+          </summary>
+          <div class="style-auto-inner">
+            <div class="kv">
+              <label>Auto je Wochentag</label>
+              <input id="presetAuto" type="checkbox">
+            </div>
+            <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
+            <div class="divider"></div>
+            <div class="kv">
+              <label>Style-Automation aktiv</label>
+              <input id="styleAutoEnabled" type="checkbox">
+            </div>
+            <div class="kv">
+              <label>Fallback-Stil</label>
+              <select id="styleAutoFallback" class="input"></select>
+            </div>
+            <div class="kv">
+              <label>Fallback-Musik</label>
+              <select id="styleAutoFallbackTrack" class="input"></select>
+            </div>
+            <div class="style-auto-list" id="styleAutoList"></div>
+            <div class="row style-auto-actions">
+              <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
+            </div>
           </div>
-          <nav class="sidebar-nav" aria-label="Bereiche der Seitenleiste">
-            <button type="button" class="sidebar-nav-btn is-active" data-scroll-target="sidebarFlow" aria-controls="sidebarFlow">
-              Ablauf &amp; Automationen
-            </button>
-            <button type="button" class="sidebar-nav-btn" data-scroll-target="sidebarAufguss" aria-controls="sidebarAufguss">
-              Aufgüsse &amp; Hinweise
-            </button>
-            <button type="button" class="sidebar-nav-btn" data-scroll-target="sidebarExtras" aria-controls="sidebarExtras">
-              Zusatzinhalte
-            </button>
-            <button type="button" class="sidebar-nav-btn" data-scroll-target="sidebarMedia" aria-controls="sidebarMedia">
-              Medien &amp; Layout
-            </button>
-          </nav>
-        </header>
-
-        <section class="sidebar-section" id="sidebarFlow" data-sidebar-section>
-          <div class="sidebar-section-head">
-            <h3 class="sidebar-section-title">Ablauf &amp; Automationen</h3>
-            <p class="sidebar-section-description">Steuere Reihenfolge, Zeiten und automatische Voreinstellungen deiner Slides.</p>
-          </div>
-          <div class="sidebar-section-body rightbar-columns">
-            <!-- Slides – Masterbox -->
-            <details class="ac full" open id="slidesMaster" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Slides – Reihenfolge, Sichtbarkeit & Zeiten</div>
-                <div class="actions">
-                  <button class="btn sm ghost" id="resetTiming">Standardwerte</button>
-                </div>
-              </summary>
-              <div class="content">
-                <div class="settings-stack">
-                  <div class="settings-card" id="slidesAutomationCard" data-jump-target hidden>
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Automatisierung</div>
-                      <p class="settings-card-description">Lädt zu Start oder Tab-Wechsel automatisch passende Voreinstellungen.</p>
-                    </div>
-                    <details class="settings-card-body style-auto-fold" id="styleAutomationFold" open>
-                      <summary class="style-auto-summary">
-                        <span class="style-auto-summary-text">Automatisierung konfigurieren</span>
-                        <span class="style-auto-summary-chev" aria-hidden="true">▾</span>
-                      </summary>
-                      <div class="style-auto-inner">
-                        <div class="kv">
-                          <label>Auto je Wochentag</label>
-                          <input id="presetAuto" type="checkbox">
-                        </div>
-                        <div class="help">Wenn aktiv, wird beim Öffnen und beim Wechsel des Tabs automatisch das Preset des aktuellen Wochentags geladen (falls vorhanden).</div>
-                        <div class="divider"></div>
-                        <div class="kv">
-                          <label>Style-Automation aktiv</label>
-                          <input id="styleAutoEnabled" type="checkbox">
-                        </div>
-                        <div class="kv">
-                          <label>Fallback-Stil</label>
-                          <select id="styleAutoFallback" class="input"></select>
-                        </div>
-                        <div class="kv">
-                          <label>Fallback-Musik</label>
-                          <select id="styleAutoFallbackTrack" class="input"></select>
-                        </div>
-                        <div class="style-auto-list" id="styleAutoList"></div>
-                        <div class="row style-auto-actions">
-                          <button class="btn sm" id="styleAutoAdd">Zeitfenster hinzufügen</button>
-                        </div>
-                      </div>
-                    </details>
-                  </div>
-
-                </div>
-
-              </div>
-            </details>
-          </div>
-        </section>
-
-        <section class="sidebar-section" id="sidebarAufguss" data-sidebar-section>
-          <div class="sidebar-section-head">
-            <h3 class="sidebar-section-title">Aufgüsse &amp; Hinweise</h3>
-            <p class="sidebar-section-description">Verwalte Saunen, Fußnoten und Badges je nach Tagesplan.</p>
-          </div>
-          <div class="sidebar-section-body rightbar-columns">
-            <!-- Unterbox 1: Saunen & Übersicht -->
-            <details class="ac sub" open id="boxSaunas" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
-                <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
-              </summary>
-              <div class="content">
-
-                <!-- Übersicht im Saunen-Stil -->
-                <div class="fieldset" style="margin-bottom:10px">
-                  <div class="legend">Übersicht (Aufgussplan)</div>
-                  <div id="overviewRow"></div>
-                </div>
-
-                <!-- Saunenliste -->
-                <!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
-                <div class="groupHead">
-                  <div class="legend">Aufguss</div>
-                  <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
-                </div>
-                <!-- Aufguss -->
-                <div class="sl-head sl-saunas">
-                  <span class="col-name">Name</span>
-                  <span class="col-prev">Preview</span>
-                  <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
-                  <span class="col-up">Upload</span>
-                  <span class="col-def">Default</span>
-                  <span class="col-del">✕</span>
-                  <span class="col-vis">Status</span>
-                </div>
-
-                <!-- kein Aufguss -->
-                <div id="saunaList"></div>
-                <div class="subh" id="extraTitle" style="display:none">Inventar</div>
-                <div id="extraSaunaList"></div>
-
-                <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
-              </div>
-            </details>
-
-            <!-- Unterbox 2: Fußnoten & Badges -->
-            <details class="ac sub" id="boxFootnotes" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Fußnoten &amp; Badges</div>
-                <div class="actions"><button class="btn sm" id="fnAdd">Fußnote hinzufügen</button></div>
-              </summary>
-              <div class="content">
-                <div class="footnote-section" id="footnoteSection" data-jump-target>
-                  <div class="footnote-header">
-                    <button class="footnote-toggle" type="button" id="footnoteToggle" aria-expanded="false" aria-controls="footnoteBody">Fußnoten verwalten</button>
-                  </div>
-                  <div class="footnote-body" id="footnoteBody" aria-hidden="true">
-                    <div class="footnote-body-inner">
-                      <div id="fnList"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="footnote-layout" id="footnoteLayoutSection">
-                  <div class="subh">Darstellung</div>
-                  <div class="kv">
-                    <label>Fußnoten-Layout</label>
-                    <select id="footnoteLayout" class="input">
-                      <option value="one-line" selected>Möglichst einzeilig</option>
-                      <option value="multi">Mehrzeilig</option>
-                      <option value="stacked">Untereinander (jede Zeile)</option>
-                      <option value="ticker">Ticker (laufend)</option>
-                      <option value="split">Zweispaltig</option>
-                    </select>
-                  </div>
-                  <div class="kv"><label>Fußnoten in Übersicht anzeigen</label><input id="footnoteOverviewToggle" type="checkbox" checked></div>
-                </div>
-                <div class="badge-lib-section" id="badgeLibrarySection" data-jump-target>
-                  <div class="badge-lib-header">
-                    <button class="badge-lib-toggle" type="button" id="badgeLibraryToggle" aria-expanded="false" aria-controls="badgeLibraryBody">Badge-Bibliothek</button>
-                    <button class="btn sm" id="badgeAdd" type="button">Badge hinzufügen</button>
-                  </div>
-                  <div class="badge-lib-body" id="badgeLibraryBody" aria-hidden="true">
-                    <div class="badge-lib-body-inner">
-                      <div id="badgeLibraryList" class="badge-library-list"></div>
-                      <div class="help">Verwalte Emoji, Bild und Label der auswählbaren Badges für Aufgüsse.</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-        </section>
-
-        <section class="sidebar-section" id="sidebarExtras" data-sidebar-section>
-          <div class="sidebar-section-head">
-            <h3 class="sidebar-section-title">Zusatzinhalte</h3>
-            <p class="sidebar-section-description">Plane Wellness-Tipps, Event-Countdowns und Story-Slides.</p>
-          </div>
-          <div class="sidebar-section-body rightbar-columns">
-            <!-- Unterbox 4: Globale Zusatzinhalte & Informationen -->
-            <details class="ac sub" id="boxStories" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Global Zusatzinhalte &amp; Informationen</div>
-              </summary>
-              <div class="content global-info-pane">
-                <div class="global-info-sections">
-                  <details class="info-fold" id="infoWellness" open data-jump-target>
-                    <summary>Wellness-Tipps</summary>
-                    <div class="info-fold-body">
-                      <div class="extras-group" id="extrasWellness">
-                        <div class="extras-group-head">
-                          <div class="extras-group-title">Wellness-Tipps</div>
-                          <button class="btn sm" id="extrasWellnessAdd">Tipp hinzufügen</button>
-                        </div>
-                        <div class="extras-group-list" id="extrasWellnessList"></div>
-                      </div>
-                    </div>
-                  </details>
-                  <details class="info-fold" id="infoEvents" open data-jump-target>
-                    <summary>Event-Countdowns</summary>
-                    <div class="info-fold-body">
-                      <div class="extras-group" id="extrasEvents">
-                        <div class="extras-group-head">
-                          <div class="extras-group-title">Event-Countdowns</div>
-                          <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
-                        </div>
-                        <div class="kv">
-                          <label class="row" style="gap:8px;align-items:center">
-                            <input id="heroTimelineEnabled" type="checkbox">
-                            <span>Event Countdown im Hero anzeigen</span>
-                          </label>
-                        </div>
-                        <div class="kv" id="heroTimelineSettings" hidden>
-                          <label>Einstellungen</label>
-                          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                            <span class="mut">Slide-Dauer (s)</span>
-                            <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="180" step="1">
-                            <span class="mut">Basis-Minuten</span>
-                            <input id="heroTimelineBase" class="input num3" type="number" min="1" max="240" step="1">
-                            <span class="mut">Max. Einträge</span>
-                            <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
-                          </div>
-                          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
-                            <span class="mut">Scrolltempo (px/s)</span>
-                            <input id="heroTimelineScrollSpeed" class="input num3" type="number" min="4" max="240" step="1">
-                            <span class="mut">Scroll-Pause (s)</span>
-                            <input id="heroTimelineScrollPause" class="input num3" type="number" min="0" max="30" step="0.5">
-                          </div>
-                          <label class="row" style="gap:8px;align-items:center;margin-top:12px">
-                            <input id="heroTimelineWaitForScroll" type="checkbox">
-                            <span>Slide erst nach vollständigem Scrollen wechseln</span>
-                          </label>
-                        </div>
-                        <div class="extras-group-list" id="extrasEventList"></div>
-                        <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
-                      </div>
-                    </div>
-                  </details>
-                  <details class="info-fold" id="infoModules" open data-jump-target>
-                    <summary>Info-Module</summary>
-                    <div class="info-fold-body">
-                      <div class="extras-group" id="extrasInfoModules">
-                        <div class="extras-group-head">
-                          <div class="extras-group-title">Info-Module</div>
-                          <button class="btn sm" id="extrasInfoModuleAdd">Eintrag hinzufügen</button>
-                        </div>
-                        <div class="extras-group-list" id="extrasInfoModuleList"></div>
-                      </div>
-                    </div>
-                  </details>
-                  <details class="info-fold" id="infoStories" data-jump-target>
-                    <summary>Story-Slides</summary>
-                    <div class="info-fold-body story-fold-body">
-                      <div class="info-fold-actions"><button class="btn sm" id="btnStoryAdd">Information hinzufügen</button></div>
-                      <div class="story-builder-pane">
-                        <div class="subh">Informationen</div>
-                        <div class="help">Pflege Texte, Bilder und Layout für erklärende Slides in einem flexiblen Spalten-Baukasten.</div>
-                        <div class="story-builder" id="storyBuilder">
-                          <div class="story-builder-list" id="storyList"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </details>
-          </div>
-        </section>
-
-        <section class="sidebar-section" id="sidebarMedia" data-sidebar-section>
-          <div class="sidebar-section-head">
-            <h3 class="sidebar-section-title">Medien &amp; Layout</h3>
-            <p class="sidebar-section-description">Passe Medien-Slides, Layout, Typografie und Audio zentral an.</p>
-          </div>
-          <div class="sidebar-section-body rightbar-columns">
-            <!-- Unterbox 4: Medien-Slides -->
-            <details class="ac sub" id="boxImages" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
-                <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button></div>
-              </summary>
-              <small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
-              <div class="content">
-                <div class="sl-head sl-images">
-                  <span class="col-name">Name</span>
-                  <span class="col-type">Typ</span>
-                  <span class="col-prev">Preview</span>
-                  <span class="col-dur" id="headImgDur">Dauer (s)</span>
-                  <span class="col-audio">Ton</span>
-                  <span class="col-wait">Video-Ende</span>
-                  <span class="col-up">Upload</span>
-                  <span class="col-del">✕</span>
-                  <span class="col-vis">Anzeigen</span>
-                </div>
-                <div id="interList2"></div>
-              </div>
-            </details>
-
-            <details class="ac full" id="boxSlidesText" data-jump-target>
-              <summary>
-                <div class="ttl">▶<span class="chev">⮞</span> Slideshow &amp; Text</div>
-                <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
-              </summary>
-              <div class="content">
-                <div class="layout-display-block">
-                  <details class="layout-display-fold" id="displayLayoutFold" open data-jump-target>
-                    <summary class="layout-display-summary">
-                      <span class="layout-display-summary-text">
-                        <span class="layout-display-summary-title">Darstellung &amp; Seiten</span>
-                        <span class="layout-display-summary-sub">Einspaltig oder Zweispaltig konfigurieren</span>
-                      </span>
-                      <span class="layout-display-chev" aria-hidden="true">▾</span>
-                    </summary>
-                    <div class="layout-display-body">
-                      <div class="kv">
-                        <label>Darstellung</label>
-                        <select id="layoutMode" class="input">
-                          <option value="single">Einspaltig</option>
-                          <option value="split">Zweispaltig</option>
-                        </select>
-                      </div>
-                      <div class="kv">
-                        <label>Layout-Profil</label>
-                        <select id="layoutProfile" class="input">
-                          <option value="landscape">Standard (16:9)</option>
-                          <option value="portrait">Portrait – Einzel</option>
-                          <option value="portrait-split">Portrait – geteilte Bereiche</option>
-                          <option value="triple">Triple-Column</option>
-                          <option value="asymmetric">Asymmetrisch</option>
-                          <option value="info-panel">Info-Panel (Seitenleiste)</option>
-                          <option value="banner">Banner (Top/Bottom)</option>
-                        </select>
-                      </div>
-                      <div class="kv">
-                        <label>Info-Banner Platzierung</label>
-                        <select id="infoBannerMode" class="input">
-                          <option value="full">Über gesamte Breite</option>
-                          <option value="left">Linke Spalte</option>
-                          <option value="right">Rechte Spalte</option>
-                        </select>
-                      </div>
-                      <div class="kv">
-                        <label>Info-Banner Höhe (% vom Bildschirm)</label>
-                        <input id="infoBannerHeight" class="input num3" type="number" min="2" max="40" step="1" placeholder="10">
-                        <div class="help">Steuert den reservierten Bereich für den laufenden Hinweisbanner.</div>
-                      </div>
-                      <div class="divider"></div>
-                      <div class="layout-flow-section">
-                        <div class="subh">Ablauf &amp; Zeitsteuerung</div>
-                        <p class="help" style="margin-top:-4px">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
-                        <div class="kv" id="rowDurMode">
-                          <label>Dauer-Modus</label>
-                          <div class="row">
-                            <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
-                            <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
-                          </div>
-                        </div>
-                        <div class="kv" id="rowDwellAll">
-                          <label>Dauer (einheitlich)</label>
-                          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                            <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
-                            <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
-                            <span class="mut" style="min-width:10ch;">Übersicht</span>
-                            <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
-                          </div>
-                        </div>
-                        <div class="kv">
-                          <label>Transition (ms)</label>
-                          <input id="transMs2" class="input" type="number" min="0" value="500">
-                        </div>
-                      </div>
-                      <div class="layout-display-columns">
-                        <div class="fieldset layout-page" id="layoutLeft">
-                          <div class="legend">Linke Seite</div>
-                          <div class="kv">
-                            <label>Timer (Sekunden)</label>
-                            <input id="pageLeftTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
-                          </div>
-                          <div class="kv playlist-row">
-                            <label class="sr-only">Playlist</label>
-                            <div class="playlist-selector" id="pageLeftPlaylist" aria-label="Playlist"></div>
-                            <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge. Eine leere Playlist nutzt den Standardfilter.</div>
-                          </div>
-                        </div>
-                        <div class="fieldset layout-page" id="layoutRight">
-                          <div class="legend">Rechte Seite</div>
-                          <div class="kv">
-                            <label>Timer (Sekunden)</label>
-                            <input id="pageRightTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
-                          </div>
-                          <div class="kv playlist-row">
-                            <label class="sr-only">Playlist</label>
-                            <div class="playlist-selector" id="pageRightPlaylist" aria-label="Playlist"></div>
-                            <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge.</div>
-                          </div>
-                          <div class="help">Wird verwendet, wenn das Zweispalten-Layout aktiv ist.</div>
-                        </div>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-                <div class="settings-grid two-col">
-                  <div class="settings-card">
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Style Paletten</div>
-                    </div>
-                    <div class="settings-card-body">
-                      <div class="kv">
-                        <label>Stil-Paletten</label>
-                        <div class="style-set-controls" id="styleSetControls" data-jump-target>
-                          <select id="styleSetSelect" class="input"></select>
-                          <div class="row" style="gap:6px;flex-wrap:wrap">
-                            <button class="btn sm" id="styleSetApply" type="button">Aktivieren</button>
-                            <button class="btn sm ghost" id="styleSetSave" type="button">Aktualisieren</button>
-                            <button class="btn sm ghost" id="styleSetCreate" type="button">Neu</button>
-                            <button class="btn sm ghost" id="styleSetDelete" type="button">Löschen</button>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="kv"><label>Palettenname</label><input id="styleSetLabel" class="input" type="text" placeholder="Palette"></div>
-                      <div class="help">Paletten speichern Farben, Typografie und Badge-Optionen. „Aktivieren“ übernimmt die Auswahl in die aktuellen Einstellungen.</div>
-                    </div>
-                  </div>
-
-                  <div class="settings-card" id="backgroundAudioCard">
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Hintergrundmusik</div>
-                    </div>
-                    <div class="settings-card-body">
-                      <div class="kv">
-                        <label class="row" style="gap:8px;align-items:center">
-                          <input id="bgAudioEnabled" type="checkbox">
-                          <span>Hintergrundmusik abspielen</span>
-                        </label>
-                      </div>
-                      <div class="kv">
-                        <label>Musik-Preset</label>
-                        <div class="style-set-controls" id="bgAudioTrackControls" data-jump-target>
-                          <select id="bgAudioTrackSelect" class="input"></select>
-                          <div class="row" style="gap:6px;flex-wrap:wrap">
-                            <button class="btn sm" id="bgAudioTrackApply" type="button">Aktivieren</button>
-                            <button class="btn sm ghost" id="bgAudioTrackSave" type="button">Aktualisieren</button>
-                            <button class="btn sm ghost" id="bgAudioTrackCreate" type="button">Neu</button>
-                            <button class="btn sm ghost" id="bgAudioTrackDelete" type="button">Löschen</button>
-                          </div>
-                        </div>
-                      </div>
-                      <div class="kv">
-                        <label>Bezeichnung</label>
-                        <input id="bgAudioTrackLabel" class="input" type="text" placeholder="z. B. Lobby">
-                      </div>
-                      <div class="kv">
-                        <label>Quelle</label>
-                        <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                          <input id="bgAudioSrc" class="input" type="text" placeholder="/assets/media/audio/datei.mp3">
-                          <button class="btn sm" id="bgAudioUpload" type="button">Upload</button>
-                          <button class="btn sm ghost" id="bgAudioClear" type="button">Entfernen</button>
-                        </div>
-                        <div class="help">Unterstützt MP3- und OGG-Dateien. Bei leerem Feld bleibt die Musik deaktiviert.</div>
-                      </div>
-                      <div class="kv">
-                        <label>Lautstärke (%)</label>
-                        <input id="bgAudioVolume" class="input num3" type="number" min="0" max="100" step="5" placeholder="100">
-                        <div class="help">0 = stumm, 100 = volle Lautstärke.</div>
-                      </div>
-                      <div class="kv">
-                        <label class="row" style="gap:8px;align-items:center">
-                          <input id="bgAudioLoop" type="checkbox">
-                          <span>Automatisch wiederholen</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="settings-card">
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Typografie – Basis</div>
-                    </div>
-                    <div class="settings-card-body">
-                      <div class="kv"><label>Schriftfamilie</label>
-                        <select id="fontFamily" class="input">
-                          <option value="system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue',sans-serif">System (Default)</option>
-                          <option value="Montserrat, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif">Montserrat</option>
-                          <option value="Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Roboto</option>
-                          <option value="'Open Sans', system-ui, -apple-system, Segoe UI, Arial, sans-serif">Open Sans</option>
-                          <option value="Lato, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Lato</option>
-                        </select>
-                      </div>
-                      <div class="kv"><label>Grundgröße</label><input id="fontScale" class="input num3" type="number" step="0.05" min="0.5" max="2" value="1"></div>
-                      <div class="kv"><label>H1-Skalierung</label><input id="h1Scale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>H2-Skalierung</label><input id="h2Scale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Überschrift Übersicht</label><input id="ovTitleScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Spaltenkopf Übersicht</label><input id="ovHeadScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
-                      <div class="kv"><label>Zelle Übersicht</label><input id="ovCellScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
-                      <div class="kv"><label>Zeit Übersicht</label><input id="ovTimeScale" class="input num3" type="number" step="0.05" min="0.4" max="3" value="0.8"></div>
-                      <div class="kv"><label>Zeit-Breite Übersicht</label><input id="ovTimeWidthScale" class="input num3" type="number" step="0.05" min="0.4" max="2" value="1"></div>
-                    </div>
-                  </div>
-
-                  <div class="settings-card">
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Typografie – Details</div>
-                    </div>
-                    <div class="settings-card-body">
-                      <div class="kv"><label>Fließtext</label><input id="bodyScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Timer</label><input id="timerScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Badge-Titel</label><input id="badgeTitleScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Badge-Emoji</label><input id="badgeEmojiScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Badge-Label</label><input id="badgeLabelScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Fußnote Text</label><input id="footnoteScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                      <div class="kv"><label>Fußnote Label</label><input id="footnoteLabelScale" class="input num3" type="number" step="0.05" min="0.5" max="3" value="1"></div>
-                    </div>
-                  </div>
-
-                  <div class="settings-card">
-                    <div class="settings-card-head">
-                      <div class="settings-card-title">Layout – Aufgussübersicht</div>
-                    </div>
-                    <div class="settings-card-body">
-                      <div class="kv"><label>Spaltenbreite – Saunaname (%)</label><input id="saunaTitleMaxWidth" class="input num3" type="number" min="30" max="80" step="1"></div>
-                      <div class="kv"><label>Spaltenbreite – Badges (%)</label><input id="saunaBadgeWidth" class="input num3" type="number" min="10" max="40" step="1"></div>
-                      <div class="kv"><label>Spaltenbreite – Notizen (%)</label><input id="saunaNoteWidth" class="input num3" type="number" min="10" max="40" step="1"></div>
-                      <div class="kv"><label>Aufgussdetails anzeigen</label><input id="saunaShowDetails" type="checkbox"></div>
-                      <div class="kv"><label>Inventar anzeigen</label><input id="saunaShowInventory" type="checkbox"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-        </section>
+        </details>
       </div>
-    </aside>
 
+    </div>
+
+    <!-- Unterbox 1: Saunen & Übersicht -->
+    <details class="ac sub" open id="boxSaunas" data-jump-target>
+      <summary><div class="ttl">▶<span class="chev">⮞</span> Saunen & Übersicht</div>
+ <div class="actions"><button class="btn sm" id="btnAddSauna">Sauna hinzufügen</button></div>
+</summary>      
+<div class="content">
+
+        <!-- Übersicht im Saunen-Stil -->
+        <div class="fieldset" style="margin-bottom:10px">
+          <div class="legend">Übersicht (Aufgussplan)</div>
+          <div id="overviewRow"></div>
+        </div>
+
+        <!-- Saunenliste -->
+		<!-- Kopf für den Bereich "Aufguss" + 2. Wochentags-Pillen -->
+<div class="groupHead">
+  <div class="legend">Aufguss</div>
+  <div id="weekdayPills2" class="day-pills row" style="gap:6px"></div>
+</div>
+ 	<!-- Aufguss -->
+<div class="sl-head sl-saunas">
+  <span class="col-name">Name</span>
+  <span class="col-prev">Preview</span>
+  <span class="col-dur" id="headSaunaDur">Dauer (s)*</span>
+  <span class="col-up">Upload</span>
+  <span class="col-def">Default</span>
+  <span class="col-del">✕</span>
+  <span class="col-vis">Status</span>
+</div>
+        
+	<!-- kein Aufguss -->
+	<div id="saunaList"></div>
+        <div class="subh" id="extraTitle" style="display:none">Inventar</div>
+        <div id="extraSaunaList"></div>
+
+        <div class="help" style="margin-top:6px">* Dauer nur sichtbar, wenn „Individuell“ gewählt ist.</div>
+      </div>
+    </details>
+
+    <!-- Unterbox 2: Fußnoten & Badges -->
+    <details class="ac sub" id="boxFootnotes" data-jump-target>
+  <summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Fußnoten &amp; Badges</div>
+    <div class="actions"><button class="btn sm" id="fnAdd">Fußnote hinzufügen</button></div>
+  </summary>
+  <div class="content">
+    <div class="footnote-section" id="footnoteSection" data-jump-target>
+      <div class="footnote-header">
+        <button class="footnote-toggle" type="button" id="footnoteToggle" aria-expanded="false" aria-controls="footnoteBody">Fußnoten verwalten</button>
+      </div>
+      <div class="footnote-body" id="footnoteBody" aria-hidden="true">
+        <div class="footnote-body-inner">
+          <div id="fnList"></div>
+        </div>
+      </div>
+    </div>
+    <div class="footnote-layout" id="footnoteLayoutSection">
+      <div class="subh">Darstellung</div>
+      <div class="kv">
+        <label>Fußnoten-Layout</label>
+        <select id="footnoteLayout" class="input">
+          <option value="one-line" selected>Möglichst einzeilig</option>
+          <option value="multi">Mehrzeilig</option>
+          <option value="stacked">Untereinander (jede Zeile)</option>
+          <option value="ticker">Ticker (laufend)</option>
+          <option value="split">Zweispaltig</option>
+        </select>
+      </div>
+      <div class="kv"><label>Fußnoten in Übersicht anzeigen</label><input id="footnoteOverviewToggle" type="checkbox" checked></div>
+    </div>
+    <div class="badge-lib-section" id="badgeLibrarySection" data-jump-target>
+      <div class="badge-lib-header">
+        <button class="badge-lib-toggle" type="button" id="badgeLibraryToggle" aria-expanded="false" aria-controls="badgeLibraryBody">Badge-Bibliothek</button>
+        <button class="btn sm" id="badgeAdd" type="button">Badge hinzufügen</button>
+      </div>
+      <div class="badge-lib-body" id="badgeLibraryBody" aria-hidden="true">
+        <div class="badge-lib-body-inner">
+          <div id="badgeLibraryList" class="badge-library-list"></div>
+          <div class="help">Verwalte Emoji, Bild und Label der auswählbaren Badges für Aufgüsse.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</details>
+
+    <!-- Unterbox 4: Globale Zusatzinhalte & Informationen -->
+    <details class="ac sub" id="boxStories" data-jump-target>
+      <summary>
+        <div class="ttl">▶<span class="chev">⮞</span> Global Zusatzinhalte &amp; Informationen</div>
+      </summary>
+      <div class="content global-info-pane">
+        <div class="global-info-sections">
+          <details class="info-fold" id="infoWellness" open data-jump-target>
+            <summary>Wellness-Tipps</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasWellness">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Wellness-Tipps</div>
+                  <button class="btn sm" id="extrasWellnessAdd">Tipp hinzufügen</button>
+                </div>
+                <div class="extras-group-list" id="extrasWellnessList"></div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoEvents" open data-jump-target>
+            <summary>Event-Countdowns</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasEvents">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Event-Countdowns</div>
+                  <button class="btn sm" id="extrasEventAdd">Event hinzufügen</button>
+                </div>
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="heroTimelineEnabled" type="checkbox">
+                    <span>Event Countdown im Hero anzeigen</span>
+                  </label>
+                </div>
+                <div class="kv" id="heroTimelineSettings" hidden>
+                  <label>Einstellungen</label>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                    <span class="mut">Slide-Dauer (s)</span>
+                    <input id="heroTimelineDuration" class="input num3" type="number" min="1" max="180" step="1">
+                    <span class="mut">Basis-Minuten</span>
+                    <input id="heroTimelineBase" class="input num3" type="number" min="1" max="240" step="1">
+                    <span class="mut">Max. Einträge</span>
+                    <input id="heroTimelineMax" class="input num3" type="number" min="1" max="50" step="1" placeholder="leer = alle">
+                  </div>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px">
+                    <span class="mut">Scrolltempo (px/s)</span>
+                    <input id="heroTimelineScrollSpeed" class="input num3" type="number" min="4" max="240" step="1">
+                    <span class="mut">Scroll-Pause (s)</span>
+                    <input id="heroTimelineScrollPause" class="input num3" type="number" min="0" max="30" step="0.5">
+                  </div>
+                  <label class="row" style="gap:8px;align-items:center;margin-top:12px">
+                    <input id="heroTimelineWaitForScroll" type="checkbox">
+                    <span>Slide erst nach vollständigem Scrollen wechseln</span>
+                  </label>
+                </div>
+                <div class="extras-group-list" id="extrasEventList"></div>
+                <div class="help">Datums- und Zeitangabe im lokalen Format, z.&nbsp;B. 2024-12-24T20:00.</div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoModules" open data-jump-target>
+            <summary>Info-Module</summary>
+            <div class="info-fold-body">
+              <div class="extras-group" id="extrasInfoModules">
+                <div class="extras-group-head">
+                  <div class="extras-group-title">Info-Module</div>
+                  <button class="btn sm" id="extrasInfoModuleAdd">Eintrag hinzufügen</button>
+                </div>
+                <div class="extras-group-list" id="extrasInfoModuleList"></div>
+              </div>
+            </div>
+          </details>
+          <details class="info-fold" id="infoStories" data-jump-target>
+            <summary>Story-Slides</summary>
+            <div class="info-fold-body story-fold-body">
+              <div class="info-fold-actions"><button class="btn sm" id="btnStoryAdd">Information hinzufügen</button></div>
+              <div class="story-builder-pane">
+                <div class="subh">Informationen</div>
+                <div class="help">Pflege Texte, Bilder und Layout für erklärende Slides in einem flexiblen Spalten-Baukasten.</div>
+                <div class="story-builder" id="storyBuilder">
+                  <div class="story-builder-list" id="storyList"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </details>
+
+    <!-- Unterbox 4: Medien-Slides -->
+    <details class="ac sub" id="boxImages" data-jump-target>
+<summary>
+    <div class="ttl">▶<span class="chev">⮞</span> Medien-Slides</div>
+    <div class="actions"><button class="btn sm" id="btnMediaAdd">Medien hinzufügen</button></div>
+  </summary>
+<small class="help">* Dauer nur sichtbar, wenn „Individuell pro Slide“ gewählt ist.</small>
+  <div class="content">
+<div class="sl-head sl-images">
+    <span class="col-name">Name</span>
+    <span class="col-type">Typ</span>
+    <span class="col-prev">Preview</span>
+    <span class="col-dur" id="headImgDur">Dauer (s)</span>
+    <span class="col-audio">Ton</span>
+    <span class="col-wait">Video-Ende</span>
+    <span class="col-up">Upload</span>
+    <span class="col-del">✕</span>
+    <span class="col-vis">Anzeigen</span>
+  </div>
+    <div id="interList2"></div>
+  </div>
+</details>
+
+  </div>
+</details>
+
+ <details class="ac full" id="boxSlidesText" data-jump-target>
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Slideshow & Text</div>
+          <div class="actions"><button class="btn sm ghost" id="resetSlides">Standardwerte</button></div>
+        </summary>
+        <div class="content">
+          <div class="layout-display-block">
+            <details class="layout-display-fold" id="displayLayoutFold" open data-jump-target>
+              <summary class="layout-display-summary">
+                <span class="layout-display-summary-text">
+                  <span class="layout-display-summary-title">Darstellung &amp; Seiten</span>
+                  <span class="layout-display-summary-sub">Einspaltig oder Zweispaltig konfigurieren</span>
+                </span>
+                <span class="layout-display-chev" aria-hidden="true">▾</span>
+              </summary>
+              <div class="layout-display-body">
+                <div class="kv">
+                  <label>Darstellung</label>
+                  <select id="layoutMode" class="input">
+                    <option value="single">Einspaltig</option>
+                    <option value="split">Zweispaltig</option>
+                  </select>
+                </div>
+                <div class="kv">
+                  <label>Layout-Profil</label>
+                  <select id="layoutProfile" class="input">
+                    <option value="landscape">Standard (16:9)</option>
+                    <option value="portrait">Portrait – Einzel</option>
+                    <option value="portrait-split">Portrait – geteilte Bereiche</option>
+                    <option value="triple">Triple-Column</option>
+                    <option value="asymmetric">Asymmetrisch</option>
+                    <option value="info-panel">Info-Panel (Seitenleiste)</option>
+                    <option value="banner">Banner (Top/Bottom)</option>
+                  </select>
+                </div>
+                <div class="kv">
+                  <label>Info-Banner Platzierung</label>
+                  <select id="infoBannerMode" class="input">
+                    <option value="full">Über gesamte Breite</option>
+                    <option value="left">Linke Spalte</option>
+                    <option value="right">Rechte Spalte</option>
+                  </select>
+                </div>
+                <div class="kv">
+                  <label>Info-Banner Höhe (% vom Bildschirm)</label>
+                  <input id="infoBannerHeight" class="input num3" type="number" min="2" max="40" step="1" placeholder="10">
+                  <div class="help">Steuert den reservierten Bereich für den laufenden Hinweisbanner.</div>
+                </div>
+                <div class="divider"></div>
+                <div class="layout-flow-section">
+                  <div class="subh">Ablauf &amp; Zeitsteuerung</div>
+                  <p class="help" style="margin-top:-4px">Bestimme Dauer, Übergänge und Verhalten beim Abspielen.</p>
+                  <div class="kv" id="rowDurMode">
+                    <label>Dauer-Modus</label>
+                    <div class="row">
+                      <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durUniform" value="uniform"> Einheitlich</label>
+                      <label class="btn sm ghost" style="gap:6px"><input type="radio" name="durMode" id="durPer" value="per"> Individuell pro Slide</label>
+                    </div>
+                  </div>
+                  <div class="kv" id="rowDwellAll">
+                    <label>Dauer (einheitlich)</label>
+                    <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                      <span class="mut" style="min-width:14ch;">alle außer Übersicht</span>
+                      <input id="dwellAll" class="input num3" type="number" min="1" max="120" step="1" />
+                      <span class="mut" style="min-width:10ch;">Übersicht</span>
+                      <input id="ovSecGlobal" class="input num3" type="number" min="1" max="120" step="1" />
+                    </div>
+                  </div>
+                  <div class="kv">
+                    <label>Transition (ms)</label>
+                    <input id="transMs2" class="input" type="number" min="0" value="500">
+                  </div>
+                </div>
+                <div class="layout-display-columns">
+                  <div class="fieldset layout-page" id="layoutLeft">
+                    <div class="legend">Linke Seite</div>
+                    <div class="kv">
+                      <label>Timer (Sekunden)</label>
+                      <input id="pageLeftTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+                    </div>
+                    <div class="kv playlist-row">
+                      <label class="sr-only">Playlist</label>
+                      <div class="playlist-selector" id="pageLeftPlaylist" aria-label="Playlist"></div>
+                      <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge. Eine leere Playlist nutzt den Standardfilter.</div>
+                    </div>
+                  </div>
+                  <div class="fieldset layout-page" id="layoutRight">
+                    <div class="legend">Rechte Seite</div>
+                    <div class="kv">
+                      <label>Timer (Sekunden)</label>
+                      <input id="pageRightTimer" class="input num3" type="number" min="0" max="600" step="1" placeholder="0 = global">
+                    </div>
+                    <div class="kv playlist-row">
+                      <label class="sr-only">Playlist</label>
+                      <div class="playlist-selector" id="pageRightPlaylist" aria-label="Playlist"></div>
+                      <div class="help">Klicken zum (De-)Aktivieren, Pfeile oder Ziehen für die Reihenfolge.</div>
+                    </div>
+                    <div class="help">Wird verwendet, wenn das Zweispalten-Layout aktiv ist.</div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+          <div class="settings-grid two-col">
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Style Paletten</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv">
+                  <label>Stil-Paletten</label>
+                  <div class="style-set-controls" id="styleSetControls" data-jump-target>
+                    <select id="styleSetSelect" class="input"></select>
+                    <div class="row" style="gap:6px;flex-wrap:wrap">
+                      <button class="btn sm" id="styleSetApply" type="button">Aktivieren</button>
+                      <button class="btn sm ghost" id="styleSetSave" type="button">Aktualisieren</button>
+                      <button class="btn sm ghost" id="styleSetCreate" type="button">Neu</button>
+                      <button class="btn sm ghost" id="styleSetDelete" type="button">Löschen</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="kv"><label>Palettenname</label><input id="styleSetLabel" class="input" type="text" placeholder="Palette"></div>
+                <div class="help">Paletten speichern Farben, Typografie und Badge-Optionen. „Aktivieren“ übernimmt die Auswahl in die aktuellen Einstellungen.</div>
+              </div>
+            </div>
+
+            <div class="settings-card" id="backgroundAudioCard">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Hintergrundmusik</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioEnabled" type="checkbox">
+                    <span>Hintergrundmusik abspielen</span>
+                  </label>
+                </div>
+                <div class="kv">
+                  <label>Musik-Preset</label>
+                  <div class="style-set-controls" id="bgAudioTrackControls" data-jump-target>
+                    <select id="bgAudioTrackSelect" class="input"></select>
+                    <div class="row" style="gap:6px;flex-wrap:wrap">
+                      <button class="btn sm" id="bgAudioTrackApply" type="button">Aktivieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackSave" type="button">Aktualisieren</button>
+                      <button class="btn sm ghost" id="bgAudioTrackCreate" type="button">Neu</button>
+                      <button class="btn sm ghost" id="bgAudioTrackDelete" type="button">Löschen</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="kv">
+                  <label>Bezeichnung</label>
+                  <input id="bgAudioTrackLabel" class="input" type="text" placeholder="z. B. Lobby">
+                </div>
+                <div class="kv">
+                  <label>Quelle</label>
+                  <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                    <input id="bgAudioSrc" class="input" type="text" placeholder="/assets/media/audio/datei.mp3">
+                    <button class="btn sm" id="bgAudioUpload" type="button">Upload</button>
+                    <button class="btn sm ghost" id="bgAudioClear" type="button">Entfernen</button>
+                  </div>
+                  <div class="help">Unterstützt MP3- und OGG-Dateien. Bei leerem Feld bleibt die Musik deaktiviert.</div>
+                </div>
+                <div class="kv">
+                  <label>Lautstärke (%)</label>
+                  <input id="bgAudioVolume" class="input num3" type="number" min="0" max="100" step="5" placeholder="100">
+                  <div class="help">0 = stumm, 100 = volle Lautstärke.</div>
+                </div>
+                <div class="kv">
+                  <label class="row" style="gap:8px;align-items:center">
+                    <input id="bgAudioLoop" type="checkbox">
+                    <span>Automatisch wiederholen</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Typografie – Basis</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>Schriftfamilie</label>
+                  <select id="fontFamily" class="input">
+                    <option value="system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, Ubuntu, Cantarell, 'Helvetica Neue',sans-serif">System (Default)</option>
+                    <option value="Montserrat, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif">Montserrat</option>
+                    <option value="Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Roboto</option>
+                    <option value="'Open Sans', system-ui, -apple-system, Segoe UI, Arial, sans-serif">Open Sans</option>
+                    <option value="Lato, system-ui, -apple-system, Segoe UI, Arial, sans-serif">Lato</option>
+                  </select>
+                </div>
+                <div class="kv"><label>Globaler Scale</label><input id="fontScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Typografie – Überschriften</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>H1 Scale</label><input id="h1Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
+                <div class="kv"><label>H2 Scale</label><input id="h2Scale" class="input" type="number" step="0.05" min="0.5" max="3.5" value="1"></div>
+                <div class="kv"><label>H2 Modus</label>
+                  <select id="h2Mode" class="input">
+                    <option value="none">— nichts —</option>
+                    <option value="text" selected>Nur Text</option>
+                    <option value="weekday">Wochentag</option>
+                    <option value="date">Datum</option>
+                    <option value="text+weekday">Text + Wochentag</option>
+                    <option value="text+date">Text + Datum</option>
+                  </select>
+                </div>
+                <div class="kv"><label>H2 Text</label><input id="h2Text" class="input" type="text" placeholder="Aufgusszeiten"></div>
+                <div class="kv"><label>H2 in Übersicht anzeigen</label><input id="h2ShowOverview" type="checkbox" checked></div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Übersicht (Tabelle)</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>Übersichtstitel Scale</label><input id="ovTitleScale" class="input" type="number" step="0.05" min="0.4" max="4" value="1"></div>
+                <div class="kv"><label>Kopf‑Scale</label><input id="ovHeadScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.9"></div>
+                <div class="kv"><label>Zellen‑Scale</label><input id="ovCellScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+                <div class="kv"><label>Uhrzeit‑Scale</label><input id="ovTimeScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+                <div class="kv"><label>Zeitspalten‑Scale</label><input id="ovTimeWidthScale" class="input" type="number" step="0.05" min="0.5" max="3" value="1"></div>
+                <div class="kv"><label>Chip‑Höhe (%)</label><input id="chipH" class="input" type="number" min="50" max="200" value="100"></div>
+                <div class="help">Chips sind immer gleich breit/hoch (füllen die Zelle) und zentriert.</div>
+                <div class="kv"><label>Textüberlänge</label>
+                  <select id="chipOverflowMode" class="input">
+                    <option value="scale" selected>Automatisch skalieren</option>
+                    <option value="ellipsis">Mit „…“ kürzen</option>
+                  </select>
+                </div>
+                <div class="kv"><label>Flammen anzeigen</label><input id="overviewFlames" type="checkbox" checked></div>
+                <div class="kv"><label>Flammen-Größe (% der Chip-Höhe)</label>
+                  <input id="flamePct" class="input" type="number" min="30" max="100" value="55">
+                </div>
+                <div class="kv"><label>Flammen-Abstand (Faktor)</label>
+                  <input id="flameGap" class="input" type="number" min="0" max="1" step="0.01" value="0.14">
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Saunafolien &amp; Komponenten</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>Text‑Scale</label><input id="tileTextScale" class="input" type="number" step="0.05" min="0.5" max="3" value="0.8"></div>
+                <div class="kv"><label>Font‑Weight</label>
+                  <select id="tileWeight" class="input">
+                    <option value="400">Normal (400)</option>
+                    <option value="500">Medium (500)</option>
+                    <option value="600" selected>Semibold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra Bold (800)</option>
+                  </select>
+                </div>
+                <div class="kv"><label>Uhrzeit Scale</label><input id="tileTimeScale" class="input" type="number" step="0.05" min="0.5" max="2" value="1"></div>
+                <div class="kv"><label>„Uhr“ hinter Uhrzeiten anzeigen</label><input id="timeSuffixToggle" type="checkbox"></div>
+                <div class="kv"><label>Flammen in Kacheln anzeigen</label><input id="saunaFlames" type="checkbox" checked></div>
+                <div class="kv"><label>Flammen-Größe (Faktor)</label><input id="tileFlameSizeScale" class="input" type="number" step="0.05" min="0.4" max="3" value="1"></div>
+                <div class="kv"><label>Flammen-Abstand (Faktor)</label><input id="tileFlameGapScale" class="input" type="number" step="0.05" min="0" max="3" value="1"></div>
+                <div class="kv"><label>Badge-Scale (Faktor)</label><input id="badgeScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
+                <div class="kv"><label>Beschreibung-Scale (Faktor)</label><input id="badgeDescriptionScale" class="input" type="number" step="0.05" min="0.3" max="3" value="1"></div>
+                <div class="kv"><label>Badges neben Aufguss anzeigen</label><input id="badgeInlineColumn" type="checkbox"></div>
+                <div class="kv"><label>Kachel‑Breite % (sichtbarer Bereich)</label><input id="tilePct" class="input" type="number" min="1" max="100" value="45"></div>
+                <div class="kv"><label>Kachel‑Breite min (Faktor)</label><input id="tileMin" class="input" type="number" min="0" max="1" step="0.01" value="0.25"></div>
+                <div class="kv"><label>Kachel‑Breite max (Faktor)</label><input id="tileMax" class="input" type="number" min="0" max="1" step="0.01" value="0.57"></div>
+                <div class="kv"><label>Überschrift Max-Breite (%)</label><input id="saunaHeadingWidth" class="input" type="number" min="10" max="100" step="0.1" value="64"></div>
+                <div class="kv"><label>Kachel-Höhen-Scale</label><input id="tileHeightScale" class="input" type="number" step="0.05" min="0.5" max="2" value="1"></div>
+                <div class="kv"><label>Innenabstand (Faktor)</label><input id="tilePaddingScale" class="input" type="number" step="0.05" min="0.25" max="1.5" value="0.75"></div>
+                <div class="kv"><label>Badge-Farbe</label>
+                  <input id="badgeColor" class="input" type="color" value="#5C3101" title="Badge-Farbe">
+                </div>
+                <div class="kv"><label>Farbverlauf anzeigen</label><input id="tileOverlayEnabled" type="checkbox" checked></div>
+                <div class="kv"><label>Farbverlauf-Stärke (%)</label><input id="tileOverlayStrength" class="input" type="number" step="5" min="0" max="200" value="100"></div>
+                <div class="kv">
+                  <label>Komponenten auf Slides</label>
+                  <div id="componentToggleWrap" class="component-toggle-wrap">
+                    <label class="btn sm ghost component-toggle"><input type="checkbox" data-component="title"> Titel &amp; Uhrzeit</label>
+                    <label class="btn sm ghost component-toggle"><input type="checkbox" data-component="description"> Beschreibung</label>
+                    <label class="btn sm ghost component-toggle"><input type="checkbox" data-component="infoBox"> Infofeld</label>
+                    <label class="btn sm ghost component-toggle"><input type="checkbox" data-component="badges"> Badge-Leiste</label>
+                  </div>
+                  <div class="help">Gilt auch für die Verfügbarkeitsliste in Story-Slides.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Bildspalte &amp; Layout</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>Breite rechts (%)</label><input id="rightW" class="input" type="number" min="0" max="70" value="38"></div>
+                <div class="kv"><label>Schnitt oben (%)</label><input id="cutTop" class="input" type="number" min="0" max="100" value="28"></div>
+                <div class="kv"><label>Schnitt unten (%)</label><input id="cutBottom" class="input" type="number" min="0" max="100" value="12"></div>
+                <div class="help">Bestimmt Breite der Bildspalte und die beiden Ankerpunkte (oben/unten) der diagonalen Schnittkante.</div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div class="settings-card-title">Flammen / Hervorhebungen</div>
+              </div>
+              <div class="settings-card-body">
+                <div class="kv"><label>Highlight aktiv</label><input id="hlEnabled" type="checkbox"></div>
+                <div class="kv"><label>Highlight‑Farbe (Hex)</label><div class="color-item"><div id="hlSw" class="swatch"></div><input id="hlColor" class="input" type="text" value="#FFDD66" placeholder="#RRGGBB"></div></div>
+                <div class="kv"><label>Min. vor Start</label><input id="hlBefore" class="input" type="number" min="0" max="120" value="15"></div>
+                <div class="kv"><label>Min. nach Start</label><input id="hlAfter" class="input" type="number" min="0" max="120" value="15"></div>
+                <div class="kv"><label>Flammen‑Bild</label>
+                  <div class="row" style="gap:8px">
+                    <img id="flamePrev" class="prev" alt="">
+                    <input id="flameImg" type="hidden" />
+                    <label class="btn sm ghost" style="position:relative;overflow:hidden"><input id="flameFile" type="file" accept="image/*" style="position:absolute;inset:0;opacity:0">Upload</label>
+                    <button class="btn sm" id="resetFlame">Default</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+</details>
+
+      <details class="ac full">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> Farben (Übersicht & Zeitspalte)</div>
+          <div class="actions"><button class="btn sm ghost" id="resetColors">Standardwerte</button></div>
+        </summary>
+        <div class="content color-cols" id="colorList"></div>
+      </details>
+
+      <details class="ac">
+        <summary>
+          <div class="ttl">▶<span class="chev">⮞</span> System</div>
+        </summary>
+        <div class="content">
+          <div class="sys-grid">
+            <div class="sys-action">
+              <button class="btn icon-label" id="btnExport">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 3a1 1 0 0 1 .82.42l4 5.5A1 1 0 0 1 16 10h-3v6a1 1 0 1 1-2 0v-6H8a1 1 0 0 1-.82-1.58l4-5.5A1 1 0 0 1 12 3zm8 16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2h16z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Export</span>
+              </button>
+            </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithImg">
+                <span>Bilder</span>
+              </label>
+            </div>
+            <div class="sys-action">
+              <label class="btn icon-label sys-file-btn">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 21a1 1 0 0 1-.82-.42l-4-5.5A1 1 0 0 1 8 14h3V8a1 1 0 0 1 2 0v6h3a1 1 0 0 1 .82 1.58l-4 5.5A1 1 0 0 1 12 21zM4 5a1 1 0 0 1 0-2h16a1 1 0 0 1 0 2H4z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Import</span>
+                <input id="importFile" type="file" accept="application/json,.json,application/x-sqlite3,application/vnd.sqlite3,.sqlite,.db">
+              </label>
+            </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteImg" checked>
+                <span>Bilder</span>
+              </label>
+            </div>
+            <div class="sys-progress" id="importProgress" hidden role="status" aria-live="polite">
+              <div class="sys-progress-bar" aria-hidden="true">
+                <div class="sys-progress-fill" data-role="progress-fill"></div>
+              </div>
+              <div class="sys-progress-label" id="importProgressLabel">Import wird vorbereitet …</div>
+            </div>
+          </div>
+          <div class="sys-cleanup">
+            <div class="sys-cleanup-row">
+              <button class="btn sm" id="btnUsers">Benutzer</button>
+            </div>
+            <div class="sys-cleanup-row">
+              <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
+            </div>
+          </div>
+          <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
+        </div>
+      </details>
+
+      </div>
+
+    </aside>
   </main>
 
   <footer>© Andrej Soennecken</footer>
