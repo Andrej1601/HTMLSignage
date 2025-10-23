@@ -7,7 +7,23 @@ require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/devices_store.php';
 auth_require_role('editor');
 header('Content-Type: application/json; charset=UTF-8');
-header('Cache-Control: no-store');
+header('Cache-Control: private, must-revalidate, max-age=3, stale-while-revalidate=30');
+
+function devices_list_client_sent_etag(string $etag): bool
+{
+  if (empty($_SERVER['HTTP_IF_NONE_MATCH'])) {
+    return false;
+  }
+
+  $requested = array_filter(array_map('trim', explode(',', $_SERVER['HTTP_IF_NONE_MATCH'])));
+  foreach ($requested as $candidate) {
+    if ($candidate === '*' || $candidate === $etag) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 $db = devices_load();
 $now = time();
@@ -59,9 +75,29 @@ foreach (($db['devices'] ?? []) as $id => $d) {
   ];
 }
 
-echo json_encode([
+$payload = [
   'ok' => true,
   'now' => $now,
   'pairings' => $pairings,
   'devices' => $devices
-], JSON_UNESCAPED_SLASHES);
+];
+
+$json = json_encode($payload, JSON_UNESCAPED_SLASHES);
+if ($json === false) {
+  http_response_code(500);
+  echo json_encode([
+    'ok' => false,
+    'error' => 'Geräteliste konnte nicht serialisiert werden.'
+  ], JSON_UNESCAPED_SLASHES);
+  return;
+}
+
+$etag = '"' . substr(hash('sha256', $json), 0, 32) . '"';
+header('ETag: ' . $etag);
+
+if (devices_list_client_sent_etag($etag)) {
+  http_response_code(304);
+  return;
+}
+
+echo $json;

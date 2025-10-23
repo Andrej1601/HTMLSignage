@@ -12,6 +12,116 @@ const DEVICES_ID_PATTERN = '/^dev_[a-f0-9]{12}$/';
 const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
 const DEVICES_HISTORY_LIMIT = 20;
 const DEVICES_MAX_ERRORS = 10;
+const DEVICES_STATE_CACHE_KEY = 'htmlsignage:devices:state';
+const DEVICES_STATE_CACHE_TTL = 5;
+
+function devices_apcu_enabled(): bool
+{
+    if (!function_exists('apcu_fetch')) {
+        return false;
+    }
+
+    if (function_exists('apcu_enabled')) {
+        return apcu_enabled();
+    }
+
+    $enabled = filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN);
+    if (PHP_SAPI === 'cli') {
+        $enabled = $enabled && filter_var(ini_get('apc.enable_cli'), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    return $enabled;
+}
+
+function devices_state_cache_path(): string
+{
+    static $path = null;
+    if ($path === null) {
+        $directory = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+        $path = $directory . DIRECTORY_SEPARATOR . 'htmlsignage_devices_state.cache';
+    }
+
+    return $path;
+}
+
+function devices_state_cache_fetch(int $ttl = DEVICES_STATE_CACHE_TTL): ?array
+{
+    if ($ttl <= 0) {
+        return null;
+    }
+
+    if (devices_apcu_enabled()) {
+        $success = false;
+        $cached = apcu_fetch(DEVICES_STATE_CACHE_KEY, $success);
+        if ($success && is_array($cached)) {
+            $expires = isset($cached['expires']) ? (float) $cached['expires'] : 0.0;
+            if ($expires > microtime(true) && isset($cached['state']) && is_array($cached['state'])) {
+                return $cached['state'];
+            }
+        }
+    }
+
+    $path = devices_state_cache_path();
+    if (!is_file($path)) {
+        return null;
+    }
+
+    $contents = @file_get_contents($path);
+    if ($contents === false || $contents === '') {
+        return null;
+    }
+
+    $payload = @unserialize($contents, ['allowed_classes' => false]);
+    if (!is_array($payload)) {
+        @unlink($path);
+        return null;
+    }
+
+    $expires = isset($payload['expires']) ? (float) $payload['expires'] : 0.0;
+    if ($expires <= microtime(true)) {
+        @unlink($path);
+        return null;
+    }
+
+    $state = $payload['state'] ?? null;
+    return is_array($state) ? $state : null;
+}
+
+function devices_state_cache_store(array $state, int $ttl = DEVICES_STATE_CACHE_TTL): void
+{
+    if ($ttl <= 0) {
+        devices_state_cache_invalidate();
+        return;
+    }
+
+    $payload = [
+        'expires' => microtime(true) + $ttl,
+        'state' => $state,
+    ];
+
+    if (devices_apcu_enabled()) {
+        apcu_store(DEVICES_STATE_CACHE_KEY, $payload, $ttl);
+    }
+
+    $encoded = @serialize($payload);
+    if ($encoded === false) {
+        return;
+    }
+
+    @file_put_contents(devices_state_cache_path(), $encoded, LOCK_EX);
+}
+
+function devices_state_cache_invalidate(): void
+{
+    if (devices_apcu_enabled()) {
+        apcu_delete(DEVICES_STATE_CACHE_KEY);
+    }
+
+    $path = devices_state_cache_path();
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
 
 // >>> GENERATED: DEVICE_FIELD_CONFIG >>>
 const DEVICES_STATUS_FIELD_CONFIG = [
@@ -1044,6 +1154,13 @@ function devices_sqlite_upsert_state(array $state): bool
 
 function devices_load(): array
 {
+    $cached = devices_state_cache_fetch();
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $state = null;
+
     if (signage_db_available()) {
         try {
             signage_db_bootstrap();
@@ -1057,21 +1174,29 @@ function devices_load(): array
                     error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
                 }
                 devices_delete_file();
-                return devices_normalize_state($import);
+                $state = devices_normalize_state($import);
+                devices_state_cache_store($state);
+                return $state;
             }
 
-            return devices_sqlite_fetch_state_from_pdo($pdo);
+            $state = devices_sqlite_fetch_state_from_pdo($pdo);
+            devices_state_cache_store($state);
+            return $state;
         } catch (Throwable $exception) {
             error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
         }
     }
 
-    return devices_load_from_file();
+    $state = devices_load_from_file();
+    devices_state_cache_store($state);
+    return $state;
 }
 
 function devices_save(array &$db): bool
 {
     $db = devices_normalize_state($db);
+
+    devices_state_cache_invalidate();
 
     if (signage_db_available()) {
         try {

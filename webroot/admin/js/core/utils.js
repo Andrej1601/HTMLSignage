@@ -29,8 +29,28 @@ export function escapeHtml(str) {
   }[m]));
 }
 
-// simple Deep-Clone (JSON-basiert, reicht für unsere Datenstrukturen)
-export const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
+let structuredCloneWarningShown = false;
+
+// Deep-Clone mit structuredClone-Fallback für ältere Browser
+export const deepClone = (obj) => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (typeof structuredClone === 'function') {
+    try {
+      return structuredClone(obj);
+    } catch (error) {
+      // Fallback auf JSON-Methode (z. B. für DOM-Knoten oder zyklische Referenzen)
+      if (!structuredCloneWarningShown) {
+        structuredCloneWarningShown = true;
+        console.warn('[admin] structuredClone fehlgeschlagen, weiche auf JSON-basierten Clone aus.', error);
+      }
+    }
+  }
+
+  return JSON.parse(JSON.stringify(obj));
+};
 
 export function deepEqual(a, b) {
   if (a === b) return true;
@@ -84,23 +104,34 @@ export async function fetchJson(url, options = {}) {
   }
 
   let payload = null;
-  let text = '';
+  let rawText = '';
+  const clone = response.clone();
+
   try {
-    text = await response.text();
-    if (/[\S]/.test(text)) payload = JSON.parse(text);
+    payload = await response.json();
   } catch (cause) {
-    throw createApiError(errorMessage || 'Server-Antwort ist kein gültiges JSON.', {
-      status: response.status,
-      payload: text,
-      cause
-    });
+    try {
+      rawText = await clone.text();
+    } catch (readError) {
+      rawText = '';
+    }
+
+    if (rawText.trim().length === 0) {
+      payload = null;
+    } else {
+      throw createApiError(errorMessage || 'Server-Antwort ist kein gültiges JSON.', {
+        status: response.status,
+        payload: rawText,
+        cause
+      });
+    }
   }
 
   if (!response.ok) {
     const message = (payload && typeof payload.error === 'string' && payload.error.trim())
       ? payload.error.trim()
       : errorMessage || `Server-Fehler (${response.status})`;
-    throw createApiError(message, { status: response.status, payload });
+    throw createApiError(message, { status: response.status, payload: payload ?? rawText });
   }
 
   const predicate = typeof okPredicate === 'function'
