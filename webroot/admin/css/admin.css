@@ -2447,6 +2447,65 @@ tr.offline .dev-name{ color:#dc2626; }
   .badge-lib-fields{ grid-template-columns: 1fr; }
 }
 
+@media (max-width: 780px){
+  :root{
+    --workspace-offset:108px;
+  }
+  header{
+    padding:12px 14px 16px;
+    align-items:flex-start;
+  }
+  header .header-title{
+    flex:1 1 100%;
+    gap:8px;
+  }
+  header .header-title h1{ font-size:15px; }
+  .header-actions{
+    width:100%;
+    margin-left:0;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(148px, 1fr));
+    gap:8px;
+    justify-content:stretch;
+    align-items:stretch;
+  }
+  .header-actions > *{ min-width:0; }
+  .header-actions .btn,
+  .header-actions .menuwrap > .btn{
+    width:100%;
+    justify-content:space-between;
+  }
+  .menuwrap{ width:100%; }
+  .header-cockpit-controls{
+    grid-column:1 / -1;
+    padding-right:0;
+    margin-right:0;
+    border-right:none;
+  }
+  .header-cockpit-toggle{
+    width:100%;
+    justify-content:space-between;
+  }
+  .header-cockpit-pin{
+    justify-content:center;
+  }
+  #unsavedBadge{ grid-column:1 / -1; }
+  main.layout{
+    padding:12px 12px 18px;
+  }
+}
+
+@media (max-width: 520px){
+  header{
+    padding:12px;
+  }
+  header .header-title h1{ font-size:14px; }
+  .header-actions{
+    grid-template-columns:1fr;
+    row-gap:6px;
+  }
+}
+
 @media (max-width: 900px){
   #userModal .user-modal-body{ grid-template-columns:1fr; }
   #userModal .user-form-section{ order:-1; }
