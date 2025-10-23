@@ -796,6 +796,8 @@ function signage_normalize_schedule($schedule): array
 
     $schedule['version'] = (int) ($schedule['version'] ?? 1);
 
+    signage_prune_missing_asset_paths($schedule);
+
     return $schedule;
 }
 
@@ -913,6 +915,8 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     $background = $audioState['background'] ?? [];
     $audioState['background'] = signage_normalize_background_audio($background, $audioDefaults);
     $normalized['audio'] = $audioState;
+
+    signage_prune_missing_asset_paths($normalized);
 
     return $normalized;
 }
@@ -1297,6 +1301,70 @@ function signage_assets_path(string $path = ''): string
         return $dir;
     }
     return $dir . '/' . ltrim($path, '/');
+}
+
+function signage_asset_canonical_path($value): ?string
+{
+    if (is_array($value) || is_object($value)) {
+        return null;
+    }
+    $raw = trim((string) $value);
+    if ($raw === '') {
+        return null;
+    }
+    $path = parse_url($raw, PHP_URL_PATH);
+    if (!is_string($path) || $path === '') {
+        $path = $raw;
+    }
+    if ($path === '') {
+        return null;
+    }
+    if ($path[0] !== '/') {
+        $path = '/' . ltrim($path, '/');
+    }
+    if (strpos($path, '/assets/') !== 0) {
+        return null;
+    }
+    return $path;
+}
+
+function signage_asset_exists(string $path): bool
+{
+    $absolute = signage_absolute_path($path);
+    if ($absolute === '') {
+        return false;
+    }
+    return @is_file($absolute);
+}
+
+function signage_prune_missing_asset_paths(&$value): void
+{
+    if (is_array($value)) {
+        foreach ($value as &$item) {
+            signage_prune_missing_asset_paths($item);
+        }
+        unset($item);
+        return;
+    }
+    if (!is_string($value) && !is_numeric($value)) {
+        return;
+    }
+    $path = signage_asset_canonical_path($value);
+    if ($path === null) {
+        return;
+    }
+    if (signage_asset_exists($path)) {
+        return;
+    }
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+    $clearable = [
+        'png','jpg','jpeg','webp','gif','svg','avif','heic','heif',
+        'mp3','ogg','oga','wav','m4a','aac','flac','opus',
+        'mp4','m4v','webm','ogv','mov'
+    ];
+    if (in_array($ext, $clearable, true)) {
+        $value = '';
+    }
 }
 
 function signage_read_json_file(string $file, array $default = []): array
