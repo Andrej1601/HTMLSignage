@@ -28,7 +28,7 @@ if (function_exists('ini_set')) {
 while (ob_get_level() > 0) {
     @ob_end_clean();
 }
-@ob_implicit_flush(1);
+@ob_implicit_flush(true);
 
 define('LIVE_JSON_FLAGS', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 const LIVE_META_CACHE_TTL_MICROS = 1_000_000;

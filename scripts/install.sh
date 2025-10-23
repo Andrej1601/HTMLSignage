@@ -385,8 +385,32 @@ deploy_application(){
       rsync -a --chown=www-data:www-data --chmod=D2755,F0644 webroot/data/ "$APP_DIR/data"/
     fi
   fi
+
+  normalize_data_permissions
+
   replace_placeholders "$APP_DIR/admin/index.html" \
     "__PUBLIC_PORT__" "$SIGNAGE_PUBLIC_PORT"
+}
+
+normalize_data_permissions(){
+  if [[ ! -d "$APP_DIR/data" ]]; then
+    return
+  fi
+
+  chown -R www-data:www-data "$APP_DIR/data" 2>/dev/null || true
+
+  while IFS= read -r -d '' dir; do
+    chmod 02775 "$dir" 2>/dev/null || true
+  done < <(find "$APP_DIR/data" -type d -print0 2>/dev/null)
+
+  while IFS= read -r -d '' file; do
+    chmod 0644 "$file" 2>/dev/null || true
+  done < <(find "$APP_DIR/data" -type f -print0 2>/dev/null)
+
+  local db_file="$APP_DIR/data/signage.db"
+  if [[ -f "$db_file" ]]; then
+    chmod 0660 "$db_file" 2>/dev/null || true
+  fi
 }
 
 deploy_nginx(){
@@ -489,6 +513,8 @@ seed_admin_user(){
     chown www-data:www-data "$db_file" 2>/dev/null || true
     chmod 660 "$db_file" 2>/dev/null || true
   fi
+
+  normalize_data_permissions
 }
 
 maybe_print_generated_password(){
