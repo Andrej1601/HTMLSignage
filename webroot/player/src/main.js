@@ -253,7 +253,19 @@ function maybeUpdateBackgroundAudioPlayback() {
   audioEl.volume = clampNumber(0, backgroundAudioState.config.volume ?? 1, 1);
   const playResult = audioEl.play();
   if (playResult && typeof playResult.catch === 'function') {
-    playResult.catch((error) => console.warn('[audio] background playback failed', error));
+    playResult.catch((error) => {
+      if (!error || typeof error !== 'object') {
+        console.warn('[audio] background playback failed', error);
+        return;
+      }
+      const name = typeof error.name === 'string' ? error.name : '';
+      const message = typeof error.message === 'string' ? error.message : '';
+      const isAbort = name === 'AbortError'
+        || /interrupted by a new load request/i.test(message);
+      if (!isAbort) {
+        console.warn('[audio] background playback failed', error);
+      }
+    });
   }
 }
 
