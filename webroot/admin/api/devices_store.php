@@ -1426,6 +1426,84 @@ function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry
     }
 }
 
+function devices_touch_update(string $deviceId, int $timestamp, array $telemetry = [], string $context = 'device touch'): array
+{
+    $context = trim($context) !== '' ? trim($context) : 'device touch';
+    $sqliteAvailable = signage_db_available();
+    $sqliteResult = null;
+
+    if ($sqliteAvailable) {
+        try {
+            $sqliteResult = devices_touch_entry_sqlite($deviceId, $timestamp, $telemetry);
+        } catch (RuntimeException $exception) {
+            error_log('SQLite ' . $context . ' failed: ' . $exception->getMessage());
+            return [
+                'ok' => false,
+                'status' => 503,
+                'error' => 'storage-unavailable',
+            ];
+        }
+    }
+
+    if ($sqliteResult === true) {
+        return [
+            'ok' => true,
+            'status' => 200,
+        ];
+    }
+
+    if ($sqliteResult === false) {
+        return [
+            'ok' => false,
+            'status' => 200,
+            'error' => 'unknown-device',
+        ];
+    }
+
+    if ($sqliteAvailable && $sqliteResult !== null) {
+        error_log('Unexpected SQLite ' . $context . ' state for device ' . $deviceId);
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    $state = devices_load();
+    if (!devices_touch_entry($state, $deviceId, $timestamp, $telemetry)) {
+        return [
+            'ok' => false,
+            'status' => 200,
+            'error' => 'unknown-device',
+        ];
+    }
+
+    try {
+        $saved = devices_save($state);
+    } catch (RuntimeException $exception) {
+        error_log('Failed to persist ' . $context . ': ' . $exception->getMessage());
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    if ($saved !== true) {
+        error_log('Failed to persist ' . $context . ': unexpected save status');
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'status' => 200,
+    ];
+}
+
 function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool
 {
     $normalizedId = devices_normalize_device_id($id);

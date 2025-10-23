@@ -20,6 +20,22 @@ const SIGNAGE_JSON_MAX_TREE_DEPTH = 16;
 const SIGNAGE_JSON_MAX_STRING_BYTES = 131072;
 const SIGNAGE_SCHEDULE_MAX_SLIDES = 2000;
 
+function signage_json_response(array $payload, int $status = 200): void
+{
+    if ($status !== 200) {
+        http_response_code($status);
+    }
+
+    $json = json_encode($payload, SIGNAGE_JSON_RESPONSE_FLAGS);
+    if ($json === false) {
+        http_response_code(500);
+        echo '{"ok":false,"error":"encode-failed"}';
+        return;
+    }
+
+    echo $json;
+}
+
 function signage_last_error_message(string $fallback): string
 {
     $error = error_get_last();
