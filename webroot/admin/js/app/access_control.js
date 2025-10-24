@@ -32,7 +32,10 @@ export function createRoleRestrictionApplier({
     const footnoteSection = document.getElementById('footnoteSection');
     const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
     const badgeSection = document.getElementById('badgeLibrarySection');
-    const colorsSection = document.getElementById('resetColors')?.closest('details');
+    const designEditor = document.getElementById('designEditor');
+    const typographyLayoutSection = document.getElementById('boxTypographyLayout');
+    const colorPaletteSection = document.getElementById('colorPaletteFold')
+      || document.getElementById('resetColors')?.closest('details');
     const systemSection = document.getElementById('btnExport')?.closest('details');
     const globalInfoBox = document.getElementById('boxStories');
     const slidesMaster = document.getElementById('slidesMaster');
@@ -58,6 +61,7 @@ export function createRoleRestrictionApplier({
     const canUseSystem = hasPermission('system');
     const canManageDevices = hasPermission('devices');
     const canManageUsers = hasPermission('user-admin');
+    const canUseDesignEditor = canUseColors || canUseSlides;
 
     setHiddenState(cockpitToggle, !canUseCockpit);
     setHiddenState(cockpitSection, !canUseCockpit);
@@ -69,7 +73,9 @@ export function createRoleRestrictionApplier({
     setHiddenState(footnoteLayoutSection, !canManageFootnotes);
     setHiddenState(badgeSection, !canManageBadges);
     setHiddenState(globalInfoBox, !canUseGlobalInfo);
-    setHiddenState(colorsSection, !canUseColors);
+    setHiddenState(designEditor, !canUseDesignEditor);
+    setHiddenState(typographyLayoutSection, !canUseSlides);
+    setHiddenState(colorPaletteSection, !canUseColors);
     setHiddenState(systemSection, !canUseSystem);
 
     if (slidesMaster) {
@@ -99,8 +105,12 @@ export function createRoleRestrictionApplier({
       slideshowBox.open = false;
     }
 
-    if (!canUseColors && colorsSection) {
-      colorsSection.open = false;
+    if (!canUseSlides && typographyLayoutSection) {
+      typographyLayoutSection.open = false;
+    }
+
+    if (!canUseColors && colorPaletteSection) {
+      colorPaletteSection.open = false;
     }
 
     if (!canUseSystem && systemSection) {
