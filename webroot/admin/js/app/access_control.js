@@ -32,7 +32,7 @@ export function createRoleRestrictionApplier({
     const footnoteSection = document.getElementById('footnoteSection');
     const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
     const badgeSection = document.getElementById('badgeLibrarySection');
-    const colorsSection = document.getElementById('resetColors')?.closest('details');
+    const colorsSection = document.getElementById('designColors');
     const systemSection = document.getElementById('btnExport')?.closest('details');
     const globalInfoBox = document.getElementById('boxStories');
     const slidesMaster = document.getElementById('slidesMaster');
