@@ -43,9 +43,10 @@ const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
     'editor' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
     'admin' => ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'],
 ];
-const SIGNAGE_AUTH_PERMISSIONS_VERSION = 2;
+const SIGNAGE_AUTH_PERMISSIONS_VERSION = 3;
 const SIGNAGE_AUTH_PERMISSION_UPGRADES = [
     'slides' => ['slides-flow', 'slides-automation', 'media', 'footnotes', 'badges'],
+    'slides-flow' => ['slides-automation'],
 ];
 const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
 

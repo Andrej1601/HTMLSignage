@@ -1,5 +1,6 @@
 'use strict';
 
+import { createPermissionSet } from './permissions.js';
 import { fetchJson } from './utils.js';
 
 const API_BASE = '/admin/api/auth';
@@ -32,13 +33,16 @@ export async function fetchSession() {
   const permissions = permissionsRaw
     .map((permission) => normalizePermissionName(permission))
     .filter((permission) => permission);
+  const upgradedPermissions = permissions.length
+    ? Array.from(createPermissionSet(permissions))
+    : DEFAULT_PERMISSIONS;
   return {
     ok: data?.ok !== false,
     user: {
       username: typeof user?.username === 'string' ? user.username : null,
       displayName: typeof user?.displayName === 'string' ? user.displayName : null,
       roles,
-      permissions: permissions.length ? permissions : DEFAULT_PERMISSIONS
+      permissions: upgradedPermissions
     }
   };
 }
@@ -51,17 +55,21 @@ export async function fetchUsers() {
   });
   const users = Array.isArray(data?.users) ? data.users : [];
   const roles = Array.isArray(data?.roles) && data.roles.length ? data.roles : DEFAULT_ROLES;
-  const permissionsCatalog = Array.isArray(data?.permissions) && data.permissions.length
+  const permissionsCatalogRaw = Array.isArray(data?.permissions) && data.permissions.length
     ? data.permissions.map((permission) => normalizePermissionName(permission)).filter((permission) => permission)
     : DEFAULT_PERMISSIONS;
+  const permissionsCatalog = Array.from(createPermissionSet(permissionsCatalogRaw));
   const normalizedUsers = users.map((user) => {
     const permissionsRaw = Array.isArray(user?.permissions) ? user.permissions : [];
     const permissions = permissionsRaw
       .map((permission) => normalizePermissionName(permission))
       .filter((permission) => permission);
+    const upgraded = permissions.length
+      ? Array.from(createPermissionSet(permissions))
+      : DEFAULT_PERMISSIONS;
     return {
       ...user,
-      permissions: permissions.length ? permissions : DEFAULT_PERMISSIONS
+      permissions: upgraded
     };
   });
   return { users: normalizedUsers, roles, permissions: permissionsCatalog };

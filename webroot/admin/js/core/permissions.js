@@ -144,5 +144,12 @@ export const createPermissionSet = (permissions = []) => {
       if (name) set.add(name);
     });
   }
+  if (set.has('slides')) {
+    ['slides-flow', 'slides-automation', 'media', 'footnotes', 'badges'].forEach((permission) => {
+      set.add(permission);
+    });
+  } else if (set.has('slides-flow') && !set.has('slides-automation')) {
+    set.add('slides-automation');
+  }
   return set;
 };
