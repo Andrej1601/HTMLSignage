@@ -3,48 +3,68 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../admin/api/storage.php';
 
+/**
+ * Normalisiert einen ganzzahligen Versionswert.
+ */
+function signage_schedule_normalize_version($value): ?int
+{
+    if (is_int($value)) {
+        return $value > 0 ? $value : null;
+    }
+
+    if (is_numeric($value)) {
+        $value = (int) $value;
+        return $value > 0 ? $value : null;
+    }
+
+    return null;
+}
+
+/**
+ * Ermittelt die Version der aktuellen Planung aus Schedule- und Meta-Daten.
+ */
+function signage_schedule_resolve_version(array $schedule, array $meta, int $mtime): int
+{
+    $candidates = [
+        $schedule['version'] ?? null,
+        $meta['version'] ?? null,
+        $mtime,
+    ];
+
+    foreach ($candidates as $candidate) {
+        $normalized = signage_schedule_normalize_version($candidate);
+        if ($normalized !== null) {
+            return $normalized;
+        }
+    }
+
+    return 1;
+}
+
 $state = signage_schedule_state();
-$schedule = $state['data'];
-$json = $state['json'];
-$meta = $state['meta'];
+$schedule = is_array($state['data'] ?? null) ? $state['data'] : [];
+$json = $state['json'] ?? null;
+$meta = is_array($state['meta'] ?? null) ? $state['meta'] : [];
 $mtime = (int) ($meta['mtime'] ?? 0);
 
-$version = $schedule['version'] ?? null;
-$scheduleChanged = false;
-if (!is_int($version)) {
-    if (is_numeric($version)) {
-        $version = (int) $version;
-    } else {
-        $version = null;
-    }
-}
-if (!is_int($version) || $version <= 0) {
-    $metaVersion = $meta['version'] ?? null;
-    if (is_numeric($metaVersion)) {
-        $version = (int) $metaVersion;
-    }
-}
-if (!is_int($version) || $version <= 0) {
-    $version = $mtime > 0 ? $mtime : 1;
-}
-if (!isset($schedule['version']) || $schedule['version'] !== $version) {
+$version = signage_schedule_resolve_version($schedule, $meta, $mtime);
+$needsEncoding = ($schedule['version'] ?? null) !== $version || !is_string($json);
+if ($needsEncoding) {
     $schedule['version'] = $version;
     $json = json_encode($schedule, SIGNAGE_JSON_RESPONSE_FLAGS);
-    $scheduleChanged = true;
-} elseif (!is_string($json)) {
-    $json = json_encode($schedule, SIGNAGE_JSON_RESPONSE_FLAGS);
-    $scheduleChanged = true;
-}
-if ($json === false) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_RESPONSE_FLAGS);
-    return;
+    if ($json === false) {
+        http_response_code(500);
+        echo json_encode(['ok' => false, 'error' => 'encode-failed'], SIGNAGE_JSON_RESPONSE_FLAGS);
+        return;
+    }
+    $hash = sha1($json);
+} else {
+    $hash = $meta['hash'] ?? null;
+    if (!is_string($hash) || $hash === '') {
+        $hash = sha1($json);
+    }
 }
 
-$hash = $meta['hash'] ?? null;
-if (!is_string($hash) || $hash === '' || $scheduleChanged) {
-    $hash = sha1($json);
-}
 $etag = sprintf('"%s"', $hash);
 
 header('Content-Type: application/json; charset=UTF-8');
