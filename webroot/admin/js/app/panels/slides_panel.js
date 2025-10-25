@@ -294,6 +294,12 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           automation.fallbackTrack = '';
         } else {
           fallbackTrackSelect.disabled = false;
+          const activeTrackId = typeof backgroundState.activeTrack === 'string'
+            ? backgroundState.activeTrack
+            : '';
+          const activeTrackOption = trackOptions.find((opt) => opt.id === activeTrackId) || null;
+          const resolveDefaultFallback = () =>
+            (activeTrackOption ? activeTrackOption.id : (trackOptions[0]?.id || ''));
           trackOptions.forEach(({ id, label }) => {
             const opt = document.createElement('option');
             opt.value = id;
@@ -301,9 +307,13 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             fallbackTrackSelect.appendChild(opt);
           });
           if (!automation.fallbackTrack || !trackOptions.some(opt => opt.id === automation.fallbackTrack)) {
-            automation.fallbackTrack = trackOptions[0].id;
+            automation.fallbackTrack = resolveDefaultFallback();
           }
-          fallbackTrackSelect.value = automation.fallbackTrack || trackOptions[0].id;
+          const selectedFallback = trackOptions.some(opt => opt.id === automation.fallbackTrack)
+            ? automation.fallbackTrack
+            : resolveDefaultFallback();
+          automation.fallbackTrack = selectedFallback;
+          fallbackTrackSelect.value = selectedFallback;
         }
         fallbackTrackSelect.onchange = () => {
           const next = fallbackTrackSelect.value || '';
