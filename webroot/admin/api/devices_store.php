@@ -743,6 +743,202 @@ function devices_path(): string
     return signage_data_path('devices.json');
 }
 
+function devices_storage_mtime(): int
+{
+    if (signage_db_available()) {
+        $dbPath = signage_db_path();
+        if ($dbPath !== '' && is_file($dbPath)) {
+            $mtime = @filemtime($dbPath);
+            if ($mtime !== false) {
+                return (int) $mtime;
+            }
+        }
+    }
+
+    $path = devices_path();
+    if (is_file($path)) {
+        $mtime = @filemtime($path);
+        if ($mtime !== false) {
+            return (int) $mtime;
+        }
+    }
+
+    return 0;
+}
+
+function devices_offline_threshold_minutes(): int
+{
+    if (defined('OFFLINE_AFTER_MIN')) {
+        $value = (int) constant('OFFLINE_AFTER_MIN');
+        if ($value > 0) {
+            return $value;
+        }
+    }
+
+    return 2;
+}
+
+function devices_list_is_offline(int $lastSeenAt, int $now, int $offlineAfterMinutes): bool
+{
+    if ($lastSeenAt <= 0) {
+        return true;
+    }
+
+    return ($now - $lastSeenAt) > ($offlineAfterMinutes * 60);
+}
+
+function devices_list_history_tail($history, int $limit = 10): array
+{
+    if (!is_array($history) || $limit <= 0) {
+        return [];
+    }
+
+    $values = array_values($history);
+    if (count($values) > $limit) {
+        $values = array_slice($values, -$limit);
+    }
+
+    return $values;
+}
+
+function devices_build_list_pairings(array $state): array
+{
+    $pairings = [];
+
+    foreach (($state['pairings'] ?? []) as $code => $row) {
+        if (!is_array($row) || !empty($row['deviceId'])) {
+            continue;
+        }
+
+        $normalizedCode = devices_normalize_code($row['code'] ?? $code);
+        if ($normalizedCode === '') {
+            continue;
+        }
+
+        $created = isset($row['created']) ? (int) $row['created'] : 0;
+
+        $pairings[] = [
+            'code' => $normalizedCode,
+            'createdAt' => $created,
+            'expiresAt' => $created ? ($created + 900) : null,
+        ];
+    }
+
+    usort($pairings, static fn ($a, $b) => ($b['createdAt'] ?? 0) <=> ($a['createdAt'] ?? 0));
+
+    return $pairings;
+}
+
+function devices_build_list_devices(array $state, int $now, int $offlineAfterMinutes): array
+{
+    $devices = [];
+
+    foreach (($state['devices'] ?? []) as $id => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $deviceId = is_string($id) ? $id : ($row['id'] ?? '');
+        if (!devices_is_valid_id($deviceId)) {
+            continue;
+        }
+
+        $deviceId = devices_normalize_device_id($deviceId);
+        if ($deviceId === '') {
+            continue;
+        }
+
+        $lastSeen = isset($row['lastSeenAt']) ? (int) $row['lastSeenAt'] : (int) ($row['lastSeen'] ?? 0);
+        $overrides = isset($row['overrides']) && is_array($row['overrides']) ? $row['overrides'] : [];
+
+        $devices[] = [
+            'id' => $deviceId,
+            'name' => isset($row['name']) && is_string($row['name']) ? $row['name'] : $deviceId,
+            'lastSeenAt' => $lastSeen ?: null,
+            'offline' => devices_list_is_offline($lastSeen, $now, $offlineAfterMinutes),
+            'useOverrides' => !empty($row['useOverrides']),
+            'overrides' => [
+                'settings' => $overrides['settings'] ?? (object) [],
+                'schedule' => $overrides['schedule'] ?? (object) [],
+            ],
+            'status' => isset($row['status']) && is_array($row['status']) ? $row['status'] : (object) [],
+            'metrics' => isset($row['metrics']) && is_array($row['metrics']) ? $row['metrics'] : (object) [],
+            'heartbeatHistory' => devices_list_history_tail($row['heartbeatHistory'] ?? [], 10),
+        ];
+    }
+
+    return $devices;
+}
+
+function devices_build_list_payload(array $state, int $now, ?int $offlineAfterMinutes = null): array
+{
+    $minutes = $offlineAfterMinutes ?? devices_offline_threshold_minutes();
+
+    return [
+        'pairings' => devices_build_list_pairings($state),
+        'devices' => devices_build_list_devices($state, $now, $minutes),
+    ];
+}
+
+function devices_state_last_activity(array $state): int
+{
+    $timestamps = [];
+
+    foreach (($state['pairings'] ?? []) as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        foreach (['created', 'updated', 'expires', 'expiresAt'] as $key) {
+            if (isset($row[$key])) {
+                $timestamps[] = (int) $row[$key];
+            }
+        }
+    }
+
+    foreach (($state['devices'] ?? []) as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        foreach (['created', 'updated', 'updatedAt', 'lastSeen', 'lastSeenAt'] as $key) {
+            if (isset($row[$key])) {
+                $timestamps[] = (int) $row[$key];
+            }
+        }
+
+        if (isset($row['heartbeatHistory']) && is_array($row['heartbeatHistory'])) {
+            foreach ($row['heartbeatHistory'] as $entry) {
+                if (is_array($entry) && isset($entry['ts'])) {
+                    $timestamps[] = (int) $entry['ts'];
+                }
+            }
+        }
+    }
+
+    if (isset($state['meta']) && is_array($state['meta'])) {
+        foreach ($state['meta'] as $meta) {
+            if (is_array($meta)) {
+                foreach (['updated', 'updatedAt', 'timestamp'] as $key) {
+                    if (isset($meta[$key])) {
+                        $timestamps[] = (int) $meta[$key];
+                    }
+                }
+            }
+        }
+    }
+
+    $timestamps[] = devices_storage_mtime();
+
+    $timestamps = array_filter($timestamps, static fn ($value) => $value > 0);
+
+    if (empty($timestamps)) {
+        return 0;
+    }
+
+    return max($timestamps);
+}
+
 function devices_default_state(): array
 {
     return [
