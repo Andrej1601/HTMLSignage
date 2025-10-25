@@ -24,18 +24,27 @@ export function createRoleRestrictionApplier({
 
     const cockpitToggle = document.querySelector('.header-cockpit-controls');
     const cockpitSection = document.querySelector('.workspace-overview');
-    const slideshowBox = document.getElementById('boxSlidesText');
-    const slidesFlowCard = document.getElementById('slidesFlowCard');
-    const slidesAutomationCard = document.getElementById('slidesAutomationCard');
-    const mediaBox = document.getElementById('boxImages');
+    const slidesMaster = document.getElementById('slidesMaster');
+    const contentSaunasBox = document.getElementById('boxSaunas');
     const footnoteBox = document.getElementById('boxFootnotes');
     const footnoteSection = document.getElementById('footnoteSection');
     const footnoteLayoutSection = document.getElementById('footnoteLayoutSection');
     const badgeSection = document.getElementById('badgeLibrarySection');
+    const globalInfoBox = document.getElementById('boxStories');
+    const infoWellness = document.getElementById('infoWellness');
+    const infoEvents = document.getElementById('infoEvents');
+    const infoModules = document.getElementById('infoModules');
+    const infoStories = document.getElementById('infoStories');
+    const mediaBox = document.getElementById('boxImages');
+    const slideshowModule = document.getElementById('boxSlidesText');
+    const slidesAutomationCard = document.getElementById('slidesAutomationCard');
+    const backgroundAudioCard = document.getElementById('backgroundAudioCard');
+    const displayLayoutFold = document.getElementById('displayLayoutFold');
+    const designModule = document.getElementById('designEditor');
+    const stylePaletteFold = document.getElementById('stylePaletteFold');
+    const typographyFold = document.getElementById('boxTypographyLayout');
     const colorsSection = document.getElementById('resetColors')?.closest('details');
     const systemSection = document.getElementById('btnExport')?.closest('details');
-    const globalInfoBox = document.getElementById('boxStories');
-    const slidesMaster = document.getElementById('slidesMaster');
 
     const cockpitCardFrom = (selector) => {
       const control = document.querySelector(selector);
@@ -47,33 +56,60 @@ export function createRoleRestrictionApplier({
     const mediaLayoutCard = cockpitCardFrom('[data-jump="boxImages"]') || cockpitCardFrom('[data-jump="boxSlidesText"]');
 
     const canUseCockpit = hasPermission('cockpit');
-    const canUseSlides = hasPermission('slides');
-    const canManageFlow = canUseSlides && hasPermission('slides-flow');
-    const canManageAutomation = canUseSlides && hasPermission('slides-automation');
-    const canManageMedia = canUseSlides && hasPermission('media');
-    const canManageFootnotes = hasPermission('footnotes');
-    const canManageBadges = hasPermission('badges');
-    const canUseGlobalInfo = hasPermission('global-info');
-    const canUseColors = hasPermission('colors');
-    const canUseSystem = hasPermission('system');
+    const canAccessContentModule = hasPermission('module-content');
+    const canAccessSaunas = canAccessContentModule && hasPermission('content-saunas');
+    const canAccessFootnotes = canAccessContentModule && hasPermission('content-footnotes');
+    const canAccessBadges = canAccessContentModule && hasPermission('content-badges');
+    const canAccessGlobalInfo = canAccessContentModule && hasPermission('content-global');
+    const canAccessGlobalWellness = canAccessGlobalInfo && hasPermission('content-global-wellness');
+    const canAccessGlobalEvents = canAccessGlobalInfo && hasPermission('content-global-events');
+    const canAccessGlobalModules = canAccessGlobalInfo && hasPermission('content-global-modules');
+    const canAccessGlobalStories = canAccessGlobalInfo && hasPermission('content-global-stories');
+    const canAccessMedia = canAccessContentModule && hasPermission('content-media');
+    const canAccessSlideshowModule = hasPermission('module-slideshow');
+    const canAccessAutomation = canAccessSlideshowModule && hasPermission('slideshow-automation');
+    const canAccessAudio = canAccessSlideshowModule && hasPermission('slideshow-audio');
+    const canAccessDisplay = canAccessSlideshowModule && hasPermission('slideshow-display');
+    const canAccessDesignModule = hasPermission('module-design');
+    const canAccessPalettes = canAccessDesignModule && hasPermission('design-palettes');
+    const canAccessTypography = canAccessDesignModule && hasPermission('design-typography');
+    const canAccessColors = canAccessDesignModule && hasPermission('design-colors');
+    const canAccessSystem = hasPermission('module-system');
     const canManageDevices = hasPermission('devices');
     const canManageUsers = hasPermission('user-admin');
 
     setHiddenState(cockpitToggle, !canUseCockpit);
     setHiddenState(cockpitSection, !canUseCockpit);
-    setHiddenState(slideshowBox, !canUseSlides);
-    setHiddenState(slidesFlowCard, !canManageFlow);
-    setHiddenState(slidesAutomationCard, !canManageAutomation);
-    setHiddenState(mediaBox, !canManageMedia);
-    setHiddenState(footnoteSection, !canManageFootnotes);
-    setHiddenState(footnoteLayoutSection, !canManageFootnotes);
-    setHiddenState(badgeSection, !canManageBadges);
-    setHiddenState(globalInfoBox, !canUseGlobalInfo);
-    setHiddenState(colorsSection, !canUseColors);
-    setHiddenState(systemSection, !canUseSystem);
+    setHiddenState(slidesMaster, !canAccessContentModule);
+    setHiddenState(contentSaunasBox, !canAccessSaunas);
+    const showFootnoteBox = canAccessFootnotes || canAccessBadges;
+    setHiddenState(footnoteBox, !(canAccessContentModule && showFootnoteBox));
+    setHiddenState(footnoteSection, !(canAccessContentModule && canAccessFootnotes));
+    setHiddenState(footnoteLayoutSection, !(canAccessContentModule && canAccessFootnotes));
+    setHiddenState(badgeSection, !(canAccessContentModule && canAccessBadges));
+    const showGlobalInfoBox = canAccessContentModule && canAccessGlobalInfo
+      && (canAccessGlobalWellness || canAccessGlobalEvents || canAccessGlobalModules || canAccessGlobalStories);
+    setHiddenState(globalInfoBox, !showGlobalInfoBox);
+    setHiddenState(infoWellness, !(canAccessGlobalInfo && canAccessGlobalWellness));
+    setHiddenState(infoEvents, !(canAccessGlobalInfo && canAccessGlobalEvents));
+    setHiddenState(infoModules, !(canAccessGlobalInfo && canAccessGlobalModules));
+    setHiddenState(infoStories, !(canAccessGlobalInfo && canAccessGlobalStories));
+    setHiddenState(mediaBox, !(canAccessContentModule && canAccessMedia));
+
+    setHiddenState(slideshowModule, !canAccessSlideshowModule);
+    setHiddenState(slidesAutomationCard, !(canAccessSlideshowModule && canAccessAutomation));
+    setHiddenState(backgroundAudioCard, !(canAccessSlideshowModule && canAccessAudio));
+    setHiddenState(displayLayoutFold, !(canAccessSlideshowModule && canAccessDisplay));
+
+    setHiddenState(designModule, !canAccessDesignModule);
+    setHiddenState(stylePaletteFold, !(canAccessDesignModule && canAccessPalettes));
+    setHiddenState(typographyFold, !(canAccessDesignModule && canAccessTypography));
+    setHiddenState(colorsSection, !(canAccessDesignModule && canAccessColors));
+
+    setHiddenState(systemSection, !canAccessSystem);
 
     if (slidesMaster) {
-      if (!canUseSlides) {
+      if (!canAccessContentModule) {
         slidesMaster.setAttribute('data-limited', 'true');
         slidesMaster.open = true;
       } else {
@@ -81,11 +117,12 @@ export function createRoleRestrictionApplier({
       }
     }
 
-    const showSlidesCard = canUseSlides || canManageFlow || canManageAutomation;
-    const showInfoCard = canUseGlobalInfo || canManageMedia;
-    const showMediaLayoutCard = canManageMedia || canUseColors || canUseSlides;
+    const showContentCard = canAccessContentModule
+      && (canAccessSaunas || canAccessFootnotes || canAccessBadges || canAccessGlobalInfo || canAccessMedia);
+    const showInfoCard = showGlobalInfoBox;
+    const showMediaLayoutCard = canAccessMedia || canAccessSlideshowModule || canAccessDesignModule;
 
-    setHiddenState(slidesCockpitCard, !showSlidesCard);
+    setHiddenState(slidesCockpitCard, !showContentCard);
     setHiddenState(infoCockpitCard, !showInfoCard);
     setHiddenState(mediaLayoutCard, !showMediaLayoutCard);
 
@@ -95,24 +132,25 @@ export function createRoleRestrictionApplier({
       : false;
     document.body?.classList.toggle('role-limited', !hasFullAccess);
 
-    if (!canUseSlides && slideshowBox) {
-      slideshowBox.open = false;
+    if (!canAccessSlideshowModule && slideshowModule) {
+      slideshowModule.open = false;
     }
 
-    if (!canUseColors && colorsSection) {
+    if (!canAccessDesignModule && designModule) {
+      designModule.open = false;
+    }
+
+    if (!canAccessColors && colorsSection) {
       colorsSection.open = false;
     }
 
-    if (!canUseSystem && systemSection) {
+    if (!canAccessSystem && systemSection) {
       systemSection.open = false;
     }
 
-    if (!canUseGlobalInfo && globalInfoBox) {
+    if (!showGlobalInfoBox && globalInfoBox) {
       globalInfoBox.open = false;
     }
-
-    const hideFootnoteBox = (!canManageFootnotes && !canManageBadges);
-    setHiddenState(footnoteBox, hideFootnoteBox);
 
     if (!canManageDevices) {
       document.querySelectorAll('[data-devices]').forEach((element) => {
