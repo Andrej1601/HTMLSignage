@@ -132,6 +132,19 @@ const SIGNAGE_AUTH_PERMISSION_UPGRADES = [
 ];
 const SIGNAGE_AUTH_PROTECTED_USERS = ['admin'];
 
+function auth_resolve_config_path(string $envKey, string $defaultFile): string
+{
+    $value = getenv($envKey);
+    if (is_string($value) && $value !== '') {
+        return $value;
+    }
+    $envValue = $_ENV[$envKey] ?? '';
+    if (is_string($envValue) && $envValue !== '') {
+        return $envValue;
+    }
+    return signage_data_path($defaultFile);
+}
+
 function auth_normalize_role_name(string $role): ?string
 {
     $role = strtolower(trim($role));
@@ -177,6 +190,30 @@ function auth_enforce_protected_roles(string $username, array $roles): array
 }
 
 
+function auth_roles_to_array($roles): array
+{
+    if (is_string($roles)) {
+        $roles = preg_split('/[,\s]+/', $roles) ?: [];
+    }
+    return is_array($roles) ? $roles : [];
+}
+
+function auth_prepare_roles(string $username, array $roles): array
+{
+    $normalized = [];
+    foreach ($roles as $role) {
+        $roleName = auth_normalize_role_name((string) $role);
+        if ($roleName !== null && !in_array($roleName, $normalized, true)) {
+            $normalized[] = $roleName;
+        }
+    }
+    if (!$normalized) {
+        $normalized[] = SIGNAGE_AUTH_DEFAULT_ROLE;
+    }
+    return auth_enforce_protected_roles($username, $normalized);
+}
+
+
 function auth_users_public_payload(array $user): array
 {
     return [
@@ -190,38 +227,17 @@ function auth_users_public_payload(array $user): array
 
 function auth_users_path(): string
 {
-    $custom = getenv('USERS_PATH');
-    if (is_string($custom) && $custom !== '') {
-        return $custom;
-    }
-    if (!empty($_ENV['USERS_PATH'])) {
-        return (string) $_ENV['USERS_PATH'];
-    }
-    return signage_data_path(SIGNAGE_AUTH_USERS_FILE);
+    return auth_resolve_config_path('USERS_PATH', SIGNAGE_AUTH_USERS_FILE);
 }
 
 function auth_audit_path(): string
 {
-    $custom = getenv('AUDIT_PATH');
-    if (is_string($custom) && $custom !== '') {
-        return $custom;
-    }
-    if (!empty($_ENV['AUDIT_PATH'])) {
-        return (string) $_ENV['AUDIT_PATH'];
-    }
-    return signage_data_path(SIGNAGE_AUTH_AUDIT_FILE);
+    return auth_resolve_config_path('AUDIT_PATH', SIGNAGE_AUTH_AUDIT_FILE);
 }
 
 function auth_basic_path(): string
 {
-    $custom = getenv('BASIC_AUTH_FILE');
-    if (is_string($custom) && $custom !== '') {
-        return $custom;
-    }
-    if (!empty($_ENV['BASIC_AUTH_FILE'])) {
-        return (string) $_ENV['BASIC_AUTH_FILE'];
-    }
-    return signage_data_path(SIGNAGE_AUTH_BASIC_FILE);
+    return auth_resolve_config_path('BASIC_AUTH_FILE', SIGNAGE_AUTH_BASIC_FILE);
 }
 
 function auth_users_default(): array
@@ -249,27 +265,9 @@ function auth_users_normalize(array $state): array
                 'password' => isset($entry['password']) && is_string($entry['password'])
                     ? $entry['password']
                     : null,
-                'roles' => [],
             ];
-            $roles = $entry['roles'] ?? $entry['role'] ?? [];
-            if (is_string($roles)) {
-                $roles = preg_split('/[,\s]+/', $roles) ?: [];
-            }
-            if (is_array($roles)) {
-                foreach ($roles as $role) {
-                    $roleName = auth_normalize_role_name((string) $role);
-                    if ($roleName === null) {
-                        continue;
-                    }
-                    if (!in_array($roleName, $user['roles'], true)) {
-                        $user['roles'][] = $roleName;
-                    }
-                }
-            }
-            if (!$user['roles']) {
-                $user['roles'][] = SIGNAGE_AUTH_DEFAULT_ROLE;
-            }
-            $user['roles'] = auth_enforce_protected_roles($username, $user['roles']);
+            $roleCandidates = auth_roles_to_array($entry['roles'] ?? $entry['role'] ?? []);
+            $user['roles'] = auth_prepare_roles($username, $roleCandidates);
             $version = isset($entry['permissionsVersion']) ? (int) $entry['permissionsVersion'] : 1;
             if ($version < 1) {
                 $version = 1;
@@ -408,20 +406,7 @@ function auth_users_set(array $user): void
     $current = $state['users'][$key] ?? [];
     $merged = array_merge($current, $user);
     $merged['username'] = $key;
-    if (!empty($merged['roles']) && is_array($merged['roles'])) {
-        $normalizedRoles = [];
-        foreach ($merged['roles'] as $role) {
-            $roleName = auth_normalize_role_name((string) $role);
-            if ($roleName !== null) {
-                $normalizedRoles[] = $roleName;
-            }
-        }
-        $merged['roles'] = array_values(array_unique($normalizedRoles));
-    }
-    if (empty($merged['roles'])) {
-        $merged['roles'] = [SIGNAGE_AUTH_DEFAULT_ROLE];
-    }
-    $merged['roles'] = auth_enforce_protected_roles($key, $merged['roles']);
+    $merged['roles'] = auth_prepare_roles($key, auth_roles_to_array($merged['roles'] ?? []));
     $merged['permissions'] = auth_normalize_permissions($merged['permissions'] ?? null, $merged['roles']);
     $merged['permissionsVersion'] = SIGNAGE_AUTH_PERMISSIONS_VERSION;
     $state['users'][$key] = $merged;
