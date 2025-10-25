@@ -5,6 +5,7 @@ import {
   PROTECTED_ADMIN_USERNAME,
   ROLE_META,
   PERMISSION_META,
+  getPermissionTree,
   mergeAvailablePermissions,
   resolvePermissionsForRoles,
   normalizeRoleName,
@@ -53,7 +54,10 @@ function renderAccessOption({
   description
 }) {
   const label = document.createElement('label');
-  label.className = `user-${name}-option user-access-option`;
+  const isPermission = name === 'permissions';
+  label.className = `user-access-option ${
+    isPermission ? 'user-permission-option' : 'user-role-option'
+  }`;
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.name = name;
@@ -61,18 +65,91 @@ function renderAccessOption({
   checkbox.checked = checked;
   checkbox.disabled = disabled;
   const copy = document.createElement('div');
-  copy.className = 'user-role-copy';
+  const copyClass = isPermission ? 'user-permission-copy' : 'user-role-copy';
+  copy.className = copyClass;
   const titleEl = document.createElement('span');
-  titleEl.className = 'role-title';
+  titleEl.className = isPermission ? 'permission-title' : 'role-title';
   titleEl.textContent = title;
   const desc = document.createElement('small');
-  desc.textContent = description;
+  desc.className = isPermission ? 'permission-desc' : 'role-desc';
+  if (description) {
+    desc.textContent = description;
+    desc.hidden = false;
+  } else {
+    desc.textContent = '';
+    desc.hidden = true;
+  }
   copy.appendChild(titleEl);
   copy.appendChild(desc);
   label.appendChild(checkbox);
   label.appendChild(copy);
-  return { label, checkbox };
+  return { label, checkbox, copy };
 }
+
+const filterPermissionTree = (nodes, allowedSet) =>
+  nodes
+    .map((node) => {
+      const includeSelf = allowedSet.has(node.key);
+      const children = node.children?.length
+        ? filterPermissionTree(node.children, allowedSet)
+        : [];
+      if (!includeSelf && children.length === 0) {
+        return null;
+      }
+      return {
+        key: node.key,
+        title: node.title,
+        description: node.description,
+        children
+      };
+    })
+    .filter((node) => node !== null);
+
+const renderPermissionTreeNodes = ({
+  container,
+  nodes,
+  selection,
+  checkboxes,
+  level = 0
+}) => {
+  nodes.forEach((node) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'permission-tree-node';
+    wrapper.dataset.permissionKey = node.key;
+    const { label, checkbox, copy } = renderAccessOption({
+      name: 'permissions',
+      value: node.key,
+      checked: selection.has(node.key),
+      disabled: false,
+      title: node.title,
+      description: node.description
+    });
+    label.dataset.permissionKey = node.key;
+    label.dataset.treeLevel = String(level);
+    if (node.children.length) {
+      label.classList.add('is-group');
+      const badge = document.createElement('span');
+      badge.className = 'user-option-badge';
+      badge.textContent = 'Bereich';
+      copy.appendChild(badge);
+    }
+    wrapper.appendChild(label);
+    checkboxes.push(checkbox);
+    if (node.children.length) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'permission-tree-children';
+      renderPermissionTreeNodes({
+        container: childrenContainer,
+        nodes: node.children,
+        selection,
+        checkboxes,
+        level: level + 1
+      });
+      wrapper.appendChild(childrenContainer);
+    }
+    container.appendChild(wrapper);
+  });
+};
 
 export function renderRoleOptions({
   container,
@@ -131,19 +208,24 @@ export function renderPermissionOptions({
         .filter(Boolean)
     : [];
   container.innerHTML = '';
+  const allowed = new Set(normalizedPermissions);
+  const tree = filterPermissionTree(getPermissionTree(), allowed);
+  if (!tree.length) {
+    const empty = document.createElement('p');
+    empty.className = 'mut';
+    empty.textContent = 'Keine Bereiche verfügbar.';
+    container.appendChild(empty);
+    return [];
+  }
+  const treeRoot = document.createElement('div');
+  treeRoot.className = 'permission-tree';
+  container.appendChild(treeRoot);
   const checkboxes = [];
-  normalizedPermissions.forEach((permissionName) => {
-    const meta = permissionMetaFor(permissionName);
-    const { label, checkbox } = renderAccessOption({
-      name: 'permissions',
-      value: permissionName,
-      checked: selection.has(permissionName),
-      disabled: false,
-      title: meta.title,
-      description: meta.description
-    });
-    container.appendChild(label);
-    checkboxes.push(checkbox);
+  renderPermissionTreeNodes({
+    container: treeRoot,
+    nodes: tree,
+    selection,
+    checkboxes
   });
   return checkboxes;
 }
