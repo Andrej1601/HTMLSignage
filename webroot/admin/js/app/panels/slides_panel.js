@@ -1130,6 +1130,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       settings.audio.background = backgroundState;
 
       const enabledInput = document.getElementById('bgAudioEnabled');
+      const enabledLabel = document.getElementById('bgAudioEnabledLabel');
+      const enableSwitch = document.getElementById('bgAudioEnableSwitch');
       const trackSelect = document.getElementById('bgAudioTrackSelect');
       const labelInput = document.getElementById('bgAudioTrackLabel');
       const srcInput = document.getElementById('bgAudioSrc');
@@ -1137,7 +1139,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const clearBtn = document.getElementById('bgAudioClear');
       const volumeInput = document.getElementById('bgAudioVolume');
       const loopInput = document.getElementById('bgAudioLoop');
-      const applyBtn = document.getElementById('bgAudioTrackApply');
       const saveBtn = document.getElementById('bgAudioTrackSave');
       const createBtn = document.getElementById('bgAudioTrackCreate');
       const deleteBtn = document.getElementById('bgAudioTrackDelete');
@@ -1163,7 +1164,16 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         const active = getTrack(backgroundState.activeTrack);
         const isEnabled = !!(backgroundState.enabled && active && active.src);
         backgroundState.enabled = isEnabled;
-        if (enabledInput) enabledInput.checked = isEnabled;
+        if (enabledInput) {
+          enabledInput.checked = isEnabled;
+          enabledInput.setAttribute('aria-checked', isEnabled ? 'true' : 'false');
+        }
+        if (enableSwitch) {
+          enableSwitch.classList.toggle('is-on', isEnabled);
+        }
+        if (enabledLabel) {
+          enabledLabel.textContent = isEnabled ? 'Aktiv' : 'Aus';
+        }
       };
 
       const refreshTrackSelect = () => {
@@ -1233,16 +1243,23 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
 
       syncUI();
 
-      if (trackSelect && !trackSelect.dataset.bound) {
-        trackSelect.dataset.bound = '1';
-        trackSelect.addEventListener('change', () => {
-          const nextId = trackSelect.value;
-          if (nextId && getTrack(nextId)) {
-            currentTrackId = nextId;
-          }
-          updateInputs();
-        });
-      }
+        if (trackSelect && !trackSelect.dataset.bound) {
+          trackSelect.dataset.bound = '1';
+          trackSelect.addEventListener('change', () => {
+            const nextId = trackSelect.value;
+            const hasTrack = nextId && getTrack(nextId);
+            if (hasTrack) {
+              currentTrackId = nextId;
+              backgroundState.activeTrack = nextId;
+            } else if (!nextId) {
+              backgroundState.activeTrack = '';
+            }
+            updateInputs();
+            ensureEnabledState();
+            notifySettingsChanged();
+            renderStyleAutomationControls();
+          });
+        }
 
       if (labelInput && !labelInput.dataset.bound) {
         labelInput.dataset.bound = '1';
@@ -1370,17 +1387,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         });
       }
 
-      if (applyBtn && !applyBtn.dataset.bound) {
-        applyBtn.dataset.bound = '1';
-        applyBtn.addEventListener('click', () => {
-          if (!currentTrackId || !getTrack(currentTrackId)) return;
-          backgroundState.activeTrack = currentTrackId;
-          ensureEnabledState();
-          notifySettingsChanged();
-          renderStyleAutomationControls();
-        });
-      }
-
       if (saveBtn && !saveBtn.dataset.bound) {
         saveBtn.dataset.bound = '1';
         saveBtn.addEventListener('click', () => {
@@ -1402,7 +1408,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             volume: baseVolume,
             loop: defaults.loop === false ? false : true
           };
-          backgroundState.activeTrack = backgroundState.activeTrack || newId;
+          backgroundState.activeTrack = newId;
           currentTrackId = newId;
           sanitizeAndSync();
           notifySettingsChanged();
