@@ -86,6 +86,105 @@ function renderAccessOption({
   return { label, checkbox, copy };
 }
 
+function ensureRelationEntry(relations, key) {
+  if (!relations || !key) return null;
+  if (!relations.has(key)) {
+    relations.set(key, {
+      key,
+      parent: null,
+      children: [],
+      checkbox: null,
+      label: null,
+      wrapper: null,
+      level: 0
+    });
+  }
+  return relations.get(key);
+}
+
+function registerRelationNode(relations, { key, parent, checkbox, label, wrapper, level }) {
+  if (!relations || !key) return;
+  const entry = ensureRelationEntry(relations, key);
+  entry.key = key;
+  entry.checkbox = checkbox || null;
+  entry.label = label || null;
+  entry.wrapper = wrapper || null;
+  entry.level = Number.isFinite(level) ? level : 0;
+  entry.parent = parent || null;
+  entry.children = [];
+  if (parent) {
+    const parentEntry = ensureRelationEntry(relations, parent);
+    parentEntry.children.push(key);
+  }
+}
+
+function applyPermissionTreeInteractions(relations) {
+  if (!relations || !(relations instanceof Map)) return;
+
+  const updateEntryVisualState = (entry) => {
+    if (!entry || !entry.label || !entry.checkbox) return;
+    entry.label.classList.toggle('is-checked', !!entry.checkbox.checked);
+    entry.label.classList.toggle('is-partial', !!entry.checkbox.indeterminate);
+  };
+
+  const setDescendantsChecked = (entry, checked) => {
+    if (!entry || !entry.children || !entry.children.length) return;
+    entry.children.forEach((childKey) => {
+      const childEntry = relations.get(childKey);
+      if (!childEntry || !childEntry.checkbox) return;
+      childEntry.checkbox.checked = !!checked;
+      childEntry.checkbox.indeterminate = false;
+      updateEntryVisualState(childEntry);
+      setDescendantsChecked(childEntry, checked);
+    });
+  };
+
+  const updateAncestorState = (key) => {
+    const entry = relations.get(key);
+    if (!entry || !entry.parent) return;
+    const parentEntry = relations.get(entry.parent);
+    if (!parentEntry || !parentEntry.checkbox) return;
+    const childEntries = parentEntry.children
+      .map((childKey) => relations.get(childKey))
+      .filter((child) => child && child.checkbox);
+    if (!childEntries.length) {
+      parentEntry.checkbox.checked = false;
+      parentEntry.checkbox.indeterminate = false;
+    } else {
+      const allChecked = childEntries.every(
+        (child) => child.checkbox.checked && !child.checkbox.indeterminate
+      );
+      const anyChecked = childEntries.some(
+        (child) => child.checkbox.checked || child.checkbox.indeterminate
+      );
+      parentEntry.checkbox.checked = anyChecked;
+      parentEntry.checkbox.indeterminate = anyChecked && !allChecked;
+    }
+    updateEntryVisualState(parentEntry);
+    updateAncestorState(parentEntry.key);
+  };
+
+  const entries = Array.from(relations.values());
+  entries.forEach((entry) => updateEntryVisualState(entry));
+  entries.forEach((entry) => {
+    if (!entry.children || !entry.children.length) {
+      updateAncestorState(entry.key);
+    }
+  });
+
+  entries.forEach((entry) => {
+    if (!entry || !entry.checkbox) return;
+    entry.checkbox.addEventListener('change', () => {
+      if (entry.children && entry.children.length) {
+        setDescendantsChecked(entry, entry.checkbox.checked);
+        entry.checkbox.indeterminate = false;
+      }
+      updateEntryVisualState(entry);
+      updateAncestorState(entry.key);
+    });
+  });
+}
+
 const filterPermissionTree = (nodes, allowedSet) =>
   nodes
     .map((node) => {
@@ -110,12 +209,16 @@ const renderPermissionTreeNodes = ({
   nodes,
   selection,
   checkboxes,
-  level = 0
+  relations,
+  level = 0,
+  parentKey = null
 }) => {
   nodes.forEach((node) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'permission-tree-node';
     wrapper.dataset.permissionKey = node.key;
+    wrapper.dataset.treeLevel = String(level);
+    wrapper.classList.add(`permission-tree-level-${level}`);
     const { label, checkbox, copy } = renderAccessOption({
       name: 'permissions',
       value: node.key,
@@ -135,6 +238,14 @@ const renderPermissionTreeNodes = ({
     }
     wrapper.appendChild(label);
     checkboxes.push(checkbox);
+    registerRelationNode(relations, {
+      key: node.key,
+      parent: parentKey,
+      checkbox,
+      label,
+      wrapper,
+      level
+    });
     if (node.children.length) {
       const childrenContainer = document.createElement('div');
       childrenContainer.className = 'permission-tree-children';
@@ -143,7 +254,9 @@ const renderPermissionTreeNodes = ({
         nodes: node.children,
         selection,
         checkboxes,
-        level: level + 1
+        relations,
+        level: level + 1,
+        parentKey: node.key
       });
       wrapper.appendChild(childrenContainer);
     }
@@ -183,6 +296,11 @@ export function renderRoleOptions({
     if (checkbox.disabled) {
       label.title = 'Der ursprüngliche Admin behält immer die Admin-Rolle.';
     }
+    const updateRoleState = () => {
+      label.classList.toggle('is-checked', !!checkbox.checked);
+    };
+    checkbox.addEventListener('change', updateRoleState);
+    updateRoleState();
     container.appendChild(label);
     checkboxes.push(checkbox);
   });
@@ -221,12 +339,15 @@ export function renderPermissionOptions({
   treeRoot.className = 'permission-tree';
   container.appendChild(treeRoot);
   const checkboxes = [];
+  const relations = new Map();
   renderPermissionTreeNodes({
     container: treeRoot,
     nodes: tree,
     selection,
-    checkboxes
+    checkboxes,
+    relations
   });
+  applyPermissionTreeInteractions(relations);
   return checkboxes;
 }
 

@@ -1024,7 +1024,11 @@ function resolveAutomationSelection() {
   const fallbackStyle = (automation?.fallbackStyle && styleSets[automation.fallbackStyle])
     ? automation.fallbackStyle
     : (savedActive || availableIds[0]);
-  const trackCandidates = [automation?.fallbackTrack, settings?.audio?.background?.activeTrack, styleAutomationState.baseAudioTrack];
+  const trackCandidates = [
+    settings?.audio?.background?.activeTrack,
+    automation?.fallbackTrack,
+    styleAutomationState.baseAudioTrack
+  ];
   let fallbackTrack = null;
   for (const candidate of trackCandidates) {
     if (candidate && backgroundTracks[candidate]) {
