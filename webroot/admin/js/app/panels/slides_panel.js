@@ -1243,23 +1243,22 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
 
       syncUI();
 
-        if (trackSelect && !trackSelect.dataset.bound) {
-          trackSelect.dataset.bound = '1';
-          trackSelect.addEventListener('change', () => {
-            const nextId = trackSelect.value;
-            const hasTrack = nextId && getTrack(nextId);
-            if (hasTrack) {
-              currentTrackId = nextId;
-              backgroundState.activeTrack = nextId;
-            } else if (!nextId) {
-              backgroundState.activeTrack = '';
-            }
-            updateInputs();
-            ensureEnabledState();
-            notifySettingsChanged();
-            renderStyleAutomationControls();
-          });
-        }
+      if (trackSelect && !trackSelect.dataset.bound) {
+        trackSelect.dataset.bound = '1';
+        trackSelect.addEventListener('change', () => {
+          const nextId = trackSelect.value;
+          const hasTrack = nextId && getTrack(nextId);
+          if (hasTrack) {
+            currentTrackId = nextId;
+            backgroundState.activeTrack = nextId;
+          } else if (!nextId) {
+            backgroundState.activeTrack = '';
+          }
+          sanitizeAndSync();
+          notifySettingsChanged();
+          renderStyleAutomationControls();
+        });
+      }
 
       if (labelInput && !labelInput.dataset.bound) {
         labelInput.dataset.bound = '1';
@@ -1345,8 +1344,9 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           } else {
             backgroundState.enabled = false;
           }
-          ensureEnabledState();
+          sanitizeAndSync();
           notifySettingsChanged();
+          renderStyleAutomationControls();
         });
       }
 

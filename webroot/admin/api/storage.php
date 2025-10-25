@@ -937,6 +937,32 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     return $normalized;
 }
 
+function signage_truthy(mixed $value, bool $fallback = true): bool
+{
+    if ($value === null) {
+        return $fallback;
+    }
+    if (is_bool($value)) {
+        return $value;
+    }
+    if (is_int($value) || is_float($value)) {
+        return (float) $value !== 0.0;
+    }
+    if (is_string($value)) {
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return $fallback;
+        }
+        if (in_array($normalized, ['false', '0', 'off', 'no'], true)) {
+            return false;
+        }
+        if (in_array($normalized, ['true', '1', 'on', 'yes'], true)) {
+            return true;
+        }
+    }
+    return $fallback;
+}
+
 function signage_normalize_audio_track($input, array $fallback, array $global): array
 {
     $track = is_array($input) ? $input : [];
@@ -1044,7 +1070,7 @@ function signage_normalize_background_audio($input, array $default): array
         }
     }
 
-    $desiredEnabled = ($state['enabled'] ?? true) !== false;
+    $desiredEnabled = signage_truthy($state['enabled'] ?? null, true);
     $activeEntry = ($activeTrack !== '' && isset($tracks[$activeTrack])) ? $tracks[$activeTrack] : null;
     $enabled = $desiredEnabled && $activeEntry && $activeEntry['src'] !== '';
 

@@ -28,9 +28,20 @@ export const ROLE_META = {
 
 export const PERMISSION_ALIASES = {
   overview: 'cockpit',
-  slideshows: 'slides',
-  info: 'global-info',
-  users: 'user-admin'
+  slideshows: 'module-slideshow',
+  slides: 'module-slideshow',
+  'slides-flow': 'slideshow-display',
+  'slides-automation': 'slideshow-automation',
+  media: 'content-media',
+  footnotes: 'content-footnotes',
+  badges: 'content-badges',
+  info: 'content-global',
+  'global-info': 'content-global',
+  colors: 'design-colors',
+  system: 'module-system',
+  users: 'user-admin',
+  design: 'module-design',
+  content: 'module-content'
 };
 
 export const PERMISSION_META = {
@@ -38,39 +49,79 @@ export const PERMISSION_META = {
     title: 'Cockpit & Übersicht',
     description: 'Zugriff auf die Übersichtskacheln und Schnellaktionen.'
   },
-  slides: {
-    title: 'Slideshow & Layout',
-    description: 'Allgemeine Slideshow-Einstellungen und Layout anpassen.'
+  'module-content': {
+    title: 'Modul: Inhalt',
+    description: 'Saunen, Fußnoten, Zusatzinfos und Medien im Inhaltsbereich anzeigen.'
   },
-  'slides-flow': {
-    title: 'Ablauf & Zeiten',
-    description: 'Dauer, Übergänge und Wiedergabe-Verhalten konfigurieren.'
+  'content-saunas': {
+    title: 'Saunen & Übersicht',
+    description: 'Aufgusszeiten, Sauna-Liste und Inventar pflegen.'
   },
-  'slides-automation': {
-    title: 'Automationen',
-    description: 'Zeit- und Stil-Automationen verwalten.'
-  },
-  media: {
-    title: 'Medien',
-    description: 'Medien-Slides hinzufügen, sortieren und konfigurieren.'
-  },
-  footnotes: {
+  'content-footnotes': {
     title: 'Fußnoten',
     description: 'Fußnoten verwalten und Darstellung festlegen.'
   },
-  badges: {
+  'content-badges': {
     title: 'Badges',
     description: 'Badge-Bibliothek mit Icons und Labels pflegen.'
   },
-  'global-info': {
-    title: 'Infobox',
-    description: 'Globale Informationen und Hinweise pflegen.'
+  'content-global': {
+    title: 'Globale Zusatzinfos',
+    description: 'Info-Module, Wellness-Tipps und Stories bearbeiten.'
   },
-  colors: {
-    title: 'Farben & Layout',
-    description: 'Farbpaletten, Schriftvarianten und Layout-Einstellungen anpassen.'
+  'content-global-wellness': {
+    title: 'Wellness-Tipps',
+    description: 'Wellness-Einträge hinzufügen und sortieren.'
   },
-  system: {
+  'content-global-events': {
+    title: 'Event-Countdowns',
+    description: 'Countdowns und Hero-Timeline konfigurieren.'
+  },
+  'content-global-modules': {
+    title: 'Info-Module',
+    description: 'Individuelle Informationsmodule verwalten.'
+  },
+  'content-global-stories': {
+    title: 'Story-Slides',
+    description: 'Story-Baukasten und Inhalte anpassen.'
+  },
+  'content-media': {
+    title: 'Medien-Slides',
+    description: 'Bilder- und Video-Slides verwalten.'
+  },
+  'module-slideshow': {
+    title: 'Modul: Slideshow',
+    description: 'Slideshow-Bereich mit Automation, Musik und Darstellung anzeigen.'
+  },
+  'slideshow-automation': {
+    title: 'Automatisierung',
+    description: 'Zeit- und Stil-Automationen verwalten.'
+  },
+  'slideshow-audio': {
+    title: 'Hintergrundmusik',
+    description: 'Musik-Presets und Wiedergabe konfigurieren.'
+  },
+  'slideshow-display': {
+    title: 'Darstellung & Seiten',
+    description: 'Layout, Seiten und Ablaufzeiten festlegen.'
+  },
+  'module-design': {
+    title: 'Modul: Design-Editor',
+    description: 'Design-Paletten, Typografie und Farben bearbeiten.'
+  },
+  'design-palettes': {
+    title: 'Style-Paletten',
+    description: 'Paletten anlegen, speichern und aktivieren.'
+  },
+  'design-typography': {
+    title: 'Typografie & Layout',
+    description: 'Schriftarten, Layout- und Komponenten-Einstellungen anpassen.'
+  },
+  'design-colors': {
+    title: 'Farben & Zeitspalte',
+    description: 'Farbpaletten und Zeitspaltenfarben konfigurieren.'
+  },
+  'module-system': {
     title: 'System & Wartung',
     description: 'Daten importieren/exportieren und Aufräumaktionen ausführen.'
   },
@@ -85,9 +136,31 @@ export const PERMISSION_META = {
 };
 
 export const ROLE_DEFAULT_PERMISSIONS = {
-  saunameister: ['cockpit', 'footnotes', 'badges'],
-  editor: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices'],
-  admin: ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin']
+  saunameister: ['cockpit', 'module-content', 'content-footnotes', 'content-badges'],
+  editor: [
+    'cockpit',
+    'module-content',
+    'content-saunas',
+    'content-footnotes',
+    'content-badges',
+    'content-global',
+    'content-global-wellness',
+    'content-global-events',
+    'content-global-modules',
+    'content-global-stories',
+    'content-media',
+    'module-slideshow',
+    'slideshow-automation',
+    'slideshow-audio',
+    'slideshow-display',
+    'module-design',
+    'design-palettes',
+    'design-typography',
+    'design-colors',
+    'module-system',
+    'devices'
+  ],
+  admin: Object.keys(PERMISSION_META)
 };
 
 export const normalizeRoleName = (role) => {

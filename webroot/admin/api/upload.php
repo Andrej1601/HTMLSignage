@@ -2,7 +2,7 @@
 require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/storage.php';
 
-auth_require_permission('media');
+auth_require_permission('content-media');
 
 // Zweck: Sicheren Upload von Medien nach /assets/media/ (Bilder, Videos)
 // Hinweise: Nginx client_max_body_size & PHP upload_max_filesize/post_max_size müssen groß genug sein.

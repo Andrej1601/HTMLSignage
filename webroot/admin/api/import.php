@@ -2,7 +2,7 @@
 require_once __DIR__ . '/auth/guard.php';
 require_once __DIR__ . '/storage.php';
 
-auth_require_permission('system');
+auth_require_permission('module-system');
 
 header('Content-Type: application/json; charset=UTF-8');
 

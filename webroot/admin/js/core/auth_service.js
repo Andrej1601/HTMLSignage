@@ -4,15 +4,61 @@ import { fetchJson } from './utils.js';
 
 const API_BASE = '/admin/api/auth';
 const DEFAULT_ROLES = ['saunameister', 'editor', 'admin'];
-const DEFAULT_PERMISSIONS = ['cockpit', 'slides', 'slides-flow', 'slides-automation', 'media', 'footnotes', 'badges', 'global-info', 'colors', 'system', 'devices', 'user-admin'];
+const DEFAULT_PERMISSIONS = [
+  'cockpit',
+  'module-content',
+  'content-saunas',
+  'content-footnotes',
+  'content-badges',
+  'content-global',
+  'content-global-wellness',
+  'content-global-events',
+  'content-global-modules',
+  'content-global-stories',
+  'content-media',
+  'module-slideshow',
+  'slideshow-automation',
+  'slideshow-audio',
+  'slideshow-display',
+  'module-design',
+  'design-palettes',
+  'design-typography',
+  'design-colors',
+  'module-system',
+  'devices',
+  'user-admin'
+];
 
 const normalizePermissionName = (permission) => {
   const name = String(permission || '').toLowerCase();
   if (!name) return null;
   switch (name) {
     case 'overview': return 'cockpit';
-    case 'slideshows': return 'slides';
-    case 'info': return 'global-info';
+    case 'slideshows':
+    case 'slideshow':
+    case 'slides':
+      return 'module-slideshow';
+    case 'slides-flow':
+      return 'slideshow-display';
+    case 'slides-automation':
+      return 'slideshow-automation';
+    case 'media':
+      return 'content-media';
+    case 'footnotes':
+      return 'content-footnotes';
+    case 'badges':
+      return 'content-badges';
+    case 'info':
+    case 'global-info':
+      return 'content-global';
+    case 'colors':
+      return 'design-colors';
+    case 'system':
+      return 'module-system';
+    case 'design':
+      return 'module-design';
+    case 'content':
+      return 'module-content';
     case 'users': return 'user-admin';
     default: return name;
   }

@@ -17,6 +17,19 @@ export function sanitizeBackgroundAudio(input = {}, defaults = {}) {
   const cfg = input && typeof input === 'object' ? input : {};
   const def = defaults && typeof defaults === 'object' ? defaults : {};
 
+  const normalizeEnabled = (value, fallback = true) => {
+    if (value === undefined) return fallback;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (!normalized) return fallback;
+      if (['false', '0', 'off', 'no'].includes(normalized)) return false;
+      if (['true', '1', 'on', 'yes'].includes(normalized)) return true;
+    }
+    return fallback;
+  };
+
   const sanitizeTrack = (track = {}, fallback = {}) => {
     const raw = track && typeof track === 'object' ? track : {};
     const fb = fallback && typeof fallback === 'object' ? fallback : {};
@@ -96,7 +109,7 @@ export function sanitizeBackgroundAudio(input = {}, defaults = {}) {
     }
   }
 
-  const desiredEnabled = cfg.enabled !== false;
+  const desiredEnabled = normalizeEnabled(cfg.enabled, true);
   const activeEntry = activeTrack && tracks[activeTrack] ? tracks[activeTrack] : null;
   const enabled = !!(desiredEnabled && activeEntry && activeEntry.src);
 

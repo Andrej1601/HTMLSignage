@@ -151,6 +151,19 @@ function ensureBackgroundAudioElement() {
   return audio;
 }
 
+function normalizeBooleanFlag(value, fallback = true) {
+  if (value === undefined) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (['false', '0', 'off', 'no'].includes(normalized)) return false;
+    if (['true', '1', 'on', 'yes'].includes(normalized)) return true;
+  }
+  return fallback;
+}
+
 function normalizeBackgroundAudioConfig(config = {}) {
   const cfg = config && typeof config === 'object' ? config : {};
 
@@ -195,7 +208,7 @@ function normalizeBackgroundAudioConfig(config = {}) {
     activeTrack = trackMap.size ? trackMap.keys().next().value : '';
   }
 
-  const desiredEnabled = cfg.enabled !== false;
+  const desiredEnabled = normalizeBooleanFlag(cfg.enabled, true);
   const activeEntry = activeTrack && trackMap.get(activeTrack) ? trackMap.get(activeTrack) : null;
   const enabled = !!(desiredEnabled && activeEntry && activeEntry.src);
 
