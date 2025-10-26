@@ -60,55 +60,20 @@ function gather_asset_paths($source): array {
   return array_keys($paths);
 }
 
-function classify_asset_type(string $mime, ?string $rel = null): string
-{
-  $normalizedMime = strtolower(trim($mime));
-  if ($normalizedMime === '') {
-    $normalizedMime = 'application/octet-stream';
-  }
-  if (str_starts_with($normalizedMime, 'image/')) {
-    return 'image';
-  }
-  if (str_starts_with($normalizedMime, 'video/')) {
-    return 'video';
-  }
-  if (str_starts_with($normalizedMime, 'audio/')) {
-    return 'audio';
-  }
-
-  $extension = strtolower((string) pathinfo((string) $rel, PATHINFO_EXTENSION));
-  if (in_array($extension, ['png','jpg','jpeg','gif','webp','svg','avif'], true)) {
-    return 'image';
-  }
-  if (in_array($extension, ['mp4','m4v','webm','ogv','mov','avi','mkv'], true)) {
-    return 'video';
-  }
-  if (in_array($extension, ['mp3','ogg','oga','wav','aac','flac','m4a'], true)) {
-    return 'audio';
-  }
-
-  return 'document';
-}
-
-$legacyInclude = get_flag('include', 0);  // Unterstützung für ältere Clients
-$incImages     = get_flag('includeImages', $legacyInclude);
-$incVideos     = get_flag('includeVideos', $legacyInclude);
-$incAudio      = get_flag('includeAudio', $legacyInclude);
-$incDocuments  = get_flag('includeDocuments', $legacyInclude);
-$incSettings   = get_flag('settings', 1);
-$incSchedule   = get_flag('schedule', 1);
-$includeAny    = ($incImages || $incVideos || $incAudio || $incDocuments);
+$include     = get_flag('include', 0);  // Bilder
+$incSettings = get_flag('settings', 1);
+$incSchedule = get_flag('schedule', 1);
 
 if (!export_sqlite_available()) {
   export_fail(500, ['ok' => false, 'error' => 'sqlite-unavailable']);
 }
 
-$settings = ($incSettings || $includeAny) ? signage_read_json('settings.json') : null;
-$schedule = ($incSchedule || $includeAny) ? signage_read_json('schedule.json') : null;
+$settings = ($incSettings || $include) ? signage_read_json('settings.json') : null;
+$schedule = ($incSchedule || $include) ? signage_read_json('schedule.json') : null;
 
 $assetEntries = [];
 
-if ($includeAny) {
+if ($include) {
   $pathSet = [];
   if ($incSettings && is_array($settings)) {
     foreach (gather_asset_paths($settings) as $rel) {
@@ -127,11 +92,6 @@ if ($includeAny) {
       $abs = signage_absolute_path($rel);
       if (!is_file($abs)) continue;
       $mime = $fi->file($abs) ?: 'application/octet-stream';
-      $type = classify_asset_type($mime, $rel);
-      if ($type === 'image' && !$incImages) continue;
-      if ($type === 'video' && !$incVideos) continue;
-      if ($type === 'audio' && !$incAudio) continue;
-      if ($type === 'document' && !$incDocuments) continue;
       $data = @file_get_contents($abs);
       if ($data === false) continue;
       $assetEntries[] = [
@@ -181,10 +141,7 @@ try {
     'kind' => 'signage-export',
     'version' => '2',
     'exportedAt' => gmdate('c'),
-    'includeImages' => $incImages ? '1' : '0',
-    'includeVideos' => $incVideos ? '1' : '0',
-    'includeAudio' => $incAudio ? '1' : '0',
-    'includeDocuments' => $incDocuments ? '1' : '0',
+    'includeImages' => $include ? '1' : '0',
     'includesSettings' => $incSettings ? '1' : '0',
     'includesSchedule' => $incSchedule ? '1' : '0',
   ];
@@ -224,12 +181,7 @@ try {
 }
 
 $name = isset($_GET['name']) ? preg_replace('/[^A-Za-z0-9_.-]/','_', $_GET['name']) : ('signage_export_'.date('Ymd'));
-$suffixParts = [];
-if ($incImages) $suffixParts[] = 'img';
-if ($incVideos) $suffixParts[] = 'vid';
-if ($incAudio) $suffixParts[] = 'aud';
-if ($incDocuments) $suffixParts[] = 'files';
-$fileName = $name . (!empty($suffixParts) ? '_with-' . implode('-', $suffixParts) : '') . '.sqlite';
+$fileName = $name . ($include ? '_with-images' : '') . '.sqlite';
 header('Content-Type: application/x-sqlite3');
 header('Content-Disposition: attachment; filename="' . $fileName . '"');
 header('X-Content-Type-Options: nosniff');

@@ -837,113 +837,73 @@
         <summary>
           <div class="ttl">▶<span class="chev">⮞</span> System</div>
         </summary>
-        <div class="content sys-content">
-          <div class="settings-card sys-card">
-            <div class="settings-card-head">
-              <div class="settings-card-title">Backup &amp; Wiederherstellung</div>
-              <p class="settings-card-description">Sichern oder importieren Sie Einstellungen, Zeitpläne und Medien.</p>
+        <div class="content">
+          <div class="sys-grid">
+            <div class="sys-action">
+              <button class="btn icon-label" id="btnExport">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 3a1 1 0 0 1 .82.42l4 5.5A1 1 0 0 1 16 10h-3v6a1 1 0 1 1-2 0v-6H8a1 1 0 0 1-.82-1.58l4-5.5A1 1 0 0 1 12 3zm8 16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2h16z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Export</span>
+              </button>
             </div>
-            <div class="settings-card-body sys-card-body">
-              <div class="sys-grid">
-                <div class="sys-action">
-                  <button class="btn icon-label" id="btnExport">
-                    <span class="icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" role="img" focusable="false">
-                        <path d="M12 3a1 1 0 0 1 .82.42l4 5.5A1 1 0 0 1 16 10h-3v6a1 1 0 1 1-2 0v-6H8a1 1 0 0 1-.82-1.58l4-5.5A1 1 0 0 1 12 3zm8 16a1 1 0 0 1 0 2H4a1 1 0 0 1 0-2h16z" fill="currentColor"/>
-                      </svg>
-                    </span>
-                    <span>Export</span>
-                  </button>
-                </div>
-                <div class="sys-options">
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithSettings" checked>
-                    <span>Einst.</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithSchedule" checked>
-                    <span>Zeiten</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithImages">
-                    <span>Bilder</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithVideos">
-                    <span>Videos</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithAudio">
-                    <span>Audio</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="expWithDocuments">
-                    <span>Dateien</span>
-                  </label>
-                </div>
-                <div class="sys-action">
-                  <label class="btn icon-label sys-file-btn">
-                    <span class="icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" role="img" focusable="false">
-                        <path d="M12 21a1 1 0 0 1-.82-.42l-4-5.5A1 1 0 0 1 8 14h3V8a1 1 0 0 1 2 0v6h3a1 1 0 0 1 .82 1.58l-4 5.5A1 1 0 0 1 12 21zM4 5a1 1 0 0 1 0-2h16a1 1 0 0 1 0 2H4z" fill="currentColor"/>
-                      </svg>
-                    </span>
-                    <span>Import</span>
-                    <input id="importFile" type="file" accept="application/json,.json,application/x-sqlite3,application/vnd.sqlite3,.sqlite,.db">
-                  </label>
-                </div>
-                <div class="sys-options">
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteSettings" checked>
-                    <span>Einst.</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteSchedule" checked>
-                    <span>Zeiten</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteImages" checked>
-                    <span>Bilder</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteVideos" checked>
-                    <span>Videos</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteAudio" checked>
-                    <span>Audio</span>
-                  </label>
-                  <label class="btn sm ghost sys-toggle">
-                    <input type="checkbox" id="impWriteDocuments" checked>
-                    <span>Dateien</span>
-                  </label>
-                </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="expWithImg">
+                <span>Bilder</span>
+              </label>
+            </div>
+            <div class="sys-action">
+              <label class="btn icon-label sys-file-btn">
+                <span class="icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" role="img" focusable="false">
+                    <path d="M12 21a1 1 0 0 1-.82-.42l-4-5.5A1 1 0 0 1 8 14h3V8a1 1 0 0 1 2 0v6h3a1 1 0 0 1 .82 1.58l-4 5.5A1 1 0 0 1 12 21zM4 5a1 1 0 0 1 0-2h16a1 1 0 0 1 0 2H4z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>Import</span>
+                <input id="importFile" type="file" accept="application/json,.json,application/x-sqlite3,application/vnd.sqlite3,.sqlite,.db">
+              </label>
+            </div>
+            <div class="sys-options">
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSettings" checked>
+                <span>Einst.</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteSchedule" checked>
+                <span>Zeiten</span>
+              </label>
+              <label class="btn sm ghost sys-toggle">
+                <input type="checkbox" id="impWriteImg" checked>
+                <span>Bilder</span>
+              </label>
+            </div>
+            <div class="sys-progress" id="importProgress" hidden role="status" aria-live="polite">
+              <div class="sys-progress-bar" aria-hidden="true">
+                <div class="sys-progress-fill" data-role="progress-fill"></div>
               </div>
-              <div class="sys-progress" id="importProgress" hidden role="status" aria-live="polite">
-                <div class="sys-progress-bar" aria-hidden="true">
-                  <div class="sys-progress-fill" data-role="progress-fill"></div>
-                </div>
-                <div class="sys-progress-label" id="importProgressLabel">Import wird vorbereitet …</div>
-              </div>
-              <small class="help sys-help">Export/Import von Einstellungen, Zeitplänen und ausgewählten Medien-Typen.</small>
+              <div class="sys-progress-label" id="importProgressLabel">Import wird vorbereitet …</div>
             </div>
           </div>
-          <div class="settings-card sys-card">
-            <div class="settings-card-head">
-              <div class="settings-card-title">Systembereinigung</div>
-              <p class="settings-card-description">Werkzeuge zum Aufräumen von Benutzern, Geräten und Medien.</p>
+          <div class="sys-cleanup">
+            <div class="sys-cleanup-row">
+              <button class="btn sm" id="btnUsers">Benutzer</button>
             </div>
-            <div class="settings-card-body sys-card-body">
-              <div class="sys-cleanup">
-                <div class="sys-cleanup-row">
-                  <button class="btn sm" id="btnUsers">Benutzer</button>
-                </div>
-                <div class="sys-cleanup-row">
-                  <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
-                </div>
-              </div>
+            <div class="sys-cleanup-row">
+              <button class="btn sm ghost" id="btnCleanupSys">Assets aufräumen</button>
             </div>
           </div>
+          <small class="help">Export/Import von Einstellungen & Plan. „Bilder einschließen“ packt Flamme & Saunen-Bilder mit ein.</small>
         </div>
       </details>
 
