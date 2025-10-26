@@ -1025,8 +1025,8 @@ function resolveAutomationSelection() {
     ? automation.fallbackStyle
     : (savedActive || availableIds[0]);
   const trackCandidates = [
-    settings?.audio?.background?.activeTrack,
     automation?.fallbackTrack,
+    settings?.audio?.background?.activeTrack,
     styleAutomationState.baseAudioTrack
   ];
   let fallbackTrack = null;
@@ -2021,8 +2021,8 @@ function renderEventCountdown(item = {}, region = 'left', ctx = {}) {
   })();
   const heroScrollSpeed = (() => {
     const raw = Number(slidesCfg.heroTimelineScrollSpeed);
-    if (Number.isFinite(raw) && raw > 0) return Math.max(4, Math.round(raw));
-    return 28;
+    if (Number.isFinite(raw) && raw > 0) return Math.max(40, Math.round(raw));
+    return 40;
   })();
   const heroScrollPauseMs = (() => {
     const raw = Number(slidesCfg.heroTimelineScrollPauseMs);
@@ -2445,13 +2445,9 @@ function enableAutoScroll(container, { axis = 'y', speed = 24, pauseMs = 3500, m
   };
 
   let retryTimer = 0;
-  let retries = 0;
-  const maxRetries = 10;
   const scheduleRetry = () => {
     if (destroyed) return;
     if (retryTimer) clearTimeout(retryTimer);
-    if (retries >= maxRetries) return;
-    retries += 1;
     retryTimer = setTimeout(() => {
       retryTimer = 0;
       begin(true);
@@ -2461,7 +2457,7 @@ function enableAutoScroll(container, { axis = 'y', speed = 24, pauseMs = 3500, m
   const begin = (fromRetry = false) => {
     if (destroyed) return;
     if (!ensureScrollable()) {
-      if (!fromRetry) scheduleRetry();
+      scheduleRetry();
       return;
     }
     const initialDelay = loopMode ? Math.min(800, pauseInterval) : pauseInterval;

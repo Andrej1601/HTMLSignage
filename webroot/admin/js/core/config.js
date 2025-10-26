@@ -493,20 +493,16 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   slidesCfg.heroTimelineFillMs = Number.isFinite(rawHeroFill) && rawHeroFill > 0
     ? Math.max(1000, Math.round(rawHeroFill < 1000 ? rawHeroFill * 1000 : rawHeroFill))
     : defaultHeroFill;
-  const defaultHeroBase = Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15;
-  const rawHeroBase = Number(slidesCfg.heroTimelineBaseMinutes);
-  slidesCfg.heroTimelineBaseMinutes = Number.isFinite(rawHeroBase) && rawHeroBase > 0
-    ? Math.max(1, Math.round(rawHeroBase))
-    : defaultHeroBase;
+  delete slidesCfg.heroTimelineBaseMinutes;
   const rawHeroMax = Number(slidesCfg.heroTimelineMaxEntries);
   slidesCfg.heroTimelineMaxEntries = Number.isFinite(rawHeroMax) && rawHeroMax > 0
     ? Math.max(1, Math.round(rawHeroMax))
     : null;
   slidesCfg.heroTimelineWaitForScroll = slidesCfg.heroTimelineWaitForScroll === true;
-  const defaultHeroScrollSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28;
+  const defaultHeroScrollSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 40;
   const rawHeroScrollSpeed = Number(slidesCfg.heroTimelineScrollSpeed);
   slidesCfg.heroTimelineScrollSpeed = Number.isFinite(rawHeroScrollSpeed) && rawHeroScrollSpeed > 0
-    ? clamp(4, Math.round(rawHeroScrollSpeed), 240)
+    ? clamp(40, Math.round(rawHeroScrollSpeed), 240)
     : defaultHeroScrollSpeed;
   const defaultHeroPause = Number(DEFAULTS.slides?.heroTimelineScrollPauseMs) || 4000;
   const rawHeroPause = Number(slidesCfg.heroTimelineScrollPauseMs);
