@@ -933,6 +933,20 @@ function collectSettings(){
         baseW:1920,
         baseH:1080,
         rightWidthPercent:+($('#rightW').value||38),
+        infoPanelWidthPercent:(() => {
+          const el = document.getElementById('infoPanelWidth');
+          const fallback = settings.display?.infoPanelWidthPercent ?? DEFAULTS.display?.infoPanelWidthPercent ?? 32;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return Math.round(fallback);
+          return Math.round(clamp(10, raw, 90));
+        })(),
+        portraitSplitTopPercent:(() => {
+          const el = document.getElementById('portraitSplitTop');
+          const fallback = settings.display?.portraitSplitTopPercent ?? DEFAULTS.display?.portraitSplitTopPercent ?? 58;
+          const raw = Number(el?.value);
+          if (!Number.isFinite(raw)) return Math.round(fallback);
+          return Math.round(clamp(10, raw, 90));
+        })(),
         cutTopPercent:+($('#cutTop').value||28),
         cutBottomPercent:+($('#cutBottom').value||12),
         infoBannerHeightPercent:(() => {

@@ -10,6 +10,10 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     const f = settings.fonts || {};
     const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
     const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
+    const ensureDisplaySettings = () => {
+      if (!settings.display || typeof settings.display !== 'object') settings.display = {};
+      return settings.display;
+    };
     const notifySettingsChanged = () => {
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
@@ -1939,9 +1943,104 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
 
     // Bildspalte / Schrägschnitt
     setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
+    setV('#infoPanelWidth', settings.display?.infoPanelWidthPercent ?? DEFAULTS.display?.infoPanelWidthPercent ?? 32);
+    setV('#portraitSplitTop', settings.display?.portraitSplitTopPercent ?? DEFAULTS.display?.portraitSplitTopPercent ?? 58);
     setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
     setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
     setV('#infoBannerHeight', settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10);
+
+    const readRangeNumericValue = (input) => {
+      if (!input) return null;
+      const viaProp = Number(input.valueAsNumber);
+      if (Number.isFinite(viaProp)) return viaProp;
+      const parsed = Number(input.value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const readRangeBound = (raw) => {
+      if (raw == null || raw === '') return null;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const clampRangeValue = (input, value) => {
+      if (!Number.isFinite(value)) return null;
+      const min = readRangeBound(input?.min);
+      const max = readRangeBound(input?.max);
+      let normalized = Math.round(value);
+      if (Number.isFinite(min)) normalized = Math.max(min, normalized);
+      if (Number.isFinite(max)) normalized = Math.min(max, normalized);
+      return normalized;
+    };
+
+    const applyPercentOutput = (input, output, value) => {
+      if (value == null) {
+        if (output) {
+          output.textContent = '';
+          if ('value' in output) output.value = '';
+        }
+        return null;
+      }
+      if (input && input.value !== String(value)) input.value = String(value);
+      const label = `${value}%`;
+      if (output) {
+        output.textContent = label;
+        if ('value' in output) output.value = label;
+      }
+      return value;
+    };
+
+    const updatePercentOutput = (input, output) => {
+      if (!input) return null;
+      const raw = readRangeNumericValue(input);
+      const normalized = clampRangeValue(input, raw);
+      return applyPercentOutput(input, output, normalized);
+    };
+
+    const bindRangeInput = (inputId, outputId, onValue) => {
+      const input = document.getElementById(inputId);
+      const output = document.getElementById(outputId);
+      if (!input) return;
+      let currentValue = null;
+      const syncValue = (raw) => {
+        const normalized = clampRangeValue(input, raw);
+        return applyPercentOutput(input, output, normalized);
+      };
+      const applyValue = () => {
+        const raw = readRangeNumericValue(input);
+        const value = syncValue(raw);
+        if (value == null || value === currentValue) return;
+        currentValue = value;
+        if (typeof onValue === 'function') onValue(value, input);
+        notifySettingsChanged();
+      };
+      const initialRaw = readRangeNumericValue(input);
+      const initial = syncValue(initialRaw);
+      if (initial != null) {
+        currentValue = initial;
+        if (typeof onValue === 'function') onValue(initial, input);
+      }
+      if (input.dataset.bound) return;
+      ['input', 'change'].forEach((evt) => {
+        input.addEventListener(evt, applyValue);
+      });
+      input.dataset.bound = '1';
+    };
+
+    bindRangeInput('infoPanelWidth', 'infoPanelWidthOutput', (value, inputEl) => {
+      const min = Number.isFinite(Number(inputEl?.min)) ? Number(inputEl.min) : 1;
+      const max = Number.isFinite(Number(inputEl?.max)) ? Number(inputEl.max) : 100;
+      const clamped = Math.max(min, Math.min(max, value));
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.infoPanelWidthPercent = clamped;
+    });
+    bindRangeInput('portraitSplitTop', 'portraitSplitTopOutput', (value, inputEl) => {
+      const min = Number.isFinite(Number(inputEl?.min)) ? Number(inputEl.min) : 1;
+      const max = Number.isFinite(Number(inputEl?.max)) ? Number(inputEl.max) : 100;
+      const clamped = Math.max(min, Math.min(max, value));
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.portraitSplitTopPercent = clamped;
+    });
 
     const infoBannerHeightInput = document.getElementById('infoBannerHeight');
     if (infoBannerHeightInput && !infoBannerHeightInput.dataset.bound) {
@@ -1981,14 +2080,25 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     }
 
     const layoutProfileSelect = document.getElementById('layoutProfile');
+    const portraitSplitRow = document.getElementById('portraitSplitRatioRow');
+    const infoPanelWidthRow = document.getElementById('infoPanelWidthRow');
+    const applyProfileVisibility = (profile) => {
+      if (portraitSplitRow) portraitSplitRow.hidden = (profile !== 'portrait-split');
+      if (infoPanelWidthRow) infoPanelWidthRow.hidden = (profile !== 'info-panel');
+    };
     if (layoutProfileSelect) {
       const profile = settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape';
       layoutProfileSelect.value = profile;
+      applyProfileVisibility(profile);
       layoutProfileSelect.onchange = () => {
         settings.display = settings.display || {};
-        settings.display.layoutProfile = layoutProfileSelect.value;
+        const selected = layoutProfileSelect.value;
+        settings.display.layoutProfile = selected;
+        applyProfileVisibility(selected);
         notifySettingsChanged();
       };
+    } else {
+      applyProfileVisibility('landscape');
     }
 
     renderStyleAutomationControls();
@@ -2049,6 +2159,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       renderStyleAutomationControls();
 
       setV('#rightW',   DEFAULTS.display.rightWidthPercent);
+      setV('#infoPanelWidth', DEFAULTS.display.infoPanelWidthPercent);
+      setV('#portraitSplitTop', DEFAULTS.display.portraitSplitTopPercent);
       setV('#cutTop',   DEFAULTS.display.cutTopPercent);
       setV('#cutBottom',DEFAULTS.display.cutBottomPercent);
       setV('#infoBannerHeight', DEFAULTS.display.infoBannerHeightPercent);
@@ -2058,13 +2170,19 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         bannerModeSelect.value = ['full', 'left', 'right'].includes(defMode) ? defMode : 'full';
       }
       setV('#layoutMode', DEFAULTS.display.layoutMode || 'single');
+      setV('#layoutProfile', DEFAULTS.display.layoutProfile || 'landscape');
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.infoPanelWidthPercent = DEFAULTS.display.infoPanelWidthPercent;
+      displayCfg.portraitSplitTopPercent = DEFAULTS.display.portraitSplitTopPercent;
+      updatePercentOutput(document.getElementById('infoPanelWidth'), document.getElementById('infoPanelWidthOutput'));
+      updatePercentOutput(document.getElementById('portraitSplitTop'), document.getElementById('portraitSplitTopOutput'));
+      applyProfileVisibility(DEFAULTS.display.layoutProfile || 'landscape');
       const defLeft = DEFAULTS.display.pages?.left || {};
       const defRight = DEFAULTS.display.pages?.right || {};
       setV('#pageLeftTimer', defLeft.timerSec ?? '');
       setV('#pageRightTimer', defRight.timerSec ?? '');
       const defLeftPlaylist = sanitizePagePlaylist(defLeft.playlist);
       const defRightPlaylist = sanitizePagePlaylist(defRight.playlist);
-      const displayCfg = settings.display = settings.display || {};
       const pagesCfg = displayCfg.pages = displayCfg.pages || {};
       const leftState = pagesCfg.left = pagesCfg.left || {};
       const rightState = pagesCfg.right = pagesCfg.right || {};
