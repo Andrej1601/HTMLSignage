@@ -2584,25 +2584,6 @@ export function renderSlidesMaster(){
     };
   }
 
-  const heroBaseEl = $('#heroTimelineBase');
-  if (heroBaseEl){
-    const fallback = Math.max(1, Math.round(DEFAULTS.slides?.heroTimelineBaseMinutes ?? 15));
-    const raw = settings.slides?.heroTimelineBaseMinutes;
-    const init = Number.isFinite(+raw) ? Math.max(1, Math.round(+raw)) : fallback;
-    heroBaseEl.value = String(init);
-    heroBaseEl.onchange = () => {
-      const num = Number(heroBaseEl.value);
-      if (!Number.isFinite(num) || num <= 0){
-        (settings.slides ||= {}).heroTimelineBaseMinutes = fallback;
-        heroBaseEl.value = String(fallback);
-        return;
-      }
-      const minutes = Math.max(1, Math.round(num));
-      (settings.slides ||= {}).heroTimelineBaseMinutes = minutes;
-      heroBaseEl.value = String(minutes);
-    };
-  }
-
   const heroMaxEl = $('#heroTimelineMax');
   if (heroMaxEl){
     const raw = settings.slides?.heroTimelineMaxEntries;
@@ -2634,9 +2615,9 @@ export function renderSlidesMaster(){
 
   const heroScrollSpeedEl = $('#heroTimelineScrollSpeed');
   if (heroScrollSpeedEl){
-    const fallback = Math.max(4, Math.round(DEFAULTS.slides?.heroTimelineScrollSpeed ?? 28));
+    const fallback = Math.max(40, Math.round(DEFAULTS.slides?.heroTimelineScrollSpeed ?? 40));
     const raw = settings.slides?.heroTimelineScrollSpeed;
-    const init = Number.isFinite(+raw) && +raw > 0 ? Math.max(4, Math.round(+raw)) : fallback;
+    const init = Number.isFinite(+raw) && +raw > 0 ? Math.max(40, Math.round(+raw)) : fallback;
     heroScrollSpeedEl.value = String(init);
     heroScrollSpeedEl.onchange = () => {
       const num = Number(heroScrollSpeedEl.value);
@@ -2645,7 +2626,7 @@ export function renderSlidesMaster(){
         heroScrollSpeedEl.value = String(fallback);
         return;
       }
-      const speed = Math.max(4, Math.round(num));
+      const speed = Math.max(40, Math.round(num));
       (settings.slides ||= {}).heroTimelineScrollSpeed = speed;
       heroScrollSpeedEl.value = String(speed);
     };

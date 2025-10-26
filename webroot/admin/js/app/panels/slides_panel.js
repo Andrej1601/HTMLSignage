@@ -1004,31 +1004,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         }
       }
 
-      const baseInput = document.getElementById('heroTimelineBase');
-      if (baseInput) {
-        const slidesCfg = ensureSlides();
-        const defaultBase = Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15;
-        const raw = Number(slidesCfg.heroTimelineBaseMinutes);
-        const minutes = Number.isFinite(raw) && raw > 0 ? Math.max(1, Math.round(raw)) : defaultBase;
-        baseInput.value = String(minutes);
-        if (!baseInput.dataset.bound) {
-          baseInput.dataset.bound = '1';
-          baseInput.addEventListener('change', () => {
-            const slides = ensureSlides();
-            const value = Number(baseInput.value);
-            if (Number.isFinite(value) && value > 0) {
-              const sanitized = Math.max(1, Math.round(value));
-              slides.heroTimelineBaseMinutes = sanitized;
-              baseInput.value = String(sanitized);
-            } else {
-              delete slides.heroTimelineBaseMinutes;
-              baseInput.value = String(Number(DEFAULTS.slides?.heroTimelineBaseMinutes) || 15);
-            }
-            notifySettingsChanged();
-          });
-        }
-      }
-
       const maxInput = document.getElementById('heroTimelineMax');
       if (maxInput) {
         const slidesCfg = ensureSlides();
@@ -1063,9 +1038,9 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const scrollSpeedInput = document.getElementById('heroTimelineScrollSpeed');
       if (scrollSpeedInput) {
         const slidesCfg = ensureSlides();
-        const defaultSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28;
+        const defaultSpeed = Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 40;
         const raw = Number(slidesCfg.heroTimelineScrollSpeed);
-        const speed = Number.isFinite(raw) && raw > 0 ? Math.max(4, Math.round(raw)) : defaultSpeed;
+        const speed = Number.isFinite(raw) && raw > 0 ? Math.max(40, Math.round(raw)) : defaultSpeed;
         scrollSpeedInput.value = String(speed);
         if (!scrollSpeedInput.dataset.bound) {
           scrollSpeedInput.dataset.bound = '1';
@@ -1073,12 +1048,12 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             const slides = ensureSlides();
             const value = Number(scrollSpeedInput.value);
             if (Number.isFinite(value) && value > 0) {
-              const sanitized = Math.max(4, Math.round(value));
+              const sanitized = Math.max(40, Math.round(value));
               slides.heroTimelineScrollSpeed = sanitized;
               scrollSpeedInput.value = String(sanitized);
             } else {
               delete slides.heroTimelineScrollSpeed;
-              scrollSpeedInput.value = String(Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 28);
+              scrollSpeedInput.value = String(Number(DEFAULTS.slides?.heroTimelineScrollSpeed) || 40);
             }
             notifySettingsChanged();
           });

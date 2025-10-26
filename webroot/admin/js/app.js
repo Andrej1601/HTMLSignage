@@ -884,13 +884,6 @@ function collectSettings(){
           if (!Number.isFinite(raw) || raw <= 0) return Math.max(1000, Math.round(fallback));
           return Math.max(1, Math.round(raw)) * 1000;
         })(),
-        heroTimelineBaseMinutes: (() => {
-          const el = document.getElementById('heroTimelineBase');
-          const fallback = settings?.slides?.heroTimelineBaseMinutes ?? (DEFAULTS?.slides?.heroTimelineBaseMinutes ?? 15);
-          const raw = Number(el?.value);
-          if (!Number.isFinite(raw) || raw <= 0) return Math.max(1, Math.round(fallback));
-          return Math.max(1, Math.round(raw));
-        })(),
         heroTimelineMaxEntries: (() => {
           const el = document.getElementById('heroTimelineMax');
           if (!el) return settings.slides?.heroTimelineMaxEntries ?? null;
@@ -902,10 +895,10 @@ function collectSettings(){
         })(),
         heroTimelineScrollSpeed: (() => {
           const el = document.getElementById('heroTimelineScrollSpeed');
-          const fallback = settings?.slides?.heroTimelineScrollSpeed ?? (DEFAULTS?.slides?.heroTimelineScrollSpeed ?? 28);
+          const fallback = settings?.slides?.heroTimelineScrollSpeed ?? (DEFAULTS?.slides?.heroTimelineScrollSpeed ?? 40);
           const raw = Number(el?.value);
-          if (!Number.isFinite(raw) || raw <= 0) return Math.max(4, Math.round(fallback));
-          return Math.max(4, Math.round(raw));
+          if (!Number.isFinite(raw) || raw <= 0) return Math.max(40, Math.round(fallback));
+          return Math.max(40, Math.round(raw));
         })(),
         heroTimelineScrollPauseMs: (() => {
           const el = document.getElementById('heroTimelineScrollPause');

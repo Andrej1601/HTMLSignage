@@ -2021,8 +2021,8 @@ function renderEventCountdown(item = {}, region = 'left', ctx = {}) {
   })();
   const heroScrollSpeed = (() => {
     const raw = Number(slidesCfg.heroTimelineScrollSpeed);
-    if (Number.isFinite(raw) && raw > 0) return Math.max(4, Math.round(raw));
-    return 28;
+    if (Number.isFinite(raw) && raw > 0) return Math.max(40, Math.round(raw));
+    return 40;
   })();
   const heroScrollPauseMs = (() => {
     const raw = Number(slidesCfg.heroTimelineScrollPauseMs);
