@@ -10,6 +10,10 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     const f = settings.fonts || {};
     const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
     const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
+    const ensureDisplaySettings = () => {
+      if (!settings.display || typeof settings.display !== 'object') settings.display = {};
+      return settings.display;
+    };
     const notifySettingsChanged = () => {
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
@@ -1946,27 +1950,52 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     setV('#infoBannerHeight', settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10);
 
     const updatePercentOutput = (input, output) => {
-      if (!input || !output) return;
+      if (!input) return null;
       const num = Number(input.value);
-      const rounded = Number.isFinite(num) ? Math.round(num) : '';
-      output.textContent = rounded === '' ? '' : `${rounded}%`;
+      const rounded = Number.isFinite(num) ? Math.round(num) : null;
+      if (output) output.textContent = rounded == null ? '' : `${rounded}%`;
+      return rounded;
     };
 
-    const bindRangeInput = (inputId, outputId) => {
+    const bindRangeInput = (inputId, outputId, onValue) => {
       const input = document.getElementById(inputId);
       const output = document.getElementById(outputId);
       if (!input) return;
-      updatePercentOutput(input, output);
-      if (input.dataset.bound) return;
-      input.addEventListener('input', () => {
-        updatePercentOutput(input, output);
+      let currentValue = null;
+      const applyValue = () => {
+        const rounded = updatePercentOutput(input, output);
+        if (rounded == null) return;
+        if (rounded === currentValue) return;
+        currentValue = rounded;
+        if (typeof onValue === 'function') onValue(rounded, input);
         notifySettingsChanged();
+      };
+      const initial = updatePercentOutput(input, output);
+      if (initial != null) {
+        currentValue = initial;
+        if (typeof onValue === 'function') onValue(initial, input);
+      }
+      if (input.dataset.bound) return;
+      ['input', 'change'].forEach((evt) => {
+        input.addEventListener(evt, applyValue);
       });
       input.dataset.bound = '1';
     };
 
-    bindRangeInput('infoPanelWidth', 'infoPanelWidthOutput');
-    bindRangeInput('portraitSplitTop', 'portraitSplitTopOutput');
+    bindRangeInput('infoPanelWidth', 'infoPanelWidthOutput', (value, inputEl) => {
+      const min = Number.isFinite(Number(inputEl?.min)) ? Number(inputEl.min) : 1;
+      const max = Number.isFinite(Number(inputEl?.max)) ? Number(inputEl.max) : 100;
+      const clamped = Math.max(min, Math.min(max, value));
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.infoPanelWidthPercent = clamped;
+    });
+    bindRangeInput('portraitSplitTop', 'portraitSplitTopOutput', (value, inputEl) => {
+      const min = Number.isFinite(Number(inputEl?.min)) ? Number(inputEl.min) : 1;
+      const max = Number.isFinite(Number(inputEl?.max)) ? Number(inputEl.max) : 100;
+      const clamped = Math.max(min, Math.min(max, value));
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.portraitSplitTopPercent = clamped;
+    });
 
     const infoBannerHeightInput = document.getElementById('infoBannerHeight');
     if (infoBannerHeightInput && !infoBannerHeightInput.dataset.bound) {
@@ -2097,6 +2126,9 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       }
       setV('#layoutMode', DEFAULTS.display.layoutMode || 'single');
       setV('#layoutProfile', DEFAULTS.display.layoutProfile || 'landscape');
+      const displayCfg = ensureDisplaySettings();
+      displayCfg.infoPanelWidthPercent = DEFAULTS.display.infoPanelWidthPercent;
+      displayCfg.portraitSplitTopPercent = DEFAULTS.display.portraitSplitTopPercent;
       updatePercentOutput(document.getElementById('infoPanelWidth'), document.getElementById('infoPanelWidthOutput'));
       updatePercentOutput(document.getElementById('portraitSplitTop'), document.getElementById('portraitSplitTopOutput'));
       applyProfileVisibility(DEFAULTS.display.layoutProfile || 'landscape');
@@ -2106,7 +2138,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       setV('#pageRightTimer', defRight.timerSec ?? '');
       const defLeftPlaylist = sanitizePagePlaylist(defLeft.playlist);
       const defRightPlaylist = sanitizePagePlaylist(defRight.playlist);
-      const displayCfg = settings.display = settings.display || {};
       const pagesCfg = displayCfg.pages = displayCfg.pages || {};
       const leftState = pagesCfg.left = pagesCfg.left || {};
       const rightState = pagesCfg.right = pagesCfg.right || {};
