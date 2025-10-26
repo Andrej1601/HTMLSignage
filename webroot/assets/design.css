@@ -597,39 +597,6 @@ body[data-layout='single'] .container.extra.extra-info-banner{min-height:calc(va
 .grid thead th{font-size:calc(22px*var(--scale)*var(--ovHeadScale)*var(--ovAuto));padding:calc(8px*var(--vwScale)) calc(12px*var(--vwScale));text-align:center;background:var(--headBg);color:var(--headFg)}
 .grid thead th{white-space:normal;word-break:break-word;hyphens:auto;overflow-wrap:anywhere;}
 .grid thead th.timecol{white-space:nowrap;}
-.grid thead th .grid-head-title{
-  display:block;
-  font-weight:800;
-  letter-spacing:.01em;
-}
-.grid thead th .grid-sauna-info{
-  margin-top:6px;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-  font-size:calc(16px*var(--scale)*var(--ovCellScale)*var(--ovAuto));
-  line-height:1.25;
-  color:color-mix(in srgb, var(--headFg) 82%, var(--headBg) 18%);
-}
-.grid thead th .sauna-status-note + .grid-sauna-info{
-  margin-top:10px;
-}
-.grid thead th .grid-sauna-info__line{
-  display:flex;
-  justify-content:center;
-  gap:.35em;
-  flex-wrap:wrap;
-}
-.grid thead th .grid-sauna-info__label{
-  font-weight:700;
-}
-.grid thead th .grid-sauna-info__label[data-has-value="true"]::after{
-  content:':';
-  margin-left:.15em;
-}
-.grid thead th .grid-sauna-info__value{
-  font-weight:600;
-}
 .grid thead th .sauna-status-note{
   display:inline-flex;
   align-items:center;
