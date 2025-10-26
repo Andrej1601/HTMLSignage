@@ -15,14 +15,12 @@
     flex-direction:column;
     gap:calc(12px*var(--vwScale));
   }
-  body[data-layout-profile='portrait-split'] .stage,
   body[data-layout-profile='triple'] .stage,
   body[data-layout-profile='asymmetric'] .stage,
   body[data-layout-profile='info-panel'] .stage{
     display:flex;
     flex-direction:column;
   }
-  body[data-layout-profile='portrait-split'] .stage-area,
   body[data-layout-profile='triple'] .stage-area,
   body[data-layout-profile='asymmetric'] .stage-area,
   body[data-layout-profile='info-panel'] .stage-area{flex:1 1 auto; min-height:0;}
