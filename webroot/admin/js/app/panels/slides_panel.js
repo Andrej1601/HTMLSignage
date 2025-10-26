@@ -1949,52 +1949,12 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
     setV('#infoBannerHeight', settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10);
 
-    const readRangeNumericValue = (input) => {
-      if (!input) return null;
-      const viaProp = Number(input.valueAsNumber);
-      if (Number.isFinite(viaProp)) return viaProp;
-      const parsed = Number(input.value);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-
-    const readRangeBound = (raw) => {
-      if (raw == null || raw === '') return null;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-
-    const clampRangeValue = (input, value) => {
-      if (!Number.isFinite(value)) return null;
-      const min = readRangeBound(input?.min);
-      const max = readRangeBound(input?.max);
-      let normalized = Math.round(value);
-      if (Number.isFinite(min)) normalized = Math.max(min, normalized);
-      if (Number.isFinite(max)) normalized = Math.min(max, normalized);
-      return normalized;
-    };
-
-    const applyPercentOutput = (input, output, value) => {
-      if (value == null) {
-        if (output) {
-          output.textContent = '';
-          if ('value' in output) output.value = '';
-        }
-        return null;
-      }
-      if (input && input.value !== String(value)) input.value = String(value);
-      const label = `${value}%`;
-      if (output) {
-        output.textContent = label;
-        if ('value' in output) output.value = label;
-      }
-      return value;
-    };
-
     const updatePercentOutput = (input, output) => {
       if (!input) return null;
-      const raw = readRangeNumericValue(input);
-      const normalized = clampRangeValue(input, raw);
-      return applyPercentOutput(input, output, normalized);
+      const num = Number(input.value);
+      const rounded = Number.isFinite(num) ? Math.round(num) : null;
+      if (output) output.textContent = rounded == null ? '' : `${rounded}%`;
+      return rounded;
     };
 
     const bindRangeInput = (inputId, outputId, onValue) => {
@@ -2002,20 +1962,15 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const output = document.getElementById(outputId);
       if (!input) return;
       let currentValue = null;
-      const syncValue = (raw) => {
-        const normalized = clampRangeValue(input, raw);
-        return applyPercentOutput(input, output, normalized);
-      };
       const applyValue = () => {
-        const raw = readRangeNumericValue(input);
-        const value = syncValue(raw);
-        if (value == null || value === currentValue) return;
-        currentValue = value;
-        if (typeof onValue === 'function') onValue(value, input);
+        const rounded = updatePercentOutput(input, output);
+        if (rounded == null) return;
+        if (rounded === currentValue) return;
+        currentValue = rounded;
+        if (typeof onValue === 'function') onValue(rounded, input);
         notifySettingsChanged();
       };
-      const initialRaw = readRangeNumericValue(input);
-      const initial = syncValue(initialRaw);
+      const initial = updatePercentOutput(input, output);
       if (initial != null) {
         currentValue = initial;
         if (typeof onValue === 'function') onValue(initial, input);
