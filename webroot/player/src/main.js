@@ -2945,31 +2945,59 @@ function collectCellDetails(cell){
   return { description, aromas, facts, badges };
 }
 
-function createSaunaInfoBox(text){
+function normalizeSaunaInfoEntries(text){
   const str = typeof text === 'string' ? text : '';
-  const normalized = str
+  return str
     .replace(/\r\n/g, '\n')
     .split('\n')
     .map(line => line.trim())
-    .filter(Boolean);
-  if (!normalized.length) return null;
-  const lines = normalized.map(line => {
-    const parts = line.split(':');
-    if (parts.length > 1){
-      const label = parts.shift()?.trim() || '';
-      const value = parts.join(':').trim();
-      if (label && value){
-        return h('div', { class: 'sauna-info-box__line' }, [
-          h('span', { class: 'sauna-info-box__label', 'data-has-value': 'true' }, label),
-          h('span', { class: 'sauna-info-box__value' }, value)
-        ]);
+    .filter(Boolean)
+    .map(line => {
+      const parts = line.split(':');
+      if (parts.length > 1){
+        const label = parts.shift()?.trim() || '';
+        const value = parts.join(':').trim();
+        if (label && value){
+          return { label, value };
+        }
       }
+      return { value: line };
+    });
+}
+
+function createSaunaInfoBox(text){
+  const entries = normalizeSaunaInfoEntries(text);
+  if (!entries.length) return null;
+  const lines = entries.map(entry => {
+    const attrs = { class: 'sauna-info-box__line' };
+    if (entry.label && entry.value){
+      return h('div', attrs, [
+        h('span', { class: 'sauna-info-box__label', 'data-has-value': 'true' }, entry.label),
+        h('span', { class: 'sauna-info-box__value' }, entry.value)
+      ]);
     }
-    return h('div', { class: 'sauna-info-box__line' }, [
-      h('span', { class: 'sauna-info-box__value' }, line)
+    return h('div', attrs, [
+      h('span', { class: 'sauna-info-box__value' }, entry.value)
     ]);
   });
   return h('div', { class: 'sauna-info-box' }, lines);
+}
+
+function createOverviewSaunaInfo(text){
+  const entries = normalizeSaunaInfoEntries(text);
+  if (!entries.length) return null;
+  const lines = entries.map(entry => {
+    if (entry.label && entry.value){
+      return h('div', { class: 'grid-sauna-info__line' }, [
+        h('span', { class: 'grid-sauna-info__label', 'data-has-value': 'true' }, entry.label),
+        h('span', { class: 'grid-sauna-info__value' }, entry.value)
+      ]);
+    }
+    return h('div', { class: 'grid-sauna-info__line' }, [
+      h('span', { class: 'grid-sauna-info__value' }, entry.value)
+    ]);
+  });
+  return h('div', { class: 'grid-sauna-info' }, lines);
 }
 
 function createDescriptionNode(text, className){
@@ -3167,11 +3195,16 @@ const notes = footnoteMap();
 const showOverviewFootnotes = (settings?.footnotesShowOnOverview !== false);
 const showFlames = (settings?.fonts?.overviewShowFlames !== false);
 const statusStateLocal = ensureSaunaStatusState();
+const componentFlags = getSlideComponentFlags();
 const saunas = Array.isArray(schedule?.saunas) ? schedule.saunas : [];
+const saunaInfoMap = (settings?.slides?.saunaInfo && typeof settings.slides.saunaInfo === 'object')
+  ? settings.slides.saunaInfo
+  : {};
 const saunaInfo = saunas.map((name, idx) => ({
   name,
   idx,
-  status: statusStateLocal.map.get(name) || SAUNA_STATUS.ACTIVE
+  status: statusStateLocal.map.get(name) || SAUNA_STATUS.ACTIVE,
+  infoText: typeof saunaInfoMap?.[name] === 'string' ? saunaInfoMap[name] : ''
 }));
 const visibleSaunas = saunaInfo.filter(info => info.status !== SAUNA_STATUS.HIDDEN);
 
@@ -3191,10 +3224,12 @@ tr.appendChild(h('th', { class: 'timecol corner' }, 'Zeit'));
 visibleSaunas.forEach(info => {
   const attrs = {};
   if (info.status === SAUNA_STATUS.OUT_OF_ORDER) attrs['data-status'] = 'out-of-order';
-  const headerChildren = [info.name];
+  const headerChildren = [h('span', { class: 'grid-head-title' }, info.name)];
   if (info.status === SAUNA_STATUS.OUT_OF_ORDER) {
     headerChildren.push(h('span', { class: 'sauna-status-note' }, SAUNA_STATUS_TEXT[SAUNA_STATUS.OUT_OF_ORDER]));
   }
+  const infoNode = componentFlags.infoBox !== false ? createOverviewSaunaInfo(info.infoText) : null;
+  if (infoNode) headerChildren.push(infoNode);
   tr.appendChild(h('th', attrs, headerChildren));
 });
 thead.appendChild(tr);
