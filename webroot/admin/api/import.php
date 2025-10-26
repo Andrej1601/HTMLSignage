@@ -27,50 +27,6 @@ function normalize_asset_rel($rel) {
   return $normalized;
 }
 
-function import_classify_asset_type(string $mime, ?string $rel = null, ?string $name = null): string
-{
-  $normalized = strtolower(trim($mime));
-  if ($normalized === '') {
-    $normalized = 'application/octet-stream';
-  }
-  if (str_starts_with($normalized, 'image/')) {
-    return 'image';
-  }
-  if (str_starts_with($normalized, 'video/')) {
-    return 'video';
-  }
-  if (str_starts_with($normalized, 'audio/')) {
-    return 'audio';
-  }
-
-  $candidate = $rel ?: $name ?: '';
-  $extension = strtolower((string) pathinfo($candidate, PATHINFO_EXTENSION));
-  if (in_array($extension, ['png','jpg','jpeg','gif','webp','svg','avif'], true)) {
-    return 'image';
-  }
-  if (in_array($extension, ['mp4','m4v','webm','ogv','mov','avi','mkv'], true)) {
-    return 'video';
-  }
-  if (in_array($extension, ['mp3','ogg','oga','wav','aac','flac','m4a'], true)) {
-    return 'audio';
-  }
-
-  return 'document';
-}
-
-function import_read_flag(string $key, bool $fallback = false): bool
-{
-  if (array_key_exists($key, $_POST)) {
-    $value = strtolower((string) $_POST[$key]);
-    return in_array($value, ['1','true','yes','on'], true);
-  }
-  if (array_key_exists($key, $_GET)) {
-    $value = strtolower((string) $_GET[$key]);
-    return in_array($value, ['1','true','yes','on'], true);
-  }
-  return $fallback;
-}
-
 function import_is_sqlite(string $raw): bool {
   return strncmp($raw, 'SQLite format 3', 15) === 0;
 }
@@ -280,14 +236,9 @@ $hasSchedule = !empty($payload['hasSchedule']);
 $assetsList = is_array($payload['assets'] ?? null) ? $payload['assets'] : [];
 if (!$hasSettings && !$hasSchedule) fail('missing-sections');
 
-$legacyWriteAssets = import_read_flag('writeAssets', false);
-$writeImages      = import_read_flag('writeImages', $legacyWriteAssets);
-$writeVideos      = import_read_flag('writeVideos', $legacyWriteAssets);
-$writeAudio       = import_read_flag('writeAudio', $legacyWriteAssets);
-$writeDocuments   = import_read_flag('writeDocuments', $legacyWriteAssets);
-$writeAssets      = ($writeImages || $writeVideos || $writeAudio || $writeDocuments);
-$writeSettings    = import_read_flag('writeSettings', true);
-$writeSchedule    = import_read_flag('writeSchedule', true);
+$writeAssets   = !empty($_POST['writeAssets']) || !empty($_GET['writeAssets']);
+$writeSettings = isset($_POST['writeSettings']) ? ($_POST['writeSettings']==='1') : true;
+$writeSchedule = isset($_POST['writeSchedule']) ? ($_POST['writeSchedule']==='1') : true;
 
 @mkdir(signage_assets_path('img'), 02775, true);
 @mkdir(signage_assets_path('media'), 02775, true);
@@ -308,11 +259,6 @@ if ($writeAssets && !empty($assetsList)) {
     $data = $asset['data'] ?? null;
     if (!is_string($data) || $data === '') continue;
     $originalRel = normalize_asset_rel($asset['originalRel'] ?? null);
-    $type = import_classify_asset_type($mime, $originalRel, $asset['name'] ?? null);
-    if ($type === 'image' && !$writeImages) continue;
-    if ($type === 'video' && !$writeVideos) continue;
-    if ($type === 'audio' && !$writeAudio) continue;
-    if ($type === 'document' && !$writeDocuments) continue;
     $baseName = pathinfo($originalRel ?: ($asset['name'] ?? ''), PATHINFO_FILENAME);
     if (!is_string($baseName) || $baseName === '') {
       $baseName = 'import';

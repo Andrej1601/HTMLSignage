@@ -10,6 +10,7 @@ import { notifyError, notifyInfo, notifySuccess } from '../core/notifications.js
 export function initBackupButtons({ fetchJson }) {
   const expBtn = document.getElementById('btnExport');
   const impFile = document.getElementById('importFile');
+  const impWrite = document.getElementById('impWriteImg');
   const impProgress = document.getElementById('importProgress');
   const impProgressFill = impProgress?.querySelector('[data-role="progress-fill"]');
   const impProgressLabel = document.getElementById('importProgressLabel');
@@ -94,29 +95,14 @@ export function initBackupButtons({ fetchJson }) {
     console.warn('[admin] Import-Status konnte nicht gelesen werden', error);
   }
 
-  const checkboxChecked = (id) => {
-    const el = document.getElementById(id);
-    return el ? Boolean(el.checked) : false;
-  };
-
   if (expBtn) {
     expBtn.onclick = () => {
-      const incImages = checkboxChecked('expWithImages');
-      const incVideos = checkboxChecked('expWithVideos');
-      const incAudio = checkboxChecked('expWithAudio');
-      const incDocuments = checkboxChecked('expWithDocuments');
-      const incSet = checkboxChecked('expWithSettings');
-      const incSch = checkboxChecked('expWithSchedule');
+      const incImg = document.getElementById('expWithImg')?.checked ? 1 : 0;
+      const incSet = document.getElementById('expWithSettings')?.checked ? 1 : 0;
+      const incSch = document.getElementById('expWithSchedule')?.checked ? 1 : 0;
       const stamp = new Date().toISOString().slice(0, 10);
-      const params = new URLSearchParams();
-      params.set('settings', incSet ? '1' : '0');
-      params.set('schedule', incSch ? '1' : '0');
-      params.set('includeImages', incImages ? '1' : '0');
-      params.set('includeVideos', incVideos ? '1' : '0');
-      params.set('includeAudio', incAudio ? '1' : '0');
-      params.set('includeDocuments', incDocuments ? '1' : '0');
-      params.set('name', `signage_export_${stamp}`);
-      window.location.assign(`/admin/api/export.php?${params.toString()}`);
+      const url = `/admin/api/export.php?include=${incImg}&settings=${incSet}&schedule=${incSch}&name=${encodeURIComponent('signage_export_' + stamp)}`;
+      window.location.assign(url);
     };
   }
 
@@ -125,20 +111,9 @@ export function initBackupButtons({ fetchJson }) {
       if (!impFile.files || !impFile.files[0]) return;
       const fd = new FormData();
       fd.append('file', impFile.files[0]);
-      const writeImages = checkboxChecked('impWriteImages');
-      const writeVideos = checkboxChecked('impWriteVideos');
-      const writeAudio = checkboxChecked('impWriteAudio');
-      const writeDocuments = checkboxChecked('impWriteDocuments');
-      const writeSettings = checkboxChecked('impWriteSettings');
-      const writeSchedule = checkboxChecked('impWriteSchedule');
-      const writeAnyAssets = writeImages || writeVideos || writeAudio || writeDocuments;
-      fd.append('writeAssets', writeAnyAssets ? '1' : '0');
-      fd.append('writeImages', writeImages ? '1' : '0');
-      fd.append('writeVideos', writeVideos ? '1' : '0');
-      fd.append('writeAudio', writeAudio ? '1' : '0');
-      fd.append('writeDocuments', writeDocuments ? '1' : '0');
-      fd.append('writeSettings', writeSettings ? '1' : '0');
-      fd.append('writeSchedule', writeSchedule ? '1' : '0');
+      fd.append('writeAssets', impWrite?.checked ? '1' : '0');
+      fd.append('writeSettings', document.getElementById('impWriteSettings')?.checked ? '1' : '0');
+      fd.append('writeSchedule', document.getElementById('impWriteSchedule')?.checked ? '1' : '0');
       try {
         notifyInfo('Import gestartet – bitte nicht schließen.');
         showProgress('Import wird übertragen …');
