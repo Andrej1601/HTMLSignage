@@ -389,14 +389,14 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
     return Math.max(1, Math.min(100, Math.round(num)));
   };
   const defaultInfoPanel = Number(DEFAULTS.display?.infoPanelWidthPercent);
-  const defaultBannerTop = Number(DEFAULTS.display?.bannerTopPercent);
+  const defaultPortraitSplit = Number(DEFAULTS.display?.portraitSplitTopPercent);
   const defaultBannerHeight = Number(DEFAULTS.display?.infoBannerHeightPercent);
   const infoPanelPercent = normalizePercentValue(src.display?.infoPanelWidthPercent, defaultInfoPanel);
   if (infoPanelPercent != null) src.display.infoPanelWidthPercent = infoPanelPercent;
   else delete src.display.infoPanelWidthPercent;
-  const bannerPercent = normalizePercentValue(src.display?.bannerTopPercent, defaultBannerTop);
-  if (bannerPercent != null) src.display.bannerTopPercent = bannerPercent;
-  else delete src.display.bannerTopPercent;
+  const portraitSplitPercent = normalizePercentValue(src.display?.portraitSplitTopPercent, defaultPortraitSplit);
+  if (portraitSplitPercent != null) src.display.portraitSplitTopPercent = portraitSplitPercent;
+  else delete src.display.portraitSplitTopPercent;
   const bannerHeightPercent = normalizePercentValue(src.display?.infoBannerHeightPercent, defaultBannerHeight);
   if (bannerHeightPercent != null) {
     src.display.infoBannerHeightPercent = Math.max(2, Math.min(40, bannerHeightPercent));
@@ -476,7 +476,7 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
 
   const pagesRaw = src.display?.pages || {};
   src.display.layoutMode = (src.display.layoutMode === 'split') ? 'split' : 'single';
-  const allowedProfiles = new Set(['landscape','portrait','portrait-split','triple','asymmetric','info-panel','banner']);
+  const allowedProfiles = new Set(['landscape','portrait-split','triple','asymmetric','info-panel']);
   const rawProfile = typeof src.display.layoutProfile === 'string' ? src.display.layoutProfile : 'landscape';
   src.display.layoutProfile = allowedProfiles.has(rawProfile) ? rawProfile : 'landscape';
   src.display.pages = {

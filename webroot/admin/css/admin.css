@@ -860,6 +860,10 @@ details.ac[open] .chev{ transform: rotate(90deg); }
 .input.num3{ width:6ch !important; text-align:center; padding-left:0; padding-right:0; }
 .input.name{ width:auto; min-width:140px; }
 
+.range-control{ display:flex; align-items:center; gap:12px; }
+.range-control input[type=range]{ flex:1 1 auto; min-width:0; }
+.range-control output{ min-width:3ch; font-variant-numeric:tabular-nums; text-align:right; font-weight:600; }
+
 /* ---------- Buttons ---------- */
 .btn{
   display:inline-flex; align-items:center; justify-content:center;

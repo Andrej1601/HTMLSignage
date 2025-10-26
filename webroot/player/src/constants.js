@@ -43,12 +43,10 @@ export const STYLE_SLIDE_KEYS = [
 
 export const LAYOUT_PROFILES = new Set([
   'landscape',
-  'portrait',
   'portrait-split',
   'triple',
   'asymmetric',
-  'info-panel',
-  'banner'
+  'info-panel'
 ]);
 
 export const LIVE_RETRY_BASE_DELAY = 2000;

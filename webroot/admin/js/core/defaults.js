@@ -300,7 +300,7 @@ export const DEFAULTS = {
     baseH:1080,
     rightWidthPercent:38,
     infoPanelWidthPercent:32,
-    bannerTopPercent:60,
+    portraitSplitTopPercent:58,
     infoBannerHeightPercent:10,
     infoBannerMode:'full',
     cutTopPercent:28,
