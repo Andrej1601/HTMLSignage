@@ -1939,9 +1939,34 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
 
     // Bildspalte / Schrägschnitt
     setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
+    setV('#infoPanelWidth', settings.display?.infoPanelWidthPercent ?? DEFAULTS.display?.infoPanelWidthPercent ?? 32);
+    setV('#portraitSplitTop', settings.display?.portraitSplitTopPercent ?? DEFAULTS.display?.portraitSplitTopPercent ?? 58);
     setV('#cutTop',   settings.display?.cutTopPercent ?? 28);
     setV('#cutBottom',settings.display?.cutBottomPercent ?? 12);
     setV('#infoBannerHeight', settings.display?.infoBannerHeightPercent ?? DEFAULTS.display?.infoBannerHeightPercent ?? 10);
+
+    const updatePercentOutput = (input, output) => {
+      if (!input || !output) return;
+      const num = Number(input.value);
+      const rounded = Number.isFinite(num) ? Math.round(num) : '';
+      output.textContent = rounded === '' ? '' : `${rounded}%`;
+    };
+
+    const bindRangeInput = (inputId, outputId) => {
+      const input = document.getElementById(inputId);
+      const output = document.getElementById(outputId);
+      if (!input) return;
+      updatePercentOutput(input, output);
+      if (input.dataset.bound) return;
+      input.addEventListener('input', () => {
+        updatePercentOutput(input, output);
+        notifySettingsChanged();
+      });
+      input.dataset.bound = '1';
+    };
+
+    bindRangeInput('infoPanelWidth', 'infoPanelWidthOutput');
+    bindRangeInput('portraitSplitTop', 'portraitSplitTopOutput');
 
     const infoBannerHeightInput = document.getElementById('infoBannerHeight');
     if (infoBannerHeightInput && !infoBannerHeightInput.dataset.bound) {
@@ -1981,14 +2006,25 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     }
 
     const layoutProfileSelect = document.getElementById('layoutProfile');
+    const portraitSplitRow = document.getElementById('portraitSplitRatioRow');
+    const infoPanelWidthRow = document.getElementById('infoPanelWidthRow');
+    const applyProfileVisibility = (profile) => {
+      if (portraitSplitRow) portraitSplitRow.hidden = (profile !== 'portrait-split');
+      if (infoPanelWidthRow) infoPanelWidthRow.hidden = (profile !== 'info-panel');
+    };
     if (layoutProfileSelect) {
       const profile = settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape';
       layoutProfileSelect.value = profile;
+      applyProfileVisibility(profile);
       layoutProfileSelect.onchange = () => {
         settings.display = settings.display || {};
-        settings.display.layoutProfile = layoutProfileSelect.value;
+        const selected = layoutProfileSelect.value;
+        settings.display.layoutProfile = selected;
+        applyProfileVisibility(selected);
         notifySettingsChanged();
       };
+    } else {
+      applyProfileVisibility('landscape');
     }
 
     renderStyleAutomationControls();
@@ -2049,6 +2085,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       renderStyleAutomationControls();
 
       setV('#rightW',   DEFAULTS.display.rightWidthPercent);
+      setV('#infoPanelWidth', DEFAULTS.display.infoPanelWidthPercent);
+      setV('#portraitSplitTop', DEFAULTS.display.portraitSplitTopPercent);
       setV('#cutTop',   DEFAULTS.display.cutTopPercent);
       setV('#cutBottom',DEFAULTS.display.cutBottomPercent);
       setV('#infoBannerHeight', DEFAULTS.display.infoBannerHeightPercent);
@@ -2058,6 +2096,10 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         bannerModeSelect.value = ['full', 'left', 'right'].includes(defMode) ? defMode : 'full';
       }
       setV('#layoutMode', DEFAULTS.display.layoutMode || 'single');
+      setV('#layoutProfile', DEFAULTS.display.layoutProfile || 'landscape');
+      updatePercentOutput(document.getElementById('infoPanelWidth'), document.getElementById('infoPanelWidthOutput'));
+      updatePercentOutput(document.getElementById('portraitSplitTop'), document.getElementById('portraitSplitTopOutput'));
+      applyProfileVisibility(DEFAULTS.display.layoutProfile || 'landscape');
       const defLeft = DEFAULTS.display.pages?.left || {};
       const defRight = DEFAULTS.display.pages?.right || {};
       setV('#pageLeftTimer', defLeft.timerSec ?? '');

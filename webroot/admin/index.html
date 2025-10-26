@@ -541,13 +541,27 @@
                   <label>Layout-Profil</label>
                   <select id="layoutProfile" class="input">
                     <option value="landscape">Standard (16:9)</option>
-                    <option value="portrait">Portrait – Einzel</option>
                     <option value="portrait-split">Portrait – geteilte Bereiche</option>
                     <option value="triple">Triple-Column</option>
                     <option value="asymmetric">Asymmetrisch</option>
                     <option value="info-panel">Info-Panel (Seitenleiste)</option>
-                    <option value="banner">Banner (Top/Bottom)</option>
                   </select>
+                </div>
+                <div class="kv" id="portraitSplitRatioRow" hidden>
+                  <label for="portraitSplitTop">Bereich oben (%)</label>
+                  <div class="range-control">
+                    <input id="portraitSplitTop" class="input" type="range" min="10" max="90" step="1" value="58">
+                    <output id="portraitSplitTopOutput" for="portraitSplitTop">58%</output>
+                  </div>
+                  <div class="help">Steuert die Höhe des oberen Bereichs im Portrait-Layout.</div>
+                </div>
+                <div class="kv" id="infoPanelWidthRow" hidden>
+                  <label for="infoPanelWidth">Breite Seitenleiste (%)</label>
+                  <div class="range-control">
+                    <input id="infoPanelWidth" class="input" type="range" min="20" max="70" step="1" value="32">
+                    <output id="infoPanelWidthOutput" for="infoPanelWidth">32%</output>
+                  </div>
+                  <div class="help">Bestimmt die Breite der Seitenleiste im Info-Panel-Layout.</div>
                 </div>
                 <div class="kv">
                   <label>Info-Banner Platzierung</label>

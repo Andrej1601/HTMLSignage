@@ -869,6 +869,8 @@ function signage_default_settings(): array
         'display' => [
             'fit' => 'cover',
             'rightWidthPercent' => 38,
+            'infoPanelWidthPercent' => 32,
+            'portraitSplitTopPercent' => 58,
             'cutTopPercent' => 28,
             'cutBottomPercent' => 12,
         ],

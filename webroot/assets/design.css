@@ -33,7 +33,7 @@
   /* right panel shape */
   --rightW:38%; --cutTop:28%; --cutBottom:12%;
   --infoPanelW:32%;
-  --bannerTop:60%;
+  --portraitSplitTop:58%; --portraitSplitBottom:42%;
   --infoBannerHeightVh:10;
   --infoBannerPadScale:1;
   --infoBannerReservedPx:0px;
@@ -115,12 +115,10 @@ body[data-layout='split'] .stage-area{display:flex}
 body[data-layout='single'] .stage{gap:0;}
 body[data-layout='single'] #stage-right{display:none;}
 
-body[data-layout-profile='portrait'] .stage,
 body[data-layout-profile='portrait-split'] .stage{flex-direction:column; align-items:stretch;}
-body[data-layout-profile='portrait'] .stage-area,
 body[data-layout-profile='portrait-split'] .stage-area{flex:1 1 auto; height:auto; min-height:0;}
-body[data-layout-profile='portrait-split'][data-layout='split'] #stage-left{flex:0 0 58%;}
-body[data-layout-profile='portrait-split'][data-layout='split'] #stage-right{flex:0 0 42%;}
+body[data-layout-profile='portrait-split'][data-layout='split'] #stage-left{flex:0 0 var(--portraitSplitTop,58%);}
+body[data-layout-profile='portrait-split'][data-layout='split'] #stage-right{flex:0 0 var(--portraitSplitBottom,42%);}
 
 body[data-layout-profile='triple'] .stage,
 body[data-layout-profile='asymmetric'] .stage{display:grid; grid-auto-flow:column; align-items:stretch;}
@@ -139,11 +137,6 @@ body[data-layout-profile='info-panel'] #stage-left{grid-column:1;}
 body[data-layout-profile='info-panel'] #stage-right{grid-column:2;}
 body[data-layout='single'][data-layout-profile='info-panel'] #stage-left{grid-column:1 / -1;}
 
-body[data-layout-profile='banner'] .stage{display:grid; grid-template-rows:minmax(0,var(--bannerTop,60%)) minmax(0,1fr); grid-auto-flow:row; align-items:stretch;}
-body[data-layout-profile='banner'] .stage-area{min-height:0;}
-body[data-layout-profile='banner'] #stage-left{grid-row:1;}
-body[data-layout-profile='banner'] #stage-right{grid-row:2;}
-body[data-layout='single'][data-layout-profile='banner'] #stage-left{grid-row:1 / -1;}
 
 .fade{opacity:0;transition:opacity .5s}
 .fade.show{opacity:1}

@@ -1448,9 +1448,6 @@ function applyDisplay() {
   updateLayoutProfileAttr(layoutProfile);
 
   switch (layoutProfile) {
-    case 'portrait':
-      docStyle.setProperty('--stage-gap', 'calc(20px * var(--vwScale))');
-      break;
     case 'portrait-split':
       docStyle.setProperty('--stage-gap', 'calc(18px * var(--vwScale))');
       break;
@@ -1471,7 +1468,16 @@ function applyDisplay() {
 
   setPercentProperty('--rightW', d.rightWidthPercent);
   setPercentProperty('--infoPanelW', d.infoPanelWidthPercent ?? d.rightWidthPercent);
-  setPercentProperty('--bannerTop', d.bannerTopPercent);
+  const portraitTop = toFiniteNumber(d.portraitSplitTopPercent);
+  if (portraitTop !== null) {
+    const clamped = Math.max(5, Math.min(95, portraitTop));
+    docStyle.setProperty('--portraitSplitTop', `${clamped}%`);
+    const bottom = Math.max(0, Math.min(100, 100 - clamped));
+    docStyle.setProperty('--portraitSplitBottom', `${bottom}%`);
+  } else {
+    docStyle.removeProperty('--portraitSplitTop');
+    docStyle.removeProperty('--portraitSplitBottom');
+  }
   applyInfoBannerLayout(d, docStyle);
 
   const topPercent = toFiniteNumber(d.cutTopPercent);
