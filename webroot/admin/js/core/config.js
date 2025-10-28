@@ -3,7 +3,7 @@
 
 'use strict';
 
-import { DEFAULTS } from './defaults.js';
+import { DEFAULTS, EVENT_PLAN_KEYS } from './defaults.js';
 import { sanitizeBadgeLibrary } from './badge_library.js';
 import { deepClone, genId } from './utils.js';
 
@@ -715,6 +715,8 @@ function sanitizeStyleAutomation(settings){
     timeSlots: []
   };
 
+  const allowedPlans = new Set(Array.isArray(EVENT_PLAN_KEYS) ? EVENT_PLAN_KEYS : []);
+
   const fallbackTrackCandidates = [raw.fallbackTrack, defaults.fallbackTrack, background.activeTrack];
   for (const candidate of fallbackTrackCandidates) {
     if (typeof candidate === 'string') {
@@ -741,6 +743,8 @@ function sanitizeStyleAutomation(settings){
     const style = availableStyles.has(entry.style) ? entry.style : normalized.fallbackStyle;
     const trackCandidate = typeof entry.track === 'string' ? entry.track.trim() : '';
     const track = trackCandidate && availableTracks.has(trackCandidate) ? trackCandidate : (normalized.fallbackTrack || '');
+    const planCandidate = typeof entry.plan === 'string' ? entry.plan.trim() : '';
+    const plan = allowedPlans.has(planCandidate) ? planCandidate : '';
     const mode = entry.mode === 'range' || (entry.startDateTime && entry.endDateTime)
       ? 'range'
       : 'daily';
@@ -755,12 +759,13 @@ function sanitizeStyleAutomation(settings){
         mode: 'range',
         startDateTime: startInfo.iso,
         endDateTime: endInfo.iso,
-        track
+        track,
+        plan
       });
     } else {
       const start = normalizeTimeString(entry.start || entry.startTime || '');
       if (!start) return;
-      normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track });
+      normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track, plan });
     }
     seen.add(id);
   });

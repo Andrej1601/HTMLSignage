@@ -1,5 +1,5 @@
 import { deepClone, genId } from '../../core/utils.js';
-import { DEFAULTS } from '../../core/defaults.js';
+import { DEFAULTS, EVENT_PLAN_ENTRIES, EVENT_PLAN_KEYS } from '../../core/defaults.js';
 import { uploadGeneric } from '../../core/upload.js';
 import { sanitizePagePlaylist, playlistKeyFromSanitizedEntry, mapSaunaHeadingWidthToInput, SAUNA_HEADING_WIDTH_LIMITS, sanitizeBackgroundAudio } from '../../core/config.js';
 import { collectSlideOrderStream, SAUNA_STATUS, SAUNA_STATUS_TEXT } from '../../ui/slides_master.js';
@@ -7,6 +7,8 @@ import { collectSlideOrderStream, SAUNA_STATUS, SAUNA_STATUS_TEXT } from '../../
 export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState, resolveOverviewTimeWidthScale }) {
   const renderSlidesBox = () => {
     const settings = getSettings();
+    const eventPlanOptions = EVENT_PLAN_ENTRIES.map(([id, label]) => ({ id, label }));
+    const allowedEventPlans = new Set(EVENT_PLAN_KEYS || []);
     const f = settings.fonts || {};
     const setV = (sel, val) => { const el = document.querySelector(sel); if (el) el.value = val; };
     const setC = (sel, val) => { const el = document.querySelector(sel); if (el) el.checked = !!val; };
@@ -131,6 +133,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
         const track = trackCandidate && availableTracks.includes(trackCandidate)
           ? trackCandidate
           : (normalized.fallbackTrack || '');
+        const planCandidate = typeof slot.plan === 'string' ? slot.plan.trim() : '';
+        const plan = allowedEventPlans.has(planCandidate) ? planCandidate : '';
         const mode = slot.mode === 'range' || (slot.startDateTime && slot.endDateTime)
           ? 'range'
           : 'daily';
@@ -145,12 +149,13 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
             mode: 'range',
             startDateTime: startInfo.iso,
             endDateTime: endInfo.iso,
-            track
+            track,
+            plan
           });
         } else {
           const start = normalizeTime(slot.start || slot.startTime || '');
           if (!start) return;
-          normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track });
+          normalized.timeSlots.push({ id, label, start, style, mode: 'daily', track, plan });
         }
         seen.add(id);
       };
@@ -340,6 +345,10 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           const row = document.createElement('div');
           row.className = 'style-auto-slot';
 
+          if (!allowedEventPlans.has(slot.plan)) {
+            slot.plan = '';
+          }
+
           const modeWrap = document.createElement('div');
           modeWrap.className = 'style-auto-field style-auto-mode';
           const modeLabel = document.createElement('label');
@@ -513,6 +522,33 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           trackWrap.append(trackLabel, trackSelect);
           row.appendChild(trackWrap);
 
+          const planWrap = document.createElement('div');
+          planWrap.className = 'style-auto-field';
+          const planLabel = document.createElement('label');
+          planLabel.textContent = 'Plan';
+          const planSelect = document.createElement('select');
+          planSelect.className = 'input';
+          const defaultPlanOpt = document.createElement('option');
+          defaultPlanOpt.value = '';
+          defaultPlanOpt.textContent = 'Standard (Wochentag)';
+          planSelect.appendChild(defaultPlanOpt);
+          eventPlanOptions.forEach(({ id, label }) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = label;
+            planSelect.appendChild(opt);
+          });
+          const currentPlan = allowedEventPlans.has(slot.plan) ? slot.plan : '';
+          slot.plan = currentPlan;
+          planSelect.value = currentPlan;
+          planSelect.onchange = () => {
+            const next = planSelect.value || '';
+            slot.plan = allowedEventPlans.has(next) ? next : '';
+            notifySettingsChanged();
+          };
+          planWrap.append(planLabel, planSelect);
+          row.appendChild(planWrap);
+
           const labelWrap = document.createElement('div');
           labelWrap.className = 'style-auto-field';
           const labelLabel = document.createElement('label');
@@ -550,7 +586,15 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
           const state = ensureStyleAutomationState();
           const last = state.timeSlots[state.timeSlots.length - 1];
           const start = last && last.mode === 'daily' ? last.start : '06:00';
-          state.timeSlots.push({ id: genId('sty_'), mode: 'daily', start: start || '06:00', label: '', style: state.fallbackStyle, track: state.fallbackTrack });
+          state.timeSlots.push({
+            id: genId('sty_'),
+            mode: 'daily',
+            start: start || '06:00',
+            label: '',
+            style: state.fallbackStyle,
+            track: state.fallbackTrack,
+            plan: ''
+          });
           state.timeSlots.sort(compareAutomationSlots);
           renderStyleAutomationControls();
           notifySettingsChanged();
