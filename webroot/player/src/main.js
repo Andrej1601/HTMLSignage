@@ -70,6 +70,7 @@ const liveStateTokens = { config: null, device: null };
 const eventStreamProbeCache = new Map();
 const jsonRequestCache = new Map();
 let badgeLookupCache = null;
+const EVENT_PLAN_KEYS = ['Evt1', 'Evt2'];
 let styleAutomationTimer = null;
 const styleAutomationState = {
   baseTheme: null,
@@ -77,7 +78,9 @@ const styleAutomationState = {
   baseSlides: null,
   activeStyle: null,
   baseAudioTrack: null,
-  activeTrack: null
+  activeTrack: null,
+  baseSchedule: null,
+  scheduleOverride: null
 };
 let infoBannerMode = 'full';
 let infoBannerSpacingFrame = 0;
@@ -926,6 +929,7 @@ const parseDateTimeLocal = (value) => {
 // ---------- Presets ----------
 function dayKey(){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]; }
 function maybeApplyPreset(){
+  if (styleAutomationState.scheduleOverride) return;
   const auto = !!(settings && settings.presetAuto);
   const presets = (settings && settings.presets) || {};
   if (!auto) return;
@@ -943,6 +947,8 @@ function snapshotStyleAutomationBase() {
   styleAutomationState.baseSlides = cloneSubset(settings?.slides || {}, STYLE_SLIDE_KEYS);
   styleAutomationState.activeStyle = settings?.slides?.activeStyleSet || null;
   styleAutomationState.baseAudioTrack = settings?.audio?.background?.activeTrack || null;
+  styleAutomationState.baseSchedule = null;
+  styleAutomationState.scheduleOverride = null;
 }
 
 function getStyleSets() {
@@ -960,7 +966,7 @@ function getBackgroundTracks() {
   return (tracks && typeof tracks === 'object') ? tracks : {};
 }
 
-function resolveTimeSlotSelection(styleSets, automation, tracks) {
+function resolveTimeSlotSelection(styleSets, automation, tracks, validPlans) {
   if (!automation || automation.enabled === false) return null;
   const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
   if (!slots.length) return null;
@@ -972,7 +978,9 @@ function resolveTimeSlotSelection(styleSets, automation, tracks) {
     const minutes = parseHM(slot.start || slot.startTime || '');
     if (minutes === null) return;
     const trackKey = slot.track && tracks[slot.track] ? slot.track : null;
-    valid.push({ minutes, style: styleKey, track: trackKey });
+    const planCandidate = typeof slot.plan === 'string' ? slot.plan.trim() : '';
+    const planKey = (validPlans && validPlans.has(planCandidate)) ? planCandidate : null;
+    valid.push({ minutes, style: styleKey, track: trackKey, plan: planKey });
   });
   if (!valid.length) return null;
   valid.sort((a, b) => a.minutes - b.minutes);
@@ -984,10 +992,10 @@ function resolveTimeSlotSelection(styleSets, automation, tracks) {
   if (!selected) {
     selected = valid[valid.length - 1];
   }
-  return selected ? { style: selected.style, track: selected.track } : null;
+  return selected ? { style: selected.style, track: selected.track, plan: selected.plan || null } : null;
 }
 
-function resolveRangeSlotSelection(styleSets, automation, tracks) {
+function resolveRangeSlotSelection(styleSets, automation, tracks, validPlans) {
   if (!automation || automation.enabled === false) return null;
   const slots = Array.isArray(automation.timeSlots) ? automation.timeSlots : [];
   if (!slots.length) return null;
@@ -998,16 +1006,18 @@ function resolveRangeSlotSelection(styleSets, automation, tracks) {
     if (slot.mode !== 'range' && !(slot.startDateTime && slot.endDateTime)) return;
     const styleKey = slot.style && styleSets[slot.style] ? slot.style : null;
     const trackKey = slot.track && tracks[slot.track] ? slot.track : null;
+    const planCandidate = typeof slot.plan === 'string' ? slot.plan.trim() : '';
+    const planKey = (validPlans && validPlans.has(planCandidate)) ? planCandidate : null;
     const startInfo = parseDateTimeLocal(slot.startDateTime || slot.start);
     const endInfo = parseDateTimeLocal(slot.endDateTime || slot.end);
     if (!startInfo || !endInfo) return;
     if (endInfo.ms < startInfo.ms) return;
     if (now < startInfo.ms || now > endInfo.ms) return;
     if (!selected || startInfo.ms >= selected.startMs) {
-      selected = { style: styleKey, track: trackKey, startMs: startInfo.ms };
+      selected = { style: styleKey, track: trackKey, plan: planKey, startMs: startInfo.ms };
     }
   });
-  return selected ? { style: selected.style, track: selected.track } : null;
+  return selected ? { style: selected.style, track: selected.track, plan: selected.plan || null } : null;
 }
 
 function resolveAutomationSelection() {
@@ -1018,6 +1028,7 @@ function resolveAutomationSelection() {
   const trackIds = Object.keys(backgroundTracks);
   const slidesCfg = settings?.slides || {};
   const automation = getAutomationConfig();
+  const validPlanSet = new Set(EVENT_PLAN_KEYS);
   const savedActive = slidesCfg.activeStyleSet && styleSets[slidesCfg.activeStyleSet]
     ? slidesCfg.activeStyleSet
     : null;
@@ -1040,25 +1051,60 @@ function resolveAutomationSelection() {
     fallbackTrack = trackIds[0];
   }
   if (!automation || automation.enabled === false) {
-    return { style: fallbackStyle, track: fallbackTrack, reason: 'disabled' };
+    return { style: fallbackStyle, track: fallbackTrack, plan: null, reason: 'disabled' };
   }
-  const rangeSelection = resolveRangeSlotSelection(styleSets, automation, backgroundTracks);
+  const rangeSelection = resolveRangeSlotSelection(styleSets, automation, backgroundTracks, validPlanSet);
   if (rangeSelection && (rangeSelection.style || rangeSelection.track)) {
     return {
       style: rangeSelection.style || fallbackStyle,
       track: rangeSelection.track || fallbackTrack,
+      plan: rangeSelection.plan || null,
       reason: 'range'
     };
   }
-  const timeSelection = resolveTimeSlotSelection(styleSets, automation, backgroundTracks);
+  const timeSelection = resolveTimeSlotSelection(styleSets, automation, backgroundTracks, validPlanSet);
   if (timeSelection && (timeSelection.style || timeSelection.track)) {
     return {
       style: timeSelection.style || fallbackStyle,
       track: timeSelection.track || fallbackTrack,
+      plan: timeSelection.plan || null,
       reason: 'time'
     };
   }
-  return { style: fallbackStyle, track: fallbackTrack, reason: 'fallback' };
+  return { style: fallbackStyle, track: fallbackTrack, plan: null, reason: 'fallback' };
+}
+
+function applyScheduleOverride(planKey) {
+  const normalized = typeof planKey === 'string' ? planKey.trim() : '';
+  const target = EVENT_PLAN_KEYS.includes(normalized) ? normalized : '';
+  if (!target) {
+    if (!styleAutomationState.scheduleOverride) {
+      return false;
+    }
+    const base = styleAutomationState.baseSchedule;
+    if (base) {
+      schedule = deepClone(base);
+    }
+    styleAutomationState.scheduleOverride = null;
+    styleAutomationState.baseSchedule = null;
+    saunaStatusState = computeSaunaStatusState(settings, schedule);
+    return true;
+  }
+  const presets = settings?.presets;
+  const preset = (presets && typeof presets === 'object') ? presets[target] : null;
+  if (!preset || !Array.isArray(preset.saunas) || !Array.isArray(preset.rows)) {
+    return applyScheduleOverride('');
+  }
+  if (styleAutomationState.scheduleOverride === target) {
+    return false;
+  }
+  if (!styleAutomationState.scheduleOverride) {
+    styleAutomationState.baseSchedule = deepClone(schedule);
+  }
+  styleAutomationState.scheduleOverride = target;
+  schedule = deepClone(preset);
+  saunaStatusState = computeSaunaStatusState(settings, schedule);
+  return true;
 }
 
 function applyStyleAutomation() {
@@ -1128,7 +1174,9 @@ function applyStyleAutomation() {
     applyBackgroundAudio(settings.audio.background);
   }
 
-  return { changed: styleChanged, style: styleId };
+  const scheduleChanged = applyScheduleOverride(selection.plan);
+
+  return { changed: styleChanged, style: styleId, scheduleChanged };
 }
 
 function stopStyleAutomationTimer() {
@@ -1142,6 +1190,9 @@ function startStyleAutomationTimer() {
   stopStyleAutomationTimer();
   const tick = () => {
     const result = applyStyleAutomation();
+    if (result.scheduleChanged) {
+      refreshStageQueues({ resetIndex: true, autoplay: true });
+    }
     if (result.changed) {
       applyTheme();
       runResizeHandlers();
@@ -5379,6 +5430,10 @@ function createStageController(id, element){
       return;
     }
     const styleResult = applyStyleAutomation();
+    if (styleResult.scheduleChanged) {
+      refreshStageQueues({ resetIndex: true, autoplay: true });
+      return;
+    }
     if (styleResult.changed) {
       applyTheme();
       runResizeHandlers();

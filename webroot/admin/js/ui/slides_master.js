@@ -15,7 +15,7 @@
 import { $, $$, preloadImg, escapeHtml } from '../core/utils.js';
 import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
-import { DAYS, DAY_LABELS, dayKeyToday } from '../core/defaults.js';
+import { DAYS, DAY_LABELS, WEEKDAY_KEYS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
 import { notifySuccess, notifyWarning } from '../core/notifications.js';
 import { WELLNESS_GLOBAL_ID } from '../core/config.js';
@@ -734,7 +734,7 @@ function computePresetSaunaDays(){
   const settings = ctx.getSettings();
   const map = new Map();
   const P = settings?.presets || {};
-  const days = DAYS.filter(d => d[0] !== 'Opt'); // nur echte Wochentage
+  const days = DAYS.filter(([key]) => WEEKDAY_KEYS.includes(key)); // nur echte Wochentage
   for (const [key, label] of days) {
     const sc = P[key];
     const list = Array.isArray(sc?.saunas) ? sc.saunas : [];

@@ -365,10 +365,34 @@ export const DEFAULTS = {
 };
 
 // Wochentage + Labels (+ „Opt“ als manueller Tag)
-export const DAYS = [
-  ['Mon','Mo'],['Tue','Di'],['Wed','Mi'],['Thu','Do'],['Fri','Fr'],['Sat','Sa'],['Sun','So'],
-  ['Opt','Opt']
+export const WEEKDAY_ENTRIES = [
+  ['Mon', 'Mo'],
+  ['Tue', 'Di'],
+  ['Wed', 'Mi'],
+  ['Thu', 'Do'],
+  ['Fri', 'Fr'],
+  ['Sat', 'Sa'],
+  ['Sun', 'So']
 ];
+
+export const EVENT_PLAN_ENTRIES = [
+  ['Evt1', 'Event 1'],
+  ['Evt2', 'Event 2']
+];
+
+export const SPECIAL_DAY_ENTRIES = [
+  ['Opt', 'Opt'],
+  ...EVENT_PLAN_ENTRIES
+];
+
+export const DAYS = [
+  ...WEEKDAY_ENTRIES,
+  ...SPECIAL_DAY_ENTRIES
+];
+
+export const WEEKDAY_KEYS = WEEKDAY_ENTRIES.map(([key]) => key);
+export const EVENT_PLAN_KEYS = EVENT_PLAN_ENTRIES.map(([key]) => key);
+export const SPECIAL_DAY_KEYS = SPECIAL_DAY_ENTRIES.map(([key]) => key);
 export const DAY_LABELS = Object.fromEntries(DAYS);
 
 export function dayKeyToday(){
