@@ -369,6 +369,7 @@ function createSlidesMasterContext() {
     getSettings: stateAccess.getSettings,
     setSchedule: stateAccess.setSchedule,
     setSettings: stateAccess.setSettings,
+    collectCurrentState: () => collectSettings(),
     refreshSlidesBox: renderSlidesBox,
     refreshColors: renderColors,
     hasUnsavedChanges: () => unsavedHasChanges(),

@@ -18,7 +18,11 @@ import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, WEEKDAY_KEYS, dayKeyToday } from '../core/defaults.js';
 import { DEFAULTS } from '../core/defaults.js';
 import { notifySuccess, notifyWarning } from '../core/notifications.js';
-import { WELLNESS_GLOBAL_ID } from '../core/config.js';
+import {
+  WELLNESS_GLOBAL_ID,
+  normalizeSaunaHeadingWidth,
+  SAUNA_HEADING_WIDTH_LIMITS
+} from '../core/config.js';
 import {
   ensureBadgeLibrary,
   createBadge,
@@ -90,6 +94,13 @@ const SUGGESTED_BADGE_EMOJIS = [
 const cloneValue = (value) => {
   if (value == null) return value;
   if (typeof value === 'object') return JSON.parse(JSON.stringify(value));
+  return value;
+};
+
+const clampNumber = (min, value, max) => {
+  if (!Number.isFinite(value)) return null;
+  if (value < min) return min;
+  if (value > max) return max;
   return value;
 };
 
@@ -436,12 +447,171 @@ function markBadgeLibraryChanged(settings){
   commitBadgeLibraryChanges(settings);
 }
 
+function syncStyleSetFormState(settings){
+  if (!settings || typeof settings !== 'object') return settings;
+  if (typeof document !== 'object') return settings;
+
+  const fonts = (settings.fonts && typeof settings.fonts === 'object') ? settings.fonts : (settings.fonts = {});
+  const slidesCfg = (settings.slides && typeof settings.slides === 'object') ? settings.slides : (settings.slides = {});
+  const displayCfg = (settings.display && typeof settings.display === 'object') ? settings.display : (settings.display = {});
+
+  const getEl = (id) => document.getElementById(id);
+  const readNumber = (id) => {
+    const el = getEl(id);
+    if (!el) return NaN;
+    const num = Number(el.value);
+    return Number.isFinite(num) ? num : NaN;
+  };
+  const readChecked = (id) => {
+    const el = getEl(id);
+    return !!el?.checked;
+  };
+
+  const fontFamilyEl = getEl('fontFamily');
+  if (fontFamilyEl && typeof fontFamilyEl.value === 'string') {
+    const trimmed = fontFamilyEl.value.trim();
+    fonts.family = trimmed || fonts.family || DEFAULTS.fonts.family;
+  }
+
+  const tileTextRaw = readNumber('tileTextScale');
+  if (Number.isFinite(tileTextRaw)) {
+    fonts.tileTextScale = clampNumber(0.4, tileTextRaw, 3) ?? fonts.tileTextScale;
+  }
+
+  const tileWeightEl = getEl('tileWeight');
+  if (tileWeightEl && typeof tileWeightEl.value === 'string') {
+    const parsed = Number(tileWeightEl.value);
+    if (Number.isFinite(parsed)) {
+      fonts.tileWeight = clampNumber(100, parsed, 900) ?? parsed;
+    }
+  }
+
+  const chipHeightRaw = readNumber('chipH');
+  if (Number.isFinite(chipHeightRaw)) {
+    const normalized = clampNumber(0.5, chipHeightRaw / 100, 2);
+    if (normalized != null) fonts.chipHeight = normalized;
+  }
+
+  const chipOverflowEl = getEl('chipOverflowMode');
+  if (chipOverflowEl && typeof chipOverflowEl.value === 'string') {
+    const value = chipOverflowEl.value === 'ellipsis' ? 'ellipsis' : 'scale';
+    fonts.chipOverflowMode = value;
+  }
+
+  const flamePctRaw = readNumber('flamePct');
+  if (Number.isFinite(flamePctRaw)) {
+    const normalized = clampNumber(0, flamePctRaw, 100);
+    if (normalized != null) fonts.flamePct = normalized;
+  }
+
+  const flameGapRaw = readNumber('flameGap');
+  if (Number.isFinite(flameGapRaw)) {
+    const normalized = clampNumber(0, flameGapRaw, 3);
+    if (normalized != null) fonts.flameGapScale = normalized;
+  }
+
+  const tileMetaRaw = readNumber('tileTimeScale');
+  if (Number.isFinite(tileMetaRaw)) {
+    const normalized = clampNumber(0.5, tileMetaRaw, 2);
+    if (normalized != null) fonts.tileMetaScale = normalized;
+  }
+
+  const ovTimeWidthRaw = readNumber('ovTimeWidthScale');
+  if (Number.isFinite(ovTimeWidthRaw) && ovTimeWidthRaw > 0) {
+    const normalized = clampNumber(0.5, ovTimeWidthRaw, 3);
+    if (normalized != null) fonts.overviewTimeWidthScale = normalized;
+  } else if (!Number.isFinite(Number(fonts.overviewTimeWidthScale))) {
+    const fallback = Number(DEFAULTS.fonts?.overviewTimeWidthScale ?? 1);
+    const normalized = clampNumber(0.5, fallback, 3);
+    if (normalized != null) fonts.overviewTimeWidthScale = normalized;
+  }
+
+  fonts.overviewShowFlames = readChecked('overviewFlames');
+
+  const tileFlameSizeRaw = readNumber('tileFlameSizeScale');
+  if (Number.isFinite(tileFlameSizeRaw)) {
+    const normalized = clampNumber(0.4, tileFlameSizeRaw, 3);
+    if (normalized != null) slidesCfg.tileFlameSizeScale = normalized;
+  }
+
+  const tileFlameGapRaw = readNumber('tileFlameGapScale');
+  if (Number.isFinite(tileFlameGapRaw)) {
+    const normalized = clampNumber(0, tileFlameGapRaw, 3);
+    if (normalized != null) slidesCfg.tileFlameGapScale = normalized;
+  }
+
+  const badgeScaleRaw = readNumber('badgeScale');
+  if (Number.isFinite(badgeScaleRaw)) {
+    const normalized = clampNumber(0.3, badgeScaleRaw, 3);
+    if (normalized != null) slidesCfg.badgeScale = normalized;
+  }
+
+  const badgeDescRaw = readNumber('badgeDescriptionScale');
+  if (Number.isFinite(badgeDescRaw)) {
+    const normalized = clampNumber(0.3, badgeDescRaw, 3);
+    if (normalized != null) slidesCfg.badgeDescriptionScale = normalized;
+  }
+
+  const tileHeightRaw = readNumber('tileHeightScale');
+  if (Number.isFinite(tileHeightRaw)) {
+    const normalized = clampNumber(0.5, tileHeightRaw, 2);
+    if (normalized != null) slidesCfg.tileHeightScale = normalized;
+  }
+
+  const tilePaddingRaw = readNumber('tilePaddingScale');
+  if (Number.isFinite(tilePaddingRaw)) {
+    const normalized = clampNumber(0.25, tilePaddingRaw, 1.5);
+    if (normalized != null) slidesCfg.tilePaddingScale = normalized;
+  }
+
+  slidesCfg.tileOverlayEnabled = readChecked('tileOverlayEnabled');
+  const overlayStrengthRaw = readNumber('tileOverlayStrength');
+  if (Number.isFinite(overlayStrengthRaw)) {
+    const normalized = clampNumber(0, overlayStrengthRaw, 200);
+    if (normalized != null) slidesCfg.tileOverlayStrength = normalized / 100;
+  }
+
+  slidesCfg.badgeInlineColumn = readChecked('badgeInlineColumn');
+  slidesCfg.appendTimeSuffix = readChecked('timeSuffixToggle');
+
+  const headingEl = getEl('saunaHeadingWidth');
+  if (headingEl) {
+    const fallback = settings.slides?.saunaTitleMaxWidthPercent
+      ?? DEFAULTS.slides?.saunaTitleMaxWidthPercent
+      ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+    const normalized = normalizeSaunaHeadingWidth(headingEl.value, { fallback });
+    if (Number.isFinite(normalized)) slidesCfg.saunaTitleMaxWidthPercent = normalized;
+  }
+
+  const layoutModeEl = getEl('layoutMode');
+  if (layoutModeEl && typeof layoutModeEl.value === 'string') {
+    displayCfg.layoutMode = (layoutModeEl.value === 'split') ? 'split' : 'single';
+  }
+
+  const layoutProfileEl = getEl('layoutProfile');
+  if (layoutProfileEl && typeof layoutProfileEl.value === 'string') {
+    const raw = layoutProfileEl.value;
+    const allowed = new Set(['landscape', 'portrait-split', 'triple', 'asymmetric', 'info-panel']);
+    if (allowed.has(raw)) {
+      displayCfg.layoutProfile = raw;
+    }
+  }
+
+  const saunaFlamesEl = getEl('saunaFlames');
+  if (saunaFlamesEl) {
+    slidesCfg.showSaunaFlames = !!saunaFlamesEl.checked;
+  }
+
+  return settings;
+}
+
 function snapshotStyleSet(settings){
+  const source = syncStyleSetFormState(settings);
   return {
-    theme: cloneSubset(settings.theme, STYLE_THEME_KEYS),
-    fonts: cloneSubset(settings.fonts, STYLE_FONT_KEYS),
-    slides: cloneSubset(settings.slides, STYLE_SLIDE_KEYS),
-    display: cloneSubset(settings.display, STYLE_DISPLAY_KEYS)
+    theme: cloneSubset(source.theme, STYLE_THEME_KEYS),
+    fonts: cloneSubset(source.fonts, STYLE_FONT_KEYS),
+    slides: cloneSubset(source.slides, STYLE_SLIDE_KEYS),
+    display: cloneSubset(source.display, STYLE_DISPLAY_KEYS)
   };
 }
 
