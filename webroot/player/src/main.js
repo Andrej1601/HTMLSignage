@@ -2710,17 +2710,23 @@ function normalizeFlameSpec(spec) {
 
 function parseFlameSpec(spec) {
   const norm = normalizeFlameSpec(spec);
-  if (norm === '1' || norm === '2' || norm === '3') {
-    const count = Math.max(0, Math.min(3, parseInt(norm, 10) || 0));
+  if (norm === '1' || norm === '2' || norm === '3' || norm === '4') {
+    const count = Math.max(0, Math.min(4, parseInt(norm, 10) || 0));
     return { count, approx: false };
   }
   const approxMap = {
     '1-2': 2,
     '2-3': 3,
     '1-3': 3,
+    '3-4': 4,
+    '2-4': 4,
+    '1-4': 4,
     '12': 2,
     '23': 3,
-    '13': 3
+    '13': 3,
+    '34': 4,
+    '24': 4,
+    '14': 4
   };
   if (Object.prototype.hasOwnProperty.call(approxMap, norm)) {
     return { count: approxMap[norm], approx: true };
