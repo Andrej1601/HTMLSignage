@@ -748,6 +748,7 @@ function collectSettings(){
   };
   settings.presets ||= {};
   settings.presets[getActiveDayKey()] = deepClone(schedule);
+  const tileTimeScaleRaw = Number($('#tileTimeScale')?.value);
   return {
     schedule: { ...schedule },
     settings: {
@@ -791,9 +792,21 @@ function collectSettings(){
         tileTextScale:+($('#tileTextScale').value||0.8),
         tileWeight:+($('#tileWeight').value||600),
         tileMetaScale:(() => {
-          const raw = Number($('#tileTimeScale')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.tileMetaScale ?? DEFAULTS.fonts.tileMetaScale ?? 1;
-          return clamp(0.5, raw, 2);
+          if (!Number.isFinite(tileTimeScaleRaw)) {
+            return settings.fonts?.tileMetaScale ?? DEFAULTS.fonts.tileMetaScale ?? 1;
+          }
+          return clamp(0.5, tileTimeScaleRaw, 2);
+        })(),
+        tileTimeScale:(() => {
+          if (!Number.isFinite(tileTimeScaleRaw)) {
+            const fallback = settings.fonts?.tileTimeScale
+              ?? settings.fonts?.tileMetaScale
+              ?? DEFAULTS.fonts.tileTimeScale
+              ?? DEFAULTS.fonts.tileMetaScale
+              ?? 1;
+            return clamp(0.5, fallback, 3);
+          }
+          return clamp(0.5, tileTimeScaleRaw, 3);
         })()
       },
       h2:{
