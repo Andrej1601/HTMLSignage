@@ -4661,6 +4661,9 @@ function applyTileSizing(container, opts = {}) {
   const userMetaScale = Number.isFinite(+settings?.fonts?.tileMetaScale)
     ? clamp(0.5, +settings.fonts.tileMetaScale, 2)
     : 1;
+  const userTimeScale = Number.isFinite(+settings?.fonts?.tileTimeScale)
+    ? clamp(0.5, +settings.fonts.tileTimeScale, 3)
+    : userMetaScale;
   const userBadgeScale = Number.isFinite(+settings?.slides?.badgeScale)
     ? clamp(0.3, +settings.slides.badgeScale, 3)
     : 1;
@@ -4697,7 +4700,9 @@ function applyTileSizing(container, opts = {}) {
   container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
   container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
   const combinedMeta = metaScale * userMetaScale;
+  const combinedTime = metaScale * userTimeScale;
   container.style.setProperty('--tileMetaScale', combinedMeta.toFixed(3));
+  container.style.setProperty('--tileTimeScale', combinedTime.toFixed(3));
   container.style.setProperty('--tileBadgeScale', (combinedMeta * userBadgeScale).toFixed(3));
   container.style.setProperty('--tileDescriptionScale', (combinedMeta * userBadgeDescriptionScale).toFixed(3));
   container.style.setProperty('--flameSizePx', flameSize.toFixed(2));

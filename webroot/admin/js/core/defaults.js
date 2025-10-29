@@ -24,6 +24,7 @@ const DEFAULT_FONTS = {
   overviewShowFlames:true,
   tileTextScale:0.8, tileWeight:600, chipHeight:1,
   tileMetaScale:1,
+  tileTimeScale:1,
   chipOverflowMode:'scale', flamePct:55, flameGapScale:0.14
 };
 
@@ -50,6 +51,7 @@ const DEFAULT_STYLE_SETS = {
       tileWeight:DEFAULT_FONTS.tileWeight,
       chipHeight:DEFAULT_FONTS.chipHeight,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
+      tileTimeScale:DEFAULT_FONTS.tileTimeScale,
       overviewTimeScale:DEFAULT_FONTS.overviewTimeScale,
       chipOverflowMode:DEFAULT_FONTS.chipOverflowMode,
       overviewTimeWidthScale:DEFAULT_FONTS.overviewTimeWidthScale,
@@ -94,6 +96,7 @@ const DEFAULT_STYLE_SETS = {
       tileWeight:600,
       chipHeight:1.05,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
+      tileTimeScale:DEFAULT_FONTS.tileTimeScale,
       overviewTimeScale:DEFAULT_FONTS.overviewTimeScale,
       overviewTimeWidthScale:DEFAULT_FONTS.overviewTimeWidthScale,
       overviewShowFlames:DEFAULT_FONTS.overviewShowFlames,
@@ -138,6 +141,7 @@ const DEFAULT_STYLE_SETS = {
       tileWeight:600,
       chipHeight:1.05,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
+      tileTimeScale:DEFAULT_FONTS.tileTimeScale,
       overviewTimeScale:DEFAULT_FONTS.overviewTimeScale,
       overviewTimeWidthScale:DEFAULT_FONTS.overviewTimeWidthScale,
       overviewShowFlames:true,
@@ -182,6 +186,7 @@ const DEFAULT_STYLE_SETS = {
       tileWeight:500,
       chipHeight:1,
       tileMetaScale:0.95,
+      tileTimeScale:0.95,
       overviewTimeScale:DEFAULT_FONTS.overviewTimeScale,
       overviewTimeWidthScale:DEFAULT_FONTS.overviewTimeWidthScale,
       overviewShowFlames:false,
@@ -226,6 +231,7 @@ const DEFAULT_STYLE_SETS = {
       tileWeight:700,
       chipHeight:1.12,
       tileMetaScale:1,
+      tileTimeScale:1,
       overviewTimeScale:DEFAULT_FONTS.overviewTimeScale,
       overviewTimeWidthScale:1.1,
       overviewShowFlames:true,

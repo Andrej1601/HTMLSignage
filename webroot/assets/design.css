@@ -54,6 +54,7 @@
   --tileBadgeOffsetPx:calc(12px*var(--vwScale));
   --tileMetaScale:1;
   --tileBadgeScale:1;
+  --tileTimeScale:1;
   --tileDescriptionScale:1;
   --tileMinHeightPx:calc(120px*var(--vwScale));
   --tileIconHeightScale:.9;
@@ -923,7 +924,7 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   justify-content:flex-end;
   gap:calc(0.35em + 2px*var(--vwScale));
   min-width:calc(var(--tileTimeWidthCh, 9) * 1ch);
-  font-size:calc(.65em*var(--tileMetaScale,1));
+  font-size:calc(.65em*var(--tileTimeScale, var(--tileMetaScale,1)));
   letter-spacing:.12em;
   text-transform:uppercase;
   opacity:.8;
