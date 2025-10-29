@@ -1455,6 +1455,7 @@ function applyTheme() {
     '--ovTimeWidth': `calc(${OVERVIEW_TIME_BASE_CH}ch * ${overviewTimeWidthScale})`,
     '--tileTextScale': fonts.tileTextScale || 0.8,
     '--tileWeight': fonts.tileWeight || 600,
+    '--tileTimeWeight': fonts.tileTimeWeight || fonts.tileWeight || 600,
     '--chipHScale': fonts.chipHeight || 1,
     '--badgeBg': slidesCfg.infobadgeColor || t.accent || '#5C3101',
     '--badgeFg': t.boxFg || '#FFFFFF',
@@ -4661,6 +4662,14 @@ function applyTileSizing(container, opts = {}) {
   const userMetaScale = Number.isFinite(+settings?.fonts?.tileMetaScale)
     ? clamp(0.5, +settings.fonts.tileMetaScale, 2)
     : 1;
+  const userTimeScale = Number.isFinite(+settings?.fonts?.tileTimeScale)
+    ? clamp(0.5, +settings.fonts.tileTimeScale, 4)
+    : userMetaScale;
+  const userTimeWeight = Number.isFinite(+settings?.fonts?.tileTimeWeight)
+    ? clamp(100, +settings.fonts.tileTimeWeight, 900)
+    : (Number.isFinite(+settings?.fonts?.tileWeight)
+      ? clamp(100, +settings.fonts.tileWeight, 900)
+      : 600);
   const userBadgeScale = Number.isFinite(+settings?.slides?.badgeScale)
     ? clamp(0.3, +settings.slides.badgeScale, 3)
     : 1;
@@ -4697,7 +4706,10 @@ function applyTileSizing(container, opts = {}) {
   container.style.setProperty('--tileBadgeOffsetPx', badgeOffset.toFixed(2) + 'px');
   container.style.setProperty('--tileRadiusPx', radius.toFixed(2) + 'px');
   const combinedMeta = metaScale * userMetaScale;
+  const combinedTime = metaScale * userTimeScale;
   container.style.setProperty('--tileMetaScale', combinedMeta.toFixed(3));
+  container.style.setProperty('--tileTimeScale', combinedTime.toFixed(3));
+  container.style.setProperty('--tileTimeWeight', Math.round(userTimeWeight).toString());
   container.style.setProperty('--tileBadgeScale', (combinedMeta * userBadgeScale).toFixed(3));
   container.style.setProperty('--tileDescriptionScale', (combinedMeta * userBadgeDescriptionScale).toFixed(3));
   container.style.setProperty('--flameSizePx', flameSize.toFixed(2));

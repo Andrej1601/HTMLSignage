@@ -748,6 +748,8 @@ function collectSettings(){
   };
   settings.presets ||= {};
   settings.presets[getActiveDayKey()] = deepClone(schedule);
+  const tileTimeScaleRaw = Number($('#tileTimeScale')?.value);
+  const tileTimeWeightRaw = Number($('#tileTimeWeight')?.value);
   return {
     schedule: { ...schedule },
     settings: {
@@ -791,9 +793,41 @@ function collectSettings(){
         tileTextScale:+($('#tileTextScale').value||0.8),
         tileWeight:+($('#tileWeight').value||600),
         tileMetaScale:(() => {
-          const raw = Number($('#tileTimeScale')?.value);
-          if (!Number.isFinite(raw)) return settings.fonts?.tileMetaScale ?? DEFAULTS.fonts.tileMetaScale ?? 1;
-          return clamp(0.5, raw, 2);
+          const rawMeta = Number($('#tileMetaScale')?.value);
+          if (Number.isFinite(rawMeta)) {
+            return clamp(0.5, rawMeta, 2);
+          }
+          const storedMeta = Number(settings.fonts?.tileMetaScale);
+          if (Number.isFinite(storedMeta)) {
+            return clamp(0.5, storedMeta, 2);
+          }
+          const defaultMeta = Number(DEFAULTS.fonts?.tileMetaScale ?? 1);
+          if (Number.isFinite(defaultMeta)) {
+            return clamp(0.5, defaultMeta, 2);
+          }
+          return 1;
+        })(),
+        tileTimeScale:(() => {
+          if (!Number.isFinite(tileTimeScaleRaw)) {
+            const fallback = settings.fonts?.tileTimeScale
+              ?? settings.fonts?.tileMetaScale
+              ?? DEFAULTS.fonts.tileTimeScale
+              ?? DEFAULTS.fonts.tileMetaScale
+              ?? 1;
+            return clamp(0.5, fallback, 4);
+          }
+          return clamp(0.5, tileTimeScaleRaw, 4);
+        })(),
+        tileTimeWeight:(() => {
+          if (Number.isFinite(tileTimeWeightRaw)) {
+            return clamp(100, tileTimeWeightRaw, 900);
+          }
+          const fallback = settings.fonts?.tileTimeWeight
+            ?? settings.fonts?.tileWeight
+            ?? DEFAULTS.fonts?.tileTimeWeight
+            ?? DEFAULTS.fonts?.tileWeight
+            ?? 600;
+          return clamp(100, Number(fallback) || 600, 900);
         })()
       },
       h2:{
