@@ -101,7 +101,6 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🫚', label:'Ingwer & Wärme' },
   { value:'🪻', label:'Lavendel & Beruhigung' },
   { value:'🍎', label:'Obst & Frische' },
-  { value:'🥥', label:'Kokos & Exotik' },
   { value:'🍵', label:'Tee & Kräuter' },
   { value:'🥭', label:'Tropenfrucht' },
   { value:'🍓', label:'Erdbeeren & Süße' },
@@ -114,11 +113,9 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🧘‍♂️', label:'Meditation' },
   { value:'🛌', label:'Schlaf & Regeneration' },
   { value:'🪔', label:'Licht & Zeremonie' },
-  { value:'🪩', label:'Party & Show' },
   { value:'🥂', label:'Feierlicher Aufguss' },
   { value:'🍷', label:'Wein & Trauben' },
   { value:'🍺', label:'Bier & Malz' },
-  { value:'🍻', label:'Geselligkeit' },
   { value:'🥨', label:'Regionale Spezialität' },
   { value:'🌰', label:'Nüsse & Röstaromen' },
   { value:'🍁', label:'Ahorn & Herbstduft' },
@@ -129,13 +126,7 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🪐', label:'Kosmos & Träume' },
   { value:'🦋', label:'Leichtigkeit' },
   { value:'🐚', label:'Meer & Muscheln' },
-  { value:'🦩', label:'Flair & Eleganz' },
-  { value:'🦚', label:'Pfau & Farbe' },
-  { value:'🦔', label:'Wald & Tiere' },
-  { value:'🦌', label:'Natur & Wild' },
-  { value:'🕊️', label:'Frieden & Harmonie' },
   { value:'⚜️', label:'Royal & Premium' },
-  { value:'🎗️', label:'Charity & Aktion' },
   { value:'🎀', label:'Sanft & Elegant' }
 ];
 
