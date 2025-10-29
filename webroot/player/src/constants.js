@@ -29,7 +29,7 @@ export const STYLE_THEME_KEYS = [
 ];
 
 export const STYLE_FONT_KEYS = [
-  'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
   'tileMetaScale','tileTimeScale','overviewTimeWidthScale','overviewShowFlames','overviewTitleScale','overviewHeadScale',
   'overviewCellScale','h1Scale','h2Scale'
 ];

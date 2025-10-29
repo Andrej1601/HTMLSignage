@@ -208,7 +208,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'tileMetaScale','tileTimeScale','tileTimeWeight','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 
 const STYLE_SLIDE_KEYS = [

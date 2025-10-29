@@ -1881,6 +1881,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     setV('#h1Scale',    f.h1Scale ?? 1);
     setV('#h2Scale',    f.h2Scale ?? 1);
     setV('#tileTimeScale', f.tileTimeScale ?? f.tileMetaScale ?? 1);
+    setV('#tileTimeWeight', f.tileTimeWeight ?? f.tileWeight ?? 600);
     setC('#timeSuffixToggle', settings.slides?.appendTimeSuffix === true);
     setV('#tileFlameSizeScale', settings.slides?.tileFlameSizeScale ?? DEFAULTS.slides.tileFlameSizeScale ?? 1);
     setV('#tileFlameGapScale', settings.slides?.tileFlameGapScale ?? DEFAULTS.slides.tileFlameGapScale ?? 1);
@@ -2134,6 +2135,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       setV('#h1Scale', 1);
       setV('#h2Scale', 1);
       setV('#tileTimeScale', DEFAULTS.fonts.tileTimeScale ?? DEFAULTS.fonts.tileMetaScale);
+      setV('#tileTimeWeight', DEFAULTS.fonts.tileTimeWeight ?? DEFAULTS.fonts.tileWeight ?? 600);
 
       setV('#h2Mode', DEFAULTS.h2.mode);
       setV('#h2Text', DEFAULTS.h2.text);

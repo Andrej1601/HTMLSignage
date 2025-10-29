@@ -25,6 +25,7 @@ const DEFAULT_FONTS = {
   tileTextScale:0.8, tileWeight:600, chipHeight:1,
   tileMetaScale:1,
   tileTimeScale:1,
+  tileTimeWeight:600,
   chipOverflowMode:'scale', flamePct:55, flameGapScale:0.14
 };
 
@@ -49,6 +50,7 @@ const DEFAULT_STYLE_SETS = {
       family:DEFAULT_FONTS.family,
       tileTextScale:DEFAULT_FONTS.tileTextScale,
       tileWeight:DEFAULT_FONTS.tileWeight,
+      tileTimeWeight:DEFAULT_FONTS.tileTimeWeight,
       chipHeight:DEFAULT_FONTS.chipHeight,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
       tileTimeScale:DEFAULT_FONTS.tileTimeScale,
@@ -94,6 +96,7 @@ const DEFAULT_STYLE_SETS = {
       family:"'Montserrat', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
       tileTextScale:0.86,
       tileWeight:600,
+      tileTimeWeight:DEFAULT_FONTS.tileTimeWeight,
       chipHeight:1.05,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
       tileTimeScale:DEFAULT_FONTS.tileTimeScale,
@@ -139,6 +142,7 @@ const DEFAULT_STYLE_SETS = {
       family:"'Poppins', 'Montserrat', system-ui, sans-serif",
       tileTextScale:0.84,
       tileWeight:600,
+      tileTimeWeight:DEFAULT_FONTS.tileTimeWeight,
       chipHeight:1.05,
       tileMetaScale:DEFAULT_FONTS.tileMetaScale,
       tileTimeScale:DEFAULT_FONTS.tileTimeScale,
@@ -184,6 +188,7 @@ const DEFAULT_STYLE_SETS = {
       family:"'IBM Plex Sans', system-ui, sans-serif",
       tileTextScale:0.88,
       tileWeight:500,
+      tileTimeWeight:DEFAULT_FONTS.tileTimeWeight,
       chipHeight:1,
       tileMetaScale:0.95,
       tileTimeScale:0.95,
