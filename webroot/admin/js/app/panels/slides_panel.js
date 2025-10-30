@@ -21,15 +21,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
-    const bindSettingsChange = (selector, { events = ['input', 'change'] } = {}) => {
-      const el = document.querySelector(selector);
-      if (!el || el.dataset.notifyBound) return el;
-      events.forEach((eventName) => {
-        el.addEventListener(eventName, notifySettingsChanged);
-      });
-      el.dataset.notifyBound = '1';
-      return el;
-    };
 
     const normalizeTime = (value) => {
       if (typeof value !== 'string') return null;
@@ -1901,10 +1892,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     const applySaunaFlameState = (enabled) => { saunaFlameControls.forEach(el => { if (el) el.disabled = !enabled; }); };
     applySaunaFlameState(saunaFlamesEnabled);
     if (saunaFlamesToggle && !saunaFlamesToggle.dataset.bound) {
-      saunaFlamesToggle.addEventListener('change', () => {
-        applySaunaFlameState(saunaFlamesToggle.checked);
-        notifySettingsChanged();
-      });
+      saunaFlamesToggle.addEventListener('change', () => applySaunaFlameState(saunaFlamesToggle.checked));
       saunaFlamesToggle.dataset.bound = '1';
     }
     setC('#badgeInlineColumn', settings.slides?.badgeInlineColumn === true);
@@ -1935,10 +1923,7 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     setC('#overviewFlames', overviewFlamesEnabled);
     applyOverviewFlameState(overviewFlamesEnabled);
     if (overviewFlamesToggle && !overviewFlamesToggle.dataset.bound){
-      overviewFlamesToggle.addEventListener('change', () => {
-        applyOverviewFlameState(overviewFlamesToggle.checked);
-        notifySettingsChanged();
-      });
+      overviewFlamesToggle.addEventListener('change', () => applyOverviewFlameState(overviewFlamesToggle.checked));
       overviewFlamesToggle.dataset.bound = '1';
     }
 
@@ -1970,26 +1955,11 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     const applyOverlayState = (enabled) => { if (overlayInput) overlayInput.disabled = !enabled; };
     applyOverlayState(overlayEnabled);
     if (overlayCheckbox && !overlayCheckbox.dataset.bound) {
-      overlayCheckbox.addEventListener('change', () => {
-        applyOverlayState(overlayCheckbox.checked);
-        notifySettingsChanged();
-      });
+      overlayCheckbox.addEventListener('change', () => applyOverlayState(overlayCheckbox.checked));
       overlayCheckbox.dataset.bound = '1';
     }
     const badgeColor = settings.slides?.infobadgeColor || settings.theme?.accent || DEFAULTS.slides.infobadgeColor;
     setV('#badgeColor', badgeColor);
-
-    [
-      '#fontFamily', '#fontScale', '#h1Scale', '#h2Scale', '#ovTitleScale', '#ovHeadScale', '#ovCellScale', '#ovTimeScale',
-      '#ovTimeWidthScale', '#tileTextScale', '#tileWeight', '#tileTimeScale', '#tileTimeWeight', '#tileMetaScale', '#chipH', '#chipOverflowMode',
-      '#flamePct', '#flameGap', '#tileFlameSizeScale', '#tileFlameGapScale', '#saunaHeadingWidth', '#tileHeightScale',
-      '#tilePaddingScale', '#badgeScale', '#badgeDescriptionScale', '#badgeColor', '#timeSuffixToggle'
-    ].forEach((selector) => bindSettingsChange(selector));
-
-    bindSettingsChange('#overviewFlames', { events: ['change'] });
-    bindSettingsChange('#saunaFlames', { events: ['change'] });
-    bindSettingsChange('#tileOverlayEnabled', { events: ['change'] });
-    bindSettingsChange('#tileOverlayStrength');
 
     // Bildspalte / Schrägschnitt
     setV('#rightW',   settings.display?.rightWidthPercent ?? 38);
