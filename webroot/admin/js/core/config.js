@@ -207,14 +207,22 @@ const STYLE_THEME_KEYS = [
 ];
 
 const STYLE_FONT_KEYS = [
-  'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','tileTimeWeight','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'family','scale','h1Scale','h2Scale',
+  'overviewTitleScale','overviewHeadScale','overviewCellScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames',
+  'tileTextScale','tileWeight','tileTimeWeight','tileMetaScale','tileTimeScale',
+  'chipHeight','chipOverflowMode','flamePct','flameGapScale'
 ];
 
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
   'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
-  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
+  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix',
+  'heroTimelineItemMs','heroTimelineItemDelayMs','heroTimelineFillMs','heroTimelineDelayMs',
+  'tileEnterMs','tileStaggerMs','showSaunaFlames'
+];
+
+const STYLE_DISPLAY_KEYS = [
+  'layoutMode','layoutProfile'
 ];
 
 const cloneSubset = (src = {}, keys = []) => {
@@ -550,13 +558,15 @@ function sanitizeStyleSets(rawSets, defaultSets, activeId) {
       label: typeof value.label === 'string' ? value.label.trim() : '',
       theme: cloneSubset(value.theme, STYLE_THEME_KEYS),
       fonts: cloneSubset(value.fonts, STYLE_FONT_KEYS),
-      slides: cloneSubset(value.slides, STYLE_SLIDE_KEYS)
+      slides: cloneSubset(value.slides, STYLE_SLIDE_KEYS),
+      display: cloneSubset(value.display, STYLE_DISPLAY_KEYS)
     };
     cleaned[slug] = {
       label: entry.label || slug,
       theme: entry.theme,
       fonts: entry.fonts,
-      slides: entry.slides
+      slides: entry.slides,
+      display: entry.display
     };
     seen.add(slug);
   };
