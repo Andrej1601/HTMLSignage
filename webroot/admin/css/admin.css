@@ -1460,6 +1460,13 @@ table.tbl{
   font-size:calc(15px * var(--grid-time-scale, 1));
   padding:0.55em 0.65em;
 }
+.tbl .time-offset{
+  display:block;
+  margin-top:4px;
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:0.01em;
+}
 
 /* Button in der Zelle = „Eingabe“ */
 .cellbtn{
