@@ -905,6 +905,30 @@ function createResizeRegistry() {
 // ---------- Time helpers ----------
 const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const parseHM = (hm) => { const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+const getRowSortOffset = (row) => {
+  const raw = Number(row && (row.dayOffset ?? row.sortOffset));
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return Math.min(7, Math.max(0, Math.round(raw)));
+};
+const makeRowSortKey = (time, offset) => {
+  const normalizedTime = typeof time === 'string' ? time : '';
+  const off = Number.isFinite(offset) && offset > 0 ? Math.round(offset) : 0;
+  return off > 0 ? `${normalizedTime}__${off}` : normalizedTime;
+};
+const compareTimesWithOffset = (aTime, aOffset, bTime, bOffset) => {
+  const offsetDiff = (aOffset || 0) - (bOffset || 0);
+  if (offsetDiff !== 0) return offsetDiff;
+  const timeA = typeof aTime === 'string' ? aTime : '';
+  const timeB = typeof bTime === 'string' ? bTime : '';
+  const cmp = timeA.localeCompare(timeB);
+  if (cmp !== 0) return cmp;
+  return 0;
+};
+const computeSortMinutes = (minutes, offset) => {
+  if (!Number.isFinite(minutes)) return null;
+  const normalizedOffset = Number.isFinite(offset) && offset > 0 ? Math.round(offset) : 0;
+  return minutes + normalizedOffset * 1440;
+};
 const parseDateTimeLocal = (value) => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -3161,13 +3185,24 @@ function getHighlightMap() {
     const times = [];
     (schedule?.rows ?? []).forEach((row, ri) => {
       const cell = (row?.entries ?? [])[colIdx];
-      if (cell && cell.title) { const m = parseHM(row.time); if (m !== null) times.push({ m, ri, time: row.time }); }
+      if (!cell || !cell.title) return;
+      const minutes = parseHM(row?.time);
+      if (minutes == null) return;
+      const offset = getRowSortOffset(row);
+      const key = makeRowSortKey(row?.time, offset);
+      times.push({ m: minutes, ri, time: row?.time || '', offset, key });
     });
-    times.sort((a, b) => a.m - b.m);
+    times.sort((a, b) => {
+      if (a.m === b.m) return compareTimesWithOffset(a.time, a.offset, b.time, b.offset);
+      return a.m - b.m;
+    });
     let chosen = null;
     for (const t of times) { if (now >= t.m && now <= t.m + after) { chosen = t; break; } }
     if (!chosen) for (const t of times) { if (t.m >= now && (t.m - now) <= before) { chosen = t; break; } }
-    if (chosen) { bySauna[saunaName] = new Set([chosen.time]); byCell['r' + chosen.ri + 'c' + colIdx] = true; }
+    if (chosen) {
+      bySauna[saunaName] = new Set([chosen.key]);
+      byCell['r' + chosen.ri + 'c' + colIdx] = true;
+    }
   });
   return { bySauna, byCell };
 }
@@ -4500,6 +4535,8 @@ function computeStoryAvailabilityItems(targets) {
     const time = row && row.time ? row.time : '';
     const minutes = parseHM(time);
     const displayTime = formatTimeLabel(time);
+    const sortOffset = getRowSortOffset(row);
+    const sortMinutes = computeSortMinutes(minutes, sortOffset);
     indices.forEach(({ name, idx }) => {
       const cell = row && Array.isArray(row.entries) ? row.entries[idx] : null;
       if (cell && cell.title) {
@@ -4509,6 +4546,8 @@ function computeStoryAvailabilityItems(targets) {
           title: cell.title,
           time: displayTime,
           minutes,
+          sortMinutes,
+          sortOffset,
           isUpcoming: minutes != null ? minutes >= now : false,
           description: details.description,
           aromas: details.aromas,
@@ -4519,9 +4558,13 @@ function computeStoryAvailabilityItems(targets) {
     });
   });
   items.sort((a, b) => {
-    const am = a.minutes != null ? a.minutes : Infinity;
-    const bm = b.minutes != null ? b.minutes : Infinity;
-    if (am === bm) return a.sauna.localeCompare(b.sauna, 'de');
+    const am = a.sortMinutes != null ? a.sortMinutes : Infinity;
+    const bm = b.sortMinutes != null ? b.sortMinutes : Infinity;
+    if (am === bm) {
+      const offsetDiff = (a.sortOffset || 0) - (b.sortOffset || 0);
+      if (offsetDiff !== 0) return offsetDiff;
+      return a.sauna.localeCompare(b.sauna, 'de');
+    }
     return am - bm;
   });
   const nextIdx = items.findIndex(item => item.minutes != null && item.minutes >= now);
@@ -4963,8 +5006,12 @@ function renderSauna(name, region = 'left') {
     if (cell && cell.title) {
       const details = collectCellDetails(cell);
       const isHidden = cell.hidden === true || cell.visible === false || cell.enabled === false;
+      const sortOffset = getRowSortOffset(row);
+      const sortKey = makeRowSortKey(row.time, sortOffset);
       items.push({
         time: row.time,
+        sortOffset,
+        sortKey,
         title: cell.title,
         flames: cell.flames || '',
         noteId: cell.noteId,
@@ -4978,14 +5025,19 @@ function renderSauna(name, region = 'left') {
       });
     }
   }
-  items.sort((a, b) => a.time.localeCompare(b.time));
+  items.sort((a, b) => {
+    const cmp = compareTimesWithOffset(a.time, a.sortOffset, b.time, b.sortOffset);
+    if (cmp !== 0) return cmp;
+    return String(a.title || '').localeCompare(String(b.title || ''), 'de');
+  });
 
   const usedSet = new Set();
   for (const it of items) {
     const baseTitle = String(it.title).replace(/\*+$/, '');
     const hasStar = /\*$/.test(it.title || '');
     const tileClasses = ['tile'];
-    if (hlMap.bySauna[name] && hlMap.bySauna[name].has(it.time)) tileClasses.push('highlight');
+    const saunaHighlights = hlMap.bySauna[name];
+    if (saunaHighlights && saunaHighlights.has(it.sortKey)) tileClasses.push('highlight');
     if (it.hidden || hideForStatus) tileClasses.push('is-hidden');
     let iconVariant = 'default';
     if (iconsEnabled) {

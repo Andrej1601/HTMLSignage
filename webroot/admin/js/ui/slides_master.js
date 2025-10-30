@@ -3216,10 +3216,17 @@ export function renderSlidesMaster(){
   if (badgeAddBtn){
     badgeAddBtn.onclick = () => {
       const list = ensureBadgeLibrary(settings);
-      list.push(createBadge());
+      list.unshift(createBadge());
       setBadgeSectionExpanded(true);
       renderBadgeLibraryRows();
       markBadgeLibraryChanged(settings);
+      requestAnimationFrame(() => {
+        const firstLabel = badgeListHost?.querySelector('.badge-lib-row input[type="text"]');
+        if (firstLabel instanceof HTMLInputElement){
+          firstLabel.focus();
+          firstLabel.select();
+        }
+      });
     };
   }
   renderBadgeLibraryRows();

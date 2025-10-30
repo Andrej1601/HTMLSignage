@@ -20,6 +20,36 @@ function clampNumber(value, min, max){
   return Math.min(Math.max(value, min), max);
 }
 
+function getRowSortOffset(row){
+  if (!row || typeof row !== 'object') return 0;
+  const raw = Number(row.dayOffset ?? row.sortOffset);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return Math.min(7, Math.max(0, Math.round(raw)));
+}
+
+function setRowSortOffset(row, offset){
+  if (!row || typeof row !== 'object') return;
+  const normalized = Number(offset);
+  if (Number.isFinite(normalized) && normalized > 0){
+    row.dayOffset = Math.min(7, Math.max(1, Math.round(normalized)));
+  } else {
+    delete row.dayOffset;
+  }
+}
+
+function sortRows(rows = []){
+  rows.sort((a, b) => {
+    const offsetDiff = getRowSortOffset(a) - getRowSortOffset(b);
+    if (offsetDiff !== 0) return offsetDiff;
+    const timeA = typeof a?.time === 'string' ? a.time : '';
+    const timeB = typeof b?.time === 'string' ? b.time : '';
+    const cmp = timeA.localeCompare(timeB);
+    if (cmp !== 0) return cmp;
+    return 0;
+  });
+  return rows;
+}
+
 function resolveTimeWidthScale(fonts = {}){
   const rawScale = Number(fonts.overviewTimeWidthScale);
   if (Number.isFinite(rawScale) && rawScale > 0){
@@ -64,10 +94,15 @@ function cloneCell(cell){
 }
 
 function cloneRows(rows){
-  return (rows || []).map(r=>({
-    time: r.time,
-    entries: (r.entries || []).map(cloneCell)
-  }));
+  return (rows || []).map(r=>{
+    const clone = {
+      time: r.time,
+      entries: (r.entries || []).map(cloneCell)
+    };
+    const offset = getRowSortOffset(r);
+    if (offset) clone.dayOffset = offset;
+    return clone;
+  });
 }
 
 function normalizeText(value){
@@ -409,7 +444,13 @@ function redo(){
 
 function updateSelTime(){
   const sc = ctx.getSchedule();
-  $('#selTime').textContent = sc.rows?.[curRow]?.time || '—';
+  const row = Array.isArray(sc.rows) ? sc.rows[curRow] : null;
+  if (!row){
+    $('#selTime').textContent = '—';
+    return;
+  }
+  const offset = getRowSortOffset(row);
+  $('#selTime').textContent = offset ? `${row.time || '—'} (+${offset})` : (row.time || '—');
 }
 
 function populateNoteSelect(){
@@ -433,10 +474,17 @@ export function renderGrid(){
     head.map((h,i)=>`<th class="${i===0?'timecol corner':''}">${h}</th>`).join('') +
     '</tr></thead><tbody>';
 
-  (sc.rows || []).forEach((row, ri) => {
+  const rows = Array.isArray(sc.rows) ? sc.rows : [];
+  if (curRow >= rows.length) curRow = Math.max(0, rows.length - 1);
+  rows.forEach((row, ri) => {
     html += '<tr>';
-    html += `<td class="time timecol" data-ri="${ri}">
-               <input class="input time-input" type="text" value="${row.time}" inputmode="numeric" autocomplete="off" spellcheck="false">
+    const offset = getRowSortOffset(row);
+    const offsetLabel = offset
+      ? `<span class="time-offset" title="Nach Mitternacht einordnen">+${offset}</span>`
+      : '';
+    html += `<td class="time timecol" data-ri="${ri}" data-offset="${offset}">
+               <input class="input time-input" type="text" value="${row.time ?? ''}" inputmode="numeric" autocomplete="off" spellcheck="false">
+               ${offsetLabel}
              </td>`;
     (row.entries || []).forEach((cell, ci) => {
       const filled = (cell && cell.title) ? 'filled' : '';
@@ -456,21 +504,31 @@ export function renderGrid(){
   // Zeit-Spalte
   $$('#grid .time input').forEach(inp => {
     inp.onchange = () => {
-      const ri = +inp.parentElement.dataset.ri;
-      const t  = parseTime(inp.value);
+      const cell = inp.closest('td');
+      const ri = cell ? Number(cell.dataset.ri) : NaN;
       const sc2 = ctx.getSchedule();
+      const rowsRef = Array.isArray(sc2.rows) ? sc2.rows : [];
+      const rowRef = Number.isFinite(ri) ? rowsRef[ri] : null;
+      const t  = parseTime(inp.value);
+      if (!rowRef) return;
       if (!t) {
         notifyWarning('Bitte HH:MM');
-        inp.value = sc2.rows[ri].time;
+        inp.value = rowRef.time || '';
         return;
       }
       pushHistory();
-      sc2.rows[ri].time = t;
-      sc2.rows.sort((a,b)=>a.time.localeCompare(b.time));
+      rowRef.time = t;
+      sortRows(rowsRef);
+      curRow = Math.max(0, rowsRef.indexOf(rowRef));
       scheduleChanged('time-edit');
       renderGrid();
+      updateSelTime();
     };
-    inp.onclick = () => { curRow = +inp.parentElement.dataset.ri; updateSelTime(); };
+    inp.onclick = () => {
+      const cell = inp.closest('td');
+      curRow = cell ? Number(cell.dataset.ri) || 0 : 0;
+      updateSelTime();
+    };
   });
 
   // Zellen-Buttons
@@ -481,8 +539,9 @@ export function renderGrid(){
       curCol = +btn.dataset.ci;
       updateSelTime();
 
-      const cell = sc2.rows[curRow].entries[curCol] || {};
-      $('#m_time').value  = sc2.rows[curRow].time;
+      const row = sc2.rows[curRow];
+      const cell = row.entries[curCol] || {};
+      $('#m_time').value  = row.time;
       $('#m_title').value = cell.title || '';
       $('#m_flames').value= cell.flames || '';
       $('#m_description').value = normalizeText(cell.description ?? cell.detail ?? cell.subtitle ?? cell.text ?? cell.extra ?? '');
@@ -501,6 +560,9 @@ export function renderGrid(){
       $('#m_hasNote').checked = has;
       $('#m_noteRow').style.display = has ? 'flex' : 'none';
       if (has) $('#m_note').value = cell.noteId;
+
+      const nextDayField = $('#m_nextDay');
+      if (nextDayField) nextDayField.checked = getRowSortOffset(row) > 0;
 
       $('#modal').style.display = 'grid';
       $('#m_title').focus();
@@ -523,6 +585,9 @@ function initOnce(){
   };
   $('#m_ok').onclick = () => {
     const sc = ctx.getSchedule();
+    const rows = Array.isArray(sc.rows) ? sc.rows : [];
+    const currentRow = rows[curRow];
+    if (!currentRow) return;
 
     const title   = $('#m_title').value.trim();
     const flames  = $('#m_flames').value;
@@ -567,28 +632,40 @@ function initOnce(){
       if (badgeIds.length) newCell.badgeIds = badgeIds;
     }
 
+    const nextDayField = $('#m_nextDay');
+    const sortOffset = nextDayField && nextDayField.checked ? 1 : 0;
+
     pushHistory();
 
-    if (newTime && newTime !== sc.rows[curRow].time && newCell){
+    setRowSortOffset(currentRow, sortOffset);
+
+    let targetRow = currentRow;
+
+    if (newTime && newTime !== currentRow.time && newCell){
       // ggf. neue Zeile anlegen/verschieben
-      let targetIdx = sc.rows.findIndex(r => r.time === newTime);
+      let targetIdx = rows.findIndex((r, idx) => idx !== curRow && r.time === newTime && getRowSortOffset(r) === sortOffset);
       if (targetIdx === -1){
         const cols = sc.saunas.length;
-        sc.rows.push({ time:newTime, entries: Array.from({length:cols}).map(()=>null) });
-        sc.rows.sort((a,b)=>a.time.localeCompare(b.time));
-        targetIdx = sc.rows.findIndex(r => r.time === newTime);
+        const newRow = { time:newTime, entries: Array.from({length:cols}).map(()=>null) };
+        setRowSortOffset(newRow, sortOffset);
+        rows.push(newRow);
+        targetIdx = rows.length - 1;
       }
-      sc.rows[targetIdx].entries[curCol] = newCell;
-      sc.rows[curRow].entries[curCol]    = null;
+      targetRow = rows[targetIdx];
+      targetRow.entries[curCol] = newCell;
+      currentRow.entries[curCol]    = null;
     } else {
-      sc.rows[curRow].entries[curCol] = newCell;
-      if (newTime) sc.rows[curRow].time = newTime;
+      currentRow.entries[curCol] = newCell;
+      if (newTime) currentRow.time = newTime;
     }
-    sc.rows.sort((a,b)=>a.time.localeCompare(b.time));
+
+    sortRows(rows);
+    curRow = Math.max(0, rows.indexOf(targetRow));
 
     scheduleChanged('cell-edit');
     $('#modal').style.display = 'none';
     renderGrid();
+    updateSelTime();
   };
 
   // Row-Operationen
@@ -596,7 +673,10 @@ function initOnce(){
     const sc = ctx.getSchedule();
     pushHistory();
     const cols = sc.saunas.length;
-    sc.rows.splice(curRow, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    const referenceOffset = getRowSortOffset(sc.rows[curRow]);
+    const newRow = { time:'00:00', entries: Array.from({length:cols}).map(()=>null) };
+    setRowSortOffset(newRow, referenceOffset);
+    sc.rows.splice(curRow, 0, newRow);
     scheduleChanged('row-insert-above');
     renderGrid();
   };
@@ -604,7 +684,10 @@ function initOnce(){
     const sc = ctx.getSchedule();
     pushHistory();
     const cols = sc.saunas.length;
-    sc.rows.splice(curRow+1, 0, { time:'00:00', entries: Array.from({length:cols}).map(()=>null) });
+    const referenceOffset = getRowSortOffset(sc.rows[curRow]);
+    const newRow = { time:'00:00', entries: Array.from({length:cols}).map(()=>null) };
+    setRowSortOffset(newRow, referenceOffset);
+    sc.rows.splice(curRow+1, 0, newRow);
     scheduleChanged('row-insert-below');
     renderGrid();
   };
