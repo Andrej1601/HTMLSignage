@@ -513,55 +513,6 @@ function syncStyleSetFormState(settings){
     fonts.family = trimmed || fonts.family || DEFAULTS.fonts.family;
   }
 
-  const fontScaleRaw = readNumber('fontScale');
-  if (Number.isFinite(fontScaleRaw)) {
-    const normalized = clampNumber(0.5, fontScaleRaw, 3);
-    if (normalized != null) fonts.scale = normalized;
-  }
-
-  const h1ScaleRaw = readNumber('h1Scale');
-  if (Number.isFinite(h1ScaleRaw)) {
-    const normalized = clampNumber(0.5, h1ScaleRaw, 3.5);
-    if (normalized != null) fonts.h1Scale = normalized;
-  }
-
-  const h2ScaleRaw = readNumber('h2Scale');
-  if (Number.isFinite(h2ScaleRaw)) {
-    const normalized = clampNumber(0.5, h2ScaleRaw, 3.5);
-    if (normalized != null) fonts.h2Scale = normalized;
-  }
-
-  const ovTitleScaleRaw = readNumber('ovTitleScale');
-  if (Number.isFinite(ovTitleScaleRaw)) {
-    const normalized = clampNumber(0.4, ovTitleScaleRaw, 4);
-    if (normalized != null) fonts.overviewTitleScale = normalized;
-  }
-
-  const ovHeadScaleRaw = readNumber('ovHeadScale');
-  if (Number.isFinite(ovHeadScaleRaw)) {
-    const normalized = clampNumber(0.5, ovHeadScaleRaw, 3);
-    if (normalized != null) fonts.overviewHeadScale = normalized;
-  }
-
-  const ovCellScaleRaw = readNumber('ovCellScale');
-  if (Number.isFinite(ovCellScaleRaw)) {
-    const normalized = clampNumber(0.5, ovCellScaleRaw, 3);
-    if (normalized != null) fonts.overviewCellScale = normalized;
-  }
-
-  const ovTimeScaleRaw = readNumber('ovTimeScale');
-  if (Number.isFinite(ovTimeScaleRaw)) {
-    const normalized = clampNumber(0.5, ovTimeScaleRaw, 3);
-    if (normalized != null) fonts.overviewTimeScale = normalized;
-  } else if (!Number.isFinite(Number(fonts.overviewTimeScale))) {
-    const fallback = Number(fonts.overviewTimeScale
-      ?? fonts.overviewCellScale
-      ?? DEFAULTS.fonts?.overviewTimeScale
-      ?? 0.8);
-    const normalized = clampNumber(0.5, fallback, 3);
-    if (normalized != null) fonts.overviewTimeScale = normalized;
-  }
-
   const tileTextRaw = readNumber('tileTextScale');
   if (Number.isFinite(tileTextRaw)) {
     fonts.tileTextScale = clampNumber(0.4, tileTextRaw, 3) ?? fonts.tileTextScale;
