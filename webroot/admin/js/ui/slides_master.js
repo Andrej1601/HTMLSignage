@@ -43,8 +43,10 @@ const STYLE_THEME_KEYS = [
 ];
 
 const STYLE_FONT_KEYS = [
-  'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'family','scale','h1Scale','h2Scale',
+  'overviewTitleScale','overviewHeadScale','overviewCellScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames',
+  'tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'tileMetaScale','tileTimeScale'
 ];
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
@@ -510,6 +512,66 @@ function syncStyleSetFormState(settings){
   if (fontFamilyEl && typeof fontFamilyEl.value === 'string') {
     const trimmed = fontFamilyEl.value.trim();
     fonts.family = trimmed || fonts.family || DEFAULTS.fonts.family;
+  }
+
+  const fontScaleRaw = readNumber('fontScale');
+  if (Number.isFinite(fontScaleRaw)) {
+    const normalized = clampNumber(0.5, fontScaleRaw, 3);
+    if (normalized != null) fonts.scale = normalized;
+  } else if (!Number.isFinite(Number(fonts.scale))) {
+    const fallback = Number(DEFAULTS.fonts?.scale ?? 1);
+    const normalized = clampNumber(0.5, fallback, 3);
+    if (normalized != null) fonts.scale = normalized;
+  }
+
+  const h1ScaleRaw = readNumber('h1Scale');
+  if (Number.isFinite(h1ScaleRaw)) {
+    const normalized = clampNumber(0.5, h1ScaleRaw, 3.5);
+    if (normalized != null) fonts.h1Scale = normalized;
+  } else if (!Number.isFinite(Number(fonts.h1Scale))) {
+    const fallback = Number(DEFAULTS.fonts?.h1Scale ?? 1);
+    const normalized = clampNumber(0.5, fallback, 3.5);
+    if (normalized != null) fonts.h1Scale = normalized;
+  }
+
+  const h2ScaleRaw = readNumber('h2Scale');
+  if (Number.isFinite(h2ScaleRaw)) {
+    const normalized = clampNumber(0.5, h2ScaleRaw, 3.5);
+    if (normalized != null) fonts.h2Scale = normalized;
+  } else if (!Number.isFinite(Number(fonts.h2Scale))) {
+    const fallback = Number(DEFAULTS.fonts?.h2Scale ?? 1);
+    const normalized = clampNumber(0.5, fallback, 3.5);
+    if (normalized != null) fonts.h2Scale = normalized;
+  }
+
+  const ovTitleScaleRaw = readNumber('ovTitleScale');
+  if (Number.isFinite(ovTitleScaleRaw)) {
+    const normalized = clampNumber(0.4, ovTitleScaleRaw, 4);
+    if (normalized != null) fonts.overviewTitleScale = normalized;
+  } else if (!Number.isFinite(Number(fonts.overviewTitleScale))) {
+    const fallback = Number(DEFAULTS.fonts?.overviewTitleScale ?? 1);
+    const normalized = clampNumber(0.4, fallback, 4);
+    if (normalized != null) fonts.overviewTitleScale = normalized;
+  }
+
+  const ovHeadScaleRaw = readNumber('ovHeadScale');
+  if (Number.isFinite(ovHeadScaleRaw)) {
+    const normalized = clampNumber(0.5, ovHeadScaleRaw, 3);
+    if (normalized != null) fonts.overviewHeadScale = normalized;
+  } else if (!Number.isFinite(Number(fonts.overviewHeadScale))) {
+    const fallback = Number(DEFAULTS.fonts?.overviewHeadScale ?? 0.9);
+    const normalized = clampNumber(0.5, fallback, 3);
+    if (normalized != null) fonts.overviewHeadScale = normalized;
+  }
+
+  const ovCellScaleRaw = readNumber('ovCellScale');
+  if (Number.isFinite(ovCellScaleRaw)) {
+    const normalized = clampNumber(0.5, ovCellScaleRaw, 3);
+    if (normalized != null) fonts.overviewCellScale = normalized;
+  } else if (!Number.isFinite(Number(fonts.overviewCellScale))) {
+    const fallback = Number(DEFAULTS.fonts?.overviewCellScale ?? 0.8);
+    const normalized = clampNumber(0.5, fallback, 3);
+    if (normalized != null) fonts.overviewCellScale = normalized;
   }
 
   const tileTextRaw = readNumber('tileTextScale');
