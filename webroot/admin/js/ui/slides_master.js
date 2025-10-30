@@ -43,8 +43,9 @@ const STYLE_THEME_KEYS = [
 ];
 
 const STYLE_FONT_KEYS = [
-  'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'family','scale','h1Scale','h2Scale','overviewTitleScale','overviewHeadScale','overviewCellScale',
+  'tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'tileMetaScale','tileTimeScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
