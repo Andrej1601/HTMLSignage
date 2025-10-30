@@ -18,6 +18,11 @@ final class SettingsPermissionTest extends TestCase
         $this->assertTrue(signage_permissions_allow_settings(['slideshow-display']));
     }
 
+    public function testModuleSlideshowGrantsAccess(): void
+    {
+        $this->assertTrue(signage_permissions_allow_settings(['module-slideshow']));
+    }
+
     public function testDesignTypographyPermissionGrantsAccess(): void
     {
         $this->assertTrue(signage_permissions_allow_settings(['design-typography']));
