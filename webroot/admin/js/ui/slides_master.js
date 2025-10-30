@@ -44,7 +44,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'tileMetaScale','tileTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
