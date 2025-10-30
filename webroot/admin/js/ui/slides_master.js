@@ -56,90 +56,6 @@ const STYLE_DISPLAY_KEYS = [
   'layoutMode','layoutProfile'
 ];
 
-const STYLE_FORM_FIELD_IDS = Object.freeze([
-  'fontFamily',
-  'tileTextScale',
-  'tileWeight',
-  'tileTimeWeight',
-  'chipH',
-  'chipOverflowMode',
-  'flamePct',
-  'flameGap',
-  'tileTimeScale',
-  'tileMetaScale',
-  'ovTimeWidthScale',
-  'overviewFlames',
-  'tileFlameSizeScale',
-  'tileFlameGapScale',
-  'badgeScale',
-  'badgeDescriptionScale',
-  'tileHeightScale',
-  'tilePaddingScale',
-  'tileOverlayEnabled',
-  'tileOverlayStrength',
-  'badgeInlineColumn',
-  'timeSuffixToggle',
-  'saunaHeadingWidth',
-  'layoutMode',
-  'layoutProfile',
-  'saunaFlames'
-]);
-
-const STYLE_FORM_EVENT_OVERRIDES = new Map([
-  ['chipOverflowMode', ['change']],
-  ['overviewFlames', ['change']],
-  ['tileOverlayEnabled', ['change']],
-  ['badgeInlineColumn', ['change']],
-  ['timeSuffixToggle', ['change']],
-  ['layoutMode', ['change']],
-  ['layoutProfile', ['change']],
-  ['saunaFlames', ['change']]
-]);
-
-let styleFormSyncPending = false;
-
-function scheduleStyleFormSync(){
-  if (styleFormSyncPending) return;
-  styleFormSyncPending = true;
-  const run = () => {
-    styleFormSyncPending = false;
-    const activeSettings = ctx && typeof ctx.getSettings === 'function' ? ctx.getSettings() : null;
-    if (!activeSettings) return;
-    try {
-      syncStyleSetFormState(activeSettings);
-    } catch (error) {
-      console.warn('[admin] Style-Formular konnte nach einer Änderung nicht synchronisiert werden', error);
-    }
-    try { window.__queueUnsaved?.(); } catch {}
-    try { window.__markUnsaved?.(); } catch {}
-    if (typeof window?.dockPushDebounced === 'function') {
-      try { window.dockPushDebounced(); } catch {}
-    }
-    if (ctx && typeof ctx.queueUnsavedEvaluation === 'function') {
-      try { ctx.queueUnsavedEvaluation({ immediate: true }); }
-      catch (error) { console.warn('[admin] Bewertung des Entwurfsstatus nach Style-Änderung fehlgeschlagen', error); }
-    }
-  };
-  if (typeof window === 'object' && typeof window.requestAnimationFrame === 'function') {
-    window.requestAnimationFrame(run);
-  } else {
-    setTimeout(run, 0);
-  }
-}
-
-function bindStyleFormListeners(){
-  if (typeof document !== 'object') return;
-  STYLE_FORM_FIELD_IDS.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el || el.dataset.styleSyncBound) return;
-    const events = STYLE_FORM_EVENT_OVERRIDES.get(id) || ['input', 'change'];
-    events.forEach((evt) => {
-      el.addEventListener(evt, scheduleStyleFormSync, { passive: true });
-    });
-    el.dataset.styleSyncBound = '1';
-  });
-}
-
 const SUGGESTED_BADGE_EMOJIS = [
   { value:'🌿', label:'Kräuter & Natur' },
   { value:'🔥', label:'Feuer & Hitze' },
@@ -2839,8 +2755,6 @@ export function renderSlideOrderView(){
 export function renderSlidesMaster(){
   const settings = ctx.getSettings();
   const schedule = ctx.getSchedule();
-
-  bindStyleFormListeners();
 
   const statusState = computeSaunaStatusState(settings, schedule, { autoAssign: true });
   if (statusState.changed && ctx && typeof ctx.refreshSlidesBox === 'function'){
