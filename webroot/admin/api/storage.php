@@ -20,6 +20,49 @@ const SIGNAGE_JSON_MAX_TREE_DEPTH = 16;
 const SIGNAGE_JSON_MAX_STRING_BYTES = 131072;
 const SIGNAGE_SCHEDULE_MAX_SLIDES = 2000;
 
+/**
+ * Determine whether the provided permission list grants write access to
+ * slideshow settings. The list is expected to contain normalized permission
+ * identifiers (lowercase, hyphenated).
+ */
+function signage_permissions_allow_settings($permissions): bool
+{
+    if (!is_array($permissions) || empty($permissions)) {
+        return false;
+    }
+
+    $normalized = [];
+    foreach ($permissions as $permission) {
+        if (!is_string($permission)) {
+            continue;
+        }
+        $key = strtolower(trim($permission));
+        if ($key === '') {
+            continue;
+        }
+        $normalized[$key] = true;
+    }
+
+    $writePermissions = [
+        'module-system',
+        'module-design',
+        'design-palettes',
+        'design-typography',
+        'design-colors',
+        'slideshow-display',
+        'slideshow-automation',
+        'slideshow-audio',
+    ];
+
+    foreach ($writePermissions as $permission) {
+        if (isset($normalized[$permission])) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function signage_json_response(array $payload, int $status = 200): void
 {
     if ($status !== 200) {
