@@ -580,6 +580,22 @@ function syncStyleSetFormState(settings){
     if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
   }
 
+  const ovTimeScaleEl = getEl('ovTimeScale');
+  if (ovTimeScaleEl && typeof ovTimeScaleEl.value === 'string') {
+    const parsed = Number(ovTimeScaleEl.value);
+    if (Number.isFinite(parsed)) {
+      const normalized = clampNumber(0.5, parsed, 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    } else if (Number.isFinite(Number(fonts.overviewTimeScale))) {
+      const normalized = clampNumber(0.5, Number(fonts.overviewTimeScale), 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    } else {
+      const fallback = Number(fonts.overviewCellScale ?? DEFAULTS.fonts?.overviewTimeScale ?? 0.8);
+      const normalized = clampNumber(0.5, fallback, 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    }
+  }
+
   const ovTimeWidthRaw = readNumber('ovTimeWidthScale');
   if (Number.isFinite(ovTimeWidthRaw) && ovTimeWidthRaw > 0) {
     const normalized = clampNumber(0.5, ovTimeWidthRaw, 3);
