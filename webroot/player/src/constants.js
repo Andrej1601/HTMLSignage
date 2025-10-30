@@ -29,9 +29,10 @@ export const STYLE_THEME_KEYS = [
 ];
 
 export const STYLE_FONT_KEYS = [
-  'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeWidthScale','overviewShowFlames','overviewTitleScale','overviewHeadScale',
-  'overviewCellScale','h1Scale','h2Scale'
+  'family','scale','h1Scale','h2Scale',
+  'overviewTitleScale','overviewHeadScale','overviewCellScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames',
+  'tileTextScale','tileWeight','tileTimeWeight','tileMetaScale','tileTimeScale',
+  'chipHeight','chipOverflowMode','flamePct','flameGapScale'
 ];
 
 export const STYLE_SLIDE_KEYS = [
