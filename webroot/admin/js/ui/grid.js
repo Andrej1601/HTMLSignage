@@ -22,25 +22,55 @@ function clampNumber(value, min, max){
 
 function getRowSortOffset(row){
   if (!row || typeof row !== 'object') return 0;
-  const raw = Number(row.dayOffset ?? row.sortOffset);
+  const rawDay = Number(row.dayOffset);
+  const rawSort = Number(row.sortOffset);
+  const raw = Number.isFinite(rawDay) ? rawDay : rawSort;
   if (!Number.isFinite(raw) || raw <= 0) return 0;
-  return Math.min(7, Math.max(0, Math.round(raw)));
+  return Math.min(7, Math.max(1, Math.round(raw)));
 }
 
 function setRowSortOffset(row, offset){
   if (!row || typeof row !== 'object') return;
   const normalized = Number(offset);
   if (Number.isFinite(normalized) && normalized > 0){
-    row.dayOffset = Math.min(7, Math.max(1, Math.round(normalized)));
+    const clamped = Math.min(7, Math.max(1, Math.round(normalized)));
+    row.dayOffset = clamped;
+    row.sortOffset = clamped;
   } else {
     delete row.dayOffset;
+    delete row.sortOffset;
   }
+}
+
+function parseTimeToMinutes(value){
+  const normalized = parseTime(typeof value === 'string' ? value : '');
+  if (!normalized) return null;
+  const [hh, mm] = normalized.split(':');
+  const hours = Number(hh);
+  const minutes = Number(mm);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
 }
 
 function sortRows(rows = []){
   rows.sort((a, b) => {
-    const offsetDiff = getRowSortOffset(a) - getRowSortOffset(b);
+    const offsetA = getRowSortOffset(a);
+    const offsetB = getRowSortOffset(b);
+    const offsetDiff = offsetA - offsetB;
     if (offsetDiff !== 0) return offsetDiff;
+
+    const minutesA = parseTimeToMinutes(a?.time);
+    const minutesB = parseTimeToMinutes(b?.time);
+    if (minutesA != null && minutesB != null){
+      const sortA = minutesA + offsetA * 1440;
+      const sortB = minutesB + offsetB * 1440;
+      if (sortA !== sortB) return sortA - sortB;
+    } else if (minutesA != null){
+      return -1;
+    } else if (minutesB != null){
+      return 1;
+    }
+
     const timeA = typeof a?.time === 'string' ? a.time : '';
     const timeB = typeof b?.time === 'string' ? b.time : '';
     const cmp = timeA.localeCompare(timeB);
@@ -100,7 +130,10 @@ function cloneRows(rows){
       entries: (r.entries || []).map(cloneCell)
     };
     const offset = getRowSortOffset(r);
-    if (offset) clone.dayOffset = offset;
+    if (offset){
+      clone.dayOffset = offset;
+      clone.sortOffset = offset;
+    }
     return clone;
   });
 }
@@ -475,6 +508,12 @@ export function renderGrid(){
     '</tr></thead><tbody>';
 
   const rows = Array.isArray(sc.rows) ? sc.rows : [];
+  const selectedRowRef = rows[curRow] || null;
+  sortRows(rows);
+  if (selectedRowRef){
+    const idx = rows.indexOf(selectedRowRef);
+    if (idx >= 0) curRow = idx;
+  }
   if (curRow >= rows.length) curRow = Math.max(0, rows.length - 1);
   rows.forEach((row, ri) => {
     html += '<tr>';
