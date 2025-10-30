@@ -5,9 +5,7 @@ require_once __DIR__ . '/storage.php';
 const SIGNAGE_SAVE_MAX_BYTES = 2 * 1024 * 1024; // 2 MiB
 
 $user = auth_require_permission('module-slideshow');
-$canWriteSettings = auth_user_has_permission($user, 'module-system')
-    || auth_user_has_permission($user, 'module-design')
-    || auth_user_has_permission($user, 'module-slideshow');
+$canWriteSettings = auth_user_has_permission($user, 'module-system');
 
 header('Content-Type: application/json; charset=UTF-8');
 
