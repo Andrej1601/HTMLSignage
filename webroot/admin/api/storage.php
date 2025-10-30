@@ -449,6 +449,26 @@ function signage_array_is_list(array $value): bool
     return true;
 }
 
+function signage_settings_merge(array $base, array $override): array
+{
+    foreach ($override as $key => $value) {
+        if (
+            isset($base[$key])
+            && is_array($base[$key])
+            && is_array($value)
+            && !signage_array_is_list($base[$key])
+            && !signage_array_is_list($value)
+        ) {
+            $base[$key] = signage_settings_merge($base[$key], $value);
+            continue;
+        }
+
+        $base[$key] = $value;
+    }
+
+    return $base;
+}
+
 function signage_array_merge_patch(mixed $document, array $patch): array
 {
     $document = is_array($document) ? $document : [];
@@ -1308,12 +1328,18 @@ function signage_default_settings(): array
 
 function signage_normalize_settings($settings, ?array $fallback = null): array
 {
-    if (!is_array($settings)) {
-        return $fallback ?? signage_default_settings();
-    }
-
     $baseDefault = $fallback ?? signage_default_settings();
-    $normalized = $settings;
+    $normalized = is_array($settings)
+        ? signage_settings_merge($baseDefault, $settings)
+        : $baseDefault;
+
+    if (!array_key_exists('version', $normalized)) {
+        $normalized['version'] = 1;
+    } elseif (!is_int($normalized['version'])) {
+        $normalized['version'] = is_numeric($normalized['version'])
+            ? (int) $normalized['version']
+            : 1;
+    }
 
     $audioDefaults = $baseDefault['audio']['background'] ?? signage_default_settings()['audio']['background'];
     $audioState = isset($normalized['audio']) && is_array($normalized['audio']) ? $normalized['audio'] : [];
