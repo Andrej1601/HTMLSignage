@@ -44,7 +44,7 @@ const STYLE_THEME_KEYS = [
 
 const STYLE_FONT_KEYS = [
   'family','tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale','overviewTimeWidthScale','overviewShowFlames'
+  'tileMetaScale','tileTimeScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
@@ -578,6 +578,22 @@ function syncStyleSetFormState(settings){
     const fallbackMeta = Number(DEFAULTS.fonts?.tileMetaScale ?? 1);
     const normalizedMeta = clampNumber(0.5, fallbackMeta, 2);
     if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
+  }
+
+  const ovTimeScaleEl = getEl('ovTimeScale');
+  if (ovTimeScaleEl && typeof ovTimeScaleEl.value === 'string') {
+    const parsed = Number(ovTimeScaleEl.value);
+    if (Number.isFinite(parsed)) {
+      const normalized = clampNumber(0.5, parsed, 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    } else if (Number.isFinite(Number(fonts.overviewTimeScale))) {
+      const normalized = clampNumber(0.5, Number(fonts.overviewTimeScale), 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    } else {
+      const fallback = Number(fonts.overviewCellScale ?? DEFAULTS.fonts?.overviewTimeScale ?? 0.8);
+      const normalized = clampNumber(0.5, fallback, 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    }
   }
 
   const ovTimeWidthRaw = readNumber('ovTimeWidthScale');

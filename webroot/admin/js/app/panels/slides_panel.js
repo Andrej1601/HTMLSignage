@@ -2096,7 +2096,19 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     };
     applyLayoutVisibility(layoutMode);
     if (layoutModeSelect) {
-      layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
+      if (!settings.display || typeof settings.display !== 'object') settings.display = {};
+      settings.display.layoutMode = layoutMode;
+      if (!layoutModeSelect.dataset.bound) {
+        layoutModeSelect.addEventListener('change', () => {
+          const nextMode = layoutModeSelect.value === 'split' ? 'split' : 'single';
+          const displayCfg = ensureDisplaySettings();
+          const prevMode = displayCfg.layoutMode === 'split' ? 'split' : 'single';
+          displayCfg.layoutMode = nextMode;
+          applyLayoutVisibility(nextMode);
+          if (prevMode !== nextMode) notifySettingsChanged();
+        });
+        layoutModeSelect.dataset.bound = '1';
+      }
     }
 
     const layoutProfileSelect = document.getElementById('layoutProfile');

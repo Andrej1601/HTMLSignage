@@ -217,6 +217,10 @@ const STYLE_SLIDE_KEYS = [
   'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
 ];
 
+const STYLE_DISPLAY_KEYS = [
+  'layoutMode','layoutProfile'
+];
+
 const cloneSubset = (src = {}, keys = []) => {
   const out = {};
   keys.forEach((key) => {
@@ -550,13 +554,15 @@ function sanitizeStyleSets(rawSets, defaultSets, activeId) {
       label: typeof value.label === 'string' ? value.label.trim() : '',
       theme: cloneSubset(value.theme, STYLE_THEME_KEYS),
       fonts: cloneSubset(value.fonts, STYLE_FONT_KEYS),
-      slides: cloneSubset(value.slides, STYLE_SLIDE_KEYS)
+      slides: cloneSubset(value.slides, STYLE_SLIDE_KEYS),
+      display: cloneSubset(value.display, STYLE_DISPLAY_KEYS)
     };
     cleaned[slug] = {
       label: entry.label || slug,
       theme: entry.theme,
       fonts: entry.fonts,
-      slides: entry.slides
+      slides: entry.slides,
+      display: entry.display
     };
     seen.add(slug);
   };
