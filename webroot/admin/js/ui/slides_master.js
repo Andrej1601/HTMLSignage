@@ -51,7 +51,9 @@ const STYLE_FONT_KEYS = [
 const STYLE_SLIDE_KEYS = [
   'infobadgeColor','badgeLibrary','badgeScale','badgeDescriptionScale',
   'tileHeightScale','tilePaddingScale','tileOverlayEnabled','tileOverlayStrength','badgeInlineColumn',
-  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix'
+  'tileFlameSizeScale','tileFlameGapScale','saunaTitleMaxWidthPercent','appendTimeSuffix',
+  'heroTimelineItemMs','heroTimelineItemDelayMs','heroTimelineFillMs','heroTimelineDelayMs',
+  'tileEnterMs','tileStaggerMs','showSaunaFlames'
 ];
 
 const STYLE_DISPLAY_KEYS = [
