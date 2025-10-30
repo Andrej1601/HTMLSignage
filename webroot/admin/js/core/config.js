@@ -207,10 +207,8 @@ const STYLE_THEME_KEYS = [
 ];
 
 const STYLE_FONT_KEYS = [
-  'family','scale','h1Scale','h2Scale',
-  'overviewTitleScale','overviewHeadScale','overviewCellScale','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames',
-  'tileTextScale','tileWeight','tileTimeWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
-  'tileMetaScale','tileTimeScale'
+  'family','tileTextScale','tileWeight','chipHeight','chipOverflowMode','flamePct','flameGapScale',
+  'tileMetaScale','tileTimeScale','tileTimeWeight','overviewTimeScale','overviewTimeWidthScale','overviewShowFlames'
 ];
 
 const STYLE_SLIDE_KEYS = [
