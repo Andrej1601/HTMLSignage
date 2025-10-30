@@ -22,6 +22,17 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
     };
 
+    const typographyFold = document.getElementById('boxTypographyLayout');
+    if (typographyFold && !typographyFold.dataset.unsavedNotifyBound) {
+      ['input', 'change'].forEach((eventName) => {
+        typographyFold.addEventListener(eventName, (event) => {
+          if (!event?.isTrusted) return;
+          notifySettingsChanged();
+        });
+      });
+      typographyFold.dataset.unsavedNotifyBound = '1';
+    }
+
     const normalizeTime = (value) => {
       if (typeof value !== 'string') return null;
       const match = /^\s*(\d{1,2})(?::(\d{2}))?\s*$/.exec(value);
