@@ -996,6 +996,45 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     $baseDefault = $fallback ?? signage_default_settings();
     $normalized = signage_array_merge_patch($baseDefault, $settings);
 
+    $defaultFonts = isset($baseDefault['fonts']) && is_array($baseDefault['fonts'])
+        ? $baseDefault['fonts']
+        : [];
+    $fonts = isset($normalized['fonts']) && is_array($normalized['fonts'])
+        ? $normalized['fonts']
+        : [];
+    $normalized['fonts'] = signage_array_merge_patch($defaultFonts, $fonts);
+
+    $defaultDisplay = isset($baseDefault['display']) && is_array($baseDefault['display'])
+        ? $baseDefault['display']
+        : [];
+    $display = isset($normalized['display']) && is_array($normalized['display'])
+        ? $normalized['display']
+        : [];
+    $display = signage_array_merge_patch($defaultDisplay, $display);
+
+    if (isset($defaultDisplay['pages']) && is_array($defaultDisplay['pages'])) {
+        $normalizedPages = [];
+        $displayPages = isset($display['pages']) && is_array($display['pages']) ? $display['pages'] : [];
+
+        foreach ($defaultDisplay['pages'] as $pageKey => $pageDefault) {
+            $pageDefault = is_array($pageDefault) ? $pageDefault : [];
+            $pageValue = isset($displayPages[$pageKey]) && is_array($displayPages[$pageKey])
+                ? $displayPages[$pageKey]
+                : [];
+            $normalizedPages[$pageKey] = signage_array_merge_patch($pageDefault, $pageValue);
+        }
+
+        foreach ($displayPages as $pageKey => $pageValue) {
+            if (!array_key_exists($pageKey, $normalizedPages) && is_array($pageValue)) {
+                $normalizedPages[$pageKey] = $pageValue;
+            }
+        }
+
+        $display['pages'] = $normalizedPages;
+    }
+
+    $normalized['display'] = $display;
+
     $audioDefaults = $baseDefault['audio']['background'] ?? signage_default_settings()['audio']['background'];
     $audioState = isset($normalized['audio']) && is_array($normalized['audio']) ? $normalized['audio'] : [];
     $background = $audioState['background'] ?? [];
