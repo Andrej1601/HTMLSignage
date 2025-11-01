@@ -1075,7 +1075,190 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     }
 
     $baseDefault = $fallback ?? signage_default_settings();
-    $normalized = $settings;
+    $normalized = signage_array_merge_patch($baseDefault, $settings);
+
+    $fontsDefault = isset($baseDefault['fonts']) && is_array($baseDefault['fonts']) ? $baseDefault['fonts'] : [];
+    $fonts = isset($normalized['fonts']) && is_array($normalized['fonts']) ? $normalized['fonts'] : [];
+    $fonts = array_merge($fontsDefault, $fonts);
+    $fonts['family'] = isset($fonts['family']) && is_string($fonts['family']) && trim($fonts['family']) !== ''
+        ? trim($fonts['family'])
+        : ($fontsDefault['family'] ?? '');
+    $fonts['scale'] = signage_sanitize_float_range(
+        $fonts['scale'] ?? null,
+        $fontsDefault['scale'] ?? 1.0,
+        0.5,
+        3.0
+    );
+    $fonts['h1Scale'] = signage_sanitize_float_range(
+        $fonts['h1Scale'] ?? null,
+        $fontsDefault['h1Scale'] ?? 1.0,
+        0.5,
+        3.5
+    );
+    $fonts['h2Scale'] = signage_sanitize_float_range(
+        $fonts['h2Scale'] ?? null,
+        $fontsDefault['h2Scale'] ?? 1.0,
+        0.5,
+        3.5
+    );
+    $fonts['overviewTitleScale'] = signage_sanitize_float_range(
+        $fonts['overviewTitleScale'] ?? null,
+        $fontsDefault['overviewTitleScale'] ?? 1.0,
+        0.4,
+        4.0
+    );
+    $fonts['overviewHeadScale'] = signage_sanitize_float_range(
+        $fonts['overviewHeadScale'] ?? null,
+        $fontsDefault['overviewHeadScale'] ?? 0.9,
+        0.5,
+        3.0
+    );
+    $fonts['overviewCellScale'] = signage_sanitize_float_range(
+        $fonts['overviewCellScale'] ?? null,
+        $fontsDefault['overviewCellScale'] ?? 0.8,
+        0.5,
+        3.0
+    );
+    $fonts['overviewTimeScale'] = signage_sanitize_float_range(
+        $fonts['overviewTimeScale'] ?? null,
+        $fontsDefault['overviewTimeScale'] ?? 0.8,
+        0.5,
+        3.0
+    );
+    $fonts['overviewTimeWidthScale'] = signage_sanitize_float_range(
+        $fonts['overviewTimeWidthScale'] ?? null,
+        $fontsDefault['overviewTimeWidthScale'] ?? 1.0,
+        0.5,
+        3.0
+    );
+    $fonts['overviewShowFlames'] = signage_truthy(
+        $fonts['overviewShowFlames'] ?? null,
+        $fontsDefault['overviewShowFlames'] ?? true
+    );
+    $fonts['tileTextScale'] = signage_sanitize_float_range(
+        $fonts['tileTextScale'] ?? null,
+        $fontsDefault['tileTextScale'] ?? 0.8,
+        0.3,
+        3.0
+    );
+    $fonts['tileMetaScale'] = signage_sanitize_float_range(
+        $fonts['tileMetaScale'] ?? null,
+        $fontsDefault['tileMetaScale'] ?? 1.0,
+        0.5,
+        2.0
+    );
+    $fonts['tileTimeScale'] = signage_sanitize_float_range(
+        $fonts['tileTimeScale'] ?? null,
+        $fonts['tileMetaScale'] ?? ($fontsDefault['tileTimeScale'] ?? 1.0),
+        0.5,
+        4.0
+    );
+    $fonts['tileWeight'] = signage_sanitize_int_range(
+        $fonts['tileWeight'] ?? null,
+        $fontsDefault['tileWeight'] ?? 600,
+        100,
+        900
+    );
+    $fonts['tileTimeWeight'] = signage_sanitize_int_range(
+        $fonts['tileTimeWeight'] ?? null,
+        $fontsDefault['tileTimeWeight'] ?? 600,
+        100,
+        900
+    );
+    $fonts['chipHeight'] = signage_sanitize_float_range(
+        $fonts['chipHeight'] ?? null,
+        $fontsDefault['chipHeight'] ?? 1.0,
+        0.5,
+        2.0
+    );
+    $fonts['flamePct'] = signage_sanitize_int_range(
+        $fonts['flamePct'] ?? null,
+        $fontsDefault['flamePct'] ?? 55,
+        0,
+        100
+    );
+    $fonts['flameGapScale'] = signage_sanitize_float_range(
+        $fonts['flameGapScale'] ?? null,
+        $fontsDefault['flameGapScale'] ?? 0.14,
+        0.0,
+        1.0
+    );
+    $normalized['fonts'] = $fonts;
+
+    $displayDefault = isset($baseDefault['display']) && is_array($baseDefault['display']) ? $baseDefault['display'] : [];
+    $display = isset($normalized['display']) && is_array($normalized['display']) ? $normalized['display'] : [];
+    $display = array_merge($displayDefault, $display);
+    $display['layoutMode'] = (isset($display['layoutMode']) && $display['layoutMode'] === 'split') ? 'split' : 'single';
+    $allowedProfiles = ['landscape', 'portrait-split', 'triple', 'asymmetric', 'info-panel'];
+    $profile = isset($display['layoutProfile']) ? (string) $display['layoutProfile'] : '';
+    if (!in_array($profile, $allowedProfiles, true)) {
+        $profile = isset($displayDefault['layoutProfile']) ? (string) $displayDefault['layoutProfile'] : 'landscape';
+    }
+    $display['layoutProfile'] = $profile;
+    $display['infoPanelWidthPercent'] = signage_sanitize_int_range(
+        $display['infoPanelWidthPercent'] ?? null,
+        $displayDefault['infoPanelWidthPercent'] ?? 32,
+        10,
+        90
+    );
+    $display['portraitSplitTopPercent'] = signage_sanitize_int_range(
+        $display['portraitSplitTopPercent'] ?? null,
+        $displayDefault['portraitSplitTopPercent'] ?? 58,
+        10,
+        90
+    );
+    $display['rightWidthPercent'] = signage_sanitize_int_range(
+        $display['rightWidthPercent'] ?? null,
+        $displayDefault['rightWidthPercent'] ?? 38,
+        0,
+        90
+    );
+    $display['infoBannerHeightPercent'] = signage_sanitize_int_range(
+        $display['infoBannerHeightPercent'] ?? null,
+        $displayDefault['infoBannerHeightPercent'] ?? 10,
+        2,
+        40
+    );
+    $bannerMode = isset($display['infoBannerMode']) ? strtolower((string) $display['infoBannerMode']) : '';
+    if (!in_array($bannerMode, ['full', 'left', 'right'], true)) {
+        $bannerMode = isset($displayDefault['infoBannerMode']) ? (string) $displayDefault['infoBannerMode'] : 'full';
+    }
+    $display['infoBannerMode'] = $bannerMode;
+    $display['cutTopPercent'] = signage_sanitize_int_range(
+        $display['cutTopPercent'] ?? null,
+        $displayDefault['cutTopPercent'] ?? 28,
+        0,
+        100
+    );
+    $display['cutBottomPercent'] = signage_sanitize_int_range(
+        $display['cutBottomPercent'] ?? null,
+        $displayDefault['cutBottomPercent'] ?? 12,
+        0,
+        100
+    );
+    $display['baseW'] = signage_sanitize_int_range(
+        $display['baseW'] ?? null,
+        $displayDefault['baseW'] ?? 1920,
+        320,
+        7680
+    );
+    $display['baseH'] = signage_sanitize_int_range(
+        $display['baseH'] ?? null,
+        $displayDefault['baseH'] ?? 1080,
+        200,
+        4320
+    );
+    $fitMode = isset($display['fit']) ? strtolower((string) $display['fit']) : '';
+    $display['fit'] = in_array($fitMode, ['auto', 'cover', 'contain', 'stretch'], true)
+        ? $fitMode
+        : (isset($displayDefault['fit']) ? (string) $displayDefault['fit'] : 'auto');
+    $pagesDefault = isset($displayDefault['pages']) && is_array($displayDefault['pages']) ? $displayDefault['pages'] : [];
+    $pages = isset($display['pages']) && is_array($display['pages']) ? $display['pages'] : [];
+    $display['pages'] = [
+        'left' => isset($pages['left']) && is_array($pages['left']) ? $pages['left'] : ($pagesDefault['left'] ?? []),
+        'right' => isset($pages['right']) && is_array($pages['right']) ? $pages['right'] : ($pagesDefault['right'] ?? []),
+    ];
+    $normalized['display'] = $display;
 
     $fontsDefault = isset($baseDefault['fonts']) && is_array($baseDefault['fonts']) ? $baseDefault['fonts'] : [];
     $fonts = isset($normalized['fonts']) && is_array($normalized['fonts']) ? $normalized['fonts'] : [];
