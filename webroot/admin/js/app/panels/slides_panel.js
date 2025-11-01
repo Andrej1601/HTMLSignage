@@ -2107,7 +2107,17 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     };
     applyLayoutVisibility(layoutMode);
     if (layoutModeSelect) {
-      layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
+      const commitLayoutMode = (mode) => {
+        settings.display = settings.display || {};
+        settings.display.layoutMode = mode;
+      };
+      commitLayoutMode(layoutMode);
+      layoutModeSelect.onchange = () => {
+        const mode = layoutModeSelect.value === 'split' ? 'split' : 'single';
+        commitLayoutMode(mode);
+        applyLayoutVisibility(mode);
+        notifySettingsChanged();
+      };
     }
 
     const layoutProfileSelect = document.getElementById('layoutProfile');
@@ -2120,6 +2130,8 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     if (layoutProfileSelect) {
       const profile = settings.display?.layoutProfile || DEFAULTS.display?.layoutProfile || 'landscape';
       layoutProfileSelect.value = profile;
+      settings.display = settings.display || {};
+      settings.display.layoutProfile = profile;
       applyProfileVisibility(profile);
       layoutProfileSelect.onchange = () => {
         settings.display = settings.display || {};
