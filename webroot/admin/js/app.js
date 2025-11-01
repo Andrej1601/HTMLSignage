@@ -748,11 +748,6 @@ function collectSettings(){
   };
   settings.presets ||= {};
   settings.presets[getActiveDayKey()] = deepClone(schedule);
-  try {
-    syncActiveStyleSetSnapshot(settings);
-  } catch (error) {
-    console.warn('[admin] Style palette sync failed before collecting settings', error);
-  }
   const tileTimeScaleRaw = Number($('#tileTimeScale')?.value);
   const tileTimeWeightRaw = Number($('#tileTimeWeight')?.value);
   return {
