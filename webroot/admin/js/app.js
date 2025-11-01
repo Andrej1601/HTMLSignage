@@ -179,6 +179,11 @@ let queueUnsavedEvaluationImpl = () => {};
 const queueUnsavedEvaluation = (options) => queueUnsavedEvaluationImpl(options);
 
 let suppressUnsavedSignals = false;
+let styleSetHydrated = false;
+
+const markStyleSetHydration = (ready) => {
+  styleSetHydrated = !!ready;
+};
 
 const OVERVIEW_TIME_BASE_CH = 10;
 const OVERVIEW_TIME_SCALE_MIN = 0.5;
@@ -239,12 +244,23 @@ const stateAccess = {
   }
 };
 
-const { renderSlidesBox } = createSlidesPanel({
+const { renderSlidesBox: renderSlidesBoxRaw } = createSlidesPanel({
   getSettings: () => settings,
   thumbFallback: THUMB_FALLBACK,
   setUnsavedState,
   resolveOverviewTimeWidthScale
 });
+
+const renderSlidesBox = () => {
+  markStyleSetHydration(false);
+  let succeeded = false;
+  try {
+    renderSlidesBoxRaw();
+    succeeded = true;
+  } finally {
+    markStyleSetHydration(succeeded);
+  }
+};
 
 const { renderHighlightBox } = createHighlightPanel({
   getSettings: () => settings,
@@ -499,7 +515,7 @@ if (typeof window === 'object') {
   if (typeof originalQueueUnsaved === 'function' && !window.__queueUnsavedPatched) {
     window.__queueUnsaved = (...args) => {
       const result = originalQueueUnsaved(...args);
-      if (!suppressUnsavedSignals) {
+      if (!suppressUnsavedSignals && styleSetHydrated) {
         try {
           const currentSettings = stateAccess.getSettings?.() || settings;
           if (currentSettings) syncActiveStyleSetSnapshot(currentSettings);
@@ -609,6 +625,7 @@ async function loadAll(){
   let unsavedFromDraft = false;
   const previousSuppress = suppressUnsavedSignals;
   suppressUnsavedSignals = true;
+  markStyleSetHydration(false);
   try {
     const [scheduleResult, settingsResult] = await Promise.allSettled([
       fetchJson('/admin/api/load.php', { cache: 'no-store' }),
