@@ -2105,9 +2105,18 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       const rightWrap = document.getElementById('layoutRight');
       if (rightWrap) rightWrap.hidden = (mode !== 'split');
     };
-    applyLayoutVisibility(layoutMode);
+    const applyLayoutMode = (value) => {
+      const normalized = (value === 'split') ? 'split' : 'single';
+      settings.display = settings.display || {};
+      settings.display.layoutMode = normalized;
+      applyLayoutVisibility(normalized);
+    };
+    applyLayoutMode(layoutMode);
     if (layoutModeSelect) {
-      layoutModeSelect.onchange = () => applyLayoutVisibility(layoutModeSelect.value === 'split' ? 'split' : 'single');
+      layoutModeSelect.onchange = () => {
+        applyLayoutMode(layoutModeSelect.value);
+        notifySettingsChanged();
+      };
     }
 
     const layoutProfileSelect = document.getElementById('layoutProfile');
