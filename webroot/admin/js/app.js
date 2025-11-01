@@ -178,6 +178,13 @@ const resetUnsavedBaseline = (options) => resetUnsavedBaselineImpl(options);
 let queueUnsavedEvaluationImpl = () => {};
 const queueUnsavedEvaluation = (options) => queueUnsavedEvaluationImpl(options);
 
+let suppressUnsavedSignals = false;
+let styleSetHydrated = false;
+
+const markStyleSetHydration = (ready) => {
+  styleSetHydrated = !!ready;
+};
+
 const OVERVIEW_TIME_BASE_CH = 10;
 const OVERVIEW_TIME_SCALE_MIN = 0.5;
 const OVERVIEW_TIME_SCALE_MAX = 3;
@@ -224,25 +231,36 @@ const stateAccess = {
   setSchedule: (next) => {
     schedule = next;
     appState.setSchedule(next);
-    if (typeof window === 'object') {
+    if (!suppressUnsavedSignals && typeof window === 'object') {
       try { window.__queueUnsaved?.(); } catch {}
     }
   },
   setSettings: (next) => {
     settings = next;
     appState.setSettings(next);
-    if (typeof window === 'object') {
+    if (!suppressUnsavedSignals && typeof window === 'object') {
       try { window.__queueUnsaved?.(); } catch {}
     }
   }
 };
 
-const { renderSlidesBox } = createSlidesPanel({
+const { renderSlidesBox: renderSlidesBoxRaw } = createSlidesPanel({
   getSettings: () => settings,
   thumbFallback: THUMB_FALLBACK,
   setUnsavedState,
   resolveOverviewTimeWidthScale
 });
+
+const renderSlidesBox = () => {
+  markStyleSetHydration(false);
+  let succeeded = false;
+  try {
+    renderSlidesBoxRaw();
+    succeeded = true;
+  } finally {
+    markStyleSetHydration(succeeded);
+  }
+};
 
 const { renderHighlightBox } = createHighlightPanel({
   getSettings: () => settings,
@@ -497,11 +515,13 @@ if (typeof window === 'object') {
   if (typeof originalQueueUnsaved === 'function' && !window.__queueUnsavedPatched) {
     window.__queueUnsaved = (...args) => {
       const result = originalQueueUnsaved(...args);
-      try {
-        const currentSettings = stateAccess.getSettings?.() || settings;
-        if (currentSettings) syncActiveStyleSetSnapshot(currentSettings);
-      } catch (error) {
-        console.warn('[admin] Style palette sync failed after unsaved queue', error);
+      if (!suppressUnsavedSignals && styleSetHydrated) {
+        try {
+          const currentSettings = stateAccess.getSettings?.() || settings;
+          if (currentSettings) syncActiveStyleSetSnapshot(currentSettings);
+        } catch (error) {
+          console.warn('[admin] Style palette sync failed after unsaved queue', error);
+        }
       }
       return result;
     };
@@ -603,71 +623,78 @@ const applyRoleRestrictions = createRoleRestrictionApplier({
 // ============================================================================
 async function loadAll(){
   let unsavedFromDraft = false;
-  const [scheduleResult, settingsResult] = await Promise.allSettled([
-    fetchJson('/admin/api/load.php', { cache: 'no-store' }),
-    fetchJson('/admin/api/load_settings.php', { cache: 'no-store' })
-  ]);
+  const previousSuppress = suppressUnsavedSignals;
+  suppressUnsavedSignals = true;
+  markStyleSetHydration(false);
+  try {
+    const [scheduleResult, settingsResult] = await Promise.allSettled([
+      fetchJson('/admin/api/load.php', { cache: 'no-store' }),
+      fetchJson('/admin/api/load_settings.php', { cache: 'no-store' })
+    ]);
 
-  const fetchErrors = [];
-  let schedulePayload = null;
-  if (scheduleResult.status === 'fulfilled') {
-    schedulePayload = scheduleResult.value;
-  } else {
-    fetchErrors.push(scheduleResult.reason);
-  }
-  let settingsPayload = null;
-  if (settingsResult.status === 'fulfilled') {
-    settingsPayload = settingsResult.value;
-  } else {
-    fetchErrors.push(settingsResult.reason);
-  }
-
-  if (fetchErrors.length) {
-    const errorMessages = fetchErrors
-      .map((error) => (error && typeof error.message === 'string') ? error.message.trim() : '')
-      .filter(Boolean)
-      .join(' · ');
-    console.error('[admin] Laden der Basisdaten fehlgeschlagen', fetchErrors);
-    const message = errorMessages ? `Fehler beim Laden der Daten: ${errorMessages}` : 'Fehler beim Laden der Daten.';
-    notifyError(message, { persistent: true });
-  }
-
-  stateAccess.setSchedule(deepClone(sanitizeScheduleState(schedulePayload)));
-  stateAccess.setSettings(normalizeSettings(settingsPayload || {}, { assignMissingIds: true }));
-  baseSchedule = deepClone(schedule);
-  baseSettings = deepClone(settings);
-  deviceContextState.setBaseState(baseSchedule, baseSettings);
-  deviceContextState.clearDeviceBaseState();
-  updateBaseline(baseSchedule, baseSettings);
-
-  const scheduleDraftRaw = lsGet('scheduleDraft');
-  if (scheduleDraftRaw) {
-    try {
-      stateAccess.setSchedule(JSON.parse(scheduleDraftRaw));
-      unsavedFromDraft = true;
-    } catch (error) {
-      console.warn('[admin] Lokaler Schedule-Entwurf konnte nicht wiederhergestellt werden', error);
-      lsRemove('scheduleDraft');
-      notifyWarning('Lokaler Entwurf des Aufgussplans war beschädigt und wurde entfernt.');
+    const fetchErrors = [];
+    let schedulePayload = null;
+    if (scheduleResult.status === 'fulfilled') {
+      schedulePayload = scheduleResult.value;
+    } else {
+      fetchErrors.push(scheduleResult.reason);
     }
-  }
-
-  const settingsDraftRaw = lsGet('settingsDraft');
-  if (settingsDraftRaw) {
-    try {
-      const parsed = JSON.parse(settingsDraftRaw);
-      stripBadgeDraftArtifacts(parsed);
-      stateAccess.setSettings(mergeDeep(settings, parsed));
-      unsavedFromDraft = true;
-    } catch (error) {
-      console.warn('[admin] Lokaler Einstellungen-Entwurf konnte nicht wiederhergestellt werden', error);
-      lsRemove('settingsDraft');
-      notifyWarning('Lokaler Entwurf der Einstellungen war beschädigt und wurde entfernt.');
+    let settingsPayload = null;
+    if (settingsResult.status === 'fulfilled') {
+      settingsPayload = settingsResult.value;
+    } else {
+      fetchErrors.push(settingsResult.reason);
     }
-  }
-  stateAccess.setSettings(normalizeSettings(settings, { assignMissingIds: false }));
 
-  setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
+    if (fetchErrors.length) {
+      const errorMessages = fetchErrors
+        .map((error) => (error && typeof error.message === 'string') ? error.message.trim() : '')
+        .filter(Boolean)
+        .join(' · ');
+      console.error('[admin] Laden der Basisdaten fehlgeschlagen', fetchErrors);
+      const message = errorMessages ? `Fehler beim Laden der Daten: ${errorMessages}` : 'Fehler beim Laden der Daten.';
+      notifyError(message, { persistent: true });
+    }
+
+    stateAccess.setSchedule(deepClone(sanitizeScheduleState(schedulePayload)));
+    stateAccess.setSettings(normalizeSettings(settingsPayload || {}, { assignMissingIds: true }));
+    baseSchedule = deepClone(schedule);
+    baseSettings = deepClone(settings);
+    deviceContextState.setBaseState(baseSchedule, baseSettings);
+    deviceContextState.clearDeviceBaseState();
+    updateBaseline(baseSchedule, baseSettings);
+
+    const scheduleDraftRaw = lsGet('scheduleDraft');
+    if (scheduleDraftRaw) {
+      try {
+        stateAccess.setSchedule(JSON.parse(scheduleDraftRaw));
+        unsavedFromDraft = true;
+      } catch (error) {
+        console.warn('[admin] Lokaler Schedule-Entwurf konnte nicht wiederhergestellt werden', error);
+        lsRemove('scheduleDraft');
+        notifyWarning('Lokaler Entwurf des Aufgussplans war beschädigt und wurde entfernt.');
+      }
+    }
+
+    const settingsDraftRaw = lsGet('settingsDraft');
+    if (settingsDraftRaw) {
+      try {
+        const parsed = JSON.parse(settingsDraftRaw);
+        stripBadgeDraftArtifacts(parsed);
+        stateAccess.setSettings(mergeDeep(settings, parsed));
+        unsavedFromDraft = true;
+      } catch (error) {
+        console.warn('[admin] Lokaler Einstellungen-Entwurf konnte nicht wiederhergestellt werden', error);
+        lsRemove('settingsDraft');
+        notifyWarning('Lokaler Entwurf der Einstellungen war beschädigt und wurde entfernt.');
+      }
+    }
+    stateAccess.setSettings(normalizeSettings(settings, { assignMissingIds: false }));
+
+    setUnsavedState(unsavedFromDraft, { skipDraftClear: true });
+  } finally {
+    suppressUnsavedSignals = previousSuppress;
+  }
 
   // --- UI-Module initialisieren ---------------------------------------------
   const gridContext = createGridContext();
