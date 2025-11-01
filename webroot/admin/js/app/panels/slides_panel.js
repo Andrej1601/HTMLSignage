@@ -2,7 +2,7 @@ import { deepClone, genId } from '../../core/utils.js';
 import { DEFAULTS, EVENT_PLAN_ENTRIES, EVENT_PLAN_KEYS } from '../../core/defaults.js';
 import { uploadGeneric } from '../../core/upload.js';
 import { sanitizePagePlaylist, playlistKeyFromSanitizedEntry, mapSaunaHeadingWidthToInput, SAUNA_HEADING_WIDTH_LIMITS, sanitizeBackgroundAudio } from '../../core/config.js';
-import { collectSlideOrderStream, SAUNA_STATUS, SAUNA_STATUS_TEXT } from '../../ui/slides_master.js';
+import { collectSlideOrderStream, SAUNA_STATUS, SAUNA_STATUS_TEXT, syncActiveStyleSetSnapshot } from '../../ui/slides_master.js';
 
 export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState, resolveOverviewTimeWidthScale }) {
   const renderSlidesBox = () => {
@@ -20,6 +20,11 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
       window.__queueUnsaved?.();
       window.__markUnsaved?.();
       if (typeof window.dockPushDebounced === 'function') window.dockPushDebounced();
+      try {
+        syncActiveStyleSetSnapshot(settings);
+      } catch (error) {
+        console.warn('[admin] Style palette sync failed after settings change', error);
+      }
     };
 
     const typographyFold = document.getElementById('boxTypographyLayout');
