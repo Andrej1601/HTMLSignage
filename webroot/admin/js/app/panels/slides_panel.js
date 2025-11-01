@@ -2137,10 +2137,6 @@ export function createSlidesPanel({ getSettings, thumbFallback, setUnsavedState,
     renderHeroTimelineControls();
     renderBackgroundAudioControls();
 
-    if (typographyFold) typographyFold.dataset.syncReady = '1';
-    const displayLayoutFold = document.getElementById('displayLayoutFold');
-    if (displayLayoutFold) displayLayoutFold.dataset.syncReady = '1';
-
     // Reset-Button (nur Felder dieser Box)
     const reset = document.querySelector('#resetSlides');
     if (!reset) return;
