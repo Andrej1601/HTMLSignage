@@ -726,6 +726,13 @@ function updateFlamePreview(u){
 
 
 function collectSettings(){
+  try {
+    if (settings) {
+      syncActiveStyleSetSnapshot(settings);
+    }
+  } catch (error) {
+    console.warn('[admin] Style palette sync failed before saving settings', error);
+  }
   const sanitizeTimer = (val) => {
     const num = Number(val);
     return Number.isFinite(num) && num > 0 ? Math.max(1, Math.round(num)) : null;
