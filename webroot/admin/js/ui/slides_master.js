@@ -510,209 +510,218 @@ function syncStyleSetFormState(settings){
     return !!el?.checked;
   };
 
-  const fontFamilyEl = getEl('fontFamily');
-  if (fontFamilyEl && typeof fontFamilyEl.value === 'string') {
-    const trimmed = fontFamilyEl.value.trim();
-    fonts.family = trimmed || fonts.family || DEFAULTS.fonts.family;
-  }
+  const typographyRoot = document.getElementById('boxTypographyLayout');
+  const displayRoot = document.getElementById('displayLayoutFold');
+  const typographyReady = typographyRoot?.dataset.syncReady === '1';
+  const displayReady = displayRoot?.dataset.syncReady === '1';
 
-  const fontScaleRaw = readNumber('fontScale');
-  if (Number.isFinite(fontScaleRaw)) {
-    const normalized = clampNumber(0.5, fontScaleRaw, 3);
-    if (normalized != null) fonts.scale = normalized;
-  }
+  if (typographyReady) {
+    const fontFamilyEl = getEl('fontFamily');
+    if (fontFamilyEl && typeof fontFamilyEl.value === 'string') {
+      const trimmed = fontFamilyEl.value.trim();
+      fonts.family = trimmed || fonts.family || DEFAULTS.fonts.family;
+    }
 
-  const h1ScaleRaw = readNumber('h1Scale');
-  if (Number.isFinite(h1ScaleRaw)) {
-    const normalized = clampNumber(0.5, h1ScaleRaw, 3.5);
-    if (normalized != null) fonts.h1Scale = normalized;
-  }
+    const fontScaleRaw = readNumber('fontScale');
+    if (Number.isFinite(fontScaleRaw)) {
+      const normalized = clampNumber(0.5, fontScaleRaw, 3);
+      if (normalized != null) fonts.scale = normalized;
+    }
 
-  const h2ScaleRaw = readNumber('h2Scale');
-  if (Number.isFinite(h2ScaleRaw)) {
-    const normalized = clampNumber(0.5, h2ScaleRaw, 3.5);
-    if (normalized != null) fonts.h2Scale = normalized;
-  }
+    const h1ScaleRaw = readNumber('h1Scale');
+    if (Number.isFinite(h1ScaleRaw)) {
+      const normalized = clampNumber(0.5, h1ScaleRaw, 3.5);
+      if (normalized != null) fonts.h1Scale = normalized;
+    }
 
-  const ovTitleRaw = readNumber('ovTitleScale');
-  if (Number.isFinite(ovTitleRaw)) {
-    const normalized = clampNumber(0.4, ovTitleRaw, 4);
-    if (normalized != null) fonts.overviewTitleScale = normalized;
-  }
+    const h2ScaleRaw = readNumber('h2Scale');
+    if (Number.isFinite(h2ScaleRaw)) {
+      const normalized = clampNumber(0.5, h2ScaleRaw, 3.5);
+      if (normalized != null) fonts.h2Scale = normalized;
+    }
 
-  const ovHeadRaw = readNumber('ovHeadScale');
-  if (Number.isFinite(ovHeadRaw)) {
-    const normalized = clampNumber(0.5, ovHeadRaw, 3);
-    if (normalized != null) fonts.overviewHeadScale = normalized;
-  }
+    const ovTitleRaw = readNumber('ovTitleScale');
+    if (Number.isFinite(ovTitleRaw)) {
+      const normalized = clampNumber(0.4, ovTitleRaw, 4);
+      if (normalized != null) fonts.overviewTitleScale = normalized;
+    }
 
-  const ovCellRaw = readNumber('ovCellScale');
-  if (Number.isFinite(ovCellRaw)) {
-    const normalized = clampNumber(0.5, ovCellRaw, 3);
-    if (normalized != null) fonts.overviewCellScale = normalized;
-  }
+    const ovHeadRaw = readNumber('ovHeadScale');
+    if (Number.isFinite(ovHeadRaw)) {
+      const normalized = clampNumber(0.5, ovHeadRaw, 3);
+      if (normalized != null) fonts.overviewHeadScale = normalized;
+    }
 
-  const ovTimeRaw = readNumber('ovTimeScale');
-  if (Number.isFinite(ovTimeRaw)) {
-    const normalized = clampNumber(0.5, ovTimeRaw, 3);
-    if (normalized != null) fonts.overviewTimeScale = normalized;
-  } else if (Number.isFinite(Number(fonts.overviewTimeScale))) {
-    const fallback = clampNumber(0.5, Number(fonts.overviewTimeScale), 3);
-    if (fallback != null) fonts.overviewTimeScale = fallback;
-  }
+    const ovCellRaw = readNumber('ovCellScale');
+    if (Number.isFinite(ovCellRaw)) {
+      const normalized = clampNumber(0.5, ovCellRaw, 3);
+      if (normalized != null) fonts.overviewCellScale = normalized;
+    }
 
-  const tileTextRaw = readNumber('tileTextScale');
-  if (Number.isFinite(tileTextRaw)) {
-    fonts.tileTextScale = clampNumber(0.4, tileTextRaw, 3) ?? fonts.tileTextScale;
-  }
+    const ovTimeRaw = readNumber('ovTimeScale');
+    if (Number.isFinite(ovTimeRaw)) {
+      const normalized = clampNumber(0.5, ovTimeRaw, 3);
+      if (normalized != null) fonts.overviewTimeScale = normalized;
+    } else if (Number.isFinite(Number(fonts.overviewTimeScale))) {
+      const fallback = clampNumber(0.5, Number(fonts.overviewTimeScale), 3);
+      if (fallback != null) fonts.overviewTimeScale = fallback;
+    }
 
-  const tileWeightEl = getEl('tileWeight');
-  if (tileWeightEl && typeof tileWeightEl.value === 'string') {
-    const parsed = Number(tileWeightEl.value);
-    if (Number.isFinite(parsed)) {
-      fonts.tileWeight = clampNumber(100, parsed, 900) ?? parsed;
+    const tileTextRaw = readNumber('tileTextScale');
+    if (Number.isFinite(tileTextRaw)) {
+      fonts.tileTextScale = clampNumber(0.4, tileTextRaw, 3) ?? fonts.tileTextScale;
+    }
+
+    const tileWeightEl = getEl('tileWeight');
+    if (tileWeightEl && typeof tileWeightEl.value === 'string') {
+      const parsed = Number(tileWeightEl.value);
+      if (Number.isFinite(parsed)) {
+        fonts.tileWeight = clampNumber(100, parsed, 900) ?? parsed;
+      }
+    }
+
+    const tileTimeWeightEl = getEl('tileTimeWeight');
+    if (tileTimeWeightEl && typeof tileTimeWeightEl.value === 'string') {
+      const parsed = Number(tileTimeWeightEl.value);
+      if (Number.isFinite(parsed)) {
+        fonts.tileTimeWeight = clampNumber(100, parsed, 900) ?? parsed;
+      }
+    }
+
+    const chipHeightRaw = readNumber('chipH');
+    if (Number.isFinite(chipHeightRaw)) {
+      const normalized = clampNumber(0.5, chipHeightRaw / 100, 2);
+      if (normalized != null) fonts.chipHeight = normalized;
+    }
+
+    const chipOverflowEl = getEl('chipOverflowMode');
+    if (chipOverflowEl && typeof chipOverflowEl.value === 'string') {
+      const value = chipOverflowEl.value === 'ellipsis' ? 'ellipsis' : 'scale';
+      fonts.chipOverflowMode = value;
+    }
+
+    const flamePctRaw = readNumber('flamePct');
+    if (Number.isFinite(flamePctRaw)) {
+      const normalized = clampNumber(0, flamePctRaw, 100);
+      if (normalized != null) fonts.flamePct = normalized;
+    }
+
+    const flameGapRaw = readNumber('flameGap');
+    if (Number.isFinite(flameGapRaw)) {
+      const normalized = clampNumber(0, flameGapRaw, 3);
+      if (normalized != null) fonts.flameGapScale = normalized;
+    }
+
+    const tileTimeRaw = readNumber('tileTimeScale');
+    if (Number.isFinite(tileTimeRaw)) {
+      const normalizedTime = clampNumber(0.5, tileTimeRaw, 4);
+      if (normalizedTime != null) fonts.tileTimeScale = normalizedTime;
+    } else if (!Number.isFinite(Number(fonts.tileTimeScale))) {
+      const fallback = Number(DEFAULTS.fonts?.tileTimeScale ?? fonts.tileMetaScale ?? 1);
+      const normalizedFallback = clampNumber(0.5, fallback, 4);
+      if (normalizedFallback != null) fonts.tileTimeScale = normalizedFallback;
+    }
+
+    const metaRaw = readNumber('tileMetaScale');
+    if (Number.isFinite(metaRaw)) {
+      const normalizedMeta = clampNumber(0.5, metaRaw, 2);
+      if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
+    } else if (Number.isFinite(Number(fonts.tileMetaScale))) {
+      const normalizedMeta = clampNumber(0.5, Number(fonts.tileMetaScale), 2);
+      if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
+    } else {
+      const fallbackMeta = Number(DEFAULTS.fonts?.tileMetaScale ?? 1);
+      const normalizedMeta = clampNumber(0.5, fallbackMeta, 2);
+      if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
+    }
+
+    const ovTimeWidthRaw = readNumber('ovTimeWidthScale');
+    if (Number.isFinite(ovTimeWidthRaw) && ovTimeWidthRaw > 0) {
+      const normalized = clampNumber(0.5, ovTimeWidthRaw, 3);
+      if (normalized != null) fonts.overviewTimeWidthScale = normalized;
+    } else if (!Number.isFinite(Number(fonts.overviewTimeWidthScale))) {
+      const fallback = Number(DEFAULTS.fonts?.overviewTimeWidthScale ?? 1);
+      const normalized = clampNumber(0.5, fallback, 3);
+      if (normalized != null) fonts.overviewTimeWidthScale = normalized;
+    }
+
+    fonts.overviewShowFlames = readChecked('overviewFlames');
+
+    const tileFlameSizeRaw = readNumber('tileFlameSizeScale');
+    if (Number.isFinite(tileFlameSizeRaw)) {
+      const normalized = clampNumber(0.4, tileFlameSizeRaw, 3);
+      if (normalized != null) slidesCfg.tileFlameSizeScale = normalized;
+    }
+
+    const tileFlameGapRaw = readNumber('tileFlameGapScale');
+    if (Number.isFinite(tileFlameGapRaw)) {
+      const normalized = clampNumber(0, tileFlameGapRaw, 3);
+      if (normalized != null) slidesCfg.tileFlameGapScale = normalized;
+    }
+
+    const badgeScaleRaw = readNumber('badgeScale');
+    if (Number.isFinite(badgeScaleRaw)) {
+      const normalized = clampNumber(0.3, badgeScaleRaw, 3);
+      if (normalized != null) slidesCfg.badgeScale = normalized;
+    }
+
+    const badgeDescRaw = readNumber('badgeDescriptionScale');
+    if (Number.isFinite(badgeDescRaw)) {
+      const normalized = clampNumber(0.3, badgeDescRaw, 3);
+      if (normalized != null) slidesCfg.badgeDescriptionScale = normalized;
+    }
+
+    const tileHeightRaw = readNumber('tileHeightScale');
+    if (Number.isFinite(tileHeightRaw)) {
+      const normalized = clampNumber(0.5, tileHeightRaw, 2);
+      if (normalized != null) slidesCfg.tileHeightScale = normalized;
+    }
+
+    const tilePaddingRaw = readNumber('tilePaddingScale');
+    if (Number.isFinite(tilePaddingRaw)) {
+      const normalized = clampNumber(0.25, tilePaddingRaw, 1.5);
+      if (normalized != null) slidesCfg.tilePaddingScale = normalized;
+    }
+
+    slidesCfg.tileOverlayEnabled = readChecked('tileOverlayEnabled');
+    const overlayStrengthRaw = readNumber('tileOverlayStrength');
+    if (Number.isFinite(overlayStrengthRaw)) {
+      const normalized = clampNumber(0, overlayStrengthRaw, 200);
+      if (normalized != null) slidesCfg.tileOverlayStrength = normalized / 100;
+    }
+
+    slidesCfg.badgeInlineColumn = readChecked('badgeInlineColumn');
+    slidesCfg.appendTimeSuffix = readChecked('timeSuffixToggle');
+
+    const headingEl = getEl('saunaHeadingWidth');
+    if (headingEl) {
+      const fallback = settings.slides?.saunaTitleMaxWidthPercent
+        ?? DEFAULTS.slides?.saunaTitleMaxWidthPercent
+        ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
+      const normalized = normalizeSaunaHeadingWidth(headingEl.value, { fallback });
+      if (Number.isFinite(normalized)) slidesCfg.saunaTitleMaxWidthPercent = normalized;
     }
   }
 
-  const tileTimeWeightEl = getEl('tileTimeWeight');
-  if (tileTimeWeightEl && typeof tileTimeWeightEl.value === 'string') {
-    const parsed = Number(tileTimeWeightEl.value);
-    if (Number.isFinite(parsed)) {
-      fonts.tileTimeWeight = clampNumber(100, parsed, 900) ?? parsed;
+  if (typographyReady || displayReady) {
+    const layoutModeEl = getEl('layoutMode');
+    if (layoutModeEl && typeof layoutModeEl.value === 'string') {
+      displayCfg.layoutMode = (layoutModeEl.value === 'split') ? 'split' : 'single';
     }
-  }
 
-  const chipHeightRaw = readNumber('chipH');
-  if (Number.isFinite(chipHeightRaw)) {
-    const normalized = clampNumber(0.5, chipHeightRaw / 100, 2);
-    if (normalized != null) fonts.chipHeight = normalized;
-  }
-
-  const chipOverflowEl = getEl('chipOverflowMode');
-  if (chipOverflowEl && typeof chipOverflowEl.value === 'string') {
-    const value = chipOverflowEl.value === 'ellipsis' ? 'ellipsis' : 'scale';
-    fonts.chipOverflowMode = value;
-  }
-
-  const flamePctRaw = readNumber('flamePct');
-  if (Number.isFinite(flamePctRaw)) {
-    const normalized = clampNumber(0, flamePctRaw, 100);
-    if (normalized != null) fonts.flamePct = normalized;
-  }
-
-  const flameGapRaw = readNumber('flameGap');
-  if (Number.isFinite(flameGapRaw)) {
-    const normalized = clampNumber(0, flameGapRaw, 3);
-    if (normalized != null) fonts.flameGapScale = normalized;
-  }
-
-  const tileTimeRaw = readNumber('tileTimeScale');
-  if (Number.isFinite(tileTimeRaw)) {
-    const normalizedTime = clampNumber(0.5, tileTimeRaw, 4);
-    if (normalizedTime != null) fonts.tileTimeScale = normalizedTime;
-  } else if (!Number.isFinite(Number(fonts.tileTimeScale))) {
-    const fallback = Number(DEFAULTS.fonts?.tileTimeScale ?? fonts.tileMetaScale ?? 1);
-    const normalizedFallback = clampNumber(0.5, fallback, 4);
-    if (normalizedFallback != null) fonts.tileTimeScale = normalizedFallback;
-  }
-
-  const metaRaw = readNumber('tileMetaScale');
-  if (Number.isFinite(metaRaw)) {
-    const normalizedMeta = clampNumber(0.5, metaRaw, 2);
-    if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
-  } else if (Number.isFinite(Number(fonts.tileMetaScale))) {
-    const normalizedMeta = clampNumber(0.5, Number(fonts.tileMetaScale), 2);
-    if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
-  } else {
-    const fallbackMeta = Number(DEFAULTS.fonts?.tileMetaScale ?? 1);
-    const normalizedMeta = clampNumber(0.5, fallbackMeta, 2);
-    if (normalizedMeta != null) fonts.tileMetaScale = normalizedMeta;
-  }
-
-  const ovTimeWidthRaw = readNumber('ovTimeWidthScale');
-  if (Number.isFinite(ovTimeWidthRaw) && ovTimeWidthRaw > 0) {
-    const normalized = clampNumber(0.5, ovTimeWidthRaw, 3);
-    if (normalized != null) fonts.overviewTimeWidthScale = normalized;
-  } else if (!Number.isFinite(Number(fonts.overviewTimeWidthScale))) {
-    const fallback = Number(DEFAULTS.fonts?.overviewTimeWidthScale ?? 1);
-    const normalized = clampNumber(0.5, fallback, 3);
-    if (normalized != null) fonts.overviewTimeWidthScale = normalized;
-  }
-
-  fonts.overviewShowFlames = readChecked('overviewFlames');
-
-  const tileFlameSizeRaw = readNumber('tileFlameSizeScale');
-  if (Number.isFinite(tileFlameSizeRaw)) {
-    const normalized = clampNumber(0.4, tileFlameSizeRaw, 3);
-    if (normalized != null) slidesCfg.tileFlameSizeScale = normalized;
-  }
-
-  const tileFlameGapRaw = readNumber('tileFlameGapScale');
-  if (Number.isFinite(tileFlameGapRaw)) {
-    const normalized = clampNumber(0, tileFlameGapRaw, 3);
-    if (normalized != null) slidesCfg.tileFlameGapScale = normalized;
-  }
-
-  const badgeScaleRaw = readNumber('badgeScale');
-  if (Number.isFinite(badgeScaleRaw)) {
-    const normalized = clampNumber(0.3, badgeScaleRaw, 3);
-    if (normalized != null) slidesCfg.badgeScale = normalized;
-  }
-
-  const badgeDescRaw = readNumber('badgeDescriptionScale');
-  if (Number.isFinite(badgeDescRaw)) {
-    const normalized = clampNumber(0.3, badgeDescRaw, 3);
-    if (normalized != null) slidesCfg.badgeDescriptionScale = normalized;
-  }
-
-  const tileHeightRaw = readNumber('tileHeightScale');
-  if (Number.isFinite(tileHeightRaw)) {
-    const normalized = clampNumber(0.5, tileHeightRaw, 2);
-    if (normalized != null) slidesCfg.tileHeightScale = normalized;
-  }
-
-  const tilePaddingRaw = readNumber('tilePaddingScale');
-  if (Number.isFinite(tilePaddingRaw)) {
-    const normalized = clampNumber(0.25, tilePaddingRaw, 1.5);
-    if (normalized != null) slidesCfg.tilePaddingScale = normalized;
-  }
-
-  slidesCfg.tileOverlayEnabled = readChecked('tileOverlayEnabled');
-  const overlayStrengthRaw = readNumber('tileOverlayStrength');
-  if (Number.isFinite(overlayStrengthRaw)) {
-    const normalized = clampNumber(0, overlayStrengthRaw, 200);
-    if (normalized != null) slidesCfg.tileOverlayStrength = normalized / 100;
-  }
-
-  slidesCfg.badgeInlineColumn = readChecked('badgeInlineColumn');
-  slidesCfg.appendTimeSuffix = readChecked('timeSuffixToggle');
-
-  const headingEl = getEl('saunaHeadingWidth');
-  if (headingEl) {
-    const fallback = settings.slides?.saunaTitleMaxWidthPercent
-      ?? DEFAULTS.slides?.saunaTitleMaxWidthPercent
-      ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
-    const normalized = normalizeSaunaHeadingWidth(headingEl.value, { fallback });
-    if (Number.isFinite(normalized)) slidesCfg.saunaTitleMaxWidthPercent = normalized;
-  }
-
-  const layoutModeEl = getEl('layoutMode');
-  if (layoutModeEl && typeof layoutModeEl.value === 'string') {
-    displayCfg.layoutMode = (layoutModeEl.value === 'split') ? 'split' : 'single';
-  }
-
-  const layoutProfileEl = getEl('layoutProfile');
-  if (layoutProfileEl && typeof layoutProfileEl.value === 'string') {
-    const raw = layoutProfileEl.value;
-    const allowed = new Set(['landscape', 'portrait-split', 'triple', 'asymmetric', 'info-panel']);
-    if (allowed.has(raw)) {
-      displayCfg.layoutProfile = raw;
+    const layoutProfileEl = getEl('layoutProfile');
+    if (layoutProfileEl && typeof layoutProfileEl.value === 'string') {
+      const raw = layoutProfileEl.value;
+      const allowed = new Set(['landscape', 'portrait-split', 'triple', 'asymmetric', 'info-panel']);
+      if (allowed.has(raw)) {
+        displayCfg.layoutProfile = raw;
+      }
     }
-  }
 
-  const saunaFlamesEl = getEl('saunaFlames');
-  if (saunaFlamesEl) {
-    slidesCfg.showSaunaFlames = !!saunaFlamesEl.checked;
+    const saunaFlamesEl = getEl('saunaFlames');
+    if (saunaFlamesEl) {
+      slidesCfg.showSaunaFlames = !!saunaFlamesEl.checked;
+    }
   }
 
   return settings;
