@@ -994,7 +994,7 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     }
 
     $baseDefault = $fallback ?? signage_default_settings();
-    $normalized = signage_array_merge_patch($baseDefault, $settings);
+    $normalized = $settings;
 
     $audioDefaults = $baseDefault['audio']['background'] ?? signage_default_settings()['audio']['background'];
     $audioState = isset($normalized['audio']) && is_array($normalized['audio']) ? $normalized['audio'] : [];
