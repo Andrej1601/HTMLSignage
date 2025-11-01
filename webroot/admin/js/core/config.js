@@ -235,6 +235,16 @@ const cloneSubset = (src = {}, keys = []) => {
   return out;
 };
 
+const applyStyleSubset = (target = {}, source = {}, keys = []) => {
+  if (!target || typeof target !== 'object') return;
+  if (!source || typeof source !== 'object') return;
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      target[key] = deepClone(source[key]);
+    }
+  });
+};
+
 export const PAGE_CONTENT_TYPES = [
   ['overview', 'Übersicht'],
   ['sauna', 'Saunen'],
@@ -421,6 +431,15 @@ export function normalizeSettings(source, { assignMissingIds = false } = {}) {
   const styleSetState = sanitizeStyleSets(src.slides?.styleSets, DEFAULTS.slides?.styleSets, src.slides?.activeStyleSet);
   src.slides.styleSets = styleSetState.sets;
   src.slides.activeStyleSet = styleSetState.active;
+  const activeStyleSet = (styleSetState.active && styleSetState.sets)
+    ? styleSetState.sets[styleSetState.active]
+    : null;
+  if (activeStyleSet && typeof activeStyleSet === 'object') {
+    applyStyleSubset(src.theme, activeStyleSet.theme, STYLE_THEME_KEYS);
+    applyStyleSubset(src.fonts, activeStyleSet.fonts, STYLE_FONT_KEYS);
+    applyStyleSubset(src.slides, activeStyleSet.slides, STYLE_SLIDE_KEYS);
+    applyStyleSubset(src.display, activeStyleSet.display, STYLE_DISPLAY_KEYS);
+  }
   const headingFallback = DEFAULTS.slides?.saunaTitleMaxWidthPercent ?? SAUNA_HEADING_WIDTH_LIMITS.inputMax;
   src.slides.saunaTitleMaxWidthPercent = normalizeSaunaHeadingWidth(src.slides.saunaTitleMaxWidthPercent, {
     fallback: headingFallback
