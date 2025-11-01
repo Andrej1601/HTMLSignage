@@ -897,8 +897,13 @@ function signage_default_settings(): array
             'overviewHeadScale' => 0.9,
             'overviewCellScale' => 0.8,
             'overviewTimeScale' => 0.8,
+            'overviewTimeWidthScale' => 1.0,
+            'overviewShowFlames' => true,
             'tileTextScale' => 0.8,
             'tileWeight' => 600,
+            'tileMetaScale' => 1.0,
+            'tileTimeScale' => 1.0,
+            'tileTimeWeight' => 600,
             'chipHeight' => 1,
             'chipOverflowMode' => 'scale',
             'flamePct' => 55,
@@ -910,12 +915,46 @@ function signage_default_settings(): array
             'showOnOverview' => true,
         ],
         'display' => [
-            'fit' => 'cover',
+            'fit' => 'auto',
+            'baseW' => 1920,
+            'baseH' => 1080,
             'rightWidthPercent' => 38,
             'infoPanelWidthPercent' => 32,
             'portraitSplitTopPercent' => 58,
+            'infoBannerHeightPercent' => 10,
+            'infoBannerMode' => 'full',
             'cutTopPercent' => 28,
             'cutBottomPercent' => 12,
+            'layoutMode' => 'single',
+            'layoutProfile' => 'landscape',
+            'pages' => [
+                'left' => [
+                    'source' => 'master',
+                    'timerSec' => null,
+                    'contentTypes' => [
+                        'overview',
+                        'sauna',
+                        'hero-timeline',
+                        'story',
+                        'wellness-tip',
+                        'image',
+                        'video',
+                        'url',
+                    ],
+                    'playlist' => [],
+                ],
+                'right' => [
+                    'source' => 'media',
+                    'timerSec' => null,
+                    'contentTypes' => [
+                        'wellness-tip',
+                        'image',
+                        'video',
+                        'url',
+                    ],
+                    'playlist' => [],
+                ],
+            ],
         ],
         'slides' => [
             'overviewDurationSec' => 10,
@@ -924,18 +963,85 @@ function signage_default_settings(): array
             'tileWidthPercent' => 45,
             'tileMinScale' => 0.25,
             'tileMaxScale' => 0.57,
+            'tileHeightScale' => 1.0,
+            'tilePaddingScale' => 0.75,
             'tileFlameSizeScale' => 1,
             'tileFlameGapScale' => 1,
+            'tileOverlayEnabled' => true,
+            'tileOverlayStrength' => 1.0,
             'durationMode' => 'uniform',
             'globalDwellSec' => 6,
             'loop' => true,
             'order' => ['overview'],
             'saunaTitleMaxWidthPercent' => 64,
+            'showSaunaFlames' => true,
+            'badgeInlineColumn' => false,
+            'infobadgeColor' => '#5C3101',
+            'badgeScale' => 1.0,
+            'badgeDescriptionScale' => 1.0,
+            'heroEnabled' => true,
+            'heroTimelineFillMs' => 8000,
+            'heroTimelineMaxEntries' => null,
+            'heroTimelineWaitForScroll' => false,
+            'heroTimelineScrollSpeed' => 40,
+            'heroTimelineScrollPauseMs' => 4000,
+            'saunaInfo' => [],
+            'enabledComponents' => [
+                'title' => true,
+                'description' => true,
+                'infoBox' => true,
+                'badges' => true,
+            ],
+            'styleSets' => [],
+            'activeStyleSet' => 'classic',
+            'styleAutomation' => [
+                'enabled' => true,
+                'fallbackStyle' => 'classic',
+                'fallbackTrack' => 'default',
+                'timeSlots' => [
+                    [
+                        'id' => 'morning',
+                        'label' => 'Vormittag',
+                        'mode' => 'daily',
+                        'start' => '06:00',
+                        'style' => 'classic',
+                        'track' => 'default',
+                    ],
+                    [
+                        'id' => 'evening',
+                        'label' => 'Abend',
+                        'mode' => 'daily',
+                        'start' => '18:00',
+                        'style' => 'sunset',
+                        'track' => 'default',
+                    ],
+                    [
+                        'id' => 'night',
+                        'label' => 'Nacht',
+                        'mode' => 'daily',
+                        'start' => '21:30',
+                        'style' => 'midnight',
+                        'track' => 'default',
+                    ],
+                ],
+            ],
         ],
         'assets' => [
             'rightImages' => [],
             'flameImage' => '/assets/img/flame_test.svg',
         ],
+        'highlightNext' => [
+            'enabled' => false,
+            'color' => '#FFDD66',
+            'minutesBeforeNext' => 15,
+            'minutesAfterStart' => 15,
+        ],
+        'extras' => [
+            'wellnessTips' => [],
+            'eventCountdowns' => [],
+            'infoModules' => [],
+        ],
+        'footnotesShowOnOverview' => true,
         'audio' => [
             'background' => [
                 'enabled' => false,
@@ -971,6 +1077,80 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     $baseDefault = $fallback ?? signage_default_settings();
     $normalized = $settings;
 
+    $fontsDefault = isset($baseDefault['fonts']) && is_array($baseDefault['fonts']) ? $baseDefault['fonts'] : [];
+    $fonts = isset($normalized['fonts']) && is_array($normalized['fonts']) ? $normalized['fonts'] : [];
+    $fonts = array_merge($fontsDefault, $fonts);
+    $fonts['overviewTimeWidthScale'] = signage_sanitize_float_range(
+        $fonts['overviewTimeWidthScale'] ?? null,
+        $fontsDefault['overviewTimeWidthScale'] ?? 1.0,
+        0.5,
+        3.0
+    );
+    $fonts['overviewShowFlames'] = signage_truthy(
+        $fonts['overviewShowFlames'] ?? null,
+        $fontsDefault['overviewShowFlames'] ?? true
+    );
+    $fonts['tileMetaScale'] = signage_sanitize_float_range(
+        $fonts['tileMetaScale'] ?? null,
+        $fontsDefault['tileMetaScale'] ?? 1.0,
+        0.5,
+        2.0
+    );
+    $fonts['tileTimeScale'] = signage_sanitize_float_range(
+        $fonts['tileTimeScale'] ?? null,
+        $fonts['tileMetaScale'] ?? ($fontsDefault['tileTimeScale'] ?? 1.0),
+        0.5,
+        4.0
+    );
+    $fonts['tileTimeWeight'] = signage_sanitize_int_range(
+        $fonts['tileTimeWeight'] ?? null,
+        $fontsDefault['tileTimeWeight'] ?? 600,
+        100,
+        900
+    );
+    $normalized['fonts'] = $fonts;
+
+    $displayDefault = isset($baseDefault['display']) && is_array($baseDefault['display']) ? $baseDefault['display'] : [];
+    $display = isset($normalized['display']) && is_array($normalized['display']) ? $normalized['display'] : [];
+    $display = array_merge($displayDefault, $display);
+    $display['layoutMode'] = (isset($display['layoutMode']) && $display['layoutMode'] === 'split') ? 'split' : 'single';
+    $allowedProfiles = ['landscape', 'portrait-split', 'triple', 'asymmetric', 'info-panel'];
+    $profile = isset($display['layoutProfile']) ? (string) $display['layoutProfile'] : '';
+    if (!in_array($profile, $allowedProfiles, true)) {
+        $profile = isset($displayDefault['layoutProfile']) ? (string) $displayDefault['layoutProfile'] : 'landscape';
+    }
+    $display['layoutProfile'] = $profile;
+    $display['infoPanelWidthPercent'] = signage_sanitize_int_range(
+        $display['infoPanelWidthPercent'] ?? null,
+        $displayDefault['infoPanelWidthPercent'] ?? 32,
+        10,
+        90
+    );
+    $display['portraitSplitTopPercent'] = signage_sanitize_int_range(
+        $display['portraitSplitTopPercent'] ?? null,
+        $displayDefault['portraitSplitTopPercent'] ?? 58,
+        10,
+        90
+    );
+    $display['infoBannerHeightPercent'] = signage_sanitize_int_range(
+        $display['infoBannerHeightPercent'] ?? null,
+        $displayDefault['infoBannerHeightPercent'] ?? 10,
+        2,
+        40
+    );
+    $bannerMode = isset($display['infoBannerMode']) ? strtolower((string) $display['infoBannerMode']) : '';
+    if (!in_array($bannerMode, ['full', 'left', 'right'], true)) {
+        $bannerMode = isset($displayDefault['infoBannerMode']) ? (string) $displayDefault['infoBannerMode'] : 'full';
+    }
+    $display['infoBannerMode'] = $bannerMode;
+    $pagesDefault = isset($displayDefault['pages']) && is_array($displayDefault['pages']) ? $displayDefault['pages'] : [];
+    $pages = isset($display['pages']) && is_array($display['pages']) ? $display['pages'] : [];
+    $display['pages'] = [
+        'left' => isset($pages['left']) && is_array($pages['left']) ? $pages['left'] : ($pagesDefault['left'] ?? []),
+        'right' => isset($pages['right']) && is_array($pages['right']) ? $pages['right'] : ($pagesDefault['right'] ?? []),
+    ];
+    $normalized['display'] = $display;
+
     $audioDefaults = $baseDefault['audio']['background'] ?? signage_default_settings()['audio']['background'];
     $audioState = isset($normalized['audio']) && is_array($normalized['audio']) ? $normalized['audio'] : [];
     $background = $audioState['background'] ?? [];
@@ -980,6 +1160,44 @@ function signage_normalize_settings($settings, ?array $fallback = null): array
     signage_prune_missing_asset_paths($normalized);
 
     return $normalized;
+}
+
+function signage_sanitize_float_range($value, $fallback, float $min, float $max): float
+{
+    if (is_numeric($value)) {
+        $num = (float) $value;
+        if (is_finite($num)) {
+            return max($min, min($max, $num));
+        }
+    }
+
+    if (is_numeric($fallback)) {
+        $num = (float) $fallback;
+        if (is_finite($num)) {
+            return max($min, min($max, $num));
+        }
+    }
+
+    return max($min, min($max, $min));
+}
+
+function signage_sanitize_int_range($value, $fallback, int $min, int $max): int
+{
+    if (is_numeric($value)) {
+        $num = (int) round($value);
+        if ($num >= $min && $num <= $max) {
+            return $num;
+        }
+    }
+
+    if (is_numeric($fallback)) {
+        $num = (int) round($fallback);
+        if ($num >= $min && $num <= $max) {
+            return $num;
+        }
+    }
+
+    return max($min, min($max, $min));
 }
 
 function signage_truthy(mixed $value, bool $fallback = true): bool
