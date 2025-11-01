@@ -46,7 +46,6 @@ function signage_permissions_allow_settings($permissions): bool
     $writePermissions = [
         'module-system',
         'module-design',
-        'module-slideshow',
         'design-palettes',
         'design-typography',
         'design-colors',
