@@ -4927,7 +4927,7 @@ function ensureTilePager(list) {
 }
 
 // ---------- Sauna slide ----------
-function renderSauna(name, region = 'left') {
+function renderSauna(name, region = 'left', ctx = {}) {
   const hlMap = getHighlightMap();
   const rightUrl = settings?.assets?.rightImages?.[name] || '';
   const iconsEnabled = settings?.slides?.showIcons !== false;
@@ -4951,6 +4951,21 @@ function renderSauna(name, region = 'left') {
 
   const body = h('div', { class: 'body' });
   const list = h('div', { class: 'list' });
+
+  const slidesCfg = settings?.slides || {};
+  const saunaScrollSpeed = (() => {
+    const raw = Number(slidesCfg.saunaScrollSpeed);
+    if (Number.isFinite(raw) && raw > 0) return Math.max(16, Math.round(raw));
+    return 40;
+  })();
+  const saunaScrollPauseMs = (() => {
+    const raw = Number(slidesCfg.saunaScrollPauseMs);
+    if (Number.isFinite(raw) && raw >= 0) {
+      const normalized = raw < 1000 ? raw * 1000 : raw;
+      return Math.max(0, Math.round(normalized));
+    }
+    return 4000;
+  })();
 
   const colIdx = (schedule.saunas || []).indexOf(name);
   const saunaStatus = getSaunaStatus(name);
@@ -5237,17 +5252,169 @@ function renderSauna(name, region = 'left') {
     }
   }
 
-  const pager = ensureTilePager(list);
-  c.__cleanup = () => {
-    if (pager && typeof pager.destroy === 'function') pager.destroy();
-  };
+  let autoScrollStop = null;
+  let resizeObserver = null;
+  let waitForScroll = false;
+  let cycleReached = true;
+  let defaultDwellMs = null;
+  let totalDurationMs = null;
+  let scrollDurationMs = null;
+  let advanceHelper = null;
+  let startTime = 0;
+
+  function destroyAutoScroll() {
+    if (autoScrollStop) {
+      try { autoScrollStop(); } catch {}
+      autoScrollStop = null;
+    }
+    if (list) {
+      list.classList.remove('is-scrollable');
+      try { list.scrollTop = 0; } catch {}
+    }
+  }
+
+  function computeScrollDuration(maxScroll) {
+    if (!Number.isFinite(maxScroll)) {
+      maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+    }
+    if (maxScroll <= 0) return null;
+    const travelMs = Math.round((maxScroll / Math.max(1, saunaScrollSpeed)) * 1000);
+    const initialDelay = Math.round(Math.min(800, saunaScrollPauseMs));
+    return Math.max(0, travelMs + initialDelay);
+  }
+
+  function applyDurationFromScroll(maxScroll) {
+    const duration = computeScrollDuration(maxScroll);
+    scrollDurationMs = duration;
+    const base = Number.isFinite(defaultDwellMs) && defaultDwellMs > 0 ? defaultDwellMs : 0;
+    totalDurationMs = Number.isFinite(duration) && duration > 0 ? Math.max(duration, base) : (base || null);
+  }
+
+  function scheduleIfReady() {
+    if (!advanceHelper) return;
+    if (waitForScroll && !cycleReached) return;
+    const helper = advanceHelper;
+    advanceHelper = null;
+    if (!waitForScroll) {
+      if (Number.isFinite(totalDurationMs) && Number.isFinite(defaultDwellMs) && totalDurationMs > defaultDwellMs) {
+        const elapsed = startTime ? Math.max(0, Date.now() - startTime) : 0;
+        const remaining = Math.max(1000, Math.round(totalDurationMs - elapsed));
+        try {
+          helper.schedule(remaining);
+        } catch (err) {
+          try { helper.scheduleDefault(); } catch {}
+        }
+      } else {
+        try { helper.scheduleDefault(); } catch {}
+      }
+      return;
+    }
+    const elapsed = startTime ? Math.max(0, Date.now() - startTime) : 0;
+    const base = Number.isFinite(totalDurationMs) && totalDurationMs > 0
+      ? totalDurationMs
+      : (Number.isFinite(defaultDwellMs) && defaultDwellMs > 0 ? defaultDwellMs : 6000);
+    const remaining = Math.max(1000, Math.round(base - elapsed));
+    try {
+      helper.schedule(remaining);
+    } catch (err) {
+      try { helper.scheduleDefault(); } catch {}
+    }
+  }
+
+  function refreshAutoScroll() {
+    const height = list?.clientHeight || 0;
+    if (!height) {
+      destroyAutoScroll();
+      waitForScroll = false;
+      cycleReached = true;
+      applyDurationFromScroll(0);
+      return false;
+    }
+    const maxScroll = Math.max(0, list.scrollHeight - height);
+    if (maxScroll <= 1) {
+      destroyAutoScroll();
+      waitForScroll = false;
+      cycleReached = true;
+      applyDurationFromScroll(0);
+      scheduleIfReady();
+      return false;
+    }
+    destroyAutoScroll();
+    waitForScroll = true;
+    cycleReached = false;
+    applyDurationFromScroll(maxScroll);
+    autoScrollStop = enableAutoScroll(list, {
+      axis: 'y',
+      speed: saunaScrollSpeed,
+      pauseMs: saunaScrollPauseMs,
+      mode: 'loop',
+      onCycle: () => {
+        cycleReached = true;
+        scheduleIfReady();
+      },
+      onScrollableChange: (scrollable, nextMaxScroll) => {
+        if (!scrollable) {
+          destroyAutoScroll();
+          waitForScroll = false;
+          cycleReached = true;
+          applyDurationFromScroll(0);
+          scheduleIfReady();
+          return;
+        }
+        const maxValue = Number.isFinite(nextMaxScroll) ? nextMaxScroll : Math.max(0, list.scrollHeight - list.clientHeight);
+        applyDurationFromScroll(maxValue);
+        cycleReached = false;
+      }
+    });
+    return true;
+  }
+
+  function handleManualScroll() {
+    if (!waitForScroll) return;
+    const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+    if (maxScroll <= 0) return;
+    const threshold = Math.max(1, maxScroll * 0.02);
+    if (list.scrollTop >= maxScroll - threshold) {
+      cycleReached = true;
+      scheduleIfReady();
+    }
+  }
+
+  list.addEventListener('scroll', handleManualScroll, { passive: true });
+
+  if (typeof ctx?.deferAdvance === 'function') {
+    ctx.deferAdvance((helper) => {
+      startTime = Date.now();
+      defaultDwellMs = Number.isFinite(helper.defaultMs) && helper.defaultMs > 0 ? Math.round(helper.defaultMs) : null;
+      advanceHelper = helper;
+      refreshAutoScroll();
+      if (!waitForScroll) scheduleIfReady();
+      return true;
+    });
+  }
 
   const recalc = () => {
     applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
-    if (pager) pager.scheduleUpdate({ container: c, body, region, saunaName: name });
+    refreshAutoScroll();
   };
   setTimeout(recalc, 0);
   setResizeHandler(region, recalc);
+
+  if (typeof ResizeObserver === 'function') {
+    try {
+      resizeObserver = new ResizeObserver(() => { refreshAutoScroll(); });
+      resizeObserver.observe(list);
+    } catch {}
+  }
+
+  c.__cleanup = () => {
+    destroyAutoScroll();
+    if (resizeObserver) {
+      try { resizeObserver.disconnect(); } catch {}
+      resizeObserver = null;
+    }
+    list.removeEventListener('scroll', handleManualScroll);
+  };
 
   return c;
 }
@@ -5616,7 +5783,7 @@ function renderSlideNode(item, ctx){
     case 'overview':
       return renderOverview(region);
     case 'sauna':
-      return renderSauna(item.sauna, region);
+      return renderSauna(item.sauna, region, ctx);
     case 'image':
       return renderImage(item.src, region, ctx);
     case 'video':
