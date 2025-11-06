@@ -4980,6 +4980,14 @@ function renderSauna(name, region = 'left', ctx = {}) {
   let advanceHelper = null;
   let lastScheduledMs = null;
 
+  const updateBodyScrollableClass = (scrollable) => {
+    if (scrollable) {
+      body.classList.add('is-scrollable');
+    } else {
+      body.classList.remove('is-scrollable');
+    }
+  };
+
   const scheduleAdvanceWhenReady = () => {
     if (!advanceHelper || !scrollReady) return;
     const baseMs = Number.isFinite(advanceHelper.defaultMs) && advanceHelper.defaultMs > 0
@@ -5025,15 +5033,21 @@ function renderSauna(name, region = 'left', ctx = {}) {
     pauseMs: saunaScrollPauseMs,
     mode: 'loop',
     onScrollableChange: (scrollable, maxScroll) => {
+      updateBodyScrollableClass(scrollable);
       finalizeScrollState(scrollable ? maxScroll : 0);
     }
   });
   if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
 
   const fallbackTimer = setTimeout(() => {
-    if (!scrollReady) finalizeScrollState();
+    if (!scrollReady) {
+      const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+      updateBodyScrollableClass(maxScroll > 0);
+      finalizeScrollState(maxScroll);
+    }
   }, 1200);
   cleanups.push(() => clearTimeout(fallbackTimer));
+  cleanups.push(() => updateBodyScrollableClass(false));
 
   const colIdx = (schedule.saunas || []).indexOf(name);
   const saunaStatus = getSaunaStatus(name);
@@ -5328,7 +5342,9 @@ function renderSauna(name, region = 'left', ctx = {}) {
 
   const recalc = () => {
     applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
-    updateScrollDuration();
+    const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
+    updateBodyScrollableClass(maxScroll > 0);
+    updateScrollDuration(maxScroll);
     scheduleAdvanceWhenReady();
   };
   setTimeout(recalc, 0);
