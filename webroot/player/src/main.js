@@ -4927,7 +4927,7 @@ function ensureTilePager(list) {
 }
 
 // ---------- Sauna slide ----------
-function renderSauna(name, region = 'left', ctx = {}) {
+function renderSauna(name, region = 'left') {
   const hlMap = getHighlightMap();
   const rightUrl = settings?.assets?.rightImages?.[name] || '';
   const iconsEnabled = settings?.slides?.showIcons !== false;
@@ -4951,89 +4951,6 @@ function renderSauna(name, region = 'left', ctx = {}) {
 
   const body = h('div', { class: 'body' });
   const list = h('div', { class: 'list' });
-
-  const cleanups = [];
-  const slidesCfg = settings?.slides || {};
-  const saunaScrollSpeed = (() => {
-    const raw = Number(slidesCfg.saunaScrollSpeed ?? slidesCfg.heroTimelineScrollSpeed);
-    if (Number.isFinite(raw) && raw > 0) return Math.max(40, Math.round(raw));
-    return 40;
-  })();
-  const saunaScrollPauseMs = (() => {
-    const raw = Number(slidesCfg.saunaScrollPauseMs ?? slidesCfg.heroTimelineScrollPauseMs);
-    if (Number.isFinite(raw) && raw >= 0) {
-      const normalized = raw < 1000 ? raw * 1000 : raw;
-      return Math.max(0, Math.round(normalized));
-    }
-    return 4000;
-  })();
-  const computedDwell = (() => {
-    try {
-      return dwellMsForItem({ type: 'sauna', sauna: name }, ctx?.pageConfig);
-    } catch (err) {
-      return null;
-    }
-  })();
-  const fallbackDwell = Number.isFinite(computedDwell) && computedDwell > 0 ? Math.round(computedDwell) : null;
-  let scrollDurationMs = null;
-  let scrollReady = false;
-  let advanceHelper = null;
-  let lastScheduledMs = null;
-
-  const scheduleAdvanceWhenReady = () => {
-    if (!advanceHelper || !scrollReady) return;
-    const baseMs = Number.isFinite(advanceHelper.defaultMs) && advanceHelper.defaultMs > 0
-      ? Math.round(advanceHelper.defaultMs)
-      : (fallbackDwell && fallbackDwell > 0 ? fallbackDwell : 6000);
-    const target = Number.isFinite(scrollDurationMs) && scrollDurationMs > baseMs ? scrollDurationMs : baseMs;
-    const normalized = Math.max(1000, Math.round(target));
-    if (lastScheduledMs === normalized) return;
-    advanceHelper.schedule(normalized);
-    lastScheduledMs = normalized;
-  };
-
-  if (typeof ctx?.deferAdvance === 'function') {
-    ctx.deferAdvance((helper) => {
-      advanceHelper = helper;
-      scheduleAdvanceWhenReady();
-      return true;
-    });
-  }
-  cleanups.push(() => { advanceHelper = null; });
-
-  const updateScrollDuration = (maxScrollValue = null) => {
-    const maxScroll = Number.isFinite(maxScrollValue)
-      ? Math.max(0, maxScrollValue)
-      : Math.max(0, list.scrollHeight - list.clientHeight);
-    if (maxScroll <= 0) {
-      scrollDurationMs = null;
-    } else {
-      const travelMs = Math.round((maxScroll / Math.max(1, saunaScrollSpeed)) * 1000);
-      scrollDurationMs = Math.max(0, travelMs + Math.max(0, saunaScrollPauseMs));
-    }
-  };
-
-  const finalizeScrollState = (maxScrollValue = null) => {
-    updateScrollDuration(maxScrollValue);
-    scrollReady = true;
-    scheduleAdvanceWhenReady();
-  };
-
-  const stopAutoScroll = enableAutoScroll(list, {
-    axis: 'y',
-    speed: saunaScrollSpeed,
-    pauseMs: saunaScrollPauseMs,
-    mode: 'loop',
-    onScrollableChange: (scrollable, maxScroll) => {
-      finalizeScrollState(scrollable ? maxScroll : 0);
-    }
-  });
-  if (typeof stopAutoScroll === 'function') cleanups.push(stopAutoScroll);
-
-  const fallbackTimer = setTimeout(() => {
-    if (!scrollReady) finalizeScrollState();
-  }, 1200);
-  cleanups.push(() => clearTimeout(fallbackTimer));
 
   const colIdx = (schedule.saunas || []).indexOf(name);
   const saunaStatus = getSaunaStatus(name);
@@ -5320,16 +5237,14 @@ function renderSauna(name, region = 'left', ctx = {}) {
     }
   }
 
+  const pager = ensureTilePager(list);
   c.__cleanup = () => {
-    cleanups.forEach((fn) => {
-      try { fn(); } catch (err) { /* noop */ }
-    });
+    if (pager && typeof pager.destroy === 'function') pager.destroy();
   };
 
   const recalc = () => {
     applyTileSizing(c, { useIcons: iconsEnabled || hasStripeInSauna });
-    updateScrollDuration();
-    scheduleAdvanceWhenReady();
+    if (pager) pager.scheduleUpdate({ container: c, body, region, saunaName: name });
   };
   setTimeout(recalc, 0);
   setResizeHandler(region, recalc);
@@ -5701,7 +5616,7 @@ function renderSlideNode(item, ctx){
     case 'overview':
       return renderOverview(region);
     case 'sauna':
-      return renderSauna(item.sauna, region, ctx);
+      return renderSauna(item.sauna, region);
     case 'image':
       return renderImage(item.src, region, ctx);
     case 'video':
