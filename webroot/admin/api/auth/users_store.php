@@ -61,7 +61,14 @@ const SIGNAGE_AUTH_PERMISSION_ALIASES = [
     'content' => 'module-content',
 ];
 const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
-    'saunameister' => ['cockpit', 'module-content', 'content-footnotes', 'content-badges'],
+    'saunameister' => [
+        'cockpit',
+        'module-content',
+        'content-saunas',
+        'content-footnotes',
+        'content-badges',
+        'module-slideshow',
+    ],
     'editor' => [
         'cockpit',
         'module-content',
@@ -110,12 +117,13 @@ const SIGNAGE_AUTH_ROLE_DEFAULT_PERMISSIONS = [
         'user-admin',
     ],
 ];
-const SIGNAGE_AUTH_PERMISSIONS_VERSION = 3;
+const SIGNAGE_AUTH_PERMISSIONS_VERSION = 4;
 const SIGNAGE_AUTH_PERMISSION_UPGRADES = [
     'module-slideshow' => ['slideshow-display', 'slideshow-audio'],
     'slideshow-automation' => ['module-slideshow'],
     'slideshow-display' => ['module-slideshow'],
     'slideshow-audio' => ['module-slideshow'],
+    'module-content' => ['content-saunas', 'module-slideshow'],
     'content-saunas' => ['module-content'],
     'content-footnotes' => ['module-content'],
     'content-badges' => ['module-content'],
