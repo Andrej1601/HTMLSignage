@@ -927,7 +927,7 @@ body.overview-hide-flames .overview .chip-flames{display:none;}
   justify-content:flex-end;
   gap:calc(0.35em + 2px*var(--vwScale));
   min-width:calc(var(--tileTimeWidthCh, 9) * 1ch);
-  font-size:calc(.65em*var(--tileTimeScale, var(--tileMetaScale,1)));
+  font-size:calc(22px*var(--scale)*var(--tileTimeScale, var(--tileMetaScale,1)));
   font-weight:var(--tileTimeWeight, var(--tileWeight));
   letter-spacing:.12em;
   text-transform:uppercase;
