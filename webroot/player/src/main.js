@@ -5322,7 +5322,9 @@ function renderSauna(name, region = 'left', ctx = {}) {
   }
 
   function refreshAutoScroll() {
-    const height = list?.clientHeight || 0;
+    const listHeight = list?.clientHeight || 0;
+    const availableHeight = body?.clientHeight || list?.parentElement?.clientHeight || 0;
+    const height = Math.min(listHeight || availableHeight, availableHeight || listHeight);
     if (!height) {
       destroyAutoScroll();
       waitForScroll = false;
@@ -5343,6 +5345,7 @@ function renderSauna(name, region = 'left', ctx = {}) {
     waitForScroll = true;
     cycleReached = false;
     applyDurationFromScroll(maxScroll);
+    list.classList.add('is-scrollable');
     autoScrollStop = enableAutoScroll(list, {
       axis: 'y',
       speed: saunaScrollSpeed,

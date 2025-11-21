@@ -379,7 +379,14 @@ export const PERMISSION_META = permissionMetaCache;
 export const getPermissionTree = () => clonePermissionTree(permissionTreeCache);
 
 export const ROLE_DEFAULT_PERMISSIONS = {
-  saunameister: ['cockpit', 'module-content', 'content-footnotes', 'content-badges'],
+  saunameister: [
+    'cockpit',
+    'module-content',
+    'content-saunas',
+    'content-footnotes',
+    'content-badges',
+    'module-slideshow'
+  ],
   editor: [
     'cockpit',
     'module-content',
