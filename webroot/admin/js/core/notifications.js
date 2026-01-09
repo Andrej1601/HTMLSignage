@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 const DEFAULT_TIMEOUT = 6000;
+const MAX_ACTIVE_NOTIFICATIONS = 3;
 const ROLE_BY_TYPE = {
   success: 'status',
   info: 'status',
@@ -12,6 +13,8 @@ const ROLE_BY_TYPE = {
 };
 
 let hostElement = null;
+let activeNotifications = [];
+let pendingNotifications = [];
 
 function ensureHost(doc = document) {
   if (hostElement && hostElement.ownerDocument === doc) {
@@ -50,8 +53,30 @@ function dismissNotification(element) {
   setTimeout(remove, 400);
 }
 
-export function notify(options, extraOptions) {
-  const normalized = normalizeOptions(options, extraOptions);
+function enqueueNotification(request) {
+  pendingNotifications.push(request);
+}
+
+function dequeueNotification() {
+  if (pendingNotifications.length === 0) return;
+  const next = pendingNotifications.shift();
+  if (next) {
+    next();
+  }
+}
+
+function registerNotificationHandle(handle) {
+  activeNotifications.push(handle);
+}
+
+function unregisterNotificationHandle(handle) {
+  activeNotifications = activeNotifications.filter((item) => item !== handle);
+  if (activeNotifications.length < MAX_ACTIVE_NOTIFICATIONS) {
+    dequeueNotification();
+  }
+}
+
+function createNotification(normalized) {
   const { document: customDocument, type = 'info' } = normalized;
   const doc = customDocument || document;
   const host = ensureHost(doc);
@@ -124,13 +149,47 @@ export function notify(options, extraOptions) {
     timer = setTimeout(() => dismissNotification(el), Math.max(1500, timeout));
   }
 
-  return {
+  const handle = {
     element: el,
     dismiss: () => {
       if (timer) clearTimeout(timer);
       dismissNotification(el);
     }
   };
+
+  const cleanup = () => unregisterNotificationHandle(handle);
+  el.addEventListener('transitionend', cleanup);
+  return handle;
+}
+
+export function notify(options, extraOptions) {
+  const normalized = normalizeOptions(options, extraOptions);
+  if (normalized.type === 'error' && normalized.persistent === undefined && normalized.timeout === undefined) {
+    normalized.persistent = true;
+  }
+
+  if (activeNotifications.length >= MAX_ACTIVE_NOTIFICATIONS) {
+    let queuedHandle = null;
+    const run = () => {
+      queuedHandle = createNotification(normalized);
+      registerNotificationHandle(queuedHandle);
+    };
+    enqueueNotification(run);
+    return {
+      element: null,
+      dismiss: () => {
+        if (!queuedHandle) {
+          pendingNotifications = pendingNotifications.filter((item) => item !== run);
+          return;
+        }
+        queuedHandle.dismiss();
+      }
+    };
+  }
+
+  const handle = createNotification(normalized);
+  registerNotificationHandle(handle);
+  return handle;
 }
 
 export function notifySuccess(message, options) {

@@ -134,7 +134,7 @@ async function fetchSettingsVersion() {
   }
   let payload;
   try {
-    payload = await response.clone().json();
+    payload = await response.json();
   } catch (error) {
     throw new Error('settings-invalid-json');
   }
@@ -149,24 +149,15 @@ async function fetchSettingsVersion() {
 }
 
 async function fetchScheduleSignature() {
-  try {
-    const headResponse = await fetch(SCHEDULE_URL, { method: 'HEAD', cache: 'no-store' });
-    if (headResponse && headResponse.ok) {
-      const headerSignature = extractScheduleSignatureFromHeaders(headResponse.headers);
-      if (headerSignature) {
-        return headerSignature;
-      }
-    }
-  } catch (error) {
-    console.error('[sw] Failed to fetch schedule signature (HEAD)', error);
-  }
-
   const response = await fetch(SCHEDULE_URL, { cache: 'no-store' });
   if (!response || !response.ok) {
     throw new Error(`schedule-response-${response ? response.status : 'missing'}`);
   }
-  const signature = await readScheduleSignatureFromResponse(response.clone())
-    || extractScheduleSignatureFromHeaders(response.headers);
+  const headerSignature = extractScheduleSignatureFromHeaders(response.headers);
+  if (headerSignature) {
+    return headerSignature;
+  }
+  const signature = await readScheduleSignatureFromResponse(response);
   if (signature) {
     return signature;
   }
