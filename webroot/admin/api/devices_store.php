@@ -118,7 +118,20 @@ final class DevicesStateCache
             return null;
         }
 
-        $contents = @file_get_contents($this->path);
+        $handle = @fopen($this->path, 'rb');
+        if ($handle === false) {
+            return null;
+        }
+
+        $locked = flock($handle, LOCK_SH);
+        if (!$locked) {
+            fclose($handle);
+            return null;
+        }
+
+        $contents = stream_get_contents($handle);
+        flock($handle, LOCK_UN);
+        fclose($handle);
         if ($contents === false || $contents === '') {
             $this->deleteFile();
             return null;

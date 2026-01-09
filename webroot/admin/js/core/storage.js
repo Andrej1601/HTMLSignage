@@ -9,7 +9,19 @@ import { notifyWarning } from './notifications.js';
 
 const safeStorage = createSafeLocalStorage({
   onFallback: () => {
-    notifyWarning('Speicher voll – Daten werden nur temporär gespeichert.');
+    notifyWarning({
+      message: 'Speicher voll – Daten werden nur temporär gespeichert.',
+      description: 'Bitte Speicherplatz freigeben oder Einstellungen exportieren, um Datenverlust zu vermeiden.',
+      persistent: true,
+      actions: [
+        {
+          label: 'Neu laden',
+          onClick: () => {
+            window.location.reload();
+          }
+        }
+      ]
+    });
   },
   logger: (method, error) => console.warn(`[admin] localStorage.${method} failed`, error)
 });

@@ -65,13 +65,11 @@ export function deepEqual(a, b) {
   }
   if (typeof a === 'object') {
     if (Array.isArray(b)) return false;
-    const keysA = Object.keys(a).filter((key) => typeof a[key] !== 'undefined').sort();
-    const keysB = Object.keys(b).filter((key) => typeof b[key] !== 'undefined').sort();
+    const keysA = Object.keys(a).filter((key) => typeof a[key] !== 'undefined');
+    const keysB = Object.keys(b).filter((key) => typeof b[key] !== 'undefined');
     if (keysA.length !== keysB.length) return false;
-    for (let i = 0; i < keysA.length; i++) {
-      if (keysA[i] !== keysB[i]) return false;
-    }
     for (const key of keysA) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
       if (!deepEqual(a[key], b[key])) return false;
     }
     return true;
@@ -105,20 +103,19 @@ export async function fetchJson(url, options = {}) {
 
   let payload = null;
   let rawText = '';
-  const clone = response.clone();
 
   try {
-    payload = await response.json();
-  } catch (cause) {
-    try {
-      rawText = await clone.text();
-    } catch (readError) {
-      rawText = '';
-    }
+    rawText = await response.text();
+  } catch (readError) {
+    rawText = '';
+  }
 
-    if (rawText.trim().length === 0) {
-      payload = null;
-    } else {
+  if (rawText.trim().length === 0) {
+    payload = null;
+  } else {
+    try {
+      payload = JSON.parse(rawText);
+    } catch (cause) {
       throw createApiError(errorMessage || 'Server-Antwort ist kein gültiges JSON.', {
         status: response.status,
         payload: rawText,
