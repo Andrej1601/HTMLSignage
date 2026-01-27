@@ -1,8 +1,9 @@
+import storage from '../core/storage.js';
+
 export function createRoleRestrictionApplier({
   hasPermission,
   getAvailablePermissions,
   setDevicesPinned,
-  lsRemove,
   destroyDevicesPane
 }) {
   return function applyRoleRestrictions() {
@@ -163,7 +164,7 @@ export function createRoleRestrictionApplier({
       }
 
       setDevicesPinned(false);
-      lsRemove('devicesPinned');
+      storage.remove('devicesPinned');
       document.body?.classList.remove('devices-pinned');
       destroyDevicesPane();
 

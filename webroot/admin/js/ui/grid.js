@@ -2,7 +2,7 @@
 // Rendert die Übersichtstabelle (#grid), bedient den Zellen-Dialog und die Row-Buttons.
 // Abhängigkeiten: utils ($,$$,parseTime) + Zugriff auf schedule/settings via init(ctx).
 
-import { $, $$, parseTime } from '../core/utils.js';
+import { $, $$, parseTime, clampNumber } from '../core/utils.js';
 import { sanitizeBadgeLibrary } from '../core/config.js';
 import { notifyWarning } from '../core/notifications.js';
 
@@ -15,10 +15,6 @@ let redoStack = [];
 const TIME_WIDTH_BASE_CH = 10;
 const TIME_WIDTH_SCALE_MIN = 0.5;
 const TIME_WIDTH_SCALE_MAX = 3;
-
-function clampNumber(value, min, max){
-  return Math.min(Math.max(value, min), max);
-}
 
 function getRowSortOffset(row){
   if (!row || typeof row !== 'object') return 0;
