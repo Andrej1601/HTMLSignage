@@ -10,7 +10,7 @@
 'use strict';
 
 // === Modular imports =========================================================
-import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml } from './core/utils.js';
+import { $, $$, preloadImg, genId, deepClone, mergeDeep, fetchJson, escapeHtml, clampNumber } from './core/utils.js';
 import { DEFAULTS } from './core/defaults.js';
 import { ensureBadgeLibrary } from './core/badge_library.js';
 import { initGridUI, renderGrid as renderGridUI } from './ui/grid.js';
@@ -21,7 +21,6 @@ import { createUnsavedTracker } from './core/unsaved_state.js';
 import storage from './core/storage.js';
 import { createAppState } from './core/app_state.js';
 import { createDeviceContextManager } from './core/device_context.js';
-import { registerStateAccess } from './app/state_store.js';
 import { createRoleRestrictionApplier } from './app/access_control.js';
 import { initSidebarResize as initSidebarResizeModule } from './app/sidebar_resize.js';
 import { createSlidesPanel } from './app/panels/slides_panel.js';
@@ -83,11 +82,6 @@ const ensureAuthServiceModule = () => {
 
 const SLIDESHOW_ORIGIN = window.SLIDESHOW_ORIGIN || location.origin;
 const THUMB_FALLBACK = '/assets/img/thumb_fallback.svg';
-
-const lsGet = (key) => storage.get(key);
-const lsSet = (key, value) => storage.set(key, value);
-const lsRemove = (key) => storage.remove(key);
-
 
 let availablePermissions = mergeAvailablePermissions();
 const defaultAdminPermissions = resolvePermissionsForRoles(['admin']);
@@ -160,12 +154,12 @@ let baseSchedule = null;            // globaler Schedule (Quelle)
 let baseSettings = null;            // globale Settings (Quelle)
 let deviceBaseSchedule = null;      // Basis für Geräte-Kontext
 let deviceBaseSettings = null;
-let storedView = lsGet('adminView');
+let storedView = storage.get('adminView');
 if (storedView === 'devices') storedView = 'grid';
 if (storedView !== 'grid' && storedView !== 'preview') storedView = 'grid';
 const appState = createAppState({
   initialView: storedView,
-  devicesPinned: lsGet('devicesPinned') === '1'
+  devicesPinned: storage.get('devicesPinned') === '1'
 });
 document.body?.classList.toggle('devices-pinned', appState.isDevicesPinned());
 
@@ -188,8 +182,6 @@ const markStyleSetHydration = (ready) => {
 const OVERVIEW_TIME_BASE_CH = 10;
 const OVERVIEW_TIME_SCALE_MIN = 0.5;
 const OVERVIEW_TIME_SCALE_MAX = 3;
-
-const clampNumber = (value, min, max) => Math.min(Math.max(value, min), max);
 
 const resolveOverviewTimeWidthScale = (fonts = {}, { fallback = 1 } = {}) => {
   const rawScale = Number(fonts?.overviewTimeWidthScale);
@@ -328,42 +320,6 @@ const deviceContextState = {
   getDevicesPane: () => appState.getDevicesPane()
 };
 
-registerStateAccess({
-  getSchedule: () => schedule,
-  setSchedule: (next) => {
-    schedule = next;
-  },
-  getSettings: () => settings,
-  setSettings: (next) => {
-    settings = next;
-  },
-  setBaseState: (scheduleValue, settingsValue) => {
-    baseSchedule = scheduleValue;
-    baseSettings = settingsValue;
-  },
-  getBaseState: () => ({ schedule: baseSchedule, settings: baseSettings }),
-  setDeviceBaseState: (scheduleValue, settingsValue) => {
-    deviceBaseSchedule = scheduleValue;
-    deviceBaseSettings = settingsValue;
-  },
-  getDeviceBaseState: () => ({ schedule: deviceBaseSchedule, settings: deviceBaseSettings }),
-  clearDeviceBaseState: () => {
-    deviceBaseSchedule = null;
-    deviceBaseSettings = null;
-  },
-  setDeviceContext: (ctx) => deviceContextState.setDeviceContext(ctx),
-  getDeviceContext: () => deviceContextState.getDeviceContext(),
-  clearDeviceContext: () => deviceContextState.clearDeviceContext(),
-  setCurrentView: (view) => deviceContextState.setCurrentView(view),
-  getCurrentView: () => deviceContextState.getCurrentView(),
-  setDevicesPinned: (flag) => deviceContextState.setDevicesPinned(flag),
-  isDevicesPinned: () => deviceContextState.isDevicesPinned(),
-  setDockPane: (pane) => deviceContextState.setDockPane(pane),
-  getDockPane: () => deviceContextState.getDockPane(),
-  setDevicesPane: (pane) => deviceContextState.setDevicesPane(pane),
-  getDevicesPane: () => deviceContextState.getDevicesPane()
-});
-
 function createGridContext() {
   return {
     getSchedule: stateAccess.getSchedule,
@@ -434,8 +390,8 @@ function safeInvoke(label, fn) {
 }
 
 function clearDraftsIfPresent() {
-  lsRemove('scheduleDraft');
-  lsRemove('settingsDraft');
+  storage.remove('scheduleDraft');
+  storage.remove('settingsDraft');
 }
 
 function stripBadgeDraftArtifacts(source) {
@@ -558,7 +514,7 @@ if (unsavedBadgeResetBtn){
   });
 }
 
-const initSidebarResize = () => initSidebarResizeModule({ lsGet, lsSet });
+const initSidebarResize = () => initSidebarResizeModule();
 
 // ============================================================================
 // 0) Zugriff & Rollensteuerung
@@ -614,7 +570,6 @@ const applyRoleRestrictions = createRoleRestrictionApplier({
   hasPermission,
   getAvailablePermissions: () => availablePermissions,
   setDevicesPinned,
-  lsRemove,
   destroyDevicesPane
 });
 
@@ -664,19 +619,19 @@ async function loadAll(){
     deviceContextState.clearDeviceBaseState();
     updateBaseline(baseSchedule, baseSettings);
 
-    const scheduleDraftRaw = lsGet('scheduleDraft');
+    const scheduleDraftRaw = storage.get('scheduleDraft');
     if (scheduleDraftRaw) {
       try {
         stateAccess.setSchedule(JSON.parse(scheduleDraftRaw));
         unsavedFromDraft = true;
       } catch (error) {
         console.warn('[admin] Lokaler Schedule-Entwurf konnte nicht wiederhergestellt werden', error);
-        lsRemove('scheduleDraft');
+        storage.remove('scheduleDraft');
         notifyWarning('Lokaler Entwurf des Aufgussplans war beschädigt und wurde entfernt.');
       }
     }
 
-    const settingsDraftRaw = lsGet('settingsDraft');
+    const settingsDraftRaw = storage.get('settingsDraft');
     if (settingsDraftRaw) {
       try {
         const parsed = JSON.parse(settingsDraftRaw);
@@ -685,7 +640,7 @@ async function loadAll(){
         unsavedFromDraft = true;
       } catch (error) {
         console.warn('[admin] Lokaler Einstellungen-Entwurf konnte nicht wiederhergestellt werden', error);
-        lsRemove('settingsDraft');
+        storage.remove('settingsDraft');
         notifyWarning('Lokaler Entwurf der Einstellungen war beschädigt und wurde entfernt.');
       }
     }
@@ -1060,6 +1015,10 @@ function collectSettings(){
 
 // Buttons: Open / Preview / Save
 $('#btnOpen')?.addEventListener('click', ()=> window.open(SLIDESHOW_ORIGIN + '/', '_blank'));
+
+$('#btnLogout')?.addEventListener('click', () => {
+  window.location.href = '/admin/api/auth/logout_handler.php';
+});
 
 $('#btnSave')?.addEventListener('click', async ()=>{
   const body = collectSettings();
@@ -1505,7 +1464,7 @@ function destroyDevicesPane(){
 
 async function applyDevicesPaneState(){
   const pinned = isDevicesPinned();
-  lsSet('devicesPinned', pinned ? '1' : '0');
+  storage.set('devicesPinned', pinned ? '1' : '0');
   document.body.classList.toggle('devices-pinned', pinned);
   let pane = getDevicesPane();
   if (pinned){
@@ -1530,7 +1489,7 @@ async function showView(v){
   if (v !== 'grid' && v !== 'preview') v = 'grid';
 
   setCurrentView(v);
-  lsSet('adminView', v);
+  storage.set('adminView', v);
 
   const labelEl = document.getElementById('viewMenuLabel');
   if (labelEl) labelEl.textContent = viewLabel(v);
@@ -1632,11 +1591,11 @@ function initThemeToggle(){
   const apply = (mode) => {
     document.body.classList.toggle('theme-light', mode === 'light');
     document.body.classList.toggle('theme-dark',  mode === 'dark');
-    lsSet('adminTheme', mode);
+    storage.set('adminTheme', mode);
   };
 
   // ⬇️ Standard jetzt "light"
-  const saved = lsGet('adminTheme') || 'light';
+  const saved = storage.get('adminTheme') || 'light';
   cb.checked = (saved === 'light');
   apply(saved);
 

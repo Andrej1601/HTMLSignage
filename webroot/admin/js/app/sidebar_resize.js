@@ -1,4 +1,6 @@
-export function initSidebarResize({ lsGet, lsSet }) {
+import storage from '../core/storage.js';
+
+export function initSidebarResize() {
   const resizer = document.getElementById('layoutResizer');
   const rightbar = document.querySelector('.rightbar');
   if (!resizer || !rightbar) return;
@@ -24,7 +26,7 @@ export function initSidebarResize({ lsGet, lsSet }) {
   refreshBounds();
 
   const readStoredWidth = () => {
-    const stored = Number.parseFloat(lsGet('sidebarWidthPx'));
+    const stored = Number.parseFloat(storage.get('sidebarWidthPx'));
     return Number.isFinite(stored) ? clampWidth(stored) : null;
   };
 
@@ -39,7 +41,7 @@ export function initSidebarResize({ lsGet, lsSet }) {
     const clamped = clampWidth(width);
     root.style.setProperty('--sidebar-size', `${clamped}px`);
     updateAria(clamped);
-    if (store) lsSet('sidebarWidthPx', String(Math.round(clamped)));
+    if (store) storage.set('sidebarWidthPx', String(Math.round(clamped)));
   };
 
   const resetWidth = () => {
