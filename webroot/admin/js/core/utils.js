@@ -78,6 +78,9 @@ export function deepEqual(a, b) {
   return false;
 }
 
+// Wert zwischen min und max begrenzen
+export const clampNumber = (value, min, max) => Math.max(min, Math.min(max, value));
+
 function createApiError(message, { status, payload, cause } = {}) {
   const error = new Error(message || 'Unbekannter Fehler');
   if (status) error.status = status;

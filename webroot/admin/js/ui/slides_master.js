@@ -12,7 +12,7 @@
 
 'use strict';
 
-import { $, $$, preloadImg, escapeHtml } from '../core/utils.js';
+import { $, $$, preloadImg, escapeHtml, clampNumber as clampNumberUtil, deepClone } from '../core/utils.js';
 import { uploadGeneric } from '../core/upload.js';
 import { renderGrid as renderGridUI } from './grid.js';
 import { DAYS, DAY_LABELS, WEEKDAY_KEYS, dayKeyToday } from '../core/defaults.js';
@@ -134,23 +134,16 @@ const SUGGESTED_BADGE_EMOJIS = [
   { value:'🎀', label:'Sanft & Elegant' }
 ];
 
-const cloneValue = (value) => {
-  if (value == null) return value;
-  if (typeof value === 'object') return JSON.parse(JSON.stringify(value));
-  return value;
-};
-
+// Wrapper für clampNumber mit anderer Parameter-Reihenfolge (legacy)
 const clampNumber = (min, value, max) => {
   if (!Number.isFinite(value)) return null;
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
+  return clampNumberUtil(value, min, max);
 };
 
 function cloneSubset(src = {}, keys = []){
   const out = {};
   keys.forEach(key => {
-    if (Object.prototype.hasOwnProperty.call(src, key)) out[key] = cloneValue(src[key]);
+    if (Object.prototype.hasOwnProperty.call(src, key)) out[key] = deepClone(src[key]);
   });
   return out;
 }

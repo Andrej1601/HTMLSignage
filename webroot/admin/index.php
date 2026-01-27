@@ -1,8 +1,18 @@
- <!doctype html> <html lang="de"> <head>
+<?php
+// Session-based authentication check
+require_once __DIR__ . '/api/auth/session_manager.php';
+session_require_auth();
+
+// Get current user info
+$currentUser = session_get_user();
+$csrfToken = session_csrf_token();
+?>
+<!doctype html> <html lang="de"> <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Aufguss – Admin</title>
 <link rel="stylesheet" href="/admin/css/admin.css">
+<link rel="stylesheet" href="/admin/css/admin-modern-theme.css">
 
 </head>
 <body class="theme-light">
@@ -55,6 +65,7 @@
     </div>
       <button class="btn" id="btnOpen">Slideshow öffnen</button>
       <button class="btn primary" id="btnSave">Speichern</button>
+      <button class="btn ghost" id="btnLogout" title="Abmelden">Abmelden</button>
       <span id="unsavedBadge" class="unsaved-badge" hidden role="status" aria-live="polite">
         <span class="unsaved-badge-icon" aria-hidden="true"></span>
         <span class="unsaved-badge-content">
