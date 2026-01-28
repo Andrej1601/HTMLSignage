@@ -1,0 +1,191 @@
+import { useState, useEffect } from 'react';
+import { Layout } from '@/components/Layout';
+import { useSettings } from '@/hooks/useSettings';
+import { ThemeEditor } from '@/components/Settings/ThemeEditor';
+import { FontEditor } from '@/components/Settings/FontEditor';
+import { AudioSettings } from '@/components/Settings/AudioSettings';
+import { getDefaultSettings } from '@/types/settings.types';
+import type { Settings, ThemeColors, FontSettings, AudioSettings as AudioSettingsType } from '@/types/settings.types';
+import { Save, RotateCcw, Palette, Type, Music } from 'lucide-react';
+
+type TabId = 'theme' | 'fonts' | 'audio';
+
+export function SettingsPage() {
+  const { settings, isLoading, save, isSaving, refetch } = useSettings();
+  const [activeTab, setActiveTab] = useState<TabId>('theme');
+  const [localSettings, setLocalSettings] = useState<Settings | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setLocalSettings(settings);
+      setIsDirty(false);
+    }
+  }, [settings]);
+
+  const handleThemeChange = (theme: ThemeColors) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, theme });
+    setIsDirty(true);
+  };
+
+  const handleFontsChange = (fonts: FontSettings) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, fonts });
+    setIsDirty(true);
+  };
+
+  const handleAudioChange = (audio: AudioSettingsType) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, audio });
+    setIsDirty(true);
+  };
+
+  const handleSave = () => {
+    if (!localSettings) return;
+
+    const settingsToSave = {
+      ...localSettings,
+      version: (localSettings.version || 1) + 1,
+    };
+
+    save(settingsToSave);
+    setIsDirty(false);
+  };
+
+  const handleReload = () => {
+    refetch();
+    setIsDirty(false);
+  };
+
+  const handleReset = () => {
+    const defaults = getDefaultSettings();
+    setLocalSettings(defaults);
+    setIsDirty(true);
+  };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-spa-text-secondary">Lade Einstellungen...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!localSettings) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-spa-text-secondary">Keine Einstellungen verfügbar</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const tabs = [
+    { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
+    { id: 'fonts' as TabId, label: 'Schriften', icon: Type },
+    { id: 'audio' as TabId, label: 'Audio', icon: Music },
+  ];
+
+  return (
+    <Layout>
+      <div>
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Einstellungen</h2>
+              <p className="text-spa-text-secondary">Design, Schriften und Audio konfigurieren</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {isDirty && (
+                <span className="text-sm text-spa-accent font-medium">
+                  Nicht gespeicherte Änderungen
+                </span>
+              )}
+              <button
+                onClick={handleReload}
+                disabled={isSaving}
+                className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Neu laden
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={isSaving}
+                className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50"
+              >
+                Zurücksetzen
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!isDirty || isSaving}
+                className="px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="flex border-b border-spa-bg-secondary">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 ${
+                    activeTab === tab.id
+                      ? 'text-spa-primary border-b-2 border-spa-primary'
+                      : 'text-spa-text-secondary hover:text-spa-text-primary'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {activeTab === 'theme' && localSettings.theme && (
+            <ThemeEditor
+              theme={localSettings.theme}
+              onChange={handleThemeChange}
+            />
+          )}
+
+          {activeTab === 'fonts' && localSettings.fonts && (
+            <FontEditor
+              fonts={localSettings.fonts}
+              onChange={handleFontsChange}
+            />
+          )}
+
+          {activeTab === 'audio' && localSettings.audio && (
+            <AudioSettings
+              audio={localSettings.audio}
+              onChange={handleAudioChange}
+            />
+          )}
+        </div>
+
+        {/* Version Info */}
+        <div className="mt-6 text-center text-sm text-spa-text-secondary">
+          Version: {localSettings.version}
+        </div>
+      </div>
+    </Layout>
+  );
+}

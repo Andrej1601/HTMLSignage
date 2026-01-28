@@ -1,155 +1,382 @@
-# HTMLSignage
+# HTMLSignage v2.0 - Modern Digital Signage System
 
-This repository contains a small HTML signage stack.  
-The original monolithic install script has been refactored into a modular
-structure:
+Complete rewrite with modern TypeScript stack for Westfalenbad Hagen Sauna facility.
 
-- `scripts/install.sh` – automated installation and configuration.
-- `config/nginx/` – nginx configuration templates with placeholders.
-- `webroot/` – static application files and full admin interface.
+## 🎯 Features
 
-The installer applies secure defaults (basic auth for the admin interface,
-strict file permissions and PHP hardening) and ensures reproducible setup.
+### ✅ Admin Interface
+- **Dashboard** - System overview with statistics and quick actions
+- **Schedule Editor** - Visual weekly sauna infusion plan editor
+- **Device Management** - Register, monitor, and control displays
+- **Media Library** - Upload and manage images, audio, and video files
+- **Settings Editor** - Configure themes, fonts, and audio
+- **Real-time Updates** - WebSocket-based live synchronization
 
-## Requirements
+### ✅ Display Client
+- **Slideshow System** - Automatic rotation between overview and clock
+- **Overview Slide** - Full weekly schedule display
+- **Clock Slide** - Large digital clock with date
+- **Auto-Update** - Receives schedule/settings changes instantly
+- **Heartbeat System** - Reports online status to admin
 
-PHP extensions `curl` and `gd` must be enabled. On Debian/Ubuntu systems:
+### ✅ System Features
+- **Monorepo Architecture** - Backend and frontend in one workspace
+- **Type Safety** - Full TypeScript coverage
+- **Modern UI** - Tailwind CSS with Wellness/Spa theme
+- **Responsive Design** - Works on all screen sizes
+- **LAN Access** - Optimized for local network deployment
 
-```bash
-sudo apt-get install php-curl php-gd
+## 🏗️ Tech Stack
+
+### Backend
+- **Runtime**: Node.js 20+ with TypeScript
+- **Framework**: Express.js
+- **Database**: PostgreSQL 16+ with Prisma ORM
+- **Validation**: Zod
+- **Real-time**: Socket.IO
+- **File Upload**: Multer
+- **Security**: Helmet, bcrypt, JWT, CORS
+
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite 6
+- **Styling**: Tailwind CSS (Custom Wellness/Spa theme)
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router v7
+- **Icons**: Lucide React
+- **Real-time**: Socket.IO Client
+- **HTTP Client**: Axios
+
+### Database
+- **PostgreSQL** with 8 models:
+  - User (authentication)
+  - Session (JWT sessions)
+  - Device (display management)
+  - DeviceOverride (device-specific configs)
+  - Schedule (weekly sauna plan)
+  - Settings (theme & design)
+  - Media (file library)
+  - AuditLog (activity tracking)
+
+## 📂 Project Structure
+
+```
+HTMLSignage/
+├── packages/
+│   ├── backend/                    # Express + Prisma API
+│   │   ├── src/
+│   │   │   ├── routes/            # API endpoints
+│   │   │   │   ├── schedule.ts    # Schedule CRUD
+│   │   │   │   ├── settings.ts    # Settings CRUD
+│   │   │   │   ├── devices.ts     # Device management
+│   │   │   │   ├── media.ts       # File upload/management
+│   │   │   │   └── auth.ts        # Authentication
+│   │   │   ├── websocket/         # Socket.IO handlers
+│   │   │   ├── lib/               # Utilities (Prisma, upload)
+│   │   │   └── server.ts          # Express app
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma      # Database schema
+│   │   │   └── migrations/        # DB migrations
+│   │   ├── uploads/               # Uploaded files
+│   │   └── package.json
+│   └── frontend/                   # React SPA
+│       ├── src/
+│       │   ├── components/
+│       │   │   ├── Dashboard/     # Dashboard cards
+│       │   │   ├── Schedule/      # Schedule editor
+│       │   │   ├── Settings/      # Theme/Font/Audio editors
+│       │   │   ├── Devices/       # Device management
+│       │   │   ├── Media/         # Media library
+│       │   │   └── Display/       # Display client slides
+│       │   ├── pages/
+│       │   │   ├── DashboardPage.tsx
+│       │   │   ├── SchedulePage.tsx
+│       │   │   ├── SettingsPage.tsx
+│       │   │   ├── DevicesPage.tsx
+│       │   │   ├── MediaPage.tsx
+│       │   │   └── DisplayClientPage.tsx
+│       │   ├── hooks/             # Custom React hooks
+│       │   ├── services/          # API client
+│       │   ├── types/             # TypeScript types
+│       │   └── App.tsx
+│       └── package.json
+├── webroot/                        # Legacy PHP (deprecated)
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
-## Usage
+## 🚀 Quick Start
 
-Run the installer as root:
+### Prerequisites
+- Node.js 20+
+- PostgreSQL 16+
+- pnpm (or npx)
 
+### 1. Install Dependencies
 ```bash
-sudo scripts/install.sh
+npx pnpm install
 ```
 
-The installer is idempotent and inspects the host before calling `apt-get`.
-Only missing packages are installed and the log reports which packages were
-skipped because they are already present. To customise the behaviour, the
-following optional flags are available:
-
-- `--skip-package-group <name>` (or `--skip-package-group=name`): omit one or
-  more package groups during installation. Supported group names are listed in
-  the table below and the flag can be provided multiple times.
-- `--force-package-reinstall`: reinstall every package in the selected groups
-  even if it is already available.
-- `--install-missing-only`: explicitly request the default behaviour of only
-  installing missing packages (useful for scripts that want to state the mode
-  explicitly).
-
-| Group     | Packages                                                                      |
-|-----------|-------------------------------------------------------------------------------|
-| `web`     | `nginx`                                                                        |
-| `php`     | `php8.3-fpm`, `php8.3-cli`, `php8.3-sqlite3`, `php8.3-xml`, `php8.3-mbstring`, |
-|           | `php8.3-curl`, `php8.3-gd`                                                     |
-| `database`| `sqlite3`                                                                      |
-| `tools`   | `jq`, `unzip`, `curl`, `git`, `rsync`, `openssl`                               |
-| `node`    | `nodejs`, `npm`                                                                |
-
-When executed interactively the installer prompts for the network ports and
-admin username, then generates a random administrator password using
-`openssl rand`. The password is printed once during the run, so copy it to a
-safe place before closing the terminal. Non-interactive usage (for example in
-CI) must provide `SIGNAGE_ADMIN_PASS` explicitly, otherwise the script aborts.
-See `docs/deployment.md` for additional deployment tips and examples.
-Environment variables such as `SIGNAGE_PUBLIC_PORT`, `SIGNAGE_ADMIN_PORT` and
-`SIGNAGE_ADMIN_USER` can still be set to override the defaults, and
-`SIGNAGE_ADMIN_PASS` may be provided to supply a custom password in either
-mode.
-
-### Preflight checks
-
-Before deploying on a fresh host you can run the non-destructive preflight
-script. It verifies that Docker is installed, checks port availability and
-ensures sufficient disk space and write permissions:
-
+### 2. Setup Database
 ```bash
-scripts/preflight.sh
+# Create database and user
+sudo -u postgres psql <<EOF
+CREATE DATABASE htmlsignage;
+CREATE USER signage WITH PASSWORD 'signage123';
+GRANT ALL PRIVILEGES ON DATABASE htmlsignage TO signage;
+ALTER USER signage CREATEDB;
+EOF
 ```
 
-The installer invokes this script automatically (use `--skip-preflight` to
-skip it when re-running on the same machine).
-
-### Local development with Docker
-
-A lightweight Docker Compose stack is available for local development. It
-provisions PHP-FPM and nginx containers and mounts the repository into the
-containers for hot reloading:
-
+### 3. Configure Backend
 ```bash
-docker compose up --build
+cd packages/backend
+cp .env.example .env
+# Edit .env with your database credentials
 ```
 
-The admin UI is then reachable at <http://localhost:8080/admin/> while the
-public signage runs on <http://localhost:8080/>.
-
-### Tests and linting
-
-Install both the JavaScript and PHP tooling once before running the suites:
-
+### 4. Run Migrations
 ```bash
-npm install
-composer install
+cd packages/backend
+npx prisma migrate dev
+npx prisma generate
 ```
 
-Frontend checks use Vitest and ESLint, while backend API tests are covered by
-PHPUnit. You can execute them individually or run the combined workflow:
-
+### 5. Start Development Servers
 ```bash
-npm run test:frontend   # Vitest
-npm run test:backend    # PHPUnit wrapper
-npm run lint            # ESLint
+# From project root
+pnpm dev
 
-# Run both layers in one go
-npm test
+# Backend will run on: http://localhost:3000
+# Frontend will run on: http://localhost:5173
 ```
 
-### User and role management
+### 6. Access the Application
+- **Admin Interface**: http://192.168.178.93:5173
+- **Display Client**: http://192.168.178.93:5173/display
+- **API Health**: http://192.168.178.93:3000/health
 
-The admin interface now exposes a “Benutzer” button in the header that opens a
-modal to create, edit and remove accounts as well as assign roles. New passwords
-can be set or rotated directly from the UI, and attempts to delete the final
-admin account are blocked to prevent lock-outs. All changes are persisted in the
-SQLite database at `data/signage.db` and logged in `data/audit.log` together with
-the acting user for auditing.
+## 📱 Pages & Routes
 
-The PHP helper is still available for automation or bootstrapping:
+### Admin Interface
+- `/` - Dashboard (overview, stats, quick actions)
+- `/schedule` - Schedule Editor (weekly plan)
+- `/devices` - Device Management (pairing, monitoring)
+- `/media` - Media Library (upload, manage files)
+- `/settings` - Settings Editor (theme, fonts, audio)
+- `/login` - Login Page (authentication)
 
-```bash
-php scripts/users.php add alice editor
-php scripts/users.php list
-php scripts/users.php delete bob
+### Display Client
+- `/display?deviceId=xxx` - Display Client (slideshow mode)
+
+## 🎨 Features Detail
+
+### Dashboard
+- Real-time statistics (devices, media, schedule)
+- System health indicators
+- Quick action cards
+- Recent activity timeline
+
+### Schedule Editor
+- Visual grid editor
+- Group by days
+- Add/edit/delete cells
+- Time, title, subtitle, badges
+- Sauna selection
+- Auto-save with versioning
+
+### Device Management
+- Device pairing with unique ID
+- Online/offline status tracking
+- Heartbeat monitoring (2-minute interval)
+- Remote commands (reload, restart, clear-cache)
+- Device overrides (custom schedule/settings per device)
+- Auto/Override mode
+
+### Media Library
+- Drag & drop file upload
+- Supported formats:
+  - Images: JPG, PNG, GIF, WebP, SVG
+  - Audio: MP3, WAV, OGG
+  - Video: MP4, WebM
+- Max file size: 50MB
+- Search and filter
+- Copy URL, download, delete
+- Visual preview for images
+
+### Settings Editor
+- **Theme Colors**: 4 preset palettes + advanced editor (20+ colors)
+- **Fonts**: 11 scale sliders + weight control
+- **Audio**: Enable/disable, file upload, volume, loop
+- Live preview
+- Version control
+
+### Display Client
+- Fullscreen slideshow mode
+- Auto-rotation between slides
+- Real-time updates via WebSocket
+- Heartbeat to admin interface
+- Remote control support
+- Two slide types:
+  - **Overview**: Full weekly schedule
+  - **Clock**: Large digital clock with date
+
+## 🔌 API Endpoints
+
+### Schedule
+- `GET /api/schedule` - Get active schedule
+- `POST /api/schedule` - Save new schedule
+- `GET /api/schedule/history` - Get schedule history
+
+### Settings
+- `GET /api/settings` - Get active settings
+- `POST /api/settings` - Save new settings
+
+### Devices
+- `GET /api/devices` - List all devices
+- `GET /api/devices/:id` - Get device details
+- `POST /api/devices` - Create device (pairing)
+- `PATCH /api/devices/:id` - Update device
+- `DELETE /api/devices/:id` - Delete device
+- `POST /api/devices/:id/heartbeat` - Send heartbeat
+- `POST /api/devices/:id/control` - Send control command
+- `POST /api/devices/:id/overrides` - Set device overrides
+- `DELETE /api/devices/:id/overrides` - Clear overrides
+
+### Media
+- `GET /api/media` - List all media (filter by type, search)
+- `GET /api/media/:id` - Get media details
+- `POST /api/media/upload` - Upload file
+- `DELETE /api/media/:id` - Delete media
+
+### Auth
+- `POST /api/auth/login` - Login (JWT)
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/me` - Get current user
+
+### Static Files
+- `GET /uploads/:filename` - Serve uploaded files
+
+## 🔧 Configuration
+
+### Backend (.env)
+```env
+DATABASE_URL="postgresql://signage:signage123@localhost:5432/htmlsignage?schema=public"
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://192.168.178.93:5173
+JWT_SECRET=your-secret-key
 ```
 
-Available roles are `saunameister`, `editor` and `admin`. Saunameister accounts
-may edit the Aufguss grid, adjust the slideshow box, trigger the live preview,
-open the slideshow player, store changes and toggle the light/dark mode. Editors
-retain access to all other administrative tools except user management. Admins
-can manage accounts in addition to all other features, and the initial
-`admin` user is protected from deletion. Once at least one account exists the
-API requires HTTP Basic authentication.
+### Frontend (vite.config.ts)
+- LAN access enabled (`host: '0.0.0.0'`)
+- Proxy to backend
+- HMR for development
 
-### Device telemetry
+## 🌐 Network Configuration
 
-Heartbeats can now include optional telemetry such as firmware, network quality
-or resource usage. Send JSON payloads to `/api/heartbeat.php` or
-`/admin/api/devices_touch.php`:
+The system is configured for LAN access:
+- Backend listens on `0.0.0.0:3000`
+- Frontend listens on `0.0.0.0:5173`
+- CORS allows `192.168.*` IPs in development
 
+## 📦 Build & Deployment
+
+### Production Build
 ```bash
-curl -X POST https://signage.example.com/api/heartbeat.php \
-  -H 'Content-Type: application/json' \
-  -d '{
-        "device": "dev_abc123def456",
-        "status": {"firmware": "2.1.0", "ip": "192.0.2.41"},
-        "metrics": {"cpuLoad": 34, "memoryUsage": 67, "temperature": 48},
-        "network": {"type": "wifi", "ssid": "lobby", "signal": -54}
-      }'
+# Build both packages
+pnpm build
+
+# Backend output: packages/backend/dist/
+# Frontend output: packages/frontend/dist/
 ```
 
-The admin “Geräte” table renders the latest telemetry, highlights missing data
-with a hint and records a short heartbeat history so that outages are visible
-at a glance.
+### Production Start
+```bash
+# Backend
+cd packages/backend
+node dist/server.js
+
+# Frontend (serve with nginx/apache)
+# Serve packages/frontend/dist/ as static files
+```
+
+### Environment Variables (Production)
+```env
+NODE_ENV=production
+DATABASE_URL=postgresql://user:pass@host:5432/db
+FRONTEND_URL=https://your-domain.com
+JWT_SECRET=strong-random-secret
+```
+
+## 🔐 Security Notes
+
+- JWT-based authentication
+- Bcrypt password hashing
+- Helmet security headers
+- CORS configuration
+- Input validation with Zod
+- SQL injection prevention (Prisma)
+- File upload validation
+
+## 🐛 Troubleshooting
+
+### Database Connection Failed
+```bash
+# Check PostgreSQL is running
+sudo systemctl status postgresql
+
+# Test connection
+psql -U signage -d htmlsignage -h localhost
+```
+
+### Port Already in Use
+```bash
+# Kill processes on port 3000 or 5173
+lsof -ti:3000 | xargs kill -9
+lsof -ti:5173 | xargs kill -9
+```
+
+### Git Permissions Issue
+```bash
+sudo chown -R $USER:$USER .git/
+```
+
+### Prisma Migration Failed
+```bash
+# Reset database (WARNING: deletes all data)
+cd packages/backend
+npx prisma migrate reset
+
+# Grant CREATEDB permission
+sudo -u postgres psql -c "ALTER USER signage CREATEDB;"
+```
+
+## 📝 Development Notes
+
+- Use `pnpm` for package management
+- TypeScript strict mode enabled
+- ESLint + Prettier configured
+- Git hooks for code quality
+- Monorepo with pnpm workspaces
+
+## 🎯 Roadmap
+
+- [ ] User authentication implementation
+- [ ] Data migration from SQLite
+- [ ] Backup/restore functionality
+- [ ] Audit log viewer
+- [ ] Multi-language support
+- [ ] Mobile app (React Native)
+- [ ] Advanced analytics
+- [ ] Email notifications
+
+## 📄 License
+
+Proprietary - Westfalenbad Hagen
+
+## 👨‍💻 Development
+
+Built with ❤️ using modern TypeScript stack.
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>

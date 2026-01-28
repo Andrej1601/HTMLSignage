@@ -1,0 +1,157 @@
+// Prisma Schema für HTMLSignage v2.0
+// PostgreSQL Database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String?  @unique
+  password  String   // bcrypt hash
+  roles     String[] @default(["viewer"]) // ["admin", "editor", "viewer"]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions     Session[]
+  devices      Device[]
+  mediaUploads Media[]
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============================================================================
+// Devices (Slideshow Displays)
+// ============================================================================
+
+model Device {
+  id        String    @id @default(cuid())
+  name      String
+  mode      String    @default("auto") // "auto" | "override"
+  pairedBy  String?
+  pairedAt  DateTime?
+  lastSeen  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User?           @relation(fields: [pairedBy], references: [id], onDelete: SetNull)
+  overrides DeviceOverride?
+
+  @@index([pairedBy])
+  @@index([lastSeen])
+  @@map("devices")
+}
+
+model DeviceOverride {
+  id       String @id @default(cuid())
+  deviceId String @unique
+  schedule Json   // Aufgussplan Override
+  settings Json   // Design/Theme Settings Override
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_overrides")
+}
+
+// ============================================================================
+// Schedule (Aufgussplan)
+// ============================================================================
+
+model Schedule {
+  id        String   @id @default(cuid())
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  data      Json     // Aufgussplan: { rows: [...] }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, version(sort: Desc)])
+  @@map("schedules")
+}
+
+// ============================================================================
+// Settings (Design/Theme)
+// ============================================================================
+
+model Settings {
+  id        String   @id @default(cuid())
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  data      Json     // Design Settings: { theme: {...}, fonts: {...}, ... }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, version(sort: Desc)])
+  @@map("settings")
+}
+
+// ============================================================================
+// Media Library
+// ============================================================================
+
+model Media {
+  id           String   @id @default(cuid())
+  type         String   // "image" | "audio" | "video"
+  filename     String   // Stored filename on disk
+  originalName String   // Original filename from upload
+  mimeType     String
+  size         Int      // File size in bytes
+  uploadedBy   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@map("media")
+}
+
+// ============================================================================
+// Audit Log
+// ============================================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // "schedule.update", "device.pair", "settings.update", etc.
+  resource  String?  // Resource ID
+  details   Json?    // Additional metadata
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, timestamp(sort: Desc)])
+  @@index([action, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+  @@map("audit_logs")
+}
