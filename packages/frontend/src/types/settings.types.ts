@@ -1,31 +1,45 @@
 // Settings Types für Design/Theme System
+import type { Sauna } from './sauna.types';
+import type { SlideshowConfig } from './slideshow.types';
 
 export interface ThemeColors {
   // Background & Foreground
   bg: string;
   fg: string;
   accent: string;
-  
+
   // Grid/Table Colors
   gridTable: string;
   cellBg: string;
   boxFg: string;
   timeColBg: string;
-  
+
   // Special Colors
   flame: string;
-  
+
   // Zebra Striping
   zebra1: string;
   zebra2: string;
   timeZebra1: string;
   timeZebra2: string;
-  
+
   // Header Colors
   headRowBg: string;
   headRowFg: string;
   cornerBg: string;
   cornerFg: string;
+
+  // Dashboard Theme Colors (for Wellness Dark & Modern Wellness designs)
+  dashboardBg?: string;
+  cardBg?: string;
+  cardBorder?: string;
+  textMain?: string;
+  textMuted?: string;
+  accentGold?: string;
+  accentGreen?: string; // For Modern Wellness green accent
+  statusLive?: string;
+  statusNext?: string;
+  statusPrestart?: string; // For "coming soon" status
 }
 
 export interface FontSettings {
@@ -68,18 +82,37 @@ export interface AudioSettings {
   loop: boolean;
 }
 
+export interface HeaderSettings {
+  enabled: boolean;
+  showLogo: boolean;
+  logoText?: string;
+  showClock: boolean;
+  showDate: boolean;
+  subtitle?: string;
+  height?: number; // percentage of screen height (default: 8)
+}
+
+export type DesignStyle = 'classic' | 'dashboard' | 'modern-wellness'; // Visual design style (independent of colors)
+export type ColorPaletteName = 'standard-warm' | 'modern-spa' | 'dark' | 'fresh' | 'wellness-dark' | 'wellness-warm' | 'custom';
+
 export interface Settings {
   version: number;
+  designStyle?: DesignStyle; // Which visual design to use (classic or dashboard)
+  colorPalette?: ColorPaletteName; // Which color palette to use
   theme?: ThemeColors;
   fonts?: FontSettings;
   slides?: SlideSettings;
   display?: DisplaySettings;
   audio?: AudioSettings;
+  header?: HeaderSettings;
+  saunas?: Sauna[];
+  slideshow?: SlideshowConfig;
 }
 
 // Predefined Color Palettes (from old system)
-export const COLOR_PALETTES: Array<{ name: string; colors: Partial<ThemeColors> }> = [
+export const COLOR_PALETTES: Array<{ id: ColorPaletteName; name: string; colors: Partial<ThemeColors> }> = [
   {
+    id: 'standard-warm',
     name: 'Standard (Warm)',
     colors: {
       bg: '#E8DEBD',
@@ -101,6 +134,7 @@ export const COLOR_PALETTES: Array<{ name: string; colors: Partial<ThemeColors> 
     },
   },
   {
+    id: 'modern-spa',
     name: 'Modern (Spa)',
     colors: {
       bg: '#F9F7F4',
@@ -122,6 +156,7 @@ export const COLOR_PALETTES: Array<{ name: string; colors: Partial<ThemeColors> 
     },
   },
   {
+    id: 'dark',
     name: 'Dunkel',
     colors: {
       bg: '#2C2416',
@@ -143,6 +178,7 @@ export const COLOR_PALETTES: Array<{ name: string; colors: Partial<ThemeColors> 
     },
   },
   {
+    id: 'fresh',
     name: 'Hell & Frisch',
     colors: {
       bg: '#FFFFFF',
@@ -163,12 +199,101 @@ export const COLOR_PALETTES: Array<{ name: string; colors: Partial<ThemeColors> 
       cornerFg: '#FFFFFF',
     },
   },
+  {
+    id: 'wellness-dark',
+    name: 'Wellness Dark',
+    colors: {
+      bg: '#0c0b0a',
+      fg: '#f4f1ea',
+      accent: '#c5a059',
+      gridTable: '#2a2622',
+      cellBg: '#161412',
+      boxFg: '#f4f1ea',
+      timeColBg: '#c5a059',
+      flame: '#FF6B35',
+      zebra1: '#1a1816',
+      zebra2: '#161412',
+      timeZebra1: '#c5a059',
+      timeZebra2: '#b8976a',
+      headRowBg: '#2a2622',
+      headRowFg: '#8e867a',
+      cornerBg: '#161412',
+      cornerFg: '#8e867a',
+      // Dashboard specific
+      dashboardBg: '#0c0b0a',
+      cardBg: '#161412',
+      cardBorder: '#2a2622',
+      textMain: '#f4f1ea',
+      textMuted: '#8e867a',
+      accentGold: '#c5a059',
+      statusLive: '#10B981',
+      statusNext: '#c5a059',
+    },
+  },
+  {
+    id: 'wellness-warm',
+    name: 'Wellness Warm (Modern)',
+    colors: {
+      bg: '#FDFBF7',
+      fg: '#3E2723',
+      accent: '#A68A64',
+      gridTable: '#EBE5D3',
+      cellBg: '#FFFFFF',
+      boxFg: '#3E2723',
+      timeColBg: '#8F9779',
+      flame: '#FF6B35',
+      zebra1: '#F7F3E9',
+      zebra2: '#F2EDE1',
+      timeZebra1: '#8F9779',
+      timeZebra2: '#A68A64',
+      headRowBg: '#F7F3E9',
+      headRowFg: '#3E2723',
+      cornerBg: '#8F9779',
+      cornerFg: '#FFFFFF',
+      // Dashboard specific - Modern Wellness Style
+      dashboardBg: '#FDFBF7',
+      cardBg: '#FFFFFF',
+      cardBorder: '#EBE5D3',
+      textMain: '#3E2723',
+      textMuted: '#5D4037',
+      accentGold: '#A68A64',
+      accentGreen: '#8F9779',
+      statusLive: '#10B981',
+      statusNext: '#A68A64',
+      statusPrestart: '#F59E0B',
+    },
+  },
 ];
+
+// Helper to get color palette by ID
+export function getColorPalette(id: ColorPaletteName): Partial<ThemeColors> {
+  const palette = COLOR_PALETTES.find((p) => p.id === id);
+  return palette?.colors || COLOR_PALETTES[0].colors;
+}
+
+// Helper to generate dashboard-specific colors from base colors
+export function generateDashboardColors(baseColors: Partial<ThemeColors>): ThemeColors {
+  const colors = { ...baseColors } as ThemeColors;
+
+  // Generate dashboard-specific colors if not present
+  if (!colors.dashboardBg) colors.dashboardBg = colors.bg;
+  if (!colors.cardBg) colors.cardBg = colors.cellBg || colors.bg;
+  if (!colors.cardBorder) colors.cardBorder = colors.gridTable;
+  if (!colors.textMain) colors.textMain = colors.fg;
+  if (!colors.textMuted) colors.textMuted = colors.headRowFg || colors.fg;
+  if (!colors.accentGold) colors.accentGold = colors.accent;
+  if (!colors.statusLive) colors.statusLive = '#10B981';
+  if (!colors.statusNext) colors.statusNext = colors.accent;
+
+  return colors;
+}
 
 // Helper to get default settings
 export function getDefaultSettings(): Settings {
   return {
     version: 1,
+    designStyle: 'classic',
+    colorPalette: 'standard-warm',
     theme: COLOR_PALETTES[0].colors as ThemeColors,
     fonts: {
       fontScale: 1,
@@ -204,6 +329,15 @@ export function getDefaultSettings(): Settings {
       enabled: false,
       volume: 0.5,
       loop: true,
+    },
+    header: {
+      enabled: true,
+      showLogo: true,
+      logoText: 'HTMLSignage',
+      showClock: true,
+      showDate: true,
+      subtitle: '',
+      height: 8,
     },
   };
 }
