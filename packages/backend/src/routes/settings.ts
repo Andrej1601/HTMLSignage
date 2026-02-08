@@ -12,7 +12,12 @@ const SettingsSchema = z.object({
   slides: z.record(z.any()).optional(),
   display: z.record(z.any()).optional(),
   audio: z.record(z.any()).optional(),
-});
+  header: z.record(z.any()).optional(),
+  saunas: z.array(z.any()).optional(),
+  designStyle: z.string().optional(),
+  colorPalette: z.string().optional(),
+  slideshow: z.record(z.any()).optional(),
+}).passthrough(); // Allow additional fields that aren't explicitly defined
 
 // GET /api/settings
 router.get('/', async (req, res) => {
