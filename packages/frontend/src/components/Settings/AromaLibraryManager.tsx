@@ -65,8 +65,15 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     setFormData({ emoji: '', name: '' });
   };
 
-  // Common emoji suggestions
-  const emojiSuggestions = ['🌿', '🍋', '❄️', '🌸', '🍊', '🌲', '🥥', '🌹', '🍃', '🌺', '🌻', '🪻', '🌼', '🍀', '🌴', '🥭'];
+  // Emoji categories for better organization
+  const emojiCategories = {
+    'Pflanzen & Kräuter': ['🌿', '🍃', '🌱', '🌾', '🍀', '☘️', '🌵', '🎋', '🎍'],
+    'Blumen': ['🌸', '🌺', '🌻', '🌼', '🌷', '🏵️', '🥀', '🌹', '🪻'],
+    'Früchte': ['🍋', '🍊', '🍎', '🍏', '🍑', '🍓', '🍇', '🫐', '🥭', '🍍', '🥥'],
+    'Bäume': ['🌲', '🌳', '🌴', '🎄', '🪵'],
+    'Winter & Frische': ['❄️', '⛄', '🧊', '💧', '💨', '🌬️'],
+    'Sonstige': ['✨', '⭐', '🌟', '💫', '🔥', '🕯️', '🪔'],
+  };
 
   return (
     <div>
@@ -101,30 +108,43 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
               <label className="block text-sm font-medium text-spa-text-primary mb-2">
                 Emoji
               </label>
-              <div className="flex gap-2 mb-2">
-                {emojiSuggestions.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setFormData({ ...formData, emoji })}
-                    className={clsx(
-                      'w-10 h-10 text-2xl rounded-md border-2 transition-colors hover:bg-spa-bg-secondary',
-                      formData.emoji === emoji
-                        ? 'border-spa-primary bg-spa-primary/10'
-                        : 'border-spa-bg-secondary'
-                    )}
-                  >
-                    {emoji}
-                  </button>
+              <div className="space-y-3 mb-3 max-h-96 overflow-y-auto border border-spa-bg-secondary rounded-md p-3 bg-white">
+                {Object.entries(emojiCategories).map(([category, emojis]) => (
+                  <div key={category}>
+                    <div className="text-xs font-semibold text-spa-text-secondary mb-2">
+                      {category}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => setFormData({ ...formData, emoji })}
+                          className={clsx(
+                            'w-10 h-10 text-2xl rounded-md border-2 transition-all hover:scale-110',
+                            formData.emoji === emoji
+                              ? 'border-spa-primary bg-spa-primary/10 shadow-sm'
+                              : 'border-spa-bg-secondary hover:border-spa-primary/50'
+                          )}
+                          title={emoji}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-              <input
-                type="text"
-                value={formData.emoji}
-                onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
-                className="w-24 px-3 py-2 text-2xl text-center border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                placeholder="🌿"
-                maxLength={2}
-              />
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-spa-text-secondary">Oder eigenes Emoji:</label>
+                <input
+                  type="text"
+                  value={formData.emoji}
+                  onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
+                  className="w-20 px-3 py-2 text-2xl text-center border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  placeholder="🌿"
+                  maxLength={2}
+                />
+              </div>
             </div>
 
             {/* Name Input */}

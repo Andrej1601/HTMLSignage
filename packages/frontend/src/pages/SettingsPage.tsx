@@ -4,11 +4,12 @@ import { useSettings } from '@/hooks/useSettings';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
+import { EventManager } from '@/components/Settings/EventManager';
 import { getDefaultSettings } from '@/types/settings.types';
-import type { Settings, ThemeColors, AudioSettings as AudioSettingsType, Aroma } from '@/types/settings.types';
-import { Save, RotateCcw, Palette, Music, Sparkles } from 'lucide-react';
+import type { Settings, ThemeColors, AudioSettings as AudioSettingsType, Aroma, Event } from '@/types/settings.types';
+import { Save, RotateCcw, Palette, Music, Sparkles, Calendar } from 'lucide-react';
 
-type TabId = 'theme' | 'audio' | 'aromas';
+type TabId = 'theme' | 'audio' | 'aromas' | 'events';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
@@ -53,6 +54,12 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
+  const handleEventsChange = (events: Event[]) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, events });
+    setIsDirty(true);
+  };
+
   const handleSave = () => {
     if (!localSettings) return;
 
@@ -72,13 +79,14 @@ export function SettingsPage() {
 
   const handleReset = () => {
     const defaults = getDefaultSettings();
-    // IMPORTANT: Preserve saunas, slideshow, and aromas from current settings
+    // IMPORTANT: Preserve saunas, slideshow, aromas, and events from current settings
     // Only reset theme, fonts, slides, display, and audio
     setLocalSettings({
       ...defaults,
       saunas: localSettings?.saunas,
       slideshow: localSettings?.slideshow,
       aromas: localSettings?.aromas || defaults.aromas,
+      events: localSettings?.events || defaults.events,
     });
     setIsDirty(true);
   };
@@ -107,6 +115,7 @@ export function SettingsPage() {
     { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
     { id: 'audio' as TabId, label: 'Audio', icon: Music },
     { id: 'aromas' as TabId, label: 'Aromas', icon: Sparkles },
+    { id: 'events' as TabId, label: 'Events', icon: Calendar },
   ];
 
   return (
@@ -200,6 +209,13 @@ export function SettingsPage() {
             <AromaLibraryManager
               aromas={localSettings.aromas || []}
               onChange={handleAromasChange}
+            />
+          )}
+
+          {activeTab === 'events' && (
+            <EventManager
+              events={localSettings.events || []}
+              onChange={handleEventsChange}
             />
           )}
         </div>

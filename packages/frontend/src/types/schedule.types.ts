@@ -1,4 +1,6 @@
 // Frontend Schedule Types (matching backend Zod schemas)
+import type { Settings } from './settings.types';
+import { getActiveEvent } from './settings.types';
 
 // Entry in a time slot for a specific sauna
 export interface Entry {
@@ -74,6 +76,20 @@ export function getTodayPresetKey(): PresetKey {
   const day = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
   const map: PresetKey[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return map[day];
+}
+
+// Helper to get active preset key (considering events)
+// If an event is active, returns the event's assigned preset
+// Otherwise returns the current weekday preset
+export function getActivePresetKey(settings?: Settings | null): PresetKey {
+  if (!settings) return getTodayPresetKey();
+
+  const activeEvent = getActiveEvent(settings);
+  if (activeEvent) {
+    return activeEvent.assignedPreset;
+  }
+
+  return getTodayPresetKey();
 }
 
 // Helper to get day label

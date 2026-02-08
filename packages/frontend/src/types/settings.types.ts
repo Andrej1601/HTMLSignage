@@ -102,6 +102,20 @@ export interface Aroma {
   name: string; // Name of the aroma (e.g., "Eukalyptus", "Zitrone", "Minze")
 }
 
+// Event for special occasions
+export interface Event {
+  id: string;
+  name: string;
+  description?: string;
+  imageId?: string; // Reference to media library
+  startDate: string; // YYYY-MM-DD format
+  startTime: string; // HH:MM format
+  endDate?: string; // YYYY-MM-DD format (optional, defaults to startDate)
+  endTime?: string; // HH:MM format (optional)
+  assignedPreset: 'Evt1' | 'Evt2'; // Which event schedule to use
+  isActive: boolean; // Enable/disable event
+}
+
 export interface Settings {
   version: number;
   designStyle?: DesignStyle; // Which visual design to use (classic or dashboard)
@@ -115,6 +129,7 @@ export interface Settings {
   saunas?: Sauna[];
   slideshow?: SlideshowConfig;
   aromas?: Aroma[]; // Library of available aromas for aufguss
+  events?: Event[]; // Special events with custom schedules
 }
 
 // Predefined Color Palettes (from old system)
@@ -357,5 +372,34 @@ export function getDefaultSettings(): Settings {
       { id: '7', emoji: '🥥', name: 'Kokos' },
       { id: '8', emoji: '🌹', name: 'Rose' },
     ],
+    events: [],
   };
+}
+
+// Helper to check if an event is currently active
+export function isEventActive(event: Event, now: Date = new Date()): boolean {
+  if (!event.isActive) return false;
+
+  const startDateTime = new Date(`${event.startDate}T${event.startTime}`);
+  const endDate = event.endDate || event.startDate;
+  const endTime = event.endTime || '23:59';
+  const endDateTime = new Date(`${endDate}T${endTime}`);
+
+  return now >= startDateTime && now <= endDateTime;
+}
+
+// Helper to get currently active event (if any)
+export function getActiveEvent(settings: Settings, now: Date = new Date()): Event | null {
+  if (!settings.events) return null;
+
+  const activeEvents = settings.events
+    .filter(event => isEventActive(event, now))
+    .sort((a, b) => {
+      // Sort by start time, most recent first
+      const aStart = new Date(`${a.startDate}T${a.startTime}`);
+      const bStart = new Date(`${b.startDate}T${b.startTime}`);
+      return bStart.getTime() - aStart.getTime();
+    });
+
+  return activeEvents[0] || null;
 }

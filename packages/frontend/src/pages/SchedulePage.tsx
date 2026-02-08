@@ -13,6 +13,7 @@ import {
   WEEKDAY_PRESETS,
   SPECIAL_PRESETS,
   getTodayPresetKey,
+  getActivePresetKey,
   sortTimeRows,
   copyDaySchedule,
   syncScheduleWithSaunas,
@@ -49,12 +50,12 @@ export function SchedulePage() {
       setLocalSchedule(schedule);
       // Set active preset based on autoPlay
       if (schedule.autoPlay) {
-        setActivePreset(getTodayPresetKey());
+        setActivePreset(getActivePresetKey(settings));
       } else if (schedule.activePreset) {
         setActivePreset(schedule.activePreset);
       }
     }
-  }, [schedule, localSchedule]);
+  }, [schedule, localSchedule, settings]);
 
   // Sync schedule with settings saunas
   useEffect(() => {
@@ -76,6 +77,26 @@ export function SchedulePage() {
       }
     }
   }, [settings?.saunas, localSchedule, activePreset]);
+
+  // Auto-switch preset when event becomes active/ends (only in auto-play mode)
+  useEffect(() => {
+    if (!localSchedule?.autoPlay || !settings) return;
+
+    const checkForActiveEvent = () => {
+      const newActivePreset = getActivePresetKey(settings);
+      if (newActivePreset !== activePreset) {
+        setActivePreset(newActivePreset);
+      }
+    };
+
+    // Check immediately
+    checkForActiveEvent();
+
+    // Check every minute for event changes
+    const interval = setInterval(checkForActiveEvent, 60000);
+
+    return () => clearInterval(interval);
+  }, [localSchedule?.autoPlay, settings, activePreset]);
 
   // Get current day schedule
   const currentDaySchedule = localSchedule?.presets?.[activePreset];
@@ -106,7 +127,7 @@ export function SchedulePage() {
     setIsDirty(true);
 
     if (newAutoPlay) {
-      setActivePreset(getTodayPresetKey());
+      setActivePreset(getActivePresetKey(settings));
     }
   };
 

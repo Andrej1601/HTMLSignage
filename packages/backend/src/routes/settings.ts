@@ -22,6 +22,18 @@ const SettingsSchema = z.object({
     emoji: z.string(),
     name: z.string(),
   })).optional(),
+  events: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    imageId: z.string().optional(),
+    startDate: z.string(), // YYYY-MM-DD
+    startTime: z.string(), // HH:MM
+    endDate: z.string().optional(), // YYYY-MM-DD
+    endTime: z.string().optional(), // HH:MM
+    assignedPreset: z.enum(['Evt1', 'Evt2']),
+    isActive: z.boolean(),
+  })).optional(),
 }).passthrough(); // Allow additional fields that aren't explicitly defined
 
 // GET /api/settings
