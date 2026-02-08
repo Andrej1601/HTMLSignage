@@ -3,11 +3,12 @@ import { Layout } from '@/components/Layout';
 import { useSettings } from '@/hooks/useSettings';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
+import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { getDefaultSettings } from '@/types/settings.types';
-import type { Settings, ThemeColors, AudioSettings as AudioSettingsType } from '@/types/settings.types';
-import { Save, RotateCcw, Palette, Music } from 'lucide-react';
+import type { Settings, ThemeColors, AudioSettings as AudioSettingsType, Aroma } from '@/types/settings.types';
+import { Save, RotateCcw, Palette, Music, Sparkles } from 'lucide-react';
 
-type TabId = 'theme' | 'audio';
+type TabId = 'theme' | 'audio' | 'aromas';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
@@ -46,6 +47,12 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
+  const handleAromasChange = (aromas: Aroma[]) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, aromas });
+    setIsDirty(true);
+  };
+
   const handleSave = () => {
     if (!localSettings) return;
 
@@ -65,12 +72,13 @@ export function SettingsPage() {
 
   const handleReset = () => {
     const defaults = getDefaultSettings();
-    // IMPORTANT: Preserve saunas and slideshow from current settings
+    // IMPORTANT: Preserve saunas, slideshow, and aromas from current settings
     // Only reset theme, fonts, slides, display, and audio
     setLocalSettings({
       ...defaults,
       saunas: localSettings?.saunas,
       slideshow: localSettings?.slideshow,
+      aromas: localSettings?.aromas || defaults.aromas,
     });
     setIsDirty(true);
   };
@@ -98,6 +106,7 @@ export function SettingsPage() {
   const tabs = [
     { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
     { id: 'audio' as TabId, label: 'Audio', icon: Music },
+    { id: 'aromas' as TabId, label: 'Aromas', icon: Sparkles },
   ];
 
   return (
@@ -184,6 +193,13 @@ export function SettingsPage() {
             <AudioSettings
               audio={localSettings.audio}
               onChange={handleAudioChange}
+            />
+          )}
+
+          {activeTab === 'aromas' && (
+            <AromaLibraryManager
+              aromas={localSettings.aromas || []}
+              onChange={handleAromasChange}
             />
           )}
         </div>

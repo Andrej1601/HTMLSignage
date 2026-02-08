@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Entry } from '@/types/schedule.types';
+import type { Aroma } from '@/types/settings.types';
 import { X, Save, Trash2, Flame } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -9,9 +10,10 @@ interface CellEditorProps {
   onClose: () => void;
   onSave: (entry: Entry | null) => void;
   onDelete?: () => void;
+  aromas?: Aroma[]; // Available aromas from settings
 }
 
-export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEditorProps) {
+export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = [] }: CellEditorProps) {
   const [localEntry, setLocalEntry] = useState<Entry>({
     title: '',
     subtitle: '',
@@ -22,7 +24,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEdi
     description: '',
   });
 
-  const [badgeInput, setBadgeInput] = useState('');
+  const [selectedAromaId, setSelectedAromaId] = useState<string>('');
 
   // Initialize local entry when entry changes
   useEffect(() => {
@@ -39,7 +41,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEdi
         description: '',
       });
     }
-    setBadgeInput('');
+    setSelectedAromaId('');
   }, [entry]);
 
   if (!isOpen) return null;
@@ -60,17 +62,29 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEdi
     }
   };
 
-  const handleAddBadge = () => {
-    if (badgeInput.trim()) {
-      setLocalEntry({
-        ...localEntry,
-        badges: [...(localEntry.badges || []), badgeInput.trim()],
-      });
-      setBadgeInput('');
+  const handleAddAroma = () => {
+    if (!selectedAromaId) return;
+
+    const aroma = aromas.find((a) => a.id === selectedAromaId);
+    if (!aroma) return;
+
+    // Store as "emoji name" for display
+    const aromaText = `${aroma.emoji} ${aroma.name}`;
+
+    // Don't add if already exists
+    if (localEntry.badges?.includes(aromaText)) {
+      setSelectedAromaId('');
+      return;
     }
+
+    setLocalEntry({
+      ...localEntry,
+      badges: [...(localEntry.badges || []), aromaText],
+    });
+    setSelectedAromaId('');
   };
 
-  const handleRemoveBadge = (index: number) => {
+  const handleRemoveAroma = (index: number) => {
     setLocalEntry({
       ...localEntry,
       badges: localEntry.badges?.filter((_, i) => i !== index) || [],
@@ -180,43 +194,56 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEdi
             />
           </div>
 
-          {/* Badges */}
+          {/* Aromas */}
           <div>
             <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Badges
+              Aromas
             </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="text"
-                value={badgeInput}
-                onChange={(e) => setBadgeInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddBadge()}
-                className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                placeholder="Badge hinzufügen..."
-              />
-              <button
-                onClick={handleAddBadge}
-                className="px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors"
-              >
-                Hinzufügen
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {localEntry.badges?.map((badge, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-spa-secondary/20 text-spa-secondary-dark rounded-full text-sm"
-                >
-                  {badge}
-                  <button
-                    onClick={() => handleRemoveBadge(index)}
-                    className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"
+            {aromas.length > 0 ? (
+              <>
+                <div className="flex gap-2 mb-2">
+                  <select
+                    value={selectedAromaId}
+                    onChange={(e) => setSelectedAromaId(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
                   >
-                    <X className="w-3 h-3" />
+                    <option value="">Aroma auswählen...</option>
+                    {aromas.map((aroma) => (
+                      <option key={aroma.id} value={aroma.id}>
+                        {aroma.emoji} {aroma.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAddAroma}
+                    disabled={!selectedAromaId}
+                    className="px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Hinzufügen
                   </button>
-                </span>
-              ))}
-            </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {localEntry.badges?.map((badge, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-spa-secondary/20 text-spa-secondary-dark rounded-full text-sm"
+                    >
+                      {badge}
+                      <button
+                        onClick={() => handleRemoveAroma(index)}
+                        className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-spa-text-secondary bg-spa-bg-primary p-3 rounded-md">
+                Keine Aromas konfiguriert. Bitte erstellen Sie zuerst Aromas in den Einstellungen.
+              </div>
+            )}
           </div>
 
           {/* Notes */}

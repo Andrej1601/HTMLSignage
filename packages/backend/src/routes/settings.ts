@@ -17,6 +17,11 @@ const SettingsSchema = z.object({
   designStyle: z.string().optional(),
   colorPalette: z.string().optional(),
   slideshow: z.record(z.any()).optional(),
+  aromas: z.array(z.object({
+    id: z.string(),
+    emoji: z.string(),
+    name: z.string(),
+  })).optional(),
 }).passthrough(); // Allow additional fields that aren't explicitly defined
 
 // GET /api/settings

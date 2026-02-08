@@ -95,6 +95,13 @@ export interface HeaderSettings {
 export type DesignStyle = 'classic' | 'dashboard' | 'modern-wellness'; // Visual design style (independent of colors)
 export type ColorPaletteName = 'standard-warm' | 'modern-spa' | 'dark' | 'fresh' | 'wellness-dark' | 'wellness-warm' | 'custom';
 
+// Aroma/Scent for aufguss badges
+export interface Aroma {
+  id: string;
+  emoji: string; // Visual representation (e.g., "🌿", "🍋", "❄️")
+  name: string; // Name of the aroma (e.g., "Eukalyptus", "Zitrone", "Minze")
+}
+
 export interface Settings {
   version: number;
   designStyle?: DesignStyle; // Which visual design to use (classic or dashboard)
@@ -107,6 +114,7 @@ export interface Settings {
   header?: HeaderSettings;
   saunas?: Sauna[];
   slideshow?: SlideshowConfig;
+  aromas?: Aroma[]; // Library of available aromas for aufguss
 }
 
 // Predefined Color Palettes (from old system)
@@ -339,5 +347,15 @@ export function getDefaultSettings(): Settings {
       subtitle: '',
       height: 8,
     },
+    aromas: [
+      { id: '1', emoji: '🌿', name: 'Eukalyptus' },
+      { id: '2', emoji: '🍋', name: 'Zitrone' },
+      { id: '3', emoji: '❄️', name: 'Minze' },
+      { id: '4', emoji: '🌸', name: 'Lavendel' },
+      { id: '5', emoji: '🍊', name: 'Orange' },
+      { id: '6', emoji: '🌲', name: 'Kiefer' },
+      { id: '7', emoji: '🥥', name: 'Kokos' },
+      { id: '8', emoji: '🌹', name: 'Rose' },
+    ],
   };
 }

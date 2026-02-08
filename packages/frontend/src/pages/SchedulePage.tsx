@@ -466,6 +466,7 @@ export function SchedulePage() {
           onClose={() => setEditingCell(null)}
           onSave={handleSaveCell}
           onDelete={editingCell?.entry ? handleDeleteCell : undefined}
+          aromas={settings?.aromas || []}
         />
 
         {/* Time Editor Dialog */}
