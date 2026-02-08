@@ -28,6 +28,18 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
+  const handleDesignStyleChange = (designStyle: string) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, designStyle: designStyle as any });
+    setIsDirty(true);
+  };
+
+  const handleColorPaletteChange = (colorPalette: string) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, colorPalette: colorPalette as any });
+    setIsDirty(true);
+  };
+
   const handleAudioChange = (audio: AudioSettingsType) => {
     if (!localSettings) return;
     setLocalSettings({ ...localSettings, audio });
@@ -160,7 +172,11 @@ export function SettingsPage() {
           {activeTab === 'theme' && localSettings.theme && (
             <ThemeEditor
               theme={localSettings.theme}
+              designStyle={localSettings.designStyle}
+              colorPalette={localSettings.colorPalette}
               onChange={handleThemeChange}
+              onDesignStyleChange={handleDesignStyleChange}
+              onColorPaletteChange={handleColorPaletteChange}
             />
           )}
 

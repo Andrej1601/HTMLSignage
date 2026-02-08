@@ -220,9 +220,15 @@ export function DisplayClientPage() {
 
   // If no slides configured, show default overview
   if (!currentSlide || totalSlides === 0) {
+    const designStyle = localSettings.designStyle || 'classic';
+
     return (
       <div className="w-full h-screen overflow-hidden">
-        <OverviewSlide schedule={localSchedule} settings={localSettings} />
+        {designStyle === 'modern-wellness' ? (
+          <ScheduleGridSlide schedule={localSchedule} settings={localSettings} />
+        ) : (
+          <OverviewSlide schedule={localSchedule} settings={localSettings} />
+        )}
       </div>
     );
   }

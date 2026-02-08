@@ -1,19 +1,47 @@
 import { useState } from 'react';
-import type { ThemeColors } from '@/types/settings.types';
+import type { ThemeColors, DesignStyle, ColorPaletteName } from '@/types/settings.types';
 import { COLOR_PALETTES } from '@/types/settings.types';
-import { Palette, ChevronDown, ChevronUp } from 'lucide-react';
+import { Palette, ChevronDown, ChevronUp, Layout, Sparkles, Grid } from 'lucide-react';
 
 interface ThemeEditorProps {
   theme: ThemeColors;
+  designStyle?: DesignStyle;
+  colorPalette?: ColorPaletteName;
   onChange: (theme: ThemeColors) => void;
+  onDesignStyleChange?: (style: DesignStyle) => void;
+  onColorPaletteChange?: (palette: ColorPaletteName) => void;
 }
 
-export function ThemeEditor({ theme, onChange }: ThemeEditorProps) {
+export function ThemeEditor({ theme, designStyle, colorPalette, onChange, onDesignStyleChange, onColorPaletteChange }: ThemeEditorProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const applyPalette = (paletteColors: Partial<ThemeColors>) => {
+  const applyPalette = (paletteId: ColorPaletteName, paletteColors: Partial<ThemeColors>) => {
     onChange({ ...theme, ...paletteColors });
+    if (onColorPaletteChange) {
+      onColorPaletteChange(paletteId);
+    }
   };
+
+  const designStyles = [
+    {
+      id: 'classic' as DesignStyle,
+      name: 'Classic Grid',
+      description: 'Traditionelle Tabellen-Ansicht mit Zebra-Streifen',
+      icon: Grid,
+    },
+    {
+      id: 'dashboard' as DesignStyle,
+      name: 'Dashboard',
+      description: 'Moderne Dashboard-Ansicht mit Kacheln',
+      icon: Layout,
+    },
+    {
+      id: 'modern-wellness' as DesignStyle,
+      name: 'Modern Wellness',
+      description: 'Glassmorphismus-Design mit abgerundeten Ecken',
+      icon: Sparkles,
+    },
+  ];
 
   const updateColor = (key: keyof ThemeColors, value: string) => {
     onChange({ ...theme, [key]: value });
@@ -65,35 +93,88 @@ export function ThemeEditor({ theme, onChange }: ThemeEditorProps) {
 
   return (
     <div className="space-y-6">
-      {/* Predefined Palettes */}
+      {/* Design Style Selection */}
+      <div>
+        <h3 className="text-lg font-semibold text-spa-text-primary mb-3 flex items-center gap-2">
+          <Layout className="w-5 h-5" />
+          Design-Stil
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {designStyles.map((style) => {
+            const Icon = style.icon;
+            const isActive = designStyle === style.id;
+            return (
+              <button
+                key={style.id}
+                onClick={() => onDesignStyleChange?.(style.id)}
+                className={`p-5 border-2 rounded-lg transition-all text-left ${
+                  isActive
+                    ? 'border-spa-accent bg-spa-accent/5 shadow-md'
+                    : 'border-spa-secondary/20 hover:border-spa-accent/50 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-start gap-3 mb-2">
+                  <Icon className={`w-6 h-6 ${isActive ? 'text-spa-accent' : 'text-spa-text-secondary'}`} />
+                  <div className="flex-1">
+                    <div className={`font-semibold ${isActive ? 'text-spa-accent' : 'text-spa-text-primary'}`}>
+                      {style.name}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="w-3 h-3 rounded-full bg-spa-accent"></div>
+                  )}
+                </div>
+                <p className="text-sm text-spa-text-secondary">{style.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Color Palettes */}
       <div>
         <h3 className="text-lg font-semibold text-spa-text-primary mb-3 flex items-center gap-2">
           <Palette className="w-5 h-5" />
           Farbpaletten
         </h3>
+        <p className="text-sm text-spa-text-secondary mb-4">
+          Wählen Sie eine Farbpalette, um nur die Farben zu ändern (Design-Stil bleibt erhalten)
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {COLOR_PALETTES.map((palette, index) => (
-            <button
-              key={index}
-              onClick={() => applyPalette(palette.colors)}
-              className="p-4 border-2 border-spa-secondary/20 rounded-lg hover:border-spa-accent hover:shadow-md transition-all text-left group"
-            >
-              <div className="font-medium text-spa-text-primary mb-2 group-hover:text-spa-accent transition-colors">
-                {palette.name}
-              </div>
-              <div className="flex gap-1">
-                {palette.colors.bg && (
-                  <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.bg }} />
-                )}
-                {palette.colors.fg && (
-                  <div className="w-8 h-8 rounded border border-gray-300" style={{ backgroundColor: palette.colors.fg }} />
-                )}
-                {palette.colors.accent && (
-                  <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.accent }} />
-                )}
-              </div>
-            </button>
-          ))}
+          {COLOR_PALETTES.map((palette) => {
+            const isActive = colorPalette === palette.id;
+            return (
+              <button
+                key={palette.id}
+                onClick={() => applyPalette(palette.id, palette.colors)}
+                className={`p-4 border-2 rounded-lg transition-all text-left group ${
+                  isActive
+                    ? 'border-spa-accent bg-spa-accent/5 shadow-md'
+                    : 'border-spa-secondary/20 hover:border-spa-accent hover:shadow-md'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className={`font-medium ${isActive ? 'text-spa-accent' : 'text-spa-text-primary group-hover:text-spa-accent'} transition-colors`}>
+                    {palette.name}
+                  </div>
+                  {isActive && (
+                    <div className="w-2 h-2 rounded-full bg-spa-accent"></div>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {palette.colors.bg && (
+                    <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.bg }} />
+                  )}
+                  {palette.colors.fg && (
+                    <div className="w-8 h-8 rounded border border-gray-300" style={{ backgroundColor: palette.colors.fg }} />
+                  )}
+                  {palette.colors.accent && (
+                    <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.accent }} />
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
