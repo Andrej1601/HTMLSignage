@@ -1,36 +1,25 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { DeviceList } from '@/components/Devices/DeviceList';
-import { DevicePairingDialog } from '@/components/Devices/DevicePairingDialog';
 import { DeviceEditDialog } from '@/components/Devices/DeviceEditDialog';
+import { PendingPairings } from '@/components/Devices/PendingPairings';
 import {
   useDevices,
-  useCreateDevice,
   useUpdateDevice,
   useDeleteDevice,
   useSendCommand
 } from '@/hooks/useDevices';
 import type { Device } from '@/types/device.types';
-import { Plus, RefreshCw, Monitor } from 'lucide-react';
+import { RefreshCw, Monitor } from 'lucide-react';
 
 export function DevicesPage() {
   const { data: devices = [], isLoading, refetch } = useDevices();
-  const createDevice = useCreateDevice();
   const updateDevice = useUpdateDevice();
   const deleteDevice = useDeleteDevice();
   const sendCommand = useSendCommand();
 
-  const [pairingDialogOpen, setPairingDialogOpen] = useState(false);
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
-
-  const handlePairDevice = (data: { name: string; mode?: 'auto' | 'override' }) => {
-    createDevice.mutate(data, {
-      onSuccess: () => {
-        setPairingDialogOpen(false);
-      }
-    });
-  };
 
   const handleUpdateDevice = (id: string, updates: any) => {
     updateDevice.mutate({ id, updates }, {
@@ -79,7 +68,10 @@ export function DevicesPage() {
     );
   }
 
-  const onlineDevices = devices.filter(d => {
+  // Filter to only show paired devices in main list
+  const pairedDevices = devices.filter(d => d.pairedAt !== null);
+
+  const onlineDevices = pairedDevices.filter(d => {
     if (!d.lastSeen) return false;
     const lastSeen = new Date(d.lastSeen);
     const now = new Date();
@@ -100,22 +92,13 @@ export function DevicesPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Aktualisieren
-              </button>
-              <button
-                onClick={() => setPairingDialogOpen(true)}
-                className="px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Display hinzufügen
-              </button>
-            </div>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Aktualisieren
+            </button>
           </div>
 
           {/* Stats */}
@@ -127,7 +110,7 @@ export function DevicesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-spa-text-secondary">Gesamt</p>
-                  <p className="text-2xl font-bold text-spa-text-primary">{devices.length}</p>
+                  <p className="text-2xl font-bold text-spa-text-primary">{pairedDevices.length}</p>
                 </div>
               </div>
             </div>
@@ -151,29 +134,24 @@ export function DevicesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-spa-text-secondary">Offline</p>
-                  <p className="text-2xl font-bold text-orange-600">{devices.length - onlineDevices}</p>
+                  <p className="text-2xl font-bold text-orange-600">{pairedDevices.length - onlineDevices}</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Pending Pairings */}
+        <PendingPairings />
+
         {/* Device List */}
         <DeviceList
-          devices={devices}
+          devices={pairedDevices}
           onEdit={setEditingDevice}
           onDelete={setDeletingDevice}
           onReload={handleReload}
           onRestart={handleRestart}
           onManageOverrides={handleManageOverrides}
-        />
-
-        {/* Pairing Dialog */}
-        <DevicePairingDialog
-          isOpen={pairingDialogOpen}
-          onClose={() => setPairingDialogOpen(false)}
-          onPair={handlePairDevice}
-          isPairing={createDevice.isPending}
         />
 
         {/* Edit Dialog */}

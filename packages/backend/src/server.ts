@@ -14,6 +14,7 @@ import scheduleRouter from './routes/schedule.js';
 import settingsRouter from './routes/settings.js';
 import devicesRouter from './routes/devices.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
 import mediaRouter from './routes/media.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,7 +54,10 @@ export const io = new SocketIOServer(httpServer, {
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(compression());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
@@ -76,6 +80,7 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/schedule', scheduleRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/devices', devicesRouter);
@@ -94,7 +99,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 setupWebSocket(io);
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 httpServer.listen(PORT, HOST, () => {
   console.log(`Server running on http://localhost:${PORT}`);

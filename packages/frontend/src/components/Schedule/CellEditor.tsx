@@ -1,67 +1,79 @@
 import { useState, useEffect } from 'react';
-import type { Cell } from '@/types/schedule.types';
-import { X, Save, Trash2 } from 'lucide-react';
-import { isValidTime } from '@/types/schedule.types';
+import type { Entry } from '@/types/schedule.types';
+import { X, Save, Trash2, Flame } from 'lucide-react';
+import clsx from 'clsx';
 
 interface CellEditorProps {
-  cell: Cell | null;
+  entry: Entry | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (cell: Cell) => void;
+  onSave: (entry: Entry | null) => void;
   onDelete?: () => void;
 }
 
-export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEditorProps) {
-  const [formData, setFormData] = useState<Cell>({
-    time: '12:00',
+export function CellEditor({ entry, isOpen, onClose, onSave, onDelete }: CellEditorProps) {
+  const [localEntry, setLocalEntry] = useState<Entry>({
     title: '',
     subtitle: '',
+    flames: undefined,
     badges: [],
     duration: 15,
     notes: '',
+    description: '',
   });
 
   const [badgeInput, setBadgeInput] = useState('');
 
+  // Initialize local entry when entry changes
   useEffect(() => {
-    if (cell) {
-      setFormData(cell);
+    if (entry) {
+      setLocalEntry(entry);
+    } else {
+      setLocalEntry({
+        title: '',
+        subtitle: '',
+        flames: undefined,
+        badges: [],
+        duration: 15,
+        notes: '',
+        description: '',
+      });
     }
-  }, [cell]);
+    setBadgeInput('');
+  }, [entry]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!isValidTime(formData.time)) {
-      alert('Ungültige Zeit. Format: HH:MM');
-      return;
+  const handleSave = () => {
+    // Only save if title is not empty
+    if (localEntry.title.trim()) {
+      onSave({
+        ...localEntry,
+        title: localEntry.title.trim(),
+        subtitle: localEntry.subtitle?.trim() || undefined,
+        notes: localEntry.notes?.trim() || undefined,
+        description: localEntry.description?.trim() || undefined,
+      });
+    } else {
+      // If title is empty, treat as delete
+      onSave(null);
     }
-
-    if (!formData.title.trim()) {
-      alert('Titel ist erforderlich');
-      return;
-    }
-
-    onSave(formData);
-    onClose();
   };
 
-  const addBadge = () => {
+  const handleAddBadge = () => {
     if (badgeInput.trim()) {
-      setFormData({
-        ...formData,
-        badges: [...(formData.badges || []), badgeInput.trim()],
+      setLocalEntry({
+        ...localEntry,
+        badges: [...(localEntry.badges || []), badgeInput.trim()],
       });
       setBadgeInput('');
     }
   };
 
-  const removeBadge = (index: number) => {
-    setFormData({
-      ...formData,
-      badges: formData.badges?.filter((_, i) => i !== index),
+  const handleRemoveBadge = (index: number) => {
+    setLocalEntry({
+      ...localEntry,
+      badges: localEntry.badges?.filter((_, i) => i !== index) || [],
     });
   };
 
@@ -69,35 +81,20 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold text-spa-text-primary">
-            {cell ? 'Aufguss bearbeiten' : 'Neuer Aufguss'}
-          </h2>
+        <div className="flex items-center justify-between p-6 border-b border-spa-bg-secondary">
+          <h3 className="text-xl font-semibold text-spa-text-primary">
+            {entry ? 'Aufguss bearbeiten' : 'Neuer Aufguss'}
+          </h3>
           <button
             onClick={onClose}
-            className="text-spa-text-secondary hover:text-spa-text-primary transition-colors"
+            className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Time */}
-          <div>
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Uhrzeit *
-            </label>
-            <input
-              type="text"
-              value={formData.time}
-              onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-              placeholder="HH:MM"
-              className="w-full px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              required
-            />
-          </div>
-
+        <div className="p-6 space-y-4">
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-spa-text-primary mb-2">
@@ -105,11 +102,11 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
             </label>
             <input
               type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="z.B. Fruchtiger Aufguss"
-              className="w-full px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              required
+              value={localEntry.title}
+              onChange={(e) => setLocalEntry({ ...localEntry, title: e.target.value })}
+              className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              placeholder="z.B. Eis-Aufguss"
+              autoFocus
             />
           </div>
 
@@ -120,11 +117,49 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
             </label>
             <input
               type="text"
-              value={formData.subtitle || ''}
-              onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-              placeholder="z.B. mit Orangenduft"
-              className="w-full px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              value={localEntry.subtitle || ''}
+              onChange={(e) => setLocalEntry({ ...localEntry, subtitle: e.target.value })}
+              className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              placeholder="z.B. Mint & Eukalyptus"
             />
+          </div>
+
+          {/* Flames (Intensity) */}
+          <div>
+            <label className="block text-sm font-medium text-spa-text-primary mb-2">
+              Intensität
+            </label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((flameCount) => (
+                <button
+                  key={flameCount}
+                  onClick={() =>
+                    setLocalEntry({
+                      ...localEntry,
+                      flames: localEntry.flames === flameCount ? undefined : flameCount,
+                    })
+                  }
+                  className={clsx(
+                    'flex items-center gap-1 px-4 py-2 rounded-md border-2 transition-colors',
+                    localEntry.flames === flameCount
+                      ? 'border-orange-500 bg-orange-50 text-orange-700'
+                      : 'border-spa-bg-secondary text-spa-text-secondary hover:border-orange-300'
+                  )}
+                >
+                  {Array.from({ length: flameCount }).map((_, i) => (
+                    <Flame
+                      key={i}
+                      className={clsx(
+                        'w-4 h-4',
+                        localEntry.flames === flameCount
+                          ? 'text-orange-500 fill-orange-500'
+                          : 'text-spa-text-secondary'
+                      )}
+                    />
+                  ))}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Duration */}
@@ -134,11 +169,14 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
             </label>
             <input
               type="number"
-              value={formData.duration || 15}
-              onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
+              value={localEntry.duration || ''}
+              onChange={(e) =>
+                setLocalEntry({ ...localEntry, duration: parseInt(e.target.value) || undefined })
+              }
+              className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              placeholder="15"
               min="1"
               max="180"
-              className="w-full px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
             />
           </div>
 
@@ -152,29 +190,27 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
                 type="text"
                 value={badgeInput}
                 onChange={(e) => setBadgeInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addBadge())}
-                placeholder="Badge hinzufügen"
-                className="flex-1 px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddBadge()}
+                className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                placeholder="Badge hinzufügen..."
               />
               <button
-                type="button"
-                onClick={addBadge}
+                onClick={handleAddBadge}
                 className="px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors"
               >
-                +
+                Hinzufügen
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {formData.badges?.map((badge, index) => (
+              {localEntry.badges?.map((badge, index) => (
                 <span
                   key={index}
                   className="inline-flex items-center gap-1 px-3 py-1 bg-spa-secondary/20 text-spa-secondary-dark rounded-full text-sm"
                 >
                   {badge}
                   <button
-                    type="button"
-                    onClick={() => removeBadge(index)}
-                    className="hover:text-spa-text-primary"
+                    onClick={() => handleRemoveBadge(index)}
+                    className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -189,46 +225,58 @@ export function CellEditor({ cell, isOpen, onClose, onSave, onDelete }: CellEdit
               Notizen
             </label>
             <textarea
-              value={formData.notes || ''}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
+              value={localEntry.notes || ''}
+              onChange={(e) => setLocalEntry({ ...localEntry, notes: e.target.value })}
+              className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
               placeholder="Interne Notizen..."
-              className="w-full px-4 py-2 border border-spa-secondary/30 rounded-md focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              rows={3}
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div>
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={onDelete}
-                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Löschen
-                </button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
-              >
-                <Save className="w-4 h-4" />
-                Speichern
-              </button>
-            </div>
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-spa-text-primary mb-2">
+              Beschreibung
+            </label>
+            <textarea
+              value={localEntry.description || ''}
+              onChange={(e) => setLocalEntry({ ...localEntry, description: e.target.value })}
+              className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              placeholder="Öffentliche Beschreibung..."
+              rows={3}
+            />
           </div>
-        </form>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-6 border-t border-spa-bg-secondary">
+          <div>
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Löschen
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={handleSave}
+              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              Speichern
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

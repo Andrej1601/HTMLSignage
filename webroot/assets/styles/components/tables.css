@@ -1,0 +1,255 @@
+/**
+ * Component: Tables
+ * Overview-Grid für Aufgussplan
+ */
+
+@layer components {
+  /* ========================================
+     Overview Grid/Table
+     ======================================== */
+  .grid {
+    width: 100%;
+    max-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .grid th,
+  .grid td {
+    border: var(--gridTableW, 2px) solid var(--spa-primary);
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  /* Column Widths */
+  .grid col.c_time {
+    width: var(--ovTimeWidthPx, var(--ovTimeWidth, 10ch));
+  }
+
+  .grid col.c_auto {
+    width: auto;
+  }
+
+  /* ========================================
+     Table Header
+     ======================================== */
+  .grid thead th {
+    font-size: calc(22px * var(--scale, 1) * var(--ovHeadScale, 0.9) * var(--ovAuto, 1));
+    padding: calc(8px * var(--vwScale, 1)) calc(12px * var(--vwScale, 1));
+    text-align: center;
+    background: var(--spa-bg-primary);
+    color: var(--spa-text-primary);
+    white-space: normal;
+    word-break: break-word;
+    hyphens: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .grid thead th.timecol {
+    white-space: nowrap;
+  }
+
+  .overview .grid thead th {
+    padding: calc(8px * var(--ovAuto, 1)) calc(12px * var(--ovAuto, 1));
+  }
+
+  /* Corner Cell */
+  .grid thead th.corner {
+    background: var(--spa-bg-secondary);
+    color: var(--spa-text-primary);
+  }
+
+  /* ========================================
+     Sauna Status Note (in Header)
+     ======================================== */
+  .grid thead th .sauna-status-note {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45em;
+    margin-top: 6px;
+    padding: 0.35em 0.9em;
+    font-size: calc(16px * var(--scale, 1) * var(--ovHeadScale, 0.9) * var(--ovAuto, 1) * 0.9);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: var(--radius-full);
+    color: var(--spa-text-primary);
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Out-of-Order Status */
+  .grid thead th[data-status="out-of-order"] {
+    position: relative;
+  }
+
+  .grid thead th[data-status="out-of-order"] .sauna-status-note {
+    background: var(--spa-warning);
+    color: var(--spa-warning-contrast);
+    box-shadow: 0 0 0 1px var(--spa-warning-dark), var(--elevation-2);
+    opacity: 1;
+  }
+
+  .grid thead th[data-status="out-of-order"] .sauna-status-note::before {
+    content: '⚠';
+    font-size: 1.1em;
+    line-height: 1;
+  }
+
+  /* ========================================
+     Table Body - Zebra Striping
+     ======================================== */
+
+  /* Content Cells */
+  .grid tbody tr:nth-child(odd) td:not(.timecol) {
+    background: var(--spa-bg-secondary);
+  }
+
+  .grid tbody tr:nth-child(even) td:not(.timecol) {
+    background: var(--spa-bg-tertiary);
+  }
+
+  /* Time Column (separate zebra colors) */
+  .grid tbody tr:nth-child(odd) td.timecol {
+    background: #EAD9A0 !important;
+  }
+
+  .grid tbody tr:nth-child(even) td.timecol {
+    background: #E2CE91 !important;
+  }
+
+  /* ========================================
+     Table Cells
+     ======================================== */
+  .grid td {
+    font-size: calc(22px * var(--scale, 1) * var(--ovCellScale, 0.8) * var(--ovAuto, 1));
+    padding: calc(8px * var(--vwScale, 1)) calc(12px * var(--vwScale, 1));
+  }
+
+  .overview .grid td {
+    padding: calc(8px * var(--ovAuto, 1)) calc(12px * var(--ovAuto, 1));
+  }
+
+  /* Time Column */
+  .grid th.timecol,
+  .grid td.timecol {
+    width: var(--ovTimeWidthPx, var(--ovTimeWidth, 10ch));
+  }
+
+  .grid td.timecol {
+    background: var(--spa-bg-primary) !important;
+    text-align: center;
+    font-weight: 800;
+    min-width: var(--ovTimeWidthPx, var(--ovTimeWidth, 10ch));
+    color: var(--spa-text-primary);
+    font-size: calc(22px * var(--scale, 1) * var(--ovTimeScale, var(--ovCellScale, 0.8)) * var(--ovAuto, 1));
+  }
+
+  /* Out-of-Order Cells */
+  .grid td[data-status="out-of-order"] .caption,
+  .grid td[data-status="out-of-order"] .chip-text {
+    font-style: italic;
+  }
+
+  .grid td[data-status="out-of-order"] .chip {
+    background: rgba(212, 165, 116, 0.2);
+    border-color: var(--spa-warning);
+    box-shadow: 0 0 0 1px var(--spa-warning-light) inset;
+  }
+
+  .grid td[data-status="out-of-order"] .chip::before {
+    content: '⚠';
+    margin-right: 0.55em;
+    font-size: 1.1em;
+    line-height: 1;
+  }
+
+  /* ========================================
+     Chips in Grid Cells
+     ======================================== */
+  .cellwrap {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .chip {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: var(--chipH, calc(44px * var(--scale, 1) * var(--chipHScale, 1)));
+    padding: 0 0.8em;
+    border-radius: 10px;
+    background: var(--spa-primary);
+    color: white;
+    border: var(--chipBorderW, 2px) solid var(--spa-primary-dark);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    overflow: hidden;
+  }
+
+  .overview .chip {
+    height: calc(var(--chipH, calc(44px * var(--scale, 1) * var(--chipHScale, 1))) * var(--ovAuto, 1));
+  }
+
+  /* Chip Text */
+  .chip-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .chip-text.ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Chip Flames */
+  .chip-flames {
+    flex: 0 0 auto;
+    display: inline-flex;
+    margin-left: auto;
+    padding-left: 0.6em;
+    justify-content: flex-end;
+  }
+
+  .chip-flames .flames {
+    display: inline-flex;
+    gap: var(--chipFlameGap, calc(var(--chipH, 44px) * var(--chipFlameGapScale, 0.14)));
+    justify-content: flex-end;
+  }
+
+  .chip-flames .flame {
+    height: calc(var(--chipH, 44px) * var(--chipFlamePct, 0.55));
+    width: auto;
+  }
+
+  body.overview-hide-flames .overview .chip-flames {
+    display: none;
+  }
+
+  /* Chip Highlight */
+  .chip.highlight {
+    outline: 3px solid var(--spa-accent-light);
+    outline-offset: 2px;
+  }
+
+  /* ========================================
+     Overview Wrapper (for autoscaling)
+     ======================================== */
+  .ovwrap {
+    transform-origin: top left;
+    width: 100%;
+    will-change: contents;
+  }
+
+  .ovbar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin: 0 0 10px;
+  }
+}

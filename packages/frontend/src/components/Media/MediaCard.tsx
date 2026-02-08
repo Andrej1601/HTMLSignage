@@ -3,6 +3,8 @@ import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy }
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+
 interface MediaCardProps {
   media: Media;
   onDelete: (media: Media) => void;
@@ -11,6 +13,9 @@ interface MediaCardProps {
 export function MediaCard({ media, onDelete }: MediaCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Construct full URL for media
+  const mediaUrl = `${API_URL}${media.url}`;
 
   const getIcon = () => {
     switch (media.type) {
@@ -28,15 +33,14 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
   const Icon = getIcon();
 
   const handleCopyUrl = () => {
-    const fullUrl = `${window.location.origin}${media.url}`;
-    navigator.clipboard.writeText(fullUrl);
+    navigator.clipboard.writeText(mediaUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     setMenuOpen(false);
   };
 
   const handleDownload = () => {
-    window.open(media.url, '_blank');
+    window.open(mediaUrl, '_blank');
     setMenuOpen(false);
   };
 
@@ -46,10 +50,25 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
       <div className="aspect-square bg-spa-bg-primary relative">
         {media.type === 'image' ? (
           <img
-            src={media.url}
+            src={mediaUrl}
             alt={media.originalName}
             className="w-full h-full object-cover"
           />
+        ) : media.type === 'video' ? (
+          <>
+            <video
+              src={mediaUrl}
+              className="w-full h-full object-cover"
+              muted
+              playsInline
+              preload="metadata"
+            />
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
+              <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                <Film className="w-8 h-8 text-spa-primary" />
+              </div>
+            </div>
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Icon className="w-16 h-16 text-spa-primary/30" />

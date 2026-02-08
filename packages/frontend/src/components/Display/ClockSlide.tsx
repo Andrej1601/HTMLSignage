@@ -6,7 +6,8 @@ interface ClockSlideProps {
 }
 
 export function ClockSlide({ settings }: ClockSlideProps) {
-  const { theme, fonts } = settings;
+  const theme = settings.theme!;
+  const fonts = settings.fonts!;
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -39,8 +40,8 @@ export function ClockSlide({ settings }: ClockSlideProps) {
         {/* Time */}
         <div
           style={{
-            fontSize: `${fonts.fontScale * 8}rem`,
-            fontWeight: fonts.tileTimeWeight,
+            fontSize: `${(fonts.fontScale || 1) * 8}rem`,
+            fontWeight: fonts.tileTimeWeight || 600,
             lineHeight: 1,
             color: theme.accent,
           }}
@@ -53,7 +54,7 @@ export function ClockSlide({ settings }: ClockSlideProps) {
         {/* Seconds */}
         <div
           style={{
-            fontSize: `${fonts.fontScale * 3}rem`,
+            fontSize: `${(fonts.fontScale || 1) * 3}rem`,
             fontWeight: 300,
             marginTop: '1rem',
             opacity: 0.7,
@@ -65,7 +66,7 @@ export function ClockSlide({ settings }: ClockSlideProps) {
         {/* Date */}
         <div
           style={{
-            fontSize: `${fonts.fontScale * 1.5}rem`,
+            fontSize: `${(fonts.fontScale || 1) * 1.5}rem`,
             marginTop: '3rem',
             opacity: 0.9,
             textTransform: 'capitalize',

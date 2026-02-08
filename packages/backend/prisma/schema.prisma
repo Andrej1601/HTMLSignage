@@ -52,20 +52,22 @@ model Session {
 // ============================================================================
 
 model Device {
-  id        String    @id @default(cuid())
-  name      String
-  mode      String    @default("auto") // "auto" | "override"
-  pairedBy  String?
-  pairedAt  DateTime?
-  lastSeen  DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  pairingCode String?   @unique // 6-digit code for pairing
+  mode        String    @default("auto") // "auto" | "override"
+  pairedBy    String?
+  pairedAt    DateTime?
+  lastSeen    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user      User?           @relation(fields: [pairedBy], references: [id], onDelete: SetNull)
   overrides DeviceOverride?
 
   @@index([pairedBy])
   @@index([lastSeen])
+  @@index([pairingCode])
   @@map("devices")
 }
 

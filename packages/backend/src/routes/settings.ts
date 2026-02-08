@@ -26,7 +26,22 @@ router.get('/', async (req, res) => {
       return res.json({ version: 1 });
     }
 
-    res.json(settings.data);
+    // Create a copy of settings data and add header defaults if missing
+    const data = { ...(settings.data as any) };
+    if (!data.header) {
+      data.header = {
+        enabled: true,
+        showLogo: true,
+        logoText: 'HTML Signage',
+        showClock: true,
+        showDate: true,
+        subtitle: 'Premium Wellness & Spa Dashboard',
+        height: 8,
+      };
+      console.log('[settings] Added default header configuration');
+    }
+
+    res.json(data);
   } catch (error) {
     console.error('[settings] Error fetching:', error);
     res.status(500).json({ error: 'fetch-failed' });

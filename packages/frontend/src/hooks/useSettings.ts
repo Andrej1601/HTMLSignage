@@ -1,13 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '@/services/api';
 import type { Settings } from '@/types/settings.types';
+import { migrateSettings } from '@/utils/slideshowMigration';
 
 export function useSettings() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['settings'],
-    queryFn: settingsApi.getSettings,
+    queryFn: async () => {
+      const settings = await settingsApi.getSettings();
+      // Migrate old settings to new format
+      return migrateSettings(settings);
+    },
   });
 
   const saveMutation = useMutation({

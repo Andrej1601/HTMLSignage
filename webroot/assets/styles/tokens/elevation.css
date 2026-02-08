@@ -1,0 +1,104 @@
+/**
+ * Design Tokens: Elevation
+ * Schatten-System für Tiefenwirkung
+ */
+
+@layer tokens {
+  :root {
+    /* ========================================
+       Elevation/Shadow Levels
+       Basierend auf Material Design Prinzipien,
+       angepasst für Wellness/Spa-Ästhetik
+       ======================================== */
+
+    /* Keine Elevation */
+    --elevation-0: none;
+
+    /* Subtil - leicht erhöht (z.B. Hover-States) */
+    --elevation-1:
+      0 1px 2px rgba(44, 36, 22, 0.04),
+      0 1px 3px rgba(44, 36, 22, 0.08);
+
+    /* Niedrig - Standard Cards */
+    --elevation-2:
+      0 2px 4px rgba(44, 36, 22, 0.06),
+      0 4px 8px rgba(44, 36, 22, 0.10);
+
+    /* Mittel - Hervorgehobene Elemente */
+    --elevation-3:
+      0 4px 8px rgba(44, 36, 22, 0.08),
+      0 8px 16px rgba(44, 36, 22, 0.12);
+
+    /* Hoch - Modals, Overlays */
+    --elevation-4:
+      0 8px 16px rgba(44, 36, 22, 0.10),
+      0 16px 32px rgba(44, 36, 22, 0.14);
+
+    /* Sehr hoch - Tooltips, Dropdowns */
+    --elevation-5:
+      0 12px 24px rgba(44, 36, 22, 0.12),
+      0 24px 48px rgba(44, 36, 22, 0.16);
+
+    /* ========================================
+       Semantic Elevation
+       ======================================== */
+    --shadow-card: var(--elevation-2);
+    --shadow-card-hover: var(--elevation-3);
+    --shadow-modal: var(--elevation-4);
+    --shadow-dropdown: var(--elevation-5);
+    --shadow-button: var(--elevation-1);
+
+    /* ========================================
+       Inner Shadow (für eingesenkte Elemente)
+       ======================================== */
+    --shadow-inner: inset 0 2px 4px rgba(44, 36, 22, 0.08);
+    --shadow-inner-strong: inset 0 4px 8px rgba(44, 36, 22, 0.12);
+
+    /* ========================================
+       Focus Ring (Accessibility)
+       ======================================== */
+    --shadow-focus:
+      0 0 0 3px var(--spa-accent-light);
+
+    --shadow-focus-error:
+      0 0 0 3px rgba(193, 122, 107, 0.3);
+
+    /* ========================================
+       Glow Effects (für Highlights)
+       ======================================== */
+    --glow-subtle: 0 0 12px rgba(212, 165, 116, 0.2);
+    --glow-medium: 0 0 24px rgba(212, 165, 116, 0.3);
+    --glow-strong: 0 0 36px rgba(212, 165, 116, 0.4);
+  }
+
+  /* ========================================
+     Dark Mode Anpassungen
+     ======================================== */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Stärkere Schatten im Dark Mode für besseren Kontrast */
+      --elevation-1:
+        0 1px 2px rgba(0, 0, 0, 0.10),
+        0 1px 3px rgba(0, 0, 0, 0.15);
+
+      --elevation-2:
+        0 2px 4px rgba(0, 0, 0, 0.15),
+        0 4px 8px rgba(0, 0, 0, 0.20);
+
+      --elevation-3:
+        0 4px 8px rgba(0, 0, 0, 0.20),
+        0 8px 16px rgba(0, 0, 0, 0.25);
+
+      --elevation-4:
+        0 8px 16px rgba(0, 0, 0, 0.25),
+        0 16px 32px rgba(0, 0, 0, 0.30);
+
+      --elevation-5:
+        0 12px 24px rgba(0, 0, 0, 0.30),
+        0 24px 48px rgba(0, 0, 0, 0.35);
+
+      --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+      --shadow-inner-strong: inset 0 4px 8px rgba(0, 0, 0, 0.25);
+    }
+  }
+}

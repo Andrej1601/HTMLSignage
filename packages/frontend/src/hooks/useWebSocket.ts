@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+
 interface UseWebSocketOptions {
   url?: string;
   autoConnect?: boolean;
@@ -11,7 +13,7 @@ interface UseWebSocketOptions {
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
-    url = window.location.origin,
+    url = API_URL,
     autoConnect = true,
     onScheduleUpdate,
     onSettingsUpdate,
@@ -130,7 +132,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     return () => {
       disconnect();
     };
-  }, [autoConnect, connect, disconnect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect, url]);
 
   return {
     isConnected,

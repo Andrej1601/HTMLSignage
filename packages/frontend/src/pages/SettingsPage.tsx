@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { useSettings } from '@/hooks/useSettings';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
-import { FontEditor } from '@/components/Settings/FontEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { getDefaultSettings } from '@/types/settings.types';
-import type { Settings, ThemeColors, FontSettings, AudioSettings as AudioSettingsType } from '@/types/settings.types';
-import { Save, RotateCcw, Palette, Type, Music } from 'lucide-react';
+import type { Settings, ThemeColors, AudioSettings as AudioSettingsType } from '@/types/settings.types';
+import { Save, RotateCcw, Palette, Music } from 'lucide-react';
 
-type TabId = 'theme' | 'fonts' | 'audio';
+type TabId = 'theme' | 'audio';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
@@ -26,12 +25,6 @@ export function SettingsPage() {
   const handleThemeChange = (theme: ThemeColors) => {
     if (!localSettings) return;
     setLocalSettings({ ...localSettings, theme });
-    setIsDirty(true);
-  };
-
-  const handleFontsChange = (fonts: FontSettings) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, fonts });
     setIsDirty(true);
   };
 
@@ -60,7 +53,13 @@ export function SettingsPage() {
 
   const handleReset = () => {
     const defaults = getDefaultSettings();
-    setLocalSettings(defaults);
+    // IMPORTANT: Preserve saunas and slideshow from current settings
+    // Only reset theme, fonts, slides, display, and audio
+    setLocalSettings({
+      ...defaults,
+      saunas: localSettings?.saunas,
+      slideshow: localSettings?.slideshow,
+    });
     setIsDirty(true);
   };
 
@@ -86,7 +85,6 @@ export function SettingsPage() {
 
   const tabs = [
     { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
-    { id: 'fonts' as TabId, label: 'Schriften', icon: Type },
     { id: 'audio' as TabId, label: 'Audio', icon: Music },
   ];
 
@@ -163,13 +161,6 @@ export function SettingsPage() {
             <ThemeEditor
               theme={localSettings.theme}
               onChange={handleThemeChange}
-            />
-          )}
-
-          {activeTab === 'fonts' && localSettings.fonts && (
-            <FontEditor
-              fonts={localSettings.fonts}
-              onChange={handleFontsChange}
             />
           )}
 

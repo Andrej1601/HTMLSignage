@@ -37,7 +37,7 @@ export function DashboardPage() {
       return diffMinutes < 5;
     }).length,
     totalMedia: media.length,
-    scheduleRows: schedule?.rows?.length || 0,
+    scheduleRows: schedule?.presets ? Object.values(schedule.presets).reduce((sum, preset) => sum + preset.rows.length, 0) : 0,
     scheduleVersion: schedule?.version || 1,
   };
 
@@ -194,10 +194,7 @@ export function DashboardPage() {
               <div className="flex items-center gap-3 text-sm">
                 <div className="w-2 h-2 bg-spa-primary rounded-full" />
                 <span className="text-spa-text-secondary">
-                  Aufgussplan Version {schedule.version} aktiviert
-                </span>
-                <span className="text-xs text-spa-text-secondary ml-auto">
-                  {new Date(schedule.updatedAt || schedule.createdAt).toLocaleString('de-DE')}
+                  Aufgussplan Version {schedule.version} aktiv
                 </span>
               </div>
             )}

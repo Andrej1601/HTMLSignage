@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ThemeColors } from '@/types/settings.types';
 import { COLOR_PALETTES } from '@/types/settings.types';
 import { Palette, ChevronDown, ChevronUp } from 'lucide-react';
-import clsx from 'clsx';
 
 interface ThemeEditorProps {
   theme: ThemeColors;

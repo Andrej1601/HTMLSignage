@@ -8,6 +8,7 @@ export type DeviceStatus = 'online' | 'offline' | 'unknown';
 export interface Device {
   id: string;
   name: string;
+  pairingCode?: string | null;
   mode: DeviceMode;
   pairedBy?: string;
   pairedAt?: string;
@@ -16,6 +17,9 @@ export interface Device {
   updatedAt: string;
   status?: DeviceStatus; // Computed on frontend
   overrides?: DeviceOverride;
+  user?: {
+    username: string;
+  };
 }
 
 export interface DeviceOverride {

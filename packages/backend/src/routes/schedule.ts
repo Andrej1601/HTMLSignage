@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
       return res.json({ version: 1, rows: [] });
     }
 
+    // Return raw data directly from database
     res.json(schedule.data);
   } catch (error) {
     console.error('[schedule] Error fetching schedule:', error);

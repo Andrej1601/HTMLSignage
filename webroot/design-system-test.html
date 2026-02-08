@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wellness Design System - Test</title>
+  <link rel="stylesheet" href="/assets/design.css">
+  <style>
+    body {
+      padding: var(--space-6);
+      background: var(--spa-bg-primary);
+      color: var(--spa-text-primary);
+    }
+
+    .demo-section {
+      margin-bottom: var(--space-8);
+      padding: var(--space-6);
+      background: var(--spa-bg-elevated);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--elevation-2);
+    }
+
+    .demo-section h2 {
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--spa-primary);
+      margin-bottom: var(--space-4);
+      border-bottom: 2px solid var(--spa-border-light);
+      padding-bottom: var(--space-2);
+    }
+
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+
+    .color-swatch {
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      text-align: center;
+      font-weight: var(--font-weight-semibold);
+      box-shadow: var(--elevation-1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1 style="font-size: var(--font-size-4xl); font-weight: 800; margin-bottom: var(--space-6); color: var(--spa-primary);">
+      🌿 Wellness Design System
+    </h1>
+    <p style="font-size: var(--font-size-lg); margin-bottom: var(--space-8); opacity: 0.9;">
+      Testseite für das neue Wellness/Spa-orientierte Design-System der HTMLSignage Saunalandschaft
+    </p>
+
+    <!-- Farbpalette -->
+    <div class="demo-section">
+      <h2>Farbpalette</h2>
+      <div class="demo-grid">
+        <div class="color-swatch" style="background: var(--spa-primary); color: var(--spa-bg-primary);">
+          Primary<br>#8B6F47
+        </div>
+        <div class="color-swatch" style="background: var(--spa-primary-light); color: var(--spa-text-primary);">
+          Primary Light<br>#B8976A
+        </div>
+        <div class="color-swatch" style="background: var(--spa-primary-dark); color: var(--spa-bg-primary);">
+          Primary Dark<br>#6B5435
+        </div>
+        <div class="color-swatch" style="background: var(--spa-secondary); color: var(--spa-bg-primary);">
+          Secondary<br>#7FA99B
+        </div>
+        <div class="color-swatch" style="background: var(--spa-accent); color: var(--spa-text-primary);">
+          Accent<br>#D4A574
+        </div>
+        <div class="color-swatch" style="background: var(--spa-success); color: white;">
+          Success<br>#6B9B7A
+        </div>
+        <div class="color-swatch" style="background: var(--spa-warning); color: var(--spa-text-primary);">
+          Warning<br>#D4A574
+        </div>
+        <div class="color-swatch" style="background: var(--spa-error); color: white;">
+          Error<br>#C17A6B
+        </div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="demo-section">
+      <h2>Buttons</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-3);">
+        <button class="btn-primary">Primary Button</button>
+        <button class="btn-secondary">Secondary Button</button>
+        <button class="btn-accent">Accent Button</button>
+        <button class="btn-ghost">Ghost Button</button>
+        <button class="btn-danger">Danger Button</button>
+      </div>
+
+      <h3 style="margin-top: var(--space-4); margin-bottom: var(--space-2);">Button Größen</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center;">
+        <button class="btn-primary btn-sm">Small</button>
+        <button class="btn-primary btn-md">Medium (Default)</button>
+        <button class="btn-primary btn-lg">Large</button>
+      </div>
+
+      <h3 style="margin-top: var(--space-4); margin-bottom: var(--space-2);">Button States</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-3);">
+        <button class="btn-primary" disabled>Disabled</button>
+        <button class="btn-primary btn-loading">
+          <span class="btn-spinner"></span>
+          Loading
+        </button>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="demo-section">
+      <h2>Badges</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+        <span class="badge badge-primary">Primary</span>
+        <span class="badge badge-secondary">Secondary</span>
+        <span class="badge badge-accent">Accent</span>
+        <span class="badge badge-success">Success</span>
+        <span class="badge badge-warning">Warning</span>
+        <span class="badge badge-error">Error</span>
+        <span class="badge badge-info">Info</span>
+        <span class="badge badge-neutral">Neutral</span>
+      </div>
+
+      <h3 style="margin-top: var(--space-4); margin-bottom: var(--space-2);">Badge Varianten</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+        <span class="badge badge-primary badge-outlined">Outlined</span>
+        <span class="badge badge-accent badge-pill">Pill Badge</span>
+        <span class="badge badge-success badge-dot">
+          <span class="badge-dot-indicator"></span>
+          Mit Dot
+        </span>
+        <span class="badge badge-counter">99+</span>
+      </div>
+
+      <h3 style="margin-top: var(--space-4); margin-bottom: var(--space-2);">Badge Größen</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;">
+        <span class="badge badge-primary badge-sm">Small</span>
+        <span class="badge badge-primary badge-md">Medium</span>
+        <span class="badge badge-primary badge-lg">Large</span>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="demo-section">
+      <h2>Cards</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-header-title">Standard Card</h3>
+            <p class="card-header-subtitle">Mit Header und Body</p>
+          </div>
+          <div class="card-body">
+            Dies ist eine Standard-Card mit Header und Body. Perfekt für strukturierte Inhalte.
+          </div>
+        </div>
+
+        <div class="card card-highlighted">
+          <div class="card-body">
+            <h3 style="margin: 0 0 var(--space-2);">Highlighted Card</h3>
+            <p style="margin: 0;">Diese Card ist hervorgehoben mit einem Accent-Border.</p>
+          </div>
+        </div>
+
+        <div class="card card-success">
+          <div class="card-body">
+            <h3 style="margin: 0 0 var(--space-2);">Success Card</h3>
+            <p style="margin: 0;">Card mit Success-Status und grünem Border.</p>
+          </div>
+        </div>
+
+        <div class="card card-warning">
+          <div class="card-body">
+            <h3 style="margin: 0 0 var(--space-2);">Warning Card</h3>
+            <p style="margin: 0;">Card mit Warning-Status.</p>
+          </div>
+        </div>
+
+        <div class="card card-interactive">
+          <div class="card-body">
+            <h3 style="margin: 0 0 var(--space-2);">Interactive Card</h3>
+            <p style="margin: 0;">Diese Card reagiert auf Hover (versuche drüberzufahren).</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header card-header-flex">
+            <h3 class="card-header-title" style="margin: 0;">Card mit Actions</h3>
+            <div class="card-header-actions">
+              <button class="btn-ghost btn-sm">Action</button>
+            </div>
+          </div>
+          <div class="card-body">
+            Card mit Header-Actions im Header-Bereich.
+          </div>
+          <div class="card-footer">
+            Footer-Bereich
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forms -->
+    <div class="demo-section">
+      <h2>Form Elements</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <div class="form-group">
+            <label class="form-label">Text Input</label>
+            <input type="text" class="input" placeholder="Gib etwas ein...">
+            <span class="form-help">Hilfstext für das Input-Feld</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label form-label-required">Pflichtfeld</label>
+            <input type="text" class="input input-error" value="Ungültige Eingabe">
+            <span class="form-error">Dieser Wert ist ungültig</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Success State</label>
+            <input type="text" class="input input-success" value="Korrekte Eingabe">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Select</label>
+            <select class="input">
+              <option>Option 1</option>
+              <option>Option 2</option>
+              <option>Option 3</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="form-group">
+            <label class="form-label">Textarea</label>
+            <textarea class="input" rows="4" placeholder="Mehrere Zeilen..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Checkboxen</label>
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+              <label style="display: flex; align-items: center; gap: var(--space-2);">
+                <input type="checkbox" class="checkbox" checked>
+                <span>Option 1 (checked)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: var(--space-2);">
+                <input type="checkbox" class="checkbox">
+                <span>Option 2</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Radio Buttons</label>
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+              <label style="display: flex; align-items: center; gap: var(--space-2);">
+                <input type="radio" class="radio" name="demo" checked>
+                <span>Option A (checked)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: var(--space-2);">
+                <input type="radio" class="radio" name="demo">
+                <span>Option B</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Switch Toggle</label>
+            <label class="switch">
+              <input type="checkbox" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typography -->
+    <div class="demo-section">
+      <h2>Typografie-Skala</h2>
+      <div style="display: flex; flex-direction: column; gap: var(--space-2);">
+        <p style="font-size: var(--font-size-xs);">XS (12px) - var(--font-size-xs)</p>
+        <p style="font-size: var(--font-size-sm);">SM (14px) - var(--font-size-sm)</p>
+        <p style="font-size: var(--font-size-base);">Base (16px) - var(--font-size-base)</p>
+        <p style="font-size: var(--font-size-lg);">LG (20px) - var(--font-size-lg)</p>
+        <p style="font-size: var(--font-size-xl);">XL (25px) - var(--font-size-xl)</p>
+        <p style="font-size: var(--font-size-2xl);">2XL (31px) - var(--font-size-2xl)</p>
+        <p style="font-size: var(--font-size-3xl);">3XL (39px) - var(--font-size-3xl)</p>
+        <p style="font-size: var(--font-size-4xl);">4XL (49px) - var(--font-size-4xl)</p>
+      </div>
+
+      <h3 style="margin-top: var(--space-6); margin-bottom: var(--space-3);">Font Families</h3>
+      <p style="font-family: var(--font-family-base);">
+        Lato (Base) - The quick brown fox jumps over the lazy dog
+      </p>
+      <p style="font-family: var(--font-family-display); font-weight: 700;">
+        Montserrat (Display) - The quick brown fox jumps over the lazy dog
+      </p>
+    </div>
+
+    <!-- Spacing -->
+    <div class="demo-section">
+      <h2>Spacing System (8px Grid)</h2>
+      <div style="display: flex; flex-direction: column; gap: var(--space-3);">
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-1); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-1 (8px)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-2); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-2 (16px)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-3); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-3 (24px)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-4); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-4 (32px)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-6); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-6 (48px)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--space-4);">
+          <div style="width: var(--space-8); height: 40px; background: var(--spa-primary);"></div>
+          <span>space-8 (64px)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Elevation -->
+    <div class="demo-section">
+      <h2>Elevation System (Schatten)</h2>
+      <div class="demo-grid">
+        <div style="padding: var(--space-4); background: white; box-shadow: var(--elevation-1); border-radius: var(--radius-md);">
+          elevation-1
+        </div>
+        <div style="padding: var(--space-4); background: white; box-shadow: var(--elevation-2); border-radius: var(--radius-md);">
+          elevation-2
+        </div>
+        <div style="padding: var(--space-4); background: white; box-shadow: var(--elevation-3); border-radius: var(--radius-md);">
+          elevation-3
+        </div>
+        <div style="padding: var(--space-4); background: white; box-shadow: var(--elevation-4); border-radius: var(--radius-md);">
+          elevation-4
+        </div>
+      </div>
+    </div>
+
+    <!-- Responsive Grid -->
+    <div class="demo-section">
+      <h2>Responsive Grid System</h2>
+      <p style="margin-bottom: var(--space-4);">
+        Verkleinere das Browser-Fenster, um die verschiedenen Breakpoints zu sehen.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="card card-compact">
+          <div class="card-body" style="background: var(--spa-primary); color: white; text-align: center;">
+            1
+          </div>
+        </div>
+        <div class="card card-compact">
+          <div class="card-body" style="background: var(--spa-secondary); color: white; text-align: center;">
+            2
+          </div>
+        </div>
+        <div class="card card-compact">
+          <div class="card-body" style="background: var(--spa-accent); color: white; text-align: center;">
+            3
+          </div>
+        </div>
+        <div class="card card-compact">
+          <div class="card-body" style="background: var(--spa-primary); color: white; text-align: center;">
+            4
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="margin-top: var(--space-8); padding-top: var(--space-6); border-top: 2px solid var(--spa-border-light); text-align: center; opacity: 0.7;">
+      <p>Wellness Design System für HTMLSignage - Saunalandschaft Westfalenbad Hagen</p>
+      <p style="font-size: var(--font-size-sm); margin-top: var(--space-2);">
+        Erstellt mit CSS Layers • Mobile-First • WCAG AA konform
+      </p>
+    </div>
+  </div>
+
+</body>
+</html>
