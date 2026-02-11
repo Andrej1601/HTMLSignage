@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import type { Schedule } from '@/types/schedule.types';
+import type { Settings } from '@/types/settings.types';
+import { API_URL } from '@/config/env';
 
 interface UseWebSocketOptions {
   url?: string;
   autoConnect?: boolean;
-  onScheduleUpdate?: (data: any) => void;
-  onSettingsUpdate?: (data: any) => void;
+  onScheduleUpdate?: (data: Schedule) => void;
+  onSettingsUpdate?: (data: Settings) => void;
   onDeviceCommand?: (command: string) => void;
 }
 
@@ -55,21 +56,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     });
 
     // Schedule updates
-    socket.on('schedule:updated', (data) => {
+    socket.on('schedule:updated', (data: Schedule) => {
       console.log('[WebSocket] Schedule updated:', data);
       onScheduleUpdate?.(data);
     });
 
     // Settings updates
-    socket.on('settings:updated', (data) => {
+    socket.on('settings:updated', (data: Settings) => {
       console.log('[WebSocket] Settings updated:', data);
       onSettingsUpdate?.(data);
     });
 
     // Device commands
-    socket.on('device:command', (data) => {
+    socket.on('device:command', (data: { command?: string }) => {
       console.log('[WebSocket] Device command:', data);
-      onDeviceCommand?.(data.command);
+      if (data?.command) {
+        onDeviceCommand?.(data.command);
+      }
     });
 
     socketRef.current = socket;

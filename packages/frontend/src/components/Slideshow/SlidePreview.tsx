@@ -2,9 +2,10 @@ import { memo } from 'react';
 import type { SlideConfig } from '@/types/slideshow.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
+import type { Media } from '@/types/media.types';
+import type { InfoItem, Settings } from '@/types/settings.types';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { Film, Calendar, Flame, Info } from 'lucide-react';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface SlidePreviewProps {
   slide: SlideConfig;
@@ -99,8 +100,15 @@ function ContentPanelPreview({ className }: { className: string }) {
 }
 
 // Sauna Detail Preview
-function SaunaDetailPreview({ className, saunaId, settings, media }: any) {
-  const sauna = settings?.saunas?.find((s: any) => s.id === saunaId);
+interface SaunaDetailPreviewProps {
+  className: string;
+  saunaId?: string;
+  settings?: Settings;
+  media?: Media[];
+}
+
+function SaunaDetailPreview({ className, saunaId, settings, media }: SaunaDetailPreviewProps) {
+  const sauna = settings?.saunas?.find((s) => s.id === saunaId);
 
   if (!sauna) {
     return (
@@ -110,8 +118,7 @@ function SaunaDetailPreview({ className, saunaId, settings, media }: any) {
     );
   }
 
-  const saunaImage = sauna.imageId ? media?.find((m: any) => m.id === sauna.imageId) : null;
-  const imageUrl = saunaImage ? `${API_URL}/uploads/${saunaImage.filename}` : null;
+  const imageUrl = getMediaUploadUrl(media, sauna.imageId);
 
   return (
     <div className={className}>
@@ -141,18 +148,23 @@ function SaunaDetailPreview({ className, saunaId, settings, media }: any) {
 }
 
 // Media Image Preview
-function MediaImagePreview({ className, mediaId, media }: any) {
-  const mediaItem = media?.find((m: any) => m.id === mediaId);
+interface MediaPreviewProps {
+  className: string;
+  mediaId?: string;
+  media?: Media[];
+}
 
-  if (!mediaItem) {
+function MediaImagePreview({ className, mediaId, media }: MediaPreviewProps) {
+  const mediaItem = media?.find((m) => m.id === mediaId);
+  const imageUrl = getMediaUploadUrl(media, mediaId);
+
+  if (!mediaItem || !imageUrl) {
     return (
       <div className={className}>
         <span className="text-xs text-spa-text-secondary">Kein Bild</span>
       </div>
     );
   }
-
-  const imageUrl = `${API_URL}/uploads/${mediaItem.filename}`;
 
   return (
     <div className={className}>
@@ -170,18 +182,17 @@ function MediaImagePreview({ className, mediaId, media }: any) {
 }
 
 // Media Video Preview
-function MediaVideoPreview({ className, mediaId, media }: any) {
-  const mediaItem = media?.find((m: any) => m.id === mediaId);
+function MediaVideoPreview({ className, mediaId, media }: MediaPreviewProps) {
+  const mediaItem = media?.find((m) => m.id === mediaId);
+  const videoUrl = getMediaUploadUrl(media, mediaId);
 
-  if (!mediaItem) {
+  if (!mediaItem || !videoUrl) {
     return (
       <div className={className}>
         <span className="text-xs text-spa-text-secondary">Kein Video</span>
       </div>
     );
   }
-
-  const videoUrl = `${API_URL}/uploads/${mediaItem.filename}`;
 
   return (
     <div className={className}>
@@ -204,9 +215,9 @@ function MediaVideoPreview({ className, mediaId, media }: any) {
   );
 }
 
-function InfosPreview({ className, infoId, settings }: any) {
-  const infos = (settings as any)?.infos || [];
-  const selected = infoId ? infos.find((i: any) => i.id === infoId) : null;
+function InfosPreview({ className, infoId, settings }: { className: string; infoId?: string; settings?: Settings }) {
+  const infos: InfoItem[] = settings?.infos || [];
+  const selected = infoId ? infos.find((i) => i.id === infoId) : null;
   const title = selected?.title || infos[0]?.title || 'Info';
 
   return (

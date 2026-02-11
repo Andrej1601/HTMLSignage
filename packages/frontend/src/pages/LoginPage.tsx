@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '@/config/env';
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');

@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy } from 'lucide-react';
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 
 interface MediaCardProps {
   media: Media;
@@ -15,7 +14,7 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
   const [copied, setCopied] = useState(false);
 
   // Construct full URL for media
-  const mediaUrl = `${API_URL}${media.url}`;
+  const mediaUrl = toAbsoluteMediaUrl(media.url);
 
   const getIcon = () => {
     switch (media.type) {

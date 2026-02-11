@@ -6,10 +6,9 @@ import type { Media } from '@/types/media.types';
 import type { InfoItem } from '@/types/settings.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
+import { buildUploadUrl } from '@/utils/mediaUrl';
 import { X, Save, Clock, Film } from 'lucide-react';
 import clsx from 'clsx';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface SlideEditorProps {
   slide: Omit<SlideConfig, 'id'> | SlideConfig | null;
@@ -23,7 +22,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
   const { data: media } = useMedia();
 
   const saunas: Sauna[] = settings?.saunas || [];
-  const infos: InfoItem[] = (settings as any)?.infos || [];
+  const infos: InfoItem[] = settings?.infos || [];
   const images = media?.filter((m: Media) => m.type === 'image') || [];
   const videos = media?.filter((m: Media) => m.type === 'video') || [];
 
@@ -46,7 +45,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
         saunaId: slide.saunaId,
         mediaId: slide.mediaId,
         videoPlayback: slide.videoPlayback,
-        infoId: (slide as any).infoId,
+        infoId: slide.infoId,
         title: slide.title,
         showTitle: slide.showTitle,
         transition: slide.transition,
@@ -226,7 +225,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                       >
                         <div className="relative w-full h-24 bg-gray-900">
                           <video
-                            src={`${API_URL}/uploads/${video.filename}`}
+                            src={buildUploadUrl(video.filename)}
                             className="w-full h-full object-cover"
                             muted
                             preload="metadata"
@@ -262,7 +261,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                         )}
                       >
                         <img
-                          src={`${API_URL}/uploads/${img.filename}`}
+                          src={buildUploadUrl(img.filename)}
                           alt={img.originalName}
                           className="w-full h-24 object-cover"
                         />
@@ -426,7 +425,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             <select
               value={formData.transition || 'fade'}
               onChange={(e) =>
-                setFormData({ ...formData, transition: e.target.value as any })
+                setFormData({ ...formData, transition: e.target.value as SlideConfig['transition'] })
               }
               className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
             >

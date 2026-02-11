@@ -13,10 +13,9 @@ import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { getDefaultSettings } from '@/types/settings.types';
 import type { PairingResponse } from '@/types/auth.types';
+import { API_URL, ENV_IS_DEV } from '@/config/env';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 // Generate a unique browser ID (UUID v4)
 function generateBrowserId(): string {
@@ -949,7 +948,7 @@ export function DisplayClientPage() {
       )}
 
       {/* Connection indicator (dev mode) */}
-      {(import.meta as any).env?.DEV && (
+      {ENV_IS_DEV && (
         <div
           className="fixed top-4 right-4 px-3 py-2 rounded-lg text-xs font-mono z-50"
           style={{

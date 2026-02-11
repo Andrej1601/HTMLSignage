@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { Plus, Edit2, Trash2, Users as UsersIcon, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '@/config/env';
 
 interface User {
   id: string;

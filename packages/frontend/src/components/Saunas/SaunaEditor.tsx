@@ -3,10 +3,9 @@ import type { Sauna, SaunaStatus } from '@/types/sauna.types';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
 import { useMedia } from '@/hooks/useMedia';
+import { buildUploadUrl } from '@/utils/mediaUrl';
 import { X, Save, Trash2, Image as ImageIcon, Thermometer, Droplets, Users } from 'lucide-react';
 import clsx from 'clsx';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface SaunaEditorProps {
   sauna: Omit<Sauna, 'id'> | Sauna | null;
@@ -193,7 +192,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
               {selectedImage ? (
                 <div className="relative">
                   <img
-                    src={`${API_URL}/uploads/${selectedImage.filename}`}
+                    src={buildUploadUrl(selectedImage.filename)}
                     alt={selectedImage.originalName}
                     className="w-full h-48 object-cover rounded-lg"
                   />
@@ -219,7 +218,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                   {images.map((img: Media) => (
                     <img
                       key={img.id}
-                      src={`${API_URL}/uploads/${img.filename}`}
+                      src={buildUploadUrl(img.filename)}
                       alt={img.originalName}
                       className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-spa-primary transition-all"
                       onClick={() => {

@@ -2,10 +2,9 @@ import { useState } from 'react';
 import type { Event } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { useMedia } from '@/hooks/useMedia';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { Plus, Edit2, Trash2, X, Save, Calendar, Clock, CheckCircle, XCircle } from 'lucide-react';
 import clsx from 'clsx';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface EventManagerProps {
   events: Event[];
@@ -113,9 +112,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
 
   // Get image for display
   const getImageUrl = (imageId?: string) => {
-    if (!imageId || !media) return null;
-    const image = media.find((m: Media) => m.id === imageId);
-    return image ? `${API_URL}/uploads/${image.filename}` : null;
+    return getMediaUploadUrl(media, imageId);
   };
 
   // Check if event is currently active

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ReactNode } from 'react';
+import { ENV_IS_DEV } from '@/config/env';
 
 interface SlideTransitionProps {
   children: ReactNode;
@@ -27,7 +28,7 @@ export function SlideTransition({
   duration = 0.6,
 }: SlideTransitionProps) {
   // Debug logging (dev only)
-  if ((import.meta as any).env?.DEV) {
+  if (ENV_IS_DEV) {
     console.log('[SlideTransition] Key:', slideKey, 'Enabled:', enabled);
   }
 

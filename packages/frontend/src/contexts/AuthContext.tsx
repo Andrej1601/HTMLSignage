@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '@/config/env';
 
 interface AuthContextType {
   user: User | null;

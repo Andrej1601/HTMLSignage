@@ -1,12 +1,10 @@
 import type { Sauna } from '@/types/sauna.types';
-import type { Media } from '@/types/media.types';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import { MoreVertical, Edit, Trash2, GripVertical, Thermometer, Droplets, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useMedia } from '@/hooks/useMedia';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface SaunaCardProps {
   sauna: Sauna;
@@ -22,8 +20,7 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
   const statusColor = SAUNA_STATUS_COLORS[sauna.status];
 
   // Find image filename if imageId is set
-  const saunaImage = sauna.imageId ? media?.find((m: Media) => m.id === sauna.imageId) : null;
-  const imageUrl = saunaImage ? `${API_URL}/uploads/${saunaImage.filename}` : null;
+  const imageUrl = getMediaUploadUrl(media, sauna.imageId);
 
   return (
     <div

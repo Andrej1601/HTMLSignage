@@ -7,6 +7,8 @@ import {
   getSlidesByZone,
   shouldZoneRotate,
 } from '@/types/slideshow.types';
+import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import { ENV_IS_DEV } from '@/config/env';
 
 interface UseSlideshowOptions {
   settings: Settings;
@@ -67,7 +69,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
   // Per-zone timers: zones must advance independently (a change in one zone must not reset others).
   const zoneTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const zoneTimerKeysRef = useRef<Record<string, string | undefined>>({});
-  const lastTimerConfigRef = useRef<{ slides: unknown; zones: unknown; defaultDuration: number } | null>(null);
+  const lastTimerConfigRef = useRef<{ slides: SlideConfig[]; zones: Zone[]; defaultDuration: number } | null>(null);
 
   const clearAllZoneTimers = useCallback(() => {
     Object.values(zoneTimersRef.current).forEach((t) => {
@@ -185,7 +187,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
   // Debug logging for slide rotation
   useEffect(() => {
-    if (!(import.meta as any).env?.DEV) return;
+    if (!ENV_IS_DEV) return;
 
     const zonesDebug = zones.map((zone) => {
       const zoneSlides = getSlidesByZone(slides, zone.id).filter((s) => s.enabled);
@@ -223,7 +225,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
   // Auto-advance slides per zone
   useEffect(() => {
-    const isDev = Boolean((import.meta as any).env?.DEV);
+    const isDev = ENV_IS_DEV;
     const clearZoneTimer = (zoneId: string) => {
       const existing = zoneTimersRef.current[zoneId];
       if (existing) clearTimeout(existing);

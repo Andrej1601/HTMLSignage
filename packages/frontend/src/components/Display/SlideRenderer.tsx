@@ -15,8 +15,7 @@ import { Calendar, Flame, ShieldCheck } from 'lucide-react';
 import { getDefaultSettings } from '@/types/settings.types';
 import type { InfoItem } from '@/types/settings.types';
 import { formatEventDateDE, formatEventTimeRangeDE, getUpcomingOrActiveEvents, withAlpha } from './wellnessDisplayUtils';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { buildUploadUrl, getMediaUploadUrl } from '@/utils/mediaUrl';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -115,8 +114,7 @@ function SaunaDetailSlide({ sauna, slide }: { sauna?: Sauna; slide: SlideConfig 
   }
 
   // Find image filename if imageId is set
-  const saunaImage = sauna.imageId ? media?.find((m: Media) => m.id === sauna.imageId) : null;
-  const imageUrl = saunaImage ? `${API_URL}/uploads/${saunaImage.filename}` : null;
+  const imageUrl = getMediaUploadUrl(media, sauna.imageId);
 
   return (
     <div
@@ -297,7 +295,7 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
   return (
     <div className="w-full h-full relative">
       <img
-        src={`${API_URL}/uploads/${media.filename}`}
+        src={buildUploadUrl(media.filename)}
         alt={media.originalName}
         className="w-full h-full object-cover"
       />
@@ -320,7 +318,7 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
   return (
     <div className="w-full h-full relative bg-black">
       <video
-        src={`${API_URL}/uploads/${media.filename}`}
+        src={buildUploadUrl(media.filename)}
         className="w-full h-full object-contain"
         autoPlay
         loop={shouldLoop}

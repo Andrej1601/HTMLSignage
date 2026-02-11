@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Check, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { API_URL } from '@/config/env';
 
 export function PendingPairings() {
   const { token } = useAuth();

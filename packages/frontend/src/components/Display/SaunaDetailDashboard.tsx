@@ -4,13 +4,11 @@ import { getActivePresetKey, getTodayPresetKey, normalizeSaunaNameKey } from '@/
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { useMedia } from '@/hooks/useMedia';
-import type { Media } from '@/types/media.types';
 import { Bell, Flame, Thermometer, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
 import { clampFlamesTo4, getScentEmoji, withAlpha } from './wellnessDisplayUtils';
-
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
@@ -263,9 +261,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
 
   const saunaImageUrl = useMemo(() => {
     if (!sauna?.imageId) return null;
-    const item = (media || []).find((m: Media) => m.id === sauna.imageId);
-    if (!item) return null;
-    return `${API_URL}/uploads/${item.filename}`;
+    return getMediaUploadUrl(media, sauna.imageId);
   }, [media, sauna?.imageId]);
 
   const fallbackImage =
