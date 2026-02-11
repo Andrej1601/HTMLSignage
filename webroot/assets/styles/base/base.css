@@ -1,0 +1,214 @@
+/**
+ * Base Styles
+ * HTML-Element-Defaults mit Design Tokens
+ */
+
+@layer base {
+  /* ========================================
+     Root & Body
+     ======================================== */
+  :root {
+    font-size: 16px; /* Base für rem-Einheiten */
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    min-height: 100%;
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    color: var(--spa-text-primary);
+    background-color: var(--spa-bg-primary);
+  }
+
+  /* ========================================
+     Typography
+     ======================================== */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-family-display);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    color: var(--spa-text-primary);
+  }
+
+  h1 {
+    font-size: var(--font-size-h1);
+    font-weight: var(--font-weight-h1);
+    line-height: var(--line-height-h1);
+  }
+
+  h2 {
+    font-size: var(--font-size-h2);
+    font-weight: var(--font-weight-h2);
+    line-height: var(--line-height-h2);
+  }
+
+  h3 {
+    font-size: var(--font-size-h3);
+    font-weight: var(--font-weight-h3);
+    line-height: var(--line-height-h3);
+  }
+
+  h4 {
+    font-size: var(--font-size-h4);
+    font-weight: var(--font-weight-h4);
+    line-height: var(--line-height-h4);
+  }
+
+  h5 {
+    font-size: var(--font-size-h5);
+    font-weight: var(--font-weight-h5);
+    line-height: var(--line-height-h5);
+  }
+
+  h6 {
+    font-size: var(--font-size-h6);
+    font-weight: var(--font-weight-h6);
+    line-height: var(--line-height-h6);
+  }
+
+  p {
+    margin-bottom: var(--space-3);
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ========================================
+     Links
+     ======================================== */
+  a {
+    color: var(--spa-primary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  a:hover {
+    color: var(--spa-primary-dark);
+    text-decoration: underline;
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--spa-focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ========================================
+     Strong & Em
+     ======================================== */
+  strong,
+  b {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  em,
+  i {
+    font-style: italic;
+  }
+
+  /* ========================================
+     Code & Pre
+     ======================================== */
+  code,
+  pre {
+    font-family: var(--font-family-mono);
+    font-size: 0.9em;
+  }
+
+  code {
+    padding: 0.125rem 0.25rem;
+    background-color: var(--spa-bg-secondary);
+    border-radius: var(--radius-sm);
+  }
+
+  pre {
+    padding: var(--space-3);
+    background-color: var(--spa-bg-secondary);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+  }
+
+  pre code {
+    padding: 0;
+    background: none;
+  }
+
+  /* ========================================
+     Lists
+     ======================================== */
+  ul,
+  ol {
+    padding-left: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+
+  li {
+    margin-bottom: var(--space-1);
+  }
+
+  /* ========================================
+     Blockquote
+     ======================================== */
+  blockquote {
+    padding-left: var(--space-4);
+    border-left: 4px solid var(--spa-border-strong);
+    margin: var(--space-4) 0;
+    font-style: italic;
+    color: var(--spa-text-secondary);
+  }
+
+  /* ========================================
+     HR
+     ======================================== */
+  hr {
+    border: none;
+    border-top: 1px solid var(--spa-border-medium);
+    margin: var(--space-4) 0;
+  }
+
+  /* ========================================
+     Small & Muted Text
+     ======================================== */
+  small {
+    font-size: var(--font-size-sm);
+  }
+
+  .muted {
+    color: var(--spa-text-secondary);
+  }
+
+  /* ========================================
+     Selection
+     ======================================== */
+  ::selection {
+    background-color: var(--spa-accent-light);
+    color: var(--spa-text-primary);
+  }
+
+  /* ========================================
+     Focus Visible (Global)
+     ======================================== */
+  *:focus-visible {
+    outline: 2px solid var(--spa-focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* ========================================
+     Disabled State (Global)
+     ======================================== */
+  :disabled {
+    cursor: not-allowed;
+    opacity: var(--spa-disabled-opacity);
+  }
+}
