@@ -26,8 +26,10 @@ export function SlideTransition({
   enabled = true,
   duration = 0.6,
 }: SlideTransitionProps) {
-  // Debug logging
-  console.log('[SlideTransition] Key:', slideKey, 'Enabled:', enabled);
+  // Debug logging (dev only)
+  if ((import.meta as any).env?.DEV) {
+    console.log('[SlideTransition] Key:', slideKey, 'Enabled:', enabled);
+  }
 
   if (!enabled) {
     return <>{children}</>;

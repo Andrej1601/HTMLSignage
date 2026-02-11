@@ -17,7 +17,7 @@ export interface Sauna {
   imageId?: string; // Media ID
   color?: string; // Farbe für visuelle Unterscheidung
   info?: SaunaInfo;
-  description?: string; // Beschreibung für Anzeige
+  description?: string; // Information/Hinweis (im Display als Info-Badge genutzt)
 }
 
 export interface SaunaSettings {

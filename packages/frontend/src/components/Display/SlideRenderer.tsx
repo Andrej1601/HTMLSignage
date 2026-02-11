@@ -6,11 +6,15 @@ import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
+import { normalizeSaunaNameKey } from '@/types/schedule.types';
 import { OverviewSlide } from './OverviewSlide';
 import { ScheduleGridSlide } from './ScheduleGridSlide';
+import { TimelineScheduleSlide } from './TimelineScheduleSlide';
 import { SaunaDetailDashboard } from './SaunaDetailDashboard';
-import { Flame } from 'lucide-react';
+import { Calendar, Flame, ShieldCheck } from 'lucide-react';
 import { getDefaultSettings } from '@/types/settings.types';
+import type { InfoItem } from '@/types/settings.types';
+import { formatEventDateDE, formatEventTimeRangeDE, getUpcomingOrActiveEvents, withAlpha } from './wellnessDisplayUtils';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
@@ -41,11 +45,11 @@ export function SlideRenderer({ slide, onVideoEnded }: SlideRendererProps) {
     case 'media-video':
       return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
 
-    case 'sauna-overview':
-      return <SaunaOverviewSlide saunas={settings.saunas || []} slide={slide} />;
+    case 'infos':
+      return <InfosSlide slide={slide} settings={settings} />;
 
-    case 'current-aufguss':
-      return <CurrentAufgussSlide slide={slide} />;
+    case 'events':
+      return <EventsSlide settings={settings} />;
 
     default:
       return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
@@ -54,7 +58,13 @@ export function SlideRenderer({ slide, onVideoEnded }: SlideRendererProps) {
 
 // Helper functions
 function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
-  return settings.saunas?.find(s => s.id === saunaId);
+  if (!saunaId) return undefined;
+  const list = settings.saunas || [];
+  return (
+    list.find((s) => s.id === saunaId) ||
+    list.find((s) => s.name === saunaId) ||
+    list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
+  );
 }
 
 function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefined {
@@ -64,11 +74,13 @@ function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefin
 // Individual Slide Components
 
 function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; settings: Settings; slide: SlideConfig }) {
-  // Use modern design for 'modern-wellness' designStyle
-  const designStyle = settings.designStyle || 'classic';
+  const designStyle = settings.designStyle || 'modern-wellness';
 
   if (designStyle === 'modern-wellness') {
     return <ScheduleGridSlide schedule={schedule} settings={settings} />;
+  }
+  if (designStyle === 'modern-timeline') {
+    return <TimelineScheduleSlide schedule={schedule} settings={settings} />;
   }
 
   return (
@@ -96,10 +108,9 @@ function SaunaDetailSlide({ sauna, slide }: { sauna?: Sauna; slide: SlideConfig 
   const theme = settings?.theme || defaults.theme!;
   const fonts = settings?.fonts || defaults.fonts!;
 
-  // Use modern design for 'modern-wellness' designStyle
-  const designStyle = settings?.designStyle || 'classic';
+  const designStyle = settings?.designStyle || 'modern-wellness';
 
-  if (designStyle === 'modern-wellness' && schedule) {
+  if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline') && schedule) {
     return <SaunaDetailDashboard schedule={schedule} settings={settings!} saunaId={sauna.id} />;
   }
 
@@ -325,90 +336,114 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
   );
 }
 
-function SaunaOverviewSlide({ saunas, slide }: { saunas: Sauna[]; slide: SlideConfig }) {
-  const { data: media } = useMedia();
-  const visibleSaunas = saunas.filter(s => s.status !== 'hidden');
+function InfosSlide({ slide, settings }: { slide: SlideConfig; settings: Settings }) {
+  const defaults = getDefaultSettings();
+  const theme = settings.theme || defaults.theme!;
+
+  const accentGold = (theme as any).accentGold || theme.accent || '#A68A64';
+  const accentGreen = (theme as any).accentGreen || (theme as any).timeColBg || '#8F9779';
+  const textMain = (theme as any).textMain || theme.fg || '#3E2723';
+  const textMuted = (theme as any).textMuted || theme.fg || '#5D4037';
+
+  const infos: InfoItem[] = (settings as any).infos || [];
+  const selected = slide.infoId ? infos.find((i) => i.id === slide.infoId) : null;
+  const fallback = infos[0] || { id: 'default', title: 'Wellness Tipp', text: 'Bitte beachten Sie unsere Hinweise für einen angenehmen Aufenthalt.' };
+  const info = selected || fallback;
 
   return (
-    <div className="w-full h-full bg-spa-bg-primary p-12">
-      {slide.showTitle && slide.title && (
-        <h1 className="text-6xl font-bold text-spa-text-primary mb-12 text-center">{slide.title}</h1>
-      )}
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-        {visibleSaunas.map(sauna => {
-          // Find image filename if imageId is set
-          const saunaImage = sauna.imageId ? media?.find((m: Media) => m.id === sauna.imageId) : null;
-          const imageUrl = saunaImage ? `${API_URL}/uploads/${saunaImage.filename}` : null;
-
-          return (
-            <div
-              key={sauna.id}
-              className="bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center"
-              style={{ borderTop: `8px solid ${sauna.color || '#8B6F47'}` }}
-            >
-              {imageUrl && (
-                <img
-                  src={imageUrl}
-                  alt={sauna.name}
-                  className="w-full h-48 object-cover rounded-lg mb-6"
-                />
-              )}
-
-              <h2 className="text-4xl font-bold text-spa-text-primary mb-4 text-center">
-                {sauna.name}
-              </h2>
-
-              <div className="flex gap-6 text-center">
-                {sauna.info?.temperature && (
-                  <div>
-                    <div className="text-3xl font-bold" style={{ color: sauna.color || '#8B6F47' }}>
-                      {sauna.info.temperature}°C
-                    </div>
-                  </div>
-                )}
-                {sauna.info?.humidity && (
-                  <div>
-                    <div className="text-3xl font-bold" style={{ color: sauna.color || '#8B6F47' }}>
-                      {sauna.info.humidity}%
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="w-full h-full flex flex-col justify-center">
+      <div className="flex items-center gap-4 mb-3">
+        <div
+          className="p-2.5 rounded-xl border shadow-sm"
+          style={{
+            backgroundColor: `${accentGreen}10`,
+            borderColor: `${accentGreen}20`,
+          }}
+        >
+          <ShieldCheck className="w-5 h-5" style={{ color: accentGreen }} />
+        </div>
+        <h4 className="text-[11px] font-black uppercase tracking-[0.4em]" style={{ color: accentGold }}>
+          {info.title || 'Info'}
+        </h4>
       </div>
+      <p
+        className="text-[15px] leading-relaxed font-bold uppercase tracking-tight italic pl-2 border-l-4"
+        style={{
+          color: textMuted,
+          borderLeftColor: `${accentGreen}20`,
+        }}
+      >
+        {info.text}
+      </p>
+      <div className="sr-only" style={{ color: textMain }} />
     </div>
   );
 }
 
-function CurrentAufgussSlide({ slide }: { slide: SlideConfig }) {
-  // Get current time and find current/next aufguss
-  const now = new Date();
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+function EventsSlide({ settings }: { settings: Settings }) {
+  const defaults = getDefaultSettings();
+  const theme = settings.theme || defaults.theme!;
 
-  // TODO: Implement logic to find current/next aufguss from schedule
-  // For now, show placeholder
+  const accentGold = (theme as any).accentGold || theme.accent || '#A68A64';
+  const accentGreen = (theme as any).accentGreen || (theme as any).timeColBg || '#8F9779';
+  const textMain = (theme as any).textMain || theme.fg || '#3E2723';
+  const cardBg = (theme as any).cardBg || theme.cellBg || '#FFFFFF';
+  const cardBorder = (theme as any).cardBorder || theme.gridTable || '#EBE5D3';
+
+  const events = getUpcomingOrActiveEvents(settings, new Date());
 
   return (
-    <div className="w-full h-full bg-gradient-to-br from-spa-primary to-spa-primary-dark flex flex-col items-center justify-center p-12 text-white">
-      <div className="text-8xl font-bold mb-8">{currentTime}</div>
-
-      {slide.showTitle && slide.title && (
-        <h1 className="text-6xl font-bold mb-12">{slide.title}</h1>
-      )}
-
-      <div className="text-4xl text-center mb-8">
-        Aktueller Aufguss
+    <div className="w-full h-full flex flex-col justify-center">
+      <div className="flex items-center gap-4 mb-3">
+        <div
+          className="p-2.5 rounded-xl border shadow-sm"
+          style={{
+            backgroundColor: `${accentGold}10`,
+            borderColor: `${accentGold}20`,
+          }}
+        >
+          <Calendar className="w-5 h-5" style={{ color: accentGold }} />
+        </div>
+        <h4 className="text-[11px] font-black uppercase tracking-[0.4em]" style={{ color: accentGold }}>
+          Events
+        </h4>
       </div>
 
-      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-12 max-w-4xl">
-        <h2 className="text-7xl font-bold mb-6">Finnische Sauna</h2>
-        <p className="text-3xl mb-8">Classic Aufguss</p>
-        <div className="text-2xl opacity-80">
-          15:00 Uhr • 15 Minuten
-        </div>
+      <div className="flex gap-4">
+        {events.length === 0 ? (
+          <div
+            className="flex-1 p-3 rounded-2xl border"
+            style={{
+              backgroundColor: withAlpha(cardBg, 0.35),
+              borderColor: withAlpha(cardBorder, 0.6),
+              color: textMain,
+            }}
+          >
+            <div className="text-sm font-black uppercase leading-tight mb-1">Keine Events geplant</div>
+            <div className="text-[9px] font-bold uppercase opacity-70">Demnaechst mehr</div>
+          </div>
+        ) : (
+          events.map((event) => (
+            <div
+              key={event.id}
+              className="flex-1 p-3 rounded-2xl border"
+              style={{
+                backgroundColor: withAlpha(cardBg, 0.35),
+                borderColor: withAlpha(cardBorder, 0.6),
+              }}
+            >
+              <div className="text-[10px] font-black uppercase tracking-widest mb-1" style={{ color: accentGreen }}>
+                {formatEventDateDE(event)}
+              </div>
+              <div className="text-sm font-black uppercase leading-tight mb-1" style={{ color: textMain }}>
+                {event.name}
+              </div>
+              <div className="text-[9px] font-bold uppercase" style={{ color: withAlpha(textMain, 0.58) }}>
+                {formatEventTimeRangeDE(event)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

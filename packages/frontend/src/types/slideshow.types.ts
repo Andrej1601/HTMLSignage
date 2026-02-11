@@ -6,20 +6,15 @@ export type SlideType =
   | 'sauna-detail' // Individual sauna with info
   | 'media-image' // Image from media library
   | 'media-video' // Video from media library
-  | 'sauna-overview' // All saunas overview
-  | 'current-aufguss'; // Current/next aufguss highlight
+  | 'infos' // Info panel (wellness tips, house rules, etc.)
+  | 'events'; // Events panel
 
 // Layout options for the slideshow display
 export type LayoutType =
   | 'split-view' // Persistent panel + rotating content
   | 'full-rotation' // Full screen rotation of all slides
-  | 'picture-in-picture' // Small persistent panel overlay on content
-  | 'carousel' // Persistent panel top/bottom, carousel in middle
-  | 'sidebar-left' // Sidebar left, content main area
-  | 'sidebar-right' // Sidebar right, content main area
   | 'triple-view' // 1 left, 2 right (stacked) - Dashboard style
-  | 'grid-2x2' // 4 items in 2x2 grid
-  | 'grid-3x3'; // 9 items in 3x3 grid
+  | 'grid-2x2'; // 4 items in 2x2 grid
 
 // Video playback behavior
 export type VideoPlaybackMode =
@@ -55,6 +50,7 @@ export interface SlideConfig {
   saunaId?: string; // For sauna-detail
   mediaId?: string; // For media-image, media-video
   videoPlayback?: VideoPlaybackMode; // For media-video
+  infoId?: string; // For infos
 
   // Display options
   title?: string; // Custom title override
@@ -109,7 +105,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
       { id: 'main', name: 'Rotierender Content', type: 'rotating' },
     ],
     supportsPersistentZone: true,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'media-video', 'sauna-overview'],
+    supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'infos', 'events'],
   },
   {
     type: 'full-rotation',
@@ -125,57 +121,9 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
       'sauna-detail',
       'media-image',
       'media-video',
-      'sauna-overview',
-      'current-aufguss',
+      'infos',
+      'events',
     ],
-  },
-  {
-    type: 'picture-in-picture',
-    label: 'Picture-in-Picture',
-    description: 'Kleines persistentes Overlay über Content',
-    icon: '📺',
-    zones: [
-      { id: 'persistent', name: 'Overlay', type: 'smart-persistent', size: 25 },
-      { id: 'main', name: 'Hintergrund Content', type: 'rotating' },
-    ],
-    supportsPersistentZone: true,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'media-video', 'sauna-overview'],
-  },
-  {
-    type: 'carousel',
-    label: 'Carousel',
-    description: 'Persistenter Bereich oben/unten, Content-Carousel in der Mitte',
-    icon: '🎠',
-    zones: [
-      { id: 'persistent', name: 'Persistenter Bereich', type: 'smart-persistent', position: 'top', size: 30 },
-      { id: 'main', name: 'Carousel', type: 'rotating' },
-    ],
-    supportsPersistentZone: true,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'media-video', 'sauna-overview'],
-  },
-  {
-    type: 'sidebar-left',
-    label: 'Sidebar Links',
-    description: 'Persistenter Bereich als Sidebar links, Content nimmt Hauptbereich',
-    icon: '📋',
-    zones: [
-      { id: 'persistent', name: 'Sidebar', type: 'smart-persistent', position: 'left', size: 30 },
-      { id: 'main', name: 'Hauptbereich', type: 'rotating' },
-    ],
-    supportsPersistentZone: true,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'media-video', 'sauna-overview'],
-  },
-  {
-    type: 'sidebar-right',
-    label: 'Sidebar Rechts',
-    description: 'Persistenter Bereich als Sidebar rechts, Content nimmt Hauptbereich',
-    icon: '📄',
-    zones: [
-      { id: 'persistent', name: 'Sidebar', type: 'smart-persistent', position: 'right', size: 30 },
-      { id: 'main', name: 'Hauptbereich', type: 'rotating' },
-    ],
-    supportsPersistentZone: true,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'media-video', 'sauna-overview'],
   },
   {
     type: 'triple-view',
@@ -188,7 +136,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
       { id: 'bottom-right', name: 'Rechts Unten', type: 'smart-persistent', position: 'bottom', size: 50 },
     ],
     supportsPersistentZone: true,
-    supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'sauna-overview', 'current-aufguss'],
+    supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'infos', 'events'],
   },
   {
     type: 'grid-2x2',
@@ -202,26 +150,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
       { id: 'zone-4', name: 'Unten Rechts', type: 'rotating' },
     ],
     supportsPersistentZone: false,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'sauna-overview', 'current-aufguss'],
-  },
-  {
-    type: 'grid-3x3',
-    label: '3x3 Grid',
-    description: '9 Inhalte gleichzeitig in 3x3 Grid',
-    icon: '▦',
-    zones: [
-      { id: 'zone-1', name: 'Position 1', type: 'rotating' },
-      { id: 'zone-2', name: 'Position 2', type: 'rotating' },
-      { id: 'zone-3', name: 'Position 3', type: 'rotating' },
-      { id: 'zone-4', name: 'Position 4', type: 'rotating' },
-      { id: 'zone-5', name: 'Position 5', type: 'rotating' },
-      { id: 'zone-6', name: 'Position 6', type: 'rotating' },
-      { id: 'zone-7', name: 'Position 7', type: 'rotating' },
-      { id: 'zone-8', name: 'Position 8', type: 'rotating' },
-      { id: 'zone-9', name: 'Position 9', type: 'rotating' },
-    ],
-    supportsPersistentZone: false,
-    supportedSlideTypes: ['sauna-detail', 'media-image', 'sauna-overview'],
+    supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'infos', 'events'],
   },
 ];
 
@@ -274,19 +203,19 @@ export const SLIDE_TYPE_OPTIONS: SlideTypeOption[] = [
     supportsVideo: true,
   },
   {
-    type: 'sauna-overview',
-    label: 'Sauna Übersicht',
-    description: 'Zeigt alle Saunas auf einmal',
-    icon: '🏛️',
+    type: 'infos',
+    label: 'Infos',
+    description: 'Wellness-Tipps / Hinweise aus den Einstellungen',
+    icon: 'ℹ️',
     requiresSauna: false,
     requiresMedia: false,
     supportsVideo: false,
   },
   {
-    type: 'current-aufguss',
-    label: 'Aktueller Aufguss',
-    description: 'Hebt den aktuellen/nächsten Aufguss hervor',
-    icon: '⏰',
+    type: 'events',
+    label: 'Events',
+    description: 'Zeigt kommende Events aus den Einstellungen',
+    icon: '📆',
     requiresSauna: false,
     requiresMedia: false,
     supportsVideo: false,
@@ -345,12 +274,15 @@ export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex:
 // Zone helper functions
 export function getZonesForLayout(layoutType: LayoutType): Zone[] {
   const layout = getLayoutOption(layoutType);
-  return layout?.zones || [];
+  if (layout) return layout.zones;
+  // Fallback for legacy/unknown layouts so the UI/display doesn't break hard.
+  return getLayoutOption('split-view')?.zones || [];
 }
 
 export function getSlidesByZone(slides: SlideConfig[], zoneId: string): SlideConfig[] {
   return slides
-    .filter((slide) => slide.zoneId === zoneId)
+    // Backward-compatible default: slides without a zoneId belong to "main".
+    .filter((slide) => (slide.zoneId || 'main') === zoneId)
     .sort((a, b) => a.order - b.order);
 }
 
@@ -386,7 +318,7 @@ export function shouldZoneRotate(zone: Zone, slides: SlideConfig[]): boolean {
 
   switch (zone.type) {
     case 'rotating':
-      return true;
+      return enabledSlides.length >= 2;
     case 'persistent':
       return false;
     case 'smart-persistent':

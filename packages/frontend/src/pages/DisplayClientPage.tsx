@@ -5,13 +5,16 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSlideshow } from '@/hooks/useSlideshow';
 import { OverviewSlide } from '@/components/Display/OverviewSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
-import { DisplayHeader } from '@/components/Display/DisplayHeader';
 import { ScheduleGridSlide } from '@/components/Display/ScheduleGridSlide';
+import { TimelineScheduleSlide } from '@/components/Display/TimelineScheduleSlide';
 import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard';
 import { SlideTransition } from '@/components/Display/SlideTransition';
+import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
+import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { getDefaultSettings } from '@/types/settings.types';
 import type { PairingResponse } from '@/types/auth.types';
 import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
@@ -46,8 +49,11 @@ export function DisplayClientPage() {
 
   // Check pairing status
   useEffect(() => {
-    const checkPairing = async () => {
-      setIsPairingLoading(true);
+    let isMounted = true;
+
+    const checkPairing = async (opts?: { silent?: boolean }) => {
+      const silent = Boolean(opts?.silent);
+      if (!silent && isMounted) setIsPairingLoading(true);
       try {
         const response = await fetch(`${API_URL}/api/devices/request-pairing`, {
           method: 'POST',
@@ -59,20 +65,37 @@ export function DisplayClientPage() {
 
         if (response.ok) {
           const data: PairingResponse = await response.json();
-          setPairingInfo(data);
+          if (isMounted) {
+            setPairingInfo((prev) => {
+              if (
+                prev &&
+                prev.id === data.id &&
+                prev.paired === data.paired &&
+                prev.pairingCode === data.pairingCode &&
+                prev.name === data.name
+              ) {
+                return prev;
+              }
+              return data;
+            });
+          }
         }
       } catch (error) {
         console.error('[Display] Pairing check failed:', error);
       } finally {
-        setIsPairingLoading(false);
+        if (!silent && isMounted) setIsPairingLoading(false);
       }
     };
 
-    checkPairing();
+    // First load: show a blocking loading state.
+    checkPairing({ silent: false });
 
     // Re-check pairing every 10 seconds
-    const interval = setInterval(checkPairing, 10000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => checkPairing({ silent: true }), 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [browserId]);
 
   // Update local state when data is fetched
@@ -218,14 +241,31 @@ export function DisplayClientPage() {
     );
   }
 
-  // If no slides configured, show default overview
-  if (!currentSlide || totalSlides === 0) {
-    const designStyle = localSettings.designStyle || 'classic';
+  const designStyle = localSettings.designStyle || 'modern-wellness';
+  const isModernWellness = designStyle === 'modern-wellness';
+  const isModernTimeline = designStyle === 'modern-timeline';
+  const isModernDesign = isModernWellness || isModernTimeline;
 
+  const renderContentPanel = () => {
+    if (isModernTimeline) {
+      return <TimelineScheduleSlide schedule={localSchedule} settings={localSettings} />;
+    }
+    return <ScheduleGridSlide schedule={localSchedule} settings={localSettings} />;
+  };
+
+  // Safety: old configs might contain legacy layout strings; render them as split-view instead of breaking.
+  const safeLayout = (['split-view', 'full-rotation', 'triple-view', 'grid-2x2'] as const).includes(layout as any)
+    ? layout
+    : 'split-view';
+
+  const hasAnyZoneSlides = zones.some((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
+
+  // If no slides configured, show default overview
+  if (!hasAnyZoneSlides) {
     return (
       <div className="w-full h-screen overflow-hidden">
-        {designStyle === 'modern-wellness' ? (
-          <ScheduleGridSlide schedule={localSchedule} settings={localSettings} />
+        {isModernDesign ? (
+          renderContentPanel()
         ) : (
           <OverviewSlide schedule={localSchedule} settings={localSettings} />
         )}
@@ -235,169 +275,474 @@ export function DisplayClientPage() {
 
   // Get defaults for header and theme
   const defaults = getDefaultSettings();
-  const headerSettings = localSettings.header || defaults.header!;
   const themeColors = localSettings.theme || defaults.theme!;
 
   // Render based on layout
   const renderLayout = () => {
-    switch (layout) {
-      case 'full-rotation':
-        return (
-          <SlideTransition
-            slideKey={currentSlide?.id || currentSlideIndex}
-            enabled={enableTransitions}
-            duration={0.6}
-          >
-            <SlideRenderer slide={currentSlide} onVideoEnded={onVideoEnded} />
-          </SlideTransition>
-        );
+    const renderSplitLikeLayout = () => {
+      // Get zones for this layout
+      const splitZones = zones.filter((z) => z.id === 'persistent' || z.id === 'main');
+      const persistentZone = splitZones.find((z) => z.id === 'persistent');
+      const mainZone = splitZones.find((z) => z.id === 'main');
 
-      case 'split-view':
-        // Get zones for this layout
-        const splitZones = zones.filter((z) => z.id === 'persistent' || z.id === 'main');
-        const persistentZone = splitZones.find((z) => z.id === 'persistent');
-        const mainZone = splitZones.find((z) => z.id === 'main');
+      const gridSizePercent = persistentZone?.size || 50;
+      const isVertical = persistentZone?.position === 'left' || persistentZone?.position === 'right';
+      const scheduleFirst = persistentZone?.position === 'left' || persistentZone?.position === 'top';
 
-        const gridSizePercent = persistentZone?.size || 50;
-        const isVertical = persistentZone?.position === 'left' || persistentZone?.position === 'right';
-        const scheduleFirst = persistentZone?.position === 'left' || persistentZone?.position === 'top';
+      // Get slides for each zone
+      const persistentSlide = persistentZone ? getZoneSlide(persistentZone.id) : null;
+      const persistentInfo = persistentZone ? getZoneInfo(persistentZone.id) : null;
+      const mainSlide = mainZone ? getZoneSlide(mainZone.id) : null;
+      const mainInfo = mainZone ? getZoneInfo(mainZone.id) : null;
 
-        // Get slides for each zone
-        const persistentSlide = persistentZone ? getZoneSlide(persistentZone.id) : null;
-        const persistentInfo = persistentZone ? getZoneInfo(persistentZone.id) : null;
-        const mainSlide = mainZone ? getZoneSlide(mainZone.id) : currentSlide;
+      const theme = themeColors as any;
+      const leftBg = theme.zebra1 || '#F7F3E9';
+      const rightBg = theme.zebra2 || '#F2EDE1';
+      const border = theme.gridTable || '#EBE5D3';
 
-        if (isVertical) {
+      const hasPersistent = Boolean(persistentSlide);
+      const hasMain = Boolean(mainSlide);
+
+      const persistentSize = hasPersistent && hasMain ? gridSizePercent : hasPersistent ? 100 : 0;
+      const mainSize = hasPersistent && hasMain ? 100 - gridSizePercent : hasMain ? 100 : 0;
+
+      const renderZoneSlide = (
+        slide: any,
+        zone: any,
+      ) => {
+        if (!slide) {
           return (
-            <div className="w-full h-full flex">
-              {scheduleFirst && persistentSlide && (
-                <div style={{ width: `${gridSizePercent}%` }}>
-                  <SlideTransition
-                    slideKey={persistentSlide?.id || 'persistent'}
-                    enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                    duration={0.6}
-                  >
-                    <SlideRenderer
-                      slide={persistentSlide}
-                      onVideoEnded={() => persistentZone && onVideoEnded(persistentZone.id)}
-                    />
-                  </SlideTransition>
-                </div>
-              )}
-              <div style={{ width: `${100 - gridSizePercent}%` }}>
-                <SlideTransition
-                  slideKey={mainSlide?.id || currentSlideIndex}
-                  enabled={enableTransitions}
-                  duration={0.6}
-                >
-                  <SlideRenderer
-                    slide={mainSlide}
-                    onVideoEnded={() => mainZone && onVideoEnded(mainZone.id)}
-                  />
-                </SlideTransition>
-              </div>
-              {!scheduleFirst && persistentSlide && (
-                <div style={{ width: `${gridSizePercent}%` }}>
-                  <SlideTransition
-                    slideKey={persistentSlide?.id || 'persistent'}
-                    enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                    duration={0.6}
-                  >
-                    <SlideRenderer
-                      slide={persistentSlide}
-                      onVideoEnded={() => persistentZone && onVideoEnded(persistentZone.id)}
-                    />
-                  </SlideTransition>
-                </div>
-              )}
+            <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
+              Keine Slides
             </div>
           );
-        } else {
+        }
+
+        const isMedia = typeof slide.type === 'string' && slide.type.startsWith('media-');
+        const needsPadding = isModernDesign && (isMedia || slide.type === 'infos' || slide.type === 'events');
+
+        const rendered = (
+          <SlideRenderer slide={slide} onVideoEnded={() => zone && onVideoEnded(zone.id)} />
+        );
+
+        if (!needsPadding) return rendered;
+
+        if (isMedia) {
           return (
-            <div className="w-full h-full flex flex-col">
-              {scheduleFirst && persistentSlide && (
-                <div style={{ height: `${gridSizePercent}%` }}>
+            <div className="p-8 w-full h-full">
+              <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
+                {rendered}
+              </div>
+            </div>
+          );
+        }
+
+        return <div className="p-8 w-full h-full">{rendered}</div>;
+      };
+
+      if (isVertical) {
+        return (
+          <div className="w-full h-full flex">
+            {scheduleFirst ? (
+              <>
+                {hasPersistent && (
+                  <div
+                    className={clsx(isModernDesign && hasMain && 'border-r')}
+                    style={{
+                      width: `${persistentSize}%`,
+                      borderColor: isModernDesign ? border : undefined,
+                      backgroundColor: isModernDesign ? leftBg : undefined,
+                    }}
+                  >
+                    <SlideTransition
+                      slideKey={persistentSlide?.id || 'persistent'}
+                      enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
+                      duration={0.6}
+                    >
+                      {renderZoneSlide(persistentSlide, persistentZone)}
+                    </SlideTransition>
+                  </div>
+                )}
+
+                {hasMain && (
+                  <div
+                    style={{
+                      width: `${mainSize}%`,
+                      backgroundColor: isModernDesign ? rightBg : undefined,
+                    }}
+                  >
+                    <SlideTransition
+                      slideKey={mainSlide?.id || 'main'}
+                      enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
+                      duration={0.6}
+                    >
+                      {renderZoneSlide(mainSlide, mainZone)}
+                    </SlideTransition>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {hasMain && (
+                  <div
+                    className={clsx(isModernDesign && hasPersistent && 'border-r')}
+                    style={{
+                      width: `${mainSize}%`,
+                      borderColor: isModernDesign ? border : undefined,
+                      backgroundColor: isModernDesign ? leftBg : undefined,
+                    }}
+                  >
+                    <SlideTransition
+                      slideKey={mainSlide?.id || 'main'}
+                      enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
+                      duration={0.6}
+                    >
+                      {renderZoneSlide(mainSlide, mainZone)}
+                    </SlideTransition>
+                  </div>
+                )}
+
+                {hasPersistent && (
+                  <div
+                    style={{
+                      width: `${persistentSize}%`,
+                      backgroundColor: isModernDesign ? rightBg : undefined,
+                    }}
+                  >
+                    <SlideTransition
+                      slideKey={persistentSlide?.id || 'persistent'}
+                      enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
+                      duration={0.6}
+                    >
+                      {renderZoneSlide(persistentSlide, persistentZone)}
+                    </SlideTransition>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="w-full h-full flex flex-col">
+          {scheduleFirst ? (
+            <>
+              {hasPersistent && (
+                <div
+                  className={clsx(isModernDesign && hasMain && 'border-b')}
+                  style={{
+                    height: `${persistentSize}%`,
+                    borderColor: isModernDesign ? border : undefined,
+                    backgroundColor: isModernDesign ? leftBg : undefined,
+                  }}
+                >
                   <SlideTransition
                     slideKey={persistentSlide?.id || 'persistent'}
                     enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                     duration={0.6}
                   >
-                    <SlideRenderer
-                      slide={persistentSlide}
-                      onVideoEnded={() => persistentZone && onVideoEnded(persistentZone.id)}
-                    />
+                    {renderZoneSlide(persistentSlide, persistentZone)}
                   </SlideTransition>
                 </div>
               )}
-              <div style={{ height: `${100 - gridSizePercent}%` }}>
-                <SlideTransition
-                  slideKey={mainSlide?.id || currentSlideIndex}
-                  enabled={enableTransitions}
-                  duration={0.6}
+
+              {hasMain && (
+                <div
+                  style={{
+                    height: `${mainSize}%`,
+                    backgroundColor: isModernDesign ? rightBg : undefined,
+                  }}
                 >
-                  <SlideRenderer
-                    slide={mainSlide}
-                    onVideoEnded={() => mainZone && onVideoEnded(mainZone.id)}
-                  />
-                </SlideTransition>
-              </div>
-              {!scheduleFirst && persistentSlide && (
-                <div style={{ height: `${gridSizePercent}%` }}>
+                  <SlideTransition
+                    slideKey={mainSlide?.id || 'main'}
+                    enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
+                    duration={0.6}
+                  >
+                    {renderZoneSlide(mainSlide, mainZone)}
+                  </SlideTransition>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {hasMain && (
+                <div
+                  className={clsx(isModernDesign && hasPersistent && 'border-b')}
+                  style={{
+                    height: `${mainSize}%`,
+                    borderColor: isModernDesign ? border : undefined,
+                    backgroundColor: isModernDesign ? leftBg : undefined,
+                  }}
+                >
+                  <SlideTransition
+                    slideKey={mainSlide?.id || 'main'}
+                    enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
+                    duration={0.6}
+                  >
+                    {renderZoneSlide(mainSlide, mainZone)}
+                  </SlideTransition>
+                </div>
+              )}
+
+              {hasPersistent && (
+                <div
+                  style={{
+                    height: `${persistentSize}%`,
+                    backgroundColor: isModernDesign ? rightBg : undefined,
+                  }}
+                >
                   <SlideTransition
                     slideKey={persistentSlide?.id || 'persistent'}
                     enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                     duration={0.6}
                   >
-                    <SlideRenderer
-                      slide={persistentSlide}
-                      onVideoEnded={() => persistentZone && onVideoEnded(persistentZone.id)}
-                    />
+                    {renderZoneSlide(persistentSlide, persistentZone)}
                   </SlideTransition>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    };
+
+    switch (safeLayout) {
+      case 'full-rotation':
+        {
+          const zoneWithSlides = zones.find((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
+          const zoneId = zoneWithSlides?.id || zones[0]?.id || 'main';
+          const slide = getZoneSlide(zoneId) || currentSlide;
+          if (!slide) return null;
+
+          const isMedia = isModernDesign && typeof slide.type === 'string' && slide.type.startsWith('media-');
+          const needsPadding = isModernDesign && (isMedia || slide.type === 'infos' || slide.type === 'events');
+
+          const rendered = (
+            <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+          );
+
+          return (
+            <SlideTransition
+              slideKey={slide?.id || currentSlideIndex}
+              enabled={enableTransitions}
+              duration={0.6}
+            >
+              {needsPadding ? (
+                isMedia ? (
+                  <div className="p-8 w-full h-full">
+                    <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
+                      {rendered}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 w-full h-full">{rendered}</div>
+                )
+              ) : (
+                rendered
+              )}
+            </SlideTransition>
+          );
+        }
+
+      case 'split-view':
+        return renderSplitLikeLayout();
+
+      case 'triple-view':
+        if (isModernDesign) {
+          const tripleZones = zones.filter((z) => z.id === 'left' || z.id === 'top-right' || z.id === 'bottom-right');
+          const leftZone = tripleZones.find((z) => z.id === 'left');
+          const topRightZone = tripleZones.find((z) => z.id === 'top-right');
+          const bottomRightZone = tripleZones.find((z) => z.id === 'bottom-right');
+
+          const leftSlide = leftZone ? getZoneSlide(leftZone.id) : null;
+          const topRightSlide = topRightZone ? getZoneSlide(topRightZone.id) : null;
+          const bottomRightSlide = bottomRightZone ? getZoneSlide(bottomRightZone.id) : null;
+
+          const topRightInfo = topRightZone ? getZoneInfo(topRightZone.id) : null;
+
+          const leftSize = leftZone?.size || (isModernTimeline ? 65 : 60);
+          const rightSize = 100 - leftSize;
+          const topDurationSec = (topRightSlide?.duration ?? 12);
+
+          const theme = themeColors as any;
+          const leftBg = theme.zebra1 || '#F7F3E9';
+          const rightBg = theme.zebra2 || '#F2EDE1';
+          const border = theme.gridTable || '#EBE5D3';
+          const bottomBg = withAlpha(rightBg, 0.6);
+
+          const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
+          const accentGold = theme.accentGold || theme.accent || '#A68A64';
+
+          return (
+            <div className="w-full h-full flex relative overflow-hidden">
+              {/* Left Panel: Content grid/timeline or media */}
+              <div
+                className="h-full relative overflow-hidden border-r"
+                style={{
+                  width: `${leftSize}%`,
+                  backgroundColor: leftBg,
+                  borderColor: border,
+                }}
+              >
+                <AnimatePresence mode="wait">
+                  {!leftSlide || leftSlide.type === 'content-panel' ? (
+                    <motion.div
+                      key={`content-panel-${designStyle}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1 }}
+                      className="w-full h-full"
+                    >
+                      {renderContentPanel()}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key={leftSlide?.id || 'media-left'}
+                      initial={{ x: -100, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      exit={{ x: 100, opacity: 0 }}
+                      transition={{ duration: 1.2 }}
+                      className="w-full h-full"
+                    >
+                      {leftSlide?.type?.startsWith('media-') ? (
+                        <div className="p-5 w-full h-full">
+                          <div className="w-full h-full rounded-[2.5rem] overflow-hidden border-[6px] border-white shadow-xl">
+                            <SlideRenderer
+                              slide={leftSlide}
+                              onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <SlideRenderer
+                          slide={leftSlide}
+                          onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
+                        />
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Right Panel (40%): Detail + Bottom */}
+              <div
+                className="h-full flex flex-col relative overflow-hidden"
+                style={{
+                  width: `${rightSize}%`,
+                  backgroundColor: rightBg,
+                }}
+              >
+                {/* Right Top */}
+                <div className="flex-1 relative overflow-hidden flex flex-col">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={topRightSlide?.id || topRightInfo?.currentSlideIndex || 0}
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -30 }}
+                      transition={{ duration: 1.2, ease: 'easeOut' }}
+                      className="absolute inset-0 flex flex-col"
+                    >
+                      {topRightSlide?.type === 'sauna-detail' ? (
+                        <SaunaDetailDashboard
+                          schedule={localSchedule}
+                          settings={localSettings}
+                          saunaId={topRightSlide.saunaId}
+                        />
+                      ) : topRightSlide ? (
+                        topRightSlide.type?.startsWith('media-') ? (
+                          <div className="p-5 w-full h-full">
+                            <div className="w-full h-full rounded-[2.3rem] overflow-hidden border-[6px] border-white shadow-xl">
+                              <SlideRenderer
+                                slide={topRightSlide}
+                                onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full">
+                            <SlideRenderer
+                              slide={topRightSlide}
+                              onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
+                            />
+                          </div>
+                        )
+                      ) : (
+                        <SaunaDetailDashboard schedule={localSchedule} settings={localSettings} saunaId={undefined} />
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                {/* Right Bottom */}
+                <div
+                  className="h-56 p-8 border-t relative shrink-0 overflow-hidden"
+                  style={{
+                    backgroundColor: bottomBg,
+                    borderColor: border,
+                  }}
+                >
+                  <AnimatePresence mode="wait">
+                    {bottomRightSlide ? (
+                      <motion.div
+                        key={bottomRightSlide.id || 'bottom-slide'}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -20, opacity: 0 }}
+                        className="w-full h-full"
+                      >
+                        {bottomRightSlide.type?.startsWith('media-') ? (
+                          <div className="p-2 w-full h-full">
+                            <div className="w-full h-full rounded-[1.8rem] overflow-hidden border-4 border-white shadow-lg">
+                              <SlideRenderer
+                                slide={bottomRightSlide}
+                                onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <SlideRenderer
+                            slide={bottomRightSlide}
+                            onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
+                          />
+                        )}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="bottom-fallback"
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -20, opacity: 0 }}
+                        className="w-full h-full"
+                      >
+                        <WellnessBottomPanel settings={localSettings} theme={themeColors} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              {(topRightInfo?.shouldRotate || false) && (
+                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/[0.03]">
+                  <motion.div
+                    key={topRightSlide?.id || topRightInfo?.currentSlideIndex || 0}
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: topDurationSec, ease: 'linear' }}
+                    className="h-full"
+                    style={{
+                      background: `linear-gradient(to right, ${accentGreen}, ${accentGold})`,
+                    }}
+                  />
                 </div>
               )}
             </div>
           );
         }
 
-      case 'picture-in-picture':
-        // Get zones for this layout
-        const pipZones = zones.filter((z) => z.id === 'overlay' || z.id === 'main');
-        const overlayZone = pipZones.find((z) => z.id === 'overlay');
-        const pipMainZone = pipZones.find((z) => z.id === 'main');
-
-        const overlaySlide = overlayZone ? getZoneSlide(overlayZone.id) : null;
-        const pipMainSlide = pipMainZone ? getZoneSlide(pipMainZone.id) : currentSlide;
-
-        return (
-          <div className="w-full h-full relative">
-            <SlideTransition
-              slideKey={pipMainSlide?.id || 'main'}
-              enabled={enableTransitions}
-              duration={0.6}
-            >
-              <SlideRenderer
-                slide={pipMainSlide}
-                onVideoEnded={() => pipMainZone && onVideoEnded(pipMainZone.id)}
-              />
-            </SlideTransition>
-            {overlaySlide && (
-              <div className="absolute top-8 right-8 w-1/3 h-1/3 shadow-2xl rounded-lg overflow-hidden">
-                <SlideTransition
-                  slideKey={overlaySlide?.id || 'overlay'}
-                  enabled={enableTransitions}
-                  duration={0.6}
-                >
-                  <SlideRenderer
-                    slide={overlaySlide}
-                    onVideoEnded={() => overlayZone && onVideoEnded(overlayZone.id)}
-                  />
-                </SlideTransition>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'triple-view':
         // Get zones for this layout
         const tripleZones = zones.filter((z) => z.id === 'left' || z.id === 'top-right' || z.id === 'bottom-right');
         const leftZone = tripleZones.find((z) => z.id === 'left');
@@ -492,36 +837,87 @@ export function DisplayClientPage() {
           </div>
         );
 
-      case 'carousel':
-      case 'sidebar-left':
-      case 'sidebar-right':
-        // Similar to split-view
-        return renderLayout(); // Fallback to split-view for now
-
       case 'grid-2x2':
-      case 'grid-3x3':
-        // Grid layouts would show multiple slides at once
-        // For now, show single slide
-        return (
-          <SlideTransition
-            slideKey={currentSlide?.id || currentSlideIndex}
-            enabled={enableTransitions}
-            duration={0.6}
-          >
-            <SlideRenderer slide={currentSlide} onVideoEnded={onVideoEnded} />
-          </SlideTransition>
-        );
+        {
+          const theme = themeColors as any;
+          const border = theme.gridTable || '#EBE5D3';
+          const bgBase = theme.dashboardBg || theme.bg || '#FDFBF7';
+          const bg1 = theme.zebra1 || bgBase;
+          const bg2 = theme.zebra2 || bgBase;
+
+          const cellBgForIndex = (idx: number) => {
+            // Checker pattern (TL/TR/BL/BR): 1/2/2/1
+            return idx === 0 || idx === 3 ? bg1 : bg2;
+          };
+
+          const renderCell = (zoneId: string) => {
+            const slide = getZoneSlide(zoneId);
+
+            const isMedia = isModernDesign && typeof slide?.type === 'string' && slide.type.startsWith('media-');
+            const needsPadding = isModernDesign && (isMedia || slide?.type === 'infos' || slide?.type === 'events');
+
+            const rendered = slide ? (
+              <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
+                Keine Slides
+              </div>
+            );
+
+            if (!slide || !needsPadding) return rendered;
+
+            if (isMedia) {
+              return (
+                <div className="p-6 w-full h-full">
+                  <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
+                    {rendered}
+                  </div>
+                </div>
+              );
+            }
+
+            return <div className="p-6 w-full h-full">{rendered}</div>;
+          };
+
+          return (
+            <div className="w-full h-full p-8" style={{ backgroundColor: isModernDesign ? bgBase : undefined }}>
+              <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-6">
+                {zones.slice(0, 4).map((zone, idx) => {
+                  const info = getZoneInfo(zone.id);
+                  const slide = getZoneSlide(zone.id);
+
+                  return (
+                    <div
+                      key={zone.id}
+                      className={clsx(
+                        'relative overflow-hidden',
+                        isModernDesign ? 'rounded-[2rem] border' : ''
+                      )}
+                      style={{
+                        borderColor: isModernDesign ? border : undefined,
+                        backgroundColor: isModernDesign ? cellBgForIndex(idx) : undefined,
+                      }}
+                    >
+                      <SlideTransition
+                        slideKey={slide?.id || `${zone.id}-empty`}
+                        enabled={enableTransitions && (info?.shouldRotate || false)}
+                        duration={0.6}
+                      >
+                        {renderCell(zone.id)}
+                      </SlideTransition>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
 
       default:
-        return (
-          <SlideTransition
-            slideKey={currentSlide?.id || currentSlideIndex}
-            enabled={enableTransitions}
-            duration={0.6}
-          >
-            <SlideRenderer slide={currentSlide} onVideoEnded={onVideoEnded} />
-          </SlideTransition>
-        );
+        {
+          // Should never happen because safeLayout normalizes unknown values.
+          return renderSplitLikeLayout();
+        }
     }
   };
 
@@ -530,18 +926,13 @@ export function DisplayClientPage() {
       className="w-full h-screen overflow-hidden flex flex-col"
       style={{ backgroundColor: themeColors.dashboardBg || themeColors.bg }}
     >
-      {/* Optional Header */}
-      {headerSettings.enabled && (
-        <DisplayHeader settings={headerSettings} theme={themeColors} />
-      )}
-
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative">
         {renderLayout()}
       </div>
 
       {/* Slide Indicators */}
-      {showSlideIndicators && totalSlides > 1 && (
+      {showSlideIndicators && totalSlides > 1 && !isModernDesign && (
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-50">
           {Array.from({ length: totalSlides }).map((_, i) => (
             <div
@@ -573,7 +964,7 @@ export function DisplayClientPage() {
           <div className="text-xs opacity-75 mt-1">
             Slide {currentSlideIndex + 1}/{totalSlides}
           </div>
-          <div className="text-xs opacity-75">Layout: {layout}</div>
+          <div className="text-xs opacity-75">Layout: {safeLayout}</div>
         </div>
       )}
     </div>

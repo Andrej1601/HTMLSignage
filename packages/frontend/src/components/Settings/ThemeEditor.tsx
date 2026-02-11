@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ThemeColors, DesignStyle, ColorPaletteName } from '@/types/settings.types';
-import { COLOR_PALETTES } from '@/types/settings.types';
-import { Palette, ChevronDown, ChevronUp, Layout, Sparkles, Grid } from 'lucide-react';
+import { COLOR_PALETTES, generateDashboardColors } from '@/types/settings.types';
+import { Palette, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ThemeEditorProps {
   theme: ThemeColors;
@@ -12,36 +12,24 @@ interface ThemeEditorProps {
   onColorPaletteChange?: (palette: ColorPaletteName) => void;
 }
 
-export function ThemeEditor({ theme, designStyle, colorPalette, onChange, onDesignStyleChange, onColorPaletteChange }: ThemeEditorProps) {
+export function ThemeEditor({
+  theme,
+  designStyle,
+  colorPalette,
+  onChange,
+  onDesignStyleChange,
+  onColorPaletteChange,
+}: ThemeEditorProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const applyPalette = (paletteId: ColorPaletteName, paletteColors: Partial<ThemeColors>) => {
-    onChange({ ...theme, ...paletteColors });
+    // Palette selection should fully drive the theme (including derived dashboard tokens),
+    // otherwise old palette leftovers can "leak" into the modern wellness design.
+    onChange(generateDashboardColors(paletteColors));
     if (onColorPaletteChange) {
       onColorPaletteChange(paletteId);
     }
   };
-
-  const designStyles = [
-    {
-      id: 'classic' as DesignStyle,
-      name: 'Classic Grid',
-      description: 'Traditionelle Tabellen-Ansicht mit Zebra-Streifen',
-      icon: Grid,
-    },
-    {
-      id: 'dashboard' as DesignStyle,
-      name: 'Dashboard',
-      description: 'Moderne Dashboard-Ansicht mit Kacheln',
-      icon: Layout,
-    },
-    {
-      id: 'modern-wellness' as DesignStyle,
-      name: 'Modern Wellness',
-      description: 'Glassmorphismus-Design mit abgerundeten Ecken',
-      icon: Sparkles,
-    },
-  ];
 
   const updateColor = (key: keyof ThemeColors, value: string) => {
     onChange({ ...theme, [key]: value });
@@ -93,41 +81,36 @@ export function ThemeEditor({ theme, designStyle, colorPalette, onChange, onDesi
 
   return (
     <div className="space-y-6">
-      {/* Design Style Selection */}
+      {/* Design Style */}
       <div>
-        <h3 className="text-lg font-semibold text-spa-text-primary mb-3 flex items-center gap-2">
-          <Layout className="w-5 h-5" />
-          Design-Stil
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {designStyles.map((style) => {
-            const Icon = style.icon;
-            const isActive = designStyle === style.id;
-            return (
-              <button
-                key={style.id}
-                onClick={() => onDesignStyleChange?.(style.id)}
-                className={`p-5 border-2 rounded-lg transition-all text-left ${
-                  isActive
-                    ? 'border-spa-accent bg-spa-accent/5 shadow-md'
-                    : 'border-spa-secondary/20 hover:border-spa-accent/50 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex items-start gap-3 mb-2">
-                  <Icon className={`w-6 h-6 ${isActive ? 'text-spa-accent' : 'text-spa-text-secondary'}`} />
-                  <div className="flex-1">
-                    <div className={`font-semibold ${isActive ? 'text-spa-accent' : 'text-spa-text-primary'}`}>
-                      {style.name}
-                    </div>
-                  </div>
-                  {isActive && (
-                    <div className="w-3 h-3 rounded-full bg-spa-accent"></div>
-                  )}
-                </div>
-                <p className="text-sm text-spa-text-secondary">{style.description}</p>
-              </button>
-            );
-          })}
+        <h3 className="text-lg font-semibold text-spa-text-primary mb-3">Design-Stil</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[
+            {
+              id: 'modern-wellness' as const,
+              title: 'Modern Wellness',
+              description: 'Klassisches Wellness-Grid (60/40) mit Saunakacheln.',
+            },
+            {
+              id: 'modern-timeline' as const,
+              title: 'Modern Timeline',
+              description: 'Zeitachsen-Layout nach Design3 mit Timeline-Tabelle.',
+            },
+          ].map((style) => (
+            <button
+              key={style.id}
+              onClick={() => onDesignStyleChange?.(style.id)}
+              disabled={!onDesignStyleChange}
+              className={`p-4 border-2 rounded-lg transition-all text-left ${
+                designStyle === style.id
+                  ? 'border-spa-accent bg-spa-accent/5 shadow-sm'
+                  : 'border-spa-secondary/20 hover:border-spa-accent/60'
+              }`}
+            >
+              <div className="font-semibold text-spa-text-primary">{style.title}</div>
+              <div className="text-xs text-spa-text-secondary mt-1">{style.description}</div>
+            </button>
+          ))}
         </div>
       </div>
 

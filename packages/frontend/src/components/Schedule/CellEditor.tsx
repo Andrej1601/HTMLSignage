@@ -4,6 +4,17 @@ import type { Aroma } from '@/types/settings.types';
 import { X, Save, Trash2, Flame } from 'lucide-react';
 import clsx from 'clsx';
 
+function normalizeBadgeLabel(value: string): string {
+  const s = String(value ?? '').trim();
+  if (!s) return s;
+  const parts = s.split(/\s+/);
+  // Migrate legacy format like "🌿 Eukalyptus" to "Eukalyptus".
+  if (parts.length >= 2 && /^[^A-Za-z0-9ÄÖÜäöüß]+$/.test(parts[0] || '')) {
+    return parts.slice(1).join(' ').trim();
+  }
+  return s;
+}
+
 interface CellEditorProps {
   entry: Entry | null;
   isOpen: boolean;
@@ -29,7 +40,11 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
   // Initialize local entry when entry changes
   useEffect(() => {
     if (entry) {
-      setLocalEntry(entry);
+      const cleanedBadges = (entry.badges || []).map(normalizeBadgeLabel).filter(Boolean);
+      setLocalEntry({
+        ...entry,
+        badges: cleanedBadges,
+      });
     } else {
       setLocalEntry({
         title: '',
@@ -49,10 +64,12 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
   const handleSave = () => {
     // Only save if title is not empty
     if (localEntry.title.trim()) {
+      const cleanedBadges = (localEntry.badges || []).map(normalizeBadgeLabel).filter(Boolean);
       onSave({
         ...localEntry,
         title: localEntry.title.trim(),
         subtitle: localEntry.subtitle?.trim() || undefined,
+        badges: cleanedBadges.length > 0 ? cleanedBadges : undefined,
         notes: localEntry.notes?.trim() || undefined,
         description: localEntry.description?.trim() || undefined,
       });
@@ -68,11 +85,12 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
     const aroma = aromas.find((a) => a.id === selectedAromaId);
     if (!aroma) return;
 
-    // Store as "emoji name" for display
-    const aromaText = `${aroma.emoji} ${aroma.name}`;
+    // Store as plain name, emojis are resolved at render-time from settings.aromas
+    const aromaText = normalizeBadgeLabel(aroma.name);
+    if (!aromaText) return;
 
     // Don't add if already exists
-    if (localEntry.badges?.includes(aromaText)) {
+    if ((localEntry.badges || []).some((b) => normalizeBadgeLabel(b).toLowerCase() === aromaText.toLowerCase())) {
       setSelectedAromaId('');
       return;
     }
@@ -228,7 +246,11 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                       key={index}
                       className="inline-flex items-center gap-1 px-3 py-1 bg-spa-secondary/20 text-spa-secondary-dark rounded-full text-sm"
                     >
-                      {badge}
+                      {(() => {
+                        const cleaned = normalizeBadgeLabel(badge);
+                        const lib = aromas.find((a) => a.name.toLowerCase() === cleaned.toLowerCase());
+                        return lib ? `${lib.emoji} ${cleaned}` : cleaned;
+                      })()}
                       <button
                         onClick={() => handleRemoveAroma(index)}
                         className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"

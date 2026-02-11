@@ -92,7 +92,7 @@ export interface HeaderSettings {
   height?: number; // percentage of screen height (default: 8)
 }
 
-export type DesignStyle = 'classic' | 'dashboard' | 'modern-wellness'; // Visual design style (independent of colors)
+export type DesignStyle = 'modern-wellness' | 'modern-timeline'; // Visual design styles
 export type ColorPaletteName = 'standard-warm' | 'modern-spa' | 'dark' | 'fresh' | 'wellness-dark' | 'wellness-warm' | 'custom';
 
 // Aroma/Scent for aufguss badges
@@ -100,6 +100,13 @@ export interface Aroma {
   id: string;
   emoji: string; // Visual representation (e.g., "🌿", "🍋", "❄️")
   name: string; // Name of the aroma (e.g., "Eukalyptus", "Zitrone", "Minze")
+}
+
+// Info item (wellness tip / house rule / notice) shown in display.
+export interface InfoItem {
+  id: string;
+  title: string;
+  text: string;
 }
 
 // Event for special occasions
@@ -118,7 +125,7 @@ export interface Event {
 
 export interface Settings {
   version: number;
-  designStyle?: DesignStyle; // Which visual design to use (classic or dashboard)
+  designStyle?: DesignStyle; // Which visual design to use
   colorPalette?: ColorPaletteName; // Which color palette to use
   theme?: ThemeColors;
   fonts?: FontSettings;
@@ -129,6 +136,7 @@ export interface Settings {
   saunas?: Sauna[];
   slideshow?: SlideshowConfig;
   aromas?: Aroma[]; // Library of available aromas for aufguss
+  infos?: InfoItem[]; // Info/tips shown in "Infos" slides
   events?: Event[]; // Special events with custom schedules
 }
 
@@ -305,19 +313,23 @@ export function generateDashboardColors(baseColors: Partial<ThemeColors>): Theme
   if (!colors.textMain) colors.textMain = colors.fg;
   if (!colors.textMuted) colors.textMuted = colors.headRowFg || colors.fg;
   if (!colors.accentGold) colors.accentGold = colors.accent;
+  if (!colors.accentGreen) colors.accentGreen = colors.timeColBg || colors.accent;
   if (!colors.statusLive) colors.statusLive = '#10B981';
-  if (!colors.statusNext) colors.statusNext = colors.accent;
+  if (!colors.statusNext) colors.statusNext = colors.accentGold || colors.accent;
+  if (!colors.statusPrestart) colors.statusPrestart = '#F59E0B';
 
   return colors;
 }
 
 // Helper to get default settings
 export function getDefaultSettings(): Settings {
+  const paletteId: ColorPaletteName = 'wellness-warm';
+  const paletteColors = getColorPalette(paletteId);
   return {
     version: 1,
-    designStyle: 'classic',
-    colorPalette: 'standard-warm',
-    theme: COLOR_PALETTES[0].colors as ThemeColors,
+    designStyle: 'modern-wellness',
+    colorPalette: paletteId,
+    theme: generateDashboardColors(paletteColors) as ThemeColors,
     fonts: {
       fontScale: 1,
       h1Scale: 1.5,
@@ -356,10 +368,10 @@ export function getDefaultSettings(): Settings {
     header: {
       enabled: true,
       showLogo: true,
-      logoText: 'HTMLSignage',
+      logoText: 'Westfalenbad Hagen',
       showClock: true,
       showDate: true,
-      subtitle: '',
+      subtitle: 'Saunawelt',
       height: 8,
     },
     aromas: [
@@ -371,6 +383,18 @@ export function getDefaultSettings(): Settings {
       { id: '6', emoji: '🌲', name: 'Kiefer' },
       { id: '7', emoji: '🥥', name: 'Kokos' },
       { id: '8', emoji: '🌹', name: 'Rose' },
+    ],
+    infos: [
+      {
+        id: 'info-1',
+        title: 'Wellness-Knigge',
+        text: 'Bitte legen Sie immer ein ausreichend großes Handtuch unter den gesamten Körper.',
+      },
+      {
+        id: 'info-2',
+        title: 'Abkühlung',
+        text: 'Nutzen Sie nach dem Saunagang unsere Kaltwasserbecken für den perfekten Kreislauf-Kick.',
+      },
     ],
     events: [],
   };

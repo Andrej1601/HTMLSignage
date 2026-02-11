@@ -344,16 +344,16 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
             </div>
           </div>
 
-          {/* Description */}
+          {/* Information (shown as badges in the modern display) */}
           <div>
             <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Beschreibung
+              Information
             </label>
             <textarea
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-              placeholder="Zusätzliche Informationen zur Sauna..."
+              placeholder="Hinweis fuer die Anzeige (eine Zeile = ein Info-Badge)..."
               rows={3}
             />
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { Settings } from '@/types/settings.types';
 import {
   getEnabledSlides,
@@ -17,9 +17,13 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
   const [isPaused, setIsPaused] = useState(false);
 
   // Get slideshow config from settings
-  const slideshowConfig = settings.slideshow || createDefaultSlideshowConfig();
-  const slides = getEnabledSlides(slideshowConfig);
-  const zones = getZonesForLayout(slideshowConfig.layout);
+  const slideshowConfig = useMemo(
+    () => settings.slideshow || createDefaultSlideshowConfig(),
+    [settings.slideshow]
+  );
+  // Important: memoize derived arrays so unrelated re-renders (e.g. pairing polling) don't reset timers.
+  const slides = useMemo(() => getEnabledSlides(slideshowConfig), [slideshowConfig]);
+  const zones = useMemo(() => getZonesForLayout(slideshowConfig.layout), [slideshowConfig.layout]);
 
   // Track current slide index per zone
   const [zoneSlideIndexes, setZoneSlideIndexes] = useState<Record<string, number>>(() => {
@@ -30,13 +34,59 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     return initial;
   });
 
+  // Keep zone indexes in sync with current zones (e.g. when layout changes or settings load async).
+  useEffect(() => {
+    setZoneSlideIndexes((prev) => {
+      let changed = false;
+      const next: Record<string, number> = { ...prev };
+
+      // Add missing zones and normalize invalid values (undefined/NaN).
+      zones.forEach((zone) => {
+        const current = next[zone.id];
+        if (!Number.isFinite(current)) {
+          next[zone.id] = 0;
+          changed = true;
+        }
+      });
+
+      // Remove zones that no longer exist.
+      Object.keys(next).forEach((key) => {
+        if (!zones.some((z) => z.id === key)) {
+          delete next[key];
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [zones]);
+
   // Track video ended state per zone
   const videoEndedRefs = useRef<Record<string, boolean>>({});
 
-  // Legacy support: for single-zone layouts, use first zone
-  const mainZone = zones[0];
-  const currentSlideIndex = zoneSlideIndexes[mainZone?.id] || 0;
+  // Per-zone timers: zones must advance independently (a change in one zone must not reset others).
+  const zoneTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
+  const zoneTimerKeysRef = useRef<Record<string, string | undefined>>({});
+  const lastTimerConfigRef = useRef<{ slides: unknown; zones: unknown; defaultDuration: number } | null>(null);
+
+  const clearAllZoneTimers = useCallback(() => {
+    Object.values(zoneTimersRef.current).forEach((t) => {
+      if (t) clearTimeout(t);
+    });
+    zoneTimersRef.current = {};
+    zoneTimerKeysRef.current = {};
+  }, []);
+
+  // Ensure no timers leak on unmount.
+  useEffect(() => clearAllZoneTimers, [clearAllZoneTimers]);
+
+  // Legacy support: prefer the zone named "main" when present, otherwise use the first zone.
+  const mainZone = zones.find((z) => z.id === 'main') || zones[0];
+  const rawMainIndex = mainZone?.id && Number.isFinite(zoneSlideIndexes[mainZone.id])
+    ? zoneSlideIndexes[mainZone.id]
+    : 0;
   const mainZoneSlides = mainZone ? getSlidesByZone(slides, mainZone.id).filter((s) => s.enabled) : slides;
+  const currentSlideIndex = mainZoneSlides.length > 0 ? (rawMainIndex % mainZoneSlides.length) : 0;
   const currentSlide = mainZoneSlides[currentSlideIndex] || null;
 
   const nextSlide = useCallback(
@@ -49,7 +99,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
       setZoneSlideIndexes((prev) => ({
         ...prev,
-        [targetZone]: (prev[targetZone] + 1) % zoneSlides.length,
+        [targetZone]: ((prev[targetZone] ?? 0) + 1) % zoneSlides.length,
       }));
       if (videoEndedRefs.current[targetZone]) {
         videoEndedRefs.current[targetZone] = false;
@@ -68,7 +118,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
       setZoneSlideIndexes((prev) => ({
         ...prev,
-        [targetZone]: (prev[targetZone] - 1 + zoneSlides.length) % zoneSlides.length,
+        [targetZone]: ((prev[targetZone] ?? 0) - 1 + zoneSlides.length) % zoneSlides.length,
       }));
       if (videoEndedRefs.current[targetZone]) {
         videoEndedRefs.current[targetZone] = false;
@@ -120,7 +170,8 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       if (!targetZone) return;
 
       const zoneSlides = getSlidesByZone(slides, targetZone).filter((s) => s.enabled);
-      const currentIndex = zoneSlideIndexes[targetZone] || 0;
+      const rawIndex = Number.isFinite(zoneSlideIndexes[targetZone]) ? zoneSlideIndexes[targetZone] : 0;
+      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
       const slide = zoneSlides[currentIndex];
 
       if (slide?.type === 'media-video' && slide.videoPlayback === 'complete') {
@@ -134,6 +185,8 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
   // Debug logging for slide rotation
   useEffect(() => {
+    if (!(import.meta as any).env?.DEV) return;
+
     const zonesDebug = zones.map((zone) => {
       const zoneSlides = getSlidesByZone(slides, zone.id).filter((s) => s.enabled);
       return {
@@ -159,20 +212,44 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     // Show rotation status clearly
     zonesDebug.forEach((zone) => {
       if (zone.slidesCount === 0) {
-        console.warn(`⚠️ Zone "${zone.name}" has NO slides!`);
+        console.warn(`[useSlideshow] Zone "${zone.name}" has NO slides!`);
       } else if (zone.slidesCount === 1) {
-        console.warn(`⚠️ Zone "${zone.name}" has only 1 slide - will NOT rotate (smart-persistent)`);
+        console.warn(`[useSlideshow] Zone "${zone.name}" has only 1 slide - will NOT rotate`);
       } else {
-        console.log(`✅ Zone "${zone.name}" has ${zone.slidesCount} slides - will rotate`);
+        console.log(`[useSlideshow] Zone "${zone.name}" has ${zone.slidesCount} slides - will rotate`);
       }
     });
   }, [slideshowConfig.layout, slides, zones]);
 
   // Auto-advance slides per zone
   useEffect(() => {
-    if (!enabled || isPaused || slides.length === 0) return;
+    const isDev = Boolean((import.meta as any).env?.DEV);
+    const clearZoneTimer = (zoneId: string) => {
+      const existing = zoneTimersRef.current[zoneId];
+      if (existing) clearTimeout(existing);
+      delete zoneTimersRef.current[zoneId];
+      delete zoneTimerKeysRef.current[zoneId];
+    };
 
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    const timerConfigChanged =
+      !lastTimerConfigRef.current ||
+      lastTimerConfigRef.current.slides !== slides ||
+      lastTimerConfigRef.current.zones !== zones ||
+      lastTimerConfigRef.current.defaultDuration !== (slideshowConfig.defaultDuration || 0);
+
+    if (timerConfigChanged) {
+      clearAllZoneTimers();
+      lastTimerConfigRef.current = {
+        slides,
+        zones,
+        defaultDuration: slideshowConfig.defaultDuration || 0,
+      };
+    }
+
+    if (!enabled || isPaused || slides.length === 0) {
+      clearAllZoneTimers();
+      return;
+    }
 
     zones.forEach((zone) => {
       const zoneSlides = getSlidesByZone(slides, zone.id).filter((s) => s.enabled);
@@ -180,13 +257,18 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       // Check if this zone should rotate
       if (!shouldZoneRotate(zone, slides)) {
         // Zone is static (smart-persistent with 1 slide or persistent type)
+        clearZoneTimer(zone.id);
         return;
       }
 
-      const currentIndex = zoneSlideIndexes[zone.id] || 0;
+      const rawIndex = Number.isFinite(zoneSlideIndexes[zone.id]) ? zoneSlideIndexes[zone.id] : 0;
+      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
       const slide = zoneSlides[currentIndex];
 
-      if (!slide) return;
+      if (!slide) {
+        clearZoneTimer(zone.id);
+        return;
+      }
 
       // For videos set to play until complete, wait for video to end
       if (
@@ -194,29 +276,49 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
         slide.videoPlayback === 'complete' &&
         !videoEndedRefs.current[zone.id]
       ) {
+        clearZoneTimer(zone.id);
         return; // Don't set timer, wait for onVideoEnded
       }
 
-      const duration = (slide.duration || 10) * 1000; // Default to 10 seconds if not set
-      console.log(`[useSlideshow] Setting timer for zone "${zone.id}" with duration ${duration}ms (slide: ${slide.id})`);
-      const timer = setTimeout(() => {
-        console.log(`[useSlideshow] Timer fired for zone "${zone.id}" - advancing to next slide`);
+      const durationSec = slide.duration || slideshowConfig.defaultDuration || 10; // Default to config/global duration
+      const duration = durationSec * 1000;
+      const timerKey = `${slide.id}:${duration}`;
+
+      if (zoneTimerKeysRef.current[zone.id] === timerKey && zoneTimersRef.current[zone.id]) {
+        // Timer already running for this zone+slide.
+        return;
+      }
+
+      clearZoneTimer(zone.id);
+      zoneTimerKeysRef.current[zone.id] = timerKey;
+      if (isDev) {
+        console.log(
+          `[useSlideshow] Setting timer for zone "${zone.id}" with duration ${duration}ms (slide: ${slide.id})`
+        );
+      }
+      zoneTimersRef.current[zone.id] = setTimeout(() => {
+        if (isDev) {
+          console.log(`[useSlideshow] Timer fired for zone "${zone.id}" - advancing to next slide`);
+        }
         nextSlide(zone.id);
       }, duration);
-
-      timers.push(timer);
     });
 
-    return () => {
-      timers.forEach((timer) => clearTimeout(timer));
-    };
-  }, [enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide]);
+    // Remove timers for zones that no longer exist.
+    Object.keys(zoneTimersRef.current).forEach((zoneId) => {
+      if (!zones.some((z) => z.id === zoneId)) {
+        clearZoneTimer(zoneId);
+      }
+    });
+  }, [enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide, slideshowConfig.defaultDuration]);
 
   // Helper to get current slide for a zone
   const getZoneSlide = useCallback(
     (zoneId: string) => {
       const zoneSlides = getSlidesByZone(slides, zoneId).filter((s) => s.enabled);
-      const index = zoneSlideIndexes[zoneId] || 0;
+      const rawIndex = Number.isFinite(zoneSlideIndexes[zoneId]) ? zoneSlideIndexes[zoneId] : 0;
+      if (zoneSlides.length === 0) return null;
+      const index = rawIndex % zoneSlides.length;
       return zoneSlides[index] || null;
     },
     [slides, zoneSlideIndexes]
@@ -229,7 +331,8 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       if (!zone) return null;
 
       const zoneSlides = getSlidesByZone(slides, zoneId).filter((s) => s.enabled);
-      const currentIndex = zoneSlideIndexes[zoneId] || 0;
+      const rawIndex = Number.isFinite(zoneSlideIndexes[zoneId]) ? zoneSlideIndexes[zoneId] : 0;
+      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
 
       return {
         zone,

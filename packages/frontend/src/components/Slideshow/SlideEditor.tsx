@@ -3,6 +3,7 @@ import type { SlideConfig, SlideType } from '@/types/slideshow.types';
 import { SLIDE_TYPE_OPTIONS, getSlideTypeOption } from '@/types/slideshow.types';
 import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
+import type { InfoItem } from '@/types/settings.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
 import { X, Save, Clock, Film } from 'lucide-react';
@@ -22,6 +23,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
   const { data: media } = useMedia();
 
   const saunas: Sauna[] = settings?.saunas || [];
+  const infos: InfoItem[] = (settings as any)?.infos || [];
   const images = media?.filter((m: Media) => m.type === 'image') || [];
   const videos = media?.filter((m: Media) => m.type === 'video') || [];
 
@@ -44,6 +46,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
         saunaId: slide.saunaId,
         mediaId: slide.mediaId,
         videoPlayback: slide.videoPlayback,
+        infoId: (slide as any).infoId,
         title: slide.title,
         showTitle: slide.showTitle,
         transition: slide.transition,
@@ -78,6 +81,11 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       return;
     }
 
+    if (formData.type === 'infos' && infos.length > 0 && !formData.infoId) {
+      alert('Bitte wähle eine Info aus');
+      return;
+    }
+
     if (formData.duration < 1) {
       alert('Dauer muss mindestens 1 Sekunde sein');
       return;
@@ -98,6 +106,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       saunaId: undefined,
       mediaId: undefined,
       videoPlayback: undefined,
+      infoId: undefined,
     });
   };
 
@@ -325,6 +334,40 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                   </div>
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Info Selection (Infos Slide) */}
+          {formData.type === 'infos' && (
+            <div>
+              <label className="block text-sm font-medium text-spa-text-primary mb-2">
+                Info auswählen *
+              </label>
+              {infos.length === 0 ? (
+                <p className="text-sm text-red-600">
+                  Keine Infos konfiguriert. Bitte lege zuerst Infos unter Einstellungen → Infos an.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <select
+                    value={formData.infoId || ''}
+                    onChange={(e) => setFormData({ ...formData, infoId: e.target.value || undefined })}
+                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  >
+                    <option value="">Bitte wählen...</option>
+                    {infos.map((info) => (
+                      <option key={info.id} value={info.id}>
+                        {info.title}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.infoId && (
+                    <div className="text-xs text-spa-text-secondary bg-spa-bg-primary rounded-md p-3 border border-spa-bg-secondary">
+                      {infos.find((i) => i.id === formData.infoId)?.text}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

@@ -12,7 +12,6 @@ import {
   PRESET_LABELS,
   WEEKDAY_PRESETS,
   SPECIAL_PRESETS,
-  getTodayPresetKey,
   getActivePresetKey,
   sortTimeRows,
   copyDaySchedule,

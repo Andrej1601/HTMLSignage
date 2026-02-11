@@ -1,10 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
+import { getActivePresetKey, getTodayPresetKey, normalizeSaunaNameKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
-import { getTodayPresetKey } from '@/types/schedule.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { Flame, Thermometer, Users, Info } from 'lucide-react';
-import { StatusBadge } from './StatusBadge';
+import { useMedia } from '@/hooks/useMedia';
+import type { Media } from '@/types/media.types';
+import { Bell, Flame, Thermometer, Users } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
+import { clampFlamesTo4, getScentEmoji, withAlpha } from './wellnessDisplayUtils';
+
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
@@ -12,302 +18,421 @@ interface SaunaDetailDashboardProps {
   saunaId?: string;
 }
 
-interface IntensityIconProps {
-  level: number;
-  isActive: boolean;
-  isNext: boolean;
-  theme: any;
+interface SaunaInfusionDetailItem extends InfusionListItem {
+  title: string;
+  intensity: number;
+  scents: string[];
+  description: string;
 }
 
-function IntensityIcon({ level, isActive, isNext, theme }: IntensityIconProps) {
+function timeToMinutes(timeStr: string): number {
+  const [hRaw, mRaw] = String(timeStr ?? '').split(':');
+  const h = parseInt(hRaw || '', 10);
+  const m = parseInt(mRaw || '', 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
+  return h * 60 + m;
+}
+
+function normalizeBadgeLabel(value: string): string {
+  const s = String(value ?? '').trim();
+  if (!s) return s;
+  const parts = s.split(/\s+/);
+  // Migrate legacy format like "🌿 Eukalyptus" to "Eukalyptus".
+  if (parts.length >= 2 && /^[^A-Za-z0-9ÄÖÜäöüß]+$/.test(parts[0] || '')) {
+    return parts.slice(1).join(' ').trim();
+  }
+  return s;
+}
+
+function IntensityFlames({
+  level,
+  size = 12,
+  activeColor,
+}: {
+  level: number;
+  size?: number;
+  activeColor: string;
+}) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="flex gap-0.5">
-        {[1, 2, 3].map((i) => (
-          <Flame
-            key={i}
-            size={14}
-            className={i <= level ? 'fill-current' : ''}
-            style={{
-              color: i <= level ? theme.accentGold || theme.flame : theme.cardBorder || theme.gridTable,
-            }}
-          />
-        ))}
-      </div>
-      {isActive && (
-        <div
-          className="text-[7px] font-black px-1 py-0.5 rounded-sm uppercase tracking-tighter leading-none mt-0.5 text-white"
-          style={{ backgroundColor: theme.statusLive || '#10B981' }}
-        >
-          Läuft
-        </div>
-      )}
-      {isNext && !isActive && (
-        <div
-          className="text-[7px] font-black px-1 py-0.5 rounded-sm uppercase tracking-tighter leading-none mt-0.5 text-white"
-          style={{ backgroundColor: theme.statusNext || theme.accentGold || theme.accent }}
-        >
-          Nächster
-        </div>
-      )}
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4].map((i) => (
+        <Flame
+          key={i}
+          size={size}
+          className={i <= level ? 'fill-current' : ''}
+          style={{
+            color: i <= level ? activeColor : 'rgba(120, 113, 108, 0.35)',
+          }}
+        />
+      ))}
     </div>
   );
 }
 
-interface ScentsBadgesProps {
-  scents: string[];
-  theme: any;
-}
+function InfusionItemDetail({
+  infusion,
+  status,
+  textMain,
+  borderColor,
+  cardBg,
+  accentGold,
+  accentGreen,
+  statusLive,
+  statusPrestart,
+  aromas,
+}: {
+  infusion: SaunaInfusionDetailItem;
+  status: 'ONGOING' | 'PRESTART' | 'UPCOMING' | 'FINISHED';
+  textMain: string;
+  borderColor: string;
+  cardBg: string;
+  accentGold: string;
+  accentGreen: string;
+  statusLive: string;
+  statusPrestart: string;
+  aromas?: Settings['aromas'];
+}) {
+  const isActive = status === 'ONGOING' || status === 'PRESTART' || status === 'UPCOMING';
+  const isOngoing = status === 'ONGOING';
+  const isPrestart = status === 'PRESTART';
+  const isFinished = status === 'FINISHED';
 
-function ScentsBadges({ scents, theme }: ScentsBadgesProps) {
-  if (!scents || scents.length === 0) return null;
+  const containerBg = isOngoing
+    ? withAlpha(statusLive, 0.10)
+    : isPrestart
+      ? withAlpha(statusPrestart, 0.10)
+      : isActive
+        ? withAlpha(cardBg, 0.70)
+        : withAlpha(cardBg, 0.45);
+
+  const containerBorder = isOngoing
+    ? withAlpha(statusLive, 0.25)
+    : isPrestart
+      ? withAlpha(statusPrestart, 0.35)
+      : isActive
+        ? withAlpha(borderColor, 0.7)
+        : withAlpha(borderColor, 0.5);
+
+  const timeColor = isOngoing
+    ? statusLive
+    : isPrestart
+      ? statusPrestart
+      : isFinished
+        ? withAlpha(textMain, 0.35)
+        : textMain;
+
+  const titleColor = isFinished ? withAlpha(textMain, 0.55) : textMain;
+  const scentBg = isOngoing ? withAlpha(statusLive, 0.12) : withAlpha(accentGreen, 0.10);
+  const scentBorder = isOngoing ? withAlpha(statusLive, 0.25) : withAlpha(accentGreen, 0.20);
+  const scentFg = isOngoing ? withAlpha(statusLive, 0.95) : withAlpha(textMain, 0.75);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Info size={12} className="shrink-0" style={{ color: theme.accentGreen || theme.accentGold }} />
-      <span className="text-[10px] font-bold uppercase tracking-widest leading-none" style={{ color: theme.textMuted || theme.fg }}>
-        {scents.join(' • ')}
-      </span>
+    <div
+      className={`p-5 rounded-[2rem] border transition-all mb-5 min-h-[130px] flex flex-col justify-center shadow-sm relative overflow-hidden ${isFinished ? 'opacity-60' : ''}`}
+      style={{
+        backgroundColor: containerBg,
+        borderColor: containerBorder,
+      }}
+    >
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            className="text-3xl font-black font-mono"
+            style={{ color: timeColor }}
+          >
+            {infusion.time}
+          </span>
+          <span
+            className="font-black text-[17px] uppercase tracking-tight leading-tight truncate max-w-[240px]"
+            style={{ color: titleColor }}
+          >
+            {infusion.title}
+          </span>
+        </div>
+        <IntensityFlames level={infusion.intensity} activeColor={isOngoing ? statusLive : accentGold} />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {infusion.scents.map((scent, i) => (
+          <div
+            key={`${infusion.id}-${i}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border shadow-sm"
+            style={{
+              backgroundColor: scentBg,
+              borderColor: scentBorder,
+              color: scentFg,
+            }}
+          >
+            <span>{getScentEmoji(scent, aromas || [])}</span>
+            <span>{scent}</span>
+          </div>
+        ))}
+      </div>
+
+      <p
+        className="text-[13px] leading-tight italic line-clamp-2 px-1 pr-20"
+        style={{ color: withAlpha(textMain, 0.7) }}
+      >
+        {infusion.description}
+      </p>
+
+      {(isOngoing || isPrestart) && (
+        <div className="absolute bottom-4 right-5 flex items-center">
+          {isOngoing ? (
+            <motion.span
+              animate={{ opacity: [1, 0.4, 1] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+              className="text-[10px] font-black tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-sm border"
+              style={{
+                color: statusLive,
+                backgroundColor: withAlpha(statusLive, 0.18),
+                borderColor: withAlpha(statusLive, 0.28),
+              }}
+            >
+              LÄUFT
+            </motion.span>
+          ) : (
+            <span
+              className="text-[10px] font-black tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-sm border"
+              style={{
+                color: statusPrestart,
+                backgroundColor: withAlpha(statusPrestart, 0.18),
+                borderColor: withAlpha(statusPrestart, 0.28),
+              }}
+            >
+              GLEICH
+            </span>
+          )}
+        </div>
+      )}
+
+      {isFinished && (
+        <div className="absolute bottom-4 right-5 flex items-center">
+          <span
+            className="text-[10px] font-black tracking-[0.15em] px-3.5 py-1.5 rounded-full shadow-sm border"
+            style={{
+              color: withAlpha(textMain, 0.55),
+              backgroundColor: withAlpha(borderColor, 0.18),
+              borderColor: withAlpha(borderColor, 0.28),
+            }}
+          >
+            VORBEI
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
 export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetailDashboardProps) {
   const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const theme = (settings.theme || defaults.theme!) as any;
+  const { data: media } = useMedia();
 
-  // Find the sauna
-  const sauna = settings.saunas?.find((s) => s.id === saunaId);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 10_000);
+    return () => clearInterval(t);
+  }, []);
 
-  // Determine which preset to show
+  const sauna = useMemo(() => {
+    if (!saunaId) return undefined;
+    const list = settings.saunas || [];
+    return (
+      list.find((s) => s.id === saunaId) ||
+      list.find((s) => s.name === saunaId) ||
+      list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
+    );
+  }, [settings.saunas, saunaId]);
+
+  // Preset selection (with events if autoPlay is enabled)
   const activePresetKey: PresetKey = schedule.autoPlay
-    ? getTodayPresetKey()
+    ? getActivePresetKey(settings)
     : (schedule.activePreset || getTodayPresetKey());
 
   const daySchedule = schedule.presets?.[activePresetKey];
 
-  // Debug logging
-  console.log('[SaunaDetailDashboard] Debug:', {
-    saunaId,
-    sauna: sauna?.name,
-    activePresetKey,
-    hasDaySchedule: !!daySchedule,
-    saunasInSchedule: daySchedule?.saunas,
-    rowCount: daySchedule?.rows?.length,
-  });
+  const accentGold = theme.accentGold || theme.accent || '#A68A64';
+  const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
+  const bgRight = theme.zebra2 || '#F2EDE1';
+  const textMain = theme.textMain || theme.fg || '#3E2723';
+  const statusLive = theme.statusLive || '#10B981';
+  const statusPrestart = theme.statusPrestart || '#F59E0B';
+  const cardBg = theme.cardBg || theme.cellBg || '#FFFFFF';
+  const cardBorder = theme.cardBorder || theme.gridTable || '#EBE5D3';
 
-  // Extract sessions for this sauna
-  const saunaIndex = daySchedule?.saunas?.findIndex((s) => s === sauna?.name);
-  const sessions: any[] = [];
+  const saunaImageUrl = useMemo(() => {
+    if (!sauna?.imageId) return null;
+    const item = (media || []).find((m: Media) => m.id === sauna.imageId);
+    if (!item) return null;
+    return `${API_URL}/uploads/${item.filename}`;
+  }, [media, sauna?.imageId]);
 
-  if (daySchedule && saunaIndex !== undefined && saunaIndex !== -1) {
-    const now = new Date();
-    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+  const fallbackImage =
+    'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&q=80&w=1200';
 
-    daySchedule.rows.forEach((row) => {
-      const entry = row.entries?.[saunaIndex];
-      if (entry?.title) {
-        const [hours, minutes] = row.time.split(':').map(Number);
-        const rowTimeMinutes = hours * 60 + minutes;
-        const sessionDuration = 60;
+  const infusions: SaunaInfusionDetailItem[] = useMemo(() => {
+    if (!sauna || !daySchedule?.rows || !daySchedule.saunas) return [];
+    let saunaIndex = daySchedule.saunas.indexOf(sauna.name);
+    if (saunaIndex < 0) {
+      const key = normalizeSaunaNameKey(sauna.name);
+      saunaIndex = daySchedule.saunas.findIndex((n) => normalizeSaunaNameKey(n) === key);
+    }
+    if (saunaIndex < 0) return [];
 
-        const isActive =
-          currentTimeMinutes >= rowTimeMinutes &&
-          currentTimeMinutes < rowTimeMinutes + sessionDuration;
-        const isNext = rowTimeMinutes > currentTimeMinutes && sessions.filter((s) => s.isNext).length === 0;
-
-        // Parse flames to number
-        const flames = typeof entry.flames === 'number'
-          ? entry.flames
-          : parseInt(String(entry.flames || '1'), 10) || 1;
-
-        sessions.push({
+    return daySchedule.rows
+      .map((row) => {
+        const entry = row.entries?.[saunaIndex];
+        if (!entry?.title) return null;
+        return {
+          id: `${activePresetKey}-${sauna.id}-${row.time}`,
           time: row.time,
+          duration: entry.duration ?? 15,
           title: entry.title,
-          subtitle: entry.subtitle || '',
-          intensity: flames,
-          scents: entry.badges || [],
-          isActive,
-          isNext,
-        });
-      }
-    });
-  }
+          intensity: clampFlamesTo4(entry.flames ?? 1),
+          scents: (entry.badges || []).map(normalizeBadgeLabel).filter(Boolean),
+          description: entry.description || entry.subtitle || '',
+        };
+      })
+      .filter(Boolean) as SaunaInfusionDetailItem[];
+  }, [activePresetKey, daySchedule?.rows, daySchedule?.saunas, sauna]);
 
-  // Auto-scroll effect
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || sessions.length <= 6) return; // Only scroll if more than 6 items
+  const sortedInfusions = useMemo(() => {
+    return infusions.slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [infusions]);
 
-    let scrollPos = 0;
-    const scrollMax = el.scrollHeight - el.clientHeight;
-
-    if (scrollMax <= 0) return;
-
-    const scrollInterval = setInterval(() => {
-      scrollPos += 0.5;
-      if (scrollPos >= scrollMax + 50) scrollPos = -50;
-      el.scrollTop = scrollPos;
-    }, 50);
-
-    return () => clearInterval(scrollInterval);
-  }, [sessions.length]);
+  const infoBadges = useMemo(() => {
+    if (!sauna) return [];
+    const raw = String((sauna as any).notice || sauna.description || '');
+    return raw
+      .split(/\r?\n/g)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 2);
+  }, [sauna]);
 
   if (!sauna) {
     return (
-      <div
-        className="w-full h-full flex items-center justify-center"
-        style={{
-          backgroundColor: theme.dashboardBg || theme.bg,
-          color: theme.textMain || theme.fg,
-        }}
-      >
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgRight, color: textMain }}>
         <p className="text-lg opacity-70">Keine Sauna ausgewählt</p>
       </div>
     );
   }
 
-  // Get sauna image (if available)
-  // Note: imageId would need to be resolved to actual URL in a real app
-  const saunaImage = 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&q=80&w=1200';
-
   return (
-    <div
-      className="w-full h-full flex flex-col overflow-hidden p-10"
-      style={{
-        backgroundColor: theme.dashboardBg || theme.bg,
-        color: theme.textMain || theme.fg,
-      }}
-    >
-      {/* Sauna Image with modern rounded corners */}
-      <div className="relative h-36 w-full rounded-[2.5rem] overflow-hidden mb-6 shadow-xl shrink-0 border-[6px]" style={{ borderColor: theme.cardBg || '#FFFFFF' }}>
-        <img src={saunaImage} className="w-full h-full object-cover scale-105" alt={sauna.name} />
-        <div className="absolute inset-0 bg-gradient-to-t from-current/60 via-transparent to-transparent" style={{ color: theme.dashboardBg || theme.bg }} />
+    <div className="w-full h-full p-8 flex flex-col" style={{ backgroundColor: bgRight, color: textMain }}>
+      <div className="relative h-28 w-full rounded-[2rem] overflow-hidden mb-4 shadow-lg shrink-0 border-4 border-white">
+        <img src={saunaImageUrl || fallbackImage} className="w-full h-full object-cover" alt={sauna.name} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to top, ${withAlpha(bgRight, 0.4)} 0%, rgba(0,0,0,0) 60%)`,
+          }}
+        />
       </div>
 
-      {/* Modern Badge Row */}
-      <div className="flex items-center gap-3 mb-3 px-2">
+      <div className="flex items-center gap-3 mb-2 px-1">
         <span
-          className="text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest shadow-sm"
-          style={{
-            backgroundColor: theme.accentGreen || theme.accentGold || theme.accent,
-            color: theme.cardBg || '#FFFFFF',
-          }}
+          className="text-white text-[10px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-widest shadow-sm shrink-0"
+          style={{ backgroundColor: accentGreen }}
         >
-          Sauna Portrait
+          Portrait
         </span>
         <div
-          className="flex items-center gap-4 text-sm font-bold px-4 py-1.5 rounded-full border backdrop-blur-sm"
-          style={{
-            backgroundColor: `${theme.cardBg || '#FFFFFF'}40`,
-            borderColor: `${theme.cardBg || '#FFFFFF'}60`,
-            color: theme.accentGold || theme.accent,
-          }}
+          className="flex items-center gap-3 text-[13px] font-bold bg-white/40 px-3.5 py-1.5 rounded-full border border-white/60"
+          style={{ color: accentGold }}
         >
-          {sauna.info?.temperature && (
-            <span className="flex items-center gap-1.5">
-              <Thermometer size={16} style={{ color: theme.accentGreen || theme.accentGold }} /> {sauna.info.temperature}°C
+          {sauna.info?.temperature != null && (
+            <span className="flex items-center gap-1.5 shrink-0">
+              <Thermometer size={16} style={{ color: accentGreen }} /> {sauna.info.temperature}°C
             </span>
           )}
-          {sauna.info?.capacity && (
-            <span className="flex items-center gap-1.5">
-              <Users size={16} style={{ color: theme.accentGreen || theme.accentGold }} /> {sauna.info.capacity} Pers.
+          {sauna.info?.capacity != null && (
+            <span className="flex items-center gap-1.5 shrink-0">
+              <Users size={16} style={{ color: accentGreen }} /> {sauna.info.capacity} Pers.
             </span>
           )}
         </div>
       </div>
 
-      {/* Sauna Name */}
-      <h2 className="text-5xl font-black uppercase tracking-tighter mb-6 leading-none px-2" style={{ color: theme.textMain || theme.fg }}>
+      <h2 className="text-5xl font-black uppercase tracking-tighter mb-4 leading-none px-1" style={{ color: textMain }}>
         {sauna.name}
       </h2>
 
-      {/* Modern Glassmorphism Card for Program */}
+      <AnimatePresence>
+        {infoBadges.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+            animate={{ height: 'auto', opacity: 1, marginBottom: 8 }}
+            exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+            className="overflow-hidden shrink-0"
+          >
+            <div className="flex flex-col gap-2">
+              {infoBadges.map((text, idx) => (
+                <div
+                  key={`${sauna.id}-info-${idx}`}
+                  className="text-white p-3 px-5 rounded-3xl flex items-center gap-3 shadow-sm border border-white/20"
+                  style={{ backgroundColor: accentGreen }}
+                >
+                  {idx === 0 ? (
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                      className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center shrink-0 shadow-inner"
+                    >
+                      <Bell className="w-5 h-5" />
+                    </motion.div>
+                  ) : (
+                    <div className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center shrink-0 shadow-inner">
+                      <Bell className="w-5 h-5" />
+                    </div>
+                  )}
+                  <p className="text-[13px] font-black uppercase tracking-tight leading-snug italic">
+                    {text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div
-        className="flex-1 border-2 rounded-[3rem] p-8 backdrop-blur-md flex flex-col min-h-0 shadow-sm overflow-hidden"
+        className="flex-1 border-2 rounded-[2.5rem] p-8 backdrop-blur-md flex flex-col min-h-0 shadow-sm overflow-hidden"
         style={{
-          backgroundColor: `${theme.cardBg || '#FFFFFF'}60`,
-          borderColor: theme.cardBg || '#FFFFFF',
+          backgroundColor: withAlpha(cardBg, 0.65),
+          borderColor: withAlpha(cardBorder, 1),
         }}
       >
-        <h4
-          className="font-black uppercase text-[11px] tracking-[0.4em] mb-5 flex items-center gap-4 shrink-0"
-          style={{ color: theme.accentGreen || theme.accentGold }}
-        >
-          <div className="w-10 h-0.5 rounded-full opacity-40" style={{ backgroundColor: theme.accentGreen || theme.accentGold }} />
-          Aufgussplan
+        <h4 className="font-black uppercase text-[11px] tracking-[0.4em] mb-4 flex items-center gap-4 shrink-0" style={{ color: accentGreen }}>
+          <div className="w-8 h-0.5 rounded-full opacity-40" style={{ backgroundColor: accentGreen }} />
+          Programm
         </h4>
 
         <div className="flex-1 overflow-hidden">
-          <div ref={scrollRef} className="h-full space-y-3 overflow-hidden scroll-smooth scrollbar-hide">
-            {sessions.length === 0 ? (
-              <p className="text-sm opacity-70 text-center py-4">Keine Aufgüsse geplant</p>
-            ) : (
-              sessions.map((session, idx) => {
-                const statusBadge = session.isActive ? 'ongoing' : session.isNext ? 'next' : null;
-
-                return (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-3xl border transition-all mb-3 h-[104px] flex flex-col justify-center shadow-sm backdrop-blur-sm"
-                    style={{
-                      backgroundColor: session.isActive
-                        ? `${theme.statusLive || '#10B981'}10`
-                        : session.isNext
-                        ? `${theme.statusNext || theme.accentGold}10`
-                        : `${theme.cardBg || '#FFFFFF'}60`,
-                      borderColor: session.isActive
-                        ? `${theme.statusLive || '#10B981'}20`
-                        : session.isNext
-                        ? `${theme.statusNext || theme.accentGold}20`
-                        : `${theme.cardBorder || theme.gridTable}`,
-                    }}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="text-2xl font-black font-mono"
-                          style={{
-                            color: session.isActive
-                              ? theme.statusLive || '#10B981'
-                              : session.isNext
-                              ? theme.statusNext || theme.accentGold
-                              : theme.textMain || theme.fg,
-                          }}
-                        >
-                          {session.time}
-                        </span>
-                        {statusBadge && <StatusBadge status={statusBadge} theme={theme} size="md" />}
-                        <span
-                          className="font-black text-sm uppercase tracking-tight leading-tight truncate max-w-[140px]"
-                          style={{ color: theme.textMain || theme.fg }}
-                        >
-                          {session.title}
-                        </span>
-                      </div>
-                      <IntensityIcon
-                        level={session.intensity}
-                        isActive={session.isActive}
-                        isNext={session.isNext}
-                        theme={theme}
-                      />
-                    </div>
-                    <ScentsBadges scents={session.scents} theme={theme} />
-                    {session.subtitle && (
-                      <p
-                        className="text-[11px] leading-normal italic line-clamp-2 mt-1.5"
-                        style={{ color: theme.textMuted || theme.fg }}
-                      >
-                        {session.subtitle}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
-            )}
-            <div className="h-16" />
-          </div>
+          {sortedInfusions.length === 0 ? (
+            <p className="text-sm opacity-70 text-center py-4">Keine Aufgüsse geplant</p>
+          ) : (
+            <AutoScrollingList
+              items={sortedInfusions}
+              now={now}
+              isDetail={true}
+              itemComponent={({ infusion, status }) => (
+                <InfusionItemDetail
+                  infusion={infusion}
+                  status={status}
+                  textMain={textMain}
+                  borderColor={cardBorder}
+                  cardBg={cardBg}
+                  accentGold={accentGold}
+                  accentGreen={accentGreen}
+                  statusLive={statusLive}
+                  statusPrestart={statusPrestart}
+                  aromas={settings.aromas}
+                />
+              )}
+            />
+          )}
         </div>
       </div>
     </div>

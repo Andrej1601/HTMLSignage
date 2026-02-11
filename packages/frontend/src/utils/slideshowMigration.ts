@@ -5,6 +5,7 @@
 
 import type { Settings } from '@/types/settings.types';
 import type { SlideshowConfig } from '@/types/slideshow.types';
+import { generateDashboardColors, getColorPalette } from '@/types/settings.types';
 
 /**
  * Migrates old slideshow config to new naming conventions
@@ -15,12 +16,37 @@ import type { SlideshowConfig } from '@/types/slideshow.types';
  * - scheduleGridSize → persistentZoneSize
  */
 export function migrateSettings(settings: Settings): Settings {
-  if (!settings.slideshow) {
-    return settings;
+  let migrated = false;
+  const next: Settings = { ...settings };
+
+  // Normalize legacy/unknown design styles while allowing current styles.
+  const normalizedStyle = String(next.designStyle || '').trim().toLowerCase();
+  const legacyStyleMap: Record<string, Settings['designStyle']> = {
+    classic: 'modern-wellness',
+    dashboard: 'modern-wellness',
+    'modern-wellness': 'modern-wellness',
+    'modern-timeline': 'modern-timeline',
+  };
+  const targetDesignStyle = legacyStyleMap[normalizedStyle] || 'modern-wellness';
+  if (next.designStyle !== targetDesignStyle) {
+    next.designStyle = targetDesignStyle;
+    migrated = true;
   }
 
-  const slideshow = { ...settings.slideshow };
-  let migrated = false;
+  // Ensure theme contains all design tokens needed by the modern display.
+  // Preserve user overrides in `settings.theme`, but fill missing values from the selected palette.
+  const paletteId = next.colorPalette || 'wellness-warm';
+  const paletteColors = getColorPalette(paletteId as any);
+  next.theme = generateDashboardColors({ ...paletteColors, ...(next.theme || {}) });
+
+  if (!next.slideshow) {
+    if (migrated) {
+      console.log('[slideshowMigration] Normalized settings (design/theme)');
+    }
+    return next;
+  }
+
+  const slideshow = { ...next.slideshow };
 
   // Migrate property names
   if ('scheduleGridPosition' in slideshow) {
@@ -52,7 +78,7 @@ export function migrateSettings(settings: Settings): Settings {
   }
 
   return {
-    ...settings,
+    ...next,
     slideshow: slideshow as SlideshowConfig,
   };
 }

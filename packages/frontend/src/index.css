@@ -7,3 +7,13 @@
     @apply bg-spa-bg-primary text-spa-text-primary antialiased;
   }
 }
+
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

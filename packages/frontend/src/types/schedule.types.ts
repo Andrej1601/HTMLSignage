@@ -159,6 +159,19 @@ export function copyDaySchedule(source: DaySchedule): DaySchedule {
   return JSON.parse(JSON.stringify(source));
 }
 
+// Normalize sauna names so schedule mappings survive cosmetic renames (case, hyphens, umlauts, etc.).
+export function normalizeSaunaNameKey(value: string): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 // Helper to sync schedule with settings saunas
 export function syncScheduleWithSaunas(schedule: Schedule, saunaNames: string[]): Schedule {
   const updatedPresets: Record<PresetKey, DaySchedule> = {} as Record<PresetKey, DaySchedule>;
@@ -167,11 +180,18 @@ export function syncScheduleWithSaunas(schedule: Schedule, saunaNames: string[])
     const preset = schedule.presets[presetKey];
     const oldSaunas = preset.saunas;
 
+    const oldIndexByKey = new Map<string, number>();
+    oldSaunas.forEach((name, idx) => {
+      const key = normalizeSaunaNameKey(name);
+      if (key && !oldIndexByKey.has(key)) oldIndexByKey.set(key, idx);
+    });
+
     // Create new rows with updated entries array
     const updatedRows = preset.rows.map((row) => {
       const newEntries: (Entry | null)[] = saunaNames.map((saunaName) => {
-        const oldIndex = oldSaunas.indexOf(saunaName);
-        return oldIndex >= 0 ? row.entries[oldIndex] : null;
+        const key = normalizeSaunaNameKey(saunaName);
+        const oldIndex = key ? oldIndexByKey.get(key) : undefined;
+        return typeof oldIndex === 'number' ? row.entries[oldIndex] : null;
       });
 
       return {

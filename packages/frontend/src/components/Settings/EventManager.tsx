@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Event } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { useMedia } from '@/hooks/useMedia';
-import { Plus, Edit2, Trash2, X, Save, Calendar, Clock, Image as ImageIcon, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Save, Calendar, Clock, CheckCircle, XCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';

@@ -4,12 +4,22 @@ import { useSettings } from '@/hooks/useSettings';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
+import { InfoManager } from '@/components/Settings/InfoManager';
 import { EventManager } from '@/components/Settings/EventManager';
 import { getDefaultSettings } from '@/types/settings.types';
-import type { Settings, ThemeColors, AudioSettings as AudioSettingsType, Aroma, Event } from '@/types/settings.types';
-import { Save, RotateCcw, Palette, Music, Sparkles, Calendar } from 'lucide-react';
+import type {
+  Settings,
+  ThemeColors,
+  AudioSettings as AudioSettingsType,
+  Aroma,
+  Event,
+  InfoItem,
+  DesignStyle,
+  ColorPaletteName,
+} from '@/types/settings.types';
+import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info } from 'lucide-react';
 
-type TabId = 'theme' | 'audio' | 'aromas' | 'events';
+type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
@@ -30,15 +40,15 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
-  const handleDesignStyleChange = (designStyle: string) => {
+  const handleDesignStyleChange = (designStyle: DesignStyle) => {
     if (!localSettings) return;
-    setLocalSettings({ ...localSettings, designStyle: designStyle as any });
+    setLocalSettings({ ...localSettings, designStyle });
     setIsDirty(true);
   };
 
-  const handleColorPaletteChange = (colorPalette: string) => {
+  const handleColorPaletteChange = (colorPalette: ColorPaletteName) => {
     if (!localSettings) return;
-    setLocalSettings({ ...localSettings, colorPalette: colorPalette as any });
+    setLocalSettings({ ...localSettings, colorPalette });
     setIsDirty(true);
   };
 
@@ -51,6 +61,12 @@ export function SettingsPage() {
   const handleAromasChange = (aromas: Aroma[]) => {
     if (!localSettings) return;
     setLocalSettings({ ...localSettings, aromas });
+    setIsDirty(true);
+  };
+
+  const handleInfosChange = (infos: InfoItem[]) => {
+    if (!localSettings) return;
+    setLocalSettings({ ...localSettings, infos });
     setIsDirty(true);
   };
 
@@ -79,13 +95,14 @@ export function SettingsPage() {
 
   const handleReset = () => {
     const defaults = getDefaultSettings();
-    // IMPORTANT: Preserve saunas, slideshow, aromas, and events from current settings
+    // IMPORTANT: Preserve saunas, slideshow, aromas, infos, and events from current settings
     // Only reset theme, fonts, slides, display, and audio
     setLocalSettings({
       ...defaults,
       saunas: localSettings?.saunas,
       slideshow: localSettings?.slideshow,
       aromas: localSettings?.aromas || defaults.aromas,
+      infos: localSettings?.infos || defaults.infos,
       events: localSettings?.events || defaults.events,
     });
     setIsDirty(true);
@@ -115,6 +132,7 @@ export function SettingsPage() {
     { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
     { id: 'audio' as TabId, label: 'Audio', icon: Music },
     { id: 'aromas' as TabId, label: 'Aromas', icon: Sparkles },
+    { id: 'infos' as TabId, label: 'Infos', icon: Info },
     { id: 'events' as TabId, label: 'Events', icon: Calendar },
   ];
 
@@ -209,6 +227,13 @@ export function SettingsPage() {
             <AromaLibraryManager
               aromas={localSettings.aromas || []}
               onChange={handleAromasChange}
+            />
+          )}
+
+          {activeTab === 'infos' && (
+            <InfoManager
+              infos={localSettings.infos || []}
+              onChange={handleInfosChange}
             />
           )}
 

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import type { SlideConfig } from '@/types/slideshow.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
-import { Film, Calendar, Flame, Clock } from 'lucide-react';
+import { Film, Calendar, Flame, Info } from 'lucide-react';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3000';
 
@@ -53,16 +53,17 @@ export const SlidePreview = memo(function SlidePreview({ slide, className = '' }
         />
       );
 
-    case 'sauna-overview':
+    case 'infos':
       return (
-        <SaunaOverviewPreview
+        <InfosPreview
           className={`${baseClasses} ${className}`}
+          infoId={slide.infoId}
           settings={settings}
         />
       );
 
-    case 'current-aufguss':
-      return <CurrentAufgussPreview className={`${baseClasses} ${className}`} />;
+    case 'events':
+      return <EventsPreview className={`${baseClasses} ${className}`} />;
 
     default:
       return (
@@ -203,43 +204,34 @@ function MediaVideoPreview({ className, mediaId, media }: any) {
   );
 }
 
-// Sauna Overview Preview
-function SaunaOverviewPreview({ className, settings }: any) {
-  const saunas = settings?.saunas?.filter((s: any) => s.status !== 'hidden') || [];
-  const displaySaunas = saunas.slice(0, 4); // Show max 4 in preview
+function InfosPreview({ className, infoId, settings }: any) {
+  const infos = (settings as any)?.infos || [];
+  const selected = infoId ? infos.find((i: any) => i.id === infoId) : null;
+  const title = selected?.title || infos[0]?.title || 'Info';
 
   return (
     <div className={className}>
-      <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full h-full p-1">
-        {displaySaunas.map((sauna: any) => (
-          <div
-            key={sauna.id}
-            className="rounded-sm flex flex-col items-center justify-center text-white text-[8px] font-semibold"
-            style={{ backgroundColor: sauna.color || '#10b981' }}
-          >
-            <Flame className="w-2.5 h-2.5 mb-0.5" />
-            <span className="truncate max-w-[90%]">{sauna.name.split(' ')[0]}</span>
-          </div>
-        ))}
+      <div className="w-full h-full bg-gradient-to-br from-spa-primary/10 to-spa-secondary/10 flex flex-col items-center justify-center text-spa-text-primary">
+        <Info className="w-6 h-6 mb-1 text-spa-primary" />
+        <div className="text-[9px] font-semibold uppercase tracking-wide">Infos</div>
+        <div className="text-[8px] text-spa-text-secondary mt-0.5 max-w-[90%] truncate">{title}</div>
       </div>
       <div className="absolute bottom-1 left-1 bg-spa-primary text-white px-1.5 py-0.5 rounded text-[8px] font-semibold">
-        Übersicht
+        Info
       </div>
     </div>
   );
 }
 
-// Current Aufguss Preview
-function CurrentAufgussPreview({ className }: { className: string }) {
+function EventsPreview({ className }: { className: string }) {
   return (
     <div className={className}>
-      <div className="w-full h-full bg-gradient-to-br from-spa-accent/20 to-spa-accent/40 flex flex-col items-center justify-center text-spa-text-primary">
-        <Clock className="w-6 h-6 mb-1 text-spa-accent" />
-        <div className="text-[9px] font-semibold">Aktueller</div>
-        <div className="text-[9px] font-semibold">Aufguss</div>
+      <div className="w-full h-full bg-gradient-to-br from-spa-secondary/10 to-spa-accent/10 flex flex-col items-center justify-center text-spa-text-primary">
+        <Calendar className="w-6 h-6 mb-1 text-spa-secondary" />
+        <div className="text-[9px] font-semibold uppercase tracking-wide">Events</div>
       </div>
-      <div className="absolute bottom-1 left-1 bg-spa-accent text-white px-1.5 py-0.5 rounded text-[8px] font-semibold">
-        Event
+      <div className="absolute bottom-1 left-1 bg-spa-secondary text-white px-1.5 py-0.5 rounded text-[8px] font-semibold">
+        Events
       </div>
     </div>
   );
