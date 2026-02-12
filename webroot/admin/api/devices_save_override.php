@@ -1,0 +1,57 @@
+<?php
+require_once __DIR__ . '/auth/guard.php';
+require_once __DIR__ . '/devices_store.php';
+auth_require_role('editor');
+header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store');
+
+$raw = file_get_contents('php://input');
+$in  = json_decode($raw, true);
+if (!$in || !isset($in['device']) || !is_array($in['settings'])) {
+  echo json_encode(['ok'=>false, 'error'=>'missing']); exit;
+}
+$devId = devices_normalize_device_id($in['device']);
+if ($devId === '') {
+  echo json_encode(['ok'=>false, 'error'=>'invalid-device']); exit;
+}
+$set   = $in['settings'];
+$sch   = isset($in['schedule']) && is_array($in['schedule']) ? $in['schedule'] : null;
+
+$dev = devices_load();
+if (!isset($dev['devices'][$devId])) {
+  echo json_encode(['ok'=>false, 'error'=>'unknown-device']); exit;
+}
+
+// Version hochzählen (Signal für Clients)
+$dev['devices'][$devId]['overrides'] = $dev['devices'][$devId]['overrides'] ?? [];
+
+// Versionsnummern getrennt führen und erhöhen
+$currSetVer = intval($dev['devices'][$devId]['overrides']['settings']['version'] ?? 0);
+$set['version'] = $currSetVer + 1;
+
+if ($sch !== null) {
+  $currSchVer = intval($dev['devices'][$devId]['overrides']['schedule']['version'] ?? 0);
+  $sch['version'] = $currSchVer + 1;
+  $dev['devices'][$devId]['overrides']['schedule'] = $sch;
+}
+
+$dev['devices'][$devId]['overrides']['settings'] = $set;
+
+try {
+  devices_save($dev);
+} catch (RuntimeException $e) {
+  http_response_code(500);
+  error_log('Failed to persist device overrides: ' . $e->getMessage());
+  echo json_encode(['ok'=>false, 'error'=>'write-failed']);
+  exit;
+}
+auth_audit('device.override', [
+  'deviceId' => $devId,
+  'settingsVersion' => $set['version'],
+  'scheduleVersion' => $sch['version'] ?? null
+]);
+echo json_encode([
+  'ok'=>true,
+  'version'=>$set['version'],
+  'scheduleVersion'=> $sch['version'] ?? null
+]);
