@@ -1,0 +1,76 @@
+/**
+ * Design Tokens: Spacing
+ * 8px-Grid System für konsistente Abstände
+ */
+
+@layer tokens {
+  :root {
+    /* ========================================
+       Spacing Scale (8px-Grid)
+       ======================================== */
+    --space-0: 0;
+    --space-1: 0.5rem;   /*  8px */
+    --space-2: 1rem;     /* 16px */
+    --space-3: 1.5rem;   /* 24px */
+    --space-4: 2rem;     /* 32px */
+    --space-5: 2.5rem;   /* 40px */
+    --space-6: 3rem;     /* 48px */
+    --space-7: 3.5rem;   /* 56px */
+    --space-8: 4rem;     /* 64px */
+    --space-10: 5rem;    /* 80px */
+    --space-12: 6rem;    /* 96px */
+    --space-16: 8rem;    /* 128px */
+
+    /* ========================================
+       Semantic Spacing
+       ======================================== */
+    --space-xs: var(--space-1);   /*  8px */
+    --space-sm: var(--space-2);   /* 16px */
+    --space-md: var(--space-3);   /* 24px */
+    --space-lg: var(--space-4);   /* 32px */
+    --space-xl: var(--space-6);   /* 48px */
+    --space-2xl: var(--space-8);  /* 64px */
+
+    /* ========================================
+       Component-Specific Spacing
+       ======================================== */
+    --padding-btn-sm: var(--space-1) var(--space-2);     /* 8px 16px */
+    --padding-btn-md: var(--space-2) var(--space-3);     /* 16px 24px */
+    --padding-btn-lg: var(--space-3) var(--space-4);     /* 24px 32px */
+
+    --padding-card: var(--space-4);                      /* 32px */
+    --padding-card-sm: var(--space-3);                   /* 24px */
+    --padding-card-lg: var(--space-6);                   /* 48px */
+
+    --gap-xs: var(--space-1);   /*  8px - Enge Abstände */
+    --gap-sm: var(--space-2);   /* 16px - Standard */
+    --gap-md: var(--space-3);   /* 24px - Moderate */
+    --gap-lg: var(--space-4);   /* 32px - Locker */
+    --gap-xl: var(--space-6);   /* 48px - Weit */
+
+    /* ========================================
+       Border Radius
+       ======================================== */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+    --radius-full: 9999px;
+
+    /* Semantic Radius */
+    --radius-btn: var(--radius-md);
+    --radius-card: var(--radius-xl);
+    --radius-badge: var(--radius-lg);
+    --radius-input: var(--radius-md);
+
+    /* ========================================
+       Container & Layout Widths
+       ======================================== */
+    --container-sm: 640px;
+    --container-md: 768px;
+    --container-lg: 1024px;
+    --container-xl: 1280px;
+    --container-2xl: 1536px;
+  }
+}
