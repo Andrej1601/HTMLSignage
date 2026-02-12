@@ -1,0 +1,512 @@
+/**
+ * Component: Info Banner & Extra Containers
+ * Info-Banner, Extra-Container für zusätzliche Inhalte
+ */
+
+@layer components {
+  /* ========================================
+     Extra Container Base
+     ======================================== */
+  .container.extra {
+    background: var(--spa-primary);
+    color: var(--spa-text-primary);
+    border-radius: calc(28px * var(--vwScale, 1));
+    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.32);
+    padding: calc(40px * var(--vwScale, 1));
+    gap: calc(20px * var(--vwScale, 1));
+  }
+
+  .container.extra .brand {
+    margin-top: auto;
+    opacity: 0.55;
+    font-size: calc(18px * var(--scale, 1));
+  }
+
+  /* Extra Content Structure */
+  .extra-eyebrow {
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    font-size: calc(18px * var(--scale, 1));
+    opacity: 0.7;
+    margin-bottom: calc(16px * var(--vwScale, 1));
+  }
+
+  .extra-content {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: calc(24px * var(--vwScale, 1));
+    width: 100%;
+  }
+
+  .extra-icon {
+    font-size: calc(88px * var(--scale, 1));
+    line-height: 1;
+    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+  }
+
+  .extra-body-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: calc(16px * var(--vwScale, 1));
+    max-width: min(100%, 960px);
+  }
+
+  .extra-title {
+    margin: 0;
+    font-size: calc(54px * var(--scale, 1));
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  .extra-text,
+  .extra-textline {
+    margin: 0;
+    font-size: calc(24px * var(--scale, 1));
+    line-height: 1.45;
+    opacity: 0.9;
+  }
+
+  /* Extra List */
+  .extra-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: calc(12px * var(--vwScale, 1));
+    font-size: calc(24px * var(--scale, 1));
+  }
+
+  .extra-list li {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(8px * var(--vwScale, 1));
+  }
+
+  .extra-list .extra-item-header {
+    display: flex;
+    align-items: center;
+    gap: calc(16px * var(--scale, 1));
+  }
+
+  .extra-list .extra-icon {
+    font-size: calc(48px * var(--scale, 1));
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.3));
+    flex-shrink: 0;
+  }
+
+  .extra-list .extra-title {
+    font-size: calc(36px * var(--scale, 1));
+  }
+
+  /* ========================================
+     Extra Countdown
+     ======================================== */
+  .extra-content.extra-countdown {
+    align-items: flex-start;
+  }
+
+  .extra-countdown-display {
+    display: flex;
+    flex-direction: column;
+    gap: calc(8px * var(--vwScale, 1));
+    margin-top: calc(12px * var(--vwScale, 1));
+  }
+
+  .extra-countdown-value {
+    font-size: calc(72px * var(--scale, 1));
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .extra-countdown-label {
+    font-size: calc(24px * var(--scale, 1));
+    opacity: 0.75;
+  }
+
+  .extra-event.is-live .extra-countdown-value {
+    color: var(--spa-accent);
+  }
+
+  .extra-event.is-soon:not(.is-live) .extra-countdown-value {
+    color: color-mix(in srgb, var(--spa-accent) 70%, #fff 30%);
+  }
+
+  /* ========================================
+     Info Banner Container
+     ======================================== */
+  .container.extra.extra-info {
+    gap: calc(28px * var(--vwScale, 1));
+  }
+
+  .container.extra.extra-info-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--infoBannerPadScale, 1) * 22px * var(--vwScale, 1))
+             calc(32px * var(--vwScale, 1));
+    background: color-mix(in srgb, var(--spa-primary) 92%, transparent);
+    border-radius: calc(24px * var(--vwScale, 1));
+    gap: calc(18px * var(--vwScale, 1));
+    pointer-events: auto;
+    box-sizing: border-box;
+  }
+
+  /* ========================================
+     Info Banner Area (Container)
+     ======================================== */
+  .info-banner-area {
+    position: absolute;
+    inset: auto 0 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--infoBannerPadScale, 1) * 18px * var(--vwScale, 1))
+             calc(32px * var(--vwScale, 1));
+    box-sizing: border-box;
+    min-height: calc(var(--infoBannerHeightVh, 10) * 1vh);
+    pointer-events: none;
+    z-index: 12;
+  }
+
+  .info-banner-area[data-empty="true"] {
+    display: none;
+  }
+
+  .info-banner-area[data-mode="full"] {
+    justify-content: center;
+  }
+
+  .info-banner-area[data-mode="left"] {
+    justify-content: flex-start;
+  }
+
+  .info-banner-area[data-mode="right"] {
+    justify-content: flex-end;
+  }
+
+  .info-banner-area .container.extra.extra-info-banner {
+    width: 100%;
+    max-width: var(--infoBannerColumnWidth, none);
+  }
+
+  .info-banner-area[data-mode="left"] .container.extra.extra-info-banner,
+  .info-banner-area[data-mode="right"] .container.extra.extra-info-banner {
+    margin-left: var(--infoBannerInsetStart, 0px);
+    margin-right: var(--infoBannerInsetEnd, 0px);
+    width: max(
+      0px,
+      min(
+        100%,
+        calc(var(--infoBannerColumnWidth, 100%) - var(--infoBannerInsetStart, 0px) - var(--infoBannerInsetEnd, 0px))
+      )
+    );
+  }
+
+  .info-banner-area[data-mode="left"] .container.extra.extra-info-banner {
+    --infoBannerInsetStart: calc(16px * var(--vwScale, 1));
+    --infoBannerInsetEnd: calc(var(--stage-gap, 0px) + 18px * var(--vwScale, 1));
+  }
+
+  .info-banner-area[data-mode="right"] .container.extra.extra-info-banner {
+    --infoBannerInsetStart: calc(var(--stage-gap, 0px) + 18px * var(--vwScale, 1));
+    --infoBannerInsetEnd: calc(16px * var(--vwScale, 1));
+  }
+
+  /* ========================================
+     Info Banner (Marquee)
+     ======================================== */
+  .info-banner {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .info-banner-track {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(24px * var(--vwScale, 1));
+    min-width: 100%;
+    animation: infoBannerMarquee 38s linear infinite;
+  }
+
+  .info-banner:hover .info-banner-track {
+    animation-play-state: paused;
+  }
+
+  .info-banner-item {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(12px * var(--vwScale, 1));
+    font-size: calc(26px * var(--scale, 1));
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .info-banner-icon {
+    font-size: calc(30px * var(--scale, 1));
+    line-height: 1;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.26));
+  }
+
+  .info-banner-text {
+    display: inline-block;
+    line-height: 1.2;
+  }
+
+  .info-banner-sep {
+    opacity: 0.55;
+    font-size: calc(22px * var(--scale, 1));
+  }
+
+  .info-banner--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(22px * var(--scale, 1));
+    opacity: 0.7;
+    padding: calc(12px * var(--vwScale, 1)) calc(18px * var(--vwScale, 1));
+    background: color-mix(in srgb, var(--spa-text-primary) 12%, transparent);
+    border-radius: calc(18px * var(--vwScale, 1));
+  }
+
+  /* ========================================
+     Info Banner: Split Layout Adjustments
+     ======================================== */
+  body[data-layout="split"] .container.extra.extra-info-banner {
+    align-items: flex-end;
+  }
+
+  body[data-layout="split"] #stage-right .container.extra.extra-info-banner {
+    justify-content: flex-start;
+  }
+
+  body[data-layout="single"] .container.extra.extra-info-banner {
+    min-height: calc(var(--infoBannerHeightVh, 10) * 1vh);
+  }
+
+  /* ========================================
+     Extra Info Components
+     ======================================== */
+  .extra-info-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: calc(16px * var(--vwScale, 1));
+  }
+
+  .extra-info-icon {
+    font-size: calc(64px * var(--scale, 1));
+    line-height: 1;
+    filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.28));
+  }
+
+  .extra-info-card .extra-info-icon {
+    font-size: calc(40px * var(--scale, 1));
+  }
+
+  .extra-info-metric .extra-info-icon {
+    font-size: calc(36px * var(--scale, 1));
+  }
+
+  .extra-info-title {
+    margin: 0;
+    font-size: calc(48px * var(--scale, 1));
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  .extra-info-subtitle {
+    margin: 0;
+    font-size: calc(24px * var(--scale, 1));
+    opacity: 0.78;
+  }
+
+  .extra-info-body {
+    display: flex;
+    flex-direction: column;
+    gap: calc(20px * var(--vwScale, 1));
+    width: 100%;
+  }
+
+  /* Info Grid/Metrics/Ticker - Hidden by Default */
+  .extra-info-grid,
+  .extra-info-metrics,
+  .extra-info-ticker {
+    display: none;
+  }
+
+  /* Info Grid */
+  .extra-info-grid {
+    gap: calc(18px * var(--vwScale, 1));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .extra-info-card {
+    padding: calc(22px * var(--vwScale, 1));
+    border-radius: calc(22px * var(--vwScale, 1));
+    background: color-mix(in srgb, var(--spa-text-primary) 88%, transparent);
+    color: inherit;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
+    display: flex;
+    flex-direction: column;
+    gap: calc(10px * var(--vwScale, 1));
+  }
+
+  .extra-info-card h3 {
+    margin: 0;
+    font-size: calc(24px * var(--scale, 1));
+    font-weight: 700;
+  }
+
+  .extra-info-card p {
+    margin: 0;
+    font-size: calc(20px * var(--scale, 1));
+    opacity: 0.88;
+  }
+
+  /* Info Metrics */
+  .extra-info-metrics {
+    gap: calc(18px * var(--vwScale, 1));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .extra-info-metric {
+    display: flex;
+    flex-direction: column;
+    gap: calc(6px * var(--vwScale, 1));
+  }
+
+  .extra-info-metric-value {
+    font-size: calc(42px * var(--scale, 1));
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .extra-info-metric-label {
+    font-size: calc(20px * var(--scale, 1));
+    opacity: 0.72;
+  }
+
+  .extra-info-trend {
+    font-size: calc(18px * var(--scale, 1));
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    opacity: 0.9;
+  }
+
+  .extra-info-trend[data-trend="up"] {
+    color: var(--spa-success);
+  }
+
+  .extra-info-trend[data-trend="down"] {
+    color: var(--spa-error);
+  }
+
+  .extra-info-trend[data-trend="steady"] {
+    color: color-mix(in srgb, var(--spa-text-primary) 85%, transparent);
+  }
+
+  /* Info Ticker */
+  .extra-info-ticker {
+    align-items: center;
+    gap: calc(18px * var(--vwScale, 1));
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .extra-info-ticker-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: calc(10px * var(--vwScale, 1));
+    font-size: calc(22px * var(--scale, 1));
+  }
+
+  .extra-info-ticker .fnsep {
+    margin: 0 calc(12px * var(--vwScale, 1));
+    opacity: 0.7;
+  }
+
+  .extra-info-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(6px * var(--vwScale, 1));
+    border-radius: 999px;
+    padding: calc(6px * var(--vwScale, 1)) calc(12px * var(--vwScale, 1));
+    background: color-mix(in srgb, var(--spa-text-primary) 80%, transparent);
+    font-size: calc(18px * var(--scale, 1));
+  }
+
+  .extra-info-note {
+    font-size: calc(18px * var(--scale, 1));
+    opacity: 0.75;
+  }
+
+  .extra-info-ticker-track {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(18px * var(--vwScale, 1));
+    min-width: 100%;
+    animation: infoTicker 32s linear infinite;
+  }
+
+  .extra-info--ticker .extra-info-ticker-track:hover {
+    animation-play-state: paused;
+  }
+
+  /* ========================================
+     Info Variant Visibility
+     ======================================== */
+  .extra-info--cards .extra-info-grid {
+    display: grid;
+  }
+
+  .extra-info--cards .extra-info-metrics {
+    display: none;
+  }
+
+  .extra-info--metrics .extra-info-metrics {
+    display: grid;
+  }
+
+  .extra-info--metrics .extra-info-grid {
+    display: none;
+  }
+
+  .extra-info--ticker .extra-info-ticker {
+    display: flex;
+  }
+
+  .extra-info--ticker .extra-info-grid,
+  .extra-info--ticker .extra-info-metrics {
+    display: none;
+  }
+
+  /* ========================================
+     Animations
+     ======================================== */
+  @keyframes infoBannerMarquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes infoTicker {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+}
