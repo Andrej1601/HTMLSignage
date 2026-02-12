@@ -1,0 +1,1774 @@
+<?php
+// /admin/api/devices_store.php – gemeinsame Helfer für Geräte-Datenbank
+// Wird von Heartbeat- und Admin-APIs genutzt. Pfade werden zentral über
+// devices_path() bestimmt, um harte Pfadangaben zu vermeiden.
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/storage.php';
+
+const DEVICES_STORAGE_KEY = 'devices.state';
+const DEVICES_ID_PATTERN = '/^dev_[a-f0-9]{12}$/';
+const DEVICES_CODE_PATTERN = '/^[A-Z]{6}$/';
+const DEVICES_HISTORY_LIMIT = 20;
+const DEVICES_MAX_ERRORS = 10;
+const DEVICES_STATE_CACHE_KEY = 'htmlsignage:devices:state';
+const DEVICES_STATE_CACHE_TTL = 5;
+
+function devices_apcu_enabled(): bool
+{
+    if (!function_exists('apcu_fetch')) {
+        return false;
+    }
+
+    if (function_exists('apcu_enabled')) {
+        return apcu_enabled();
+    }
+
+    $enabled = filter_var(ini_get('apc.enabled'), FILTER_VALIDATE_BOOLEAN);
+    if (PHP_SAPI === 'cli') {
+        $enabled = $enabled && filter_var(ini_get('apc.enable_cli'), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    return $enabled;
+}
+
+final class DevicesStateCache
+{
+    private string $path;
+
+    private bool $apcuEnabled;
+
+    public function __construct(?string $path = null, ?bool $apcuEnabled = null)
+    {
+        $this->path = $path ?? $this->resolvePath();
+        $this->apcuEnabled = $apcuEnabled ?? devices_apcu_enabled();
+    }
+
+    public function fetch(int $ttl = DEVICES_STATE_CACHE_TTL): ?array
+    {
+        if ($ttl <= 0) {
+            return null;
+        }
+
+        $state = $this->readFromApcu();
+        if ($state !== null) {
+            return $state;
+        }
+
+        return $this->readFromFile();
+    }
+
+    public function store(array $state, int $ttl = DEVICES_STATE_CACHE_TTL): void
+    {
+        if ($ttl <= 0) {
+            $this->invalidate();
+            return;
+        }
+
+        $payload = [
+            'expires' => microtime(true) + $ttl,
+            'state' => $state,
+        ];
+
+        if ($this->apcuEnabled) {
+            apcu_store(DEVICES_STATE_CACHE_KEY, $payload, $ttl);
+        }
+
+        $encoded = @serialize($payload);
+        if (!is_string($encoded) || $encoded === '') {
+            return;
+        }
+
+        @file_put_contents($this->path, $encoded, LOCK_EX);
+    }
+
+    public function invalidate(): void
+    {
+        if ($this->apcuEnabled) {
+            apcu_delete(DEVICES_STATE_CACHE_KEY);
+        }
+
+        $this->deleteFile();
+    }
+
+    private function readFromApcu(): ?array
+    {
+        if (!$this->apcuEnabled) {
+            return null;
+        }
+
+        $success = false;
+        $payload = apcu_fetch(DEVICES_STATE_CACHE_KEY, $success);
+        if (!$success) {
+            return null;
+        }
+
+        $state = $this->extractState($payload);
+        if ($state === null) {
+            apcu_delete(DEVICES_STATE_CACHE_KEY);
+        }
+
+        return $state;
+    }
+
+    private function readFromFile(): ?array
+    {
+        if (!is_file($this->path)) {
+            return null;
+        }
+
+        $handle = @fopen($this->path, 'rb');
+        if ($handle === false) {
+            return null;
+        }
+
+        $locked = flock($handle, LOCK_SH);
+        if (!$locked) {
+            fclose($handle);
+            return null;
+        }
+
+        $contents = stream_get_contents($handle);
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        if ($contents === false || $contents === '') {
+            $this->deleteFile();
+            return null;
+        }
+
+        $payload = @unserialize($contents, ['allowed_classes' => false]);
+        $state = $this->extractState($payload);
+        if ($state === null) {
+            $this->deleteFile();
+        }
+
+        return $state;
+    }
+
+    private function extractState(mixed $payload): ?array
+    {
+        if (!is_array($payload)) {
+            return null;
+        }
+
+        $expires = isset($payload['expires']) ? (float) $payload['expires'] : 0.0;
+        if ($expires <= microtime(true)) {
+            return null;
+        }
+
+        $state = $payload['state'] ?? null;
+        return is_array($state) ? $state : null;
+    }
+
+    private function deleteFile(): void
+    {
+        if (is_file($this->path)) {
+            @unlink($this->path);
+        }
+    }
+
+    private function resolvePath(): string
+    {
+        $directory = rtrim((string) sys_get_temp_dir(), DIRECTORY_SEPARATOR);
+
+        return $directory . DIRECTORY_SEPARATOR . 'htmlsignage_devices_state.cache';
+    }
+}
+
+function devices_state_cache(): DevicesStateCache
+{
+    static $cache = null;
+
+    if ($cache === null) {
+        $cache = new DevicesStateCache();
+    }
+
+    return $cache;
+}
+
+function devices_state_cache_fetch(int $ttl = DEVICES_STATE_CACHE_TTL): ?array
+{
+    return devices_state_cache()->fetch($ttl);
+}
+
+function devices_state_cache_store(array $state, int $ttl = DEVICES_STATE_CACHE_TTL): void
+{
+    devices_state_cache()->store($state, $ttl);
+}
+
+function devices_state_cache_invalidate(): void
+{
+    devices_state_cache()->invalidate();
+}
+
+// >>> GENERATED: DEVICE_FIELD_CONFIG >>>
+const DEVICES_STATUS_FIELD_CONFIG = [
+    'firmware' => [
+        'type' => 'string',
+        'aliases' => [
+            'firmware',
+            'version',
+        ],
+        'maxLength' => 100,
+    ],
+    'appVersion' => [
+        'type' => 'string',
+        'aliases' => [
+            'appVersion',
+            'player',
+        ],
+        'maxLength' => 100,
+    ],
+    'ip' => [
+        'type' => 'string',
+        'aliases' => [
+            'ip',
+            'address',
+        ],
+        'maxLength' => 64,
+    ],
+    'notes' => [
+        'type' => 'string',
+        'aliases' => [
+            'notes',
+        ],
+        'maxLength' => 180,
+    ],
+];
+
+const DEVICES_NETWORK_FIELD_CONFIG = [
+    'type' => [
+        'type' => 'string',
+        'aliases' => [
+            'type',
+            'interface',
+        ],
+        'maxLength' => 40,
+    ],
+    'ssid' => [
+        'type' => 'string',
+        'aliases' => [
+            'ssid',
+            'networkName',
+        ],
+        'maxLength' => 64,
+    ],
+    'quality' => [
+        'type' => 'number',
+        'aliases' => [
+            'quality',
+            'signalQuality',
+            'linkQuality',
+            'strength',
+        ],
+        'min' => 0,
+        'max' => 100,
+        'integer' => true,
+        'round' => 'nearest',
+    ],
+    'signal' => [
+        'type' => 'number',
+        'aliases' => [
+            'signal',
+            'dbm',
+            'wifiSignal',
+            'strength',
+            'rssi',
+        ],
+    ],
+    'rssi' => [
+        'type' => 'number',
+        'aliases' => [
+            'rssi',
+        ],
+        'integer' => true,
+        'round' => 'nearest',
+    ],
+    'latency' => [
+        'type' => 'number',
+        'aliases' => [
+            'latency',
+        ],
+        'min' => 0,
+    ],
+];
+
+const DEVICES_METRIC_FIELD_CONFIG = [
+    'cpuLoad' => [
+        'type' => 'number',
+        'aliases' => [
+            'cpuLoad',
+            'cpu',
+            'cpu_usage',
+            'cpuPercent',
+            'cpuLoadPercent',
+        ],
+    ],
+    'memoryUsage' => [
+        'type' => 'number',
+        'aliases' => [
+            'memoryUsage',
+            'memory',
+            'ram',
+            'memoryPercent',
+            'memUsage',
+            'ramUsage',
+        ],
+    ],
+    'storageFree' => [
+        'type' => 'number',
+        'aliases' => [
+            'storageFree',
+            'storage_free',
+            'storageFreeMb',
+            'diskFree',
+            'diskFreeMb',
+            'freeStorage',
+        ],
+    ],
+    'storageUsed' => [
+        'type' => 'number',
+        'aliases' => [
+            'storageUsed',
+            'storage_used',
+            'storageUsedMb',
+            'diskUsed',
+            'diskUsedMb',
+            'usedStorage',
+        ],
+    ],
+    'temperature' => [
+        'type' => 'number',
+        'aliases' => [
+            'temperature',
+            'temp',
+            'temperatureC',
+            'tempC',
+        ],
+    ],
+    'uptime' => [
+        'type' => 'number',
+        'aliases' => [
+            'uptime',
+            'upTimeSeconds',
+            'uptimeSeconds',
+            'uptimeSec',
+        ],
+    ],
+    'batteryLevel' => [
+        'type' => 'number',
+        'aliases' => [
+            'batteryLevel',
+            'battery',
+            'batteryPercent',
+            'battery_level',
+        ],
+    ],
+    'latency' => [
+        'type' => 'number',
+        'aliases' => [
+            'latency',
+            'ping',
+        ],
+    ],
+];
+// <<< GENERATED: DEVICE_FIELD_CONFIG <<<
+
+function devices_truncate_string(string $value, int $length): string
+{
+    if ($length <= 0) {
+        return '';
+    }
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+        if (mb_strlen($value, 'UTF-8') > $length) {
+            return mb_substr($value, 0, $length, 'UTF-8');
+        }
+        return $value;
+    }
+    return strlen($value) > $length ? substr($value, 0, $length) : $value;
+}
+
+function devices_optional_string($value, int $maxLength = 120): ?string
+{
+    if (!is_scalar($value)) {
+        return null;
+    }
+    $string = trim((string) $value);
+    if ($string === '') {
+        return null;
+    }
+    return devices_truncate_string($string, $maxLength);
+}
+
+function devices_optional_number($value, array $config)
+{
+    if (!is_numeric($value)) {
+        return null;
+    }
+
+    $number = (float) $value;
+
+    if (isset($config['min'])) {
+        $number = max((float) $config['min'], $number);
+    }
+
+    if (isset($config['max'])) {
+        $number = min((float) $config['max'], $number);
+    }
+
+    if (isset($config['round'])) {
+        switch ($config['round']) {
+            case 'nearest':
+                $number = round($number);
+                break;
+            case 'floor':
+                $number = floor($number);
+                break;
+            case 'ceil':
+                $number = ceil($number);
+                break;
+        }
+    }
+
+    if (!empty($config['integer'])) {
+        return (int) $number;
+    }
+
+    return $number;
+}
+
+function devices_sanitize_fields(array $input, array $fieldConfig): array
+{
+    $result = [];
+
+    foreach ($fieldConfig as $name => $config) {
+        if (!isset($config['aliases']) || !is_array($config['aliases'])) {
+            continue;
+        }
+        foreach ($config['aliases'] as $alias) {
+            if (!array_key_exists($alias, $input)) {
+                continue;
+            }
+            $raw = $input[$alias];
+            if ($config['type'] === 'string') {
+                $maxLength = $config['maxLength'] ?? 120;
+                $value = devices_optional_string($raw, (int) $maxLength);
+            } elseif ($config['type'] === 'number') {
+                $value = devices_optional_number($raw, $config);
+            } else {
+                $value = null;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $result[$name] = $value;
+            break;
+        }
+    }
+
+    return $result;
+}
+
+function devices_sanitize_network($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $network = devices_sanitize_fields($value, DEVICES_NETWORK_FIELD_CONFIG);
+
+    if (isset($network['signal']) && !is_float($network['signal'])) {
+        $network['signal'] = (float) $network['signal'];
+    }
+
+    if (isset($network['latency'])) {
+        $network['latency'] = max(0, (float) $network['latency']);
+    }
+
+    if (isset($network['quality'])) {
+        $network['quality'] = (int) $network['quality'];
+    }
+
+    return $network;
+}
+
+function devices_sanitize_errors($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $errors = [];
+    foreach ($value as $entry) {
+        if (is_array($entry)) {
+            $code = devices_optional_string($entry['code'] ?? null, 64);
+            $message = devices_optional_string($entry['message'] ?? $entry['detail'] ?? null, 160);
+            $ts = isset($entry['ts']) ? (int) $entry['ts'] : null;
+            if ($code === null && $message === null) {
+                continue;
+            }
+            $item = [];
+            if ($code !== null) {
+                $item['code'] = $code;
+            }
+            if ($message !== null) {
+                $item['message'] = $message;
+            }
+            if ($ts) {
+                $item['ts'] = $ts;
+            }
+            $errors[] = $item;
+        } elseif (is_scalar($entry)) {
+            $message = devices_optional_string($entry, 160);
+            if ($message !== null) {
+                $errors[] = ['message' => $message];
+            }
+        }
+        if (count($errors) >= DEVICES_MAX_ERRORS) {
+            break;
+        }
+    }
+
+    return $errors;
+}
+
+function devices_sanitize_metrics($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+    return devices_sanitize_fields($value, DEVICES_METRIC_FIELD_CONFIG);
+}
+
+function devices_sanitize_status($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $status = devices_sanitize_fields($value, DEVICES_STATUS_FIELD_CONFIG);
+
+    $networkSource = [];
+    if (isset($value['network']) && is_array($value['network'])) {
+        $networkSource = $value['network'];
+    }
+    if (isset($value['networkType']) && !isset($networkSource['type'])) {
+        $networkSource['type'] = $value['networkType'];
+    }
+    if (isset($value['signal']) && !isset($networkSource['signal'])) {
+        $networkSource['signal'] = $value['signal'];
+    }
+    if (isset($value['quality']) && !isset($networkSource['quality'])) {
+        $networkSource['quality'] = $value['quality'];
+    }
+    if (isset($value['ssid']) && !isset($networkSource['ssid'])) {
+        $networkSource['ssid'] = $value['ssid'];
+    }
+    $network = devices_sanitize_network($networkSource);
+    if (!empty($network)) {
+        $status['network'] = $network;
+    }
+
+    $errors = [];
+    if (isset($value['errors'])) {
+        $errors = devices_sanitize_errors($value['errors']);
+    } elseif (isset($value['lastError'])) {
+        $errors = devices_sanitize_errors([$value['lastError']]);
+    }
+    if (!empty($errors)) {
+        $status['errors'] = $errors;
+    }
+
+    return $status;
+}
+
+function devices_sanitize_history($history): array
+{
+    if (!is_array($history)) {
+        return [];
+    }
+    $normalized = [];
+    foreach ($history as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $ts = isset($entry['ts']) ? (int) $entry['ts'] : null;
+        if (!$ts) {
+            continue;
+        }
+        $row = ['ts' => $ts];
+        if (isset($entry['offline'])) {
+            $row['offline'] = (bool) $entry['offline'];
+        }
+        if (isset($entry['status'])) {
+            $status = devices_sanitize_status($entry['status']);
+            if (!empty($status)) {
+                $row['status'] = $status;
+            }
+        }
+        if (isset($entry['metrics'])) {
+            $metrics = devices_sanitize_metrics($entry['metrics']);
+            if (!empty($metrics)) {
+                $row['metrics'] = $metrics;
+            }
+        }
+        $normalized[] = $row;
+    }
+
+    usort($normalized, static function ($a, $b) {
+        return ($a['ts'] <=> $b['ts']);
+    });
+
+    $count = count($normalized);
+    if ($count > DEVICES_HISTORY_LIMIT) {
+        $normalized = array_slice($normalized, -DEVICES_HISTORY_LIMIT);
+    }
+
+    return array_values($normalized);
+}
+
+function devices_record_telemetry(array &$device, array $telemetry, int $timestamp): void
+{
+    if (!isset($device['heartbeatHistory']) || !is_array($device['heartbeatHistory'])) {
+        $device['heartbeatHistory'] = [];
+    }
+
+    $statusInput = [];
+    if (isset($telemetry['status']) && is_array($telemetry['status'])) {
+        $statusInput = $telemetry['status'];
+    }
+    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
+        if (isset($telemetry[$key]) && !isset($statusInput[$key])) {
+            $statusInput[$key] = $telemetry[$key];
+        }
+    }
+    foreach (['network', 'errors'] as $key) {
+        if (isset($telemetry[$key]) && !isset($statusInput[$key])) {
+            $statusInput[$key] = $telemetry[$key];
+        }
+    }
+
+    $metricsInput = [];
+    if (isset($telemetry['metrics']) && is_array($telemetry['metrics'])) {
+        $metricsInput = $telemetry['metrics'];
+    }
+
+    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
+
+        if (isset($telemetry[$key]) && !isset($metricsInput[$key])) {
+            $metricsInput[$key] = $telemetry[$key];
+        }
+    }
+
+    $status = devices_sanitize_status($statusInput);
+    $metrics = devices_sanitize_metrics($metricsInput);
+    $offlineFlag = array_key_exists('offline', $telemetry) ? (bool) $telemetry['offline'] : false;
+
+
+    if (!empty($status)) {
+        $device['status'] = $status;
+    }
+    if (!empty($metrics)) {
+        $device['metrics'] = $metrics;
+    }
+
+    $history = devices_sanitize_history($device['heartbeatHistory']);
+    $history[] = array_filter([
+        'ts' => $timestamp,
+        'offline' => $offlineFlag,
+        'status' => !empty($status) ? $status : null,
+        'metrics' => !empty($metrics) ? $metrics : null,
+    ], static function ($value) {
+        return $value !== null;
+    });
+
+    if (count($history) > DEVICES_HISTORY_LIMIT) {
+        $history = array_slice($history, -DEVICES_HISTORY_LIMIT);
+    }
+
+    $device['heartbeatHistory'] = $history;
+}
+
+function devices_extract_telemetry_payload(array $payload): array
+{
+    $telemetry = [];
+
+    $status = [];
+    foreach (array_keys(DEVICES_STATUS_FIELD_CONFIG) as $key) {
+        if (isset($payload[$key])) {
+            $status[$key] = $payload[$key];
+        }
+    }
+    if (isset($payload['status']) && is_array($payload['status'])) {
+        $status = array_merge($payload['status'], $status);
+    }
+    if (isset($payload['network'])) {
+        if (!isset($status['network'])) {
+            $status['network'] = $payload['network'];
+        } elseif (is_array($status['network']) && is_array($payload['network'])) {
+            $status['network'] = array_merge($payload['network'], $status['network']);
+        }
+    }
+    if (!empty($status)) {
+        $telemetry['status'] = $status;
+    }
+
+    $metrics = [];
+    if (isset($payload['metrics']) && is_array($payload['metrics'])) {
+        $metrics = $payload['metrics'];
+    }
+    foreach (array_keys(DEVICES_METRIC_FIELD_CONFIG) as $key) {
+        if (isset($payload[$key]) && !isset($metrics[$key])) {
+            $metrics[$key] = $payload[$key];
+        }
+    }
+    if (!empty($metrics)) {
+        $telemetry['metrics'] = $metrics;
+    }
+
+    if (isset($payload['errors']) && is_array($payload['errors'])) {
+        $telemetry['errors'] = $payload['errors'];
+    } elseif (isset($payload['status']['errors']) && is_array($payload['status']['errors'])) {
+        $telemetry['errors'] = $payload['status']['errors'];
+    }
+
+    if (array_key_exists('offline', $payload)) {
+        $telemetry['offline'] = (bool) $payload['offline'];
+    } elseif (array_key_exists('online', $payload)) {
+        $telemetry['offline'] = !(bool) $payload['online'];
+    }
+
+    return $telemetry;
+}
+
+function devices_path(): string
+{
+    $custom = getenv('DEVICES_PATH');
+    if (is_string($custom) && $custom !== '') {
+        return $custom;
+    }
+    if (!empty($_ENV['DEVICES_PATH'])) {
+        return $_ENV['DEVICES_PATH'];
+    }
+    return signage_data_path('devices.json');
+}
+
+function devices_storage_mtime(): int
+{
+    if (signage_db_available()) {
+        $dbPath = signage_db_path();
+        if ($dbPath !== '' && is_file($dbPath)) {
+            $mtime = @filemtime($dbPath);
+            if ($mtime !== false) {
+                return (int) $mtime;
+            }
+        }
+    }
+
+    $path = devices_path();
+    if (is_file($path)) {
+        $mtime = @filemtime($path);
+        if ($mtime !== false) {
+            return (int) $mtime;
+        }
+    }
+
+    return 0;
+}
+
+function devices_offline_threshold_minutes(): int
+{
+    if (defined('OFFLINE_AFTER_MIN')) {
+        $value = (int) constant('OFFLINE_AFTER_MIN');
+        if ($value > 0) {
+            return $value;
+        }
+    }
+
+    return 2;
+}
+
+function devices_list_is_offline(int $lastSeenAt, int $now, int $offlineAfterMinutes): bool
+{
+    if ($lastSeenAt <= 0) {
+        return true;
+    }
+
+    return ($now - $lastSeenAt) > ($offlineAfterMinutes * 60);
+}
+
+function devices_list_history_tail($history, int $limit = 10): array
+{
+    if (!is_array($history) || $limit <= 0) {
+        return [];
+    }
+
+    $values = array_values($history);
+    if (count($values) > $limit) {
+        $values = array_slice($values, -$limit);
+    }
+
+    return $values;
+}
+
+function devices_build_list_pairings(array $state): array
+{
+    $pairings = [];
+
+    foreach (($state['pairings'] ?? []) as $code => $row) {
+        if (!is_array($row) || !empty($row['deviceId'])) {
+            continue;
+        }
+
+        $normalizedCode = devices_normalize_code($row['code'] ?? $code);
+        if ($normalizedCode === '') {
+            continue;
+        }
+
+        $created = isset($row['created']) ? (int) $row['created'] : 0;
+
+        $pairings[] = [
+            'code' => $normalizedCode,
+            'createdAt' => $created,
+            'expiresAt' => $created ? ($created + 900) : null,
+        ];
+    }
+
+    usort($pairings, static fn ($a, $b) => ($b['createdAt'] ?? 0) <=> ($a['createdAt'] ?? 0));
+
+    return $pairings;
+}
+
+function devices_build_list_devices(array $state, int $now, int $offlineAfterMinutes): array
+{
+    $devices = [];
+
+    foreach (($state['devices'] ?? []) as $id => $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $deviceId = is_string($id) ? $id : ($row['id'] ?? '');
+        if (!devices_is_valid_id($deviceId)) {
+            continue;
+        }
+
+        $deviceId = devices_normalize_device_id($deviceId);
+        if ($deviceId === '') {
+            continue;
+        }
+
+        $lastSeen = isset($row['lastSeenAt']) ? (int) $row['lastSeenAt'] : (int) ($row['lastSeen'] ?? 0);
+        $overrides = isset($row['overrides']) && is_array($row['overrides']) ? $row['overrides'] : [];
+
+        $devices[] = [
+            'id' => $deviceId,
+            'name' => isset($row['name']) && is_string($row['name']) ? $row['name'] : $deviceId,
+            'lastSeenAt' => $lastSeen ?: null,
+            'offline' => devices_list_is_offline($lastSeen, $now, $offlineAfterMinutes),
+            'useOverrides' => !empty($row['useOverrides']),
+            'overrides' => [
+                'settings' => $overrides['settings'] ?? (object) [],
+                'schedule' => $overrides['schedule'] ?? (object) [],
+            ],
+            'status' => isset($row['status']) && is_array($row['status']) ? $row['status'] : (object) [],
+            'metrics' => isset($row['metrics']) && is_array($row['metrics']) ? $row['metrics'] : (object) [],
+            'heartbeatHistory' => devices_list_history_tail($row['heartbeatHistory'] ?? [], 10),
+        ];
+    }
+
+    return $devices;
+}
+
+function devices_build_list_payload(array $state, int $now, ?int $offlineAfterMinutes = null): array
+{
+    $minutes = $offlineAfterMinutes ?? devices_offline_threshold_minutes();
+
+    return [
+        'pairings' => devices_build_list_pairings($state),
+        'devices' => devices_build_list_devices($state, $now, $minutes),
+    ];
+}
+
+function devices_state_last_activity(array $state): int
+{
+    $timestamps = [];
+
+    foreach (($state['pairings'] ?? []) as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        foreach (['created', 'updated', 'expires', 'expiresAt'] as $key) {
+            if (isset($row[$key])) {
+                $timestamps[] = (int) $row[$key];
+            }
+        }
+    }
+
+    foreach (($state['devices'] ?? []) as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        foreach (['created', 'updated', 'updatedAt', 'lastSeen', 'lastSeenAt'] as $key) {
+            if (isset($row[$key])) {
+                $timestamps[] = (int) $row[$key];
+            }
+        }
+
+        if (isset($row['heartbeatHistory']) && is_array($row['heartbeatHistory'])) {
+            foreach ($row['heartbeatHistory'] as $entry) {
+                if (is_array($entry) && isset($entry['ts'])) {
+                    $timestamps[] = (int) $entry['ts'];
+                }
+            }
+        }
+    }
+
+    if (isset($state['meta']) && is_array($state['meta'])) {
+        foreach ($state['meta'] as $meta) {
+            if (is_array($meta)) {
+                foreach (['updated', 'updatedAt', 'timestamp'] as $key) {
+                    if (isset($meta[$key])) {
+                        $timestamps[] = (int) $meta[$key];
+                    }
+                }
+            }
+        }
+    }
+
+    $timestamps[] = devices_storage_mtime();
+
+    $timestamps = array_filter($timestamps, static fn ($value) => $value > 0);
+
+    if (empty($timestamps)) {
+        return 0;
+    }
+
+    return max($timestamps);
+}
+
+function devices_default_state(): array
+{
+    return [
+        'version' => 1,
+        'pairings' => [],
+        'devices' => [],
+    ];
+}
+
+function devices_normalize_device_id($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+    $id = strtolower(trim($value));
+    return preg_match(DEVICES_ID_PATTERN, $id) ? $id : '';
+}
+
+function devices_is_valid_id(string $id): bool
+{
+    return preg_match(DEVICES_ID_PATTERN, $id) === 1;
+}
+
+function devices_normalize_code($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+    $code = strtoupper(trim($value));
+    return preg_match(DEVICES_CODE_PATTERN, $code) ? $code : '';
+}
+
+function devices_normalize_state($state): array
+{
+    $normalized = devices_default_state();
+    if (!is_array($state)) {
+        return $normalized;
+    }
+
+    if (isset($state['version'])) {
+        $normalized['version'] = (int) $state['version'];
+    }
+
+    foreach ($state as $key => $value) {
+        if ($key === 'devices' || $key === 'pairings') {
+            continue;
+        }
+        $normalized[$key] = $value;
+    }
+
+    if (isset($state['pairings']) && is_array($state['pairings'])) {
+        foreach ($state['pairings'] as $code => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $normalizedCode = devices_normalize_code($row['code'] ?? $code);
+            if ($normalizedCode === '') {
+                continue;
+            }
+            $entry = $row;
+            $entry['code'] = $normalizedCode;
+            $entry['created'] = isset($entry['created']) ? (int) $entry['created'] : time();
+            if (isset($entry['deviceId'])) {
+                $deviceId = devices_normalize_device_id($entry['deviceId']);
+                $entry['deviceId'] = $deviceId !== '' ? $deviceId : null;
+            }
+            $normalized['pairings'][$normalizedCode] = $entry;
+        }
+    }
+
+    if (isset($state['devices']) && is_array($state['devices'])) {
+        foreach ($state['devices'] as $key => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = devices_normalize_device_id($row['id'] ?? $key);
+            if ($id === '') {
+                continue;
+            }
+            $device = $row;
+            $device['id'] = $id;
+            if (!isset($device['name']) || !is_string($device['name'])) {
+                $device['name'] = $id;
+            }
+            if (isset($device['created'])) {
+                $device['created'] = (int) $device['created'];
+            }
+            if (isset($device['lastSeen'])) {
+                $device['lastSeen'] = (int) $device['lastSeen'];
+            }
+            if (isset($device['lastSeenAt'])) {
+                $device['lastSeenAt'] = (int) $device['lastSeenAt'];
+            }
+            if (!isset($device['overrides']) || !is_array($device['overrides'])) {
+                $device['overrides'] = [];
+            }
+            $status = devices_sanitize_status($device['status'] ?? []);
+            if (!empty($status)) {
+                $device['status'] = $status;
+            } else {
+                unset($device['status']);
+            }
+            $metrics = devices_sanitize_metrics($device['metrics'] ?? []);
+            if (!empty($metrics)) {
+                $device['metrics'] = $metrics;
+            } else {
+                unset($device['metrics']);
+            }
+            $history = devices_sanitize_history($device['heartbeatHistory'] ?? []);
+            if (!empty($history)) {
+                $device['heartbeatHistory'] = $history;
+            } else {
+                unset($device['heartbeatHistory']);
+            }
+            $normalized['devices'][$id] = $device;
+        }
+    }
+
+    return $normalized;
+}
+
+function devices_load_from_file(): array
+{
+    $path = devices_path();
+    if (!is_file($path)) {
+        return devices_default_state();
+    }
+    $error = null;
+    $raw = signage_read_file_locked($path, $error);
+    if ($raw === null) {
+        if ($error !== null) {
+            error_log('Failed to read devices JSON ' . $path . ': ' . $error);
+        }
+        return devices_default_state();
+    }
+    if ($raw === '') {
+        return devices_default_state();
+    }
+    $decoded = json_decode($raw, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('Invalid JSON in devices store ' . $path . ': ' . json_last_error_msg());
+        return devices_default_state();
+    }
+    return devices_normalize_state($decoded);
+}
+
+function devices_save_to_file(array &$db): bool
+{
+    $db = devices_normalize_state($db);
+    $path = devices_path();
+    $json = json_encode($db, SIGNAGE_JSON_STORAGE_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('Unable to encode device database: ' . json_last_error_msg());
+    }
+
+    $existing = null;
+    $existingError = null;
+    if (is_file($path)) {
+        $existing = signage_read_file_locked($path, $existingError);
+        if ($existing === null && $existingError !== null) {
+            error_log('Failed to read existing devices JSON ' . $path . ': ' . $existingError);
+        }
+    }
+
+    if ($existing !== null && $existing === $json) {
+        return true;
+    }
+    $error = null;
+    if (!signage_atomic_file_put_contents($path, $json, $error)) {
+        throw new RuntimeException('Unable to write device database: ' . ($error ?? 'unknown error'));
+    }
+    @chmod($path, 0644);
+    @chown($path, 'www-data');
+    @chgrp($path, 'www-data');
+    return true;
+}
+
+function devices_sqlite_tables_empty(\PDO $pdo): bool
+{
+    $tables = ['device_store', 'device_pairings', 'device_metadata'];
+    foreach ($tables as $table) {
+        try {
+            $stmt = $pdo->query('SELECT COUNT(*) FROM ' . $table);
+            if ($stmt !== false && (int) $stmt->fetchColumn() > 0) {
+                return false;
+            }
+        } catch (Throwable $exception) {
+            throw new RuntimeException('Unable to inspect SQLite table ' . $table . ': ' . $exception->getMessage(), 0, $exception);
+        }
+    }
+
+    return true;
+}
+
+function devices_sqlite_read_raw(\PDO $pdo): array
+{
+    $raw = [
+        'meta' => [],
+        'pairings' => [],
+        'devices' => [],
+    ];
+
+    try {
+        $metaStmt = $pdo->query('SELECT key, value FROM device_metadata');
+        if ($metaStmt !== false) {
+            while ($row = $metaStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['value'], true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    error_log('Failed to decode device metadata for key ' . $row['key'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['meta'][(string) $row['key']] = $decoded;
+            }
+        }
+
+        $pairStmt = $pdo->query('SELECT code, payload FROM device_pairings');
+        if ($pairStmt !== false) {
+            while ($row = $pairStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['payload'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    error_log('Failed to decode device pairing ' . $row['code'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['pairings'][(string) $row['code']] = $decoded;
+            }
+        }
+
+        $deviceStmt = $pdo->query('SELECT id, payload FROM device_store');
+        if ($deviceStmt !== false) {
+            while ($row = $deviceStmt->fetch(\PDO::FETCH_ASSOC)) {
+                $decoded = json_decode((string) $row['payload'], true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    error_log('Failed to decode device entry ' . $row['id'] . ': ' . json_last_error_msg());
+                    continue;
+                }
+                $raw['devices'][(string) $row['id']] = $decoded;
+            }
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to read devices from SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    return $raw;
+}
+
+function devices_sqlite_build_state_from_raw(array $raw): array
+{
+    $state = devices_default_state();
+
+    foreach (($raw['meta'] ?? []) as $key => $value) {
+        if ($key === 'version') {
+            $state['version'] = (int) $value;
+            continue;
+        }
+        $state[$key] = $value;
+    }
+
+    foreach (($raw['pairings'] ?? []) as $code => $row) {
+        $state['pairings'][$code] = $row;
+    }
+
+    foreach (($raw['devices'] ?? []) as $id => $row) {
+        $state['devices'][$id] = $row;
+    }
+
+    return devices_normalize_state($state);
+}
+
+function devices_sqlite_fetch_state_from_pdo(\PDO $pdo): array
+{
+    $raw = devices_sqlite_read_raw($pdo);
+    return devices_sqlite_build_state_from_raw($raw);
+}
+
+function devices_sqlite_fetch_state(): array
+{
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    return devices_sqlite_fetch_state_from_pdo($pdo);
+}
+
+function devices_sqlite_replace_state(array $state): void
+{
+    $normalized = devices_normalize_state($state);
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    $timestamp = time();
+
+    signage_sqlite_with_transaction(
+        $pdo,
+        static function (\PDO $transaction) use ($normalized, $timestamp): void {
+            $transaction->exec('DELETE FROM device_store');
+            $transaction->exec('DELETE FROM device_pairings');
+            $transaction->exec('DELETE FROM device_metadata');
+
+            $metaStmt = $transaction->prepare('INSERT INTO device_metadata(key, value, updated_at) VALUES (:key, :value, :updated)');
+            $pairStmt = $transaction->prepare('INSERT INTO device_pairings(code, payload, updated_at) VALUES (:code, :payload, :updated)');
+            $deviceStmt = $transaction->prepare('INSERT INTO device_store(id, payload, updated_at) VALUES (:id, :payload, :updated)');
+
+            foreach ($normalized as $key => $value) {
+                if ($key === 'devices' || $key === 'pairings') {
+                    continue;
+                }
+                $json = json_encode($value, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device metadata ' . $key . ': ' . json_last_error_msg());
+                }
+                $metaStmt->execute([
+                    ':key' => $key,
+                    ':value' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+
+            foreach (($normalized['pairings'] ?? []) as $code => $row) {
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device pairing ' . $code . ': ' . json_last_error_msg());
+                }
+                $pairStmt->execute([
+                    ':code' => $code,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+
+            foreach (($normalized['devices'] ?? []) as $id => $row) {
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device entry ' . $id . ': ' . json_last_error_msg());
+                }
+                $deviceStmt->execute([
+                    ':id' => $id,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+            }
+        }
+    );
+}
+
+function devices_sqlite_upsert_state(array $state): bool
+{
+    $normalized = devices_normalize_state($state);
+    signage_db_bootstrap();
+    $pdo = signage_db();
+    $timestamp = time();
+
+    $raw = devices_sqlite_read_raw($pdo);
+    $currentMeta = $raw['meta'];
+    $currentPairings = $raw['pairings'];
+    $currentDevices = $raw['devices'];
+
+    $nextMeta = [];
+    foreach ($normalized as $key => $value) {
+        if ($key === 'devices' || $key === 'pairings') {
+            continue;
+        }
+        $nextMeta[$key] = $value;
+    }
+
+    $nextPairings = $normalized['pairings'] ?? [];
+    $nextDevices = $normalized['devices'] ?? [];
+
+    return (bool) signage_sqlite_with_transaction(
+        $pdo,
+        static function (\PDO $transaction) use (
+            $timestamp,
+            $currentMeta,
+            $currentPairings,
+            $currentDevices,
+            $nextMeta,
+            $nextPairings,
+            $nextDevices
+        ): bool {
+            $changed = false;
+
+            $metaUpsert = $transaction->prepare(
+                'INSERT INTO device_metadata(key, value, updated_at) VALUES (:key, :value, :updated)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at'
+            );
+            foreach ($nextMeta as $key => $value) {
+                $current = $currentMeta[$key] ?? null;
+                if ($current === $value) {
+                    continue;
+                }
+                $json = json_encode($value, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device metadata ' . $key . ': ' . json_last_error_msg());
+                }
+                $metaUpsert->execute([
+                    ':key' => $key,
+                    ':value' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $metaDelete = $transaction->prepare('DELETE FROM device_metadata WHERE key = :key');
+            foreach ($currentMeta as $key => $_) {
+                if (!array_key_exists($key, $nextMeta)) {
+                    $metaDelete->execute([':key' => $key]);
+                    if ($metaDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            $pairUpsert = $transaction->prepare(
+                'INSERT INTO device_pairings(code, payload, updated_at) VALUES (:code, :payload, :updated)
+                 ON CONFLICT(code) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at'
+            );
+            foreach ($nextPairings as $code => $row) {
+                $current = $currentPairings[$code] ?? null;
+                if ($current === $row) {
+                    continue;
+                }
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device pairing ' . $code . ': ' . json_last_error_msg());
+                }
+                $pairUpsert->execute([
+                    ':code' => $code,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $pairDelete = $transaction->prepare('DELETE FROM device_pairings WHERE code = :code');
+            foreach ($currentPairings as $code => $_) {
+                if (!array_key_exists($code, $nextPairings)) {
+                    $pairDelete->execute([':code' => $code]);
+                    if ($pairDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            $deviceUpsert = $transaction->prepare(
+                'INSERT INTO device_store(id, payload, updated_at) VALUES (:id, :payload, :updated)
+                 ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at'
+            );
+            foreach ($nextDevices as $id => $row) {
+                $current = $currentDevices[$id] ?? null;
+                if ($current === $row) {
+                    continue;
+                }
+                $json = json_encode($row, SIGNAGE_JSON_STORAGE_FLAGS);
+                if ($json === false) {
+                    throw new RuntimeException('Failed to encode device entry ' . $id . ': ' . json_last_error_msg());
+                }
+                $deviceUpsert->execute([
+                    ':id' => $id,
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                ]);
+                $changed = true;
+            }
+
+            $deviceDelete = $transaction->prepare('DELETE FROM device_store WHERE id = :id');
+            foreach ($currentDevices as $id => $_) {
+                if (!array_key_exists($id, $nextDevices)) {
+                    $deviceDelete->execute([':id' => $id]);
+                    if ($deviceDelete->rowCount() > 0) {
+                        $changed = true;
+                    }
+                }
+            }
+
+            return $changed;
+        }
+    );
+}
+
+function devices_load(): array
+{
+    $cached = devices_state_cache_fetch();
+    if ($cached !== null) {
+        return $cached;
+    }
+
+    $state = null;
+
+    if (signage_db_available()) {
+        try {
+            signage_db_bootstrap();
+            $pdo = signage_db();
+
+            if (devices_sqlite_tables_empty($pdo)) {
+                $import = devices_load_from_file();
+                try {
+                    devices_sqlite_replace_state($import);
+                } catch (Throwable $exception) {
+                    error_log('Failed to import devices into SQLite: ' . $exception->getMessage());
+                }
+                devices_delete_file();
+                $state = devices_normalize_state($import);
+                devices_state_cache_store($state);
+                return $state;
+            }
+
+            $state = devices_sqlite_fetch_state_from_pdo($pdo);
+            devices_state_cache_store($state);
+            return $state;
+        } catch (Throwable $exception) {
+            error_log('Failed to load devices from SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    $state = devices_load_from_file();
+    devices_state_cache_store($state);
+    return $state;
+}
+
+function devices_save(array &$db): bool
+{
+    $db = devices_normalize_state($db);
+
+    devices_state_cache_invalidate();
+
+    if (signage_db_available()) {
+        try {
+            devices_sqlite_upsert_state($db);
+            devices_delete_file();
+            return true;
+        } catch (Throwable $exception) {
+            error_log('Failed to persist devices to SQLite: ' . $exception->getMessage());
+        }
+    }
+
+    return devices_save_to_file($db);
+}
+
+function devices_delete_file(): void
+{
+    $path = devices_path();
+    if (is_file($path)) {
+        @unlink($path);
+    }
+}
+
+function devices_array_is_list(array $value): bool
+{
+    if (function_exists('array_is_list')) {
+        return array_is_list($value);
+    }
+
+    $expected = 0;
+    foreach ($value as $key => $_) {
+        if ($key !== $expected) {
+            return false;
+        }
+        $expected++;
+    }
+
+    return true;
+}
+
+function devices_build_merge_patch($original, $updated)
+{
+    if ($original === $updated) {
+        return [];
+    }
+
+    if (!is_array($original) || !is_array($updated)) {
+        return $updated;
+    }
+
+    if (devices_array_is_list($original) || devices_array_is_list($updated)) {
+        return $original === $updated ? [] : array_values($updated);
+    }
+
+    $patch = [];
+    $keys = array_unique(array_merge(array_keys($original), array_keys($updated)));
+    foreach ($keys as $key) {
+        $hasOriginal = array_key_exists($key, $original);
+        $hasUpdated = array_key_exists($key, $updated);
+
+        if (!$hasUpdated) {
+            if ($hasOriginal) {
+                $patch[$key] = null;
+            }
+            continue;
+        }
+
+        $origValue = $hasOriginal ? $original[$key] : null;
+        $newValue = $updated[$key];
+
+        if (is_array($origValue) && is_array($newValue) && !devices_array_is_list($origValue) && !devices_array_is_list($newValue)) {
+            $child = devices_build_merge_patch($origValue, $newValue);
+            if (!empty($child)) {
+                $patch[$key] = $child;
+            }
+            continue;
+        }
+
+        if ($hasOriginal && $origValue === $newValue) {
+            continue;
+        }
+
+        $patch[$key] = $newValue;
+    }
+
+    return $patch;
+}
+
+function devices_touch_entry_sqlite(string $id, int $timestamp, array $telemetry = []): ?bool
+{
+    if (!signage_db_available()) {
+        return null;
+    }
+
+    $deviceId = devices_normalize_device_id($id);
+    if ($deviceId === '') {
+        return false;
+    }
+
+    try {
+        signage_db_bootstrap();
+        $pdo = signage_db();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Unable to access SQLite store: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT payload FROM device_store WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $deviceId]);
+        $payload = $stmt->fetchColumn();
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to load device from SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+
+    if ($payload === false || $payload === null) {
+        return false;
+    }
+
+    $device = json_decode((string) $payload, true);
+    if (!is_array($device)) {
+        return false;
+    }
+
+    $device['id'] = $deviceId;
+    $device['lastSeen'] = $timestamp;
+    $device['lastSeenAt'] = $timestamp;
+
+    if (!empty($telemetry)) {
+        devices_record_telemetry($device, $telemetry, $timestamp);
+    } elseif (isset($device['heartbeatHistory'])) {
+        $device['heartbeatHistory'] = devices_sanitize_history($device['heartbeatHistory']);
+    }
+
+    $json = json_encode($device, SIGNAGE_JSON_STORAGE_FLAGS);
+    if ($json === false) {
+        throw new RuntimeException('Failed to encode device entry ' . $deviceId . ': ' . json_last_error_msg());
+    }
+
+    try {
+        return signage_sqlite_with_transaction(
+            $pdo,
+            static function (\PDO $transaction) use ($deviceId, $json, $timestamp): bool {
+                $update = $transaction->prepare('UPDATE device_store SET payload = :payload, updated_at = :updated WHERE id = :id');
+                $update->execute([
+                    ':payload' => $json,
+                    ':updated' => $timestamp,
+                    ':id' => $deviceId,
+                ]);
+
+                if ($update->rowCount() > 0) {
+                    return true;
+                }
+
+                $check = $transaction->prepare('SELECT 1 FROM device_store WHERE id = :id LIMIT 1');
+                $check->execute([':id' => $deviceId]);
+
+                return $check->fetchColumn() !== false;
+            }
+        );
+    } catch (Throwable $exception) {
+        throw new RuntimeException('Failed to update device in SQLite: ' . $exception->getMessage(), 0, $exception);
+    }
+}
+
+function devices_touch_update(string $deviceId, int $timestamp, array $telemetry = [], string $context = 'device touch'): array
+{
+    $context = trim($context) !== '' ? trim($context) : 'device touch';
+    $sqliteAvailable = signage_db_available();
+    $sqliteResult = null;
+
+    if ($sqliteAvailable) {
+        try {
+            $sqliteResult = devices_touch_entry_sqlite($deviceId, $timestamp, $telemetry);
+        } catch (RuntimeException $exception) {
+            error_log('SQLite ' . $context . ' failed: ' . $exception->getMessage());
+            return [
+                'ok' => false,
+                'status' => 503,
+                'error' => 'storage-unavailable',
+            ];
+        }
+    }
+
+    if ($sqliteResult === true) {
+        return [
+            'ok' => true,
+            'status' => 200,
+        ];
+    }
+
+    if ($sqliteResult === false) {
+        return [
+            'ok' => false,
+            'status' => 200,
+            'error' => 'unknown-device',
+        ];
+    }
+
+    if ($sqliteAvailable && $sqliteResult !== null) {
+        error_log('Unexpected SQLite ' . $context . ' state for device ' . $deviceId);
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    $state = devices_load();
+    if (!devices_touch_entry($state, $deviceId, $timestamp, $telemetry)) {
+        return [
+            'ok' => false,
+            'status' => 200,
+            'error' => 'unknown-device',
+        ];
+    }
+
+    try {
+        $saved = devices_save($state);
+    } catch (RuntimeException $exception) {
+        error_log('Failed to persist ' . $context . ': ' . $exception->getMessage());
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    if ($saved !== true) {
+        error_log('Failed to persist ' . $context . ': unexpected save status');
+        return [
+            'ok' => false,
+            'status' => 500,
+            'error' => 'storage-failed',
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'status' => 200,
+    ];
+}
+
+function devices_touch_entry(array &$db, $id, ?int $timestamp = null, array $telemetry = []): bool
+{
+    $normalizedId = devices_normalize_device_id($id);
+    if ($normalizedId === '' || !isset($db['devices'][$normalizedId]) || !is_array($db['devices'][$normalizedId])) {
+        return false;
+    }
+    $ts = $timestamp ?? time();
+    $db['devices'][$normalizedId]['lastSeen'] = $ts;
+    $db['devices'][$normalizedId]['lastSeenAt'] = $ts;
+    if (!empty($telemetry)) {
+        devices_record_telemetry($db['devices'][$normalizedId], $telemetry, $ts);
+    }
+    return true;
+}
+
+// Koppel-Code (AAAAAA) aus A–Z (ohne I/O) generieren; keine Speicherung hier
+function dev_gen_code($db)
+{
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    for ($i = 0; $i < 500; $i++) {
+        $code = '';
+        for ($j = 0; $j < 6; $j++) {
+            $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+        if (empty($db['pairings'][$code])) {
+            return $code;
+        }
+    }
+    return null;
+}
+
+// Geräte-ID im Format dev_ + 12 hex (Regex im Player erwartet exakt das)
+function dev_gen_id($db)
+{
+    for ($i = 0; $i < 1000; $i++) {
+        $id = 'dev_' . bin2hex(random_bytes(6));
+        if (empty($db['devices'][$id])) {
+            return $id;
+        }
+    }
+    return null;
+}
+
+// Aufräumen: offene Pairings >15min löschen; verwaiste Links bereinigen
+function dev_gc(&$db)
+{
+    $db = devices_normalize_state($db);
+    $now = time();
+    foreach (($db['pairings'] ?? []) as $code => $p) {
+        $age = $now - (int) ($p['created'] ?? $now);
+        if ($age > 900 && empty($p['deviceId'])) {
+            unset($db['pairings'][$code]);
+        }
+        // Referenz auf nicht-existentes Device? -> lösen
+        if (!empty($p['deviceId']) && empty($db['devices'][$p['deviceId']])) {
+            $db['pairings'][$code]['deviceId'] = null;
+        }
+    }
+}
