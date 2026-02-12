@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
-  <rect width="160" height="90" fill="#ccc"/>
-  <line x1="0" y1="0" x2="160" y2="90" stroke="#888" stroke-width="10"/>
-  <line x1="160" y1="0" x2="0" y2="90" stroke="#888" stroke-width="10"/>
-</svg>

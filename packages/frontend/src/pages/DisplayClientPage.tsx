@@ -13,6 +13,7 @@ import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { getDefaultSettings } from '@/types/settings.types';
 import type { PairingResponse } from '@/types/auth.types';
+import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
 import { API_URL, ENV_IS_DEV } from '@/config/env';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -24,6 +25,23 @@ function generateBrowserId(): string {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+const SUPPORTED_LAYOUTS: LayoutType[] = ['split-view', 'full-rotation', 'triple-view', 'grid-2x2'];
+
+function normalizeLayout(layout: unknown): LayoutType {
+  return SUPPORTED_LAYOUTS.includes(layout as LayoutType)
+    ? (layout as LayoutType)
+    : 'split-view';
+}
+
+function isMediaSlide(slide: SlideConfig | null | undefined): boolean {
+  return Boolean(slide && typeof slide.type === 'string' && slide.type.startsWith('media-'));
+}
+
+function needsModernSlidePadding(isModernDesign: boolean, slide: SlideConfig | null | undefined): boolean {
+  if (!isModernDesign || !slide) return false;
+  return isMediaSlide(slide) || slide.type === 'infos' || slide.type === 'events';
 }
 
 export function DisplayClientPage() {
@@ -253,9 +271,7 @@ export function DisplayClientPage() {
   };
 
   // Safety: old configs might contain legacy layout strings; render them as split-view instead of breaking.
-  const safeLayout = (['split-view', 'full-rotation', 'triple-view', 'grid-2x2'] as const).includes(layout as any)
-    ? layout
-    : 'split-view';
+  const safeLayout = normalizeLayout(layout);
 
   const hasAnyZoneSlides = zones.some((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
 
@@ -294,7 +310,7 @@ export function DisplayClientPage() {
       const mainSlide = mainZone ? getZoneSlide(mainZone.id) : null;
       const mainInfo = mainZone ? getZoneInfo(mainZone.id) : null;
 
-      const theme = themeColors as any;
+      const theme = themeColors;
       const leftBg = theme.zebra1 || '#F7F3E9';
       const rightBg = theme.zebra2 || '#F2EDE1';
       const border = theme.gridTable || '#EBE5D3';
@@ -306,8 +322,8 @@ export function DisplayClientPage() {
       const mainSize = hasPersistent && hasMain ? 100 - gridSizePercent : hasMain ? 100 : 0;
 
       const renderZoneSlide = (
-        slide: any,
-        zone: any,
+        slide: SlideConfig | null,
+        zone?: Zone,
       ) => {
         if (!slide) {
           return (
@@ -317,8 +333,8 @@ export function DisplayClientPage() {
           );
         }
 
-        const isMedia = typeof slide.type === 'string' && slide.type.startsWith('media-');
-        const needsPadding = isModernDesign && (isMedia || slide.type === 'infos' || slide.type === 'events');
+        const mediaSlide = isMediaSlide(slide);
+        const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
         const rendered = (
           <SlideRenderer slide={slide} onVideoEnded={() => zone && onVideoEnded(zone.id)} />
@@ -326,7 +342,7 @@ export function DisplayClientPage() {
 
         if (!needsPadding) return rendered;
 
-        if (isMedia) {
+        if (mediaSlide) {
           return (
             <div className="p-8 w-full h-full">
               <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
@@ -514,8 +530,8 @@ export function DisplayClientPage() {
           const slide = getZoneSlide(zoneId) || currentSlide;
           if (!slide) return null;
 
-          const isMedia = isModernDesign && typeof slide.type === 'string' && slide.type.startsWith('media-');
-          const needsPadding = isModernDesign && (isMedia || slide.type === 'infos' || slide.type === 'events');
+          const mediaSlide = isMediaSlide(slide);
+          const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
           const rendered = (
             <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
@@ -528,7 +544,7 @@ export function DisplayClientPage() {
               duration={0.6}
             >
               {needsPadding ? (
-                isMedia ? (
+                mediaSlide ? (
                   <div className="p-8 w-full h-full">
                     <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
                       {rendered}
@@ -564,7 +580,7 @@ export function DisplayClientPage() {
           const rightSize = 100 - leftSize;
           const topDurationSec = (topRightSlide?.duration ?? 12);
 
-          const theme = themeColors as any;
+          const theme = themeColors;
           const leftBg = theme.zebra1 || '#F7F3E9';
           const rightBg = theme.zebra2 || '#F2EDE1';
           const border = theme.gridTable || '#EBE5D3';
@@ -838,7 +854,7 @@ export function DisplayClientPage() {
 
       case 'grid-2x2':
         {
-          const theme = themeColors as any;
+          const theme = themeColors;
           const border = theme.gridTable || '#EBE5D3';
           const bgBase = theme.dashboardBg || theme.bg || '#FDFBF7';
           const bg1 = theme.zebra1 || bgBase;
@@ -852,8 +868,8 @@ export function DisplayClientPage() {
           const renderCell = (zoneId: string) => {
             const slide = getZoneSlide(zoneId);
 
-            const isMedia = isModernDesign && typeof slide?.type === 'string' && slide.type.startsWith('media-');
-            const needsPadding = isModernDesign && (isMedia || slide?.type === 'infos' || slide?.type === 'events');
+            const mediaSlide = isMediaSlide(slide);
+            const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
             const rendered = slide ? (
               <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
@@ -865,7 +881,7 @@ export function DisplayClientPage() {
 
             if (!slide || !needsPadding) return rendered;
 
-            if (isMedia) {
+            if (mediaSlide) {
               return (
                 <div className="p-6 w-full h-full">
                   <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">

@@ -1,6 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devicesApi } from '@/services/api';
+import type { DeviceOverridesPayload } from '@/services/api';
 import type { CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
+
+function invalidateDevices(queryClient: ReturnType<typeof useQueryClient>, deviceId?: string): void {
+  queryClient.invalidateQueries({ queryKey: ['devices'] });
+  if (deviceId) {
+    queryClient.invalidateQueries({ queryKey: ['devices', deviceId] });
+  }
+}
 
 // Get all devices
 export function useDevices() {
@@ -27,7 +35,7 @@ export function useCreateDevice() {
   return useMutation({
     mutationFn: (device: CreateDeviceRequest) => devicesApi.createDevice(device),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      invalidateDevices(queryClient);
     },
   });
 }
@@ -40,8 +48,7 @@ export function useUpdateDevice() {
     mutationFn: ({ id, updates }: { id: string; updates: UpdateDeviceRequest }) =>
       devicesApi.updateDevice(id, updates),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['devices', variables.id] });
+      invalidateDevices(queryClient, variables.id);
     },
   });
 }
@@ -53,7 +60,7 @@ export function useDeleteDevice() {
   return useMutation({
     mutationFn: (id: string) => devicesApi.deleteDevice(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      invalidateDevices(queryClient);
     },
   });
 }
@@ -71,11 +78,10 @@ export function useSetOverrides() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, overrides }: { id: string; overrides: any }) =>
+    mutationFn: ({ id, overrides }: { id: string; overrides: DeviceOverridesPayload }) =>
       devicesApi.setOverrides(id, overrides),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['devices', variables.id] });
+      invalidateDevices(queryClient, variables.id);
     },
   });
 }
@@ -87,8 +93,7 @@ export function useClearOverrides() {
   return useMutation({
     mutationFn: (id: string) => devicesApi.clearOverrides(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['devices', id] });
+      invalidateDevices(queryClient, id);
     },
   });
 }

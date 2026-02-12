@@ -100,7 +100,6 @@ HTMLSignage/
 │       │   ├── types/             # TypeScript types
 │       │   └── App.tsx
 │       └── package.json
-├── webroot/                        # Legacy PHP (deprecated)
 ├── pnpm-workspace.yaml
 └── package.json
 ```

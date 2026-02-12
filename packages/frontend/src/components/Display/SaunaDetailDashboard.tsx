@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
 import { clampFlamesTo4, getScentEmoji, withAlpha } from './wellnessDisplayUtils';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
+import { buildScheduleSaunaIndexMap, resolveScheduleSaunaIndex, timeToMinutes } from './displayScheduleUtils';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
@@ -21,14 +22,6 @@ interface SaunaInfusionDetailItem extends InfusionListItem {
   intensity: number;
   scents: string[];
   description: string;
-}
-
-function timeToMinutes(timeStr: string): number {
-  const [hRaw, mRaw] = String(timeStr ?? '').split(':');
-  const h = parseInt(hRaw || '', 10);
-  const m = parseInt(mRaw || '', 10);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
-  return h * 60 + m;
 }
 
 function normalizeBadgeLabel(value: string): string {
@@ -249,6 +242,10 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
     : (schedule.activePreset || getTodayPresetKey());
 
   const daySchedule = schedule.presets?.[activePresetKey];
+  const scheduleSaunaIndexByKey = useMemo(
+    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
+    [daySchedule?.saunas]
+  );
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
@@ -269,11 +266,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
 
   const infusions: SaunaInfusionDetailItem[] = useMemo(() => {
     if (!sauna || !daySchedule?.rows || !daySchedule.saunas) return [];
-    let saunaIndex = daySchedule.saunas.indexOf(sauna.name);
-    if (saunaIndex < 0) {
-      const key = normalizeSaunaNameKey(sauna.name);
-      saunaIndex = daySchedule.saunas.findIndex((n) => normalizeSaunaNameKey(n) === key);
-    }
+    const saunaIndex = resolveScheduleSaunaIndex(daySchedule.saunas, sauna.name, scheduleSaunaIndexByKey);
     if (saunaIndex < 0) return [];
 
     return daySchedule.rows
@@ -291,7 +284,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
         };
       })
       .filter(Boolean) as SaunaInfusionDetailItem[];
-  }, [activePresetKey, daySchedule?.rows, daySchedule?.saunas, sauna]);
+  }, [activePresetKey, daySchedule?.rows, daySchedule?.saunas, sauna, scheduleSaunaIndexByKey]);
 
   const sortedInfusions = useMemo(() => {
     return infusions.slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));

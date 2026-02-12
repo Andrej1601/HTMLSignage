@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { getActivePresetKey, getTodayPresetKey, normalizeSaunaNameKey } from '@/types/schedule.types';
+import { getActivePresetKey, getTodayPresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { getVisibleSaunas, type Sauna } from '@/types/sauna.types';
+import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, withAlpha } from './wellnessDisplayUtils';
 import { motion } from 'framer-motion';
+import {
+  buildScheduleSaunaIndexMap,
+  getSaunaAccentColor,
+  resolveScheduleSaunaIndex,
+  timeToMinutes,
+} from './displayScheduleUtils';
 
 interface ScheduleGridSlideProps {
   schedule: Schedule;
@@ -17,20 +23,6 @@ interface ScheduleGridSlideProps {
 interface SaunaInfusionItem extends InfusionListItem {
   title: string;
   intensity: number; // 1-4
-}
-
-function timeToMinutes(timeStr: string): number {
-  const [hRaw, mRaw] = String(timeStr ?? '').split(':');
-  const h = parseInt(hRaw || '', 10);
-  const m = parseInt(mRaw || '', 10);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
-  return h * 60 + m;
-}
-
-function getSaunaAccentColor(sauna: Sauna, idx: number, accentGreen: string, accentGold: string): string {
-  if (sauna.color && typeof sauna.color === 'string') return sauna.color;
-  const colors = [accentGold, accentGreen, '#F59E0B', '#10B981', '#c5a059', '#8B6F47'];
-  return colors[idx % colors.length];
 }
 
 function IntensityFlames({
@@ -194,14 +186,10 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
 
   const daySchedule = schedule.presets?.[activePresetKey];
 
-  const scheduleSaunaIndexByKey = useMemo(() => {
-    const map = new Map<string, number>();
-    (daySchedule?.saunas || []).forEach((name, idx) => {
-      const key = normalizeSaunaNameKey(name);
-      if (key && !map.has(key)) map.set(key, idx);
-    });
-    return map;
-  }, [daySchedule?.saunas]);
+  const scheduleSaunaIndexByKey = useMemo(
+    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
+    [daySchedule?.saunas]
+  );
 
   const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
   const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
@@ -288,10 +276,11 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
         <div className="grid grid-cols-3 grid-rows-2 gap-x-12 gap-y-14 flex-1 overflow-hidden px-2">
           {gridSaunas.map((sauna, idx) => {
             const isOutOfOrder = sauna.status === 'out-of-order';
-            let saunaIndex = daySchedule.saunas.indexOf(sauna.name);
-            if (saunaIndex < 0) {
-              saunaIndex = scheduleSaunaIndexByKey.get(normalizeSaunaNameKey(sauna.name)) ?? -1;
-            }
+            const saunaIndex = resolveScheduleSaunaIndex(
+              daySchedule.saunas,
+              sauna.name,
+              scheduleSaunaIndexByKey,
+            );
 
             const infusions: SaunaInfusionItem[] = daySchedule.rows
               .map((row) => {

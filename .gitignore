@@ -5,18 +5,12 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 yarn.lock
-webroot/admin/dist/
-webroot/player/dist/
 
 # Database files
 *.db
 *.db-journal
 *.db-shm
 *.db-wal
-
-# Data directories
-webroot/data/
-webroot/assets/media/
 
 # Backup files
 *.backup
@@ -29,6 +23,7 @@ webroot/assets/media/
 *.jpeg
 restore-saunas.js
 php.ini
+webroot/data/
 
 # Config files
 nginx-*.conf

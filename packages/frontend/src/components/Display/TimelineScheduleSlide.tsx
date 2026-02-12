@@ -2,11 +2,17 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { AlertTriangle, Clock3, Flame, Thermometer, Waves } from 'lucide-react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { getActivePresetKey, getTodayPresetKey, normalizeSaunaNameKey } from '@/types/schedule.types';
+import { getActivePresetKey, getTodayPresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { getVisibleSaunas, type Sauna } from '@/types/sauna.types';
+import { getVisibleSaunas } from '@/types/sauna.types';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, withAlpha } from './wellnessDisplayUtils';
+import {
+  buildScheduleSaunaIndexMap,
+  getSaunaAccentColor,
+  resolveScheduleSaunaIndex,
+  timeToMinutes,
+} from './displayScheduleUtils';
 
 const BASE_ROW_HEIGHT_PX = 72;
 const MIN_ROW_HEIGHT_PX = 56;
@@ -27,25 +33,12 @@ interface TimelineInfusion {
   intensity: number;
 }
 
-function timeToMinutes(timeStr: string): number {
-  const [hRaw, mRaw] = String(timeStr ?? '').split(':');
-  const h = parseInt(hRaw || '', 10);
-  const m = parseInt(mRaw || '', 10);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
-  return h * 60 + m;
-}
-
 function minutesToTimeLabel(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60) % 24;
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function getSaunaAccentColor(sauna: Sauna, idx: number, accentGreen: string, accentGold: string): string {
-  if (sauna.color && typeof sauna.color === 'string') return sauna.color;
-  const fallbacks = [accentGold, accentGreen, '#F59E0B', '#10B981', '#c5a059', '#8B6F47'];
-  return fallbacks[idx % fallbacks.length];
-}
 
 function IntensityFlames({
   level,
@@ -222,14 +215,10 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
 
   const daySchedule = schedule.presets?.[activePresetKey];
 
-  const scheduleSaunaIndexByKey = useMemo(() => {
-    const map = new Map<string, number>();
-    (daySchedule?.saunas || []).forEach((name, idx) => {
-      const key = normalizeSaunaNameKey(name);
-      if (key && !map.has(key)) map.set(key, idx);
-    });
-    return map;
-  }, [daySchedule?.saunas]);
+  const scheduleSaunaIndexByKey = useMemo(
+    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
+    [daySchedule?.saunas]
+  );
 
   const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
   const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
@@ -238,10 +227,11 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
     const map = new Map<string, TimelineInfusion[]>();
 
     gridSaunas.forEach((sauna) => {
-      let saunaIndex = daySchedule?.saunas.indexOf(sauna.name) ?? -1;
-      if (saunaIndex < 0) {
-        saunaIndex = scheduleSaunaIndexByKey.get(normalizeSaunaNameKey(sauna.name)) ?? -1;
-      }
+      const saunaIndex = resolveScheduleSaunaIndex(
+        daySchedule?.saunas || [],
+        sauna.name,
+        scheduleSaunaIndexByKey,
+      );
 
       const items = (daySchedule?.rows || [])
         .map((row) => {

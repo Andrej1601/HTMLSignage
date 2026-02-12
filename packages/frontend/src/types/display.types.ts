@@ -14,7 +14,7 @@ export interface DisplayConfig {
 export interface SlideConfig {
   type: SlideType;
   duration: number; // seconds
-  data?: any;
+  data?: unknown;
 }
 
 export interface DisplayState {

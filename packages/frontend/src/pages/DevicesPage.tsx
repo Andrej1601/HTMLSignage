@@ -9,7 +9,7 @@ import {
   useDeleteDevice,
   useSendCommand
 } from '@/hooks/useDevices';
-import type { Device } from '@/types/device.types';
+import type { Device, UpdateDeviceRequest } from '@/types/device.types';
 import { RefreshCw, Monitor } from 'lucide-react';
 
 export function DevicesPage() {
@@ -21,7 +21,7 @@ export function DevicesPage() {
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
 
-  const handleUpdateDevice = (id: string, updates: any) => {
+  const handleUpdateDevice = (id: string, updates: UpdateDeviceRequest) => {
     updateDevice.mutate({ id, updates }, {
       onSuccess: () => {
         setEditingDevice(null);

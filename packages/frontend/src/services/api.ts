@@ -2,6 +2,20 @@ import axios from 'axios';
 import type { Schedule, ScheduleResponse } from '@/types/schedule.types';
 import type { Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
 import type { Media, MediaFilter } from '@/types/media.types';
+import type { Settings } from '@/types/settings.types';
+
+export interface ApiOkResponse {
+  ok: boolean;
+}
+
+export interface SaveVersionedResponse extends ApiOkResponse {
+  version: number;
+}
+
+export interface DeviceOverridesPayload {
+  schedule?: Schedule;
+  settings?: Settings;
+}
 
 const api = axios.create({
   baseURL: '/api',
@@ -19,8 +33,8 @@ export const scheduleApi = {
   },
 
   // Save schedule
-  saveSchedule: async (schedule: Schedule): Promise<{ ok: boolean; version: number }> => {
-    const { data } = await api.post('/schedule', schedule);
+  saveSchedule: async (schedule: Schedule): Promise<SaveVersionedResponse> => {
+    const { data } = await api.post<SaveVersionedResponse>('/schedule', schedule);
     return data;
   },
 
@@ -33,13 +47,13 @@ export const scheduleApi = {
 
 // Settings API
 export const settingsApi = {
-  getSettings: async () => {
-    const { data } = await api.get('/settings');
+  getSettings: async (): Promise<Settings> => {
+    const { data } = await api.get<Settings>('/settings');
     return data;
   },
 
-  saveSettings: async (settings: any) => {
-    const { data } = await api.post('/settings', settings);
+  saveSettings: async (settings: Settings): Promise<SaveVersionedResponse> => {
+    const { data } = await api.post<SaveVersionedResponse>('/settings', settings);
     return data;
   },
 };
@@ -71,32 +85,32 @@ export const devicesApi = {
   },
 
   // Delete device
-  deleteDevice: async (id: string): Promise<{ ok: boolean }> => {
-    const { data } = await api.delete(`/devices/${id}`);
+  deleteDevice: async (id: string): Promise<ApiOkResponse> => {
+    const { data } = await api.delete<ApiOkResponse>(`/devices/${id}`);
     return data;
   },
 
   // Send heartbeat (device pings this)
-  sendHeartbeat: async (id: string): Promise<{ ok: boolean }> => {
-    const { data } = await api.post(`/devices/${id}/heartbeat`);
+  sendHeartbeat: async (id: string): Promise<ApiOkResponse> => {
+    const { data } = await api.post<ApiOkResponse>(`/devices/${id}/heartbeat`);
     return data;
   },
 
   // Send control command (reload, restart, clear-cache)
-  sendCommand: async (id: string, command: DeviceControlCommand): Promise<{ ok: boolean }> => {
-    const { data } = await api.post(`/devices/${id}/control`, command);
+  sendCommand: async (id: string, command: DeviceControlCommand): Promise<ApiOkResponse> => {
+    const { data } = await api.post<ApiOkResponse>(`/devices/${id}/control`, command);
     return data;
   },
 
   // Set device overrides
-  setOverrides: async (id: string, overrides: { schedule?: any; settings?: any }): Promise<{ ok: boolean }> => {
-    const { data } = await api.post(`/devices/${id}/overrides`, overrides);
+  setOverrides: async (id: string, overrides: DeviceOverridesPayload): Promise<ApiOkResponse> => {
+    const { data } = await api.post<ApiOkResponse>(`/devices/${id}/overrides`, overrides);
     return data;
   },
 
   // Clear device overrides
-  clearOverrides: async (id: string): Promise<{ ok: boolean }> => {
-    const { data } = await api.delete(`/devices/${id}/overrides`);
+  clearOverrides: async (id: string): Promise<ApiOkResponse> => {
+    const { data } = await api.delete<ApiOkResponse>(`/devices/${id}/overrides`);
     return data;
   },
 };
@@ -133,8 +147,8 @@ export const mediaApi = {
   },
 
   // Delete media
-  deleteMedia: async (id: string): Promise<{ ok: boolean }> => {
-    const { data } = await api.delete(`/media/${id}`);
+  deleteMedia: async (id: string): Promise<ApiOkResponse> => {
+    const { data } = await api.delete<ApiOkResponse>(`/media/${id}`);
     return data;
   },
 };

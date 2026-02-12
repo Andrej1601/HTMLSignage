@@ -15,6 +15,35 @@ interface UseSlideshowOptions {
   enabled?: boolean;
 }
 
+interface ZoneSlidesState {
+  zoneSlides: SlideConfig[];
+  currentIndex: number;
+  currentSlide: SlideConfig | null;
+}
+
+function getEnabledSlidesForZone(slides: SlideConfig[], zoneId: string): SlideConfig[] {
+  return getSlidesByZone(slides, zoneId).filter((slide) => slide.enabled);
+}
+
+function normalizeSlideIndex(rawIndex: number | undefined, slideCount: number): number {
+  if (slideCount <= 0) return 0;
+  return Number.isFinite(rawIndex) ? (rawIndex as number) % slideCount : 0;
+}
+
+function getZoneSlidesState(
+  slides: SlideConfig[],
+  zoneId: string,
+  zoneSlideIndexes: Record<string, number>,
+): ZoneSlidesState {
+  const zoneSlides = getEnabledSlidesForZone(slides, zoneId);
+  const currentIndex = normalizeSlideIndex(zoneSlideIndexes[zoneId], zoneSlides.length);
+  return {
+    zoneSlides,
+    currentIndex,
+    currentSlide: zoneSlides[currentIndex] || null,
+  };
+}
+
 export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) {
   const [isPaused, setIsPaused] = useState(false);
 
@@ -84,11 +113,10 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
 
   // Legacy support: prefer the zone named "main" when present, otherwise use the first zone.
   const mainZone = zones.find((z) => z.id === 'main') || zones[0];
-  const rawMainIndex = mainZone?.id && Number.isFinite(zoneSlideIndexes[mainZone.id])
-    ? zoneSlideIndexes[mainZone.id]
+  const mainZoneSlides = mainZone ? getEnabledSlidesForZone(slides, mainZone.id) : slides;
+  const currentSlideIndex = mainZone?.id
+    ? normalizeSlideIndex(zoneSlideIndexes[mainZone.id], mainZoneSlides.length)
     : 0;
-  const mainZoneSlides = mainZone ? getSlidesByZone(slides, mainZone.id).filter((s) => s.enabled) : slides;
-  const currentSlideIndex = mainZoneSlides.length > 0 ? (rawMainIndex % mainZoneSlides.length) : 0;
   const currentSlide = mainZoneSlides[currentSlideIndex] || null;
 
   const nextSlide = useCallback(
@@ -96,7 +124,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       const targetZone = zoneId || mainZone?.id;
       if (!targetZone) return;
 
-      const zoneSlides = getSlidesByZone(slides, targetZone).filter((s) => s.enabled);
+      const zoneSlides = getEnabledSlidesForZone(slides, targetZone);
       if (zoneSlides.length === 0) return;
 
       setZoneSlideIndexes((prev) => ({
@@ -115,7 +143,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       const targetZone = zoneId || mainZone?.id;
       if (!targetZone) return;
 
-      const zoneSlides = getSlidesByZone(slides, targetZone).filter((s) => s.enabled);
+      const zoneSlides = getEnabledSlidesForZone(slides, targetZone);
       if (zoneSlides.length === 0) return;
 
       setZoneSlideIndexes((prev) => ({
@@ -134,7 +162,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       const targetZone = zoneId || mainZone?.id;
       if (!targetZone) return;
 
-      const zoneSlides = getSlidesByZone(slides, targetZone).filter((s) => s.enabled);
+      const zoneSlides = getEnabledSlidesForZone(slides, targetZone);
       if (index >= 0 && index < zoneSlides.length) {
         setZoneSlideIndexes((prev) => ({
           ...prev,
@@ -171,10 +199,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       const targetZone = zoneId || mainZone?.id;
       if (!targetZone) return;
 
-      const zoneSlides = getSlidesByZone(slides, targetZone).filter((s) => s.enabled);
-      const rawIndex = Number.isFinite(zoneSlideIndexes[targetZone]) ? zoneSlideIndexes[targetZone] : 0;
-      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
-      const slide = zoneSlides[currentIndex];
+      const { currentSlide: slide } = getZoneSlidesState(slides, targetZone, zoneSlideIndexes);
 
       if (slide?.type === 'media-video' && slide.videoPlayback === 'complete') {
         videoEndedRefs.current[targetZone] = true;
@@ -190,7 +215,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     if (!ENV_IS_DEV) return;
 
     const zonesDebug = zones.map((zone) => {
-      const zoneSlides = getSlidesByZone(slides, zone.id).filter((s) => s.enabled);
+      const zoneSlides = getEnabledSlidesForZone(slides, zone.id);
       return {
         id: zone.id,
         name: zone.name,
@@ -254,7 +279,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     }
 
     zones.forEach((zone) => {
-      const zoneSlides = getSlidesByZone(slides, zone.id).filter((s) => s.enabled);
+      const { currentSlide: slide } = getZoneSlidesState(slides, zone.id, zoneSlideIndexes);
 
       // Check if this zone should rotate
       if (!shouldZoneRotate(zone, slides)) {
@@ -262,10 +287,6 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
         clearZoneTimer(zone.id);
         return;
       }
-
-      const rawIndex = Number.isFinite(zoneSlideIndexes[zone.id]) ? zoneSlideIndexes[zone.id] : 0;
-      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
-      const slide = zoneSlides[currentIndex];
 
       if (!slide) {
         clearZoneTimer(zone.id);
@@ -317,11 +338,8 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
   // Helper to get current slide for a zone
   const getZoneSlide = useCallback(
     (zoneId: string) => {
-      const zoneSlides = getSlidesByZone(slides, zoneId).filter((s) => s.enabled);
-      const rawIndex = Number.isFinite(zoneSlideIndexes[zoneId]) ? zoneSlideIndexes[zoneId] : 0;
-      if (zoneSlides.length === 0) return null;
-      const index = rawIndex % zoneSlides.length;
-      return zoneSlides[index] || null;
+      const { currentSlide } = getZoneSlidesState(slides, zoneId, zoneSlideIndexes);
+      return currentSlide;
     },
     [slides, zoneSlideIndexes]
   );
@@ -332,13 +350,11 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
       const zone = zones.find((z) => z.id === zoneId);
       if (!zone) return null;
 
-      const zoneSlides = getSlidesByZone(slides, zoneId).filter((s) => s.enabled);
-      const rawIndex = Number.isFinite(zoneSlideIndexes[zoneId]) ? zoneSlideIndexes[zoneId] : 0;
-      const currentIndex = zoneSlides.length > 0 ? (rawIndex % zoneSlides.length) : 0;
+      const { zoneSlides, currentIndex, currentSlide } = getZoneSlidesState(slides, zoneId, zoneSlideIndexes);
 
       return {
         zone,
-        currentSlide: zoneSlides[currentIndex] || null,
+        currentSlide,
         currentSlideIndex: currentIndex,
         totalSlides: zoneSlides.length,
         shouldRotate: shouldZoneRotate(zone, slides),
