@@ -63,6 +63,7 @@ if [[ "${NEED_NODE_INSTALL}" == "true" ]]; then
 fi
 
 log "Enabling corepack/pnpm..."
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 corepack enable
 corepack prepare pnpm@latest --activate
 
@@ -82,7 +83,12 @@ else
 fi
 
 log "Installing Node dependencies..."
-sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --frozen-lockfile"
+if [[ -f "${APP_DIR}/pnpm-lock.yaml" ]]; then
+  sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --frozen-lockfile"
+else
+  log "pnpm-lock.yaml not found, using --no-frozen-lockfile fallback."
+  sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --no-frozen-lockfile"
+fi
 
 log "Configuring PostgreSQL..."
 systemctl enable --now postgresql
