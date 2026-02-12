@@ -1,154 +1,81 @@
 # Quick Start Guide
 
-## 🚀 Get Up and Running in 5 Minutes
+## 1. Fresh Ubuntu Machine
 
-### Step 1: Install Dependencies
+Run these commands on a clean Ubuntu/Debian host:
 
 ```bash
-cd /home/andrej/HTMLSignage
+sudo apt update
+sudo apt install -y git curl ca-certificates
 
-# Install pnpm globally (if not already installed)
-npm install -g pnpm
+git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
+cd /opt/HTMLSignage
 
-# Install all dependencies
-pnpm install
+SERVER_IP=$(hostname -I | awk '{print $1}')
+sudo APP_USER="$USER" SERVER_IP="$SERVER_IP" bash scripts/install-new-machine.sh
 ```
 
-### Step 2: Setup PostgreSQL
+After install:
 
-**Option A: Local PostgreSQL**
 ```bash
-sudo -u postgres psql
-CREATE DATABASE htmlsignage;
-CREATE USER signage WITH PASSWORD 'signage123';
-GRANT ALL PRIVILEGES ON DATABASE htmlsignage TO signage;
-\q
+systemctl status htmlsignage-backend.service --no-pager
+systemctl status htmlsignage-frontend.service --no-pager
+ss -tulpen | grep -E ':(3000|5173)\b'
+curl http://127.0.0.1:3000/health
 ```
 
-**Option B: Docker (Recommended)**
+URLs:
+- Admin: `http://<SERVER_IP>:5173`
+- Display: `http://<SERVER_IP>:5173/display`
+- API health: `http://<SERVER_IP>:3000/health`
+
+The first user registration becomes admin.
+
+## 2. Optional Installer Overrides
+
+You can override defaults when needed:
+
 ```bash
-docker run -d \
-  --name htmlsignage-db \
-  -e POSTGRES_DB=htmlsignage \
-  -e POSTGRES_USER=signage \
-  -e POSTGRES_PASSWORD=signage123 \
-  -p 5432:5432 \
-  postgres:16
+sudo \
+  APP_USER="$USER" \
+  APP_DIR="/opt/HTMLSignage" \
+  SERVER_IP="192.168.178.93" \
+  DB_NAME="htmlsignage" \
+  DB_USER="signage" \
+  DB_PASS="strong-db-password" \
+  BACKEND_PORT="3000" \
+  FRONTEND_PORT="5173" \
+  JWT_SECRET="strong-jwt-secret" \
+  bash scripts/install-new-machine.sh
 ```
 
-### Step 3: Configure Environment
+## 3. Update an Existing Installation
 
 ```bash
+cd /opt/HTMLSignage
+git pull --ff-only origin main
+sudo systemctl restart htmlsignage-backend.service
+sudo systemctl restart htmlsignage-frontend.service
+```
+
+## 4. Local Development (manual)
+
+```bash
+cd /path/to/HTMLSignage
+npx pnpm install
 cp packages/backend/.env.example packages/backend/.env
+npx pnpm --filter backend db:generate
+npx pnpm --filter backend db:migrate
+npx pnpm dev
 ```
 
-Edit `packages/backend/.env`:
-```env
-DATABASE_URL="postgresql://signage:signage123@localhost:5432/htmlsignage"
-JWT_SECRET="change-me-in-production"
-FRONTEND_URL="http://localhost:5173"
-PORT=3000
-```
+Local URLs:
+- Frontend: `http://localhost:5173`
+- Display: `http://localhost:5173/display`
+- Backend: `http://localhost:3000`
 
-### Step 4: Initialize Database
+## 5. Troubleshooting
 
-```bash
-# Generate Prisma Client
-pnpm --filter backend db:generate
-
-# Run migrations
-pnpm --filter backend db:migrate
-```
-
-### Step 5: Start Development Servers
-
-```bash
-# Start both backend and frontend
-pnpm dev
-```
-
-**Access:**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- Health Check: http://localhost:3000/health
-
-## 🔍 Verify Everything Works
-
-```bash
-# Test backend health
-curl http://localhost:3000/health
-
-# Test schedule API
-curl http://localhost:3000/api/schedule
-
-# Open Prisma Studio (database GUI)
-pnpm db:studio
-```
-
-## 🛠️ Next Steps
-
-1. **Implement Authentication** - Complete auth middleware
-2. **Build Schedule Editor** - Migrate grid component to React
-3. **Add Settings UI** - Design/theme editor
-4. **Implement Media Upload** - File upload with multer
-5. **Data Migration** - Migrate from SQLite to PostgreSQL
-6. **Deploy to Production** - Nginx + PM2/Systemd
-
-## 📚 Useful Commands
-
-```bash
-# Backend only
-pnpm backend
-
-# Frontend only
-pnpm frontend
-
-# Type checking
-pnpm typecheck
-
-# Linting
-pnpm lint
-
-# Build for production
-pnpm build
-
-# Database management
-pnpm db:studio      # Open Prisma Studio
-pnpm db:generate    # Regenerate Prisma Client
-pnpm db:push        # Push schema without migration
-```
-
-## 🐛 Troubleshooting
-
-### Can't connect to PostgreSQL
-```bash
-# Check if PostgreSQL is running
-sudo systemctl status postgresql
-
-# Or for Docker
-docker ps | grep htmlsignage-db
-```
-
-### Port already in use
-```bash
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Kill process on port 5173
-lsof -ti:5173 | xargs kill -9
-```
-
-### Prisma Client not generated
-```bash
-pnpm --filter backend db:generate
-```
-
-## 💡 Development Tips
-
-- Use **React DevTools** browser extension for debugging
-- Use **Prisma Studio** for database inspection
-- Enable **React Query DevTools** in development
-- Check browser console for WebSocket connection
-- Backend logs are in console (no file logging yet)
-
-Happy coding! 🎉
+- Backend logs: `journalctl -u htmlsignage-backend.service -f`
+- Frontend logs: `journalctl -u htmlsignage-frontend.service -f`
+- Restart both: `sudo systemctl restart htmlsignage-backend htmlsignage-frontend`

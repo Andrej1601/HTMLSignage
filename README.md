@@ -106,54 +106,64 @@ HTMLSignage/
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Fresh Machine Install (recommended)
+
+Use the installer script to provision everything for production-style runtime on ports `5173` (frontend) and `3000` (backend).
+
+```bash
+sudo apt update
+sudo apt install -y git curl ca-certificates
+
+git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
+cd /opt/HTMLSignage
+
+SERVER_IP=$(hostname -I | awk '{print $1}')
+sudo APP_USER="$USER" SERVER_IP="$SERVER_IP" bash scripts/install-new-machine.sh
+```
+
+What this does:
+- Installs Node.js 20+, pnpm, PostgreSQL
+- Installs dependencies and builds backend/frontend
+- Creates backend/frontend env files
+- Runs Prisma migrations
+- Creates and starts systemd services:
+  - `htmlsignage-backend.service`
+  - `htmlsignage-frontend.service`
+
+Verify after install:
+
+```bash
+systemctl status htmlsignage-backend.service --no-pager
+systemctl status htmlsignage-frontend.service --no-pager
+curl http://127.0.0.1:3000/health
+```
+
+Open in browser:
+- Admin: `http://<SERVER_IP>:5173`
+- Display: `http://<SERVER_IP>:5173/display`
+- API health: `http://<SERVER_IP>:3000/health`
+
+The first registered account becomes admin.
+
+### Local Development Setup
+
+Prerequisites:
 - Node.js 20+
 - PostgreSQL 16+
-- pnpm (or npx)
+- pnpm (or `npx pnpm`)
 
-### 1. Install Dependencies
 ```bash
 npx pnpm install
+cp packages/backend/.env.example packages/backend/.env
+npx pnpm --filter backend db:generate
+npx pnpm --filter backend db:migrate
+npx pnpm dev
 ```
 
-### 2. Setup Database
-```bash
-# Create database and user
-sudo -u postgres psql <<EOF
-CREATE DATABASE htmlsignage;
-CREATE USER signage WITH PASSWORD 'signage123';
-GRANT ALL PRIVILEGES ON DATABASE htmlsignage TO signage;
-ALTER USER signage CREATEDB;
-EOF
-```
-
-### 3. Configure Backend
-```bash
-cd packages/backend
-cp .env.example .env
-# Edit .env with your database credentials
-```
-
-### 4. Run Migrations
-```bash
-cd packages/backend
-npx prisma migrate dev
-npx prisma generate
-```
-
-### 5. Start Development Servers
-```bash
-# From project root
-pnpm dev
-
-# Backend will run on: http://localhost:3000
-# Frontend will run on: http://localhost:5173
-```
-
-### 6. Access the Application
-- **Admin Interface**: http://192.168.178.93:5173
-- **Display Client**: http://192.168.178.93:5173/display
-- **API Health**: http://192.168.178.93:3000/health
+Development URLs:
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3000`
+- Display: `http://localhost:5173/display`
 
 ## 📱 Pages & Routes
 
@@ -292,12 +302,17 @@ pnpm build
 
 ### Production Start
 ```bash
-# Backend
-cd packages/backend
-node dist/server.js
+# Start services
+sudo systemctl start htmlsignage-backend.service
+sudo systemctl start htmlsignage-frontend.service
 
-# Frontend (serve with nginx/apache)
-# Serve packages/frontend/dist/ as static files
+# Enable autostart
+sudo systemctl enable htmlsignage-backend.service
+sudo systemctl enable htmlsignage-frontend.service
+
+# Logs
+journalctl -u htmlsignage-backend.service -f
+journalctl -u htmlsignage-frontend.service -f
 ```
 
 ### Environment Variables (Production)
