@@ -6,29 +6,41 @@ import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config/env';
 
 export function PendingPairings() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const queryClient = useQueryClient();
   const [pairingDevice, setPairingDevice] = useState<Device | null>(null);
   const [deviceName, setDeviceName] = useState('');
 
   // Fetch pending devices (unpaired with pairing codes)
   const { data: pendingDevices = [], refetch, isLoading } = useQuery<Device[]>({
-    queryKey: ['devices', 'pending'],
+    queryKey: ['devices', 'pending', token],
+    enabled: !!token,
+    retry: false,
     queryFn: async () => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/devices/pending`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
+
+      if (response.status === 401) {
+        await logout();
+        throw new Error('unauthorized');
+      }
+
       if (!response.ok) throw new Error('Failed to fetch pending devices');
       return response.json();
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: token ? 5000 : false, // Refresh every 5 seconds when authenticated
   });
 
   // Pair device mutation
   const pairDevice = useMutation({
     mutationFn: async (data: { pairingCode: string; name: string }) => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/devices/pair`, {
         method: 'POST',
         headers: {

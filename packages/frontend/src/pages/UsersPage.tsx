@@ -29,7 +29,7 @@ interface UpdateUserData {
 }
 
 export function UsersPage() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -37,13 +37,23 @@ export function UsersPage() {
 
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: ['users'],
+    queryKey: ['users', token],
+    enabled: !!token,
+    retry: false,
     queryFn: async () => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/users`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
+
+      if (response.status === 401) {
+        await logout();
+        throw new Error('unauthorized');
+      }
+
       if (!response.ok) throw new Error('Failed to fetch users');
       return response.json();
     },
@@ -52,6 +62,8 @@ export function UsersPage() {
   // Create user mutation
   const createUser = useMutation({
     mutationFn: async (data: CreateUserData) => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/users`, {
         method: 'POST',
         headers: {
@@ -75,6 +87,8 @@ export function UsersPage() {
   // Update user mutation
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/users/${id}`, {
         method: 'PATCH',
         headers: {
@@ -98,6 +112,8 @@ export function UsersPage() {
   // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
+      if (!token) throw new Error('unauthorized');
+
       const response = await fetch(`${API_URL}/api/users/${id}`, {
         method: 'DELETE',
         headers: {
