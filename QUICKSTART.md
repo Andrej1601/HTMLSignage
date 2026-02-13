@@ -11,8 +11,7 @@ sudo apt install -y git curl ca-certificates
 git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
 
-SERVER_IP=$(hostname -I | awk '{print $1}')
-sudo APP_USER="$USER" SERVER_IP="$SERVER_IP" bash scripts/install-new-machine.sh
+sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 ```
 
 After install:
@@ -25,9 +24,9 @@ curl http://127.0.0.1:3000/health
 ```
 
 URLs:
-- Admin: `http://<SERVER_IP>:5173`
-- Display: `http://<SERVER_IP>:5173/display`
-- API health: `http://<SERVER_IP>:3000/health`
+- Admin: `http://<machine-ip-or-hostname>:5173`
+- Display: `http://<machine-ip-or-hostname>:5173/display`
+- API health: `http://<machine-ip-or-hostname>:3000/health`
 
 The first user registration becomes admin.
 
@@ -39,10 +38,11 @@ You can override defaults when needed:
 sudo \
   APP_USER="$USER" \
   APP_DIR="/opt/HTMLSignage" \
-  SERVER_IP="192.168.178.93" \
   DB_NAME="htmlsignage" \
   DB_USER="signage" \
   DB_PASS="strong-db-password" \
+  FRONTEND_URL="*" \
+  VITE_API_URL="" \
   BACKEND_PORT="3000" \
   FRONTEND_PORT="5173" \
   JWT_SECRET="strong-jwt-secret" \

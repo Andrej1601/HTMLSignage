@@ -117,12 +117,11 @@ sudo apt install -y git curl ca-certificates
 git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
 
-SERVER_IP=$(hostname -I | awk '{print $1}')
-sudo APP_USER="$USER" SERVER_IP="$SERVER_IP" bash scripts/install-new-machine.sh
+sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 ```
 
 What this does:
-- Installs Node.js 20+, pnpm, PostgreSQL
+- Installs latest available Node.js, pnpm, PostgreSQL
 - Installs dependencies and builds backend/frontend
 - Creates backend/frontend env files
 - Runs Prisma migrations
@@ -139,9 +138,9 @@ curl http://127.0.0.1:3000/health
 ```
 
 Open in browser:
-- Admin: `http://<SERVER_IP>:5173`
-- Display: `http://<SERVER_IP>:5173/display`
-- API health: `http://<SERVER_IP>:3000/health`
+- Admin: `http://<machine-ip-or-hostname>:5173`
+- Display: `http://<machine-ip-or-hostname>:5173/display`
+- API health: `http://<machine-ip-or-hostname>:3000/health`
 
 The first registered account becomes admin.
 
@@ -273,7 +272,7 @@ Development URLs:
 DATABASE_URL="postgresql://signage:signage123@localhost:5432/htmlsignage?schema=public"
 PORT=3000
 NODE_ENV=development
-FRONTEND_URL=http://192.168.178.93:5173
+FRONTEND_URL=*
 JWT_SECRET=your-secret-key
 ```
 
@@ -287,7 +286,7 @@ JWT_SECRET=your-secret-key
 The system is configured for LAN access:
 - Backend listens on `0.0.0.0:3000`
 - Frontend listens on `0.0.0.0:5173`
-- CORS allows `192.168.*` IPs in development
+- CORS is controlled by `FRONTEND_URL` (default `*` in installer)
 
 ## 📦 Build & Deployment
 

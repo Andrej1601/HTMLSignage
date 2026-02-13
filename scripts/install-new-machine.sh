@@ -22,15 +22,11 @@ DB_USER="${DB_USER:-signage}"
 DB_PASS="${DB_PASS:-$(openssl rand -hex 18)}"
 BACKEND_PORT="${BACKEND_PORT:-3000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-NODE_MAJOR="${NODE_MAJOR:-20}"
+FRONTEND_URL="${FRONTEND_URL:-*}"
+VITE_API_URL="${VITE_API_URL:-}"
 
 if ! id -u "${APP_USER}" >/dev/null 2>&1; then
   die "User '${APP_USER}' does not exist. Create the user first or pass APP_USER=<existing-user>."
-fi
-
-SERVER_IP="${SERVER_IP:-$(hostname -I | awk '{print $1}')}"
-if [[ -z "${SERVER_IP}" ]]; then
-  die "Could not detect SERVER_IP. Set it explicitly: SERVER_IP=192.168.x.x"
 fi
 
 JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
@@ -38,29 +34,18 @@ JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 32)}"
 log "Configuration:"
 log "APP_DIR=${APP_DIR}"
 log "APP_USER=${APP_USER}"
-log "SERVER_IP=${SERVER_IP}"
 log "PORTS frontend=${FRONTEND_PORT} backend=${BACKEND_PORT}"
 log "DATABASE ${DB_USER}@${DB_NAME}"
+log "FRONTEND_URL=${FRONTEND_URL}"
 
 log "Installing base packages..."
 apt-get update -y
 apt-get install -y curl git ca-certificates gnupg build-essential postgresql postgresql-contrib
+apt-get upgrade -y
 
-NEED_NODE_INSTALL="false"
-if ! command -v node >/dev/null 2>&1; then
-  NEED_NODE_INSTALL="true"
-else
-  CURRENT_NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
-  if (( CURRENT_NODE_MAJOR < NODE_MAJOR )); then
-    NEED_NODE_INSTALL="true"
-  fi
-fi
-
-if [[ "${NEED_NODE_INSTALL}" == "true" ]]; then
-  log "Installing Node.js ${NODE_MAJOR}.x..."
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
-  apt-get install -y nodejs
-fi
+log "Installing latest available Node.js from NodeSource..."
+curl -fsSL "https://deb.nodesource.com/setup_current.x" | bash -
+apt-get install -y nodejs
 
 log "Enabling corepack/pnpm..."
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -82,13 +67,8 @@ else
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
 
-log "Installing Node dependencies..."
-if [[ -f "${APP_DIR}/pnpm-lock.yaml" ]]; then
-  sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --frozen-lockfile"
-else
-  log "pnpm-lock.yaml not found, using --no-frozen-lockfile fallback."
-  sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --no-frozen-lockfile"
-fi
+log "Installing Node dependencies (no lockfile pinning)..."
+sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --no-frozen-lockfile"
 
 log "Configuring PostgreSQL..."
 systemctl enable --now postgresql
@@ -114,7 +94,7 @@ cat > "${APP_DIR}/packages/backend/.env" <<EOF
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}?schema=public"
 PORT=${BACKEND_PORT}
 NODE_ENV=production
-FRONTEND_URL=http://${SERVER_IP}:${FRONTEND_PORT}
+FRONTEND_URL="${FRONTEND_URL}"
 JWT_SECRET=${JWT_SECRET}
 JWT_EXPIRES_IN=7d
 UPLOAD_DIR=uploads
@@ -126,7 +106,7 @@ chmod 600 "${APP_DIR}/packages/backend/.env"
 
 log "Writing frontend production environment..."
 cat > "${APP_DIR}/packages/frontend/.env.production" <<EOF
-VITE_API_URL=http://${SERVER_IP}:${BACKEND_PORT}
+VITE_API_URL=${VITE_API_URL}
 EOF
 chown "${APP_USER}:${APP_USER}" "${APP_DIR}/packages/frontend/.env.production"
 
@@ -190,13 +170,18 @@ sleep 2
 curl -fsS "http://127.0.0.1:${BACKEND_PORT}/health" >/dev/null
 curl -fsS "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
 
+ACCESS_HOST="$(hostname -I | awk '{print $1}')"
+if [[ -z "${ACCESS_HOST}" ]]; then
+  ACCESS_HOST="$(hostname)"
+fi
+
 cat <<EOF
 
 Install complete.
 
-Frontend: http://${SERVER_IP}:${FRONTEND_PORT}
-Display:  http://${SERVER_IP}:${FRONTEND_PORT}/display
-Backend:  http://${SERVER_IP}:${BACKEND_PORT}/health
+Frontend: http://${ACCESS_HOST}:${FRONTEND_PORT}
+Display:  http://${ACCESS_HOST}:${FRONTEND_PORT}/display
+Backend:  http://${ACCESS_HOST}:${BACKEND_PORT}/health
 
 Systemd status:
   systemctl status htmlsignage-backend.service

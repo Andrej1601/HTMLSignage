@@ -1,5 +1,6 @@
 import express from 'express';
 import { createServer } from 'http';
+import os from 'os';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -24,6 +25,26 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim();
+const allowAllOrigins = configuredFrontendUrl === '' || configuredFrontendUrl === '*';
+
+const isDevAllowedOrigin = (origin: string): boolean => {
+  try {
+    const hostname = new URL(origin).hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return true;
+    }
+    if (hostname.endsWith('.local')) {
+      return true;
+    }
+    if (hostname.startsWith('10.') || hostname.startsWith('192.168.')) {
+      return true;
+    }
+    return /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+  } catch {
+    return false;
+  }
+};
 
 // CORS Configuration - Allow LAN access in development
 const corsOptions = {
@@ -31,15 +52,15 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
 
-    // In development, allow localhost and LAN IPs
+    // In development, allow localhost and private LAN origins
     if (process.env.NODE_ENV === 'development') {
-      if (origin.includes('localhost') || origin.includes('192.168.') || origin.includes('127.0.0.1')) {
+      if (isDevAllowedOrigin(origin)) {
         return callback(null, true);
       }
     }
 
-    // In production, only allow configured frontend URL
-    if (origin === process.env.FRONTEND_URL) {
+    // In production, allow all origins when FRONTEND_URL is "*" (or empty)
+    if (allowAllOrigins || origin === configuredFrontendUrl) {
       return callback(null, true);
     }
 
@@ -102,8 +123,21 @@ setupWebSocket(io);
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 httpServer.listen(PORT, HOST, () => {
+  const networkInterfaces = os.networkInterfaces();
+  const lanAddresses = Object.values(networkInterfaces)
+    .flatMap((entries) => entries ?? [])
+    .filter(
+      (entry): entry is os.NetworkInterfaceInfo =>
+        Boolean(entry) && entry.family === 'IPv4' && !entry.internal
+    )
+    .map((entry) => entry.address);
+
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Network: http://192.168.178.93:${PORT}`);
+  if (lanAddresses.length > 0) {
+    lanAddresses.forEach((address) => {
+      console.log(`Network: http://${address}:${PORT}`);
+    });
+  }
   console.log('WebSocket server ready');
   console.log(`Environment: ${process.env.NODE_ENV}`);
 });
