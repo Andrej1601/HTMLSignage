@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import type { Event } from '@/types/settings.types';
+import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
+import {
+  COLOR_PALETTES,
+  type AudioSettings,
+  type ColorPaletteName,
+  type DesignStyle,
+  type Event,
+  type EventSettingsOverrides,
+} from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { useMedia } from '@/hooks/useMedia';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
@@ -15,6 +23,54 @@ export function EventManager({ events, onChange }: EventManagerProps) {
   const { data: media } = useMedia();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const defaultEventAudio: AudioSettings = {
+    enabled: false,
+    volume: 0.5,
+    loop: true,
+  };
+
+  const normalizeOverrides = (raw?: EventSettingsOverrides): EventSettingsOverrides | undefined => {
+    if (!raw) return undefined;
+
+    const next: EventSettingsOverrides = {};
+
+    if (raw.designStyle) next.designStyle = raw.designStyle;
+    if (raw.colorPalette) next.colorPalette = raw.colorPalette;
+    if (raw.theme && Object.keys(raw.theme).length > 0) next.theme = raw.theme;
+    if (raw.fonts && Object.keys(raw.fonts).length > 0) next.fonts = raw.fonts;
+    if (raw.slides && Object.keys(raw.slides).length > 0) next.slides = raw.slides;
+    if (raw.display && Object.keys(raw.display).length > 0) next.display = raw.display;
+    if (raw.header && Object.keys(raw.header).length > 0) next.header = raw.header;
+    if (raw.slideshow) next.slideshow = raw.slideshow;
+    if (raw.audio) next.audio = raw.audio;
+
+    return Object.keys(next).length > 0 ? next : undefined;
+  };
+
+  const updateOverrides = (patch: Partial<EventSettingsOverrides>) => {
+    setFormData((prev) => {
+      const merged: EventSettingsOverrides = {
+        ...(prev.settingsOverrides || {}),
+        ...patch,
+      };
+
+      if ('audio' in patch && !patch.audio) {
+        delete merged.audio;
+      }
+      if ('designStyle' in patch && !patch.designStyle) {
+        delete merged.designStyle;
+      }
+      if ('colorPalette' in patch && !patch.colorPalette) {
+        delete merged.colorPalette;
+      }
+
+      return {
+        ...prev,
+        settingsOverrides: normalizeOverrides(merged),
+      };
+    });
+  };
+
   const [formData, setFormData] = useState<Omit<Event, 'id'>>({
     name: '',
     description: '',
@@ -25,6 +81,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
     endTime: '23:59',
     assignedPreset: 'Evt1',
     isActive: true,
+    settingsOverrides: undefined,
   });
 
   const handleStartAdd = () => {
@@ -39,6 +96,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
       endTime: '23:59',
       assignedPreset: 'Evt1',
       isActive: true,
+      settingsOverrides: undefined,
     });
     setIsAdding(true);
     setEditingId(null);
@@ -55,6 +113,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
       endTime: event.endTime,
       assignedPreset: event.assignedPreset,
       isActive: event.isActive,
+      settingsOverrides: normalizeOverrides(event.settingsOverrides),
     });
     setEditingId(event.id);
     setIsAdding(false);
@@ -333,6 +392,95 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                 )}
               </button>
             </div>
+
+            {/* Event Design Override */}
+            <div className="md:col-span-2 border-t border-spa-bg-secondary pt-4 mt-2">
+              <h5 className="text-sm font-semibold text-spa-text-primary mb-3">Event-Design (optional)</h5>
+              <p className="text-xs text-spa-text-secondary mb-4">
+                Wenn gesetzt, wird waehrend des aktiven Events dieses Design verwendet.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-spa-text-primary mb-2">
+                    Designstil
+                  </label>
+                  <select
+                    value={formData.settingsOverrides?.designStyle || ''}
+                    onChange={(e) => {
+                      const value = e.target.value as DesignStyle | '';
+                      updateOverrides({ designStyle: value || undefined });
+                    }}
+                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  >
+                    <option value="">Globaler Stil</option>
+                    <option value="modern-wellness">Modern Wellness</option>
+                    <option value="modern-timeline">Modern Timeline</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-spa-text-primary mb-2">
+                    Farbpalette
+                  </label>
+                  <select
+                    value={formData.settingsOverrides?.colorPalette || ''}
+                    onChange={(e) => {
+                      const value = (e.target.value as ColorPaletteName | '') || undefined;
+                      updateOverrides({ colorPalette: value });
+                    }}
+                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  >
+                    <option value="">Globale Palette</option>
+                    {COLOR_PALETTES.map((palette) => (
+                      <option key={palette.id} value={palette.id}>
+                        {palette.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Event Audio Override */}
+            <div className="md:col-span-2 border-t border-spa-bg-secondary pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h5 className="text-sm font-semibold text-spa-text-primary">Event-Musik (optional)</h5>
+                  <p className="text-xs text-spa-text-secondary">
+                    Aktiviert eine eigene Musik nur fuer dieses Event.
+                  </p>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.settingsOverrides?.audio)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        updateOverrides({ audio: { ...defaultEventAudio } });
+                      } else {
+                        updateOverrides({ audio: undefined });
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
+                </label>
+              </div>
+
+              {formData.settingsOverrides?.audio && (
+                <AudioConfigEditor
+                  audio={formData.settingsOverrides.audio}
+                  onChange={(nextAudio) => updateOverrides({ audio: nextAudio })}
+                  title="Event-Hintergrundmusik"
+                  subtitle="Spielt nur waehrend dieses aktiven Events."
+                  showEnableToggle
+                  enableLabel="Event-Musik aktivieren"
+                  enableDescription="Ueberschreibt globale Musik fuer dieses Event."
+                />
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2 mt-6">
@@ -465,6 +613,16 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                       <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-accent/10 text-spa-accent rounded-full text-xs font-medium">
                         Aufgussplan: {event.assignedPreset}
                       </div>
+                      {(event.settingsOverrides?.designStyle || event.settingsOverrides?.colorPalette) && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                          Design Override
+                        </div>
+                      )}
+                      {event.settingsOverrides?.audio && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                          Musik Override
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -78,6 +78,7 @@ export interface DisplaySettings {
 export interface AudioSettings {
   enabled: boolean;
   src?: string;
+  mediaId?: string;
   volume: number;
   loop: boolean;
 }
@@ -121,6 +122,19 @@ export interface Event {
   endTime?: string; // HH:MM format (optional)
   assignedPreset: 'Evt1' | 'Evt2'; // Which event schedule to use
   isActive: boolean; // Enable/disable event
+  settingsOverrides?: EventSettingsOverrides; // Optional design/audio/slideshow overrides during this event
+}
+
+export interface EventSettingsOverrides {
+  designStyle?: DesignStyle;
+  colorPalette?: ColorPaletteName;
+  theme?: Partial<ThemeColors>;
+  fonts?: Partial<FontSettings>;
+  slides?: Partial<SlideSettings>;
+  display?: Partial<DisplaySettings>;
+  header?: Partial<HeaderSettings>;
+  slideshow?: SlideshowConfig;
+  audio?: AudioSettings;
 }
 
 export interface Settings {

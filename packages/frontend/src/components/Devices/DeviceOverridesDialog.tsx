@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
+import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -19,7 +20,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { useClearOverrides, useSetOverrides } from '@/hooks/useDevices';
 import type { Device } from '@/types/device.types';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
-import { getDefaultSettings, type Settings } from '@/types/settings.types';
+import { getDefaultSettings, type AudioSettings, type Settings } from '@/types/settings.types';
 import type { LayoutType, SlideConfig, SlideType, SlideshowConfig } from '@/types/slideshow.types';
 import {
   LAYOUT_OPTIONS,
@@ -91,6 +92,26 @@ function getOverrideSlideshowConfig(device: Device | null): SlideshowConfig | nu
   } as SlideshowConfig;
 
   return merged;
+}
+
+function toAudioSettings(raw: unknown): AudioSettings | null {
+  if (!isPlainRecord(raw)) return null;
+
+  const enabled = Boolean(raw.enabled);
+  const volume = typeof raw.volume === 'number' && Number.isFinite(raw.volume)
+    ? Math.min(1, Math.max(0, raw.volume))
+    : 0.5;
+  const loop = raw.loop !== false;
+  const src = typeof raw.src === 'string' && raw.src.trim().length > 0 ? raw.src : undefined;
+  const mediaId = typeof raw.mediaId === 'string' && raw.mediaId.trim().length > 0 ? raw.mediaId : undefined;
+
+  return {
+    enabled,
+    src,
+    mediaId,
+    volume,
+    loop,
+  };
 }
 
 function getSlideTypeLabel(type: SlideType): string {
@@ -191,6 +212,7 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
   const clearOverrides = useClearOverrides();
 
   const [localConfig, setLocalConfig] = useState<SlideshowConfig | null>(null);
+  const [localAudioOverride, setLocalAudioOverride] = useState<AudioSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -211,6 +233,7 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     const initialConfig = normalizeSlideshowConfig(cloneConfig(overrideConfig || fallbackConfig));
 
     setLocalConfig(initialConfig);
+    setLocalAudioOverride(toAudioSettings(getOverrideSettings(device).audio));
     setSelectedZone(getZonesForLayout(initialConfig.layout)[0]?.id || 'main');
     setEditingSlide(null);
     setIsAddingNew(false);
@@ -237,6 +260,11 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
         version: (localConfig.version || 1) + (isDirty ? 1 : 0),
       };
     }
+    if (localAudioOverride) {
+      settingsOverride.audio = localAudioOverride;
+    } else if ('audio' in settingsOverride) {
+      delete settingsOverride.audio;
+    }
 
     const mergedSettings = migrateSettings(
       deepMergeRecords(
@@ -258,6 +286,7 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     globalSettings,
     isDirty,
     localConfig,
+    localAudioOverride,
   ]);
 
   const handleClose = () => {
@@ -365,6 +394,11 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     setIsDirty(true);
   };
 
+  const handleAudioOverrideChange = (nextAudio: AudioSettings) => {
+    setLocalAudioOverride(nextAudio);
+    setIsDirty(true);
+  };
+
   const handleSaveOverrides = () => {
     if (!device || !localConfig) return;
 
@@ -376,6 +410,11 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
         version: (localConfig.version || 1) + 1,
       },
     };
+    if (localAudioOverride) {
+      nextSettings.audio = localAudioOverride;
+    } else {
+      delete (nextSettings as Record<string, unknown>).audio;
+    }
 
     setOverrides.mutate(
       {
@@ -507,6 +546,53 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
                     schedule={previewConfigPayload.schedule}
                     settings={previewConfigPayload.settings}
                   />
+                </div>
+
+                <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-spa-text-primary">Audio-Override</h3>
+                      <p className="text-xs text-spa-text-secondary">
+                        Musik nur fuer dieses Geraet (im Modus Ueberschrieben).
+                      </p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(localAudioOverride)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setLocalAudioOverride({
+                              enabled: false,
+                              volume: 0.5,
+                              loop: true,
+                            });
+                          } else {
+                            setLocalAudioOverride(null);
+                          }
+                          setIsDirty(true);
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
+                    </label>
+                  </div>
+
+                  {localAudioOverride ? (
+                    <AudioConfigEditor
+                      audio={localAudioOverride}
+                      onChange={handleAudioOverrideChange}
+                      title="Geraete-Musik"
+                      subtitle="Ueberschreibt globale Musik nur fuer dieses Display."
+                      showEnableToggle
+                      enableLabel="Musik fuer dieses Geraet aktivieren"
+                      enableDescription="Wird nur genutzt, wenn der Geraetemodus auf Ueberschrieben steht."
+                    />
+                  ) : (
+                    <p className="text-sm text-spa-text-secondary">
+                      Kein Audio-Override aktiv. Das Geraet nutzt globale (oder Event-)Audioeinstellungen.
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">

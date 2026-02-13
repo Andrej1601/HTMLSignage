@@ -33,6 +33,7 @@ const SettingsSchema = z.object({
     endTime: z.string().optional(), // HH:MM
     assignedPreset: z.enum(['Evt1', 'Evt2']),
     isActive: z.boolean(),
+    settingsOverrides: z.record(z.any()).optional(),
   })).optional(),
 }).passthrough(); // Allow additional fields that aren't explicitly defined
 

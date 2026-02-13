@@ -11,13 +11,14 @@ import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard'
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
-import { getDefaultSettings, type Settings } from '@/types/settings.types';
+import { getActiveEvent, getDefaultSettings, type AudioSettings, type Settings } from '@/types/settings.types';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
 import { API_URL, ENV_IS_DEV } from '@/config/env';
 import { devicesApi } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
+import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -65,6 +66,33 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function normalizeAudio(raw: unknown): AudioSettings {
+  const value = isPlainRecord(raw) ? raw : {};
+  const volume = typeof value.volume === 'number' && Number.isFinite(value.volume)
+    ? Math.max(0, Math.min(1, value.volume))
+    : 0.5;
+
+  return {
+    enabled: Boolean(value.enabled),
+    src: typeof value.src === 'string' && value.src.trim().length > 0 ? value.src : undefined,
+    mediaId: typeof value.mediaId === 'string' && value.mediaId.trim().length > 0 ? value.mediaId : undefined,
+    volume,
+    loop: value.loop !== false,
+  };
+}
+
 export function DisplayClientPage() {
   const location = useLocation();
   const isPreviewMode = useMemo(
@@ -87,7 +115,9 @@ export function DisplayClientPage() {
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
   const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
   const [hasPreviewPayload, setHasPreviewPayload] = useState(false);
+  const [isAudioBlocked, setIsAudioBlocked] = useState(false);
   const pairedDeviceIdRef = useRef<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { schedule, isLoading: scheduleLoading } = useSchedule();
   const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
@@ -338,6 +368,84 @@ export function DisplayClientPage() {
     return () => clearInterval(interval);
   }, [pairingInfo, isPreviewMode]);
 
+  const effectiveSettings = useMemo(() => {
+    const baseSettings = migrateSettings(localSettings || getDefaultSettings());
+    const activeEvent = getActiveEvent(baseSettings);
+    const overrides = activeEvent?.settingsOverrides;
+
+    if (!isPlainRecord(overrides)) {
+      return baseSettings;
+    }
+
+    const merged = deepMergeRecords(
+      baseSettings as unknown as Record<string, unknown>,
+      overrides
+    ) as unknown as Settings;
+
+    return migrateSettings(merged);
+  }, [localSettings]);
+
+  const effectiveAudio = useMemo(
+    () => normalizeAudio(effectiveSettings.audio),
+    [effectiveSettings.audio]
+  );
+
+  const effectiveAudioSrc = useMemo(
+    () => (effectiveAudio.enabled && effectiveAudio.src ? toAbsoluteMediaUrl(effectiveAudio.src) : ''),
+    [effectiveAudio.enabled, effectiveAudio.src]
+  );
+
+  const tryPlayAudio = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio || !effectiveAudio.enabled || !effectiveAudioSrc) return;
+
+    try {
+      await audio.play();
+      setIsAudioBlocked(false);
+    } catch (error) {
+      setIsAudioBlocked(true);
+      console.warn('[Display] Audio autoplay blocked:', error);
+    }
+  }, [effectiveAudio.enabled, effectiveAudioSrc]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!effectiveAudio.enabled || !effectiveAudioSrc) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      setIsAudioBlocked(false);
+      return;
+    }
+
+    if (audio.getAttribute('src') !== effectiveAudioSrc) {
+      audio.setAttribute('src', effectiveAudioSrc);
+      audio.load();
+    }
+
+    audio.loop = effectiveAudio.loop;
+    audio.volume = effectiveAudio.volume;
+    void tryPlayAudio();
+  }, [effectiveAudio.enabled, effectiveAudio.loop, effectiveAudio.volume, effectiveAudioSrc, tryPlayAudio]);
+
+  useEffect(() => {
+    if (!isAudioBlocked || !effectiveAudio.enabled || !effectiveAudioSrc) return;
+
+    const unlockAudio = () => {
+      void tryPlayAudio();
+    };
+
+    window.addEventListener('pointerdown', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio]);
+
   // Slideshow
   const {
     currentSlide,
@@ -351,7 +459,7 @@ export function DisplayClientPage() {
     getZoneSlide,
     getZoneInfo,
   } = useSlideshow({
-    settings: localSettings,
+    settings: effectiveSettings,
     enabled: true,
   });
 
@@ -419,16 +527,16 @@ export function DisplayClientPage() {
     );
   }
 
-  const designStyle = localSettings.designStyle || 'modern-wellness';
+  const designStyle = effectiveSettings.designStyle || 'modern-wellness';
   const isModernWellness = designStyle === 'modern-wellness';
   const isModernTimeline = designStyle === 'modern-timeline';
   const isModernDesign = isModernWellness || isModernTimeline;
 
   const renderContentPanel = () => {
     if (isModernTimeline) {
-      return <TimelineScheduleSlide schedule={localSchedule} settings={localSettings} />;
+      return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} />;
     }
-    return <ScheduleGridSlide schedule={localSchedule} settings={localSettings} />;
+    return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />;
   };
 
   // Safety: old configs might contain legacy layout strings; render them as split-view instead of breaking.
@@ -443,7 +551,7 @@ export function DisplayClientPage() {
         {isModernDesign ? (
           renderContentPanel()
         ) : (
-          <OverviewSlide schedule={localSchedule} settings={localSettings} />
+          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} />
         )}
       </div>
     );
@@ -451,7 +559,7 @@ export function DisplayClientPage() {
 
   // Get defaults for header and theme
   const defaults = getDefaultSettings();
-  const themeColors = localSettings.theme || defaults.theme!;
+  const themeColors = effectiveSettings.theme || defaults.theme!;
 
   // Render based on layout
   const renderLayout = () => {
@@ -824,7 +932,7 @@ export function DisplayClientPage() {
                       {topRightSlide?.type === 'sauna-detail' ? (
                         <SaunaDetailDashboard
                           schedule={localSchedule}
-                          settings={localSettings}
+                          settings={effectiveSettings}
                           saunaId={topRightSlide.saunaId}
                         />
                       ) : topRightSlide ? (
@@ -846,7 +954,7 @@ export function DisplayClientPage() {
                           </div>
                         )
                       ) : (
-                        <SaunaDetailDashboard schedule={localSchedule} settings={localSettings} saunaId={undefined} />
+                        <SaunaDetailDashboard schedule={localSchedule} settings={effectiveSettings} saunaId={undefined} />
                       )}
                     </motion.div>
                   </AnimatePresence>
@@ -893,7 +1001,7 @@ export function DisplayClientPage() {
                         exit={{ y: -20, opacity: 0 }}
                         className="w-full h-full"
                       >
-                        <WellnessBottomPanel settings={localSettings} theme={themeColors} />
+                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -949,7 +1057,7 @@ export function DisplayClientPage() {
                   duration={0.6}
                 >
                   {leftSlide.type === 'content-panel' ? (
-                    <ScheduleGridSlide schedule={localSchedule} settings={localSettings} />
+                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />
                   ) : (
                     <SlideRenderer
                       slide={leftSlide}
@@ -973,7 +1081,7 @@ export function DisplayClientPage() {
                     {topRightSlide.type === 'sauna-detail' ? (
                       <SaunaDetailDashboard
                         schedule={localSchedule}
-                        settings={localSettings}
+                        settings={effectiveSettings}
                         saunaId={topRightSlide.saunaId}
                       />
                     ) : (
@@ -997,7 +1105,7 @@ export function DisplayClientPage() {
                     {bottomRightSlide.type === 'sauna-detail' ? (
                       <SaunaDetailDashboard
                         schedule={localSchedule}
-                        settings={localSettings}
+                        settings={effectiveSettings}
                         saunaId={bottomRightSlide.saunaId}
                       />
                     ) : (
@@ -1106,6 +1214,24 @@ export function DisplayClientPage() {
       <div className="flex-1 overflow-hidden relative">
         {renderLayout()}
       </div>
+
+      <audio
+        ref={audioRef}
+        preload="auto"
+        playsInline
+        className="hidden"
+      />
+
+      {isPreviewMode && isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSrc) && (
+        <button
+          onClick={() => {
+            void tryPlayAudio();
+          }}
+          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black"
+        >
+          Audio in Vorschau aktivieren
+        </button>
+      )}
 
       {/* Slide Indicators */}
       {showSlideIndicators && totalSlides > 1 && !isModernDesign && (

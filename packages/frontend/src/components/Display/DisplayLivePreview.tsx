@@ -41,10 +41,7 @@ export function DisplayLivePreview({
 
   useEffect(() => {
     const handleReady = (event: MessageEvent<{ type?: string }>) => {
-      const frame = iframeRef.current?.contentWindow;
-      if (!frame) return;
       if (event.origin !== window.location.origin) return;
-      if (event.source !== frame) return;
       if (event.data?.type !== PREVIEW_READY_EVENT) return;
       setIsReady(true);
     };
@@ -81,10 +78,13 @@ export function DisplayLivePreview({
         ref={iframeRef}
         title={title}
         src={src}
+        allow="autoplay"
         className="absolute inset-0 h-full w-full border-0"
         onLoad={() => {
           setIsReady(false);
+          // Trigger immediately and shortly after load to catch early/late listeners reliably.
           requestReady();
+          window.setTimeout(requestReady, 120);
         }}
       />
 
@@ -96,4 +96,3 @@ export function DisplayLivePreview({
     </div>
   );
 }
-
