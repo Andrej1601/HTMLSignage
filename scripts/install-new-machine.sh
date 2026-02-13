@@ -24,6 +24,8 @@ BACKEND_PORT="${BACKEND_PORT:-3000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 FRONTEND_URL="${FRONTEND_URL:-*}"
 VITE_API_URL="${VITE_API_URL:-}"
+NODE_MAJOR="${NODE_MAJOR:-20}"
+PNPM_VERSION="${PNPM_VERSION:-9.15.9}"
 
 if ! id -u "${APP_USER}" >/dev/null 2>&1; then
   die "User '${APP_USER}' does not exist. Create the user first or pass APP_USER=<existing-user>."
@@ -37,20 +39,57 @@ log "APP_USER=${APP_USER}"
 log "PORTS frontend=${FRONTEND_PORT} backend=${BACKEND_PORT}"
 log "DATABASE ${DB_USER}@${DB_NAME}"
 log "FRONTEND_URL=${FRONTEND_URL}"
+log "NODE_MAJOR=${NODE_MAJOR}"
+log "PNPM_VERSION=${PNPM_VERSION}"
 
 log "Installing base packages..."
 apt-get update -y
 apt-get install -y curl git ca-certificates gnupg build-essential postgresql postgresql-contrib
 apt-get upgrade -y
 
-log "Installing latest available Node.js from NodeSource..."
-curl -fsSL "https://deb.nodesource.com/setup_current.x" | bash -
-apt-get install -y nodejs
+NEED_NODE_INSTALL="false"
+if ! command -v node >/dev/null 2>&1; then
+  NEED_NODE_INSTALL="true"
+else
+  CURRENT_NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
+  if (( CURRENT_NODE_MAJOR < NODE_MAJOR )); then
+    NEED_NODE_INSTALL="true"
+  fi
+fi
 
-log "Enabling corepack/pnpm..."
-export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-corepack enable
-corepack prepare pnpm@latest --activate
+if [[ "${NEED_NODE_INSTALL}" == "true" ]]; then
+  log "Installing Node.js ${NODE_MAJOR}.x from NodeSource..."
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+  apt-get install -y nodejs
+else
+  log "Using existing Node.js: $(node -v)"
+fi
+
+log "Preparing pnpm (${PNPM_VERSION})..."
+CURRENT_PNPM="$(pnpm --version 2>/dev/null || true)"
+if [[ "${CURRENT_PNPM}" == "${PNPM_VERSION}" ]]; then
+  log "pnpm already available: ${CURRENT_PNPM}"
+elif command -v corepack >/dev/null 2>&1; then
+  export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+  corepack enable
+  corepack prepare "pnpm@${PNPM_VERSION}" --activate
+else
+  log "corepack not found, installing pnpm via npm..."
+  for bin in /usr/bin/pnpm /usr/bin/pnpx /usr/local/bin/pnpm /usr/local/bin/pnpx; do
+    if [[ -L "${bin}" && ! -e "${bin}" ]]; then
+      log "Removing broken symlink ${bin}..."
+      rm -f "${bin}"
+    fi
+  done
+
+  if ! npm install -g "pnpm@${PNPM_VERSION}"; then
+    log "Initial pnpm install failed, removing conflicting pnpm/pnpx paths and retrying..."
+    rm -f /usr/bin/pnpm /usr/bin/pnpx /usr/local/bin/pnpm /usr/local/bin/pnpx
+    npm install -g "pnpm@${PNPM_VERSION}"
+  fi
+fi
+hash -r
+log "Using pnpm version: $(pnpm --version)"
 
 log "Ensuring application directory..."
 mkdir -p "$(dirname "${APP_DIR}")"
@@ -67,8 +106,8 @@ else
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
 
-log "Installing Node dependencies (no lockfile pinning)..."
-sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && npx pnpm install --no-frozen-lockfile"
+log "Installing Node dependencies (forced to build native modules)..."
+sudo -u "${APP_USER}" bash -lc "cd '${APP_DIR}' && pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
 
 log "Configuring PostgreSQL..."
 systemctl enable --now postgresql
