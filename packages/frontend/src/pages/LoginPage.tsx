@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config/env';
 
@@ -142,6 +142,14 @@ export function LoginPage() {
           >
             {isLoading ? 'Lädt...' : mode === 'login' ? 'Anmelden' : 'Administrator erstellen'}
           </button>
+
+          {mode === 'login' && (
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-sm text-spa-primary hover:underline">
+                Passwort vergessen?
+              </Link>
+            </div>
+          )}
         </form>
 
         {/* Toggle Mode - Only show if first user */}
