@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
+import { DeviceOverridesDialog } from '@/components/Devices/DeviceOverridesDialog';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
+import { useDevices, useUpdateDevice } from '@/hooks/useDevices';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { createDefaultSchedule } from '@/types/schedule.types';
+import type { Device } from '@/types/device.types';
+import { getDeviceStatus, getStatusColor, getStatusLabel, getModeLabel } from '@/types/device.types';
 import type { SlideshowConfig, SlideConfig, LayoutType } from '@/types/slideshow.types';
 import {
   createDefaultSlideshowConfig,
@@ -28,6 +32,8 @@ import {
   Edit,
   Trash2,
   Play,
+  Monitor,
+  Settings,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -50,6 +56,63 @@ import { CSS } from '@dnd-kit/utilities';
 // Simple UUID generator
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasDeviceSlideshowOverrides(device: Device): boolean {
+  const scheduleOverride = device.overrides?.schedule;
+  const settingsOverride = device.overrides?.settings;
+
+  const hasScheduleOverride = isPlainRecord(scheduleOverride) && 'presets' in scheduleOverride;
+  const hasSettingsOverride = isPlainRecord(settingsOverride) && Object.keys(settingsOverride).length > 0;
+
+  return hasScheduleOverride || hasSettingsOverride;
+}
+
+function getDeviceSlideshowSource(device: Device): {
+  label: string;
+  detail: string;
+  badgeClass: string;
+  usesGlobal: boolean;
+} {
+  const hasOverrides = hasDeviceSlideshowOverrides(device);
+
+  if (device.mode === 'override' && hasOverrides) {
+    return {
+      label: 'Override aktiv',
+      detail: 'Dieses Display nutzt eine eigene Slideshow-/Settings-Konfiguration.',
+      badgeClass: 'bg-blue-100 text-blue-700',
+      usesGlobal: false,
+    };
+  }
+
+  if (device.mode === 'override' && !hasOverrides) {
+    return {
+      label: 'Global (kein Override)',
+      detail: 'Modus ist Ueberschrieben, aber es sind keine Overrides gespeichert.',
+      badgeClass: 'bg-amber-100 text-amber-700',
+      usesGlobal: true,
+    };
+  }
+
+  if (device.mode === 'auto' && hasOverrides) {
+    return {
+      label: 'Global (Override hinterlegt)',
+      detail: 'Override ist gespeichert, wird im Modus Automatisch aber nicht verwendet.',
+      badgeClass: 'bg-emerald-100 text-emerald-700',
+      usesGlobal: true,
+    };
+  }
+
+  return {
+    label: 'Global',
+    detail: 'Dieses Display nutzt die globale Slideshow aus diesem Reiter.',
+    badgeClass: 'bg-emerald-100 text-emerald-700',
+    usesGlobal: true,
+  };
 }
 
 // Sortable Slide Item Component
@@ -168,6 +231,8 @@ function SortableSlideItem({
 export function SlideshowPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
   const { schedule } = useSchedule();
+  const { data: devices = [] } = useDevices();
+  const updateDevice = useUpdateDevice();
 
   const [localConfig, setLocalConfig] = useState<SlideshowConfig | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -175,6 +240,7 @@ export function SlideshowPage() {
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
+  const [overrideDevice, setOverrideDevice] = useState<Device | null>(null);
 
   const previewSettings = useMemo(() => {
     if (!settings || !localConfig) return null;
@@ -189,6 +255,38 @@ export function SlideshowPage() {
   }, [settings, localConfig, isDirty]);
 
   const previewSchedule = schedule || createDefaultSchedule();
+  const pairedDevices = useMemo(
+    () => devices.filter((device) => Boolean(device.pairedAt)),
+    [devices]
+  );
+
+  const deviceSourceSummary = useMemo(() => {
+    const summary = {
+      global: 0,
+      overrideActive: 0,
+      overrideStoredInactive: 0,
+      overrideModeWithoutData: 0,
+    };
+
+    for (const device of pairedDevices) {
+      const source = getDeviceSlideshowSource(device);
+      if (!source.usesGlobal && source.label === 'Override aktiv') {
+        summary.overrideActive += 1;
+        continue;
+      }
+      if (source.label === 'Global (Override hinterlegt)') {
+        summary.overrideStoredInactive += 1;
+        continue;
+      }
+      if (source.label === 'Global (kein Override)') {
+        summary.overrideModeWithoutData += 1;
+        continue;
+      }
+      summary.global += 1;
+    }
+
+    return summary;
+  }, [pairedDevices]);
 
   // Initialize from settings
   useEffect(() => {
@@ -356,6 +454,14 @@ export function SlideshowPage() {
     refetch();
   };
 
+  const handleDeviceModeChange = (device: Device, mode: 'auto' | 'override') => {
+    if (device.mode === mode) return;
+    updateDevice.mutate({
+      id: device.id,
+      updates: { mode },
+    });
+  };
+
   if (isLoading || !localConfig) {
     return (
       <Layout>
@@ -443,6 +549,105 @@ export function SlideshowPage() {
             />
           </div>
         )}
+
+        <div className="mb-6 bg-white rounded-lg shadow p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-spa-text-primary">Geräte-Ausspielung</h3>
+              <p className="text-xs text-spa-text-secondary mt-1">
+                Hier siehst du pro Display, ob gerade die globale Slideshow oder ein Override läuft.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-medium">
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                Global: {deviceSourceSummary.global}
+              </span>
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
+                Override aktiv: {deviceSourceSummary.overrideActive}
+              </span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                Override hinterlegt: {deviceSourceSummary.overrideStoredInactive}
+              </span>
+              {deviceSourceSummary.overrideModeWithoutData > 0 && (
+                <span className="rounded-full bg-rose-100 px-3 py-1 text-rose-700">
+                  Modus Override ohne Daten: {deviceSourceSummary.overrideModeWithoutData}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {pairedDevices.length === 0 ? (
+            <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-sm text-spa-text-secondary">
+              Keine gekoppelten Displays vorhanden.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pairedDevices.map((device) => {
+                const source = getDeviceSlideshowSource(device);
+                const status = getDeviceStatus(device.lastSeen);
+                const statusColor = getStatusColor(status);
+
+                return (
+                  <div
+                    key={device.id}
+                    className="rounded-lg border border-spa-bg-secondary p-4"
+                  >
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
+                      <div className="lg:col-span-4">
+                        <div className="flex items-center gap-2">
+                          <Monitor className="h-4 w-4 text-spa-primary" />
+                          <p className="font-semibold text-spa-text-primary">{device.name}</p>
+                        </div>
+                        <p className="mt-1 font-mono text-xs text-spa-text-secondary">{device.id}</p>
+                        <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${statusColor}`}>
+                          <span className="h-2 w-2 rounded-full bg-current" />
+                          {getStatusLabel(status)}
+                        </span>
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
+                          Modus
+                        </label>
+                        <select
+                          value={device.mode}
+                          onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
+                          disabled={updateDevice.isPending}
+                          className="w-full rounded-md border border-spa-bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
+                        >
+                          <option value="auto">{getModeLabel('auto')}</option>
+                          <option value="override">{getModeLabel('override')}</option>
+                        </select>
+                      </div>
+
+                      <div className="lg:col-span-4">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
+                          Aktuelle Quelle
+                        </label>
+                        <div className="space-y-1">
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${source.badgeClass}`}>
+                            {source.label}
+                          </span>
+                          <p className="text-xs text-spa-text-secondary">{source.detail}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-start lg:col-span-2 lg:justify-end">
+                        <button
+                          onClick={() => setOverrideDevice(device)}
+                          className="inline-flex items-center gap-2 rounded-md bg-spa-secondary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-spa-secondary-dark"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Override
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Layout Selection */}
         <div className="mb-6 bg-white rounded-lg shadow p-6">
@@ -688,6 +893,12 @@ export function SlideshowPage() {
           onSave={(slide) =>
             editingSlide ? handleSaveEditSlide(slide as SlideConfig) : handleSaveNewSlide(slide as Omit<SlideConfig, 'id'>)
           }
+        />
+
+        <DeviceOverridesDialog
+          device={overrideDevice}
+          isOpen={Boolean(overrideDevice)}
+          onClose={() => setOverrideDevice(null)}
         />
       </div>
     </Layout>

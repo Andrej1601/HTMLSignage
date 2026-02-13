@@ -35,7 +35,30 @@ const api = axios.create({
 });
 
 let hasWarnedDisplayConfigFallback = false;
-let isDisplayConfigEndpointUnavailable: boolean | null = null;
+const DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY = 'htmlsignage_display_config_unavailable';
+
+function readDisplayConfigUnavailableFlag(): boolean | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY);
+    if (value === '1') return true;
+    if (value === '0') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDisplayConfigUnavailableFlag(value: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY, value ? '1' : '0');
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+let isDisplayConfigEndpointUnavailable: boolean | null = readDisplayConfigUnavailableFlag();
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -198,6 +221,7 @@ export const devicesApi = {
     try {
       const { data } = await api.get<DeviceDisplayConfigResponse>(`/devices/${id}/display-config`);
       isDisplayConfigEndpointUnavailable = false;
+      writeDisplayConfigUnavailableFlag(false);
       return data;
     } catch (error) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
@@ -205,6 +229,7 @@ export const devicesApi = {
 
       // Compatibility fallback for older backends without /display-config endpoint.
       isDisplayConfigEndpointUnavailable = true;
+      writeDisplayConfigUnavailableFlag(true);
       if (!hasWarnedDisplayConfigFallback) {
         // eslint-disable-next-line no-console
         console.warn('[api] /devices/:id/display-config returned 404, using client-side fallback merge');
