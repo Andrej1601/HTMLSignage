@@ -8,7 +8,6 @@ interface DeviceListProps {
   onDelete: (device: Device) => void;
   onReload: (device: Device) => void;
   onRestart: (device: Device) => void;
-  onManageOverrides: (device: Device) => void;
 }
 
 export function DeviceList({
@@ -17,17 +16,16 @@ export function DeviceList({
   onDelete,
   onReload,
   onRestart,
-  onManageOverrides
 }: DeviceListProps) {
   if (devices.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-12 text-center">
         <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-          Keine Geräte gefunden
+          Keine Geraete gefunden
         </h3>
         <p className="text-spa-text-secondary">
-          Füge dein erstes Display hinzu, um loszulegen
+          Fuege dein erstes Display hinzu, um loszulegen
         </p>
       </div>
     );
@@ -43,7 +41,6 @@ export function DeviceList({
           onDelete={onDelete}
           onReload={onReload}
           onRestart={onRestart}
-          onManageOverrides={onManageOverrides}
         />
       ))}
     </div>

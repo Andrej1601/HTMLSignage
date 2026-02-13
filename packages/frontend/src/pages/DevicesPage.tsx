@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { DeviceList } from '@/components/Devices/DeviceList';
 import { DeviceEditDialog } from '@/components/Devices/DeviceEditDialog';
-import { DeviceOverridesDialog } from '@/components/Devices/DeviceOverridesDialog';
 import { PendingPairings } from '@/components/Devices/PendingPairings';
 import {
   useDevices,
   useUpdateDevice,
   useDeleteDevice,
-  useSendCommand
+  useSendCommand,
 } from '@/hooks/useDevices';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
-import { RefreshCw, Monitor } from 'lucide-react';
+import { Monitor, RefreshCw } from 'lucide-react';
 
 export function DevicesPage() {
   const { data: devices = [], isLoading, refetch } = useDevices();
@@ -21,13 +20,12 @@ export function DevicesPage() {
 
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
-  const [overrideDevice, setOverrideDevice] = useState<Device | null>(null);
 
   const handleUpdateDevice = (id: string, updates: UpdateDeviceRequest) => {
     updateDevice.mutate({ id, updates }, {
       onSuccess: () => {
         setEditingDevice(null);
-      }
+      },
     });
   };
 
@@ -37,44 +35,39 @@ export function DevicesPage() {
     deleteDevice.mutate(deletingDevice.id, {
       onSuccess: () => {
         setDeletingDevice(null);
-      }
+      },
     });
   };
 
   const handleReload = (device: Device) => {
     sendCommand.mutate({
       id: device.id,
-      command: { action: 'reload' }
+      command: { action: 'reload' },
     });
   };
 
   const handleRestart = (device: Device) => {
     sendCommand.mutate({
       id: device.id,
-      command: { action: 'restart' }
+      command: { action: 'restart' },
     });
-  };
-
-  const handleManageOverrides = (device: Device) => {
-    setOverrideDevice(device);
   };
 
   if (isLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-96">
-          <div className="text-spa-text-secondary">Lade Geräte...</div>
+          <div className="text-spa-text-secondary">Lade Geraete...</div>
         </div>
       </Layout>
     );
   }
 
-  // Filter to only show paired devices in main list
-  const pairedDevices = devices.filter(d => d.pairedAt !== null);
+  const pairedDevices = devices.filter((device) => device.pairedAt !== null);
 
-  const onlineDevices = pairedDevices.filter(d => {
-    if (!d.lastSeen) return false;
-    const lastSeen = new Date(d.lastSeen);
+  const onlineDevices = pairedDevices.filter((device) => {
+    if (!device.lastSeen) return false;
+    const lastSeen = new Date(device.lastSeen);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastSeen.getTime()) / 1000 / 60;
     return diffMinutes < 5;
@@ -83,13 +76,12 @@ export function DevicesPage() {
   return (
     <Layout>
       <div>
-        {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Geräte</h2>
+              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Geraete</h2>
               <p className="text-spa-text-secondary">
-                Verwalte deine Displays und deren Einstellungen
+                Verwalte deine Displays und deren Basis-Einstellungen
               </p>
             </div>
 
@@ -102,7 +94,6 @@ export function DevicesPage() {
             </button>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg shadow-sm p-4">
               <div className="flex items-center gap-3">
@@ -142,43 +133,32 @@ export function DevicesPage() {
           </div>
         </div>
 
-        {/* Pending Pairings */}
         <PendingPairings />
 
-        {/* Device List */}
         <DeviceList
           devices={pairedDevices}
           onEdit={setEditingDevice}
           onDelete={setDeletingDevice}
           onReload={handleReload}
           onRestart={handleRestart}
-          onManageOverrides={handleManageOverrides}
         />
 
-        {/* Edit Dialog */}
         <DeviceEditDialog
           device={editingDevice}
-          isOpen={!!editingDevice}
+          isOpen={Boolean(editingDevice)}
           onClose={() => setEditingDevice(null)}
           onSave={handleUpdateDevice}
           isSaving={updateDevice.isPending}
         />
 
-        <DeviceOverridesDialog
-          device={overrideDevice}
-          isOpen={!!overrideDevice}
-          onClose={() => setOverrideDevice(null)}
-        />
-
-        {/* Delete Confirmation Dialog */}
         {deletingDevice && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <h3 className="text-xl font-bold text-spa-text-primary mb-4">
-                Display löschen?
+                Display loeschen?
               </h3>
               <p className="text-spa-text-secondary mb-6">
-                Möchtest du das Display "{deletingDevice.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+                Moechtest du das Display "{deletingDevice.name}" wirklich loeschen? Diese Aktion kann nicht rueckgaengig gemacht werden.
               </p>
               <div className="flex items-center gap-3">
                 <button
@@ -193,7 +173,7 @@ export function DevicesPage() {
                   disabled={deleteDevice.isPending}
                   className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
-                  {deleteDevice.isPending ? 'Wird gelöscht...' : 'Löschen'}
+                  {deleteDevice.isPending ? 'Wird geloescht...' : 'Loeschen'}
                 </button>
               </div>
             </div>
