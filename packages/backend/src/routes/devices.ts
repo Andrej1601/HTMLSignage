@@ -337,13 +337,19 @@ router.post('/:id/overrides', async (req, res) => {
       },
     });
 
-    // Update device mode to 'override'
-    await prisma.device.update({
+    const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      data: { mode: 'override' },
+      include: {
+        user: { select: { username: true } },
+        overrides: true,
+      },
     });
 
-    broadcastDeviceUpdate({ id: req.params.id, overridesUpdated: true });
+    if (device) {
+      broadcastDeviceUpdate(device);
+    } else {
+      broadcastDeviceUpdate({ id: req.params.id, overridesUpdated: true });
+    }
 
     res.json({ ok: true });
   } catch (error) {
@@ -362,13 +368,19 @@ router.delete('/:id/overrides', async (req, res) => {
       where: { deviceId: req.params.id },
     });
 
-    // Update device mode to 'auto'
-    await prisma.device.update({
+    const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      data: { mode: 'auto' },
+      include: {
+        user: { select: { username: true } },
+        overrides: true,
+      },
     });
 
-    broadcastDeviceUpdate({ id: req.params.id, overridesCleared: true });
+    if (device) {
+      broadcastDeviceUpdate(device);
+    } else {
+      broadcastDeviceUpdate({ id: req.params.id, overridesCleared: true });
+    }
 
     res.json({ ok: true });
   } catch (error) {

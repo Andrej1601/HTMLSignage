@@ -2,9 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
   Edit2,
   Eye,
   EyeOff,
+  Pause,
+  Play,
   Plus,
   RotateCcw,
   Save,
@@ -167,6 +171,12 @@ function replaceZoneSlides(config: SlideshowConfig, zoneId: string, zoneSlides: 
   };
 }
 
+function getPreviewSlidesForZone(config: SlideshowConfig, zoneId: string): SlideConfig[] {
+  const zoneSlides = getSlidesByZone(config.slides, zoneId);
+  const enabledSlides = zoneSlides.filter((slide) => slide.enabled);
+  return enabledSlides.length > 0 ? enabledSlides : zoneSlides;
+}
+
 export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverridesDialogProps) {
   const { settings: globalSettings } = useSettings();
   const setOverrides = useSetOverrides();
@@ -177,6 +187,8 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
+  const [previewIndexByZone, setPreviewIndexByZone] = useState<Record<string, number>>({});
+  const [isPreviewAutoPlay, setIsPreviewAutoPlay] = useState(true);
 
   const isBusy = setOverrides.isPending || clearOverrides.isPending;
 
@@ -197,11 +209,67 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     setEditingSlide(null);
     setIsAddingNew(false);
     setIsDirty(false);
+    setPreviewIndexByZone({});
+    setIsPreviewAutoPlay(true);
   }, [device, globalSettings?.slideshow, isOpen]);
 
-  if (!isOpen || !device) return null;
+  const zones = useMemo(
+    () => (localConfig ? getZonesForLayout(localConfig.layout) : []),
+    [localConfig?.layout]
+  );
 
-  const zones = localConfig ? getZonesForLayout(localConfig.layout) : [];
+  useEffect(() => {
+    if (!localConfig) return;
+
+    const previewZones = getZonesForLayout(localConfig.layout);
+    setPreviewIndexByZone((prev) => {
+      const next: Record<string, number> = {};
+      for (const zone of previewZones) {
+        const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
+        if (zoneSlides.length === 0) {
+          next[zone.id] = 0;
+          continue;
+        }
+
+        const current = prev[zone.id] ?? 0;
+        const normalized = ((current % zoneSlides.length) + zoneSlides.length) % zoneSlides.length;
+        next[zone.id] = normalized;
+      }
+      return next;
+    });
+  }, [localConfig]);
+
+  useEffect(() => {
+    if (!localConfig || !isPreviewAutoPlay) return;
+
+    const timers: number[] = [];
+    for (const zone of zones) {
+      const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
+      if (zoneSlides.length < 2) continue;
+
+      const currentIndex = previewIndexByZone[zone.id] ?? 0;
+      const currentSlide = zoneSlides[currentIndex % zoneSlides.length];
+      const durationSeconds = Math.max(2, Math.round(currentSlide.duration || localConfig.defaultDuration || 8));
+
+      const timer = window.setTimeout(() => {
+        setPreviewIndexByZone((prev) => {
+          const prevIndex = prev[zone.id] ?? 0;
+          return {
+            ...prev,
+            [zone.id]: (prevIndex + 1) % zoneSlides.length,
+          };
+        });
+      }, durationSeconds * 1000);
+
+      timers.push(timer);
+    }
+
+    return () => {
+      for (const timer of timers) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [localConfig, zones, previewIndexByZone, isPreviewAutoPlay]);
 
   const handleClose = () => {
     if (isBusy) return;
@@ -308,6 +376,21 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     setIsDirty(true);
   };
 
+  const stepPreview = (zoneId: string, step: -1 | 1) => {
+    if (!localConfig) return;
+    const zoneSlides = getPreviewSlidesForZone(localConfig, zoneId);
+    if (zoneSlides.length === 0) return;
+
+    setPreviewIndexByZone((prev) => {
+      const current = prev[zoneId] ?? 0;
+      const nextIndex = ((current + step) % zoneSlides.length + zoneSlides.length) % zoneSlides.length;
+      return {
+        ...prev,
+        [zoneId]: nextIndex,
+      };
+    });
+  };
+
   const handleSaveOverrides = () => {
     if (!device || !localConfig) return;
 
@@ -373,6 +456,8 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     });
   };
 
+  if (!isOpen || !device) return null;
+
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/50 p-4">
@@ -403,6 +488,16 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
               </p>
             </div>
 
+            {device.mode !== 'override' && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900 font-medium">Hinweis zum Modus</p>
+                <p className="mt-1 text-sm text-amber-700">
+                  Dieses Geraet steht auf <strong>Automatisch</strong>. Das gespeicherte Override wird erst genutzt,
+                  wenn du im Geraete-Menue den Modus auf <strong>Ueberschrieben</strong> setzt.
+                </p>
+              </div>
+            )}
+
             {!localConfig && (
               <div className="rounded-lg border border-spa-bg-secondary bg-white p-6 text-spa-text-secondary">
                 Lade Slideshow-Konfiguration...
@@ -411,6 +506,85 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
 
             {localConfig && (
               <div className="space-y-6">
+                <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">
+                  <div className="mb-4 flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-spa-text-primary">Live-Vorschau</h3>
+                      <p className="text-xs text-spa-text-secondary">
+                        Zeigt pro Zone die aktive Slide-Reihenfolge (inkl. automatischem Durchlauf).
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsPreviewAutoPlay((prev) => !prev)}
+                      className="inline-flex items-center gap-2 rounded-md border border-spa-bg-secondary px-3 py-2 text-sm text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
+                    >
+                      {isPreviewAutoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      {isPreviewAutoPlay ? 'Auto-Vorschau pausieren' : 'Auto-Vorschau starten'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                    {zones.map((zone) => {
+                      const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
+                      const slideCount = zoneSlides.length;
+                      const currentIndex = slideCount > 0 ? (previewIndexByZone[zone.id] ?? 0) % slideCount : 0;
+                      const currentSlide = slideCount > 0 ? zoneSlides[currentIndex] : null;
+
+                      return (
+                        <div key={`preview-${zone.id}`} className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/30 p-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold text-spa-text-primary">{zone.name}</p>
+                              <p className="text-xs text-spa-text-secondary">
+                                {slideCount === 0
+                                  ? 'Keine Slides'
+                                  : `Slide ${currentIndex + 1} von ${slideCount}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => stepPreview(zone.id, -1)}
+                                disabled={slideCount < 2}
+                                className="rounded-md border border-spa-bg-secondary p-1.5 text-spa-text-secondary transition-colors hover:bg-white disabled:opacity-40"
+                                title="Vorherige Slide"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => stepPreview(zone.id, 1)}
+                                disabled={slideCount < 2}
+                                className="rounded-md border border-spa-bg-secondary p-1.5 text-spa-text-secondary transition-colors hover:bg-white disabled:opacity-40"
+                                title="Naechste Slide"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg bg-white">
+                            {currentSlide ? (
+                              <div className="origin-center scale-[1.12]">
+                                <SlidePreview slide={currentSlide} />
+                              </div>
+                            ) : (
+                              <p className="text-sm text-spa-text-secondary">Keine Vorschau verfuegbar</p>
+                            )}
+                          </div>
+
+                          {currentSlide && (
+                            <div className="mt-3 text-sm text-spa-text-secondary">
+                              <span className="font-medium text-spa-text-primary">
+                                {currentSlide.title || getSlideTypeLabel(currentSlide.type)}
+                              </span>
+                              {' '}• {currentSlide.duration}s
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">
                   <h3 className="mb-4 text-lg font-semibold text-spa-text-primary">Layout</h3>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

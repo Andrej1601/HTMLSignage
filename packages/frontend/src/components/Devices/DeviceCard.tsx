@@ -47,6 +47,11 @@ export function DeviceCard({
     Object.keys(device.overrides.settings).length > 0
   );
   const hasOverrides = hasScheduleOverride || hasSettingsOverride;
+  const isOverrideMode = device.mode === 'override';
+  const isOverrideActive = hasOverrides && isOverrideMode;
+  const modeBadgeClass = isOverrideMode
+    ? 'bg-blue-100 text-blue-700'
+    : 'bg-gray-100 text-gray-700';
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary hover:shadow-md transition-shadow">
@@ -66,12 +71,10 @@ export function DeviceCard({
                   <Circle className="w-2 h-2 fill-current" />
                   {getStatusLabel(status)}
                 </span>
-                {device.mode === 'override' && (
-                  <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${modeBadgeClass}`}>
                     <Settings className="w-3 h-3" />
                     {getModeLabel(device.mode)}
-                  </span>
-                )}
+                </span>
               </div>
             </div>
           </div>
@@ -185,12 +188,16 @@ export function DeviceCard({
 
         {/* Override Warning */}
         {hasOverrides && (
-          <div className="flex items-start gap-2 text-sm bg-blue-50 rounded-lg p-3">
-            <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className={`flex items-start gap-2 text-sm rounded-lg p-3 ${isOverrideActive ? 'bg-blue-50' : 'bg-amber-50'}`}>
+            <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOverrideActive ? 'text-blue-600' : 'text-amber-600'}`} />
             <div className="flex-1">
-              <p className="text-blue-900 font-medium">Device Overrides aktiv</p>
-              <p className="text-blue-700 text-xs mt-1">
-                Dieses Gerät verwendet angepasste Einstellungen
+              <p className={`font-medium ${isOverrideActive ? 'text-blue-900' : 'text-amber-900'}`}>
+                {isOverrideActive ? 'Device Overrides aktiv' : 'Device Overrides hinterlegt'}
+              </p>
+              <p className={`text-xs mt-1 ${isOverrideActive ? 'text-blue-700' : 'text-amber-700'}`}>
+                {isOverrideActive
+                  ? 'Dieses Gerät verwendet angepasste Einstellungen'
+                  : 'Overrides sind gespeichert, aber Modus steht auf Automatisch'}
               </p>
             </div>
           </div>
