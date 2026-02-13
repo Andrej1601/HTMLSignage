@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
+import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
+import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
+import { createDefaultSchedule } from '@/types/schedule.types';
 import type { SlideshowConfig, SlideConfig, LayoutType } from '@/types/slideshow.types';
 import {
   createDefaultSlideshowConfig,
@@ -13,6 +16,7 @@ import {
   getZonesForLayout,
   getSlidesByZone,
 } from '@/types/slideshow.types';
+import { migrateSettings } from '@/utils/slideshowMigration';
 import {
   Save,
   RefreshCw,
@@ -163,6 +167,7 @@ function SortableSlideItem({
 
 export function SlideshowPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
+  const { schedule } = useSchedule();
 
   const [localConfig, setLocalConfig] = useState<SlideshowConfig | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -170,6 +175,20 @@ export function SlideshowPage() {
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
+
+  const previewSettings = useMemo(() => {
+    if (!settings || !localConfig) return null;
+
+    return migrateSettings({
+      ...settings,
+      slideshow: {
+        ...localConfig,
+        version: (localConfig.version || 1) + (isDirty ? 1 : 0),
+      },
+    });
+  }, [settings, localConfig, isDirty]);
+
+  const previewSchedule = schedule || createDefaultSchedule();
 
   // Initialize from settings
   useEffect(() => {
@@ -401,6 +420,29 @@ export function SlideshowPage() {
             </button>
           </div>
         </div>
+
+        {previewSettings && (
+          <div className="mb-6 bg-white rounded-lg shadow p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-spa-text-primary">1:1 Monitor-Vorschau</h3>
+                <p className="text-xs text-spa-text-secondary mt-1">
+                  Direkte Vorschau der echten `/display` Ansicht mit deiner aktuellen Konfiguration.
+                </p>
+              </div>
+              <span className={`text-xs font-medium px-3 py-1 rounded-full ${
+                isDirty ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+              }`}>
+                {isDirty ? 'Ungespeicherte Aenderungen aktiv' : 'Gespeicherter Stand'}
+              </span>
+            </div>
+
+            <DisplayLivePreview
+              schedule={previewSchedule}
+              settings={previewSettings}
+            />
+          </div>
+        )}
 
         {/* Layout Selection */}
         <div className="mb-6 bg-white rounded-lg shadow p-6">

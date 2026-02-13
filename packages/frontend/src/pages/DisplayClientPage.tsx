@@ -21,6 +21,11 @@ import { migrateSettings } from '@/utils/slideshowMigration';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import {
+  PREVIEW_CONFIG_EVENT,
+  PREVIEW_READY_EVENT,
+  PREVIEW_REQUEST_READY_EVENT,
+} from '@/components/Display/previewBridge';
 
 // Generate a unique browser ID (UUID v4)
 function generateBrowserId(): string {
@@ -47,9 +52,6 @@ function needsModernSlidePadding(isModernDesign: boolean, slide: SlideConfig | n
   if (!isModernDesign || !slide) return false;
   return isMediaSlide(slide) || slide.type === 'infos' || slide.type === 'events';
 }
-
-const PREVIEW_CONFIG_EVENT = 'htmlsignage:preview-config';
-const PREVIEW_READY_EVENT = 'htmlsignage:preview-ready';
 
 interface PreviewConfigMessage {
   type: string;
@@ -169,10 +171,23 @@ export function DisplayClientPage() {
   useEffect(() => {
     if (!isPreviewMode) return;
 
+    const notifyParentReady = () => {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: PREVIEW_READY_EVENT }, window.location.origin);
+      }
+    };
+
     const handlePreviewMessage = (event: MessageEvent<PreviewConfigMessage>) => {
       if (event.origin !== window.location.origin) return;
       const message = event.data;
-      if (!message || message.type !== PREVIEW_CONFIG_EVENT) return;
+      if (!message || typeof message.type !== 'string') return;
+
+      if (message.type === PREVIEW_REQUEST_READY_EVENT) {
+        notifyParentReady();
+        return;
+      }
+
+      if (message.type !== PREVIEW_CONFIG_EVENT) return;
 
       const payload = message.payload;
       if (!payload) return;
@@ -197,9 +212,7 @@ export function DisplayClientPage() {
 
     window.addEventListener('message', handlePreviewMessage);
 
-    if (window.parent !== window) {
-      window.parent.postMessage({ type: PREVIEW_READY_EVENT }, window.location.origin);
-    }
+    notifyParentReady();
 
     return () => {
       window.removeEventListener('message', handlePreviewMessage);

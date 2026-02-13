@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -11,6 +11,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -36,9 +37,6 @@ interface DeviceOverridesDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const PREVIEW_CONFIG_EVENT = 'htmlsignage:preview-config';
-const PREVIEW_READY_EVENT = 'htmlsignage:preview-ready';
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -197,8 +195,6 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
-  const [previewReady, setPreviewReady] = useState(false);
-  const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const isBusy = setOverrides.isPending || clearOverrides.isPending;
 
@@ -219,7 +215,6 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     setEditingSlide(null);
     setIsAddingNew(false);
     setIsDirty(false);
-    setPreviewReady(false);
   }, [device, globalSettings?.slideshow, isOpen]);
 
   const zones = useMemo(
@@ -264,35 +259,6 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     isDirty,
     localConfig,
   ]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handlePreviewReady = (event: MessageEvent<{ type?: string }>) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== PREVIEW_READY_EVENT) return;
-      setPreviewReady(true);
-    };
-
-    window.addEventListener('message', handlePreviewReady);
-    return () => {
-      window.removeEventListener('message', handlePreviewReady);
-    };
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen || !previewReady) return;
-    const previewWindow = previewFrameRef.current?.contentWindow;
-    if (!previewWindow) return;
-
-    previewWindow.postMessage(
-      {
-        type: PREVIEW_CONFIG_EVENT,
-        payload: previewConfigPayload,
-      },
-      window.location.origin
-    );
-  }, [isOpen, previewConfigPayload, previewReady]);
 
   const handleClose = () => {
     if (isBusy) return;
@@ -537,28 +503,10 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
                       : 'Vorschau entspricht dem aktuellen Stand.'}
                   </p>
 
-                  <div
-                    className="relative w-full overflow-hidden rounded-lg border border-spa-bg-secondary bg-black"
-                    style={{ aspectRatio: '16 / 9' }}
-                  >
-                    <iframe
-                      ref={previewFrameRef}
-                      title="Display Vorschau"
-                      src="/display?preview=1"
-                      className="absolute inset-0 h-full w-full border-0"
-                      onLoad={() => {
-                        setPreviewReady(false);
-                      }}
-                    />
-
-                    {!previewReady && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/65 text-white">
-                        <div className="text-center">
-                          <div className="text-sm font-medium">Vorschau wird initialisiert...</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <DisplayLivePreview
+                    schedule={previewConfigPayload.schedule}
+                    settings={previewConfigPayload.settings}
+                  />
                 </div>
 
                 <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">
