@@ -1,115 +1,101 @@
-# HTMLSignage v2.0 - Modern Digital Signage System
+# HTMLSignage
 
-Complete rewrite with modern TypeScript stack for Westfalenbad Hagen Sauna facility.
+Digital-Signage-System fuer Sauna- und Wellnessbereiche auf Basis von TypeScript, React und Express.
 
-## 🎯 Features
+Diese Dokumentation ist als Betriebs- und Installationsleitfaden aufgebaut:
+- Was das System kann
+- Wie es auf einer neuen Maschine installiert wird
+- Wie es betrieben, aktualisiert und konfiguriert wird
+- Wie typische Fehler schnell behoben werden
 
-### ✅ Admin Interface
-- **Dashboard** - System overview with statistics and quick actions
-- **Schedule Editor** - Visual weekly sauna infusion plan editor
-- **Device Management** - Register, monitor, and control displays
-- **Media Library** - Upload and manage images, audio, and video files
-- **Settings Editor** - Configure themes, fonts, and audio
-- **Real-time Updates** - WebSocket-based live synchronization
+## Inhaltsverzeichnis
+1. [Systemueberblick](#systemueberblick)
+2. [Funktionsumfang](#funktionsumfang)
+3. [Architektur und Ports](#architektur-und-ports)
+4. [Schnellstart auf neuer Maschine (Installer)](#schnellstart-auf-neuer-maschine-installer)
+5. [Installer-Parameter](#installer-parameter)
+6. [Erstkonfiguration nach Installation](#erstkonfiguration-nach-installation)
+7. [Lokale Entwicklung](#lokale-entwicklung)
+8. [Konfiguration](#konfiguration)
+9. [Betrieb und Wartung](#betrieb-und-wartung)
+10. [API-Uebersicht](#api-uebersicht)
+11. [Projektstruktur](#projektstruktur)
+12. [Troubleshooting](#troubleshooting)
 
-### ✅ Display Client
-- **Slideshow System** - Automatic rotation between overview and clock
-- **Overview Slide** - Full weekly schedule display
-- **Clock Slide** - Large digital clock with date
-- **Auto-Update** - Receives schedule/settings changes instantly
-- **Heartbeat System** - Reports online status to admin
+## Systemueberblick
+HTMLSignage besteht aus zwei Hauptkomponenten:
+- `Frontend` (React + Vite) auf Port `5173`
+- `Backend` (Express + Prisma) auf Port `3000`
 
-### ✅ System Features
-- **Monorepo Architecture** - Backend and frontend in one workspace
-- **Type Safety** - Full TypeScript coverage
-- **Modern UI** - Tailwind CSS with Wellness/Spa theme
-- **Responsive Design** - Works on all screen sizes
-- **LAN Access** - Optimized for local network deployment
+Persistenz:
+- PostgreSQL als Datenbank
+- Upload-Dateien unter `packages/backend/uploads`
 
-## 🏗️ Tech Stack
+Zielplattform:
+- Ubuntu/Debian (Installer ist darauf ausgelegt)
+- Betrieb in beliebigen LANs ohne feste IP-Annahmen
 
-### Backend
-- **Runtime**: Node.js 20+ with TypeScript
-- **Framework**: Express.js
-- **Database**: PostgreSQL 16+ with Prisma ORM
-- **Validation**: Zod
-- **Real-time**: Socket.IO
-- **File Upload**: Multer
-- **Security**: Helmet, bcrypt, JWT, CORS
+## Funktionsumfang
 
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite 6
-- **Styling**: Tailwind CSS (Custom Wellness/Spa theme)
-- **State Management**: React Query (TanStack Query)
-- **Routing**: React Router v7
-- **Icons**: Lucide React
-- **Real-time**: Socket.IO Client
-- **HTTP Client**: Axios
+### Admin-Oberflaeche
+Routen (Frontend):
+- `/` Dashboard
+- `/schedule` Aufgussplan bearbeiten
+- `/saunas` Saunen verwalten
+- `/slideshow` Slides/Layouteinstellungen
+- `/settings` Design/Farben/Systemeinstellungen
+- `/devices` Geraeteverwaltung + Pairing
+- `/users` Benutzerverwaltung (Admin)
+- `/media` Medienbibliothek und Upload
+- `/login` Login
 
-### Database
-- **PostgreSQL** with 8 models:
-  - User (authentication)
-  - Session (JWT sessions)
-  - Device (display management)
-  - DeviceOverride (device-specific configs)
-  - Schedule (weekly sauna plan)
-  - Settings (theme & design)
-  - Media (file library)
-  - AuditLog (activity tracking)
+### Display-Client
+Route:
+- `/display`
 
-## 📂 Project Structure
+Funktionen:
+- Slideshow-Wiedergabe basierend auf konfigurierten Slides
+- Live-Updates ueber WebSocket
+- Heartbeat an Backend
 
-```
-HTMLSignage/
-├── packages/
-│   ├── backend/                    # Express + Prisma API
-│   │   ├── src/
-│   │   │   ├── routes/            # API endpoints
-│   │   │   │   ├── schedule.ts    # Schedule CRUD
-│   │   │   │   ├── settings.ts    # Settings CRUD
-│   │   │   │   ├── devices.ts     # Device management
-│   │   │   │   ├── media.ts       # File upload/management
-│   │   │   │   └── auth.ts        # Authentication
-│   │   │   ├── websocket/         # Socket.IO handlers
-│   │   │   ├── lib/               # Utilities (Prisma, upload)
-│   │   │   └── server.ts          # Express app
-│   │   ├── prisma/
-│   │   │   ├── schema.prisma      # Database schema
-│   │   │   └── migrations/        # DB migrations
-│   │   ├── uploads/               # Uploaded files
-│   │   └── package.json
-│   └── frontend/                   # React SPA
-│       ├── src/
-│       │   ├── components/
-│       │   │   ├── Dashboard/     # Dashboard cards
-│       │   │   ├── Schedule/      # Schedule editor
-│       │   │   ├── Settings/      # Theme/Font/Audio editors
-│       │   │   ├── Devices/       # Device management
-│       │   │   ├── Media/         # Media library
-│       │   │   └── Display/       # Display client slides
-│       │   ├── pages/
-│       │   │   ├── DashboardPage.tsx
-│       │   │   ├── SchedulePage.tsx
-│       │   │   ├── SettingsPage.tsx
-│       │   │   ├── DevicesPage.tsx
-│       │   │   ├── MediaPage.tsx
-│       │   │   └── DisplayClientPage.tsx
-│       │   ├── hooks/             # Custom React hooks
-│       │   ├── services/          # API client
-│       │   ├── types/             # TypeScript types
-│       │   └── App.tsx
-│       └── package.json
-├── pnpm-workspace.yaml
-└── package.json
-```
+### Medienverwaltung
+- Upload von Bild/Audio/Video
+- Loeschen und Filtern/Suchen
+- **Multi-Datei-Upload per Drag-and-Drop**
+  - mehrere Dateien gleichzeitig in den Uploadbereich ziehen
+  - sequentieller Upload mit Fortschrittsanzeige
+  - Fehler pro Datei, erfolgreiche Uploads bleiben erhalten
 
-## 🚀 Quick Start
+Unterstuetzte Formate:
+- Bild: JPG, PNG, GIF, WebP, SVG
+- Audio: MP3, WAV, OGG
+- Video: MP4, WebM
+- Maximale Dateigroesse pro Datei: 50 MB
 
-### Fresh Machine Install (recommended)
+## Architektur und Ports
 
-Use the installer script to provision everything for production-style runtime on ports `5173` (frontend) and `3000` (backend).
+### Netzwerk
+- Frontend lauscht auf `0.0.0.0:5173`
+- Backend lauscht auf `0.0.0.0:3000`
 
+### Kommunikation
+- Frontend nutzt API-Endpunkte unter `/api`
+- Backend stellt Uploads unter `/uploads` bereit
+- WebSocket fuer Live-Sync
+
+### CORS
+- Gesteuert ueber `FRONTEND_URL` im Backend
+- Installer-Standard: `FRONTEND_URL="*"` (kein fester Host/IP erforderlich)
+
+## Schnellstart auf neuer Maschine (Installer)
+
+### Voraussetzungen
+Auf Zielmaschine:
+- Ubuntu/Debian
+- sudo-Rechte
+- Internetzugang
+
+### Schritt-fuer-Schritt
 ```bash
 sudo apt update
 sudo apt install -y git curl ca-certificates
@@ -120,37 +106,78 @@ cd /opt/HTMLSignage
 sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 ```
 
-What this does:
-- Installs latest available Node.js, pnpm, PostgreSQL
-- Installs dependencies and builds backend/frontend
-- Creates backend/frontend env files
-- Runs Prisma migrations
-- Creates and starts systemd services:
-  - `htmlsignage-backend.service`
-  - `htmlsignage-frontend.service`
+### Was der Installer automatisch macht
+1. Systempakete installieren/aktualisieren
+2. Neueste verfuegbare Node.js-Version von NodeSource installieren (`setup_current.x`)
+3. pnpm via corepack aktivieren
+4. Repository auf `main` klonen/aktualisieren
+5. Dependencies installieren (`pnpm install --no-frozen-lockfile`)
+6. PostgreSQL einrichten (DB + User)
+7. `.env`-Dateien fuer Backend/Frontend erzeugen
+8. Prisma Client generieren + Migrationen ausfuehren
+9. Frontend/Backend bauen
+10. systemd-Services erstellen und starten:
+   - `htmlsignage-backend.service`
+   - `htmlsignage-frontend.service`
+11. Optional Firewall-Regeln (wenn `ufw` aktiv ist)
+12. Health-Checks ausfuehren
 
-Verify after install:
-
+### Verifikation nach Installation
 ```bash
 systemctl status htmlsignage-backend.service --no-pager
 systemctl status htmlsignage-frontend.service --no-pager
+ss -tulpen | grep -E ':(3000|5173)\b'
 curl http://127.0.0.1:3000/health
 ```
 
-Open in browser:
+### Zugriff
 - Admin: `http://<machine-ip-or-hostname>:5173`
 - Display: `http://<machine-ip-or-hostname>:5173/display`
-- API health: `http://<machine-ip-or-hostname>:3000/health`
+- API Health: `http://<machine-ip-or-hostname>:3000/health`
 
-The first registered account becomes admin.
+## Installer-Parameter
+Folgende Variablen koennen beim Aufruf gesetzt werden:
 
-### Local Development Setup
+```bash
+sudo \
+  APP_USER="$USER" \
+  APP_DIR="/opt/HTMLSignage" \
+  BRANCH="main" \
+  DB_NAME="htmlsignage" \
+  DB_USER="signage" \
+  DB_PASS="<starkes-passwort>" \
+  BACKEND_PORT="3000" \
+  FRONTEND_PORT="5173" \
+  FRONTEND_URL="*" \
+  VITE_API_URL="" \
+  JWT_SECRET="<starkes-secret>" \
+  bash scripts/install-new-machine.sh
+```
 
-Prerequisites:
-- Node.js 20+
-- PostgreSQL 16+
-- pnpm (or `npx pnpm`)
+Bedeutung:
+- `APP_USER`: Linux-User, unter dem Services laufen
+- `APP_DIR`: Installationspfad
+- `BRANCH`: Git-Branch fuer Deployment
+- `DB_*`: PostgreSQL-Zugang
+- `BACKEND_PORT`, `FRONTEND_PORT`: Service-Ports
+- `FRONTEND_URL`: CORS-Whitelist (`*` erlaubt alle)
+- `VITE_API_URL`: Optional feste API-URL fuer Frontend-Build
+  - leer: Frontend nutzt dynamischen Fallback (Host der aktuellen Seite + Port 3000)
+- `JWT_SECRET`: Signierschluessel fuer Auth-Tokens
 
+## Erstkonfiguration nach Installation
+1. Frontend im Browser oeffnen
+2. Ersten Benutzer registrieren
+3. Der erste registrierte Benutzer bekommt Admin-Rechte
+4. Danach Login und Konfiguration (Saunen, Schedule, Slideshow, Settings)
+
+## Lokale Entwicklung
+
+### Voraussetzungen
+- Node.js >= 20
+- PostgreSQL
+
+### Setup
 ```bash
 npx pnpm install
 cp packages/backend/.env.example packages/backend/.env
@@ -159,237 +186,173 @@ npx pnpm --filter backend db:migrate
 npx pnpm dev
 ```
 
-Development URLs:
+### Entwicklungs-URLs
 - Frontend: `http://localhost:5173`
-- Backend: `http://localhost:3000`
 - Display: `http://localhost:5173/display`
+- Backend: `http://localhost:3000`
 
-## 📱 Pages & Routes
+## Konfiguration
 
-### Admin Interface
-- `/` - Dashboard (overview, stats, quick actions)
-- `/schedule` - Schedule Editor (weekly plan)
-- `/devices` - Device Management (pairing, monitoring)
-- `/media` - Media Library (upload, manage files)
-- `/settings` - Settings Editor (theme, fonts, audio)
-- `/login` - Login Page (authentication)
-
-### Display Client
-- `/display?deviceId=xxx` - Display Client (slideshow mode)
-
-## 🎨 Features Detail
-
-### Dashboard
-- Real-time statistics (devices, media, schedule)
-- System health indicators
-- Quick action cards
-- Recent activity timeline
-
-### Schedule Editor
-- Visual grid editor
-- Group by days
-- Add/edit/delete cells
-- Time, title, subtitle, badges
-- Sauna selection
-- Auto-save with versioning
-
-### Device Management
-- Device pairing with unique ID
-- Online/offline status tracking
-- Heartbeat monitoring (2-minute interval)
-- Remote commands (reload, restart, clear-cache)
-- Device overrides (custom schedule/settings per device)
-- Auto/Override mode
-
-### Media Library
-- Drag & drop file upload
-- Supported formats:
-  - Images: JPG, PNG, GIF, WebP, SVG
-  - Audio: MP3, WAV, OGG
-  - Video: MP4, WebM
-- Max file size: 50MB
-- Search and filter
-- Copy URL, download, delete
-- Visual preview for images
-
-### Settings Editor
-- **Theme Colors**: 4 preset palettes + advanced editor (20+ colors)
-- **Fonts**: 11 scale sliders + weight control
-- **Audio**: Enable/disable, file upload, volume, loop
-- Live preview
-- Version control
-
-### Display Client
-- Fullscreen slideshow mode
-- Auto-rotation between slides
-- Real-time updates via WebSocket
-- Heartbeat to admin interface
-- Remote control support
-- Two slide types:
-  - **Overview**: Full weekly schedule
-  - **Clock**: Large digital clock with date
-
-## 🔌 API Endpoints
-
-### Schedule
-- `GET /api/schedule` - Get active schedule
-- `POST /api/schedule` - Save new schedule
-- `GET /api/schedule/history` - Get schedule history
-
-### Settings
-- `GET /api/settings` - Get active settings
-- `POST /api/settings` - Save new settings
-
-### Devices
-- `GET /api/devices` - List all devices
-- `GET /api/devices/:id` - Get device details
-- `POST /api/devices` - Create device (pairing)
-- `PATCH /api/devices/:id` - Update device
-- `DELETE /api/devices/:id` - Delete device
-- `POST /api/devices/:id/heartbeat` - Send heartbeat
-- `POST /api/devices/:id/control` - Send control command
-- `POST /api/devices/:id/overrides` - Set device overrides
-- `DELETE /api/devices/:id/overrides` - Clear overrides
-
-### Media
-- `GET /api/media` - List all media (filter by type, search)
-- `GET /api/media/:id` - Get media details
-- `POST /api/media/upload` - Upload file
-- `DELETE /api/media/:id` - Delete media
-
-### Auth
-- `POST /api/auth/login` - Login (JWT)
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
-
-### Static Files
-- `GET /uploads/:filename` - Serve uploaded files
-
-## 🔧 Configuration
-
-### Backend (.env)
+### Backend: `packages/backend/.env`
+Beispiel:
 ```env
-DATABASE_URL="postgresql://signage:signage123@localhost:5432/htmlsignage?schema=public"
+DATABASE_URL="postgresql://signage:password@localhost:5432/htmlsignage?schema=public"
 PORT=3000
-NODE_ENV=development
+NODE_ENV=production
 FRONTEND_URL=*
-JWT_SECRET=your-secret-key
+JWT_SECRET=change-me
+JWT_EXPIRES_IN=7d
+UPLOAD_DIR=uploads
+MAX_FILE_SIZE=10485760
+SESSION_DURATION=604800
 ```
 
-### Frontend (vite.config.ts)
-- LAN access enabled (`host: '0.0.0.0'`)
-- Proxy to backend
-- HMR for development
-
-## 🌐 Network Configuration
-
-The system is configured for LAN access:
-- Backend listens on `0.0.0.0:3000`
-- Frontend listens on `0.0.0.0:5173`
-- CORS is controlled by `FRONTEND_URL` (default `*` in installer)
-
-## 📦 Build & Deployment
-
-### Production Build
-```bash
-# Build both packages
-pnpm build
-
-# Backend output: packages/backend/dist/
-# Frontend output: packages/frontend/dist/
+### Frontend: `packages/frontend/.env.production`
+```env
+VITE_API_URL=
 ```
 
-### Production Start
+Hinweis:
+- leer = dynamische API-Aufloesung (aktueller Host + `:3000`)
+- gesetzt = explizite API-URL
+
+### Vite Dev Proxy
+In `packages/frontend/vite.config.ts`:
+- `VITE_DEV_API_TARGET` kann fuer lokales Development gesetzt werden
+- Default: `http://localhost:3000`
+
+## Betrieb und Wartung
+
+### Service-Status und Logs
 ```bash
-# Start services
-sudo systemctl start htmlsignage-backend.service
-sudo systemctl start htmlsignage-frontend.service
+systemctl status htmlsignage-backend.service
+systemctl status htmlsignage-frontend.service
 
-# Enable autostart
-sudo systemctl enable htmlsignage-backend.service
-sudo systemctl enable htmlsignage-frontend.service
-
-# Logs
 journalctl -u htmlsignage-backend.service -f
 journalctl -u htmlsignage-frontend.service -f
 ```
 
-### Environment Variables (Production)
-```env
-NODE_ENV=production
-DATABASE_URL=postgresql://user:pass@host:5432/db
-FRONTEND_URL=https://your-domain.com
-JWT_SECRET=strong-random-secret
-```
-
-## 🔐 Security Notes
-
-- JWT-based authentication
-- Bcrypt password hashing
-- Helmet security headers
-- CORS configuration
-- Input validation with Zod
-- SQL injection prevention (Prisma)
-- File upload validation
-
-## 🐛 Troubleshooting
-
-### Database Connection Failed
+### Services neu starten
 ```bash
-# Check PostgreSQL is running
-sudo systemctl status postgresql
-
-# Test connection
-psql -U signage -d htmlsignage -h localhost
+sudo systemctl restart htmlsignage-backend.service
+sudo systemctl restart htmlsignage-frontend.service
 ```
 
-### Port Already in Use
+### Update auf neue Version
 ```bash
-# Kill processes on port 3000 or 5173
-lsof -ti:3000 | xargs kill -9
-lsof -ti:5173 | xargs kill -9
+cd /opt/HTMLSignage
+git pull --ff-only origin main
+sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 ```
 
-### Git Permissions Issue
+### Build manuell
 ```bash
-sudo chown -R $USER:$USER .git/
+cd /opt/HTMLSignage
+npx pnpm build
 ```
 
-### Prisma Migration Failed
+## API-Uebersicht
+
+### Auth
+- `POST /api/auth/register` (nur fuer ersten Benutzer)
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+### Users (admin)
+- `GET /api/users`
+- `POST /api/users`
+- `PATCH /api/users/:id`
+- `DELETE /api/users/:id`
+
+### Schedule
+- `GET /api/schedule`
+- `GET /api/schedule/history`
+- `POST /api/schedule`
+- `GET /api/schedule/:id`
+
+### Settings
+- `GET /api/settings`
+- `POST /api/settings`
+
+### Devices
+- `GET /api/devices`
+- `GET /api/devices/pending`
+- `GET /api/devices/:id`
+- `POST /api/devices`
+- `PATCH /api/devices/:id`
+- `DELETE /api/devices/:id`
+- `POST /api/devices/:id/heartbeat`
+- `POST /api/devices/:id/control`
+- `POST /api/devices/:id/overrides`
+- `DELETE /api/devices/:id/overrides`
+- `POST /api/devices/request-pairing`
+- `POST /api/devices/pair`
+
+### Media
+- `GET /api/media`
+- `GET /api/media/:id`
+- `POST /api/media/upload`
+- `DELETE /api/media/:id`
+
+### Health
+- `GET /health`
+
+## Projektstruktur
+```text
+HTMLSignage/
+  packages/
+    backend/
+      prisma/
+      src/
+      uploads/
+    frontend/
+      src/
+  scripts/
+    install-new-machine.sh
+```
+
+## Troubleshooting
+
+### Frontend laeuft, aber API nicht erreichbar
+Pruefen:
 ```bash
-# Reset database (WARNING: deletes all data)
-cd packages/backend
-npx prisma migrate reset
-
-# Grant CREATEDB permission
-sudo -u postgres psql -c "ALTER USER signage CREATEDB;"
+curl http://127.0.0.1:3000/health
+```
+Wenn Fehler:
+```bash
+systemctl status htmlsignage-backend.service --no-pager
+journalctl -u htmlsignage-backend.service -n 200 --no-pager
 ```
 
-## 📝 Development Notes
+### Ports bereits belegt
+```bash
+ss -tulpen | grep -E ':(3000|5173)\b'
+```
+Dann Konfliktprozess stoppen oder Ports per Installer-Variablen aendern.
 
-- Use `pnpm` for package management
-- TypeScript strict mode enabled
-- ESLint + Prettier configured
-- Git hooks for code quality
-- Monorepo with pnpm workspaces
+### Datenbank-Probleme
+```bash
+systemctl status postgresql --no-pager
+sudo -u postgres psql -c "\l"
+```
 
-## 🎯 Roadmap
+### Migration fehlgeschlagen
+```bash
+cd /opt/HTMLSignage/packages/backend
+npx prisma generate
+npx prisma migrate deploy
+```
 
-- [ ] User authentication implementation
-- [ ] Data migration from SQLite
-- [ ] Backup/restore functionality
-- [ ] Audit log viewer
-- [ ] Multi-language support
-- [ ] Mobile app (React Native)
-- [ ] Advanced analytics
-- [ ] Email notifications
+### Upload funktioniert nicht
+Pruefen:
+- Schreibrechte in `packages/backend/uploads`
+- Dateityp/Dateigroesse innerhalb erlaubter Limits
+- Backend-Logs fuer Multer/Prisma-Fehler
 
-## 📄 License
+### Auth-Probleme
+- Erster Benutzer kann nur einmal via `/api/auth/register` angelegt werden
+- Danach User-Verwaltung ueber `/users` (Admin)
 
-Proprietary - Westfalenbad Hagen
-
-## 👨‍💻 Development
-
-Built with ❤️ using modern TypeScript stack.
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+## Lizenz
+Projektspezifisch / intern.
