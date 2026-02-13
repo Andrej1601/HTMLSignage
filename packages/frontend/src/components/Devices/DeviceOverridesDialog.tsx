@@ -1,14 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  ChevronLeft,
-  ChevronRight,
   Edit2,
   Eye,
   EyeOff,
-  Pause,
-  Play,
   Plus,
   RotateCcw,
   Save,
@@ -17,11 +13,12 @@ import {
 } from 'lucide-react';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
+import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useClearOverrides, useSetOverrides } from '@/hooks/useDevices';
 import type { Device } from '@/types/device.types';
-import type { Schedule } from '@/types/schedule.types';
-import type { Settings } from '@/types/settings.types';
+import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
+import { getDefaultSettings, type Settings } from '@/types/settings.types';
 import type { LayoutType, SlideConfig, SlideType, SlideshowConfig } from '@/types/slideshow.types';
 import {
   LAYOUT_OPTIONS,
@@ -32,6 +29,7 @@ import {
   reorderSlides,
   SLIDE_TYPE_OPTIONS,
 } from '@/types/slideshow.types';
+import { migrateSettings } from '@/utils/slideshowMigration';
 
 interface DeviceOverridesDialogProps {
   device: Device | null;
@@ -39,12 +37,29 @@ interface DeviceOverridesDialogProps {
   onClose: () => void;
 }
 
+const PREVIEW_CONFIG_EVENT = 'htmlsignage:preview-config';
+const PREVIEW_READY_EVENT = 'htmlsignage:preview-ready';
+
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...base };
+
+  for (const [key, value] of Object.entries(override)) {
+    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
+      continue;
+    }
+    merged[key] = value;
+  }
+
+  return merged;
 }
 
 function cloneConfig(config: SlideshowConfig): SlideshowConfig {
@@ -171,14 +186,9 @@ function replaceZoneSlides(config: SlideshowConfig, zoneId: string, zoneSlides: 
   };
 }
 
-function getPreviewSlidesForZone(config: SlideshowConfig, zoneId: string): SlideConfig[] {
-  const zoneSlides = getSlidesByZone(config.slides, zoneId);
-  const enabledSlides = zoneSlides.filter((slide) => slide.enabled);
-  return enabledSlides.length > 0 ? enabledSlides : zoneSlides;
-}
-
 export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverridesDialogProps) {
   const { settings: globalSettings } = useSettings();
+  const { schedule: globalSchedule } = useSchedule();
   const setOverrides = useSetOverrides();
   const clearOverrides = useClearOverrides();
 
@@ -187,8 +197,8 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
-  const [previewIndexByZone, setPreviewIndexByZone] = useState<Record<string, number>>({});
-  const [isPreviewAutoPlay, setIsPreviewAutoPlay] = useState(true);
+  const [previewReady, setPreviewReady] = useState(false);
+  const previewFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const isBusy = setOverrides.isPending || clearOverrides.isPending;
 
@@ -209,8 +219,7 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     setEditingSlide(null);
     setIsAddingNew(false);
     setIsDirty(false);
-    setPreviewIndexByZone({});
-    setIsPreviewAutoPlay(true);
+    setPreviewReady(false);
   }, [device, globalSettings?.slideshow, isOpen]);
 
   const zones = useMemo(
@@ -218,58 +227,72 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     [localConfig?.layout]
   );
 
-  useEffect(() => {
-    if (!localConfig) return;
+  const previewConfigPayload = useMemo(() => {
+    const baseSchedule = globalSchedule || createDefaultSchedule();
+    const baseSettings = migrateSettings(globalSettings || getDefaultSettings());
 
-    const previewZones = getZonesForLayout(localConfig.layout);
-    setPreviewIndexByZone((prev) => {
-      const next: Record<string, number> = {};
-      for (const zone of previewZones) {
-        const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
-        if (zoneSlides.length === 0) {
-          next[zone.id] = 0;
-          continue;
-        }
+    const scheduleOverride = isScheduleOverride(device?.overrides?.schedule)
+      ? device.overrides?.schedule
+      : undefined;
 
-        const current = prev[zone.id] ?? 0;
-        const normalized = ((current % zoneSlides.length) + zoneSlides.length) % zoneSlides.length;
-        next[zone.id] = normalized;
-      }
-      return next;
-    });
-  }, [localConfig]);
-
-  useEffect(() => {
-    if (!localConfig || !isPreviewAutoPlay) return;
-
-    const timers: number[] = [];
-    for (const zone of zones) {
-      const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
-      if (zoneSlides.length < 2) continue;
-
-      const currentIndex = previewIndexByZone[zone.id] ?? 0;
-      const currentSlide = zoneSlides[currentIndex % zoneSlides.length];
-      const durationSeconds = Math.max(2, Math.round(currentSlide.duration || localConfig.defaultDuration || 8));
-
-      const timer = window.setTimeout(() => {
-        setPreviewIndexByZone((prev) => {
-          const prevIndex = prev[zone.id] ?? 0;
-          return {
-            ...prev,
-            [zone.id]: (prevIndex + 1) % zoneSlides.length,
-          };
-        });
-      }, durationSeconds * 1000);
-
-      timers.push(timer);
+    const settingsOverride = getOverrideSettings(device);
+    if (localConfig) {
+      settingsOverride.slideshow = {
+        ...localConfig,
+        version: (localConfig.version || 1) + (isDirty ? 1 : 0),
+      };
     }
 
-    return () => {
-      for (const timer of timers) {
-        window.clearTimeout(timer);
-      }
+    const mergedSettings = migrateSettings(
+      deepMergeRecords(
+        baseSettings as unknown as Record<string, unknown>,
+        settingsOverride
+      ) as unknown as Settings
+    );
+
+    const useOverride = device?.mode === 'override';
+    return {
+      schedule: useOverride && scheduleOverride ? scheduleOverride : baseSchedule,
+      settings: useOverride ? mergedSettings : baseSettings,
     };
-  }, [localConfig, zones, previewIndexByZone, isPreviewAutoPlay]);
+  }, [
+    device?.mode,
+    device?.overrides?.schedule,
+    device?.overrides?.settings,
+    globalSchedule,
+    globalSettings,
+    isDirty,
+    localConfig,
+  ]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePreviewReady = (event: MessageEvent<{ type?: string }>) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== PREVIEW_READY_EVENT) return;
+      setPreviewReady(true);
+    };
+
+    window.addEventListener('message', handlePreviewReady);
+    return () => {
+      window.removeEventListener('message', handlePreviewReady);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !previewReady) return;
+    const previewWindow = previewFrameRef.current?.contentWindow;
+    if (!previewWindow) return;
+
+    previewWindow.postMessage(
+      {
+        type: PREVIEW_CONFIG_EVENT,
+        payload: previewConfigPayload,
+      },
+      window.location.origin
+    );
+  }, [isOpen, previewConfigPayload, previewReady]);
 
   const handleClose = () => {
     if (isBusy) return;
@@ -374,21 +397,6 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
     });
     setLocalConfig(updated);
     setIsDirty(true);
-  };
-
-  const stepPreview = (zoneId: string, step: -1 | 1) => {
-    if (!localConfig) return;
-    const zoneSlides = getPreviewSlidesForZone(localConfig, zoneId);
-    if (zoneSlides.length === 0) return;
-
-    setPreviewIndexByZone((prev) => {
-      const current = prev[zoneId] ?? 0;
-      const nextIndex = ((current + step) % zoneSlides.length + zoneSlides.length) % zoneSlides.length;
-      return {
-        ...prev,
-        [zoneId]: nextIndex,
-      };
-    });
   };
 
   const handleSaveOverrides = () => {
@@ -509,79 +517,47 @@ export function DeviceOverridesDialog({ device, isOpen, onClose }: DeviceOverrid
                 <div className="rounded-lg border border-spa-bg-secondary bg-white p-6">
                   <div className="mb-4 flex items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-spa-text-primary">Live-Vorschau</h3>
+                      <h3 className="text-lg font-semibold text-spa-text-primary">1:1 Monitor-Vorschau</h3>
                       <p className="text-xs text-spa-text-secondary">
-                        Zeigt pro Zone die aktive Slide-Reihenfolge (inkl. automatischem Durchlauf).
+                        Dieser Bereich rendert dieselbe `/display` Ansicht wie auf dem Kundenbildschirm.
                       </p>
                     </div>
-                    <button
-                      onClick={() => setIsPreviewAutoPlay((prev) => !prev)}
-                      className="inline-flex items-center gap-2 rounded-md border border-spa-bg-secondary px-3 py-2 text-sm text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
-                    >
-                      {isPreviewAutoPlay ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      {isPreviewAutoPlay ? 'Auto-Vorschau pausieren' : 'Auto-Vorschau starten'}
-                    </button>
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                      device.mode === 'override'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      Modus: {device.mode === 'override' ? 'Ueberschrieben' : 'Automatisch'}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    {zones.map((zone) => {
-                      const zoneSlides = getPreviewSlidesForZone(localConfig, zone.id);
-                      const slideCount = zoneSlides.length;
-                      const currentIndex = slideCount > 0 ? (previewIndexByZone[zone.id] ?? 0) % slideCount : 0;
-                      const currentSlide = slideCount > 0 ? zoneSlides[currentIndex] : null;
+                  <p className="mb-3 text-xs text-spa-text-secondary">
+                    {isDirty
+                      ? 'Vorschau beinhaltet ungespeicherte Aenderungen aus diesem Dialog.'
+                      : 'Vorschau entspricht dem aktuellen Stand.'}
+                  </p>
 
-                      return (
-                        <div key={`preview-${zone.id}`} className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/30 p-4">
-                          <div className="mb-3 flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-spa-text-primary">{zone.name}</p>
-                              <p className="text-xs text-spa-text-secondary">
-                                {slideCount === 0
-                                  ? 'Keine Slides'
-                                  : `Slide ${currentIndex + 1} von ${slideCount}`}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => stepPreview(zone.id, -1)}
-                                disabled={slideCount < 2}
-                                className="rounded-md border border-spa-bg-secondary p-1.5 text-spa-text-secondary transition-colors hover:bg-white disabled:opacity-40"
-                                title="Vorherige Slide"
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => stepPreview(zone.id, 1)}
-                                disabled={slideCount < 2}
-                                className="rounded-md border border-spa-bg-secondary p-1.5 text-spa-text-secondary transition-colors hover:bg-white disabled:opacity-40"
-                                title="Naechste Slide"
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </div>
+                  <div
+                    className="relative w-full overflow-hidden rounded-lg border border-spa-bg-secondary bg-black"
+                    style={{ aspectRatio: '16 / 9' }}
+                  >
+                    <iframe
+                      ref={previewFrameRef}
+                      title="Display Vorschau"
+                      src="/display?preview=1"
+                      className="absolute inset-0 h-full w-full border-0"
+                      onLoad={() => {
+                        setPreviewReady(false);
+                      }}
+                    />
 
-                          <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg bg-white">
-                            {currentSlide ? (
-                              <div className="origin-center scale-[1.12]">
-                                <SlidePreview slide={currentSlide} />
-                              </div>
-                            ) : (
-                              <p className="text-sm text-spa-text-secondary">Keine Vorschau verfuegbar</p>
-                            )}
-                          </div>
-
-                          {currentSlide && (
-                            <div className="mt-3 text-sm text-spa-text-secondary">
-                              <span className="font-medium text-spa-text-primary">
-                                {currentSlide.title || getSlideTypeLabel(currentSlide.type)}
-                              </span>
-                              {' '}• {currentSlide.duration}s
-                            </div>
-                          )}
+                    {!previewReady && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/65 text-white">
+                        <div className="text-center">
+                          <div className="text-sm font-medium">Vorschau wird initialisiert...</div>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
                 </div>
 

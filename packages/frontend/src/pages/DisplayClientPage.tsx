@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -11,8 +11,8 @@ import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard'
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
-import { getDefaultSettings } from '@/types/settings.types';
-import { createDefaultSchedule } from '@/types/schedule.types';
+import { getDefaultSettings, type Settings } from '@/types/settings.types';
+import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
 import { API_URL, ENV_IS_DEV } from '@/config/env';
@@ -20,6 +20,7 @@ import { devicesApi } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 // Generate a unique browser ID (UUID v4)
 function generateBrowserId(): string {
@@ -47,7 +48,28 @@ function needsModernSlidePadding(isModernDesign: boolean, slide: SlideConfig | n
   return isMediaSlide(slide) || slide.type === 'infos' || slide.type === 'events';
 }
 
+const PREVIEW_CONFIG_EVENT = 'htmlsignage:preview-config';
+const PREVIEW_READY_EVENT = 'htmlsignage:preview-ready';
+
+interface PreviewConfigMessage {
+  type: string;
+  payload?: {
+    schedule?: unknown;
+    settings?: unknown;
+  };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function DisplayClientPage() {
+  const location = useLocation();
+  const isPreviewMode = useMemo(
+    () => new URLSearchParams(location.search).get('preview') === '1',
+    [location.search]
+  );
+
   // Get or create unique browser ID (persists across page reloads)
   const [browserId] = useState(() => {
     let id = localStorage.getItem('browserId');
@@ -62,6 +84,7 @@ export function DisplayClientPage() {
   const [isPairingLoading, setIsPairingLoading] = useState(true);
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
   const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
+  const [hasPreviewPayload, setHasPreviewPayload] = useState(false);
   const pairedDeviceIdRef = useRef<string | null>(null);
 
   const { schedule, isLoading: scheduleLoading } = useSchedule();
@@ -72,6 +95,11 @@ export function DisplayClientPage() {
 
   // Check pairing status
   useEffect(() => {
+    if (isPreviewMode) {
+      setIsPairingLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     const checkPairing = async (opts?: { silent?: boolean }) => {
@@ -119,7 +147,7 @@ export function DisplayClientPage() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [browserId]);
+  }, [browserId, isPreviewMode]);
 
   const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
@@ -139,6 +167,54 @@ export function DisplayClientPage() {
   }, []);
 
   useEffect(() => {
+    if (!isPreviewMode) return;
+
+    const handlePreviewMessage = (event: MessageEvent<PreviewConfigMessage>) => {
+      if (event.origin !== window.location.origin) return;
+      const message = event.data;
+      if (!message || message.type !== PREVIEW_CONFIG_EVENT) return;
+
+      const payload = message.payload;
+      if (!payload) return;
+
+      const incomingSchedule = payload.schedule;
+      if (
+        isPlainRecord(incomingSchedule) &&
+        typeof incomingSchedule.version === 'number' &&
+        isPlainRecord(incomingSchedule.presets) &&
+        typeof incomingSchedule.autoPlay === 'boolean'
+      ) {
+        setLocalSchedule(incomingSchedule as unknown as Schedule);
+        setHasPreviewPayload(true);
+      }
+
+      const incomingSettings = payload.settings;
+      if (isPlainRecord(incomingSettings)) {
+        setLocalSettings(migrateSettings(incomingSettings as unknown as Settings));
+        setHasPreviewPayload(true);
+      }
+    };
+
+    window.addEventListener('message', handlePreviewMessage);
+
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: PREVIEW_READY_EVENT }, window.location.origin);
+    }
+
+    return () => {
+      window.removeEventListener('message', handlePreviewMessage);
+    };
+  }, [isPreviewMode]);
+
+  useEffect(() => {
+    if (!isPreviewMode) {
+      setHasPreviewPayload(false);
+    }
+  }, [isPreviewMode]);
+
+  useEffect(() => {
+    if (isPreviewMode) return;
+
     const pairedDeviceId = pairingInfo?.paired ? pairingInfo.id : null;
     pairedDeviceIdRef.current = pairedDeviceId;
 
@@ -148,25 +224,28 @@ export function DisplayClientPage() {
     }
 
     refreshDeviceDisplayConfig(pairedDeviceId);
-  }, [pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig]);
+  }, [pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig, isPreviewMode]);
 
   // Update local state when global data is fetched (fallback while no paired device config is loaded yet)
   useEffect(() => {
     if (!schedule) return;
+    if (isPreviewMode && hasPreviewPayload) return;
     if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
       setLocalSchedule(schedule);
     }
-  }, [schedule, pairingInfo?.paired, hasLoadedDeviceConfig]);
+  }, [schedule, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
 
   useEffect(() => {
     if (!fetchedSettings) return;
+    if (isPreviewMode && hasPreviewPayload) return;
     if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
       setLocalSettings(fetchedSettings);
     }
-  }, [fetchedSettings, pairingInfo?.paired, hasLoadedDeviceConfig]);
+  }, [fetchedSettings, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
 
   // WebSocket for real-time updates
   const { isConnected, subscribe } = useWebSocket({
+    autoConnect: !isPreviewMode,
     onScheduleUpdate: (data) => {
       console.log('[Display] Schedule updated via WebSocket');
       const deviceId = pairedDeviceIdRef.current;
@@ -209,16 +288,19 @@ export function DisplayClientPage() {
 
   // Subscribe to updates once connected and paired
   useEffect(() => {
+    if (isPreviewMode) return;
+
     if (isConnected && pairingInfo?.paired && pairingInfo?.id) {
       subscribe('schedule');
       subscribe('settings');
       subscribe('device', pairingInfo.id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, pairingInfo?.paired, pairingInfo?.id]);
+  }, [isConnected, pairingInfo?.paired, pairingInfo?.id, isPreviewMode]);
 
   // Heartbeat system (only when paired)
   useEffect(() => {
+    if (isPreviewMode) return;
     if (!pairingInfo?.paired || !pairingInfo?.id) return;
 
     const sendHeartbeat = async () => {
@@ -241,7 +323,7 @@ export function DisplayClientPage() {
     const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [pairingInfo]);
+  }, [pairingInfo, isPreviewMode]);
 
   // Slideshow
   const {
@@ -261,7 +343,7 @@ export function DisplayClientPage() {
   });
 
   // Pairing screen - show if not paired
-  if (isPairingLoading) {
+  if (!isPreviewMode && isPairingLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center">
@@ -272,7 +354,7 @@ export function DisplayClientPage() {
     );
   }
 
-  if (!pairingInfo?.paired && pairingInfo?.pairingCode) {
+  if (!isPreviewMode && !pairingInfo?.paired && pairingInfo?.pairingCode) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center max-w-2xl px-8">
@@ -304,14 +386,20 @@ export function DisplayClientPage() {
   }
 
   // Loading state
-  if ((!pairingInfo?.paired && (scheduleLoading || settingsLoading)) || (pairingInfo?.paired && isDisplayConfigLoading && !hasLoadedDeviceConfig)) {
+  const isLoading =
+    isPreviewMode
+      ? scheduleLoading || settingsLoading
+      : ((!pairingInfo?.paired && (scheduleLoading || settingsLoading)) ||
+          (pairingInfo?.paired && isDisplayConfigLoading && !hasLoadedDeviceConfig));
+
+  if (isLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
           <div className="text-2xl font-bold mb-4">HTMLSignage</div>
           <div className="text-lg">Wird geladen...</div>
           <div className="text-sm mt-2 opacity-70">
-            {isConnected ? 'Verbunden' : 'Verbinde...'}
+            {isPreviewMode ? 'Vorschau' : (isConnected ? 'Verbunden' : 'Verbinde...')}
           </div>
         </div>
       </div>
