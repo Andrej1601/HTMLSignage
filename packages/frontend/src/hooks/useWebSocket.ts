@@ -10,6 +10,7 @@ interface UseWebSocketOptions {
   onScheduleUpdate?: (data: Schedule) => void;
   onSettingsUpdate?: (data: Settings) => void;
   onDeviceCommand?: (command: string) => void;
+  onDeviceUpdate?: (data: Record<string, unknown>) => void;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -19,6 +20,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onScheduleUpdate,
     onSettingsUpdate,
     onDeviceCommand,
+    onDeviceUpdate,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -75,8 +77,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       }
     });
 
+    // Device updates (mode/override changes, pairing updates, etc.)
+    socket.on('device:updated', (data: Record<string, unknown>) => {
+      console.log('[WebSocket] Device updated:', data);
+      onDeviceUpdate?.(data);
+
+      const command = typeof data?.command === 'string' ? data.command : undefined;
+      if (command) {
+        onDeviceCommand?.(command);
+      }
+    });
+
     socketRef.current = socket;
-  }, [url, onScheduleUpdate, onSettingsUpdate, onDeviceCommand]);
+  }, [url, onScheduleUpdate, onSettingsUpdate, onDeviceCommand, onDeviceUpdate]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {

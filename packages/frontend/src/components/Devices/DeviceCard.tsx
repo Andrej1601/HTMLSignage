@@ -40,6 +40,13 @@ export function DeviceCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const status = getDeviceStatus(device.lastSeen);
   const statusColor = getStatusColor(status);
+  const hasScheduleOverride = Boolean(device.overrides?.schedule && typeof device.overrides.schedule === 'object' && 'presets' in device.overrides.schedule);
+  const hasSettingsOverride = Boolean(
+    device.overrides?.settings &&
+    typeof device.overrides.settings === 'object' &&
+    Object.keys(device.overrides.settings).length > 0
+  );
+  const hasOverrides = hasScheduleOverride || hasSettingsOverride;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary hover:shadow-md transition-shadow">
@@ -177,7 +184,7 @@ export function DeviceCard({
         )}
 
         {/* Override Warning */}
-        {device.overrides && (
+        {hasOverrides && (
           <div className="flex items-start gap-2 text-sm bg-blue-50 rounded-lg p-3">
             <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">

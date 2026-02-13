@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { DeviceList } from '@/components/Devices/DeviceList';
 import { DeviceEditDialog } from '@/components/Devices/DeviceEditDialog';
+import { DeviceOverridesDialog } from '@/components/Devices/DeviceOverridesDialog';
 import { PendingPairings } from '@/components/Devices/PendingPairings';
 import {
   useDevices,
@@ -20,6 +21,7 @@ export function DevicesPage() {
 
   const [editingDevice, setEditingDevice] = useState<Device | null>(null);
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
+  const [overrideDevice, setOverrideDevice] = useState<Device | null>(null);
 
   const handleUpdateDevice = (id: string, updates: UpdateDeviceRequest) => {
     updateDevice.mutate({ id, updates }, {
@@ -54,8 +56,7 @@ export function DevicesPage() {
   };
 
   const handleManageOverrides = (device: Device) => {
-    // TODO: Open overrides management dialog
-    console.log('Manage overrides for device:', device.id);
+    setOverrideDevice(device);
   };
 
   if (isLoading) {
@@ -161,6 +162,12 @@ export function DevicesPage() {
           onClose={() => setEditingDevice(null)}
           onSave={handleUpdateDevice}
           isSaving={updateDevice.isPending}
+        />
+
+        <DeviceOverridesDialog
+          device={overrideDevice}
+          isOpen={!!overrideDevice}
+          onClose={() => setOverrideDevice(null)}
         />
 
         {/* Delete Confirmation Dialog */}

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { Schedule, ScheduleResponse } from '@/types/schedule.types';
+import { createDefaultSchedule } from '@/types/schedule.types';
 import type { Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
 import type { Media, MediaFilter } from '@/types/media.types';
 import type { Settings } from '@/types/settings.types';
@@ -14,7 +15,16 @@ export interface SaveVersionedResponse extends ApiOkResponse {
 
 export interface DeviceOverridesPayload {
   schedule?: Schedule;
-  settings?: Settings;
+  settings?: Partial<Settings>;
+}
+
+export interface DeviceDisplayConfigResponse {
+  deviceId: string;
+  mode: 'auto' | 'override';
+  hasScheduleOverride: boolean;
+  hasSettingsOverride: boolean;
+  schedule: Schedule;
+  settings: Settings;
 }
 
 const api = axios.create({
@@ -29,6 +39,15 @@ export const scheduleApi = {
   // Get current schedule
   getSchedule: async (): Promise<Schedule> => {
     const { data } = await api.get<ScheduleResponse>('/schedule');
+    if (!data || typeof data !== 'object' || !('presets' in data)) {
+      const fallbackVersion = typeof (data as { version?: unknown } | undefined)?.version === 'number'
+        ? (data as { version: number }).version
+        : 1;
+      const normalized = createDefaultSchedule();
+      normalized.version = fallbackVersion;
+      return normalized;
+    }
+
     return data;
   },
 
@@ -111,6 +130,12 @@ export const devicesApi = {
   // Clear device overrides
   clearOverrides: async (id: string): Promise<ApiOkResponse> => {
     const { data } = await api.delete<ApiOkResponse>(`/devices/${id}/overrides`);
+    return data;
+  },
+
+  // Get effective device display configuration (global + device overrides)
+  getDisplayConfig: async (id: string): Promise<DeviceDisplayConfigResponse> => {
+    const { data } = await api.get<DeviceDisplayConfigResponse>(`/devices/${id}/display-config`);
     return data;
   },
 };

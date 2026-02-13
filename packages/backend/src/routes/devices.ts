@@ -1,10 +1,81 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { broadcastDeviceUpdate } from '../websocket/index.js';
+import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
+import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/index.js';
 import { authMiddleware, generatePairingCode, type AuthRequest } from '../lib/auth.js';
 
 const router = Router();
+const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
+const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
+const DEFAULT_HEADER = {
+  enabled: true,
+  showLogo: true,
+  logoText: 'HTML Signage',
+  showClock: true,
+  showDate: true,
+  subtitle: 'Premium Wellness & Spa Dashboard',
+  height: 8,
+};
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function createEmptyDaySchedule(saunas: string[] = DEFAULT_SAUNAS): DaySchedule {
+  return {
+    saunas: [...saunas],
+    rows: [],
+  };
+}
+
+function createDefaultSchedule(version = 1): Schedule {
+  const presets = Object.fromEntries(
+    PRESET_KEYS.map((key) => [key, createEmptyDaySchedule()])
+  ) as Record<PresetKey, DaySchedule>;
+
+  return {
+    version: Math.max(1, Math.floor(version)),
+    presets,
+    autoPlay: false,
+  };
+}
+
+function normalizeScheduleData(raw: unknown): Schedule {
+  const parsed = ScheduleSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+
+  const maybeVersion = (raw as { version?: unknown } | null)?.version;
+  const version = typeof maybeVersion === 'number' && Number.isFinite(maybeVersion) ? maybeVersion : 1;
+  return createDefaultSchedule(version);
+}
+
+function normalizeSettingsData(raw: unknown): Record<string, unknown> {
+  const data = isPlainRecord(raw) ? { ...raw } : {};
+  if (!isPlainRecord(data.header)) {
+    data.header = { ...DEFAULT_HEADER };
+  }
+  return data;
+}
+
+function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
+  return isPlainRecord(raw) && Object.keys(raw).length > 0;
+}
+
+function deepMerge(base: unknown, override: unknown): unknown {
+  if (!isPlainRecord(base)) return override;
+  if (!isPlainRecord(override)) return base;
+
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+      merged[key] = deepMerge(merged[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
 
 const CreateDeviceSchema = z.object({
   name: z.string().min(1),
@@ -21,8 +92,10 @@ const ControlCommandSchema = z.object({
 });
 
 const OverridesSchema = z.object({
-  schedule: z.any().optional(),
-  settings: z.any().optional(),
+  schedule: ScheduleSchema.optional(),
+  settings: z.record(z.any()).optional(),
+}).refine((data) => Boolean(data.schedule) || Boolean(data.settings), {
+  message: 'At least one override (schedule or settings) is required',
 });
 
 // GET /api/devices - List all devices
@@ -61,6 +134,62 @@ router.get('/pending', authMiddleware, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('[devices] Error fetching pending devices:', error);
     res.status(500).json({ error: 'fetch-failed' });
+  }
+});
+
+// GET /api/devices/:id/display-config - Effective schedule/settings for a specific device
+router.get('/:id/display-config', async (req, res) => {
+  try {
+    const device = await prisma.device.findUnique({
+      where: { id: req.params.id },
+      include: {
+        overrides: true,
+      },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'not-found', message: 'Device not found' });
+    }
+
+    const [activeSchedule, activeSettings] = await Promise.all([
+      prisma.schedule.findFirst({
+        where: { isActive: true },
+        orderBy: { version: 'desc' },
+      }),
+      prisma.settings.findFirst({
+        where: { isActive: true },
+        orderBy: { version: 'desc' },
+      }),
+    ]);
+
+    const globalSchedule = normalizeScheduleData(activeSchedule?.data);
+    const globalSettings = normalizeSettingsData(activeSettings?.data);
+
+    const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);
+    const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
+    const hasScheduleOverride = Boolean(overrideSchedule);
+    const hasSettingsOverride = hasSettingsOverrideData(device.overrides?.settings);
+
+    const isOverrideMode = device.mode === 'override';
+    const effectiveSchedule = isOverrideMode && hasScheduleOverride
+      ? overrideSchedule
+      : globalSchedule;
+
+    const effectiveSettings = isOverrideMode && hasSettingsOverride
+      ? deepMerge(globalSettings, normalizeSettingsData(device.overrides?.settings)) as Record<string, unknown>
+      : globalSettings;
+
+    return res.json({
+      deviceId: device.id,
+      mode: device.mode,
+      hasScheduleOverride,
+      hasSettingsOverride,
+      schedule: effectiveSchedule,
+      settings: effectiveSettings,
+    });
+  } catch (error) {
+    console.error('[devices] Error fetching display config:', error);
+    return res.status(500).json({ error: 'fetch-failed' });
   }
 });
 
@@ -175,9 +304,8 @@ router.post('/:id/control', async (req, res) => {
   try {
     const validated = ControlCommandSchema.parse(req.body);
 
-    // Broadcast control command via WebSocket
-    broadcastDeviceUpdate({
-      id: req.params.id,
+    // Broadcast control command to the targeted device.
+    broadcastDeviceCommand(req.params.id, {
       command: validated.action,
     });
 
@@ -196,7 +324,7 @@ router.post('/:id/overrides', async (req, res) => {
   try {
     const validated = OverridesSchema.parse(req.body);
 
-    const override = await prisma.deviceOverride.upsert({
+    await prisma.deviceOverride.upsert({
       where: { deviceId: req.params.id },
       create: {
         deviceId: req.params.id,

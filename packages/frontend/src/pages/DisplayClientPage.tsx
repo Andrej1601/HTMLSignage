@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useWebSocket } from '@/hooks/useWebSocket';
@@ -12,9 +12,12 @@ import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { getDefaultSettings } from '@/types/settings.types';
+import { createDefaultSchedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
 import { API_URL, ENV_IS_DEV } from '@/config/env';
+import { devicesApi } from '@/services/api';
+import { migrateSettings } from '@/utils/slideshowMigration';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -57,11 +60,14 @@ export function DisplayClientPage() {
 
   const [pairingInfo, setPairingInfo] = useState<PairingResponse | null>(null);
   const [isPairingLoading, setIsPairingLoading] = useState(true);
+  const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
+  const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
+  const pairedDeviceIdRef = useRef<string | null>(null);
 
   const { schedule, isLoading: scheduleLoading } = useSchedule();
   const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
 
-  const [localSchedule, setLocalSchedule] = useState(schedule);
+  const [localSchedule, setLocalSchedule] = useState(schedule || createDefaultSchedule());
   const [localSettings, setLocalSettings] = useState(fetchedSettings || getDefaultSettings());
 
   // Check pairing status
@@ -115,24 +121,78 @@ export function DisplayClientPage() {
     };
   }, [browserId]);
 
-  // Update local state when data is fetched
-  useEffect(() => {
-    if (schedule) setLocalSchedule(schedule);
-  }, [schedule]);
+  const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) setIsDisplayConfigLoading(true);
+
+    try {
+      const displayConfig = await devicesApi.getDisplayConfig(deviceId);
+      setLocalSchedule(displayConfig.schedule);
+      setLocalSettings(migrateSettings(displayConfig.settings));
+      setHasLoadedDeviceConfig(true);
+    } catch (error) {
+      console.error('[Display] Failed to load effective display config:', error);
+      setHasLoadedDeviceConfig(false);
+    } finally {
+      if (!silent) setIsDisplayConfigLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (fetchedSettings) setLocalSettings(fetchedSettings);
-  }, [fetchedSettings]);
+    const pairedDeviceId = pairingInfo?.paired ? pairingInfo.id : null;
+    pairedDeviceIdRef.current = pairedDeviceId;
+
+    if (!pairedDeviceId) {
+      setHasLoadedDeviceConfig(false);
+      return;
+    }
+
+    refreshDeviceDisplayConfig(pairedDeviceId);
+  }, [pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig]);
+
+  // Update local state when global data is fetched (fallback while no paired device config is loaded yet)
+  useEffect(() => {
+    if (!schedule) return;
+    if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
+      setLocalSchedule(schedule);
+    }
+  }, [schedule, pairingInfo?.paired, hasLoadedDeviceConfig]);
+
+  useEffect(() => {
+    if (!fetchedSettings) return;
+    if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
+      setLocalSettings(fetchedSettings);
+    }
+  }, [fetchedSettings, pairingInfo?.paired, hasLoadedDeviceConfig]);
 
   // WebSocket for real-time updates
   const { isConnected, subscribe } = useWebSocket({
     onScheduleUpdate: (data) => {
       console.log('[Display] Schedule updated via WebSocket');
+      const deviceId = pairedDeviceIdRef.current;
+      if (deviceId) {
+        refreshDeviceDisplayConfig(deviceId, { silent: true });
+        return;
+      }
       setLocalSchedule(data);
     },
     onSettingsUpdate: (data) => {
       console.log('[Display] Settings updated via WebSocket');
-      setLocalSettings(data);
+      const deviceId = pairedDeviceIdRef.current;
+      if (deviceId) {
+        refreshDeviceDisplayConfig(deviceId, { silent: true });
+        return;
+      }
+      setLocalSettings(migrateSettings(data));
+    },
+    onDeviceUpdate: (data) => {
+      const deviceId = pairedDeviceIdRef.current;
+      if (!deviceId) return;
+
+      const updatedDeviceId = typeof data.id === 'string' ? data.id : null;
+      if (updatedDeviceId && updatedDeviceId !== deviceId) return;
+
+      refreshDeviceDisplayConfig(deviceId, { silent: true });
     },
     onDeviceCommand: (command) => {
       console.log('[Display] Command received:', command);
@@ -244,7 +304,7 @@ export function DisplayClientPage() {
   }
 
   // Loading state
-  if (scheduleLoading || settingsLoading || !localSchedule) {
+  if ((!pairingInfo?.paired && (scheduleLoading || settingsLoading)) || (pairingInfo?.paired && isDisplayConfigLoading && !hasLoadedDeviceConfig)) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
