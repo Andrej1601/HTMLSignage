@@ -400,13 +400,27 @@ export function DisplayClientPage() {
     if (!audio || !effectiveAudio.enabled || !effectiveAudioSrc) return;
 
     try {
+      audio.muted = false;
+      audio.volume = effectiveAudio.volume;
       await audio.play();
       setIsAudioBlocked(false);
+      return;
+    } catch {
+      // Fallback: start muted (allowed by most autoplay policies), then unmute.
+    }
+
+    try {
+      audio.muted = true;
+      await audio.play();
+      audio.muted = false;
+      audio.volume = effectiveAudio.volume;
+      setIsAudioBlocked(false);
     } catch (error) {
+      audio.pause();
       setIsAudioBlocked(true);
       console.warn('[Display] Audio autoplay blocked:', error);
     }
-  }, [effectiveAudio.enabled, effectiveAudioSrc]);
+  }, [effectiveAudio.enabled, effectiveAudio.volume, effectiveAudioSrc]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -1222,14 +1236,14 @@ export function DisplayClientPage() {
         className="hidden"
       />
 
-      {isPreviewMode && isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSrc) && (
+      {isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSrc) && (
         <button
           onClick={() => {
             void tryPlayAudio();
           }}
           className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black"
         >
-          Audio in Vorschau aktivieren
+          {isPreviewMode ? 'Audio in Vorschau aktivieren' : 'Audio aktivieren'}
         </button>
       )}
 

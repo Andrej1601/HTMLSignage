@@ -34,6 +34,28 @@ const api = axios.create({
   },
 });
 
+let hasWarnedDisplayConfigFallback = false;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
+      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function hasObjectKeys(value: unknown): value is Record<string, unknown> {
+  return isPlainRecord(value) && Object.keys(value).length > 0;
+}
+
 // Schedule API
 export const scheduleApi = {
   // Get current schedule
@@ -135,8 +157,51 @@ export const devicesApi = {
 
   // Get effective device display configuration (global + device overrides)
   getDisplayConfig: async (id: string): Promise<DeviceDisplayConfigResponse> => {
-    const { data } = await api.get<DeviceDisplayConfigResponse>(`/devices/${id}/display-config`);
-    return data;
+    try {
+      const { data } = await api.get<DeviceDisplayConfigResponse>(`/devices/${id}/display-config`);
+      return data;
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (status !== 404) throw error;
+
+      // Compatibility fallback for older backends without /display-config endpoint.
+      if (!hasWarnedDisplayConfigFallback) {
+        // eslint-disable-next-line no-console
+        console.warn('[api] /devices/:id/display-config returned 404, using client-side fallback merge');
+        hasWarnedDisplayConfigFallback = true;
+      }
+
+      const [{ data: device }, schedule, settings] = await Promise.all([
+        api.get<Device>(`/devices/${id}`),
+        scheduleApi.getSchedule(),
+        settingsApi.getSettings(),
+      ]);
+
+      const overrides = device.overrides;
+      const hasScheduleOverride = hasObjectKeys(overrides?.schedule);
+      const hasSettingsOverride = hasObjectKeys(overrides?.settings);
+      const useOverrides = device.mode === 'override';
+
+      const effectiveSchedule = useOverrides && hasScheduleOverride
+        ? (overrides!.schedule as Schedule)
+        : schedule;
+
+      const effectiveSettings = useOverrides && hasSettingsOverride
+        ? deepMergeRecords(
+            settings as unknown as Record<string, unknown>,
+            overrides!.settings as unknown as Record<string, unknown>
+          ) as unknown as Settings
+        : settings;
+
+      return {
+        deviceId: device.id,
+        mode: device.mode,
+        hasScheduleOverride,
+        hasSettingsOverride,
+        schedule: effectiveSchedule,
+        settings: effectiveSettings,
+      };
+    }
   },
 };
 

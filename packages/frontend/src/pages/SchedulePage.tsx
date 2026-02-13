@@ -5,6 +5,7 @@ import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
+import { getActiveEvent } from '@/types/settings.types';
 import type { Schedule, PresetKey, Entry } from '@/types/schedule.types';
 import type { Sauna } from '@/types/sauna.types';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
@@ -17,7 +18,7 @@ import {
   copyDaySchedule,
   syncScheduleWithSaunas,
 } from '@/types/schedule.types';
-import { Save, RefreshCw, AlertCircle, Copy, Play } from 'lucide-react';
+import { Save, RefreshCw, AlertCircle, Copy, Play, CalendarClock } from 'lucide-react';
 import clsx from 'clsx';
 
 export function SchedulePage() {
@@ -99,6 +100,8 @@ export function SchedulePage() {
 
   // Get current day schedule
   const currentDaySchedule = localSchedule?.presets?.[activePreset];
+  const activeEvent = settings ? getActiveEvent(settings) : null;
+  const activeEventPreset = activeEvent?.assignedPreset;
 
   // Handle preset tab change
   const handlePresetChange = (preset: PresetKey) => {
@@ -354,6 +357,20 @@ export function SchedulePage() {
 
         {/* Preset Tabs */}
         <div className="mb-6">
+          {localSchedule.autoPlay && activeEvent && (
+            <div className="mb-3 flex items-start gap-3 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-4 py-3">
+              <CalendarClock className="mt-0.5 h-5 w-5 text-spa-accent" />
+              <div>
+                <p className="text-sm font-semibold text-spa-text-primary">
+                  Event-Plan aktiv: {activeEvent.name}
+                </p>
+                <p className="text-xs text-spa-text-secondary">
+                  Aktuell wird {PRESET_LABELS[activeEvent.assignedPreset]} ({activeEvent.assignedPreset}) abgespielt.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Weekday Tabs */}
           <div className="flex gap-2 mb-2">
             {WEEKDAY_PRESETS.map((preset) => (
@@ -385,7 +402,21 @@ export function SchedulePage() {
                     : 'bg-white text-spa-text-secondary border-spa-bg-secondary hover:border-spa-accent/50'
                 )}
               >
-                {PRESET_LABELS[preset]}
+                <span className="inline-flex items-center gap-2">
+                  <span>{PRESET_LABELS[preset]}</span>
+                  {localSchedule.autoPlay && activeEventPreset === preset && (
+                    <span
+                      className={clsx(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        activePreset === preset
+                          ? 'bg-white/80 text-spa-accent'
+                          : 'bg-spa-accent/15 text-spa-accent'
+                      )}
+                    >
+                      Event aktiv
+                    </span>
+                  )}
+                </span>
               </button>
             ))}
 
