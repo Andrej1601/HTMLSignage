@@ -20,12 +20,25 @@ import { buildUploadUrl, getMediaUploadUrl } from '@/utils/mediaUrl';
 interface SlideRendererProps {
   slide: SlideConfig;
   onVideoEnded?: () => void;
+  schedule?: Schedule;
+  settings?: Settings;
+  media?: Media[];
 }
 
-export function SlideRenderer({ slide, onVideoEnded }: SlideRendererProps) {
-  const { schedule } = useSchedule();
-  const { settings } = useSettings();
-  const { data: media } = useMedia();
+export function SlideRenderer({
+  slide,
+  onVideoEnded,
+  schedule: scheduleProp,
+  settings: settingsProp,
+  media: mediaProp,
+}: SlideRendererProps) {
+  const { schedule: scheduleFromQuery } = useSchedule();
+  const { settings: settingsFromQuery } = useSettings();
+  const { data: mediaFromQuery } = useMedia();
+
+  const schedule = scheduleProp || scheduleFromQuery;
+  const settings = settingsProp || settingsFromQuery;
+  const media = mediaProp || mediaFromQuery;
 
   if (!schedule || !settings) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Lädt...</div>;
@@ -36,7 +49,15 @@ export function SlideRenderer({ slide, onVideoEnded }: SlideRendererProps) {
       return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} />;
 
     case 'sauna-detail':
-      return <SaunaDetailSlide sauna={getSauna(settings, slide.saunaId)} slide={slide} />;
+      return (
+        <SaunaDetailSlide
+          sauna={getSauna(settings, slide.saunaId)}
+          slide={slide}
+          schedule={schedule}
+          settings={settings}
+          media={media}
+        />
+      );
 
     case 'media-image':
       return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
@@ -94,23 +115,31 @@ function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; 
   );
 }
 
-function SaunaDetailSlide({ sauna, slide }: { sauna?: Sauna; slide: SlideConfig }) {
-  const { schedule } = useSchedule();
-  const { settings } = useSettings();
-  const { data: media } = useMedia();
-
+function SaunaDetailSlide({
+  sauna,
+  slide,
+  schedule,
+  settings,
+  media,
+}: {
+  sauna?: Sauna;
+  slide: SlideConfig;
+  schedule: Schedule;
+  settings: Settings;
+  media?: Media[];
+}) {
   if (!sauna) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Sauna nicht gefunden</div>;
   }
 
   const defaults = getDefaultSettings();
-  const theme = settings?.theme || defaults.theme!;
-  const fonts = settings?.fonts || defaults.fonts!;
+  const theme = settings.theme || defaults.theme!;
+  const fonts = settings.fonts || defaults.fonts!;
 
-  const designStyle = settings?.designStyle || 'modern-wellness';
+  const designStyle = settings.designStyle || 'modern-wellness';
 
   if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline') && schedule) {
-    return <SaunaDetailDashboard schedule={schedule} settings={settings!} saunaId={sauna.id} />;
+    return <SaunaDetailDashboard schedule={schedule} settings={settings} saunaId={sauna.id} />;
   }
 
   // Find image filename if imageId is set

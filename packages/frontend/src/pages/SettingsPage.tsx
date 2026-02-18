@@ -6,7 +6,9 @@ import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { EventManager } from '@/components/Settings/EventManager';
-import { getDefaultSettings } from '@/types/settings.types';
+import { SystemMaintenance } from '@/components/Settings/SystemMaintenance';
+import { useAuth } from '@/contexts/AuthContext';
+import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type {
   Settings,
   ThemeColors,
@@ -17,15 +19,17 @@ import type {
   DesignStyle,
   ColorPaletteName,
 } from '@/types/settings.types';
-import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info } from 'lucide-react';
+import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Wrench } from 'lucide-react';
 
-type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events';
+type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events' | 'system';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>('theme');
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const isAdmin = Boolean(user?.roles.includes('admin'));
 
   useEffect(() => {
     if (settings) {
@@ -35,44 +39,38 @@ export function SettingsPage() {
   }, [settings]);
 
   const handleThemeChange = (theme: ThemeColors) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, theme });
+    setLocalSettings((prev) => (prev ? { ...prev, theme } : prev));
     setIsDirty(true);
   };
 
   const handleDesignStyleChange = (designStyle: DesignStyle) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, designStyle });
+    setLocalSettings((prev) => (prev ? { ...prev, designStyle } : prev));
     setIsDirty(true);
   };
 
   const handleColorPaletteChange = (colorPalette: ColorPaletteName) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, colorPalette });
+    const paletteTheme = generateDashboardColors(getColorPalette(colorPalette));
+    setLocalSettings((prev) => (prev ? { ...prev, colorPalette, theme: paletteTheme } : prev));
     setIsDirty(true);
   };
 
   const handleAudioChange = (audio: AudioSettingsType) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, audio });
+    setLocalSettings((prev) => (prev ? { ...prev, audio } : prev));
     setIsDirty(true);
   };
 
   const handleAromasChange = (aromas: Aroma[]) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, aromas });
+    setLocalSettings((prev) => (prev ? { ...prev, aromas } : prev));
     setIsDirty(true);
   };
 
   const handleInfosChange = (infos: InfoItem[]) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, infos });
+    setLocalSettings((prev) => (prev ? { ...prev, infos } : prev));
     setIsDirty(true);
   };
 
   const handleEventsChange = (events: Event[]) => {
-    if (!localSettings) return;
-    setLocalSettings({ ...localSettings, events });
+    setLocalSettings((prev) => (prev ? { ...prev, events } : prev));
     setIsDirty(true);
   };
 
@@ -135,6 +133,9 @@ export function SettingsPage() {
     { id: 'infos' as TabId, label: 'Infos', icon: Info },
     { id: 'events' as TabId, label: 'Events', icon: Calendar },
   ];
+  if (isAdmin) {
+    tabs.push({ id: 'system' as TabId, label: 'System', icon: Wrench });
+  }
 
   return (
     <Layout>
@@ -242,6 +243,10 @@ export function SettingsPage() {
               events={localSettings.events || []}
               onChange={handleEventsChange}
             />
+          )}
+
+          {activeTab === 'system' && isAdmin && (
+            <SystemMaintenance />
           )}
         </div>
 

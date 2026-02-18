@@ -17,6 +17,7 @@ import devicesRouter from './routes/devices.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import mediaRouter from './routes/media.js';
+import systemRouter from './routes/system.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,6 +107,7 @@ app.use('/api/schedule', scheduleRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/devices', devicesRouter);
 app.use('/api/media', mediaRouter);
+app.use('/api/system', systemRouter);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
-import { getTodayPresetKey, PRESET_LABELS } from '@/types/schedule.types';
+import { PRESET_LABELS, resolveLivePresetKey } from '@/types/schedule.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { Flame } from 'lucide-react';
 
@@ -13,11 +14,16 @@ export function OverviewSlide({ schedule, settings }: OverviewSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const fonts = settings.fonts || defaults.fonts!;
+  const [eventClock, setEventClock] = useState(() => Date.now());
 
-  // Determine which preset to show
-  const activePresetKey: PresetKey = schedule.autoPlay
-    ? getTodayPresetKey()
-    : (schedule.activePreset || getTodayPresetKey());
+  useEffect(() => {
+    const interval = setInterval(() => setEventClock(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const now = new Date(eventClock);
+
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 
   const daySchedule = schedule.presets[activePresetKey];
 

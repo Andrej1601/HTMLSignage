@@ -11,7 +11,16 @@ import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard'
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
-import { getActiveEvent, getDefaultSettings, type AudioSettings, type Settings } from '@/types/settings.types';
+import {
+  generateDashboardColors,
+  getActiveEvent,
+  getColorPalette,
+  getDefaultSettings,
+  type AudioSettings,
+  type ColorPaletteName,
+  type Settings,
+  type ThemeColors,
+} from '@/types/settings.types';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
@@ -124,6 +133,7 @@ export function DisplayClientPage() {
 
   const [localSchedule, setLocalSchedule] = useState(schedule || createDefaultSchedule());
   const [localSettings, setLocalSettings] = useState(fetchedSettings || getDefaultSettings());
+  const [eventClock, setEventClock] = useState(() => Date.now());
 
   // Check pairing status
   useEffect(() => {
@@ -368,9 +378,14 @@ export function DisplayClientPage() {
     return () => clearInterval(interval);
   }, [pairingInfo, isPreviewMode]);
 
+  useEffect(() => {
+    const interval = setInterval(() => setEventClock(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const effectiveSettings = useMemo(() => {
     const baseSettings = migrateSettings(localSettings || getDefaultSettings());
-    const activeEvent = getActiveEvent(baseSettings);
+    const activeEvent = getActiveEvent(baseSettings, new Date(eventClock));
     const overrides = activeEvent?.settingsOverrides;
 
     if (!isPlainRecord(overrides)) {
@@ -382,8 +397,24 @@ export function DisplayClientPage() {
       overrides
     ) as unknown as Settings;
 
+    const overridePalette =
+      typeof overrides.colorPalette === 'string'
+        ? (overrides.colorPalette as ColorPaletteName)
+        : undefined;
+    if (overridePalette) {
+      const paletteTheme = generateDashboardColors(getColorPalette(overridePalette));
+      const overrideTheme = isPlainRecord(overrides.theme)
+        ? (overrides.theme as Partial<ThemeColors>)
+        : undefined;
+      merged.colorPalette = overridePalette;
+      merged.theme = generateDashboardColors({
+        ...paletteTheme,
+        ...(overrideTheme || {}),
+      });
+    }
+
     return migrateSettings(merged);
-  }, [localSettings]);
+  }, [localSettings, eventClock]);
 
   const effectiveAudio = useMemo(
     () => normalizeAudio(effectiveSettings.audio),
@@ -468,6 +499,7 @@ export function DisplayClientPage() {
     layout,
     enableTransitions,
     showSlideIndicators,
+    showZoneBorders,
     onVideoEnded,
     zones,
     getZoneSlide,
@@ -620,7 +652,7 @@ export function DisplayClientPage() {
         const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
         const rendered = (
-          <SlideRenderer slide={slide} onVideoEnded={() => zone && onVideoEnded(zone.id)} />
+          <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => zone && onVideoEnded(zone.id)} />
         );
 
         if (!needsPadding) return rendered;
@@ -645,10 +677,10 @@ export function DisplayClientPage() {
               <>
                 {hasPersistent && (
                   <div
-                    className={clsx(isModernDesign && hasMain && 'border-r')}
+                    className={clsx(isModernDesign && hasMain && showZoneBorders && 'border-r')}
                     style={{
                       width: `${persistentSize}%`,
-                      borderColor: isModernDesign ? border : undefined,
+                      borderColor: isModernDesign && showZoneBorders ? border : undefined,
                       backgroundColor: isModernDesign ? leftBg : undefined,
                     }}
                   >
@@ -683,10 +715,10 @@ export function DisplayClientPage() {
               <>
                 {hasMain && (
                   <div
-                    className={clsx(isModernDesign && hasPersistent && 'border-r')}
+                    className={clsx(isModernDesign && hasPersistent && showZoneBorders && 'border-r')}
                     style={{
                       width: `${mainSize}%`,
-                      borderColor: isModernDesign ? border : undefined,
+                      borderColor: isModernDesign && showZoneBorders ? border : undefined,
                       backgroundColor: isModernDesign ? leftBg : undefined,
                     }}
                   >
@@ -728,10 +760,10 @@ export function DisplayClientPage() {
             <>
               {hasPersistent && (
                 <div
-                  className={clsx(isModernDesign && hasMain && 'border-b')}
+                  className={clsx(isModernDesign && hasMain && showZoneBorders && 'border-b')}
                   style={{
                     height: `${persistentSize}%`,
-                    borderColor: isModernDesign ? border : undefined,
+                    borderColor: isModernDesign && showZoneBorders ? border : undefined,
                     backgroundColor: isModernDesign ? leftBg : undefined,
                   }}
                 >
@@ -766,10 +798,10 @@ export function DisplayClientPage() {
             <>
               {hasMain && (
                 <div
-                  className={clsx(isModernDesign && hasPersistent && 'border-b')}
+                  className={clsx(isModernDesign && hasPersistent && showZoneBorders && 'border-b')}
                   style={{
                     height: `${mainSize}%`,
-                    borderColor: isModernDesign ? border : undefined,
+                    borderColor: isModernDesign && showZoneBorders ? border : undefined,
                     backgroundColor: isModernDesign ? leftBg : undefined,
                   }}
                 >
@@ -817,7 +849,7 @@ export function DisplayClientPage() {
           const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
           const rendered = (
-            <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+            <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
           );
 
           return (
@@ -876,11 +908,11 @@ export function DisplayClientPage() {
             <div className="w-full h-full flex relative overflow-hidden">
               {/* Left Panel: Content grid/timeline or media */}
               <div
-                className="h-full relative overflow-hidden border-r"
+                className={clsx('h-full relative overflow-hidden', showZoneBorders && 'border-r')}
                 style={{
                   width: `${leftSize}%`,
                   backgroundColor: leftBg,
-                  borderColor: border,
+                  borderColor: showZoneBorders ? border : undefined,
                 }}
               >
                 <AnimatePresence mode="wait">
@@ -907,14 +939,14 @@ export function DisplayClientPage() {
                       {leftSlide?.type?.startsWith('media-') ? (
                         <div className="p-5 w-full h-full">
                           <div className="w-full h-full rounded-[2.5rem] overflow-hidden border-[6px] border-white shadow-xl">
-                            <SlideRenderer
+                            <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                               slide={leftSlide}
                               onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                             />
                           </div>
                         </div>
                       ) : (
-                        <SlideRenderer
+                        <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                           slide={leftSlide}
                           onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                         />
@@ -953,7 +985,7 @@ export function DisplayClientPage() {
                         topRightSlide.type?.startsWith('media-') ? (
                           <div className="p-5 w-full h-full">
                             <div className="w-full h-full rounded-[2.3rem] overflow-hidden border-[6px] border-white shadow-xl">
-                              <SlideRenderer
+                              <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                                 slide={topRightSlide}
                                 onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                               />
@@ -961,7 +993,7 @@ export function DisplayClientPage() {
                           </div>
                         ) : (
                           <div className="w-full h-full">
-                            <SlideRenderer
+                            <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                               slide={topRightSlide}
                               onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                             />
@@ -976,10 +1008,10 @@ export function DisplayClientPage() {
 
                 {/* Right Bottom */}
                 <div
-                  className="h-56 p-8 border-t relative shrink-0 overflow-hidden"
+                  className={clsx('h-56 p-8 relative shrink-0 overflow-hidden', showZoneBorders && 'border-t')}
                   style={{
                     backgroundColor: bottomBg,
-                    borderColor: border,
+                    borderColor: showZoneBorders ? border : undefined,
                   }}
                 >
                   <AnimatePresence mode="wait">
@@ -994,14 +1026,14 @@ export function DisplayClientPage() {
                         {bottomRightSlide.type?.startsWith('media-') ? (
                           <div className="p-2 w-full h-full">
                             <div className="w-full h-full rounded-[1.8rem] overflow-hidden border-4 border-white shadow-lg">
-                              <SlideRenderer
+                              <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                                 slide={bottomRightSlide}
                                 onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                               />
                             </div>
                           </div>
                         ) : (
-                          <SlideRenderer
+                          <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                             slide={bottomRightSlide}
                             onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                           />
@@ -1073,7 +1105,7 @@ export function DisplayClientPage() {
                   {leftSlide.type === 'content-panel' ? (
                     <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />
                   ) : (
-                    <SlideRenderer
+                    <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                       slide={leftSlide}
                       onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                     />
@@ -1099,7 +1131,7 @@ export function DisplayClientPage() {
                         saunaId={topRightSlide.saunaId}
                       />
                     ) : (
-                      <SlideRenderer
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                         slide={topRightSlide}
                         onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                       />
@@ -1123,7 +1155,7 @@ export function DisplayClientPage() {
                         saunaId={bottomRightSlide.saunaId}
                       />
                     ) : (
-                      <SlideRenderer
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
                         slide={bottomRightSlide}
                         onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                       />
@@ -1155,7 +1187,7 @@ export function DisplayClientPage() {
             const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
             const rendered = slide ? (
-              <SlideRenderer slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+              <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
                 Keine Slides
@@ -1189,10 +1221,11 @@ export function DisplayClientPage() {
                       key={zone.id}
                       className={clsx(
                         'relative overflow-hidden',
-                        isModernDesign ? 'rounded-[2rem] border' : ''
+                        isModernDesign ? 'rounded-[2rem]' : '',
+                        isModernDesign && showZoneBorders ? 'border' : ''
                       )}
                       style={{
-                        borderColor: isModernDesign ? border : undefined,
+                        borderColor: isModernDesign && showZoneBorders ? border : undefined,
                         backgroundColor: isModernDesign ? cellBgForIndex(idx) : undefined,
                       }}
                     >

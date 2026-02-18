@@ -77,6 +77,21 @@ export function ThemeEditor({
         { key: 'boxFg' as keyof ThemeColors, label: 'Box-Text', description: 'Text in Boxen' },
       ],
     },
+    {
+      title: 'Slideshow (Modern)',
+      colors: [
+        { key: 'dashboardBg' as keyof ThemeColors, label: 'Panel-Hintergrund', description: 'Grundflaeche der Slideshow' },
+        { key: 'cardBg' as keyof ThemeColors, label: 'Karten-BG', description: 'Hintergrund der Infokarten' },
+        { key: 'cardBorder' as keyof ThemeColors, label: 'Karten-Rahmen', description: 'Rahmenfarbe der Karten' },
+        { key: 'textMain' as keyof ThemeColors, label: 'Haupttext', description: 'Primaerer Slideshow-Text' },
+        { key: 'textMuted' as keyof ThemeColors, label: 'Sekundaertext', description: 'Dezenter Zusatztext' },
+        { key: 'accentGold' as keyof ThemeColors, label: 'Akzent 1', description: 'Headline-/Highlight-Akzent' },
+        { key: 'accentGreen' as keyof ThemeColors, label: 'Akzent 2', description: 'Sekundaerer Akzent' },
+        { key: 'statusLive' as keyof ThemeColors, label: 'Status Live', description: 'Aktiv-/Live-Indikator' },
+        { key: 'statusNext' as keyof ThemeColors, label: 'Status Naechster', description: 'Naechster Slot/Status' },
+        { key: 'statusPrestart' as keyof ThemeColors, label: 'Status Bald', description: 'Prestart-/Bald-Indikator' },
+      ],
+    },
   ];
 
   return (
@@ -121,11 +136,20 @@ export function ThemeEditor({
           Farbpaletten
         </h3>
         <p className="text-sm text-spa-text-secondary mb-4">
-          Wählen Sie eine Farbpalette, um nur die Farben zu ändern (Design-Stil bleibt erhalten)
+          Waehlen Sie eine Farbpalette. Diese Farben steuern direkt die Slideshow-Darstellung.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {COLOR_PALETTES.map((palette) => {
             const isActive = colorPalette === palette.id;
+            const previewTheme = generateDashboardColors(palette.colors);
+            const swatches = [
+              { label: 'BG', color: previewTheme.dashboardBg || previewTheme.bg || '#000000' },
+              { label: 'Card', color: previewTheme.cardBg || previewTheme.cellBg || '#000000' },
+              { label: 'Text', color: previewTheme.textMain || previewTheme.fg || '#000000' },
+              { label: 'A1', color: previewTheme.accentGold || previewTheme.accent || '#000000' },
+              { label: 'A2', color: previewTheme.accentGreen || previewTheme.timeColBg || '#000000' },
+              { label: 'Live', color: previewTheme.statusLive || '#10B981' },
+            ];
             return (
               <button
                 key={palette.id}
@@ -144,16 +168,17 @@ export function ThemeEditor({
                     <div className="w-2 h-2 rounded-full bg-spa-accent"></div>
                   )}
                 </div>
-                <div className="flex gap-1">
-                  {palette.colors.bg && (
-                    <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.bg }} />
-                  )}
-                  {palette.colors.fg && (
-                    <div className="w-8 h-8 rounded border border-gray-300" style={{ backgroundColor: palette.colors.fg }} />
-                  )}
-                  {palette.colors.accent && (
-                    <div className="w-8 h-8 rounded" style={{ backgroundColor: palette.colors.accent }} />
-                  )}
+                <div className="grid grid-cols-3 gap-2">
+                  {swatches.map((swatch) => (
+                    <div key={swatch.label} className="flex flex-col items-center gap-1">
+                      <div
+                        className="w-8 h-8 rounded border border-black/10"
+                        style={{ backgroundColor: swatch.color }}
+                        title={`${swatch.label}: ${swatch.color}`}
+                      />
+                      <span className="text-[10px] text-spa-text-secondary leading-none">{swatch.label}</span>
+                    </div>
+                  ))}
                 </div>
               </button>
             );

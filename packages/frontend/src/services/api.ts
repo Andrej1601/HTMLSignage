@@ -27,6 +27,30 @@ export interface DeviceDisplayConfigResponse {
   settings: Settings;
 }
 
+export interface SystemUpdateStatusResponse extends ApiOkResponse {
+  branch: string | null;
+  currentCommit: string | null;
+  remoteCommit: string | null;
+  hasUpdate: boolean;
+  isGitRepo: boolean;
+  isDirty: boolean;
+  isRunning: boolean;
+  checkedAt: string;
+}
+
+export interface SystemUpdateRunResponse extends ApiOkResponse {
+  status: Omit<SystemUpdateStatusResponse, 'ok' | 'checkedAt'>;
+  log: string;
+  finishedAt: string;
+  note?: string;
+}
+
+export interface SystemBackupImportResponse extends ApiOkResponse {
+  importedMedia: number;
+  replaceMedia: boolean;
+  importedAt: string;
+}
+
 const api = axios.create({
   baseURL: '/api',
   headers: {
@@ -59,6 +83,12 @@ function writeDisplayConfigUnavailableFlag(value: boolean): void {
 }
 
 let isDisplayConfigEndpointUnavailable: boolean | null = readDisplayConfigUnavailableFlag();
+
+function getAuthHeaders(token: string) {
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -274,6 +304,41 @@ export const mediaApi = {
   // Delete media
   deleteMedia: async (id: string): Promise<ApiOkResponse> => {
     const { data } = await api.delete<ApiOkResponse>(`/media/${id}`);
+    return data;
+  },
+};
+
+export const systemApi = {
+  getUpdateStatus: async (token: string): Promise<SystemUpdateStatusResponse> => {
+    const { data } = await api.get<SystemUpdateStatusResponse>('/system/update/status', {
+      headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+
+  runUpdate: async (token: string): Promise<SystemUpdateRunResponse> => {
+    const { data } = await api.post<SystemUpdateRunResponse>('/system/update/run', {}, {
+      headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+
+  exportBackup: async (token: string): Promise<Blob> => {
+    const { data } = await api.get('/system/backup/export', {
+      headers: getAuthHeaders(token),
+      responseType: 'blob',
+    });
+    return data as Blob;
+  },
+
+  importBackup: async (token: string, backupFile: File, replaceMedia = true): Promise<SystemBackupImportResponse> => {
+    const formData = new FormData();
+    formData.append('backup', backupFile);
+    formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
+
+    const { data } = await api.post<SystemBackupImportResponse>('/system/backup/import', formData, {
+      headers: getAuthHeaders(token),
+    });
     return data;
   },
 };

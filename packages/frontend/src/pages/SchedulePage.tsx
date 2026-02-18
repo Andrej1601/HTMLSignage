@@ -13,7 +13,8 @@ import {
   PRESET_LABELS,
   WEEKDAY_PRESETS,
   SPECIAL_PRESETS,
-  getActivePresetKey,
+  getTodayPresetKey,
+  resolveLivePresetKey,
   sortTimeRows,
   copyDaySchedule,
   syncScheduleWithSaunas,
@@ -27,9 +28,10 @@ export function SchedulePage() {
 
   // Local state
   const [localSchedule, setLocalSchedule] = useState<Schedule | null>(null);
-  const [activePreset, setActivePreset] = useState<PresetKey>('Mon');
+  const [editingPreset, setEditingPreset] = useState<PresetKey>('Mon');
   const [isDirty, setIsDirty] = useState(false);
   const [showCopyMenu, setShowCopyMenu] = useState(false);
+  const [eventClock, setEventClock] = useState(() => Date.now());
 
   // Cell editor state
   const [editingCell, setEditingCell] = useState<{
@@ -50,12 +52,19 @@ export function SchedulePage() {
       setLocalSchedule(schedule);
       // Set active preset based on autoPlay
       if (schedule.autoPlay) {
-        setActivePreset(getActivePresetKey(settings));
+        setEditingPreset(resolveLivePresetKey(schedule, settings));
       } else if (schedule.activePreset) {
-        setActivePreset(schedule.activePreset);
+        setEditingPreset(schedule.activePreset);
+      } else {
+        setEditingPreset(getTodayPresetKey());
       }
     }
   }, [schedule, localSchedule, settings]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setEventClock(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Sync schedule with settings saunas
   useEffect(() => {
@@ -65,7 +74,7 @@ export function SchedulePage() {
         .map((s: Sauna) => s.name);
 
       // Check if saunas have changed
-      const currentSaunas = localSchedule.presets[activePreset]?.saunas || [];
+      const currentSaunas = localSchedule.presets[editingPreset]?.saunas || [];
       const saunasChanged =
         currentSaunas.length !== saunaNames.length ||
         currentSaunas.some((name, i) => name !== saunaNames[i]);
@@ -76,44 +85,32 @@ export function SchedulePage() {
         setIsDirty(true);
       }
     }
-  }, [settings?.saunas, localSchedule, activePreset]);
+  }, [settings?.saunas, localSchedule, editingPreset]);
 
-  // Auto-switch preset when event becomes active/ends (only in auto-play mode)
-  useEffect(() => {
-    if (!localSchedule?.autoPlay || !settings) return;
-
-    const checkForActiveEvent = () => {
-      const newActivePreset = getActivePresetKey(settings);
-      if (newActivePreset !== activePreset) {
-        setActivePreset(newActivePreset);
-      }
-    };
-
-    // Check immediately
-    checkForActiveEvent();
-
-    // Check every minute for event changes
-    const interval = setInterval(checkForActiveEvent, 60000);
-
-    return () => clearInterval(interval);
-  }, [localSchedule?.autoPlay, settings, activePreset]);
+  const now = new Date(eventClock);
+  const livePreset: PresetKey = localSchedule
+    ? resolveLivePresetKey(localSchedule, settings, now)
+    : getTodayPresetKey(now);
 
   // Get current day schedule
-  const currentDaySchedule = localSchedule?.presets?.[activePreset];
-  const activeEvent = settings ? getActiveEvent(settings) : null;
+  const currentDaySchedule = localSchedule?.presets?.[editingPreset];
+  const activeEvent = settings ? getActiveEvent(settings, now) : null;
   const activeEventPreset = activeEvent?.assignedPreset;
 
   // Handle preset tab change
   const handlePresetChange = (preset: PresetKey) => {
-    setActivePreset(preset);
-    if (localSchedule && !localSchedule.autoPlay) {
-      // Update activePreset in manual mode
-      setLocalSchedule({
-        ...localSchedule,
-        activePreset: preset,
-      });
-      setIsDirty(true);
-    }
+    setEditingPreset(preset);
+  };
+
+  const handleSetLivePreset = () => {
+    if (!localSchedule || localSchedule.autoPlay) return;
+    if (localSchedule.activePreset === editingPreset) return;
+
+    setLocalSchedule({
+      ...localSchedule,
+      activePreset: editingPreset,
+    });
+    setIsDirty(true);
   };
 
   // Handle auto-play toggle
@@ -121,16 +118,17 @@ export function SchedulePage() {
     if (!localSchedule) return;
 
     const newAutoPlay = !localSchedule.autoPlay;
+    const weekdayPreset = getTodayPresetKey(now);
+    const manualPresetFallback: PresetKey = activeEvent
+      ? weekdayPreset
+      : (livePreset === 'Evt1' || livePreset === 'Evt2' ? weekdayPreset : livePreset);
+
     setLocalSchedule({
       ...localSchedule,
       autoPlay: newAutoPlay,
-      activePreset: newAutoPlay ? undefined : activePreset,
+      activePreset: newAutoPlay ? undefined : manualPresetFallback,
     });
     setIsDirty(true);
-
-    if (newAutoPlay) {
-      setActivePreset(getActivePresetKey(settings));
-    }
   };
 
   // Handle copy from another day
@@ -144,7 +142,7 @@ export function SchedulePage() {
       ...localSchedule,
       presets: {
         ...localSchedule.presets,
-        [activePreset]: copiedSchedule,
+        [editingPreset]: copiedSchedule,
       },
     });
     setIsDirty(true);
@@ -189,7 +187,7 @@ export function SchedulePage() {
         ...localSchedule,
         presets: {
           ...localSchedule.presets,
-          [activePreset]: {
+          [editingPreset]: {
             ...currentDaySchedule,
             rows: updatedRows,
           },
@@ -205,7 +203,7 @@ export function SchedulePage() {
         ...localSchedule,
         presets: {
           ...localSchedule.presets,
-          [activePreset]: {
+          [editingPreset]: {
             ...currentDaySchedule,
             rows: sortedRows,
           },
@@ -227,7 +225,7 @@ export function SchedulePage() {
       ...localSchedule,
       presets: {
         ...localSchedule.presets,
-        [activePreset]: {
+        [editingPreset]: {
           ...currentDaySchedule,
           rows: updatedRows,
         },
@@ -247,7 +245,7 @@ export function SchedulePage() {
       ...localSchedule,
       presets: {
         ...localSchedule.presets,
-        [activePreset]: {
+        [editingPreset]: {
           ...currentDaySchedule,
           rows: updatedRows,
         },
@@ -319,6 +317,9 @@ export function SchedulePage() {
                 <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Änderungen</span>
               )}
             </p>
+            <p className="text-xs text-spa-text-secondary mt-1">
+              Live: {PRESET_LABELS[livePreset]} ({livePreset}) · Bearbeitung: {PRESET_LABELS[editingPreset]} ({editingPreset})
+            </p>
           </div>
           <div className="flex gap-2">
             {/* Auto-Play Toggle */}
@@ -334,6 +335,16 @@ export function SchedulePage() {
               <Play className="w-4 h-4" />
               Auto-Play
             </button>
+
+            {!localSchedule.autoPlay && (
+              <button
+                onClick={handleSetLivePreset}
+                disabled={editingPreset === livePreset}
+                className="px-4 py-2 rounded-md border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Auswahl live schalten
+              </button>
+            )}
 
             <button
               onClick={() => refetch()}
@@ -365,9 +376,15 @@ export function SchedulePage() {
                   Event-Plan aktiv: {activeEvent.name}
                 </p>
                 <p className="text-xs text-spa-text-secondary">
-                  Aktuell wird {PRESET_LABELS[activeEvent.assignedPreset]} ({activeEvent.assignedPreset}) abgespielt.
+                  Aktuell wird {PRESET_LABELS[livePreset]} ({livePreset}) abgespielt.
                 </p>
               </div>
+            </div>
+          )}
+
+          {editingPreset !== livePreset && (
+            <div className="mb-3 rounded-lg border border-spa-secondary/30 bg-spa-secondary/10 px-4 py-3 text-xs text-spa-text-secondary">
+              Du bearbeitest {PRESET_LABELS[editingPreset]} ({editingPreset}), live läuft weiterhin {PRESET_LABELS[livePreset]} ({livePreset}).
             </div>
           )}
 
@@ -379,12 +396,26 @@ export function SchedulePage() {
                 onClick={() => handlePresetChange(preset)}
                 className={clsx(
                   'px-4 py-2 rounded-t-lg font-medium transition-colors',
-                  activePreset === preset
+                  editingPreset === preset
                     ? 'bg-spa-primary text-white'
                     : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/70'
                 )}
               >
-                {PRESET_LABELS[preset]}
+                <span className="inline-flex items-center gap-2">
+                  <span>{PRESET_LABELS[preset]}</span>
+                  {livePreset === preset && (
+                    <span
+                      className={clsx(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        editingPreset === preset
+                          ? 'bg-white/80 text-spa-primary'
+                          : 'bg-spa-primary/15 text-spa-primary'
+                      )}
+                    >
+                      Live
+                    </span>
+                  )}
+                </span>
               </button>
             ))}
           </div>
@@ -397,18 +428,30 @@ export function SchedulePage() {
                 onClick={() => handlePresetChange(preset)}
                 className={clsx(
                   'px-4 py-2 rounded-t-lg font-medium transition-colors border-2',
-                  activePreset === preset
+                  editingPreset === preset
                     ? 'bg-spa-accent text-spa-text-primary border-spa-accent'
                     : 'bg-white text-spa-text-secondary border-spa-bg-secondary hover:border-spa-accent/50'
                 )}
               >
                 <span className="inline-flex items-center gap-2">
                   <span>{PRESET_LABELS[preset]}</span>
+                  {livePreset === preset && (
+                    <span
+                      className={clsx(
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        editingPreset === preset
+                          ? 'bg-white/80 text-spa-accent'
+                          : 'bg-spa-accent/15 text-spa-accent'
+                      )}
+                    >
+                      Live
+                    </span>
+                  )}
                   {localSchedule.autoPlay && activeEventPreset === preset && (
                     <span
                       className={clsx(
                         'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        activePreset === preset
+                        editingPreset === preset
                           ? 'bg-white/80 text-spa-accent'
                           : 'bg-spa-accent/15 text-spa-accent'
                       )}
@@ -439,7 +482,7 @@ export function SchedulePage() {
                       <button
                         key={preset}
                         onClick={() => handleCopyFrom(preset)}
-                        disabled={preset === activePreset}
+                        disabled={preset === editingPreset}
                         className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {PRESET_LABELS[preset]}
@@ -451,7 +494,7 @@ export function SchedulePage() {
                       <button
                         key={preset}
                         onClick={() => handleCopyFrom(preset)}
-                        disabled={preset === activePreset}
+                        disabled={preset === editingPreset}
                         className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {PRESET_LABELS[preset]}

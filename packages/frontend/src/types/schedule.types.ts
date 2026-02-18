@@ -72,8 +72,8 @@ export const WEEKDAY_PRESETS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 
 export const SPECIAL_PRESETS: PresetKey[] = ['Opt', 'Evt1', 'Evt2'];
 
 // Helper to get current weekday preset key
-export function getTodayPresetKey(): PresetKey {
-  const day = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+export function getTodayPresetKey(now: Date = new Date()): PresetKey {
+  const day = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
   const map: PresetKey[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return map[day];
 }
@@ -81,15 +81,49 @@ export function getTodayPresetKey(): PresetKey {
 // Helper to get active preset key (considering events)
 // If an event is active, returns the event's assigned preset
 // Otherwise returns the current weekday preset
-export function getActivePresetKey(settings?: Settings | null): PresetKey {
-  if (!settings) return getTodayPresetKey();
+export function getActivePresetKey(settings?: Settings | null, now: Date = new Date()): PresetKey {
+  if (!settings) return getTodayPresetKey(now);
 
-  const activeEvent = getActiveEvent(settings);
+  const activeEvent = getActiveEvent(settings, now);
   if (activeEvent) {
     return activeEvent.assignedPreset;
   }
 
-  return getTodayPresetKey();
+  return getTodayPresetKey(now);
+}
+
+// Resolves the effective live preset for displays/admin preview:
+// 1) active event preset
+// 2) auto-play weekday preset
+// 3) manual activePreset
+//    - fail-safe: manual Evt1/Evt2 without active event falls back to weekday
+//      to avoid stale event plans staying live after an event has ended.
+export function resolveLivePresetKey(
+  schedule: Pick<Schedule, 'autoPlay' | 'activePreset'>,
+  settings?: Settings | null,
+  now: Date = new Date(),
+): PresetKey {
+  const todayPreset = getTodayPresetKey(now);
+  const activeEventPreset = settings ? getActiveEvent(settings, now)?.assignedPreset : undefined;
+
+  if (activeEventPreset) {
+    return activeEventPreset;
+  }
+
+  if (schedule.autoPlay) {
+    return todayPreset;
+  }
+
+  const manualPreset = schedule.activePreset;
+  if (!manualPreset) {
+    return todayPreset;
+  }
+
+  if (manualPreset === 'Evt1' || manualPreset === 'Evt2') {
+    return todayPreset;
+  }
+
+  return manualPreset;
 }
 
 // Helper to get day label

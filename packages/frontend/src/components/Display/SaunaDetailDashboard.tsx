@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { getActivePresetKey, getTodayPresetKey, normalizeSaunaNameKey } from '@/types/schedule.types';
+import { normalizeSaunaNameKey, resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { useMedia } from '@/hooks/useMedia';
@@ -236,10 +236,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
     );
   }, [settings.saunas, saunaId]);
 
-  // Preset selection (with events if autoPlay is enabled)
-  const activePresetKey: PresetKey = schedule.autoPlay
-    ? getActivePresetKey(settings)
-    : (schedule.activePreset || getTodayPresetKey());
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 
   const daySchedule = schedule.presets?.[activePresetKey];
   const scheduleSaunaIndexByKey = useMemo(

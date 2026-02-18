@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { AlertTriangle, Clock3, Flame, Thermometer, Waves } from 'lucide-react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { getActivePresetKey, getTodayPresetKey } from '@/types/schedule.types';
+import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { getVisibleSaunas } from '@/types/sauna.types';
@@ -209,9 +209,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
     return () => clearInterval(t);
   }, []);
 
-  const activePresetKey: PresetKey = schedule.autoPlay
-    ? getActivePresetKey(settings)
-    : (schedule.activePreset || getTodayPresetKey());
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 
   const daySchedule = schedule.presets?.[activePresetKey];
 

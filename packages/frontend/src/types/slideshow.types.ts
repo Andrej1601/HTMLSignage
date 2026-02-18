@@ -80,6 +80,7 @@ export interface SlideshowConfig {
   // Advanced
   pauseOnInteraction?: boolean;
   showSlideIndicators?: boolean;
+  showZoneBorders?: boolean;
 }
 
 // Layout metadata for UI
@@ -247,6 +248,7 @@ export function createDefaultSlideshowConfig(): SlideshowConfig {
     persistentZoneSize: 50,
     pauseOnInteraction: false,
     showSlideIndicators: true,
+    showZoneBorders: true,
   };
 }
 

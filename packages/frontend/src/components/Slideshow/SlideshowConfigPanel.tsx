@@ -569,7 +569,7 @@ export function SlideshowConfigPanel({
 
         <div className="p-6 border-t border-spa-bg-secondary bg-spa-bg-primary/30">
           <h4 className="font-semibold text-spa-text-primary mb-4">Globale Einstellungen</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-spa-text-primary mb-2">
                 Standard-Dauer (Sekunden)
@@ -614,7 +614,7 @@ export function SlideshowConfigPanel({
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.showSlideIndicators}
+                  checked={config.showSlideIndicators !== false}
                   onChange={(event) => {
                     onChange({
                       ...config,
@@ -626,6 +626,25 @@ export function SlideshowConfigPanel({
                 />
                 <span className="text-sm font-medium text-spa-text-primary">
                   Slide-Indikatoren anzeigen
+                </span>
+              </label>
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showZoneBorders !== false}
+                  onChange={(event) => {
+                    onChange({
+                      ...config,
+                      showZoneBorders: event.target.checked,
+                    });
+                  }}
+                  disabled={disabled}
+                  className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary disabled:opacity-50"
+                />
+                <span className="text-sm font-medium text-spa-text-primary">
+                  Trennlinien anzeigen
                 </span>
               </label>
             </div>
