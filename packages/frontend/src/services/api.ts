@@ -337,7 +337,10 @@ export const systemApi = {
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
     const { data } = await api.post<SystemBackupImportResponse>('/system/backup/import', formData, {
-      headers: getAuthHeaders(token),
+      headers: {
+        ...getAuthHeaders(token),
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return data;
   },
