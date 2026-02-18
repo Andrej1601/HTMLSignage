@@ -35,6 +35,8 @@ interface UpdateStatusPayload {
   currentCommit: string | null;
   remoteCommit: string | null;
   hasUpdate: boolean;
+  aheadCount: number;
+  behindCount: number;
   isGitRepo: boolean;
   isDirty: boolean;
   isRunning: boolean;
@@ -159,6 +161,8 @@ async function getGitUpdateStatus(): Promise<UpdateStatusPayload> {
       currentCommit: null,
       remoteCommit: null,
       hasUpdate: false,
+      aheadCount: 0,
+      behindCount: 0,
       isGitRepo: false,
       isDirty: false,
       isRunning: isUpdateRunning,
@@ -172,10 +176,17 @@ async function getGitUpdateStatus(): Promise<UpdateStatusPayload> {
   const currentCommit = currentCommitResult.code === 0 ? currentCommitResult.stdout.trim() : null;
 
   const dirtyResult = await runCommand('git', ['status', '--porcelain']);
-  const isDirty = dirtyResult.code === 0 && dirtyResult.stdout.trim().length > 0;
+  const dirtyLines = dirtyResult.stdout
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+  const trackedDirtyLines = dirtyLines.filter((line) => !line.startsWith('?? '));
+  const isDirty = dirtyResult.code === 0 && trackedDirtyLines.length > 0;
 
   let remoteCommit: string | null = null;
   let hasUpdate = false;
+  let aheadCount = 0;
+  let behindCount = 0;
 
   if (branch) {
     const fetchResult = await runCommand('git', ['fetch', 'origin', branch, '--prune']);
@@ -183,7 +194,15 @@ async function getGitUpdateStatus(): Promise<UpdateStatusPayload> {
       const remoteCommitResult = await runCommand('git', ['rev-parse', `origin/${branch}`]);
       if (remoteCommitResult.code === 0) {
         remoteCommit = remoteCommitResult.stdout.trim();
-        hasUpdate = Boolean(currentCommit && remoteCommit && currentCommit !== remoteCommit);
+        const divergenceResult = await runCommand('git', ['rev-list', '--left-right', '--count', `HEAD...origin/${branch}`]);
+        if (divergenceResult.code === 0) {
+          const [aheadRaw, behindRaw] = divergenceResult.stdout.trim().split(/\s+/);
+          aheadCount = Number.parseInt(aheadRaw || '0', 10) || 0;
+          behindCount = Number.parseInt(behindRaw || '0', 10) || 0;
+          hasUpdate = behindCount > 0;
+        } else {
+          hasUpdate = Boolean(currentCommit && remoteCommit && currentCommit !== remoteCommit);
+        }
       }
     }
   }
@@ -193,6 +212,8 @@ async function getGitUpdateStatus(): Promise<UpdateStatusPayload> {
     currentCommit,
     remoteCommit,
     hasUpdate,
+    aheadCount,
+    behindCount,
     isGitRepo: true,
     isDirty,
     isRunning: isUpdateRunning,
