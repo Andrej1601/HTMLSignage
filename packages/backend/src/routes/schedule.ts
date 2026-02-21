@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
+import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 
 const router = Router();
 const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
@@ -80,8 +81,8 @@ router.get('/history', async (req, res) => {
   }
 });
 
-// POST /api/schedule - Save new schedule
-router.post('/', async (req, res) => {
+// POST /api/schedule - Save new schedule (auth required)
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);

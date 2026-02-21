@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import type { Settings } from '@/types/settings.types';
 import { migrateSettings } from '@/utils/slideshowMigration';
 
@@ -19,6 +20,10 @@ export function useSettings() {
     mutationFn: (settings: Settings) => settingsApi.saveSettings(settings),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success('Einstellungen gespeichert.');
+    },
+    onError: () => {
+      toast.error('Einstellungen konnten nicht gespeichert werden.');
     },
   });
 

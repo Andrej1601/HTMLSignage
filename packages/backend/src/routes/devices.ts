@@ -215,8 +215,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/devices - Create new device (pairing)
-router.post('/', async (req, res) => {
+// POST /api/devices - Create new device (auth required)
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const validated = CreateDeviceSchema.parse(req.body);
 
@@ -243,8 +243,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PATCH /api/devices/:id - Update device
-router.patch('/:id', async (req, res) => {
+// PATCH /api/devices/:id - Update device (auth required)
+router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
 
@@ -268,8 +268,8 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/devices/:id - Delete device
-router.delete('/:id', async (req, res) => {
+// DELETE /api/devices/:id - Delete device (auth required)
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await prisma.device.delete({
       where: { id: req.params.id },
@@ -299,8 +299,8 @@ router.post('/:id/heartbeat', async (req, res) => {
   }
 });
 
-// POST /api/devices/:id/control - Send control command
-router.post('/:id/control', async (req, res) => {
+// POST /api/devices/:id/control - Send control command (auth required)
+router.post('/:id/control', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const validated = ControlCommandSchema.parse(req.body);
 
@@ -319,8 +319,8 @@ router.post('/:id/control', async (req, res) => {
   }
 });
 
-// POST /api/devices/:id/overrides - Set device overrides
-router.post('/:id/overrides', async (req, res) => {
+// POST /api/devices/:id/overrides - Set device overrides (auth required)
+router.post('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const validated = OverridesSchema.parse(req.body);
 
@@ -361,8 +361,8 @@ router.post('/:id/overrides', async (req, res) => {
   }
 });
 
-// DELETE /api/devices/:id/overrides - Clear device overrides
-router.delete('/:id/overrides', async (req, res) => {
+// DELETE /api/devices/:id/overrides - Clear device overrides (auth required)
+router.delete('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
   try {
     await prisma.deviceOverride.deleteMany({
       where: { deviceId: req.params.id },

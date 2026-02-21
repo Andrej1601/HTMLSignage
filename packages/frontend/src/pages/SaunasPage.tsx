@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageHeader } from '@/components/PageHeader';
 import { SaunaCard } from '@/components/Saunas/SaunaCard';
 import { SaunaEditor } from '@/components/Saunas/SaunaEditor';
 import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
-import { Plus, Save, AlertCircle, RefreshCw } from 'lucide-react';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { Plus, Save, RefreshCw } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 
 // Simple UUID generator
@@ -110,9 +113,7 @@ export function SaunasPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-spa-text-secondary">Lädt Saunas...</div>
-        </div>
+        <LoadingSpinner label="Lade Saunas..." />
       </Layout>
     );
   }
@@ -120,15 +121,7 @@ export function SaunasPage() {
   if (error) {
     return (
       <Layout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Fehler beim Laden</h3>
-            <p className="text-red-700 text-sm mt-1">
-              {error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten'}
-            </p>
-          </div>
-        </div>
+        <ErrorAlert error={error} onRetry={() => refetch()} />
       </Layout>
     );
   }
@@ -138,45 +131,44 @@ export function SaunasPage() {
   return (
     <Layout>
       <div>
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-spa-text-primary">Saunas</h2>
-            <p className="text-spa-text-secondary mt-1">
-              {localSaunas.length} Sauna{localSaunas.length !== 1 ? 's' : ''} ({visibleSaunas.length} sichtbar)
-              {isDirty && (
-                <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Änderungen</span>
-              )}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleReload}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Neu laden
-            </button>
+        <PageHeader
+          title="Saunas"
+          description="Pflege Sauna-Stammdaten, Sichtbarkeit und Status für den Aufgussplan."
+          actions={(
+            <>
+              <button
+                onClick={handleReload}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Neu laden
+              </button>
 
-            <button
-              onClick={handleSaveAll}
-              disabled={!isDirty || isSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              {isSaving ? 'Speichert...' : 'Speichern'}
-            </button>
+              <button
+                onClick={handleSaveAll}
+                disabled={!isDirty || isSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Speichert...' : 'Speichern'}
+              </button>
 
-            <button
-              onClick={handleAddSauna}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Neue Sauna
-            </button>
-          </div>
-        </div>
+              <button
+                onClick={handleAddSauna}
+                className="flex items-center gap-2 px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Neue Sauna
+              </button>
+            </>
+          )}
+          badges={[
+            { label: `${localSaunas.length} gesamt`, tone: 'info' },
+            { label: `${visibleSaunas.length} sichtbar`, tone: 'success' },
+            { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' : 'success' },
+          ]}
+        />
 
         {/* Info Box */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

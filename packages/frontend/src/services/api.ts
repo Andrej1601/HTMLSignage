@@ -13,6 +13,14 @@ export interface SaveVersionedResponse extends ApiOkResponse {
   version: number;
 }
 
+export interface ScheduleHistoryItem {
+  id: string;
+  version: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DeviceOverridesPayload {
   schedule?: Schedule;
   settings?: Partial<Settings>;
@@ -32,6 +40,8 @@ export interface SystemUpdateStatusResponse extends ApiOkResponse {
   currentCommit: string | null;
   remoteCommit: string | null;
   hasUpdate: boolean;
+  aheadCount?: number;
+  behindCount?: number;
   isGitRepo: boolean;
   isDirty: boolean;
   isRunning: boolean;
@@ -167,8 +177,8 @@ export const scheduleApi = {
   },
 
   // Get schedule history
-  getHistory: async (limit = 10) => {
-    const { data } = await api.get('/schedule/history', { params: { limit } });
+  getHistory: async (limit = 10): Promise<ScheduleHistoryItem[]> => {
+    const { data } = await api.get<ScheduleHistoryItem[]>('/schedule/history', { params: { limit } });
     return data;
   },
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
 import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
@@ -19,7 +20,8 @@ import {
   copyDaySchedule,
   syncScheduleWithSaunas,
 } from '@/types/schedule.types';
-import { Save, RefreshCw, AlertCircle, Copy, Play, CalendarClock } from 'lucide-react';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { Save, RefreshCw, Copy, Play, CalendarClock } from 'lucide-react';
 import clsx from 'clsx';
 
 export function SchedulePage() {
@@ -281,9 +283,7 @@ export function SchedulePage() {
   if (isLoading || !localSchedule) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-spa-text-secondary">Lädt Aufgussplan...</div>
-        </div>
+        <LoadingSpinner label="Lade Aufgussplan..." />
       </Layout>
     );
   }
@@ -291,15 +291,7 @@ export function SchedulePage() {
   if (error) {
     return (
       <Layout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Fehler beim Laden</h3>
-            <p className="text-red-700 text-sm mt-1">
-              {error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten'}
-            </p>
-          </div>
-        </div>
+        <ErrorAlert error={error} onRetry={() => refetch()} />
       </Layout>
     );
   }

@@ -36,6 +36,7 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
             src={imageUrl}
             alt={sauna.name}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
           <div className="absolute top-2 left-2">
             <div
@@ -74,8 +75,10 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-1 hover:bg-spa-bg-primary rounded transition-colors"
+              aria-label="Sauna-Aktionen"
+              aria-expanded={showMenu}
             >
-              <MoreVertical className="w-5 h-5 text-spa-text-secondary" />
+              <MoreVertical className="w-5 h-5 text-spa-text-secondary" aria-hidden="true" />
             </button>
 
             {showMenu && (

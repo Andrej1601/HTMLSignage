@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { scheduleApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import type { Schedule } from '@/types/schedule.types';
 
 export function useSchedule() {
@@ -14,6 +15,10 @@ export function useSchedule() {
     mutationFn: (schedule: Schedule) => scheduleApi.saveSchedule(schedule),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
+      toast.success('Aufgussplan gespeichert.');
+    },
+    onError: () => {
+      toast.error('Aufgussplan konnte nicht gespeichert werden.');
     },
   });
 

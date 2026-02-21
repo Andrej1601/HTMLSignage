@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mediaApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import type { MediaFilter } from '@/types/media.types';
 
 // Get all media
@@ -27,6 +28,10 @@ export function useUploadMedia() {
     mutationFn: (file: File) => mediaApi.uploadMedia(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['media'] });
+      toast.success('Datei hochgeladen.');
+    },
+    onError: () => {
+      toast.error('Datei konnte nicht hochgeladen werden.');
     },
   });
 }
@@ -39,6 +44,10 @@ export function useDeleteMedia() {
     mutationFn: (id: string) => mediaApi.deleteMedia(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['media'] });
+      toast.success('Datei gelöscht.');
+    },
+    onError: () => {
+      toast.error('Datei konnte nicht gelöscht werden.');
     },
   });
 }

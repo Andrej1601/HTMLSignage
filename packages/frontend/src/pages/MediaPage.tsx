@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageHeader } from '@/components/PageHeader';
 import { MediaUpload } from '@/components/Media/MediaUpload';
 import { MediaGrid } from '@/components/Media/MediaGrid';
 import { useMedia, useDeleteMedia } from '@/hooks/useMedia';
@@ -33,9 +35,7 @@ export function MediaPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-spa-text-secondary">Lade Medien...</div>
-        </div>
+        <LoadingSpinner label="Lade Medien..." />
       </Layout>
     );
   }
@@ -46,21 +46,25 @@ export function MediaPage() {
     audio: media.filter(m => m.type === 'audio').length,
     video: media.filter(m => m.type === 'video').length,
   };
+  const activeTypeFilter =
+    typeFilter === 'all'
+      ? 'Alle Typen'
+      : typeFilter === 'image'
+        ? 'Bilder'
+        : typeFilter === 'audio'
+          ? 'Audio'
+          : 'Video';
+  const trimmedSearch = searchQuery.trim();
 
   return (
     <Layout>
       <div>
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Medien-Bibliothek</h2>
-              <p className="text-spa-text-secondary">
-                Verwalte deine Bilder, Audio- und Videodateien
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
+        <PageHeader
+          title="Medien-Bibliothek"
+          description="Verwalte Bilder, Audio und Video für die Ausspielung."
+          icon={ImageIcon}
+          actions={(
+            <>
               <button
                 onClick={() => refetch()}
                 className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2"
@@ -75,8 +79,14 @@ export function MediaPage() {
                 <Upload className="w-4 h-4" />
                 {uploadOpen ? 'Upload schließen' : 'Hochladen'}
               </button>
-            </div>
-          </div>
+            </>
+          )}
+          badges={[
+            { label: `${stats.total} Dateien`, tone: 'info' },
+            { label: `Filter: ${activeTypeFilter}`, tone: typeFilter === 'all' ? 'neutral' : 'info' },
+            { label: trimmedSearch ? `Suche: ${trimmedSearch}` : 'Keine Suche', tone: trimmedSearch ? 'warning' : 'neutral' },
+          ]}
+        />
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -164,7 +174,6 @@ export function MediaPage() {
               />
             </div>
           </div>
-        </div>
 
         {/* Media Grid */}
         <MediaGrid

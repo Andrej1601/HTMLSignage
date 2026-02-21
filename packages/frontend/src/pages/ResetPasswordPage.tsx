@@ -28,7 +28,7 @@ export function ResetPasswordPage() {
     }
 
     if (password !== confirmPassword) {
-      setError('Passwoerter stimmen nicht ueberein.');
+      setError('Passwörter stimmen nicht überein.');
       return;
     }
 
@@ -48,7 +48,7 @@ export function ResetPasswordPage() {
 
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || 'Passwort konnte nicht zurueckgesetzt werden.');
+        throw new Error(body.message || 'Passwort konnte nicht zurückgesetzt werden.');
       }
 
       setIsSuccess(true);
@@ -73,7 +73,7 @@ export function ResetPasswordPage() {
         {!token && (
           <div className="space-y-4">
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              Der Reset-Link ist ungueltig. Bitte fordere einen neuen Link an.
+              Der Reset-Link ist ungültig. Bitte fordere einen neuen Link an.
             </div>
             <Link to="/forgot-password" className="block text-center text-sm text-spa-primary hover:underline">
               Neuen Reset-Link anfordern
@@ -84,14 +84,14 @@ export function ResetPasswordPage() {
         {token && (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 {error}
               </div>
             )}
 
             {isSuccess && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                Passwort erfolgreich geaendert. Weiterleitung zur Anmeldung...
+              <div role="status" className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                Passwort erfolgreich geändert. Weiterleitung zur Anmeldung...
               </div>
             )}
 
@@ -132,11 +132,11 @@ export function ResetPasswordPage() {
               disabled={isLoading || isSuccess}
               className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Speichere...' : 'Passwort zuruecksetzen'}
+              {isLoading ? 'Speichere...' : 'Passwort zurücksetzen'}
             </button>
 
             <Link to="/login" className="block text-center text-sm text-spa-primary hover:underline">
-              Zurueck zur Anmeldung
+              Zurück zur Anmeldung
             </Link>
           </form>
         )}

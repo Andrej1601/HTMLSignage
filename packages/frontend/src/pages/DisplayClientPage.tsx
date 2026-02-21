@@ -71,21 +71,7 @@ interface PreviewConfigMessage {
   };
 }
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
-      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
-    } else {
-      merged[key] = value;
-    }
-  }
-  return merged;
-}
+import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
 
 function normalizeAudio(raw: unknown): AudioSettings {
   const value = isPlainRecord(raw) ? raw : {};

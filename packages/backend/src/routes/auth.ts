@@ -1,11 +1,29 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createHash, randomBytes } from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, comparePassword, generateToken, authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { sendPasswordResetEmail } from '../lib/mailer.js';
 
 const router = Router();
+
+// Rate-Limiting für Auth-Endpunkte
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 Minuten
+  max: 20, // max 20 Versuche pro Fenster
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 Stunde
+  max: 5, // max 5 Versuche pro Stunde
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+});
 
 const LoginSchema = z.object({
   username: z.string().min(1),
@@ -41,7 +59,7 @@ function createResetToken(): { rawToken: string; tokenHash: string; expiresAt: D
 }
 
 // POST /api/auth/register - Register new user (ONLY first user - becomes admin)
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const validated = RegisterSchema.parse(req.body);
 
@@ -113,7 +131,7 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /api/auth/login - Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const validated = LoginSchema.parse(req.body);
 
@@ -163,7 +181,7 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/auth/forgot-password - Request password reset email
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
   try {
     const validated = ForgotPasswordSchema.parse(req.body);
     const genericResponse = {
@@ -227,7 +245,7 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password - Set a new password using reset token
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   try {
     const validated = ResetPasswordSchema.parse(req.body);
     const tokenHash = hashResetToken(validated.token);

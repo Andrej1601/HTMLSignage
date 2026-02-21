@@ -38,10 +38,10 @@ export function AudioConfigEditor({
   audio,
   onChange,
   title = 'Hintergrundmusik',
-  subtitle = 'Musik waehrend der Slideshow abspielen',
+  subtitle = 'Musik während der Slideshow abspielen',
   showEnableToggle = true,
   enableLabel = 'Hintergrundmusik aktivieren',
-  enableDescription = 'Musik waehrend der Slideshow abspielen',
+  enableDescription = 'Musik während der Slideshow abspielen',
 }: AudioConfigEditorProps) {
   const normalized = normalizeAudio(audio);
   const { data: media } = useMedia({ type: 'audio' });
@@ -158,7 +158,7 @@ export function AudioConfigEditor({
                 MP3, WAV, OGG, WebM (max. 50MB)
               </div>
               {uploadMedia.isPending && (
-                <div className="text-xs text-spa-primary mt-2">Upload laeuft...</div>
+                <div className="text-xs text-spa-primary mt-2">Upload läuft...</div>
               )}
             </div>
           </div>
@@ -171,7 +171,7 @@ export function AudioConfigEditor({
                 ) : (
                   <VolumeX className="w-4 h-4" />
                 )}
-                Lautstaerke
+                Lautstärke
               </label>
               <span className="text-sm font-mono text-spa-text-secondary">
                 {Math.round(clampVolume(normalized.volume) * 100)}%
@@ -215,7 +215,7 @@ export function AudioConfigEditor({
               />
               {selectedMedia && (
                 <div className="text-xs text-spa-text-secondary mt-2">
-                  Ausgewaehlt: {selectedMedia.originalName}
+                  Ausgewählt: {selectedMedia.originalName}
                 </div>
               )}
             </div>
@@ -225,4 +225,3 @@ export function AudioConfigEditor({
     </div>
   );
 }
-

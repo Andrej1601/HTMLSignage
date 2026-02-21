@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageHeader } from '@/components/PageHeader';
+import { TabGroup, TabPanel, type Tab } from '@/components/TabGroup';
 import { useSettings } from '@/hooks/useSettings';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
@@ -106,12 +109,25 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
+  // useMemo MUST be called before any early returns to satisfy Rules of Hooks
+  const tabs = useMemo<Tab<TabId>[]>(() => {
+    const items: Tab<TabId>[] = [
+      { id: 'theme', label: 'Farben & Design', icon: Palette },
+      { id: 'audio', label: 'Audio', icon: Music },
+      { id: 'aromas', label: 'Aromas', icon: Sparkles },
+      { id: 'infos', label: 'Infos', icon: Info },
+      { id: 'events', label: 'Events', icon: Calendar },
+    ];
+    if (isAdmin) {
+      items.push({ id: 'system', label: 'System', icon: Wrench });
+    }
+    return items;
+  }, [isAdmin]);
+
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-spa-text-secondary">Lade Einstellungen...</div>
-        </div>
+        <LoadingSpinner label="Lade Einstellungen..." />
       </Layout>
     );
   }
@@ -126,34 +142,15 @@ export function SettingsPage() {
     );
   }
 
-  const tabs = [
-    { id: 'theme' as TabId, label: 'Farben & Design', icon: Palette },
-    { id: 'audio' as TabId, label: 'Audio', icon: Music },
-    { id: 'aromas' as TabId, label: 'Aromas', icon: Sparkles },
-    { id: 'infos' as TabId, label: 'Infos', icon: Info },
-    { id: 'events' as TabId, label: 'Events', icon: Calendar },
-  ];
-  if (isAdmin) {
-    tabs.push({ id: 'system' as TabId, label: 'System', icon: Wrench });
-  }
-
   return (
     <Layout>
       <div>
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Einstellungen</h2>
-              <p className="text-spa-text-secondary">Design, Schriften und Audio konfigurieren</p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {isDirty && (
-                <span className="text-sm text-spa-accent font-medium">
-                  Nicht gespeicherte Änderungen
-                </span>
-              )}
+        <PageHeader
+          title="Einstellungen"
+          description="Design, Schriften, Audio, Events und Systemfunktionen zentral konfigurieren."
+          icon={Wrench}
+          actions={(
+            <>
               <button
                 onClick={handleReload}
                 disabled={isSaving}
@@ -177,77 +174,65 @@ export function SettingsPage() {
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Speichert...' : 'Speichern'}
               </button>
-            </div>
-          </div>
+            </>
+          )}
+          badges={[
+            { label: `Version ${localSettings.version}`, tone: 'info' },
+            { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' : 'success' },
+          ]}
+        />
+
+        <div className="mb-6">
+          <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
         </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex border-b border-spa-bg-secondary">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 ${
-                    activeTab === tab.id
-                      ? 'text-spa-primary border-b-2 border-spa-primary'
-                      : 'text-spa-text-secondary hover:text-spa-text-primary'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Tab Content */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          {activeTab === 'theme' && localSettings.theme && (
-            <ThemeEditor
-              theme={localSettings.theme}
-              designStyle={localSettings.designStyle}
-              colorPalette={localSettings.colorPalette}
-              onChange={handleThemeChange}
-              onDesignStyleChange={handleDesignStyleChange}
-              onColorPaletteChange={handleColorPaletteChange}
-            />
-          )}
+          <TabPanel id="theme" activeTab={activeTab}>
+            {localSettings.theme && (
+              <ThemeEditor
+                theme={localSettings.theme}
+                designStyle={localSettings.designStyle}
+                colorPalette={localSettings.colorPalette}
+                onChange={handleThemeChange}
+                onDesignStyleChange={handleDesignStyleChange}
+                onColorPaletteChange={handleColorPaletteChange}
+              />
+            )}
+          </TabPanel>
 
-          {activeTab === 'audio' && localSettings.audio && (
-            <AudioSettings
-              audio={localSettings.audio}
-              onChange={handleAudioChange}
-            />
-          )}
+          <TabPanel id="audio" activeTab={activeTab}>
+            {localSettings.audio && (
+              <AudioSettings
+                audio={localSettings.audio}
+                onChange={handleAudioChange}
+              />
+            )}
+          </TabPanel>
 
-          {activeTab === 'aromas' && (
+          <TabPanel id="aromas" activeTab={activeTab}>
             <AromaLibraryManager
               aromas={localSettings.aromas || []}
               onChange={handleAromasChange}
             />
-          )}
+          </TabPanel>
 
-          {activeTab === 'infos' && (
+          <TabPanel id="infos" activeTab={activeTab}>
             <InfoManager
               infos={localSettings.infos || []}
               onChange={handleInfosChange}
             />
-          )}
+          </TabPanel>
 
-          {activeTab === 'events' && (
+          <TabPanel id="events" activeTab={activeTab}>
             <EventManager
               events={localSettings.events || []}
               onChange={handleEventsChange}
             />
-          )}
+          </TabPanel>
 
-          {activeTab === 'system' && isAdmin && (
-            <SystemMaintenance />
-          )}
+          <TabPanel id="system" activeTab={activeTab}>
+            {isAdmin && <SystemMaintenance />}
+          </TabPanel>
         </div>
 
         {/* Version Info */}

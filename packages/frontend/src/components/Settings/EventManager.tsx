@@ -267,8 +267,9 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                     <div className="mt-2">
                       <img
                         src={getImageUrl(formData.imageId) || ''}
-                        alt="Event preview"
+                        alt="Event-Vorschau"
                         className="w-full h-48 object-cover rounded-md"
+                        loading="lazy"
                       />
                     </div>
                   )}
@@ -397,7 +398,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
             <div className="md:col-span-2 border-t border-spa-bg-secondary pt-4 mt-2">
               <h5 className="text-sm font-semibold text-spa-text-primary mb-3">Event-Design (optional)</h5>
               <p className="text-xs text-spa-text-secondary mb-4">
-                Wenn gesetzt, wird waehrend des aktiven Events dieses Design verwendet.
+                Wenn gesetzt, wird während des aktiven Events dieses Design verwendet.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -448,7 +449,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                 <div>
                   <h5 className="text-sm font-semibold text-spa-text-primary">Event-Musik (optional)</h5>
                   <p className="text-xs text-spa-text-secondary">
-                    Aktiviert eine eigene Musik nur fuer dieses Event.
+                    Aktiviert eine eigene Musik nur für dieses Event.
                   </p>
                 </div>
 
@@ -474,10 +475,10 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                   audio={formData.settingsOverrides.audio}
                   onChange={(nextAudio) => updateOverrides({ audio: nextAudio })}
                   title="Event-Hintergrundmusik"
-                  subtitle="Spielt nur waehrend dieses aktiven Events."
+                  subtitle="Spielt nur während dieses aktiven Events."
                   showEnableToggle
                   enableLabel="Event-Musik aktivieren"
-                  enableDescription="Ueberschreibt globale Musik fuer dieses Event."
+                  enableDescription="Überschreibt globale Musik für dieses Event."
                 />
               )}
             </div>
@@ -536,6 +537,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                         src={imageUrl}
                         alt={event.name}
                         className="w-32 h-32 object-cover rounded-md"
+                        loading="lazy"
                       />
                     </div>
                   )}

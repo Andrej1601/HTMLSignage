@@ -3,8 +3,18 @@ import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prisma.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const DEFAULT_SECRET = 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 const JWT_EXPIRES_IN = '7d';
+
+// Warnung beim Start, wenn kein sicherer JWT_SECRET gesetzt ist
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_SECRET) {
+  console.warn(
+    '\n⚠️  WARNUNG: JWT_SECRET ist nicht gesetzt oder unsicher!\n' +
+    '   Bitte einen sicheren Wert in der .env-Datei setzen.\n' +
+    '   Beispiel: JWT_SECRET=$(openssl rand -hex 32)\n'
+  );
+}
 
 export interface AuthRequest extends Request {
   userId?: string;

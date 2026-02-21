@@ -84,8 +84,10 @@ export function DeviceCard({
             <button
               onClick={() => setMenuOpen(!menuOpen)}
               className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors"
+              aria-label="Geräte-Aktionen"
+              aria-expanded={menuOpen}
             >
-              <MoreVertical className="w-5 h-5 text-spa-text-secondary" />
+              <MoreVertical className="w-5 h-5 text-spa-text-secondary" aria-hidden="true" />
             </button>
 
             {menuOpen && (
@@ -136,7 +138,7 @@ export function DeviceCard({
                       className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Loeschen
+                      Löschen
                     </button>
                   </div>
                 </div>
@@ -155,7 +157,7 @@ export function DeviceCard({
             </p>
           </div>
           <div>
-            <p className="text-spa-text-secondary">Letzte Aktivitaet</p>
+            <p className="text-spa-text-secondary">Letzte Aktivität</p>
             <p className="text-spa-text-primary font-medium mt-1">
               {formatLastSeen(device.lastSeen)}
             </p>
@@ -182,7 +184,7 @@ export function DeviceCard({
               </p>
               <p className={`text-xs mt-1 ${isOverrideActive ? 'text-blue-700' : 'text-amber-700'}`}>
                 {isOverrideActive
-                  ? 'Dieses Geraet verwendet angepasste Einstellungen'
+                  ? 'Dieses Gerät verwendet angepasste Einstellungen'
                   : 'Overrides sind gespeichert, aber Modus steht auf Automatisch'}
               </p>
             </div>

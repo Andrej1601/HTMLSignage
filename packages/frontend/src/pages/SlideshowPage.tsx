@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SlideshowConfigPanel } from '@/components/Slideshow/SlideshowConfigPanel';
 import { useClearOverrides, useDevices, useSetOverrides, useUpdateDevice } from '@/hooks/useDevices';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -10,25 +12,10 @@ import { getDeviceStatus, getModeLabel, getStatusColor, getStatusLabel } from '@
 import { createDefaultSlideshowConfig, type SlideshowConfig } from '@/types/slideshow.types';
 import type { AudioSettings, Settings } from '@/types/settings.types';
 import { migrateSettings } from '@/utils/slideshowMigration';
-import { AlertCircle, Monitor, RefreshCw, RotateCcw, Save } from 'lucide-react';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { Monitor, RefreshCw, RotateCcw, Save } from 'lucide-react';
 
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...base };
-
-  for (const [key, value] of Object.entries(override)) {
-    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
-      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
-      continue;
-    }
-    merged[key] = value;
-  }
-
-  return merged;
-}
+import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
 
 function isScheduleOverride(value: unknown): value is Schedule {
   if (!isPlainRecord(value)) return false;
@@ -111,7 +98,7 @@ function getDeviceSlideshowSource(device: Device): {
   if (device.mode === 'override' && !hasOverrides) {
     return {
       label: 'Global (kein Override)',
-      detail: 'Modus ist Ueberschrieben, aber es sind keine Overrides gespeichert.',
+      detail: 'Modus ist Überschrieben, aber es sind keine Overrides gespeichert.',
       badgeClass: 'bg-amber-100 text-amber-700',
       usesGlobal: true,
     };
@@ -161,6 +148,7 @@ export function SlideshowPage() {
   const [editorConfig, setEditorConfig] = useState<SlideshowConfig | null>(null);
   const [editorAudioOverride, setEditorAudioOverride] = useState<AudioSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'switch-target'; nextTarget: EditorTarget } | { type: 'reset' } | null>(null);
 
   const selectedDeviceId = parseDeviceId(target);
   const selectedDevice = useMemo(
@@ -289,7 +277,8 @@ export function SlideshowPage() {
   const handleSelectTarget = (nextTarget: EditorTarget) => {
     if (nextTarget === target) return;
 
-    if (isDirty && !window.confirm('Ungespeicherte Aenderungen verwerfen und Ziel wechseln?')) {
+    if (isDirty) {
+      setConfirmAction({ type: 'switch-target', nextTarget });
       return;
     }
 
@@ -298,7 +287,8 @@ export function SlideshowPage() {
   };
 
   const handleReloadCurrent = () => {
-    if (isDirty && !window.confirm('Ungespeicherte Aenderungen verwerfen?')) {
+    if (isDirty) {
+      setConfirmAction({ type: 'reset' });
       return;
     }
 
@@ -310,6 +300,24 @@ export function SlideshowPage() {
 
     loadEditorFromTarget(target);
   };
+
+  const handleConfirmAction = useCallback(() => {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === 'switch-target') {
+      setTarget(confirmAction.nextTarget);
+      setIsDirty(false);
+    } else if (confirmAction.type === 'reset') {
+      if (target === 'global') {
+        setIsDirty(false);
+        refetch();
+      } else {
+        loadEditorFromTarget(target);
+      }
+    }
+
+    setConfirmAction(null);
+  }, [confirmAction, target, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveCurrent = () => {
     if (!settings || !editorConfig) return;
@@ -412,9 +420,7 @@ export function SlideshowPage() {
   if (isLoading || !settings || !editorConfig || !previewPayload) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-spa-text-secondary">Laedt Slideshow-Konfiguration...</div>
-        </div>
+        <LoadingSpinner label="Lade Slideshow-Konfiguration..." />
       </Layout>
     );
   }
@@ -422,15 +428,7 @@ export function SlideshowPage() {
   if (error) {
     return (
       <Layout>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Fehler beim Laden</h3>
-            <p className="text-red-700 text-sm mt-1">
-              {error instanceof Error ? error.message : 'Ein Fehler ist aufgetreten'}
-            </p>
-          </div>
-        </div>
+        <ErrorAlert error={error} onRetry={() => refetch()} />
       </Layout>
     );
   }
@@ -443,10 +441,10 @@ export function SlideshowPage() {
             <h2 className="text-3xl font-bold text-spa-text-primary">Slideshow Konfiguration</h2>
             <p className="text-spa-text-secondary mt-1">
               {hasActiveDeviceTarget
-                ? `Override-Editor fuer ${selectedDevice?.name || 'Geraet'}`
+                ? `Override-Editor für ${selectedDevice?.name || 'Gerät'}`
                 : 'Globaler Stand'}
               {isDirty && (
-                <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Aenderungen</span>
+                <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Änderungen</span>
               )}
             </p>
           </div>
@@ -457,7 +455,7 @@ export function SlideshowPage() {
               className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
             >
               <RefreshCw className="w-4 h-4" />
-              Zuruecksetzen
+              Zurücksetzen
             </button>
 
             {hasActiveDeviceTarget && (
@@ -485,9 +483,9 @@ export function SlideshowPage() {
         <div className="mb-6 bg-white rounded-lg shadow p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold text-spa-text-primary">Geraete-Ausspielung</h3>
+              <h3 className="text-lg font-semibold text-spa-text-primary">Geräte-Ausspielung</h3>
               <p className="text-xs text-spa-text-secondary mt-1">
-                Waehle ein Ziel, um globale Slideshow oder Geraete-Override ohne Popup zu bearbeiten.
+                Wähle ein Ziel, um globale Slideshow oder Geräte-Override ohne Popup zu bearbeiten.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-medium">
@@ -619,12 +617,26 @@ export function SlideshowPage() {
             setEditorAudioOverride(audio);
             setIsDirty(true);
           }) : undefined}
-          audioTitle={selectedDevice ? `Geraete-Musik (${selectedDevice.name})` : 'Audio-Override'}
+          audioTitle={selectedDevice ? `Geräte-Musik (${selectedDevice.name})` : 'Audio-Override'}
           audioSubtitle={selectedDevice
-            ? 'Ueberschreibt globale Musik nur fuer dieses Display.'
-            : 'Musik fuer diese Slideshow-Ausgabe konfigurieren.'}
-          audioEnableLabel="Musik fuer dieses Geraet aktivieren"
-          audioEnableDescription="Wird nur genutzt, wenn der Geraetemodus auf Ueberschrieben steht."
+            ? 'Überschreibt globale Musik nur für dieses Display.'
+            : 'Musik für diese Slideshow-Ausgabe konfigurieren.'}
+          audioEnableLabel="Musik für dieses Gerät aktivieren"
+          audioEnableDescription="Wird nur genutzt, wenn der Gerätemodus auf Überschrieben steht."
+        />
+
+        <ConfirmDialog
+          isOpen={confirmAction !== null}
+          title="Ungespeicherte Änderungen"
+          message={
+            confirmAction?.type === 'switch-target'
+              ? 'Ungespeicherte Änderungen verwerfen und Ziel wechseln?'
+              : 'Ungespeicherte Änderungen verwerfen?'
+          }
+          confirmLabel="Verwerfen"
+          variant="warning"
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmAction(null)}
         />
       </div>
     </Layout>

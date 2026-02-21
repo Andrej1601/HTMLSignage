@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { broadcastSettingsUpdate } from '../websocket/index.js';
+import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 
 const router = Router();
 
@@ -71,8 +72,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/settings
-router.post('/', async (req, res) => {
+// POST /api/settings (auth required)
+router.post('/', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const validated = SettingsSchema.parse(req.body);
 

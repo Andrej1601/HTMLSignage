@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
+import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -82,8 +83,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/media/upload - Upload file
-router.post('/upload', upload.single('file'), async (req, res) => {
+// POST /api/media/upload - Upload file (auth required)
+router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'no-file-uploaded' });
@@ -121,8 +122,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// DELETE /api/media/:id - Delete media
-router.delete('/:id', async (req, res) => {
+// DELETE /api/media/:id - Delete media (auth required)
+router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const media = await prisma.media.findUnique({
       where: { id: req.params.id },

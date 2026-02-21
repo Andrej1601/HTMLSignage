@@ -52,6 +52,7 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
             src={mediaUrl}
             alt={media.originalName}
             className="w-full h-full object-cover"
+            loading="lazy"
           />
         ) : media.type === 'video' ? (
           <>
@@ -79,8 +80,10 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-2 bg-white/90 hover:bg-white rounded-lg transition-colors shadow-sm"
+            aria-label="Medien-Aktionen"
+            aria-expanded={menuOpen}
           >
-            <MoreVertical className="w-4 h-4 text-spa-text-secondary" />
+            <MoreVertical className="w-4 h-4 text-spa-text-secondary" aria-hidden="true" />
           </button>
 
           {menuOpen && (

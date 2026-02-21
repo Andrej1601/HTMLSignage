@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { PageHeader } from '@/components/PageHeader';
 import { Plus, Edit2, Trash2, Users as UsersIcon, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config/env';
@@ -135,9 +137,7 @@ export function UsersPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-spa-text-secondary">Lade Benutzer...</div>
-        </div>
+        <LoadingSpinner label="Lade Benutzer..." />
       </Layout>
     );
   }
@@ -145,16 +145,11 @@ export function UsersPage() {
   return (
     <Layout>
       <div>
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Benutzerverwaltung</h2>
-              <p className="text-spa-text-secondary">
-                Verwalte Benutzer und deren Zugriffsrechte
-              </p>
-            </div>
-
+        <PageHeader
+          title="Benutzerverwaltung"
+          description="Benutzerkonten, Rollen und Adminrechte zentral verwalten."
+          icon={UsersIcon}
+          actions={(
             <button
               onClick={() => setIsCreateDialogOpen(true)}
               className="px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors flex items-center gap-2"
@@ -162,33 +157,37 @@ export function UsersPage() {
               <Plus className="w-4 h-4" />
               Benutzer anlegen
             </button>
-          </div>
+          )}
+          badges={[
+            { label: `${users.length} Benutzer`, tone: 'info' },
+            { label: `${users.filter((entry) => entry.roles.includes('admin')).length} Admins`, tone: 'warning' },
+          ]}
+        />
 
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-spa-bg-primary rounded-lg">
-                  <UsersIcon className="w-6 h-6 text-spa-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Gesamt</p>
-                  <p className="text-2xl font-bold text-spa-text-primary">{users.length}</p>
-                </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-spa-bg-primary rounded-lg">
+                <UsersIcon className="w-6 h-6 text-spa-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-spa-text-secondary">Gesamt</p>
+                <p className="text-2xl font-bold text-spa-text-primary">{users.length}</p>
               </div>
             </div>
+          </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Shield className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Administratoren</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {users.filter(u => u.roles.includes('admin')).length}
-                  </p>
-                </div>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Shield className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-spa-text-secondary">Administratoren</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {users.filter(u => u.roles.includes('admin')).length}
+                </p>
               </div>
             </div>
           </div>
@@ -257,14 +256,16 @@ export function UsersPage() {
                     <button
                       onClick={() => setEditingUser(user)}
                       className="text-spa-primary hover:text-spa-primary-dark mr-3"
+                      aria-label={`${user.username} bearbeiten`}
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-4 h-4" aria-hidden="true" />
                     </button>
                     <button
                       onClick={() => setDeletingUser(user)}
                       className="text-red-600 hover:text-red-900"
+                      aria-label={`${user.username} löschen`}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </td>
                 </tr>

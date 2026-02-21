@@ -146,8 +146,9 @@ export function ScheduleGrid({
                     onClick={() => onDeleteTimeRow(timeRowIndex)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
                     title="Zeit löschen"
+                    aria-label="Zeitreihe löschen"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </td>
               </tr>

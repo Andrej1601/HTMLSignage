@@ -53,13 +53,13 @@ export function ForgotPasswordPage() {
               to="/login"
               className="block text-center w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors"
             >
-              Zurueck zur Anmeldung
+              Zurück zur Anmeldung
             </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 {error}
               </div>
             )}
@@ -88,7 +88,7 @@ export function ForgotPasswordPage() {
             </button>
 
             <Link to="/login" className="block text-center text-sm text-spa-primary hover:underline">
-              Zurueck zur Anmeldung
+              Zurück zur Anmeldung
             </Link>
           </form>
         )}

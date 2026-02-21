@@ -27,6 +27,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
+  // Store callbacks in refs so the socket listeners always call the latest version
+  // without causing reconnects when the callbacks change identity.
+  const onScheduleUpdateRef = useRef(onScheduleUpdate);
+  const onSettingsUpdateRef = useRef(onSettingsUpdate);
+  const onDeviceCommandRef = useRef(onDeviceCommand);
+  const onDeviceUpdateRef = useRef(onDeviceUpdate);
+
+  onScheduleUpdateRef.current = onScheduleUpdate;
+  onSettingsUpdateRef.current = onSettingsUpdate;
+  onDeviceCommandRef.current = onDeviceCommand;
+  onDeviceUpdateRef.current = onDeviceUpdate;
+
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
@@ -60,36 +72,36 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     // Schedule updates
     socket.on('schedule:updated', (data: Schedule) => {
       console.log('[WebSocket] Schedule updated:', data);
-      onScheduleUpdate?.(data);
+      onScheduleUpdateRef.current?.(data);
     });
 
     // Settings updates
     socket.on('settings:updated', (data: Settings) => {
       console.log('[WebSocket] Settings updated:', data);
-      onSettingsUpdate?.(data);
+      onSettingsUpdateRef.current?.(data);
     });
 
     // Device commands
     socket.on('device:command', (data: { command?: string }) => {
       console.log('[WebSocket] Device command:', data);
       if (data?.command) {
-        onDeviceCommand?.(data.command);
+        onDeviceCommandRef.current?.(data.command);
       }
     });
 
     // Device updates (mode/override changes, pairing updates, etc.)
     socket.on('device:updated', (data: Record<string, unknown>) => {
       console.log('[WebSocket] Device updated:', data);
-      onDeviceUpdate?.(data);
+      onDeviceUpdateRef.current?.(data);
 
       const command = typeof data?.command === 'string' ? data.command : undefined;
       if (command) {
-        onDeviceCommand?.(command);
+        onDeviceCommandRef.current?.(command);
       }
     });
 
     socketRef.current = socket;
-  }, [url, onScheduleUpdate, onSettingsUpdate, onDeviceCommand, onDeviceUpdate]);
+  }, [url]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -148,8 +160,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     return () => {
       disconnect();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoConnect, url]);
+  }, [autoConnect, url, connect, disconnect]);
 
   return {
     isConnected,

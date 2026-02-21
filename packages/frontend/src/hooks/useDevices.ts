@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devicesApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import type { DeviceOverridesPayload } from '@/services/api';
 import type { CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
 
@@ -36,6 +37,10 @@ export function useCreateDevice() {
     mutationFn: (device: CreateDeviceRequest) => devicesApi.createDevice(device),
     onSuccess: () => {
       invalidateDevices(queryClient);
+      toast.success('Gerät erstellt.');
+    },
+    onError: () => {
+      toast.error('Gerät konnte nicht erstellt werden.');
     },
   });
 }
@@ -49,6 +54,10 @@ export function useUpdateDevice() {
       devicesApi.updateDevice(id, updates),
     onSuccess: (_, variables) => {
       invalidateDevices(queryClient, variables.id);
+      toast.success('Gerät aktualisiert.');
+    },
+    onError: () => {
+      toast.error('Gerät konnte nicht aktualisiert werden.');
     },
   });
 }
@@ -61,6 +70,10 @@ export function useDeleteDevice() {
     mutationFn: (id: string) => devicesApi.deleteDevice(id),
     onSuccess: () => {
       invalidateDevices(queryClient);
+      toast.success('Gerät gelöscht.');
+    },
+    onError: () => {
+      toast.error('Gerät konnte nicht gelöscht werden.');
     },
   });
 }
@@ -70,6 +83,12 @@ export function useSendCommand() {
   return useMutation({
     mutationFn: ({ id, command }: { id: string; command: DeviceControlCommand }) =>
       devicesApi.sendCommand(id, command),
+    onSuccess: () => {
+      toast.success('Befehl gesendet.');
+    },
+    onError: () => {
+      toast.error('Befehl konnte nicht gesendet werden.');
+    },
   });
 }
 
@@ -82,6 +101,10 @@ export function useSetOverrides() {
       devicesApi.setOverrides(id, overrides),
     onSuccess: (_, variables) => {
       invalidateDevices(queryClient, variables.id);
+      toast.success('Override gespeichert.');
+    },
+    onError: () => {
+      toast.error('Override konnte nicht gespeichert werden.');
     },
   });
 }
@@ -94,6 +117,10 @@ export function useClearOverrides() {
     mutationFn: (id: string) => devicesApi.clearOverrides(id),
     onSuccess: (_, id) => {
       invalidateDevices(queryClient, id);
+      toast.success('Override entfernt.');
+    },
+    onError: () => {
+      toast.error('Override konnte nicht entfernt werden.');
     },
   });
 }

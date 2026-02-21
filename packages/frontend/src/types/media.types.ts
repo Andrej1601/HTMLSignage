@@ -9,6 +9,9 @@ export interface Media {
   type: MediaType;
   url: string;
   uploadedBy?: string;
+  user?: {
+    username: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

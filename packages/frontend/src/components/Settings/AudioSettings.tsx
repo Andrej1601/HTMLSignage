@@ -12,10 +12,10 @@ export function AudioSettings({ audio, onChange }: AudioSettingsProps) {
       audio={audio}
       onChange={onChange}
       title="Hintergrundmusik"
-      subtitle="Musik waehrend der Slideshow abspielen"
+      subtitle="Musik während der Slideshow abspielen"
       showEnableToggle
       enableLabel="Hintergrundmusik aktivieren"
-      enableDescription="Musik waehrend der Slideshow abspielen"
+      enableDescription="Musik während der Slideshow abspielen"
     />
   );
 }

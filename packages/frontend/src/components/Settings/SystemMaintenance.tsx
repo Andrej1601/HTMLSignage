@@ -119,7 +119,7 @@ export function SystemMaintenance() {
 
   const handleImportBackup = async () => {
     if (!token || !backupFile) return;
-    if (!confirm('Backup importieren und aktuelle Daten ueberschreiben?')) return;
+    if (!confirm('Backup importieren und aktuelle Daten überschreiben?')) return;
 
     setIsImporting(true);
     setFeedback(null);
@@ -167,7 +167,7 @@ export function SystemMaintenance() {
             <div className="font-semibold text-spa-text-primary">{status?.branch || '-'}</div>
           </div>
           <div className="rounded-md bg-spa-bg-primary p-3">
-            <div className="text-xs text-spa-text-secondary">Update verfuegbar</div>
+            <div className="text-xs text-spa-text-secondary">Update verfügbar</div>
             <div className="font-semibold text-spa-text-primary">
               {status?.hasUpdate ? 'Ja' : 'Nein'}
             </div>
@@ -185,7 +185,7 @@ export function SystemMaintenance() {
         {status?.isDirty && (
           <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-sm flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
-            Lokale uncommittete Aenderungen vorhanden. Update wird aus Sicherheitsgruenden blockiert.
+            Lokale uncommittete Änderungen vorhanden. Update wird aus Sicherheitsgründen blockiert.
           </div>
         )}
 
@@ -196,7 +196,7 @@ export function SystemMaintenance() {
             className="px-4 py-2 rounded-md bg-spa-primary text-white hover:bg-spa-primary-dark disabled:opacity-50 flex items-center gap-2"
           >
             <ArrowUpCircle className="w-4 h-4" />
-            {isRunningUpdate ? 'Update laeuft...' : 'Update ausfuehren'}
+            {isRunningUpdate ? 'Update läuft...' : 'Update ausführen'}
           </button>
           <span className="text-xs text-spa-text-secondary">
             Nach erfolgreichem Update ggf. Dienste neu starten.
@@ -258,7 +258,7 @@ export function SystemMaintenance() {
               className="px-4 py-2 rounded-md bg-spa-primary text-white hover:bg-spa-primary-dark disabled:opacity-50 flex items-center gap-2"
             >
               <Upload className="w-4 h-4" />
-              {isImporting ? 'Import laeuft...' : 'Backup importieren'}
+              {isImporting ? 'Import läuft...' : 'Backup importieren'}
             </button>
           </div>
         </div>

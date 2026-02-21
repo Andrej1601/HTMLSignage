@@ -195,6 +195,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                     src={buildUploadUrl(selectedImage.filename)}
                     alt={selectedImage.originalName}
                     className="w-full h-48 object-cover rounded-lg"
+                    loading="lazy"
                   />
                   <button
                     onClick={() => setFormData({ ...formData, imageId: undefined })}
@@ -221,6 +222,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                       src={buildUploadUrl(img.filename)}
                       alt={img.originalName}
                       className="w-full h-24 object-cover rounded cursor-pointer hover:ring-2 hover:ring-spa-primary transition-all"
+                      loading="lazy"
                       onClick={() => {
                         setFormData({ ...formData, imageId: img.id });
                         setShowImagePicker(false);
@@ -352,7 +354,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-              placeholder="Hinweis fuer die Anzeige (eine Zeile = ein Info-Badge)..."
+              placeholder="Hinweis für die Anzeige (eine Zeile = ein Info-Badge)..."
               rows={3}
             />
           </div>

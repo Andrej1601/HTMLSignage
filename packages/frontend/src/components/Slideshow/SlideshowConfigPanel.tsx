@@ -143,7 +143,7 @@ function SortableSlideItem({
         </div>
         <div className="text-sm text-spa-text-secondary">
           Dauer: {slide.duration}s
-          {slide.transition && ` • Uebergang: ${slide.transition}`}
+          {slide.transition && ` • Übergang: ${slide.transition}`}
         </div>
       </div>
 
@@ -175,7 +175,7 @@ function SortableSlideItem({
           onClick={() => onDelete(slide.id)}
           disabled={disabled}
           className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-40"
-          title="Loeschen"
+          title="Löschen"
         >
           <Trash2 className="w-5 h-5" />
         </button>
@@ -191,15 +191,15 @@ export function SlideshowConfigPanel({
   isDirty = false,
   disabled = false,
   showOpenPreviewButton = true,
-  previewButtonLabel = 'Vorschau oeffnen',
+  previewButtonLabel = 'Vorschau öffnen',
   onChange,
   showAudioOverride = false,
   audioOverride = null,
   onAudioOverrideChange,
   audioTitle = 'Audio-Override',
-  audioSubtitle = 'Musik fuer diese Slideshow-Ausgabe konfigurieren.',
+  audioSubtitle = 'Musik für diese Slideshow-Ausgabe konfigurieren.',
   audioEnableLabel = 'Audio-Override aktivieren',
-  audioEnableDescription = 'Wird fuer diesen Zielkontext verwendet.',
+  audioEnableDescription = 'Wird für diesen Zielkontext verwendet.',
 }: SlideshowConfigPanelProps) {
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -289,7 +289,7 @@ export function SlideshowConfigPanel({
   };
 
   const handleDeleteSlide = (id: string) => {
-    if (!window.confirm('Moechtest du diesen Slide wirklich loeschen?')) return;
+    if (!window.confirm('Möchtest du diesen Slide wirklich löschen?')) return;
 
     const targetSlide = config.slides.find((slide) => slide.id === id);
     if (!targetSlide) return;
@@ -351,7 +351,7 @@ export function SlideshowConfigPanel({
           <span className={`text-xs font-medium px-3 py-1 rounded-full ${
             isDirty ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
           }`}>
-            {isDirty ? 'Ungespeicherte Aenderungen aktiv' : 'Gespeicherter Stand'}
+            {isDirty ? 'Ungespeicherte Änderungen aktiv' : 'Gespeicherter Stand'}
           </span>
         </div>
 
@@ -457,7 +457,7 @@ export function SlideshowConfigPanel({
               </div>
               <div>
                 <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                  Zone Groesse ({config.persistentZoneSize || 50}%)
+                  Zone Größe ({config.persistentZoneSize || 50}%)
                 </label>
                 <input
                   type="range"
@@ -483,7 +483,7 @@ export function SlideshowConfigPanel({
         <div className="p-6 border-b border-spa-bg-secondary">
           <h3 className="text-lg font-semibold text-spa-text-primary">Slides nach Zone</h3>
           <p className="text-sm text-spa-text-secondary mt-1">
-            Ziehe die Slides, um die Reihenfolge innerhalb einer Zone zu aendern.
+            Ziehe die Slides, um die Reihenfolge innerhalb einer Zone zu ändern.
           </p>
           <p className="text-xs text-spa-text-secondary mt-2">
             {config.slides.length} Slide{config.slides.length !== 1 ? 's' : ''} ({enabledSlides.length} aktiv)
@@ -498,7 +498,7 @@ export function SlideshowConfigPanel({
               disabled={disabled}
               className="px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50"
             >
-              Ersten Slide hinzufuegen
+              Ersten Slide hinzufügen
             </button>
           </div>
         ) : (
@@ -591,7 +591,7 @@ export function SlideshowConfigPanel({
             </div>
             <div>
               <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Standard-Uebergang
+                Standard-Übergang
               </label>
               <select
                 value={config.defaultTransition}

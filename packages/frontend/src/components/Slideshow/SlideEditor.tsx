@@ -264,6 +264,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                           src={buildUploadUrl(img.filename)}
                           alt={img.originalName}
                           className="w-full h-24 object-cover"
+                          loading="lazy"
                         />
                       </button>
                     ))}

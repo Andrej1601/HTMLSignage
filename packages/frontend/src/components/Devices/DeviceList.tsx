@@ -22,10 +22,10 @@ export function DeviceList({
       <div className="bg-white rounded-lg shadow-sm p-12 text-center">
         <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-          Keine Geraete gefunden
+          Keine Geräte gefunden
         </h3>
         <p className="text-spa-text-secondary">
-          Fuege dein erstes Display hinzu, um loszulegen
+          Füge dein erstes Display hinzu, um loszulegen
         </p>
       </div>
     );
