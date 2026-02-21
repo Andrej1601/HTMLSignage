@@ -3,6 +3,7 @@ import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy }
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 
 interface MediaCardProps {
   media: Media;
@@ -10,7 +11,6 @@ interface MediaCardProps {
 }
 
 export function MediaCard({ media, onDelete }: MediaCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Construct full URL for media
@@ -35,12 +35,10 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
     navigator.clipboard.writeText(mediaUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    setMenuOpen(false);
   };
 
   const handleDownload = () => {
     window.open(mediaUrl, '_blank');
-    setMenuOpen(false);
   };
 
   return (
@@ -77,52 +75,26 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
 
         {/* Menu Button */}
         <div className="absolute top-2 right-2">
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 bg-white/90 hover:bg-white rounded-lg transition-colors shadow-sm"
-            aria-label="Medien-Aktionen"
-            aria-expanded={menuOpen}
-          >
-            <MoreVertical className="w-4 h-4 text-spa-text-secondary" aria-hidden="true" />
-          </button>
-
-          {menuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-spa-bg-secondary z-20">
-                <div className="py-1">
-                  <button
-                    onClick={handleCopyUrl}
-                    className="w-full px-4 py-2 text-left text-sm text-spa-text-primary hover:bg-spa-bg-primary flex items-center gap-2"
-                  >
-                    <Copy className="w-4 h-4" />
-                    {copied ? 'Kopiert!' : 'URL kopieren'}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="w-full px-4 py-2 text-left text-sm text-spa-text-primary hover:bg-spa-bg-primary flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Herunterladen
-                  </button>
-                  <div className="border-t border-spa-bg-secondary my-1" />
-                  <button
-                    onClick={() => {
-                      onDelete(media);
-                      setMenuOpen(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Löschen
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+          <DropdownMenu
+            ariaLabel="Medien-Aktionen"
+            width="w-48"
+            trigger={() => (
+              <button
+                className="p-2 bg-white/90 hover:bg-white rounded-lg transition-colors shadow-sm"
+                aria-label="Medien-Aktionen"
+                type="button"
+              >
+                <MoreVertical className="w-4 h-4 text-spa-text-secondary" aria-hidden="true" />
+              </button>
+            )}
+            sections={[
+              [
+                { label: copied ? 'Kopiert!' : 'URL kopieren', icon: Copy, onClick: handleCopyUrl },
+                { label: 'Herunterladen', icon: Download, onClick: handleDownload },
+              ],
+              [{ label: 'Löschen', icon: Trash2, onClick: () => onDelete(media), variant: 'danger' }],
+            ]}
+          />
         </div>
 
         {/* Type Badge */}

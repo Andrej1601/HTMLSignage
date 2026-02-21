@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';

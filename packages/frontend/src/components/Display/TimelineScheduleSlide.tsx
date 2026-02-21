@@ -282,7 +282,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
       const diff = uniqueRowMinutes[i] - uniqueRowMinutes[i - 1];
       if (diff > 0) positiveDiffs.push(diff);
     }
-    const stepMinute = Math.min(...positiveDiffs.filter((d) => d > 0)) || 30;
+    const stepMinute = positiveDiffs.length > 0 ? Math.min(...positiveDiffs) : 30;
 
     const maxFromRows = (uniqueRowMinutes[uniqueRowMinutes.length - 1] ?? minMinute) + stepMinute;
     const maxFromInfusions = infusionEndMinutes.length > 0

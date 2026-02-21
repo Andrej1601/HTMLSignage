@@ -68,6 +68,17 @@ const api = axios.create({
   },
 });
 
+// Attach JWT from localStorage to every request unless already set.
+api.interceptors.request.use((config) => {
+  if (!config.headers.Authorization) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 let hasWarnedDisplayConfigFallback = false;
 const DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY = 'htmlsignage_display_config_unavailable';
 

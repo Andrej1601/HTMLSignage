@@ -94,7 +94,12 @@ export interface LayoutOption {
   supportedSlideTypes: SlideType[];
 }
 
-// Layout options registry
+// ─── Layout Registry ────────────────────────────────────────────────────────
+//
+// LAYOUT_OPTIONS is the ordered array used for UI rendering (picks up insertion order).
+// LAYOUT_REGISTRY is a typed Record for O(1) lookup — adding a new layout means
+// adding ONE entry here. All consumers call getLayout() and never need to change.
+
 export const LAYOUT_OPTIONS: LayoutOption[] = [
   {
     type: 'split-view',
@@ -154,6 +159,16 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
     supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'infos', 'events'],
   },
 ];
+
+// O(1) registry — indexed by LayoutType for fast lookup
+export const LAYOUT_REGISTRY: Record<LayoutType, LayoutOption> = Object.fromEntries(
+  LAYOUT_OPTIONS.map((opt) => [opt.type, opt])
+) as Record<LayoutType, LayoutOption>;
+
+/** Returns the layout definition for `type`. Falls back to `full-rotation` when unknown. */
+export function getLayout(type: LayoutType): LayoutOption {
+  return LAYOUT_REGISTRY[type] ?? LAYOUT_REGISTRY['full-rotation'];
+}
 
 // Slide type metadata
 export interface SlideTypeOption {
@@ -252,8 +267,9 @@ export function createDefaultSlideshowConfig(): SlideshowConfig {
   };
 }
 
+/** @deprecated Use `getLayout()` instead — returns undefined if unknown rather than falling back. */
 export function getLayoutOption(type: LayoutType): LayoutOption | undefined {
-  return LAYOUT_OPTIONS.find((opt) => opt.type === type);
+  return LAYOUT_REGISTRY[type];
 }
 
 export function getSlideTypeOption(type: SlideType): SlideTypeOption | undefined {
@@ -275,10 +291,7 @@ export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex:
 
 // Zone helper functions
 export function getZonesForLayout(layoutType: LayoutType): Zone[] {
-  const layout = getLayoutOption(layoutType);
-  if (layout) return layout.zones;
-  // Fallback for legacy/unknown layouts so the UI/display doesn't break hard.
-  return getLayoutOption('split-view')?.zones || [];
+  return getLayout(layoutType).zones;
 }
 
 export function getSlidesByZone(slides: SlideConfig[], zoneId: string): SlideConfig[] {

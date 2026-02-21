@@ -16,7 +16,6 @@ import {
   getActiveEvent,
   getColorPalette,
   getDefaultSettings,
-  type AudioSettings,
   type ColorPaletteName,
   type Settings,
   type ThemeColors,
@@ -72,21 +71,7 @@ interface PreviewConfigMessage {
 }
 
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
-
-function normalizeAudio(raw: unknown): AudioSettings {
-  const value = isPlainRecord(raw) ? raw : {};
-  const volume = typeof value.volume === 'number' && Number.isFinite(value.volume)
-    ? Math.max(0, Math.min(1, value.volume))
-    : 0.5;
-
-  return {
-    enabled: Boolean(value.enabled),
-    src: typeof value.src === 'string' && value.src.trim().length > 0 ? value.src : undefined,
-    mediaId: typeof value.mediaId === 'string' && value.mediaId.trim().length > 0 ? value.mediaId : undefined,
-    volume,
-    loop: value.loop !== false,
-  };
-}
+import { normalizeAudioSettings } from '@/utils/audioUtils';
 
 export function DisplayClientPage() {
   const location = useLocation();
@@ -403,7 +388,7 @@ export function DisplayClientPage() {
   }, [localSettings, eventClock]);
 
   const effectiveAudio = useMemo(
-    () => normalizeAudio(effectiveSettings.audio),
+    () => normalizeAudioSettings(effectiveSettings.audio),
     [effectiveSettings.audio]
   );
 

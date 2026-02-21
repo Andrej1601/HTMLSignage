@@ -1,41 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
+import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { normalizeScheduleData, createDefaultSchedule } from '../lib/schedule.js';
 
 const router = Router();
-const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
-const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
-
-function createEmptyDaySchedule(saunas: string[] = DEFAULT_SAUNAS): DaySchedule {
-  return {
-    saunas: [...saunas],
-    rows: [],
-  };
-}
-
-function createDefaultSchedule(version = 1): Schedule {
-  const presets = Object.fromEntries(
-    PRESET_KEYS.map((key) => [key, createEmptyDaySchedule()])
-  ) as Record<PresetKey, DaySchedule>;
-
-  return {
-    version: Math.max(1, Math.floor(version)),
-    presets,
-    autoPlay: false,
-  };
-}
-
-function normalizeScheduleData(raw: unknown): Schedule {
-  const parsed = ScheduleSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-
-  const maybeVersion = (raw as { version?: unknown } | null)?.version;
-  const version = typeof maybeVersion === 'number' && Number.isFinite(maybeVersion) ? maybeVersion : 1;
-  return createDefaultSchedule(version);
-}
 
 // GET /api/schedule - Get current schedule
 router.get('/', async (req, res) => {

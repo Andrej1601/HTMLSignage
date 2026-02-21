@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import {
   Monitor,
   Circle,
-  MoreVertical,
   Settings,
   RefreshCw,
   Power,
@@ -19,6 +17,8 @@ import {
   getStatusLabel,
   getModeLabel,
 } from '@/types/device.types';
+import { hasDeviceOverrides } from '@/utils/deviceUtils';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 
 interface DeviceCardProps {
   device: Device;
@@ -35,20 +35,9 @@ export function DeviceCard({
   onReload,
   onRestart,
 }: DeviceCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const status = getDeviceStatus(device.lastSeen);
   const statusColor = getStatusColor(status);
-  const hasScheduleOverride = Boolean(
-    device.overrides?.schedule &&
-    typeof device.overrides.schedule === 'object' &&
-    'presets' in device.overrides.schedule
-  );
-  const hasSettingsOverride = Boolean(
-    device.overrides?.settings &&
-    typeof device.overrides.settings === 'object' &&
-    Object.keys(device.overrides.settings).length > 0
-  );
-  const hasOverrides = hasScheduleOverride || hasSettingsOverride;
+  const hasOverrides = hasDeviceOverrides(device);
   const isOverrideMode = device.mode === 'override';
   const isOverrideActive = hasOverrides && isOverrideMode;
   const modeBadgeClass = isOverrideMode
@@ -80,71 +69,18 @@ export function DeviceCard({
             </div>
           </div>
 
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors"
-              aria-label="Geräte-Aktionen"
-              aria-expanded={menuOpen}
-            >
-              <MoreVertical className="w-5 h-5 text-spa-text-secondary" aria-hidden="true" />
-            </button>
-
-            {menuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setMenuOpen(false)}
-                />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-spa-bg-secondary z-20">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        onEdit(device);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-spa-text-primary hover:bg-spa-bg-primary flex items-center gap-2"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Bearbeiten
-                    </button>
-                    <div className="border-t border-spa-bg-secondary my-1" />
-                    <button
-                      onClick={() => {
-                        onReload(device);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-spa-text-primary hover:bg-spa-bg-primary flex items-center gap-2"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Neu laden
-                    </button>
-                    <button
-                      onClick={() => {
-                        onRestart(device);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-spa-text-primary hover:bg-spa-bg-primary flex items-center gap-2"
-                    >
-                      <Power className="w-4 h-4" />
-                      Neustart
-                    </button>
-                    <div className="border-t border-spa-bg-secondary my-1" />
-                    <button
-                      onClick={() => {
-                        onDelete(device);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Löschen
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          <DropdownMenu
+            ariaLabel="Geräte-Aktionen"
+            width="w-56"
+            sections={[
+              [{ label: 'Bearbeiten', icon: Edit2, onClick: () => onEdit(device) }],
+              [
+                { label: 'Neu laden', icon: RefreshCw, onClick: () => onReload(device) },
+                { label: 'Neustart', icon: Power, onClick: () => onRestart(device) },
+              ],
+              [{ label: 'Löschen', icon: Trash2, onClick: () => onDelete(device), variant: 'danger' }],
+            ]}
+          />
         </div>
       </div>
 

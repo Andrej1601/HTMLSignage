@@ -1,10 +1,10 @@
 import type { Sauna } from '@/types/sauna.types';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
-import { MoreVertical, Edit, Trash2, GripVertical, Thermometer, Droplets, Users } from 'lucide-react';
-import { useState } from 'react';
+import { Edit, Trash2, GripVertical, Thermometer, Droplets, Users } from 'lucide-react';
 import { useMedia } from '@/hooks/useMedia';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 
 interface SaunaCardProps {
   sauna: Sauna;
@@ -14,7 +14,6 @@ interface SaunaCardProps {
 }
 
 export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
   const { data: media } = useMedia();
 
   const statusColor = SAUNA_STATUS_COLORS[sauna.status];
@@ -71,47 +70,14 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
           </div>
 
           {/* Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-1 hover:bg-spa-bg-primary rounded transition-colors"
-              aria-label="Sauna-Aktionen"
-              aria-expanded={showMenu}
-            >
-              <MoreVertical className="w-5 h-5 text-spa-text-secondary" aria-hidden="true" />
-            </button>
-
-            {showMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-1 bg-white border border-spa-bg-secondary rounded-lg shadow-lg z-20 min-w-[160px]">
-                  <button
-                    onClick={() => {
-                      onEdit();
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-spa-bg-primary flex items-center gap-2 text-spa-text-primary"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Bearbeiten
-                  </button>
-                  <button
-                    onClick={() => {
-                      onDelete();
-                      setShowMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-red-50 flex items-center gap-2 text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Löschen
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <DropdownMenu
+            ariaLabel="Sauna-Aktionen"
+            width="w-40"
+            sections={[
+              [{ label: 'Bearbeiten', icon: Edit, onClick: onEdit }],
+              [{ label: 'Löschen', icon: Trash2, onClick: onDelete, variant: 'danger' }],
+            ]}
+          />
         </div>
 
         {/* Info */}

@@ -16,6 +16,8 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { Monitor, RefreshCw, RotateCcw, Save } from 'lucide-react';
 
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
+import { parseAudioSettings } from '@/utils/audioUtils';
+import { hasDeviceOverrides, getDeviceOverrideSettings } from '@/utils/deviceUtils';
 
 function isScheduleOverride(value: unknown): value is Schedule {
   if (!isPlainRecord(value)) return false;
@@ -26,13 +28,8 @@ function isScheduleOverride(value: unknown): value is Schedule {
   );
 }
 
-function getOverrideSettings(device: Device | null): Record<string, unknown> {
-  const settings = device?.overrides?.settings;
-  return isPlainRecord(settings) ? { ...settings } : {};
-}
-
 function getOverrideSlideshowConfig(device: Device | null): SlideshowConfig | null {
-  const settings = getOverrideSettings(device);
+  const settings = getDeviceOverrideSettings(device);
   const raw = settings.slideshow;
   if (!isPlainRecord(raw) || !Array.isArray(raw.slides)) return null;
 
@@ -43,38 +40,8 @@ function getOverrideSlideshowConfig(device: Device | null): SlideshowConfig | nu
   };
 }
 
-function toAudioSettings(raw: unknown): AudioSettings | null {
-  if (!isPlainRecord(raw)) return null;
-
-  const enabled = Boolean(raw.enabled);
-  const volume = typeof raw.volume === 'number' && Number.isFinite(raw.volume)
-    ? Math.min(1, Math.max(0, raw.volume))
-    : 0.5;
-  const loop = raw.loop !== false;
-  const src = typeof raw.src === 'string' && raw.src.trim().length > 0 ? raw.src : undefined;
-  const mediaId = typeof raw.mediaId === 'string' && raw.mediaId.trim().length > 0 ? raw.mediaId : undefined;
-
-  return {
-    enabled,
-    src,
-    mediaId,
-    volume,
-    loop,
-  };
-}
-
-function hasDeviceSlideshowOverrides(device: Device): boolean {
-  const scheduleOverride = device.overrides?.schedule;
-  const settingsOverride = device.overrides?.settings;
-
-  const hasScheduleOverride = isPlainRecord(scheduleOverride) && 'presets' in scheduleOverride;
-  const hasSettingsOverride = isPlainRecord(settingsOverride) && Object.keys(settingsOverride).length > 0;
-
-  return hasScheduleOverride || hasSettingsOverride;
-}
-
 function hasStoredSlideshowOrAudioOverride(device: Device | null): boolean {
-  const settingsOverride = getOverrideSettings(device);
+  const settingsOverride = getDeviceOverrideSettings(device);
   return Boolean(settingsOverride.slideshow) || Boolean(settingsOverride.audio);
 }
 
@@ -84,7 +51,7 @@ function getDeviceSlideshowSource(device: Device): {
   badgeClass: string;
   usesGlobal: boolean;
 } {
-  const hasOverrides = hasDeviceSlideshowOverrides(device);
+  const hasOverrides = hasDeviceOverrides(device);
 
   if (device.mode === 'override' && hasOverrides) {
     return {
@@ -209,7 +176,7 @@ export function SlideshowPage() {
     const overrideConfig = getOverrideSlideshowConfig(device);
 
     setEditorConfig(overrideConfig || fallback);
-    setEditorAudioOverride(toAudioSettings(getOverrideSettings(device).audio));
+    setEditorAudioOverride(parseAudioSettings(getDeviceOverrideSettings(device).audio));
     setIsDirty(false);
   };
 
@@ -240,7 +207,7 @@ export function SlideshowPage() {
       ? selectedDevice.overrides?.schedule
       : undefined;
 
-    const settingsOverride = getOverrideSettings(selectedDevice);
+    const settingsOverride = getDeviceOverrideSettings(selectedDevice);
     settingsOverride.slideshow = {
       ...editorConfig,
       version: (editorConfig.version || 1) + (isDirty ? 1 : 0),
@@ -340,7 +307,7 @@ export function SlideshowPage() {
       return;
     }
 
-    const currentSettingsOverride = getOverrideSettings(selectedDevice);
+    const currentSettingsOverride = getDeviceOverrideSettings(selectedDevice);
     const nextSettings: Record<string, unknown> = {
       ...currentSettingsOverride,
       slideshow: {
@@ -371,7 +338,7 @@ export function SlideshowPage() {
   const handleRemoveCurrentOverride = () => {
     if (!selectedDevice) return;
 
-    const currentSettingsOverride = getOverrideSettings(selectedDevice);
+    const currentSettingsOverride = getDeviceOverrideSettings(selectedDevice);
     delete currentSettingsOverride.slideshow;
     delete currentSettingsOverride.audio;
 
@@ -506,20 +473,33 @@ export function SlideshowPage() {
             </div>
           </div>
 
-          <div className="mb-4 max-w-md">
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">Bearbeitungsziel</label>
-            <select
-              value={target}
-              onChange={(event) => handleSelectTarget(event.target.value as EditorTarget)}
-              className="w-full rounded-md border border-spa-bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => handleSelectTarget('global')}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                target === 'global'
+                  ? 'bg-spa-primary text-white'
+                  : 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary'
+              }`}
             >
-              <option value="global">Global</option>
-              {pairedDevices.map((device) => (
-                <option key={device.id} value={toDeviceTarget(device.id)}>
+              Global
+            </button>
+            {pairedDevices.map((device) => {
+              const tgt = toDeviceTarget(device.id);
+              return (
+                <button
+                  key={device.id}
+                  onClick={() => handleSelectTarget(tgt)}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                    target === tgt
+                      ? 'bg-spa-primary text-white'
+                      : 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary'
+                  }`}
+                >
                   {device.name}
-                </option>
-              ))}
-            </select>
+                </button>
+              );
+            })}
           </div>
 
           {pairedDevices.length === 0 ? (

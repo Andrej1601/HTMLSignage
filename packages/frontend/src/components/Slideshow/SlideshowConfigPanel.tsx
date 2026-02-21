@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
 import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
+import { GlobalSlideshowSettings } from '@/components/Slideshow/GlobalSlideshowSettings';
+import { LayoutPicker } from '@/components/Slideshow/LayoutPicker';
 import { SlideEditor } from '@/components/Slideshow/SlideEditor';
 import { SlidePreview } from '@/components/Slideshow/SlidePreview';
 import type { Schedule } from '@/types/schedule.types';
@@ -11,7 +13,6 @@ import {
   getEnabledSlides,
   getSlidesByZone,
   getZonesForLayout,
-  LAYOUT_OPTIONS,
   reorderSlides,
 } from '@/types/slideshow.types';
 import { Edit, Eye, EyeOff, GripVertical, Plus, Play, Trash2 } from 'lucide-react';
@@ -207,11 +208,6 @@ export function SlideshowConfigPanel({
 
   const zones = useMemo(() => getZonesForLayout(config.layout), [config.layout]);
   const enabledSlides = useMemo(() => getEnabledSlides(config), [config]);
-  const currentLayout = useMemo(
-    () => LAYOUT_OPTIONS.find((opt) => opt.type === config.layout),
-    [config.layout]
-  );
-
   useEffect(() => {
     const firstZone = zones[0]?.id || 'main';
     if (!zones.some((zone) => zone.id === selectedZone)) {
@@ -408,76 +404,15 @@ export function SlideshowConfigPanel({
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-spa-text-primary mb-4">Display Layout</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {LAYOUT_OPTIONS.map((layout) => (
-            <button
-              key={layout.type}
-              onClick={() => handleLayoutChange(layout.type)}
-              disabled={disabled}
-              className={clsx(
-                'p-4 rounded-lg border-2 transition-all text-left disabled:opacity-50',
-                config.layout === layout.type
-                  ? 'border-spa-primary bg-spa-primary/5'
-                  : 'border-spa-bg-secondary hover:border-spa-primary/50'
-              )}
-            >
-              <div className="text-3xl mb-2">{layout.icon}</div>
-              <div className="font-semibold text-spa-text-primary mb-1">{layout.label}</div>
-              <div className="text-xs text-spa-text-secondary">{layout.description}</div>
-            </button>
-          ))}
-        </div>
-
-        {currentLayout?.supportsPersistentZone && (
-          <div className="mt-4 p-4 bg-spa-bg-primary rounded-lg">
-            <h4 className="font-semibold text-spa-text-primary mb-3">Layout-Einstellungen</h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                  Persistente Zone Position
-                </label>
-                <select
-                  value={config.persistentZonePosition || 'left'}
-                  onChange={(event) => {
-                    onChange({
-                      ...config,
-                      persistentZonePosition: event.target.value as typeof config.persistentZonePosition,
-                    });
-                  }}
-                  disabled={disabled}
-                  className="w-full px-3 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50"
-                >
-                  <option value="left">Links</option>
-                  <option value="right">Rechts</option>
-                  <option value="top">Oben</option>
-                  <option value="bottom">Unten</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                  Zone Größe ({config.persistentZoneSize || 50}%)
-                </label>
-                <input
-                  type="range"
-                  min="30"
-                  max="70"
-                  value={config.persistentZoneSize || 50}
-                  onChange={(event) => {
-                    onChange({
-                      ...config,
-                      persistentZoneSize: parseInt(event.target.value, 10),
-                    });
-                  }}
-                  disabled={disabled}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <LayoutPicker
+        layout={config.layout}
+        persistentZonePosition={config.persistentZonePosition}
+        persistentZoneSize={config.persistentZoneSize}
+        disabled={disabled}
+        onLayoutChange={handleLayoutChange}
+        onPersistentZonePositionChange={(position) => onChange({ ...config, persistentZonePosition: position })}
+        onPersistentZoneSizeChange={(size) => onChange({ ...config, persistentZoneSize: size })}
+      />
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b border-spa-bg-secondary">
@@ -567,89 +502,7 @@ export function SlideshowConfigPanel({
           </div>
         )}
 
-        <div className="p-6 border-t border-spa-bg-secondary bg-spa-bg-primary/30">
-          <h4 className="font-semibold text-spa-text-primary mb-4">Globale Einstellungen</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Standard-Dauer (Sekunden)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="300"
-                value={config.defaultDuration}
-                onChange={(event) => {
-                  onChange({
-                    ...config,
-                    defaultDuration: parseInt(event.target.value, 10) || 10,
-                  });
-                }}
-                disabled={disabled}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Standard-Übergang
-              </label>
-              <select
-                value={config.defaultTransition}
-                onChange={(event) => {
-                  onChange({
-                    ...config,
-                    defaultTransition: event.target.value as SlideshowConfig['defaultTransition'],
-                  });
-                }}
-                disabled={disabled}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50"
-              >
-                <option value="fade">Fade</option>
-                <option value="slide">Slide</option>
-                <option value="zoom">Zoom</option>
-                <option value="none">Keine</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.showSlideIndicators !== false}
-                  onChange={(event) => {
-                    onChange({
-                      ...config,
-                      showSlideIndicators: event.target.checked,
-                    });
-                  }}
-                  disabled={disabled}
-                  className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary disabled:opacity-50"
-                />
-                <span className="text-sm font-medium text-spa-text-primary">
-                  Slide-Indikatoren anzeigen
-                </span>
-              </label>
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.showZoneBorders !== false}
-                  onChange={(event) => {
-                    onChange({
-                      ...config,
-                      showZoneBorders: event.target.checked,
-                    });
-                  }}
-                  disabled={disabled}
-                  className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary disabled:opacity-50"
-                />
-                <span className="text-sm font-medium text-spa-text-primary">
-                  Trennlinien anzeigen
-                </span>
-              </label>
-            </div>
-          </div>
-        </div>
+        <GlobalSlideshowSettings config={config} disabled={disabled} onChange={onChange} />
       </div>
 
       {showOpenPreviewButton && (

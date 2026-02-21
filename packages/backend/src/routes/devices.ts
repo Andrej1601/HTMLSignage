@@ -1,54 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
+import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/index.js';
-import { authMiddleware, generatePairingCode, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { isPlainRecord, deepMerge } from '../lib/utils.js';
+import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
 
 const router = Router();
-const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
-const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
-const DEFAULT_HEADER = {
-  enabled: true,
-  showLogo: true,
-  logoText: 'HTML Signage',
-  showClock: true,
-  showDate: true,
-  subtitle: 'Premium Wellness & Spa Dashboard',
-  height: 8,
-};
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function createEmptyDaySchedule(saunas: string[] = DEFAULT_SAUNAS): DaySchedule {
-  return {
-    saunas: [...saunas],
-    rows: [],
-  };
-}
-
-function createDefaultSchedule(version = 1): Schedule {
-  const presets = Object.fromEntries(
-    PRESET_KEYS.map((key) => [key, createEmptyDaySchedule()])
-  ) as Record<PresetKey, DaySchedule>;
-
-  return {
-    version: Math.max(1, Math.floor(version)),
-    presets,
-    autoPlay: false,
-  };
-}
-
-function normalizeScheduleData(raw: unknown): Schedule {
-  const parsed = ScheduleSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-
-  const maybeVersion = (raw as { version?: unknown } | null)?.version;
-  const version = typeof maybeVersion === 'number' && Number.isFinite(maybeVersion) ? maybeVersion : 1;
-  return createDefaultSchedule(version);
-}
 
 function normalizeSettingsData(raw: unknown): Record<string, unknown> {
   const data = isPlainRecord(raw) ? { ...raw } : {};
@@ -60,21 +19,6 @@ function normalizeSettingsData(raw: unknown): Record<string, unknown> {
 
 function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
   return isPlainRecord(raw) && Object.keys(raw).length > 0;
-}
-
-function deepMerge(base: unknown, override: unknown): unknown {
-  if (!isPlainRecord(base)) return override;
-  if (!isPlainRecord(override)) return base;
-
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
-      merged[key] = deepMerge(merged[key], value);
-    } else {
-      merged[key] = value;
-    }
-  }
-  return merged;
 }
 
 const CreateDeviceSchema = z.object({

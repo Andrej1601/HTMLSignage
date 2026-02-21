@@ -6,8 +6,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { prisma } from './lib/prisma.js';
 import { setupWebSocket } from './websocket/index.js';
 import { UPLOAD_DIR } from './lib/upload.js';
@@ -19,8 +17,6 @@ import usersRouter from './routes/users.js';
 import mediaRouter from './routes/media.js';
 import systemRouter from './routes/system.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
