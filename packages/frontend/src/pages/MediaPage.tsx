@@ -6,7 +6,9 @@ import { MediaUpload } from '@/components/Media/MediaUpload';
 import { MediaGrid } from '@/components/Media/MediaGrid';
 import { useMedia, useDeleteMedia } from '@/hooks/useMedia';
 import type { Media, MediaType } from '@/types/media.types';
-import { ImageIcon, RefreshCw, Upload, Filter } from 'lucide-react';
+import { StatCard } from '@/components/Dashboard/StatCard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ImageIcon, RefreshCw, Upload, Filter, Music, Film } from 'lucide-react';
 
 export function MediaPage() {
   const [typeFilter, setTypeFilter] = useState<MediaType | 'all'>('all');
@@ -90,53 +92,10 @@ export function MediaPage() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-spa-bg-primary rounded-lg">
-                  <ImageIcon className="w-6 h-6 text-spa-primary" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Gesamt</p>
-                  <p className="text-2xl font-bold text-spa-text-primary">{stats.total}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <ImageIcon className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Bilder</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.images}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <ImageIcon className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Audio</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.audio}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-pink-100 rounded-lg">
-                  <ImageIcon className="w-6 h-6 text-pink-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-spa-text-secondary">Video</p>
-                  <p className="text-2xl font-bold text-pink-600">{stats.video}</p>
-                </div>
-              </div>
-            </div>
+            <StatCard title="Gesamt" value={stats.total} icon={ImageIcon} color="primary" />
+            <StatCard title="Bilder" value={stats.images} icon={ImageIcon} color="info" />
+            <StatCard title="Audio" value={stats.audio} icon={Music} color="violet" />
+            <StatCard title="Video" value={stats.video} icon={Film} color="success" />
           </div>
 
           {/* Upload Section */}
@@ -181,35 +140,15 @@ export function MediaPage() {
           onDelete={setDeletingMedia}
         />
 
-        {/* Delete Confirmation Dialog */}
-        {deletingMedia && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold text-spa-text-primary mb-4">
-                Datei löschen?
-              </h3>
-              <p className="text-spa-text-secondary mb-6">
-                Möchtest du die Datei "{deletingMedia.originalName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setDeletingMedia(null)}
-                  disabled={deleteMedia.isPending}
-                  className="flex-1 px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={handleDeleteMedia}
-                  disabled={deleteMedia.isPending}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  {deleteMedia.isPending ? 'Wird gelöscht...' : 'Löschen'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={Boolean(deletingMedia)}
+          title="Datei löschen?"
+          message={`Möchtest du die Datei "${deletingMedia?.originalName}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+          confirmLabel={deleteMedia.isPending ? 'Wird gelöscht...' : 'Löschen'}
+          variant="danger"
+          onConfirm={handleDeleteMedia}
+          onCancel={() => setDeletingMedia(null)}
+        />
       </div>
     </Layout>
   );

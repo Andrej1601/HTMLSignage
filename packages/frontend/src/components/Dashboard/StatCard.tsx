@@ -18,12 +18,12 @@ interface StatCardProps {
 
 const colorClasses: Record<NonNullable<StatCardProps['color']>, { iconBg: string; iconFg: string }> = {
   primary: { iconBg: 'bg-spa-primary/10', iconFg: 'text-spa-primary' },
-  success: { iconBg: 'bg-green-100', iconFg: 'text-green-600' },
+  success: { iconBg: 'bg-spa-secondary/15', iconFg: 'text-spa-secondary-dark' },
   warning: { iconBg: 'bg-amber-100', iconFg: 'text-amber-700' },
   danger: { iconBg: 'bg-red-100', iconFg: 'text-red-600' },
-  info: { iconBg: 'bg-blue-100', iconFg: 'text-blue-600' },
-  neutral: { iconBg: 'bg-gray-100', iconFg: 'text-gray-600' },
-  violet: { iconBg: 'bg-violet-100', iconFg: 'text-violet-600' },
+  info: { iconBg: 'bg-spa-accent/15', iconFg: 'text-spa-primary-dark' },
+  neutral: { iconBg: 'bg-spa-bg-secondary', iconFg: 'text-spa-text-secondary' },
+  violet: { iconBg: 'bg-spa-primary-light/20', iconFg: 'text-spa-primary-dark' },
 };
 
 export function StatCard({

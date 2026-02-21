@@ -115,7 +115,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const subscribe = useCallback((channel: string, deviceId?: string) => {
     if (!socketRef.current) return;
 
-    console.log('[WebSocket] Subscribing to', channel, deviceId);
+    console.log('[WebSocket] Subscribing to', channel, ...(deviceId ? [deviceId] : []));
 
     switch (channel) {
       case 'schedule':
@@ -135,7 +135,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const unsubscribe = useCallback((channel: string, deviceId?: string) => {
     if (!socketRef.current) return;
 
-    console.log('[WebSocket] Unsubscribing from', channel, deviceId);
+    console.log('[WebSocket] Unsubscribing from', channel, ...(deviceId ? [deviceId] : []));
 
     switch (channel) {
       case 'schedule':

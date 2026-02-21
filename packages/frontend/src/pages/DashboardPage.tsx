@@ -6,6 +6,7 @@ import { ContentQualityWidget } from '@/components/Dashboard/ContentQualityWidge
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget';
+import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
@@ -79,31 +80,17 @@ export function DashboardPage() {
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Status Banner */}
-        <div className="rounded-xl bg-gradient-to-r from-spa-primary/10 to-spa-secondary/15 border border-spa-bg-secondary p-6">
-          <h2 className="text-3xl font-bold text-spa-text-primary mb-2">Dashboard</h2>
-          <p className="text-spa-text-secondary">Betriebszentrale für Displays, Inhalte und Systemzustand</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <StatusBadge
-              label={wsConnected ? 'WebSocket verbunden' : 'WebSocket getrennt'}
-              tone={systemChecks.websocketTone}
-              pulse={wsConnected}
-            />
-            <StatusBadge
-              label={backendHealthQuery.data?.status === 'ok' ? 'Backend erreichbar' : 'Backend prüfen'}
-              tone={systemChecks.backendTone}
-            />
-            <StatusBadge
-              label={liveState.activeEvent ? `Event live: ${liveState.activeEvent.name}` : 'Kein Event aktiv'}
-              tone={liveState.activeEvent ? 'info' : 'neutral'}
-              showDot={Boolean(liveState.activeEvent)}
-            />
-            <StatusBadge
-              label={schedule?.autoPlay ? 'Auto-Play aktiv' : 'Manueller Planmodus'}
-              tone={schedule?.autoPlay ? 'success' : 'warning'}
-            />
-          </div>
-        </div>
+        <PageHeader
+          title="Dashboard"
+          description="Betriebszentrale für Displays, Inhalte und Systemzustand"
+          icon={LayoutDashboard}
+          badges={[
+            { label: wsConnected ? 'WebSocket verbunden' : 'WebSocket getrennt', tone: systemChecks.websocketTone, pulse: wsConnected },
+            { label: backendHealthQuery.data?.status === 'ok' ? 'Backend erreichbar' : 'Backend prüfen', tone: systemChecks.backendTone },
+            { label: liveState.activeEvent ? `Event live: ${liveState.activeEvent.name}` : 'Kein Event aktiv', tone: liveState.activeEvent ? 'info' as const : 'neutral' as const },
+            { label: schedule?.autoPlay ? 'Auto-Play aktiv' : 'Manueller Planmodus', tone: schedule?.autoPlay ? 'success' as const : 'warning' as const },
+          ]}
+        />
 
         {/* Widget Layout Panel */}
         <div className="bg-white rounded-lg shadow-sm p-5 border border-spa-bg-secondary">
@@ -127,13 +114,13 @@ export function DashboardPage() {
               </button>
               <button
                 onClick={setOpsFocus}
-                className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                className="px-3 py-2 text-sm bg-spa-primary/10 text-spa-primary rounded-lg hover:bg-spa-primary/20 transition-colors"
               >
                 Ops-Fokus
               </button>
               <button
                 onClick={showAllWidgets}
-                className="px-3 py-2 text-sm bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors"
+                className="px-3 py-2 text-sm bg-spa-secondary/10 text-spa-secondary-dark rounded-lg hover:bg-spa-secondary/20 transition-colors"
               >
                 Alle anzeigen
               </button>

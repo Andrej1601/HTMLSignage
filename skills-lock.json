@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "skills": {
+    "architecture": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "3d8d5a728b16d52abec6066858a33a67beb012bf8329fa6af09f11e543cb4c61"
+    },
+    "backend": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "a85b135fbc068b47a94ffb2584cbd2e9c5965dd817bda40a79a5515ce9540604"
+    },
+    "code-review": {
+      "source": "outfitter-dev/agents",
+      "sourceType": "github",
+      "computedHash": "225df52dddbfc72cebb88d2bc8a165dd5f8d46ba5f37dbec96412f2f1040a4ec"
+    },
+    "deploy": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "4bc936fa4700acf4aa3cad5ae2fbfbaf3a88332e969ceb424c3e6b7078378c0c"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "6412eb4eb3b91595ebab937f0c69501240e7ba761b3d82510b5cf506ec5c7adc"
+    },
+    "frontend": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "cac3e1171367c50699221dc667670d125e4d87f8997b02f4c190e94ce37dc06a"
+    },
+    "git-commit": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
+    },
+    "help": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "dc60d205d89d1893e41479f7d5cecf6d9e739fc95e0923c2365ed8ccab7be8ed"
+    },
+    "qa": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "f103d1fdbca93afa70999c0fe6c7af3a934716b7f8fb3bfa5977dc1ec826a30b"
+    },
+    "requirements": {
+      "source": "AlexPEClub/ai-coding-starter-kit",
+      "sourceType": "github",
+      "computedHash": "d5498c7184e5d4df662d43f4f9cad070b5d88ca24d66ca0dbefbcb27d49c31c7"
+    },
+    "tailwindcss-framework-integration": {
+      "source": "josiahsiegel/claude-plugin-marketplace",
+      "sourceType": "github",
+      "computedHash": "38da971a986344925cad9922d826ed21946d89608b89f211b7e14fc525d2e176"
+    },
+    "ui-design-patterns": {
+      "source": "manutej/luxor-claude-marketplace",
+      "sourceType": "github",
+      "computedHash": "b1a5307c8f66157028428b09e047b418c75b42ed96e97f58ea099817d946fbdb"
+    },
+    "ui-ux-pro-max": {
+      "source": "kimny1143/claude-code-template",
+      "sourceType": "github",
+      "computedHash": "ba446ed0bc083a9f62e030142be324df63dbd13af66794ad0689114ee41fec50"
+    },
+    "web-component-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "07de4469d88b18ae2e9cbc5cc1d41d46b86756fe7fae53765f6dd7f1db7916ca"
+    },
+    "websocket-engineer": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "77a4e6e663b3a3075bb9194ce0266970a1d0dc11d08fa55ffc0fdf23e3402949"
+    }
+  }
+}

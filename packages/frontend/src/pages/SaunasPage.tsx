@@ -7,6 +7,7 @@ import { SaunaEditor } from '@/components/Saunas/SaunaEditor';
 import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Plus, Save, RefreshCw } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 
@@ -21,6 +22,7 @@ export function SaunasPage() {
   const [localSaunas, setLocalSaunas] = useState<Sauna[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [editingSauna, setEditingSauna] = useState<Sauna | null>(null);
+  const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -80,11 +82,15 @@ export function SaunasPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Möchtest du diese Sauna wirklich löschen?')) {
-      setLocalSaunas(localSaunas.filter((s) => s.id !== id));
-      setIsDirty(true);
-      setEditingSauna(null);
-    }
+    setDeletingSaunaId(id);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingSaunaId) return;
+    setLocalSaunas(localSaunas.filter((s) => s.id !== deletingSaunaId));
+    setIsDirty(true);
+    setEditingSauna(null);
+    setDeletingSaunaId(null);
   };
 
   const handleSaveAll = () => {
@@ -139,7 +145,7 @@ export function SaunasPage() {
               <button
                 onClick={handleReload}
                 disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-lg transition-colors disabled:opacity-50"
               >
                 <RefreshCw className="w-4 h-4" />
                 Neu laden
@@ -148,7 +154,7 @@ export function SaunasPage() {
               <button
                 onClick={handleSaveAll}
                 disabled={!isDirty || isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4" />
                 {isSaving ? 'Speichert...' : 'Speichern'}
@@ -156,7 +162,7 @@ export function SaunasPage() {
 
               <button
                 onClick={handleAddSauna}
-                className="flex items-center gap-2 px-4 py-2 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-spa-secondary text-white rounded-lg hover:bg-spa-secondary-dark transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Neue Sauna
@@ -171,9 +177,9 @@ export function SaunasPage() {
         />
 
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">Sauna-Verwaltung</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
+        <div className="bg-spa-secondary/10 border border-spa-secondary/30 rounded-lg p-4 mb-6">
+          <h3 className="font-semibold text-spa-text-primary mb-2">Sauna-Verwaltung</h3>
+          <ul className="text-sm text-spa-text-secondary space-y-1">
             <li>• <strong>Aufgüsse:</strong> Sauna erscheint normal im Aufgussplan</li>
             <li>• <strong>Keine Aufgüsse:</strong> Sauna wird als "Keine Aufgüsse" markiert</li>
             <li>• <strong>Außer Betrieb:</strong> Sauna wird als "Außer Betrieb" gekennzeichnet</li>
@@ -187,7 +193,7 @@ export function SaunasPage() {
             <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
             <button
               onClick={handleAddSauna}
-              className="px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
+              className="px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors"
             >
               Erste Sauna hinzufügen
             </button>
@@ -220,6 +226,16 @@ export function SaunasPage() {
             onDelete={editingSauna ? () => handleDelete(editingSauna.id) : undefined}
           />
         )}
+
+        <ConfirmDialog
+          isOpen={Boolean(deletingSaunaId)}
+          title="Sauna löschen?"
+          message={`Möchtest du die Sauna "${localSaunas.find((s) => s.id === deletingSaunaId)?.name || ''}" wirklich löschen?`}
+          confirmLabel="Löschen"
+          variant="danger"
+          onConfirm={confirmDelete}
+          onCancel={() => setDeletingSaunaId(null)}
+        />
       </div>
     </Layout>
   );

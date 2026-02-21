@@ -12,7 +12,9 @@ import {
   useSendCommand,
 } from '@/hooks/useDevices';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
-import { Monitor, RefreshCw } from 'lucide-react';
+import { StatCard } from '@/components/Dashboard/StatCard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Monitor, RefreshCw, Wifi, WifiOff, ToggleRight } from 'lucide-react';
 
 export function DevicesPage() {
   const { data: devices = [], isLoading, refetch } = useDevices();
@@ -100,54 +102,11 @@ export function DevicesPage() {
           ]}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-spa-bg-primary rounded-lg">
-                <Monitor className="w-6 h-6 text-spa-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Gesamt</p>
-                <p className="text-2xl font-bold text-spa-text-primary">{pairedDevices.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Monitor className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Online</p>
-                <p className="text-2xl font-bold text-green-600">{onlineDevices}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Monitor className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Offline</p>
-                <p className="text-2xl font-bold text-orange-600">{offlineDevices}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Monitor className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Override-Modus</p>
-                <p className="text-2xl font-bold text-blue-600">{overrideDevices}</p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatCard title="Gesamt" value={pairedDevices.length} icon={Monitor} color="primary" />
+          <StatCard title="Online" value={onlineDevices} icon={Wifi} color="success" />
+          <StatCard title="Offline" value={offlineDevices} icon={WifiOff} color={offlineDevices > 0 ? 'warning' : 'neutral'} />
+          <StatCard title="Override-Modus" value={overrideDevices} icon={ToggleRight} color="info" />
         </div>
 
         <PendingPairings />
@@ -168,40 +127,15 @@ export function DevicesPage() {
           isSaving={updateDevice.isPending}
         />
 
-        {deletingDevice && (
-          <div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-device-title"
-            aria-describedby="delete-device-desc"
-          >
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 id="delete-device-title" className="text-xl font-bold text-spa-text-primary mb-4">
-                Display löschen?
-              </h3>
-              <p id="delete-device-desc" className="text-spa-text-secondary mb-6">
-                Möchtest du das Display "{deletingDevice.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setDeletingDevice(null)}
-                  disabled={deleteDevice.isPending}
-                  className="flex-1 px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={handleDeleteDevice}
-                  disabled={deleteDevice.isPending}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  {deleteDevice.isPending ? 'Wird gelöscht...' : 'Löschen'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={Boolean(deletingDevice)}
+          title="Display löschen?"
+          message={`Möchtest du das Display "${deletingDevice?.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+          confirmLabel={deleteDevice.isPending ? 'Wird gelöscht...' : 'Löschen'}
+          variant="danger"
+          onConfirm={handleDeleteDevice}
+          onCancel={() => setDeletingDevice(null)}
+        />
       </div>
     </Layout>
   );
