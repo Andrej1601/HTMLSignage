@@ -1,4 +1,5 @@
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from './Button';
 
 interface ErrorAlertProps {
   title?: string;
@@ -20,19 +21,21 @@ export function ErrorAlert({
     || 'Ein unerwarteter Fehler ist aufgetreten.';
 
   return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3" role="alert">
-      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+    <div className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3" role="alert">
+      <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" aria-hidden="true" />
       <div className="flex-1">
-        <h3 className="font-semibold text-red-900">{title}</h3>
-        <p className="text-red-700 text-sm mt-1">{errorMessage}</p>
+        <h3 className="font-semibold text-spa-error-dark">{title}</h3>
+        <p className="text-spa-error-dark/80 text-sm mt-1">{errorMessage}</p>
         {onRetry && (
-          <button
+          <Button
+            variant="danger"
+            size="sm"
+            icon={RefreshCw}
             onClick={onRetry}
-            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
+            className="mt-3"
           >
-            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
             {retryLabel}
-          </button>
+          </Button>
         )}
       </div>
     </div>

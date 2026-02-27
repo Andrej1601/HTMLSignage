@@ -77,6 +77,7 @@ export interface DisplaySettings {
   showBadges?: boolean;
   showSubtitles?: boolean;
   compactMode?: boolean;
+  prestartMinutes?: number;
 }
 
 export interface AudioSettings {
@@ -119,6 +120,8 @@ export interface InfoItem {
   id: string;
   title: string;
   text: string;
+  imageId?: string;
+  imageMode?: 'thumbnail' | 'background';
 }
 
 // Event for special occasions

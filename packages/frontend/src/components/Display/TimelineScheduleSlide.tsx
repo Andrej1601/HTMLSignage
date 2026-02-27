@@ -6,7 +6,7 @@ import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { getVisibleSaunas } from '@/types/sauna.types';
-import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, withAlpha } from './wellnessDisplayUtils';
+import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import {
   buildScheduleSaunaIndexMap,
   getSaunaAccentColor,
@@ -72,6 +72,7 @@ function IntensityFlames({
 function TimelineInfusionCard({
   infusion,
   now,
+  prestartMinutes,
   textMain,
   borderColor,
   cardBg,
@@ -82,6 +83,7 @@ function TimelineInfusionCard({
 }: {
   infusion: TimelineInfusion;
   now: Date;
+  prestartMinutes: number;
   textMain: string;
   borderColor: string;
   cardBg: string;
@@ -90,7 +92,7 @@ function TimelineInfusionCard({
   statusPrestart: string;
   rowHeight: number;
 }) {
-  const status = getInfusionStatus(now, infusion.time, infusion.duration, 10);
+  const status = getInfusionStatus(now, infusion.time, infusion.duration, prestartMinutes);
   const isOngoing = status === 'ONGOING';
   const isPrestart = status === 'PRESTART';
   const isFinished = status === 'FINISHED';
@@ -127,6 +129,8 @@ function TimelineInfusionCard({
   const badgeFontSize = Math.max(9, Math.min(15, rowHeight * 0.17));
   const flameSize = Math.max(10, Math.min(20, rowHeight * 0.22));
   const rowGap = Math.max(3, Math.min(8, rowHeight * 0.1));
+  const metaBottomInset = Math.max(5, Math.min(12, rowHeight * 0.15));
+  const metaLift = Math.max(3, Math.min(9, rowHeight * 0.12));
   const dividerColor = withAlpha(borderColor, 0.3);
   const titleLineHeight = 1.15;
   const titleBlockMinHeight = Math.max(20, Math.ceil(titleFontSize * titleLineHeight + 2));
@@ -172,6 +176,8 @@ function TimelineInfusionCard({
         className="shrink-0 flex items-center justify-between gap-2"
         style={{
           paddingTop: `${rowGap}px`,
+          paddingBottom: `${metaBottomInset}px`,
+          transform: `translateY(-${metaLift}px)`,
         }}
       >
         <IntensityFlames
@@ -340,6 +346,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
   const statusLive = theme.statusLive || '#10B981';
   const statusPrestart = theme.statusPrestart || '#F59E0B';
+  const prestartMinutes = resolvePrestartMinutes(settings);
 
   const rawLogoText = (header.logoText || '').trim();
   const logoText = (!rawLogoText || /^html\s*signage$/i.test(rawLogoText))
@@ -673,6 +680,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
                             <TimelineInfusionCard
                               infusion={infusion}
                               now={now}
+                              prestartMinutes={prestartMinutes}
                               textMain={textMain}
                               borderColor={border}
                               cardBg={cardBg}

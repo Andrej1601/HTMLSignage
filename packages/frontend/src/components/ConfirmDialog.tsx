@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from './Button';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -45,12 +46,8 @@ export function ConfirmDialog({
 
   if (!isOpen) return null;
 
-  const confirmButtonClass =
-    variant === 'danger'
-      ? 'bg-red-600 text-white hover:bg-red-700'
-      : variant === 'warning'
-      ? 'bg-amber-600 text-white hover:bg-amber-700'
-      : 'bg-spa-primary text-white hover:bg-spa-primary-dark';
+  const confirmVariant =
+    variant === 'danger' ? 'danger' : variant === 'warning' ? 'warning' : 'primary';
 
   return (
     <div
@@ -68,10 +65,10 @@ export function ConfirmDialog({
         <div className="flex items-start gap-3 mb-4">
           {variant !== 'default' && (
             <div className={`flex-shrink-0 p-2 rounded-full ${
-              variant === 'danger' ? 'bg-red-100' : 'bg-amber-100'
+              variant === 'danger' ? 'bg-spa-error-light' : 'bg-spa-warning-light'
             }`}>
               <AlertTriangle
-                className={`w-5 h-5 ${variant === 'danger' ? 'text-red-600' : 'text-amber-600'}`}
+                className={`w-5 h-5 ${variant === 'danger' ? 'text-spa-error' : 'text-spa-warning'}`}
                 aria-hidden="true"
               />
             </div>
@@ -86,19 +83,12 @@ export function ConfirmDialog({
           </div>
         </div>
         <div className="flex items-center gap-3 justify-end">
-          <button
-            ref={cancelRef}
-            onClick={onCancel}
-            className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors"
-          >
+          <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg transition-colors ${confirmButtonClass}`}
-          >
+          </Button>
+          <Button variant={confirmVariant} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

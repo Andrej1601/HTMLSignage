@@ -35,30 +35,41 @@ export interface DeviceDisplayConfigResponse {
   settings: Settings;
 }
 
-export interface SystemUpdateStatusResponse extends ApiOkResponse {
-  branch: string | null;
-  currentCommit: string | null;
-  remoteCommit: string | null;
+export interface GitHubRelease {
+  tag: string;
+  name: string;
+  body: string;
+  publishedAt: string;
+  prerelease: boolean;
+}
+
+export interface SystemReleasesResponse extends ApiOkResponse {
+  currentVersion: string;
+  latestRelease: GitHubRelease | null;
   hasUpdate: boolean;
-  aheadCount?: number;
-  behindCount?: number;
-  isGitRepo: boolean;
+  olderReleases: GitHubRelease[];
   isDirty: boolean;
   isRunning: boolean;
   checkedAt: string;
 }
 
 export interface SystemUpdateRunResponse extends ApiOkResponse {
-  status: Omit<SystemUpdateStatusResponse, 'ok' | 'checkedAt'>;
+  newVersion: string;
+  targetVersion: string;
   log: string;
   finishedAt: string;
   note?: string;
+  backupPath?: string;
+  rolledBack?: boolean;
 }
 
 export interface SystemBackupImportResponse extends ApiOkResponse {
   importedMedia: number;
   replaceMedia: boolean;
   importedAt: string;
+  importedScheduleVersion?: number;
+  importedSettingsVersion?: number;
+  warnings?: string[];
 }
 
 const api = axios.create({
@@ -298,8 +309,15 @@ export const mediaApi = {
     const params = new URLSearchParams();
     if (filter?.type) params.append('type', filter.type);
     if (filter?.search) params.append('search', filter.search);
+    if (filter?.tag) params.append('tag', filter.tag);
 
     const { data } = await api.get('/media', { params });
+    return data;
+  },
+
+  // Get all distinct media tags
+  getTags: async (): Promise<string[]> => {
+    const { data } = await api.get<string[]>('/media/tags');
     return data;
   },
 
@@ -327,18 +345,24 @@ export const mediaApi = {
     const { data } = await api.delete<ApiOkResponse>(`/media/${id}`);
     return data;
   },
+
+  // Update media tags
+  updateMediaTags: async (id: string, tags: string[]): Promise<Media> => {
+    const { data } = await api.patch<Media>(`/media/${id}/tags`, { tags });
+    return data;
+  },
 };
 
 export const systemApi = {
-  getUpdateStatus: async (token: string): Promise<SystemUpdateStatusResponse> => {
-    const { data } = await api.get<SystemUpdateStatusResponse>('/system/update/status', {
+  getReleases: async (token: string): Promise<SystemReleasesResponse> => {
+    const { data } = await api.get<SystemReleasesResponse>('/system/update/status', {
       headers: getAuthHeaders(token),
     });
     return data;
   },
 
-  runUpdate: async (token: string): Promise<SystemUpdateRunResponse> => {
-    const { data } = await api.post<SystemUpdateRunResponse>('/system/update/run', {}, {
+  runUpdate: async (token: string, targetVersion: string): Promise<SystemUpdateRunResponse> => {
+    const { data } = await api.post<SystemUpdateRunResponse>('/system/update/run', { targetVersion }, {
       headers: getAuthHeaders(token),
     });
     return data;

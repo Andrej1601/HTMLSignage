@@ -22,6 +22,7 @@ import {
 } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { Save, RefreshCw, Copy, Play, CalendarClock } from 'lucide-react';
+import { Button } from '@/components/Button';
 import clsx from 'clsx';
 
 export function SchedulePage() {
@@ -300,61 +301,48 @@ export function SchedulePage() {
     <Layout>
       <div>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-3xl font-bold text-spa-text-primary">Aufgussplan</h2>
             <p className="text-spa-text-secondary mt-1">
               Version {localSchedule?.version || 1}
               {isDirty && (
-                <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Änderungen</span>
+                <span className="ml-2 text-spa-warning-dark font-medium">• Ungespeicherte Änderungen</span>
               )}
             </p>
             <p className="text-xs text-spa-text-secondary mt-1">
               Live: {PRESET_LABELS[livePreset]} ({livePreset}) · Bearbeitung: {PRESET_LABELS[editingPreset]} ({editingPreset})
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {/* Auto-Play Toggle */}
-            <button
+            <Button
+              variant={localSchedule?.autoPlay ? 'secondary' : 'ghost'}
+              icon={Play}
               onClick={handleAutoPlayToggle}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-md transition-colors',
-                localSchedule?.autoPlay
-                  ? 'bg-spa-secondary text-white'
-                  : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary'
-              )}
+              className={localSchedule?.autoPlay ? '!bg-spa-secondary !text-white !hover:bg-spa-secondary-dark' : ''}
             >
-              <Play className="w-4 h-4" />
               Auto-Play
-            </button>
+            </Button>
 
             {!localSchedule.autoPlay && (
-              <button
+              <Button
+                variant="ghost"
                 onClick={handleSetLivePreset}
                 disabled={editingPreset === livePreset}
-                className="px-4 py-2 rounded-md border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10"
               >
                 Auswahl live schalten
-              </button>
+              </Button>
             )}
 
-            <button
-              onClick={() => refetch()}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className="w-4 h-4" />
+            <Button variant="ghost" icon={RefreshCw} onClick={() => refetch()} disabled={isLoading}>
               Neu laden
-            </button>
+            </Button>
 
-            <button
-              onClick={handleSave}
-              disabled={!isDirty || isSaving}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              {isSaving ? 'Speichert...' : 'Speichern'}
-            </button>
+            <Button icon={Save} onClick={handleSave} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
+              Speichern
+            </Button>
           </div>
         </div>
 
@@ -381,7 +369,7 @@ export function SchedulePage() {
           )}
 
           {/* Weekday Tabs */}
-          <div className="flex gap-2 mb-2">
+          <div className="flex gap-2 mb-2 overflow-x-auto pb-1 -mx-1 px-1">
             {WEEKDAY_PRESETS.map((preset) => (
               <button
                 key={preset}
@@ -413,7 +401,7 @@ export function SchedulePage() {
           </div>
 
           {/* Special Presets */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
             {SPECIAL_PRESETS.map((preset) => (
               <button
                 key={preset}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import type { InfusionStatus } from './wellnessDisplayUtils';
 import { getInfusionStatus } from './wellnessDisplayUtils';
@@ -23,25 +23,45 @@ interface AutoScrollingListProps<T extends InfusionListItem> {
   itemComponent: (props: AutoScrollingListItemProps<T>) => React.ReactNode;
   now: Date;
   isDetail?: boolean;
+  prestartMinutes?: number;
 }
 
 export function AutoScrollingList<T extends InfusionListItem>({
   items,
   itemComponent: ItemComponent,
   now,
-  isDetail = false,
+  prestartMinutes = 10,
 }: AutoScrollingListProps<T>) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const controls = useAnimationControls();
-
-  const shouldScroll = items.length > (isDetail ? 3 : 5);
+  const [shouldScroll, setShouldScroll] = useState(false);
+  const normalizedPrestartMinutes = Number.isFinite(prestartMinutes)
+    ? Math.min(120, Math.max(0, Math.round(prestartMinutes)))
+    : 10;
 
   // Use a primitive signature so re-renders with identical content don't restart the scroll animation.
   const itemsSignature = useMemo(
     () => items.map((i) => `${i.id}:${i.time}:${i.duration}`).join('|'),
     [items]
   );
+
+  // Detect overflow dynamically via ResizeObserver
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    const check = () => {
+      setShouldScroll(content.scrollHeight > viewport.clientHeight + 4);
+    };
+
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(viewport);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [itemsSignature]);
 
   useEffect(() => {
     let cancelled = false;
@@ -99,10 +119,10 @@ export function AutoScrollingList<T extends InfusionListItem>({
   }, [controls, itemsSignature, shouldScroll]);
 
   return (
-    <div ref={viewportRef} className="flex-1 overflow-hidden relative">
+    <div ref={viewportRef} className="relative flex-1 h-full min-h-0 overflow-hidden">
       <motion.div animate={controls} ref={contentRef} initial={{ y: 0 }}>
         {items.map((item) => {
-          const status = getInfusionStatus(now, item.time, item.duration, 10);
+          const status = getInfusionStatus(now, item.time, item.duration, normalizedPrestartMinutes);
           return <ItemComponent key={item.id} infusion={item} status={status} />;
         })}
       </motion.div>

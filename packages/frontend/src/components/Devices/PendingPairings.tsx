@@ -4,6 +4,9 @@ import { Monitor, Check, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config/env';
+import { Dialog } from '@/components/Dialog';
+import { Button } from '@/components/Button';
+import { InputField } from '@/components/FormField';
 
 export function PendingPairings() {
   const { token, logout } = useAuth();
@@ -78,6 +81,13 @@ export function PendingPairings() {
     });
   };
 
+  const handleCloseDialog = () => {
+    if (!pairDevice.isPending) {
+      setPairingDevice(null);
+      setDeviceName('');
+    }
+  };
+
   if (pendingDevices.length === 0) {
     return null;
   }
@@ -85,26 +95,26 @@ export function PendingPairings() {
   return (
     <>
       <div className="mb-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+        <div className="bg-spa-warning-light border border-spa-warning/30 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Monitor className="w-5 h-5 text-yellow-600" />
-              <h3 className="text-lg font-semibold text-yellow-900">
+              <Monitor className="w-5 h-5 text-spa-warning-dark" />
+              <h3 className="text-lg font-semibold text-spa-warning-dark">
                 Nicht verbundene Geräte
               </h3>
               {isLoading && (
-                <RefreshCw className="w-4 h-4 text-yellow-600 animate-spin" />
+                <RefreshCw className="w-4 h-4 text-spa-warning-dark animate-spin" />
               )}
             </div>
             <button
               onClick={() => refetch()}
-              className="text-sm text-yellow-700 hover:text-yellow-900 underline"
+              className="text-sm text-spa-warning-dark hover:underline"
             >
               Aktualisieren
             </button>
           </div>
 
-          <p className="text-sm text-yellow-800 mb-4">
+          <p className="text-sm text-spa-warning-dark/80 mb-4">
             Diese Geräte warten darauf, verbunden zu werden. Der Pairing-Code wird auf dem Gerät angezeigt.
           </p>
 
@@ -113,12 +123,12 @@ export function PendingPairings() {
             {pendingDevices.map((device) => (
               <div
                 key={device.id}
-                className="bg-white rounded-lg p-4 border border-yellow-200 hover:border-yellow-400 transition-colors"
+                className="bg-white rounded-lg p-4 border border-spa-warning/30 hover:border-spa-warning transition-colors"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Monitor className="w-5 h-5 text-yellow-600" />
-                    <span className="text-sm font-medium text-gray-900">
+                    <Monitor className="w-5 h-5 text-spa-warning-dark" />
+                    <span className="text-sm font-medium text-spa-text-primary">
                       {device.name}
                     </span>
                   </div>
@@ -133,7 +143,7 @@ export function PendingPairings() {
                 </div>
 
                 {/* Device Info */}
-                <div className="text-xs text-gray-500 mb-3 space-y-1">
+                <div className="text-xs text-spa-text-secondary mb-3 space-y-1">
                   <div>ID: {device.id.slice(0, 12)}...</div>
                   <div>Erstellt: {new Date(device.createdAt).toLocaleString('de-DE', {
                     day: '2-digit',
@@ -145,13 +155,9 @@ export function PendingPairings() {
                 </div>
 
                 {/* Connect Button */}
-                <button
-                  onClick={() => handlePairClick(device)}
-                  className="w-full px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors flex items-center justify-center gap-2 font-medium"
-                >
-                  <LinkIcon className="w-4 h-4" />
+                <Button icon={LinkIcon} fullWidth onClick={() => handlePairClick(device)}>
                   Verbinden
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -159,77 +165,49 @@ export function PendingPairings() {
       </div>
 
       {/* Pairing Dialog */}
-      {pairingDevice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-spa-text-primary">
-                Gerät verbinden
-              </h3>
-              <button
-                onClick={() => {
-                  setPairingDevice(null);
-                  setDeviceName('');
-                }}
-                disabled={pairDevice.isPending}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
+      <Dialog
+        isOpen={Boolean(pairingDevice)}
+        onClose={handleCloseDialog}
+        title="Gerät verbinden"
+        closeDisabled={pairDevice.isPending}
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCloseDialog} disabled={pairDevice.isPending}>
+              Abbrechen
+            </Button>
+            <Button
+              type="submit"
+              form="pair-form"
+              icon={Check}
+              disabled={!deviceName.trim()}
+              loading={pairDevice.isPending}
+              loadingText="Verbinde..."
+            >
+              Verbinden
+            </Button>
+          </>
+        }
+      >
+        <form id="pair-form" onSubmit={handlePairSubmit} className="space-y-4">
+          <div className="bg-spa-bg-primary rounded-lg p-4">
+            <div className="text-sm text-spa-text-secondary mb-2">Pairing-Code</div>
+            <div className="text-3xl font-bold font-mono text-spa-primary">
+              {pairingDevice?.pairingCode}
             </div>
-
-            <form onSubmit={handlePairSubmit} className="p-6 space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="text-sm text-gray-600 mb-2">Pairing-Code</div>
-                <div className="text-3xl font-bold font-mono text-spa-primary">
-                  {pairingDevice.pairingCode}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                  Gerätename *
-                </label>
-                <input
-                  type="text"
-                  value={deviceName}
-                  onChange={(e) => setDeviceName(e.target.value)}
-                  placeholder="z.B. Sauna Haupteingang"
-                  required
-                  disabled={pairDevice.isPending}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-                  autoFocus
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Gib dem Gerät einen aussagekräftigen Namen zur Identifikation
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPairingDevice(null);
-                    setDeviceName('');
-                  }}
-                  disabled={pairDevice.isPending}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="submit"
-                  disabled={pairDevice.isPending || !deviceName.trim()}
-                  className="flex-1 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  {pairDevice.isPending ? 'Verbinde...' : 'Verbinden'}
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+
+          <InputField
+            label="Gerätename"
+            required
+            value={deviceName}
+            onChange={(e) => setDeviceName(e.target.value)}
+            placeholder="z.B. Sauna Haupteingang"
+            disabled={pairDevice.isPending}
+            hint="Gib dem Gerät einen aussagekräftigen Namen zur Identifikation"
+            autoFocus
+          />
+        </form>
+      </Dialog>
     </>
   );
 }

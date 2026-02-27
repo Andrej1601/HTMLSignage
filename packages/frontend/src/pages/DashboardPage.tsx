@@ -1,25 +1,25 @@
 import { Layout } from '@/components/Layout';
 import { StatCard } from '@/components/Dashboard/StatCard';
 import { QuickActionCard } from '@/components/Dashboard/QuickActionCard';
-import { LiveOperationsWidget } from '@/components/Dashboard/LiveOperationsWidget';
-import { ContentQualityWidget } from '@/components/Dashboard/ContentQualityWidget';
+import { OperationsContentWidget } from '@/components/Dashboard/OperationsContentWidget';
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget';
 import { PageHeader } from '@/components/PageHeader';
-import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
+import { type StatusTone } from '@/components/StatusBadge';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { PRESET_LABELS } from '@/types/schedule.types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
+  Activity,
   Calendar,
   Monitor,
   Settings,
   Wifi,
   WifiOff,
-  TrendingUp,
   Upload,
   AlertCircle,
   CheckCircle,
@@ -33,8 +33,6 @@ export function DashboardPage() {
   const widgetStorageKey = `htmlsignage_dashboard_widgets_${user?.id || 'anonymous'}`;
   const {
     widgetVisibility,
-    isWidgetPanelOpen,
-    setIsWidgetPanelOpen,
     activeWidgetCount,
     toggleWidget,
     showAllWidgets,
@@ -65,8 +63,18 @@ export function DashboardPage() {
     : planQuality.emptyRows > 0 ? 'warning'
     : 'success';
 
+  const systemHealthValue =
+    systemChecks.backendTone === 'success' && systemChecks.websocketTone === 'success'
+      ? 'OK'
+      : systemChecks.backendTone === 'danger' ? 'Fehler' : 'Warnung';
+
+  const systemHealthColor: 'success' | 'warning' | 'danger' =
+    systemChecks.backendTone === 'danger' ? 'danger'
+    : systemChecks.websocketTone !== 'success' ? 'warning'
+    : 'success';
+
   const hasLeftWidgets =
-    widgetVisibility.liveOperations || widgetVisibility.contentQuality || widgetVisibility.activityFeed;
+    widgetVisibility.operationsContent || widgetVisibility.activityFeed;
   const hasRightWidgets =
     widgetVisibility.systemChecks || widgetVisibility.mediaInsights || widgetVisibility.quickActions;
 
@@ -79,116 +87,97 @@ export function DashboardPage() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <PageHeader
           title="Dashboard"
           description="Betriebszentrale für Displays, Inhalte und Systemzustand"
           icon={LayoutDashboard}
           badges={[
-            { label: wsConnected ? 'WebSocket verbunden' : 'WebSocket getrennt', tone: systemChecks.websocketTone, pulse: wsConnected },
-            { label: backendHealthQuery.data?.status === 'ok' ? 'Backend erreichbar' : 'Backend prüfen', tone: systemChecks.backendTone },
-            { label: liveState.activeEvent ? `Event live: ${liveState.activeEvent.name}` : 'Kein Event aktiv', tone: liveState.activeEvent ? 'info' as const : 'neutral' as const },
-            { label: schedule?.autoPlay ? 'Auto-Play aktiv' : 'Manueller Planmodus', tone: schedule?.autoPlay ? 'success' as const : 'warning' as const },
+            { label: liveState.activeEvent ? `Event: ${liveState.activeEvent.name}` : 'Kein Event aktiv', tone: liveState.activeEvent ? 'info' as const : 'neutral' as const },
+            { label: schedule?.autoPlay ? 'Auto-Play' : 'Manuell', tone: schedule?.autoPlay ? 'success' as const : 'warning' as const },
           ]}
         />
 
-        {/* Widget Layout Panel */}
-        <div className="bg-white rounded-lg shadow-sm p-5 border border-spa-bg-secondary">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-spa-text-primary flex items-center gap-2">
-                <LayoutDashboard className="w-5 h-5" />
-                Widget-Layout
-              </h3>
-              <p className="text-sm text-spa-text-secondary mt-1">
-                {activeWidgetCount} von {WIDGET_PREFERENCES.length} Widgets sichtbar
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setIsWidgetPanelOpen((p) => !p)}
-                className="px-3 py-2 text-sm bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors inline-flex items-center gap-2"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                {isWidgetPanelOpen ? 'Anpassung schließen' : 'Widgets anpassen'}
-              </button>
-              <button
-                onClick={setOpsFocus}
-                className="px-3 py-2 text-sm bg-spa-primary/10 text-spa-primary rounded-lg hover:bg-spa-primary/20 transition-colors"
-              >
-                Ops-Fokus
-              </button>
-              <button
-                onClick={showAllWidgets}
-                className="px-3 py-2 text-sm bg-spa-secondary/10 text-spa-secondary-dark rounded-lg hover:bg-spa-secondary/20 transition-colors"
-              >
-                Alle anzeigen
-              </button>
-            </div>
+        {/* Compact Widget Toolbar */}
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-spa-text-secondary">
+            {activeWidgetCount} von {WIDGET_PREFERENCES.length} Widgets sichtbar
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={setOpsFocus}
+              className="px-3 py-1.5 text-sm bg-spa-primary/10 text-spa-primary rounded-lg hover:bg-spa-primary/20 transition-colors"
+            >
+              Ops-Fokus
+            </button>
+            <button
+              onClick={showAllWidgets}
+              className="px-3 py-1.5 text-sm bg-spa-secondary/10 text-spa-secondary-dark rounded-lg hover:bg-spa-secondary/20 transition-colors"
+            >
+              Alle
+            </button>
+            <DropdownMenu
+              sections={[
+                WIDGET_PREFERENCES.map((widget) => ({
+                  label: `${widgetVisibility[widget.key] ? '\u2713' : '\u2717'} ${widget.title}`,
+                  icon: SlidersHorizontal,
+                  onClick: () => toggleWidget(widget.key),
+                  keepOpen: true,
+                })),
+              ]}
+              width="w-64"
+              trigger={(open) => (
+                <button
+                  className={`p-2 rounded-lg transition-colors ${
+                    open ? 'bg-spa-primary/10' : 'bg-spa-bg-secondary hover:bg-spa-secondary/20'
+                  }`}
+                  aria-label="Widgets anpassen"
+                >
+                  <SlidersHorizontal className="w-4 h-4 text-spa-text-secondary" />
+                </button>
+              )}
+            />
           </div>
-          {isWidgetPanelOpen && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {WIDGET_PREFERENCES.map((widget) => {
-                const isEnabled = widgetVisibility[widget.key];
-                return (
-                  <button
-                    key={widget.key}
-                    onClick={() => toggleWidget(widget.key)}
-                    className={`text-left rounded-lg border p-3 transition-colors ${
-                      isEnabled
-                        ? 'border-spa-primary/40 bg-spa-primary/5'
-                        : 'border-spa-bg-secondary bg-white hover:border-spa-primary/30'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-spa-text-primary">{widget.title}</p>
-                      <StatusBadge label={isEnabled ? 'An' : 'Aus'} tone={isEnabled ? 'success' : 'neutral'} showDot={false} />
-                    </div>
-                    <p className="text-xs text-spa-text-secondary mt-1">{widget.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
-        {/* KPI Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {/* KPI Row — 3 Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard
-            title="Live-Betrieb"
+            title="Geräte"
             value={`${liveState.onlineDevices}/${liveState.pairedDevices.length}`}
-            icon={liveState.onlineDevices > 0 ? Wifi : WifiOff}
-            description={`${liveState.offlineDevices} offline · ${liveState.pendingPairings} pending`}
+            icon={liveState.offlineDevices > 0 ? WifiOff : Wifi}
+            description={
+              liveState.offlineDevices > 0
+                ? `${liveState.offlineDevices} offline · ${liveState.pendingPairings} ausstehend`
+                : `Alle online · ${liveState.pendingPairings} ausstehend`
+            }
             color={liveState.offlineDevices > 0 ? 'warning' : 'success'}
             href="/devices"
             ctaLabel="Zu Geräten"
           />
           <StatCard
-            title="Aktiver Plan"
+            title="Tagesplan"
             value={livePresetLabel}
             icon={Play}
-            description={liveState.activeEvent ? `Event: ${liveState.activeEvent.name}` : 'Regulärer Tagesplan'}
-            color={liveState.activeEvent ? 'info' : 'primary'}
+            description={
+              liveState.activeEvent
+                ? `Event: ${liveState.activeEvent.name} · bis ${liveState.activeEvent.endTime || '23:59'}`
+                : eventStats.nextEvent
+                  ? `Event „${eventStats.nextEvent.name}" ab ${eventStats.nextEvent.startDate.slice(5).replace('-', '.')}.`
+                  : `${planQuality.fillRate}% befüllt · ${planQuality.emptyRows} leer`
+            }
+            color={planQualityTone === 'danger' ? 'danger' : planQualityTone === 'warning' ? 'warning' : 'primary'}
             href="/schedule"
             ctaLabel="Zum Aufgussplan"
           />
           <StatCard
-            title="Planqualität"
-            value={`${planQuality.fillRate}%`}
-            icon={TrendingUp}
-            description={`${planQuality.emptyRows} leere Zeilen · ${planQuality.inconsistentRows + planQuality.duplicateTimeRows} Konflikte`}
-            color={planQualityTone === 'danger' ? 'danger' : planQualityTone === 'warning' ? 'warning' : 'success'}
-            href="/schedule"
-            ctaLabel="Checks öffnen"
-          />
-          <StatCard
-            title="Event-Setup"
-            value={`${eventStats.enabled}/${eventStats.total}`}
-            icon={Calendar}
-            description={eventStats.activeName ? `Aktiv: ${eventStats.activeName}` : 'Kein Event aktiv'}
-            color={eventStats.activeName ? 'info' : eventStats.enabled > 0 ? 'primary' : 'neutral'}
+            title="System"
+            value={systemHealthValue}
+            icon={Activity}
+            description={`${updateLabel} · WS ${wsConnected ? 'verbunden' : 'getrennt'}`}
+            color={systemHealthColor}
             href="/settings"
-            ctaLabel="Zu Einstellungen"
+            ctaLabel="Zum System"
           />
         </div>
 
@@ -197,7 +186,7 @@ export function DashboardPage() {
             <span>Alle Widgets sind ausgeblendet. Aktiviere mindestens ein Widget für das Dashboard.</span>
             <button
               onClick={showAllWidgets}
-              className="px-3 py-1.5 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium transition-colors"
             >
               Widgets zurücksetzen
             </button>
@@ -205,87 +194,78 @@ export function DashboardPage() {
         )}
 
         {/* Widget Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
-            {widgetVisibility.liveOperations && (
-              <LiveOperationsWidget liveState={liveState} runningSlideshows={runningSlideshows} />
-            )}
-            {widgetVisibility.contentQuality && (
-              <ContentQualityWidget
-                livePresetLabel={livePresetLabel}
-                autoPlay={schedule?.autoPlay || false}
-                activeEventName={liveState.activeEvent?.name || null}
-                planQuality={planQuality}
-              />
-            )}
-            {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
-            {!hasLeftWidgets && (
-              <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
-                <p className="text-sm text-spa-text-secondary">
-                  Im linken Bereich sind aktuell keine Widgets sichtbar. Aktiviere Widgets über "Widgets anpassen".
-                </p>
+        {(hasLeftWidgets || hasRightWidgets) && (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {hasLeftWidgets && (
+              <div className="xl:col-span-2 space-y-6">
+                {widgetVisibility.operationsContent && (
+                  <OperationsContentWidget
+                    liveState={liveState}
+                    runningSlideshows={runningSlideshows}
+                    livePresetLabel={livePresetLabel}
+                    autoPlay={schedule?.autoPlay || false}
+                    activeEventName={liveState.activeEvent?.name || null}
+                    planQuality={planQuality}
+                  />
+                )}
+                {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
               </div>
             )}
-          </div>
 
-          <div className="space-y-6">
-            {widgetVisibility.systemChecks && (
-              <SystemChecksWidget
-                backendStatus={
-                  backendHealthQuery.data?.status === 'ok' ? 'ok'
-                  : backendHealthQuery.isError ? 'error'
-                  : 'unknown'
-                }
-                backendTone={systemChecks.backendTone}
-                dataTone={systemChecks.dataTone}
-                websocketTone={systemChecks.websocketTone}
-                wsConnected={wsConnected}
-                updateTone={systemChecks.updateTone}
-                isAdmin={isAdmin}
-                updateLabel={updateLabel}
-              />
-            )}
-            {widgetVisibility.mediaInsights && (
-              <MediaInsightsWidget
-                images={mediaStats.images}
-                audio={mediaStats.audio}
-                videos={mediaStats.videos}
-                totalSize={mediaStats.totalSize}
-                latestMediaName={mediaStats.latestMedia?.originalName || null}
-                latestMediaDate={
-                  mediaStats.latestMedia ? new Date(mediaStats.latestMedia.createdAt) : null
-                }
-              />
-            )}
-            {widgetVisibility.quickActions && (
-              <div>
-                <h3 className="text-lg font-semibold text-spa-text-primary mb-4 flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5" />
-                  Schnellzugriff
-                </h3>
-                <div className="space-y-3">
-                  {quickActions.map((action) => (
-                    <QuickActionCard
-                      key={action.href}
-                      title={action.title}
-                      description={action.description}
-                      icon={action.icon}
-                      href={action.href}
-                      color={action.color}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            {!hasRightWidgets && (
-              <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
-                <p className="text-sm text-spa-text-secondary">
-                  Im rechten Bereich sind aktuell keine Widgets sichtbar. Aktiviere Widgets über "Widgets anpassen".
-                </p>
+            {hasRightWidgets && (
+              <div className={hasLeftWidgets ? 'space-y-6' : 'xl:col-span-3 space-y-6'}>
+                {widgetVisibility.systemChecks && (
+                  <SystemChecksWidget
+                    backendStatus={
+                      backendHealthQuery.data?.status === 'ok' ? 'ok'
+                      : backendHealthQuery.isError ? 'error'
+                      : 'unknown'
+                    }
+                    backendTone={systemChecks.backendTone}
+                    dataTone={systemChecks.dataTone}
+                    websocketTone={systemChecks.websocketTone}
+                    wsConnected={wsConnected}
+                    updateTone={systemChecks.updateTone}
+                    isAdmin={isAdmin}
+                    updateLabel={updateLabel}
+                  />
+                )}
+                {widgetVisibility.mediaInsights && (
+                  <MediaInsightsWidget
+                    images={mediaStats.images}
+                    audio={mediaStats.audio}
+                    videos={mediaStats.videos}
+                    totalSize={mediaStats.totalSize}
+                    latestMediaName={mediaStats.latestMedia?.originalName || null}
+                    latestMediaDate={
+                      mediaStats.latestMedia ? new Date(mediaStats.latestMedia.createdAt) : null
+                    }
+                  />
+                )}
+                {widgetVisibility.quickActions && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-spa-text-primary mb-4 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      Schnellzugriff
+                    </h3>
+                    <div className="space-y-3">
+                      {quickActions.map((action) => (
+                        <QuickActionCard
+                          key={action.href}
+                          title={action.title}
+                          description={action.description}
+                          icon={action.icon}
+                          href={action.href}
+                          color={action.color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {(scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error) && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">

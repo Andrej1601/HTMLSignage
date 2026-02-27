@@ -126,7 +126,7 @@ export function useDashboardData() {
 
   const systemStatusQuery = useQuery({
     queryKey: ['dashboard-system-update-status'],
-    queryFn: () => systemApi.getUpdateStatus(token!),
+    queryFn: () => systemApi.getReleases(token!),
     enabled: isAdmin && Boolean(token),
     refetchInterval: 60000,
   });
@@ -197,10 +197,19 @@ export function useDashboardData() {
 
   const eventStats = useMemo(() => {
     const events = settings?.events || [];
+    const now = new Date();
+    // Find the next upcoming active event (not yet started)
+    const nextEvent = events
+      .filter((e) => e.isActive && new Date(`${e.startDate}T${e.startTime}`) > now)
+      .sort((a, b) =>
+        new Date(`${a.startDate}T${a.startTime}`).getTime() -
+        new Date(`${b.startDate}T${b.startTime}`).getTime()
+      )[0] || null;
     return {
       total: events.length,
       enabled: events.filter((e) => e.isActive).length,
       activeName: liveState.activeEvent?.name || null,
+      nextEvent,
     };
   }, [settings, liveState.activeEvent]);
 
@@ -264,9 +273,9 @@ export function useDashboardData() {
   const updateLabel = useMemo(() => {
     if (systemStatusQuery.data?.isRunning) return 'Läuft';
     if (systemStatusQuery.data?.hasUpdate)
-      return `Verfügbar (${systemStatusQuery.data.behindCount || 0})`;
+      return `${systemStatusQuery.data.latestRelease?.tag || 'Update'} verfügbar`;
     if (systemStatusQuery.data?.isDirty) return 'Lokale Änderungen';
-    return 'Aktuell';
+    return `v${systemStatusQuery.data?.currentVersion || '?'}`;
   }, [systemStatusQuery.data]);
 
   const activityItems = useMemo<ActivityItem[]>(() => {
@@ -340,11 +349,11 @@ export function useDashboardData() {
         actor: 'System',
       });
     }
-    if (systemStatusQuery.data?.hasUpdate) {
+    if (systemStatusQuery.data?.hasUpdate && systemStatusQuery.data.latestRelease) {
       items.push({
         id: 'system-update',
         title: 'Systemupdate verfügbar',
-        description: `${systemStatusQuery.data.behindCount || 0} Commit(s) hinter origin/${systemStatusQuery.data.branch || 'main'}`,
+        description: `${systemStatusQuery.data.latestRelease.tag} — ${systemStatusQuery.data.latestRelease.name}`,
         tone: 'warning',
         actor: 'System',
       });

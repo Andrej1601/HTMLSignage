@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 export type DashboardWidgetKey =
-  | 'liveOperations'
-  | 'contentQuality'
+  | 'operationsContent'
   | 'activityFeed'
   | 'systemChecks'
   | 'mediaInsights'
@@ -17,8 +16,7 @@ export interface WidgetPreferenceItem {
 }
 
 export const DEFAULT_WIDGET_VISIBILITY: WidgetVisibilityState = {
-  liveOperations: true,
-  contentQuality: true,
+  operationsContent: true,
   activityFeed: true,
   systemChecks: true,
   mediaInsights: true,
@@ -26,8 +24,7 @@ export const DEFAULT_WIDGET_VISIBILITY: WidgetVisibilityState = {
 };
 
 export const WIDGET_PREFERENCES: WidgetPreferenceItem[] = [
-  { key: 'liveOperations', title: 'Live-Betrieb', description: 'Online/Offline-Status und Ausspielungsmodi der Displays' },
-  { key: 'contentQuality', title: 'Inhalte & Planqualität', description: 'Live-Preset, Event-Status und Plan-Checks' },
+  { key: 'operationsContent', title: 'Betrieb & Inhalte', description: 'Gerätezustand, Ausspielungsmodi, Live-Preset und Plan-Checks' },
   { key: 'activityFeed', title: 'Letzte Aktivitäten', description: 'Chronologischer Verlauf von Uploads und Änderungen' },
   { key: 'systemChecks', title: 'System-Checks', description: 'Backend, Datenbasis, WebSocket und Update-Status' },
   { key: 'mediaInsights', title: 'Medien-Insights', description: 'Dateitypen, Gesamtgröße und letzter Upload' },
@@ -37,10 +34,20 @@ export const WIDGET_PREFERENCES: WidgetPreferenceItem[] = [
 function parseWidgetVisibility(raw: string | null): WidgetVisibilityState {
   if (!raw) return DEFAULT_WIDGET_VISIBILITY;
   try {
-    const parsed = JSON.parse(raw) as Partial<WidgetVisibilityState>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    // Migration: map old liveOperations/contentQuality to operationsContent
+    let operationsContent: boolean;
+    if ('operationsContent' in parsed) {
+      operationsContent = parsed.operationsContent !== false;
+    } else if ('liveOperations' in parsed || 'contentQuality' in parsed) {
+      operationsContent = parsed.liveOperations !== false || parsed.contentQuality !== false;
+    } else {
+      operationsContent = true;
+    }
+
     return {
-      liveOperations: parsed.liveOperations !== false,
-      contentQuality: parsed.contentQuality !== false,
+      operationsContent,
       activityFeed: parsed.activityFeed !== false,
       systemChecks: parsed.systemChecks !== false,
       mediaInsights: parsed.mediaInsights !== false,
@@ -84,8 +91,7 @@ export function useWidgetVisibility(storageKey: string) {
 
   const setOpsFocus = () =>
     setWidgetVisibility({
-      liveOperations: true,
-      contentQuality: false,
+      operationsContent: true,
       activityFeed: true,
       systemChecks: true,
       mediaInsights: false,

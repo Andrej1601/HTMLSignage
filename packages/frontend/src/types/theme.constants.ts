@@ -133,7 +133,14 @@ export function getDefaultSettings(): Settings {
       metaTextScale: 1, metaHeadScale: 1, badgeTextScale: 0.85, flameScale: 1,
     },
     slides: { defaultDuration: 10, transitionDuration: 1, showClock: true, clockPosition: 'top-right' },
-    display: { gridColumns: 3, gridGap: 16, showBadges: true, showSubtitles: true, compactMode: false },
+    display: {
+      gridColumns: 3,
+      gridGap: 16,
+      showBadges: true,
+      showSubtitles: true,
+      compactMode: false,
+      prestartMinutes: 10,
+    },
     audio: { enabled: false, volume: 0.5, loop: true },
     header: {
       enabled: true, showLogo: true, logoText: 'Westfalenbad Hagen',

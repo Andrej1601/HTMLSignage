@@ -7,7 +7,7 @@ import { useMedia } from '@/hooks/useMedia';
 import { Bell, Flame, Thermometer, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
-import { clampFlamesTo4, getScentEmoji, withAlpha } from './wellnessDisplayUtils';
+import { clampFlamesTo4, getScentEmoji, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { buildScheduleSaunaIndexMap, resolveScheduleSaunaIndex, timeToMinutes } from './displayScheduleUtils';
 
@@ -252,6 +252,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
   const statusPrestart = theme.statusPrestart || '#F59E0B';
   const cardBg = theme.cardBg || theme.cellBg || '#FFFFFF';
   const cardBorder = theme.cardBorder || theme.gridTable || '#EBE5D3';
+  const prestartMinutes = resolvePrestartMinutes(settings);
 
   const saunaImageUrl = useMemo(() => {
     if (!sauna?.imageId) return null;
@@ -403,6 +404,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
               items={sortedInfusions}
               now={now}
               isDetail={true}
+              prestartMinutes={prestartMinutes}
               itemComponent={({ infusion, status }) => (
                 <InfusionItemDetail
                   infusion={infusion}

@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import type { InfoItem } from '@/types/settings.types';
-import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { useMedia } from '@/hooks/useMedia';
+import { buildUploadUrl } from '@/utils/mediaUrl';
+import { Plus, Edit2, Trash2, X, Save, Image } from 'lucide-react';
 
 interface InfoManagerProps {
   infos: InfoItem[];
   onChange: (infos: InfoItem[]) => void;
 }
 
+interface InfoFormData {
+  title: string;
+  text: string;
+  imageId?: string;
+  imageMode?: 'thumbnail' | 'background';
+}
+
 export function InfoManager({ infos, onChange }: InfoManagerProps) {
+  const { data: media } = useMedia();
+  const images = (media || []).filter((m) => m.type === 'image');
+
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{ title: string; text: string }>({
+  const [formData, setFormData] = useState<InfoFormData>({
     title: '',
     text: '',
   });
@@ -22,7 +34,12 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
   };
 
   const handleStartEdit = (item: InfoItem) => {
-    setFormData({ title: item.title, text: item.text });
+    setFormData({
+      title: item.title,
+      text: item.text,
+      imageId: item.imageId,
+      imageMode: item.imageMode,
+    });
     setEditingId(item.id);
     setIsAdding(false);
   };
@@ -36,11 +53,17 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
   const handleSave = () => {
     if (!formData.title.trim() || !formData.text.trim()) return;
 
+    const itemData = {
+      title: formData.title.trim(),
+      text: formData.text.trim(),
+      imageId: formData.imageId,
+      imageMode: formData.imageId ? (formData.imageMode || 'thumbnail') : undefined,
+    };
+
     if (isAdding) {
       const newItem: InfoItem = {
         id: `info-${Date.now()}`,
-        title: formData.title.trim(),
-        text: formData.text.trim(),
+        ...itemData,
       };
       onChange([...infos, newItem]);
       handleCancel();
@@ -50,9 +73,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
     if (editingId) {
       onChange(
         infos.map((i) =>
-          i.id === editingId
-            ? { ...i, title: formData.title.trim(), text: formData.text.trim() }
-            : i
+          i.id === editingId ? { ...i, ...itemData } : i
         )
       );
       handleCancel();
@@ -63,6 +84,12 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
     if (confirm('Möchten Sie diese Info wirklich löschen?')) {
       onChange(infos.filter((i) => i.id !== id));
     }
+  };
+
+  const getImageUrl = (imageId?: string) => {
+    if (!imageId) return null;
+    const item = images.find((m) => m.id === imageId);
+    return item ? buildUploadUrl(item.filename) : null;
   };
 
   return (
@@ -118,6 +145,82 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                 placeholder="Hinweistext..."
               />
             </div>
+
+            {/* Image picker */}
+            <div>
+              <label className="block text-sm font-medium text-spa-text-primary mb-2">
+                Bild (optional)
+              </label>
+              {images.length === 0 ? (
+                <p className="text-sm text-spa-text-secondary">Keine Bilder verfügbar. Laden Sie zuerst Bilder hoch.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imageId: undefined, imageMode: undefined })}
+                      className={`aspect-square rounded-lg border-2 flex items-center justify-center text-xs text-spa-text-secondary transition-colors ${
+                        !formData.imageId
+                          ? 'border-spa-primary bg-spa-primary/5'
+                          : 'border-spa-bg-secondary hover:border-spa-primary/50'
+                      }`}
+                    >
+                      Kein Bild
+                    </button>
+                    {images.map((img) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, imageId: img.id, imageMode: formData.imageMode || 'thumbnail' })}
+                        className={`aspect-square rounded-lg border-2 overflow-hidden transition-colors ${
+                          formData.imageId === img.id
+                            ? 'border-spa-primary ring-2 ring-spa-primary/30'
+                            : 'border-spa-bg-secondary hover:border-spa-primary/50'
+                        }`}
+                      >
+                        <img
+                          src={buildUploadUrl(img.filename)}
+                          alt={img.originalName}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {formData.imageId && (
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-spa-text-secondary mb-1">
+                        Anzeigemodus
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, imageMode: 'thumbnail' })}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            formData.imageMode !== 'background'
+                              ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                              : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-primary/50'
+                          }`}
+                        >
+                          Neben Text
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, imageMode: 'background' })}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            formData.imageMode === 'background'
+                              ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                              : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-primary/50'
+                          }`}
+                        >
+                          Hintergrund
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2 mt-4">
@@ -141,37 +244,53 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {infos.map((item) => (
-          <div
-            key={item.id}
-            className="p-3 bg-white border border-spa-bg-secondary rounded-md hover:shadow-sm transition-shadow"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-semibold text-spa-text-primary truncate">{item.title}</div>
-                <div className="text-sm text-spa-text-secondary mt-1 line-clamp-3">
-                  {item.text}
+        {infos.map((item) => {
+          const imgUrl = getImageUrl(item.imageId);
+          return (
+            <div
+              key={item.id}
+              className="p-3 bg-white border border-spa-bg-secondary rounded-md hover:shadow-sm transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex gap-3 min-w-0 flex-1">
+                  {imgUrl && (
+                    <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-spa-bg-secondary">
+                      <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-spa-text-primary truncate">{item.title}</div>
+                    <div className="text-sm text-spa-text-secondary mt-1 line-clamp-3">
+                      {item.text}
+                    </div>
+                    {item.imageId && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-spa-text-secondary">
+                        <Image className="w-3 h-3" />
+                        {item.imageMode === 'background' ? 'Hintergrund' : 'Neben Text'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    onClick={() => handleStartEdit(item)}
+                    className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
+                    title="Bearbeiten"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    title="Löschen"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  onClick={() => handleStartEdit(item)}
-                  className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
-                  title="Bearbeiten"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(item.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                  title="Löschen"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {infos.length === 0 && !isAdding && !editingId && (
@@ -183,4 +302,3 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
     </div>
   );
 }
-

@@ -49,9 +49,11 @@ interface SlideshowConfigPanelProps {
   previewSettings: Settings;
   isDirty?: boolean;
   disabled?: boolean;
+  prestartMinutes?: number;
   showOpenPreviewButton?: boolean;
   previewButtonLabel?: string;
   onChange: (next: SlideshowConfig) => void;
+  onPrestartMinutesChange?: (minutes: number) => void;
   showAudioOverride?: boolean;
   audioOverride?: AudioSettings | null;
   onAudioOverrideChange?: (audio: AudioSettings | null) => void;
@@ -191,9 +193,11 @@ export function SlideshowConfigPanel({
   previewSettings,
   isDirty = false,
   disabled = false,
+  prestartMinutes = 10,
   showOpenPreviewButton = true,
   previewButtonLabel = 'Vorschau öffnen',
   onChange,
+  onPrestartMinutesChange,
   showAudioOverride = false,
   audioOverride = null,
   onAudioOverrideChange,
@@ -406,12 +410,8 @@ export function SlideshowConfigPanel({
 
       <LayoutPicker
         layout={config.layout}
-        persistentZonePosition={config.persistentZonePosition}
-        persistentZoneSize={config.persistentZoneSize}
         disabled={disabled}
         onLayoutChange={handleLayoutChange}
-        onPersistentZonePositionChange={(position) => onChange({ ...config, persistentZonePosition: position })}
-        onPersistentZoneSizeChange={(size) => onChange({ ...config, persistentZoneSize: size })}
       />
 
       <div className="bg-white rounded-lg shadow">
@@ -502,7 +502,13 @@ export function SlideshowConfigPanel({
           </div>
         )}
 
-        <GlobalSlideshowSettings config={config} disabled={disabled} onChange={onChange} />
+        <GlobalSlideshowSettings
+          config={config}
+          prestartMinutes={prestartMinutes}
+          disabled={disabled}
+          onChange={onChange}
+          onPrestartMinutesChange={onPrestartMinutesChange}
+        />
       </div>
 
       {showOpenPreviewButton && (

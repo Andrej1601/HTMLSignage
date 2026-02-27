@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar, ShieldCheck } from 'lucide-react';
 import type { Settings, ThemeColors } from '@/types/settings.types';
+import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import {
   formatEventDateDE,
   formatEventTimeRangeDE,
@@ -15,9 +17,10 @@ const INTERVAL_MS = 8000;
 interface WellnessBottomPanelProps {
   settings: Settings;
   theme?: ThemeColors;
+  media?: Media[];
 }
 
-export function WellnessBottomPanel({ settings, theme }: WellnessBottomPanelProps) {
+export function WellnessBottomPanel({ settings, theme, media }: WellnessBottomPanelProps) {
   const defaults = getDefaultSettings();
   const resolvedTheme = theme || (settings.theme || defaults.theme!) as ThemeColors;
 
@@ -123,26 +126,36 @@ export function WellnessBottomPanel({ settings, theme }: WellnessBottomPanelProp
                   <div className="text-[10px] font-bold uppercase opacity-70">Demnaechst mehr</div>
                 </div>
               ) : (
-                events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex-1 p-4 rounded-2xl border"
-                    style={{
-                      backgroundColor: withAlpha(cardBg, 0.35),
-                      borderColor: withAlpha(cardBorder, 0.6),
-                    }}
-                  >
-                    <div className="text-[11px] font-black uppercase tracking-widest mb-1" style={{ color: accentGreen }}>
-                      {formatEventDateDE(event)}
+                events.map((event) => {
+                  const eventImageUrl = event.imageId ? getMediaUploadUrl(media, event.imageId) : null;
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex-1 rounded-2xl border overflow-hidden flex"
+                      style={{
+                        backgroundColor: withAlpha(cardBg, 0.35),
+                        borderColor: withAlpha(cardBorder, 0.6),
+                      }}
+                    >
+                      {eventImageUrl && (
+                        <div className="w-20 shrink-0 overflow-hidden">
+                          <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="p-4 min-w-0 flex-1">
+                        <div className="text-[11px] font-black uppercase tracking-widest mb-1" style={{ color: accentGreen }}>
+                          {formatEventDateDE(event)}
+                        </div>
+                        <div className="text-base font-black uppercase leading-tight mb-1 truncate" style={{ color: textMain }}>
+                          {event.name}
+                        </div>
+                        <div className="text-[10px] font-bold uppercase" style={{ color: withAlpha(textMain, 0.58) }}>
+                          {formatEventTimeRangeDE(event)}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-base font-black uppercase leading-tight mb-1" style={{ color: textMain }}>
-                      {event.name}
-                    </div>
-                    <div className="text-[10px] font-bold uppercase" style={{ color: withAlpha(textMain, 0.58) }}>
-                      {formatEventTimeRangeDE(event)}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </motion.div>

@@ -15,6 +15,7 @@ import type { Device, UpdateDeviceRequest } from '@/types/device.types';
 import { StatCard } from '@/components/Dashboard/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Monitor, RefreshCw, Wifi, WifiOff, ToggleRight } from 'lucide-react';
+import { Button } from '@/components/Button';
 
 export function DevicesPage() {
   const { data: devices = [], isLoading, refetch } = useDevices();
@@ -86,13 +87,9 @@ export function DevicesPage() {
           description="Verwalte Displays, Pairings und Ausspielmodi zentral an einem Ort."
           icon={Monitor}
           actions={(
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
+            <Button variant="secondary" icon={RefreshCw} onClick={() => refetch()}>
               Aktualisieren
-            </button>
+            </Button>
           )}
           badges={[
             { label: `${pairedDevices.length} gekoppelt`, tone: 'info' },

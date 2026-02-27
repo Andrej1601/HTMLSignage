@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
@@ -6,6 +7,20 @@ import fs from 'fs';
 import path from 'path';
 
 const router = Router();
+
+function normalizeTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const rawTag of value) {
+    if (typeof rawTag !== 'string') continue;
+    const tag = rawTag.trim();
+    if (!tag) continue;
+    if (tag.length > 32) continue;
+    unique.add(tag);
+    if (unique.size >= 20) break;
+  }
+  return [...unique];
+}
 
 // Helper to determine media type
 function getMediaType(mimeType: string): string {
@@ -18,9 +33,16 @@ function getMediaType(mimeType: string): string {
 // GET /api/media - List all media
 router.get('/', async (req, res) => {
   try {
-    const { type, search } = req.query;
+    const { type, search, tag } = req.query;
 
-    const where: any = {};
+    const where: {
+      type?: string;
+      tags?: { has: string };
+      OR?: Array<{
+        filename?: { contains: string; mode: 'insensitive' };
+        originalName?: { contains: string; mode: 'insensitive' };
+      }>;
+    } = {};
 
     if (type && typeof type === 'string') {
       where.type = type;
@@ -31,6 +53,13 @@ router.get('/', async (req, res) => {
         { filename: { contains: search, mode: 'insensitive' } },
         { originalName: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (tag && typeof tag === 'string') {
+      const cleanedTag = tag.trim();
+      if (cleanedTag) {
+        where.tags = { has: cleanedTag };
+      }
     }
 
     const media = await prisma.media.findMany({
@@ -53,6 +82,30 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('[media] Error listing media:', error);
     res.status(500).json({ error: 'fetch-failed' });
+  }
+});
+
+// GET /api/media/tags - List distinct tags
+router.get('/tags', async (_req, res) => {
+  try {
+    const rows = await prisma.media.findMany({
+      select: { tags: true },
+    });
+
+    const tagSet = new Set<string>();
+    for (const row of rows) {
+      for (const tag of row.tags || []) {
+        const cleaned = tag.trim();
+        if (!cleaned) continue;
+        tagSet.add(cleaned);
+      }
+    }
+
+    const tags = [...tagSet].sort((a, b) => a.localeCompare(b, 'de'));
+    res.json(tags);
+  } catch (error) {
+    console.error('[media] Error listing media tags:', error);
+    res.status(500).json({ error: 'fetch-tags-failed' });
   }
 });
 
@@ -91,6 +144,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRe
 
     const mediaType = getMediaType(req.file.mimetype);
 
+    const parsedTags = normalizeTags(req.body?.tags);
     const media = await prisma.media.create({
       data: {
         filename: req.file.filename,
@@ -98,6 +152,7 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRe
         mimeType: req.file.mimetype,
         size: req.file.size,
         type: mediaType,
+        tags: parsedTags,
       },
     });
 
@@ -118,6 +173,33 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRe
     }
 
     res.status(500).json({ error: 'upload-failed' });
+  }
+});
+
+// PATCH /api/media/:id/tags - Update media tags (auth required)
+router.patch('/:id/tags', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    const tags = normalizeTags(req.body?.tags);
+    const media = await prisma.media.update({
+      where: { id: req.params.id },
+      data: { tags },
+      include: {
+        user: {
+          select: { username: true },
+        },
+      },
+    });
+
+    res.json({
+      ...media,
+      url: `/uploads/${media.filename}`,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return res.status(404).json({ error: 'not-found' });
+    }
+    console.error('[media] Error updating media tags:', error);
+    res.status(500).json({ error: 'update-tags-failed' });
   }
 });
 

@@ -6,6 +6,8 @@ export interface DropdownMenuItem {
   icon: React.ComponentType<{ className?: string }>;
   onClick: () => void;
   variant?: 'default' | 'danger';
+  /** When true the menu stays open after clicking this item (useful for toggles). */
+  keepOpen?: boolean;
 }
 
 /** A group of items separated by a divider from the next group. */
@@ -37,7 +39,7 @@ export function DropdownMenu({
 
   const handleItemClick = (item: DropdownMenuItem) => {
     item.onClick();
-    setOpen(false);
+    if (!item.keepOpen) setOpen(false);
   };
 
   return (

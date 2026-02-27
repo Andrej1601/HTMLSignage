@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { DaySchedule } from '@/types/schedule.types';
 import { Plus, Trash2, Flame } from 'lucide-react';
+import { Button } from '@/components/Button';
 import clsx from 'clsx';
 
 interface ScheduleGridProps {
@@ -24,28 +25,25 @@ export function ScheduleGrid({
     return (
       <div className="bg-white rounded-lg shadow p-12 text-center">
         <p className="text-spa-text-secondary mb-4">Noch keine Aufgüsse für diesen Tag</p>
-        <button
-          onClick={onAddTimeRow}
-          className="px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
-        >
+        <Button icon={Plus} onClick={onAddTimeRow}>
           Ersten Aufguss hinzufügen
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
-      {/* Grid Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-spa-primary text-white">
+      {/* Grid Table — horizontal + vertical scroll with sticky header & time column */}
+      <div className="overflow-auto max-h-[70vh]">
+        <table className="w-full border-collapse">
+          <thead className="bg-spa-primary text-white sticky top-0 z-20">
             <tr>
-              <th className="px-4 py-3 text-left font-semibold w-24 sticky left-0 bg-spa-primary">
+              <th className="px-4 py-3 text-left font-semibold w-24 sticky left-0 z-30 bg-spa-primary">
                 Zeit
               </th>
               {daySchedule.saunas.map((sauna, idx) => (
-                <th key={idx} className="px-4 py-3 text-left font-semibold min-w-[200px]">
+                <th key={idx} className="px-4 py-3 text-left font-semibold min-w-[200px] whitespace-nowrap">
                   {sauna}
                 </th>
               ))}
@@ -54,12 +52,12 @@ export function ScheduleGrid({
           </thead>
           <tbody>
             {daySchedule.rows.map((timeRow, timeRowIndex) => (
-              <tr key={timeRowIndex} className="border-t border-spa-bg-secondary hover:bg-spa-bg-primary/50">
-                {/* Time Column */}
-                <td className="px-4 py-3 sticky left-0 bg-white">
+              <tr key={timeRowIndex} className="border-t border-spa-bg-secondary group hover:bg-spa-bg-primary/50">
+                {/* Time Column — sticky left with proper bg */}
+                <td className="px-4 py-3 sticky left-0 z-10 bg-white group-hover:bg-spa-bg-primary/50 transition-colors">
                   <button
                     onClick={() => onEditTime(timeRowIndex)}
-                    className="font-bold text-spa-primary hover:text-spa-primary-dark hover:underline cursor-pointer"
+                    className="font-bold text-spa-primary hover:text-spa-primary-dark hover:underline cursor-pointer min-h-[44px] min-w-[44px] flex items-center"
                     title="Zeit bearbeiten"
                   >
                     {timeRow.time}
@@ -102,7 +100,7 @@ export function ScheduleGrid({
                           {entry.flames && (
                             <div className="flex gap-0.5 mb-2">
                               {Array.from({ length: entry.flames }).map((_, i) => (
-                                <Flame key={i} className="w-4 h-4 text-orange-500 fill-orange-500" />
+                                <Flame key={i} className="w-4 h-4 text-spa-warning fill-spa-warning" />
                               ))}
                             </div>
                           )}
@@ -131,7 +129,7 @@ export function ScheduleGrid({
                       ) : (
                         <button
                           onClick={() => onEditCell(timeRowIndex, saunaIndex)}
-                          className="w-full h-20 border-2 border-dashed border-spa-secondary/20 rounded-lg text-spa-text-secondary hover:border-spa-secondary hover:bg-spa-secondary/5 transition-all flex items-center justify-center"
+                          className="w-full min-h-[80px] border-2 border-dashed border-spa-secondary/20 rounded-lg text-spa-text-secondary hover:border-spa-secondary hover:bg-spa-secondary/5 transition-all flex items-center justify-center"
                         >
                           <Plus className="w-5 h-5" />
                         </button>
@@ -144,7 +142,7 @@ export function ScheduleGrid({
                 <td className="px-4 py-3">
                   <button
                     onClick={() => onDeleteTimeRow(timeRowIndex)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                     title="Zeit löschen"
                     aria-label="Zeitreihe löschen"
                   >
@@ -161,7 +159,7 @@ export function ScheduleGrid({
       <div className="border-t border-spa-bg-secondary p-4">
         <button
           onClick={onAddTimeRow}
-          className="w-full px-4 py-3 border-2 border-dashed border-spa-primary/30 rounded-lg text-spa-primary hover:border-spa-primary hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2"
+          className="w-full px-4 py-3 border-2 border-dashed border-spa-primary/30 rounded-lg text-spa-primary hover:border-spa-primary hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2 min-h-[48px]"
         >
           <Plus className="w-5 h-5" />
           <span className="font-medium">Neue Zeit hinzufügen</span>

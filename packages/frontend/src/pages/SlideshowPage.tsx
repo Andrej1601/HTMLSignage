@@ -13,7 +13,9 @@ import { createDefaultSlideshowConfig, type SlideshowConfig } from '@/types/slid
 import type { AudioSettings, Settings } from '@/types/settings.types';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { Monitor, RefreshCw, RotateCcw, Save } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
+import { StatusBadge } from '@/components/StatusBadge';
+import { Monitor, RefreshCw, RotateCcw, Save, SlidersHorizontal } from 'lucide-react';
 
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
 import { parseAudioSettings } from '@/utils/audioUtils';
@@ -98,6 +100,13 @@ function parseDeviceId(target: EditorTarget): string | null {
   return target.startsWith('device:') ? target.slice('device:'.length) : null;
 }
 
+function normalizePrestartMinutes(value: unknown, fallback = 10): number {
+  const safeFallback = Number.isFinite(fallback) ? Math.min(120, Math.max(0, Math.round(fallback))) : 10;
+  const parsed = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return safeFallback;
+  return Math.min(120, Math.max(0, Math.round(parsed)));
+}
+
 export function SlideshowPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
   const { schedule } = useSchedule();
@@ -114,6 +123,7 @@ export function SlideshowPage() {
   const [target, setTarget] = useState<EditorTarget>('global');
   const [editorConfig, setEditorConfig] = useState<SlideshowConfig | null>(null);
   const [editorAudioOverride, setEditorAudioOverride] = useState<AudioSettings | null>(null);
+  const [editorPrestartMinutes, setEditorPrestartMinutes] = useState(10);
   const [isDirty, setIsDirty] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: 'switch-target'; nextTarget: EditorTarget } | { type: 'reset' } | null>(null);
 
@@ -166,6 +176,7 @@ export function SlideshowPage() {
     if (targetToLoad === 'global') {
       setEditorConfig(settings.slideshow || createDefaultSlideshowConfig());
       setEditorAudioOverride(null);
+      setEditorPrestartMinutes(normalizePrestartMinutes(settings.display?.prestartMinutes, 10));
       setIsDirty(false);
       return;
     }
@@ -177,6 +188,7 @@ export function SlideshowPage() {
 
     setEditorConfig(overrideConfig || fallback);
     setEditorAudioOverride(parseAudioSettings(getDeviceOverrideSettings(device).audio));
+    setEditorPrestartMinutes(normalizePrestartMinutes(settings.display?.prestartMinutes, 10));
     setIsDirty(false);
   };
 
@@ -188,7 +200,13 @@ export function SlideshowPage() {
   const previewPayload = useMemo(() => {
     if (!settings || !editorConfig) return null;
 
-    const globalSettings = migrateSettings(settings);
+    const globalSettings = migrateSettings({
+      ...settings,
+      display: {
+        ...(settings.display || {}),
+        prestartMinutes: editorPrestartMinutes,
+      },
+    });
 
     if (!selectedDevice) {
       return {
@@ -234,7 +252,7 @@ export function SlideshowPage() {
       schedule: effectiveSchedule,
       settings: mergedSettings,
     };
-  }, [editorAudioOverride, editorConfig, isDirty, previewSchedule, selectedDevice, settings]);
+  }, [editorAudioOverride, editorConfig, editorPrestartMinutes, isDirty, previewSchedule, selectedDevice, settings]);
 
   const hasActiveDeviceTarget = Boolean(selectedDevice);
   const hasRemovableOverride = hasStoredSlideshowOrAudioOverride(selectedDevice);
@@ -292,6 +310,10 @@ export function SlideshowPage() {
     if (!selectedDevice) {
       const updatedSettings = {
         ...settings,
+        display: {
+          ...(settings.display || {}),
+          prestartMinutes: editorPrestartMinutes,
+        },
         slideshow: {
           ...editorConfig,
           version: (editorConfig.version || 1) + 1,
@@ -402,57 +424,56 @@ export function SlideshowPage() {
 
   return (
     <Layout>
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-spa-text-primary">Slideshow Konfiguration</h2>
-            <p className="text-spa-text-secondary mt-1">
-              {hasActiveDeviceTarget
-                ? `Override-Editor für ${selectedDevice?.name || 'Gerät'}`
-                : 'Globaler Stand'}
-              {isDirty && (
-                <span className="ml-2 text-orange-600 font-medium">• Ungespeicherte Änderungen</span>
-              )}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleReloadCurrent}
-              disabled={isBusy}
-              className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Zurücksetzen
-            </button>
-
-            {hasActiveDeviceTarget && (
+      <div className="space-y-6">
+        <PageHeader
+          title="Slideshow Konfiguration"
+          description={
+            hasActiveDeviceTarget
+              ? `Override-Editor für ${selectedDevice?.name || 'Gerät'}`
+              : 'Globaler Stand'
+          }
+          icon={SlidersHorizontal}
+          badges={isDirty ? [{ label: 'Ungespeichert', tone: 'warning' as const }] : []}
+          actions={
+            <div className="flex gap-2">
               <button
-                onClick={handleRemoveCurrentOverride}
-                disabled={isBusy || !hasRemovableOverride}
-                className="flex items-center gap-2 px-4 py-2 border border-spa-bg-secondary text-spa-text-primary rounded-md hover:bg-spa-bg-secondary transition-colors disabled:opacity-50"
+                onClick={handleReloadCurrent}
+                disabled={isBusy}
+                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-lg transition-colors disabled:opacity-50"
               >
-                <RotateCcw className="w-4 h-4" />
-                Override entfernen
+                <RefreshCw className="w-4 h-4" />
+                Zurücksetzen
               </button>
-            )}
 
-            <button
-              onClick={handleSaveCurrent}
-              disabled={!isDirty || isBusy}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              {isBusy ? 'Speichert...' : 'Speichern'}
-            </button>
-          </div>
-        </div>
+              {hasActiveDeviceTarget && (
+                <button
+                  onClick={handleRemoveCurrentOverride}
+                  disabled={isBusy || !hasRemovableOverride}
+                  className="flex items-center gap-2 px-4 py-2 border border-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-bg-secondary transition-colors disabled:opacity-50"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Override entfernen
+                </button>
+              )}
 
-        <div className="mb-6 bg-white rounded-lg shadow p-6">
+              <button
+                onClick={handleSaveCurrent}
+                disabled={!isDirty || isBusy}
+                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                {isBusy ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          }
+        />
+
+        <div className="bg-white rounded-lg shadow p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-spa-text-primary">Geräte-Ausspielung</h3>
               <p className="text-xs text-spa-text-secondary mt-1">
-                Wähle ein Ziel, um globale Slideshow oder Geräte-Override ohne Popup zu bearbeiten.
+                Wähle ein Ziel, um globale Slideshow oder Geräte-Override zu bearbeiten.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-medium">
@@ -473,42 +494,39 @@ export function SlideshowPage() {
             </div>
           </div>
 
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button
+          <div className="space-y-3">
+            {/* Global Slideshow Card */}
+            <div
               onClick={() => handleSelectTarget('global')}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-lg border p-4 cursor-pointer transition-colors ${
                 target === 'global'
-                  ? 'bg-spa-primary text-white'
-                  : 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary'
+                  ? 'border-spa-primary bg-spa-primary/5'
+                  : 'border-spa-bg-secondary hover:border-spa-primary/30'
               }`}
             >
-              Global
-            </button>
-            {pairedDevices.map((device) => {
-              const tgt = toDeviceTarget(device.id);
-              return (
-                <button
-                  key={device.id}
-                  onClick={() => handleSelectTarget(tgt)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                    target === tgt
-                      ? 'bg-spa-primary text-white'
-                      : 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary'
-                  }`}
-                >
-                  {device.name}
-                </button>
-              );
-            })}
-          </div>
-
-          {pairedDevices.length === 0 ? (
-            <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-sm text-spa-text-secondary">
-              Keine gekoppelten Displays vorhanden.
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 p-2 rounded-lg bg-spa-primary/10">
+                  <SlidersHorizontal className="h-5 w-5 text-spa-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-spa-text-primary">Globale Slideshow</p>
+                  <p className="text-xs text-spa-text-secondary mt-0.5">
+                    Standard-Konfiguration für alle Geräte im Auto-Modus
+                  </p>
+                </div>
+                {target === 'global' && (
+                  <StatusBadge label="Im Editor aktiv" tone="success" showDot={false} />
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {pairedDevices.map((device) => {
+
+            {/* Device Cards */}
+            {pairedDevices.length === 0 ? (
+              <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-sm text-spa-text-secondary">
+                Keine gekoppelten Displays vorhanden.
+              </div>
+            ) : (
+              pairedDevices.map((device) => {
                 const source = getDeviceSlideshowSource(device);
                 const status = getDeviceStatus(device.lastSeen);
                 const statusColor = getStatusColor(status);
@@ -517,8 +535,9 @@ export function SlideshowPage() {
                 return (
                   <div
                     key={device.id}
-                    className={`rounded-lg border p-4 ${
-                      isSelected ? 'border-spa-primary bg-spa-primary/5' : 'border-spa-bg-secondary'
+                    onClick={() => handleSelectTarget(toDeviceTarget(device.id))}
+                    className={`rounded-lg border p-4 cursor-pointer transition-colors ${
+                      isSelected ? 'border-spa-primary bg-spa-primary/5' : 'border-spa-bg-secondary hover:border-spa-primary/30'
                     }`}
                   >
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
@@ -526,6 +545,9 @@ export function SlideshowPage() {
                         <div className="flex items-center gap-2">
                           <Monitor className="h-4 w-4 text-spa-primary" />
                           <p className="font-semibold text-spa-text-primary">{device.name}</p>
+                          {isSelected && (
+                            <StatusBadge label="Im Editor aktiv" tone="success" showDot={false} />
+                          )}
                         </div>
                         <p className="mt-1 font-mono text-xs text-spa-text-secondary">{device.id}</p>
                         <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${statusColor}`}>
@@ -534,7 +556,7 @@ export function SlideshowPage() {
                         </span>
                       </div>
 
-                      <div className="lg:col-span-2">
+                      <div className="lg:col-span-3" onClick={(e) => e.stopPropagation()}>
                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
                           Modus
                         </label>
@@ -542,14 +564,14 @@ export function SlideshowPage() {
                           value={device.mode}
                           onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
                           disabled={updateDevice.isPending}
-                          className="w-full rounded-md border border-spa-bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
+                          className="w-full rounded-lg border border-spa-bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
                         >
                           <option value="auto">{getModeLabel('auto')}</option>
                           <option value="override">{getModeLabel('override')}</option>
                         </select>
                       </div>
 
-                      <div className="lg:col-span-4">
+                      <div className="lg:col-span-5">
                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
                           Aktuelle Quelle
                         </label>
@@ -560,25 +582,12 @@ export function SlideshowPage() {
                           <p className="text-xs text-spa-text-secondary">{source.detail}</p>
                         </div>
                       </div>
-
-                      <div className="flex justify-start lg:col-span-2 lg:justify-end">
-                        <button
-                          onClick={() => handleSelectTarget(toDeviceTarget(device.id))}
-                          className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-spa-primary text-white'
-                              : 'bg-spa-secondary text-white hover:bg-spa-secondary-dark'
-                          }`}
-                        >
-                          {isSelected ? 'Im Editor aktiv' : 'Im Editor bearbeiten'}
-                        </button>
-                      </div>
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
 
         <SlideshowConfigPanel
@@ -587,6 +596,11 @@ export function SlideshowPage() {
             setEditorConfig(nextConfig);
             setIsDirty(true);
           }}
+          prestartMinutes={editorPrestartMinutes}
+          onPrestartMinutesChange={!selectedDevice ? ((minutes) => {
+            setEditorPrestartMinutes(normalizePrestartMinutes(minutes, editorPrestartMinutes));
+            setIsDirty(true);
+          }) : undefined}
           previewSchedule={previewPayload.schedule}
           previewSettings={previewPayload.settings}
           isDirty={isDirty}

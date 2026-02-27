@@ -78,11 +78,11 @@ export function formatLastSeen(lastSeen?: string): string {
 export function getStatusColor(status: DeviceStatus): string {
   switch (status) {
     case 'online':
-      return 'text-green-600 bg-green-100';
+      return 'text-spa-success-dark bg-spa-success-light';
     case 'offline':
-      return 'text-orange-600 bg-orange-100';
+      return 'text-spa-warning-dark bg-spa-warning-light';
     case 'unknown':
-      return 'text-gray-600 bg-gray-100';
+      return 'bg-spa-bg-secondary text-spa-text-secondary';
   }
 }
 

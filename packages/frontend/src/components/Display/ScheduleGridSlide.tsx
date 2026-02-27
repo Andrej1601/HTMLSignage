@@ -6,7 +6,7 @@ import { getDefaultSettings } from '@/types/settings.types';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
-import { clampFlamesTo4, formatClockDE, formatLongDateDE, withAlpha } from './wellnessDisplayUtils';
+import { clampFlamesTo4, formatClockDE, formatLongDateDE, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { motion } from 'framer-motion';
 import {
   buildScheduleSaunaIndexMap,
@@ -191,10 +191,34 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
   const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
   const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
 
+  // Compute dynamic row heights based on infusion counts per row
+  const gridRowTemplate = useMemo(() => {
+    if (!daySchedule || gridSaunas.length <= 3) return '1fr 1fr';
+    const countInfusions = (sauna: typeof gridSaunas[0]) => {
+      const sIdx = resolveScheduleSaunaIndex(
+        daySchedule.saunas, sauna.name, scheduleSaunaIndexByKey,
+      );
+      if (sIdx < 0) return 0;
+      return daySchedule.rows.filter((row) => {
+        const entry = row.entries?.[sIdx];
+        return entry?.title;
+      }).length;
+    };
+    const row1Saunas = gridSaunas.slice(0, 3);
+    const row2Saunas = gridSaunas.slice(3, 6);
+    const maxRow1 = Math.max(...row1Saunas.map(countInfusions), 1);
+    const maxRow2 = row2Saunas.length > 0 ? Math.max(...row2Saunas.map(countInfusions), 1) : 1;
+    const total = maxRow1 + maxRow2;
+    const ratio = total > 0 ? maxRow1 / total : 0.5;
+    if (ratio >= 0.4 && ratio <= 0.6) return '1fr 1fr';
+    return `${ratio}fr ${1 - ratio}fr`;
+  }, [daySchedule, gridSaunas, scheduleSaunaIndexByKey]);
+
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
   const statusLive = theme.statusLive || '#10B981';
   const statusPrestart = theme.statusPrestart || '#F59E0B';
+  const prestartMinutes = resolvePrestartMinutes(settings);
   const bgBase = theme.dashboardBg || theme.bg || '#FDFBF7';
   const leftBg = theme.zebra1 || '#F7F3E9';
   const border = theme.gridTable || '#EBE5D3';
@@ -236,7 +260,7 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
       style={{ backgroundColor: leftBg, color: textMain }}
     >
       <div className="w-full h-full flex flex-col overflow-hidden">
-        <header className="mb-12 flex justify-between items-center z-20 w-full">
+        <header className="mb-6 flex justify-between items-center z-20 w-full">
           <div className="flex items-center gap-5 min-w-0 flex-1">
             <div
               className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
@@ -270,7 +294,7 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
           </div>
         </header>
 
-        <div className="grid grid-cols-3 grid-rows-2 gap-x-12 gap-y-14 flex-1 overflow-hidden px-2">
+        <div className="grid grid-cols-3 gap-x-8 gap-y-6 flex-1 overflow-hidden px-2" style={{ gridTemplateRows: gridRowTemplate }}>
           {gridSaunas.map((sauna, idx) => {
             const isOutOfOrder = sauna.status === 'out-of-order';
             const saunaIndex = resolveScheduleSaunaIndex(
@@ -352,6 +376,7 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
                   <AutoScrollingList
                     items={sortedInfusions}
                     now={now}
+                    prestartMinutes={prestartMinutes}
                     itemComponent={(props) => (
                       <InfusionItemGrid
                         {...props}

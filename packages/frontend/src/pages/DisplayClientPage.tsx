@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
+import { useMedia } from '@/hooks/useMedia';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSlideshow } from '@/hooks/useSlideshow';
 import { OverviewSlide } from '@/components/Display/OverviewSlide';
@@ -101,6 +102,7 @@ export function DisplayClientPage() {
 
   const { schedule, isLoading: scheduleLoading } = useSchedule();
   const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
+  const { data: mediaData } = useMedia();
 
   const [localSchedule, setLocalSchedule] = useState(schedule || createDefaultSchedule());
   const [localSettings, setLocalSettings] = useState(fetchedSettings || getDefaultSettings());
@@ -979,7 +981,7 @@ export function DisplayClientPage() {
 
                 {/* Right Bottom */}
                 <div
-                  className={clsx('h-56 p-8 relative shrink-0 overflow-hidden', showZoneBorders && 'border-t')}
+                  className={clsx('h-44 p-4 relative shrink-0 overflow-hidden', showZoneBorders && 'border-t')}
                   style={{
                     backgroundColor: bottomBg,
                     borderColor: showZoneBorders ? border : undefined,
@@ -1018,7 +1020,7 @@ export function DisplayClientPage() {
                         exit={{ y: -20, opacity: 0 }}
                         className="w-full h-full"
                       >
-                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} />
+                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} media={mediaData} />
                       </motion.div>
                     )}
                   </AnimatePresence>

@@ -41,8 +41,8 @@ export function DeviceCard({
   const isOverrideMode = device.mode === 'override';
   const isOverrideActive = hasOverrides && isOverrideMode;
   const modeBadgeClass = isOverrideMode
-    ? 'bg-blue-100 text-blue-700'
-    : 'bg-gray-100 text-gray-700';
+    ? 'bg-spa-info-light text-spa-info-dark'
+    : 'bg-spa-bg-secondary text-spa-text-secondary';
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary hover:shadow-md transition-shadow">
@@ -102,7 +102,7 @@ export function DeviceCard({
 
         {device.pairedAt && (
           <div className="flex items-start gap-2 text-sm">
-            <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <CheckCircle className="w-4 h-4 text-spa-success mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-spa-text-secondary">
                 Gekoppelt am {new Date(device.pairedAt).toLocaleDateString('de-DE')}
@@ -112,13 +112,13 @@ export function DeviceCard({
         )}
 
         {hasOverrides && (
-          <div className={`flex items-start gap-2 text-sm rounded-lg p-3 ${isOverrideActive ? 'bg-blue-50' : 'bg-amber-50'}`}>
-            <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOverrideActive ? 'text-blue-600' : 'text-amber-600'}`} />
+          <div className={`flex items-start gap-2 text-sm rounded-lg p-3 ${isOverrideActive ? 'bg-spa-info-light' : 'bg-spa-warning-light'}`}>
+            <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOverrideActive ? 'text-spa-info' : 'text-spa-warning'}`} />
             <div className="flex-1">
-              <p className={`font-medium ${isOverrideActive ? 'text-blue-900' : 'text-amber-900'}`}>
+              <p className={`font-medium ${isOverrideActive ? 'text-spa-info-dark' : 'text-spa-warning-dark'}`}>
                 {isOverrideActive ? 'Device Overrides aktiv' : 'Device Overrides hinterlegt'}
               </p>
-              <p className={`text-xs mt-1 ${isOverrideActive ? 'text-blue-700' : 'text-amber-700'}`}>
+              <p className={`text-xs mt-1 ${isOverrideActive ? 'text-spa-info-dark/80' : 'text-spa-warning-dark/80'}`}>
                 {isOverrideActive
                   ? 'Dieses Gerät verwendet angepasste Einstellungen'
                   : 'Overrides sind gespeichert, aber Modus steht auf Automatisch'}

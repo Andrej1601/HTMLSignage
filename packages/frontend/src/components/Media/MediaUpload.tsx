@@ -298,22 +298,22 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-medium text-red-900">Fehler</p>
-            <p className="text-sm text-red-700 mt-1 whitespace-pre-line">{error}</p>
+            <p className="font-medium text-spa-error-dark">Fehler</p>
+            <p className="text-sm text-spa-error-dark/80 mt-1 whitespace-pre-line">{error}</p>
           </div>
         </div>
       )}
 
       {/* Success Message */}
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-spa-success-light border border-spa-success/30 rounded-lg p-4 flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-spa-success flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-medium text-green-900">Erfolg!</p>
-            <p className="text-sm text-green-700 mt-1">{successMessage}</p>
+            <p className="font-medium text-spa-success-dark">Erfolg!</p>
+            <p className="text-sm text-spa-success-dark/80 mt-1">{successMessage}</p>
           </div>
         </div>
       )}

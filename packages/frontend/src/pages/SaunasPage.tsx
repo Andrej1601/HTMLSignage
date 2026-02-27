@@ -1,15 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
-import { SaunaCard } from '@/components/Saunas/SaunaCard';
+import { SortableSaunaCard } from '@/components/Saunas/SaunaCard';
 import { SaunaEditor } from '@/components/Saunas/SaunaEditor';
 import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Plus, Save, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/Button';
 import { useSettings } from '@/hooks/useSettings';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 
 // Simple UUID generator
 function generateId(): string {
@@ -25,6 +40,21 @@ export function SaunasPage() {
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const sortedSaunas = useMemo(
+    () => [...localSaunas].sort((a, b) => a.order - b.order),
+    [localSaunas],
+  );
+
+  const sortedIds = useMemo(
+    () => sortedSaunas.map((s) => s.id),
+    [sortedSaunas],
+  );
 
   // Initialize local saunas from settings only once
   useEffect(() => {
@@ -59,6 +89,25 @@ export function SaunasPage() {
       setIsInitialized(true);
     }
   }, [settings, isInitialized]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedSaunas.findIndex((s) => s.id === active.id);
+    const newIndex = sortedSaunas.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder array
+    const reordered = [...sortedSaunas];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+
+    // Update order values
+    const updated = reordered.map((s, i) => ({ ...s, order: i }));
+    setLocalSaunas(updated);
+    setIsDirty(true);
+  };
 
   const handleAddSauna = () => {
     setIsAddingNew(true);
@@ -142,31 +191,15 @@ export function SaunasPage() {
           description="Pflege Sauna-Stammdaten, Sichtbarkeit und Status für den Aufgussplan."
           actions={(
             <>
-              <button
-                onClick={handleReload}
-                disabled={isLoading}
-                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className="w-4 h-4" />
+              <Button variant="ghost" icon={RefreshCw} onClick={handleReload} disabled={isLoading}>
                 Neu laden
-              </button>
-
-              <button
-                onClick={handleSaveAll}
-                disabled={!isDirty || isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                {isSaving ? 'Speichert...' : 'Speichern'}
-              </button>
-
-              <button
-                onClick={handleAddSauna}
-                className="flex items-center gap-2 px-4 py-2 bg-spa-secondary text-white rounded-lg hover:bg-spa-secondary-dark transition-colors"
-              >
-                <Plus className="w-4 h-4" />
+              </Button>
+              <Button icon={Save} onClick={handleSaveAll} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
+                Speichern
+              </Button>
+              <Button variant="secondary" icon={Plus} onClick={handleAddSauna}>
                 Neue Sauna
-              </button>
+              </Button>
             </>
           )}
           badges={[
@@ -191,26 +224,25 @@ export function SaunasPage() {
         {localSaunas.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
-            <button
-              onClick={handleAddSauna}
-              className="px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors"
-            >
+            <Button icon={Plus} onClick={handleAddSauna}>
               Erste Sauna hinzufügen
-            </button>
+            </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {localSaunas
-              .sort((a, b) => a.order - b.order)
-              .map((sauna) => (
-                <SaunaCard
-                  key={sauna.id}
-                  sauna={sauna}
-                  onEdit={() => setEditingSauna(sauna)}
-                  onDelete={() => handleDelete(sauna.id)}
-                />
-              ))}
-          </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortedIds} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sortedSaunas.map((sauna) => (
+                  <SortableSaunaCard
+                    key={sauna.id}
+                    sauna={sauna}
+                    onEdit={() => setEditingSauna(sauna)}
+                    onDelete={() => handleDelete(sauna.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
 
         {/* Editor Dialog */}

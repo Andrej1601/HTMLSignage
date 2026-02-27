@@ -2,6 +2,18 @@ import type { Aroma, Event, Settings, ThemeColors } from '@/types/settings.types
 
 export type InfusionStatus = 'ONGOING' | 'PRESTART' | 'UPCOMING' | 'FINISHED';
 
+function clampDisplayMinute(value: number): number {
+  return Math.min(120, Math.max(0, Math.round(value)));
+}
+
+export function resolvePrestartMinutes(settings: Settings | undefined, fallback: number = 10): number {
+  const safeFallback = Number.isFinite(fallback) ? clampDisplayMinute(fallback) : 10;
+  const raw = settings?.display?.prestartMinutes;
+  const parsed = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+  if (!Number.isFinite(parsed)) return safeFallback;
+  return clampDisplayMinute(parsed);
+}
+
 export function clampFlamesTo4(value: unknown): number {
   const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(n)) return 1;

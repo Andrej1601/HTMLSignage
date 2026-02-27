@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy } from 'lucide-react';
+import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy, Tags } from 'lucide-react';
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
@@ -8,9 +8,10 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu';
 interface MediaCardProps {
   media: Media;
   onDelete: (media: Media) => void;
+  onEditTags?: (media: Media) => void;
 }
 
-export function MediaCard({ media, onDelete }: MediaCardProps) {
+export function MediaCard({ media, onDelete, onEditTags }: MediaCardProps) {
   const [copied, setCopied] = useState(false);
 
   // Construct full URL for media
@@ -42,7 +43,7 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary hover:shadow-md transition-shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-all overflow-hidden border-spa-bg-secondary">
       {/* Preview */}
       <div className="aspect-square bg-spa-bg-primary relative">
         {media.type === 'image' ? (
@@ -91,6 +92,7 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
               [
                 { label: copied ? 'Kopiert!' : 'URL kopieren', icon: Copy, onClick: handleCopyUrl },
                 { label: 'Herunterladen', icon: Download, onClick: handleDownload },
+                ...(onEditTags ? [{ label: 'Tags bearbeiten', icon: Tags, onClick: () => onEditTags(media) }] : []),
               ],
               [{ label: 'Löschen', icon: Trash2, onClick: () => onDelete(media), variant: 'danger' }],
             ]}
@@ -111,6 +113,23 @@ export function MediaCard({ media, onDelete }: MediaCardProps) {
         <p className="font-medium text-spa-text-primary truncate" title={media.originalName}>
           {media.originalName}
         </p>
+        {media.tags && media.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {media.tags.slice(0, 3).map((tag) => (
+              <span
+                key={`${media.id}-${tag}`}
+                className="inline-flex items-center rounded-full bg-spa-secondary/15 px-2 py-0.5 text-[11px] text-spa-text-primary"
+              >
+                #{tag}
+              </span>
+            ))}
+            {media.tags.length > 3 && (
+              <span className="inline-flex items-center rounded-full bg-spa-bg-secondary px-2 py-0.5 text-[11px] text-spa-text-secondary">
+                +{media.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between mt-2 text-xs text-spa-text-secondary">
           <span>{formatFileSize(media.size)}</span>
           <span>{new Date(media.createdAt).toLocaleDateString('de-DE')}</span>

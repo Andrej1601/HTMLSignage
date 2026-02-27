@@ -5,9 +5,10 @@ import { ImageIcon } from 'lucide-react';
 interface MediaGridProps {
   media: Media[];
   onDelete: (media: Media) => void;
+  onEditTags?: (media: Media) => void;
 }
 
-export function MediaGrid({ media, onDelete }: MediaGridProps) {
+export function MediaGrid({ media, onDelete, onEditTags }: MediaGridProps) {
   if (media.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -29,6 +30,7 @@ export function MediaGrid({ media, onDelete }: MediaGridProps) {
           key={item.id}
           media={item}
           onDelete={onDelete}
+          onEditTags={onEditTags}
         />
       ))}
     </div>

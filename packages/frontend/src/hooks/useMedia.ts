@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mediaApi } from '@/services/api';
 import { toast } from '@/stores/toastStore';
 import type { MediaFilter } from '@/types/media.types';
@@ -8,6 +8,16 @@ export function useMedia(filter?: MediaFilter) {
   return useQuery({
     queryKey: ['media', filter],
     queryFn: () => mediaApi.getMedia(filter),
+    placeholderData: keepPreviousData,
+  });
+}
+
+// Get all distinct media tags
+export function useMediaTags() {
+  return useQuery({
+    queryKey: ['media-tags'],
+    queryFn: () => mediaApi.getTags(),
+    staleTime: 60_000,
   });
 }
 
@@ -48,6 +58,23 @@ export function useDeleteMedia() {
     },
     onError: () => {
       toast.error('Datei konnte nicht gelöscht werden.');
+    },
+  });
+}
+
+// Update media tags
+export function useUpdateMediaTags() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, tags }: { id: string; tags: string[] }) => mediaApi.updateMediaTags(id, tags),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media'] });
+      queryClient.invalidateQueries({ queryKey: ['media-tags'] });
+      toast.success('Tags gespeichert.');
+    },
+    onError: () => {
+      toast.error('Tags konnten nicht gespeichert werden.');
     },
   });
 }

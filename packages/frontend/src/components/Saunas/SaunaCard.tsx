@@ -5,15 +5,44 @@ import { useMedia } from '@/hooks/useMedia';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface SaunaCardProps {
   sauna: Sauna;
   onEdit: () => void;
   onDelete: () => void;
-  isDragging?: boolean;
 }
 
-export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProps) {
+/** Sortable wrapper that integrates with @dnd-kit */
+export function SortableSaunaCard(props: SaunaCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.sauna.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <SaunaCardInner {...props} isDragging={isDragging} dragListeners={listeners} />
+    </div>
+  );
+}
+
+/** Re-export for non-sortable usage */
+export function SaunaCard(props: SaunaCardProps & { isDragging?: boolean }) {
+  return <SaunaCardInner {...props} />;
+}
+
+interface InternalProps extends SaunaCardProps {
+  isDragging?: boolean;
+  dragListeners?: Record<string, any>;
+}
+
+function SaunaCardInner({ sauna, onEdit, onDelete, isDragging, dragListeners }: InternalProps) {
   const { data: media } = useMedia();
 
   const statusColor = SAUNA_STATUS_COLORS[sauna.status];
@@ -25,7 +54,7 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
     <div
       className={clsx(
         'bg-white rounded-lg shadow border-2 transition-all',
-        isDragging ? 'opacity-50 border-spa-primary' : 'border-transparent hover:border-spa-bg-secondary'
+        isDragging ? 'opacity-50 border-spa-primary shadow-lg' : 'border-transparent hover:border-spa-bg-secondary'
       )}
     >
       {/* Image */}
@@ -65,7 +94,14 @@ export function SaunaCard({ sauna, onEdit, onDelete, isDragging }: SaunaCardProp
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <GripVertical className="w-5 h-5 text-spa-text-secondary cursor-move" />
+            <button
+              type="button"
+              className="touch-none p-1 -m-1 text-spa-text-secondary hover:text-spa-primary cursor-grab active:cursor-grabbing"
+              aria-label="Reihenfolge ändern"
+              {...dragListeners}
+            >
+              <GripVertical className="w-5 h-5" />
+            </button>
             <h3 className="font-semibold text-lg text-spa-text-primary">{sauna.name}</h3>
           </div>
 

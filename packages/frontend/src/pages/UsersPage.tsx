@@ -3,9 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Shield } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { API_URL } from '@/config/env';
+import { Button } from '@/components/Button';
+import { Dialog } from '@/components/Dialog';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { InputField } from '@/components/FormField';
+import { DataTable, type Column } from '@/components/DataTable';
 
 interface User {
   id: string;
@@ -134,6 +139,96 @@ export function UsersPage() {
     },
   });
 
+  const userColumns: Column<User>[] = [
+    {
+      key: 'username',
+      header: 'Benutzer',
+      sortFn: (a, b) => a.username.localeCompare(b.username),
+      render: (u) => (
+        <div className="flex items-center">
+          <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+            {u.username.charAt(0).toUpperCase()}
+          </div>
+          <div className="ml-4">
+            <div className="text-sm font-medium text-spa-text-primary">{u.username}</div>
+          </div>
+        </div>
+      ),
+      hideOnMobile: true,
+    },
+    {
+      key: 'email',
+      header: 'E-Mail',
+      render: (u) => <span className="text-spa-text-primary">{u.email || '—'}</span>,
+    },
+    {
+      key: 'roles',
+      header: 'Rollen',
+      render: (u) => (
+        <div className="flex flex-wrap gap-1">
+          {u.roles.map((role) => (
+            <span
+              key={role}
+              className={`px-2 py-1 text-xs font-medium rounded ${
+                role === 'admin'
+                  ? 'bg-spa-warning-light text-spa-warning-dark'
+                  : role === 'editor'
+                  ? 'bg-spa-info-light text-spa-info-dark'
+                  : 'bg-spa-bg-secondary text-spa-text-secondary'
+              }`}
+            >
+              {role}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Erstellt',
+      sortFn: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      render: (u) => (
+        <span className="text-spa-text-secondary">
+          {new Date(u.createdAt).toLocaleDateString('de-DE')}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Aktionen',
+      alignRight: true,
+      hideOnMobile: true,
+      render: (u) => (
+        <>
+          <button
+            onClick={() => setEditingUser(u)}
+            className="text-spa-primary hover:text-spa-primary-dark mr-3"
+            aria-label={`${u.username} bearbeiten`}
+          >
+            <Edit2 className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => setDeletingUser(u)}
+            className="text-spa-error hover:text-spa-error-dark"
+            aria-label={`${u.username} löschen`}
+          >
+            <Trash2 className="w-4 h-4" aria-hidden="true" />
+          </button>
+        </>
+      ),
+      renderMobile: (u) => (
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" icon={Edit2} onClick={() => setEditingUser(u)}>
+            Bearbeiten
+          </Button>
+          <Button variant="danger" size="sm" icon={Trash2} onClick={() => setDeletingUser(u)}>
+            Löschen
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) {
     return (
       <Layout>
@@ -150,13 +245,9 @@ export function UsersPage() {
           description="Benutzerkonten, Rollen und Adminrechte zentral verwalten."
           icon={UsersIcon}
           actions={(
-            <button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
+            <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
               Benutzer anlegen
-            </button>
+            </Button>
           )}
           badges={[
             { label: `${users.length} Benutzer`, tone: 'info' },
@@ -180,12 +271,12 @@ export function UsersPage() {
 
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Shield className="w-6 h-6 text-purple-600" />
+              <div className="p-2 bg-spa-info-light rounded-lg">
+                <Shield className="w-6 h-6 text-spa-info" />
               </div>
               <div>
                 <p className="text-sm text-spa-text-secondary">Administratoren</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-2xl font-bold text-spa-info">
                   {users.filter(u => u.roles.includes('admin')).length}
                 </p>
               </div>
@@ -194,85 +285,19 @@ export function UsersPage() {
         </div>
 
         {/* Users List */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Benutzer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  E-Mail
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rollen
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Erstellt
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Aktionen
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.username}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{user.email || '—'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map((role) => (
-                        <span
-                          key={role}
-                          className={`px-2 py-1 text-xs font-medium rounded ${
-                            role === 'admin'
-                              ? 'bg-purple-100 text-purple-800'
-                              : role === 'editor'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {role}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString('de-DE')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => setEditingUser(user)}
-                      className="text-spa-primary hover:text-spa-primary-dark mr-3"
-                      aria-label={`${user.username} bearbeiten`}
-                    >
-                      <Edit2 className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      onClick={() => setDeletingUser(user)}
-                      className="text-red-600 hover:text-red-900"
-                      aria-label={`${user.username} löschen`}
-                    >
-                      <Trash2 className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<User>
+          data={users}
+          keyFn={(u) => u.id}
+          mobileTitle={(u) => (
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+                {u.username.charAt(0).toUpperCase()}
+              </div>
+              <span>{u.username}</span>
+            </div>
+          )}
+          columns={userColumns}
+        />
 
         {/* Create/Edit Dialog */}
         {(isCreateDialogOpen || editingUser) && (
@@ -294,34 +319,15 @@ export function UsersPage() {
         )}
 
         {/* Delete Confirmation */}
-        {deletingUser && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold text-spa-text-primary mb-4">
-                Benutzer löschen?
-              </h3>
-              <p className="text-spa-text-secondary mb-6">
-                Möchtest du den Benutzer "{deletingUser.username}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setDeletingUser(null)}
-                  disabled={deleteUser.isPending}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={() => deleteUser.mutate(deletingUser.id)}
-                  disabled={deleteUser.isPending}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                >
-                  {deleteUser.isPending ? 'Wird gelöscht...' : 'Löschen'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          isOpen={Boolean(deletingUser)}
+          title="Benutzer löschen?"
+          message={`Möchtest du den Benutzer "${deletingUser?.username}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`}
+          confirmLabel={deleteUser.isPending ? 'Wird gelöscht...' : 'Löschen'}
+          variant="danger"
+          onConfirm={() => deletingUser && deleteUser.mutate(deletingUser.id)}
+          onCancel={() => setDeletingUser(null)}
+        />
       </div>
     </Layout>
   );
@@ -386,106 +392,78 @@ function UserDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-spa-text-primary">
-            {user ? 'Benutzer bearbeiten' : 'Neuer Benutzer'}
-          </h2>
-          <button
-            onClick={onClose}
-            disabled={isSaving}
-            className="text-gray-400 hover:text-gray-600"
+    <Dialog
+      isOpen={true}
+      onClose={onClose}
+      title={user ? 'Benutzer bearbeiten' : 'Neuer Benutzer'}
+      closeDisabled={isSaving}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Abbrechen
+          </Button>
+          <Button
+            type="submit"
+            form="user-form"
+            icon={Save}
+            loading={isSaving}
+            loadingText="Speichern..."
           >
-            ×
-          </button>
+            Speichern
+          </Button>
+        </>
+      }
+    >
+      <form id="user-form" onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm" role="alert">
+            {error}
+          </div>
+        )}
+
+        <InputField
+          label="Benutzername"
+          required
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          minLength={3}
+        />
+
+        <InputField
+          label="E-Mail"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <InputField
+          label={user ? 'Passwort (leer lassen für keine Änderung)' : 'Passwort'}
+          type="password"
+          required={!user}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={6}
+        />
+
+        <div>
+          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+            Rollen
+          </label>
+          <div className="space-y-2">
+            {['admin', 'editor', 'viewer'].map((role) => (
+              <label key={role} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={roles.includes(role)}
+                  onChange={() => toggleRole(role)}
+                  className="w-4 h-4 text-spa-primary border-spa-bg-secondary rounded focus:ring-spa-primary"
+                />
+                <span className="text-sm capitalize text-spa-text-primary">{role}</span>
+              </label>
+            ))}
+          </div>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Benutzername *
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              required
-              minLength={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              E-Mail
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Passwort {user ? '(leer lassen für keine Änderung)' : '*'}
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              required={!user}
-              minLength={6}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-spa-text-primary mb-2">
-              Rollen
-            </label>
-            <div className="space-y-2">
-              {['admin', 'editor', 'viewer'].map((role) => (
-                <label key={role} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={roles.includes(role)}
-                    onChange={() => toggleRole(role)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm capitalize">{role}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50"
-            >
-              {isSaving ? 'Speichern...' : 'Speichern'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Dialog>
   );
 }

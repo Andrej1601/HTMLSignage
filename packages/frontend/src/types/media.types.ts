@@ -7,6 +7,7 @@ export interface Media {
   mimeType: string;
   size: number; // bytes
   type: MediaType;
+  tags?: string[];
   url: string;
   uploadedBy?: string;
   user?: {
@@ -24,6 +25,7 @@ export interface UploadMediaRequest {
 export interface MediaFilter {
   type?: MediaType;
   search?: string;
+  tag?: string;
 }
 
 // Helper functions
