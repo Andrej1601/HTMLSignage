@@ -8,8 +8,9 @@ import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { Plus, Save, RefreshCw } from 'lucide-react';
+import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
 import { Button } from '@/components/Button';
+import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
 import {
   DndContext,
@@ -185,7 +186,7 @@ export function SaunasPage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
           title="Saunas"
           description="Pflege Sauna-Stammdaten, Sichtbarkeit und Status für den Aufgussplan."
@@ -210,40 +211,41 @@ export function SaunasPage() {
         />
 
         {/* Info Box */}
-        <div className="bg-spa-secondary/10 border border-spa-secondary/30 rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-spa-text-primary mb-2">Sauna-Verwaltung</h3>
+        <SectionCard title="Hinweise" icon={Info}>
           <ul className="text-sm text-spa-text-secondary space-y-1">
             <li>• <strong>Aufgüsse:</strong> Sauna erscheint normal im Aufgussplan</li>
             <li>• <strong>Keine Aufgüsse:</strong> Sauna wird als "Keine Aufgüsse" markiert</li>
             <li>• <strong>Außer Betrieb:</strong> Sauna wird als "Außer Betrieb" gekennzeichnet</li>
             <li>• <strong>Ausgeblendet:</strong> Sauna wird komplett ausgeblendet</li>
           </ul>
-        </div>
+        </SectionCard>
 
         {/* Saunas Grid */}
-        {localSaunas.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
-            <Button icon={Plus} onClick={handleAddSauna}>
-              Erste Sauna hinzufügen
-            </Button>
-          </div>
-        ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={sortedIds} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sortedSaunas.map((sauna) => (
-                  <SortableSaunaCard
-                    key={sauna.id}
-                    sauna={sauna}
-                    onEdit={() => setEditingSauna(sauna)}
-                    onDelete={() => handleDelete(sauna.id)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
+        <SectionCard title="Saunas" description="Per Drag & Drop die Reihenfolge ändern." icon={Flame}>
+          {localSaunas.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
+              <Button icon={Plus} onClick={handleAddSauna}>
+                Erste Sauna hinzufügen
+              </Button>
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortedIds} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sortedSaunas.map((sauna) => (
+                    <SortableSaunaCard
+                      key={sauna.id}
+                      sauna={sauna}
+                      onEdit={() => setEditingSauna(sauna)}
+                      onDelete={() => handleDelete(sauna.id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </SectionCard>
 
         {/* Editor Dialog */}
         {(editingSauna || isAddingNew) && (

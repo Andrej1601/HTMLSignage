@@ -15,6 +15,7 @@ import { InputField } from '@/components/FormField';
 import { ImageIcon, RefreshCw, Upload, Filter, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { SectionCard } from '@/components/SectionCard';
 
 type ViewMode = 'grid' | 'list';
 
@@ -120,7 +121,7 @@ export function MediaPage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
           title="Medien-Bibliothek"
           description="Verwalte Bilder, Audio und Video für die Ausspielung."
@@ -144,7 +145,7 @@ export function MediaPage() {
         />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title="Gesamt" value={stats.total} icon={ImageIcon} color="primary" />
           <StatCard title="Bilder" value={stats.images} icon={ImageIcon} color="info" />
           <StatCard title="Audio" value={stats.audio} icon={Music} color="violet" />
@@ -153,17 +154,14 @@ export function MediaPage() {
 
         {/* Upload Section */}
         {uploadOpen && (
-          <div className="mb-6">
-            <MediaUpload onUploadComplete={() => refetch()} />
-          </div>
+          <MediaUpload onUploadComplete={() => refetch()} />
         )}
 
         {/* Filters + View Toggle */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <SectionCard title="Filter & Ansicht" icon={Filter}>
           <div className="flex flex-col md:flex-row gap-4">
             {/* Type Filter */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Filter className="w-5 h-5 text-spa-text-secondary" />
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
@@ -221,26 +219,34 @@ export function MediaPage() {
           {isFetching && (
             <p className="mt-2 text-xs text-spa-text-secondary">Filter wird aktualisiert...</p>
           )}
-        </div>
+        </SectionCard>
 
         {/* Media Grid or List */}
-        {isLoading && media.length === 0 ? (
-          <LoadingSpinner label="Lade Medien..." />
-        ) : error ? (
-          <ErrorAlert error={error} onRetry={() => refetch()} />
-        ) : viewMode === 'grid' ? (
-          <MediaGrid
-            media={media}
-            onDelete={setDeletingMedia}
-            onEditTags={openTagEditor}
-          />
-        ) : (
-          <MediaListView
-            media={media}
-            onDelete={setDeletingMedia}
-            onEditTags={openTagEditor}
-          />
-        )}
+        <SectionCard title="Dateien" icon={ImageIcon} noPadding>
+          {isLoading && media.length === 0 ? (
+            <div className="p-6">
+              <LoadingSpinner label="Lade Medien..." />
+            </div>
+          ) : error ? (
+            <div className="p-6">
+              <ErrorAlert error={error} onRetry={() => refetch()} />
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="p-6">
+              <MediaGrid
+                media={media}
+                onDelete={setDeletingMedia}
+                onEditTags={openTagEditor}
+              />
+            </div>
+          ) : (
+            <MediaListView
+              media={media}
+              onDelete={setDeletingMedia}
+              onEditTags={openTagEditor}
+            />
+          )}
+        </SectionCard>
 
         {/* Single Delete Confirm */}
         <ConfirmDialog

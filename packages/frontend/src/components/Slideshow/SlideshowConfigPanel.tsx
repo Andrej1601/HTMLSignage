@@ -15,7 +15,9 @@ import {
   getZonesForLayout,
   reorderSlides,
 } from '@/types/slideshow.types';
-import { Edit, Eye, EyeOff, GripVertical, Plus, Play, Trash2 } from 'lucide-react';
+import { Edit, Eye, EyeOff, GripVertical, Layers, Plus, Play, Trash2 } from 'lucide-react';
+import { SectionCard } from '@/components/SectionCard';
+import { Button } from '@/components/Button';
 import clsx from 'clsx';
 import {
   DndContext,
@@ -343,34 +345,29 @@ export function SlideshowConfigPanel({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-spa-text-primary">1:1 Monitor-Vorschau</h3>
-            <p className="text-xs text-spa-text-secondary mt-1">
-              Direkte Vorschau der echten `/display` Ansicht mit dieser Konfiguration.
-            </p>
-          </div>
+      <SectionCard
+        title="1:1 Monitor-Vorschau"
+        description="Direkte Vorschau der echten Display-Ansicht mit dieser Konfiguration."
+        icon={Play}
+        actions={
           <span className={`text-xs font-medium px-3 py-1 rounded-full ${
             isDirty ? 'bg-spa-warning-light text-spa-warning-dark' : 'bg-spa-success-light text-spa-success-dark'
           }`}>
-            {isDirty ? 'Ungespeicherte Änderungen aktiv' : 'Gespeicherter Stand'}
+            {isDirty ? 'Ungespeicherte Änderungen' : 'Gespeicherter Stand'}
           </span>
-        </div>
-
+        }
+      >
         <DisplayLivePreview
           schedule={previewSchedule}
           settings={previewSettings}
         />
-      </div>
+      </SectionCard>
 
       {canEditAudio && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-spa-text-primary">{audioTitle}</h3>
-              <p className="text-xs text-spa-text-secondary">{audioSubtitle}</p>
-            </div>
+        <SectionCard
+          title={audioTitle}
+          description={audioSubtitle}
+          actions={
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -388,8 +385,8 @@ export function SlideshowConfigPanel({
               />
               <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
             </label>
-          </div>
-
+          }
+        >
           {audioOverride ? (
             <AudioConfigEditor
               audio={audioOverride}
@@ -408,7 +405,7 @@ export function SlideshowConfigPanel({
               Kein Audio-Override aktiv.
             </p>
           )}
-        </div>
+        </SectionCard>
       )}
 
       <LayoutPicker
@@ -417,27 +414,23 @@ export function SlideshowConfigPanel({
         onLayoutChange={handleLayoutChange}
       />
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-spa-bg-secondary">
-          <h3 className="text-lg font-semibold text-spa-text-primary">Slides nach Zone</h3>
-          <p className="text-sm text-spa-text-secondary mt-1">
-            Ziehe die Slides, um die Reihenfolge innerhalb einer Zone zu ändern.
-          </p>
-          <p className="text-xs text-spa-text-secondary mt-2">
-            {config.slides.length} Slide{config.slides.length !== 1 ? 's' : ''} ({enabledSlides.length} aktiv)
-          </p>
-        </div>
-
+      <SectionCard
+        title="Slides nach Zone"
+        description={`${config.slides.length} Slide${config.slides.length !== 1 ? 's' : ''} konfiguriert (${enabledSlides.length} aktiv). Per Drag & Drop die Reihenfolge ändern.`}
+        icon={Layers}
+        noPadding
+      >
         {config.slides.length === 0 ? (
           <div className="p-12 text-center">
+            <Layers className="w-12 h-12 text-spa-text-secondary mx-auto mb-3" />
             <p className="text-spa-text-secondary mb-4">Noch keine Slides konfiguriert</p>
-            <button
+            <Button
+              icon={Plus}
               onClick={() => handleAddSlide(zones[0]?.id || 'main')}
               disabled={disabled}
-              className="px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50"
             >
               Ersten Slide hinzufügen
-            </button>
+            </Button>
           </div>
         ) : (
           <div
@@ -449,23 +442,24 @@ export function SlideshowConfigPanel({
             {zones.map((zone) => {
               const zoneSlides = getSlidesByZone(config.slides, zone.id);
               return (
-                <div key={zone.id} className="bg-spa-bg-primary/30 rounded-lg border-2 border-spa-bg-secondary">
-                  <div className="p-4 border-b border-spa-bg-secondary bg-white">
+                <div key={zone.id} className="rounded-lg border border-spa-bg-secondary overflow-hidden">
+                  <div className="px-4 py-3 border-b border-spa-bg-secondary bg-spa-bg-primary/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-spa-text-primary">{zone.name}</h4>
+                        <h4 className="font-semibold text-sm text-spa-text-primary">{zone.name}</h4>
                         <p className="text-xs text-spa-text-secondary mt-0.5">
-                          {zone.type === 'persistent' ? 'Persistent' : 'Rotierend'} • {zoneSlides.length} Slide{zoneSlides.length !== 1 ? 's' : ''}
+                          {zone.type === 'persistent' ? 'Persistent' : 'Rotierend'} · {zoneSlides.length} Slide{zoneSlides.length !== 1 ? 's' : ''}
                         </p>
                       </div>
-                      <button
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={Plus}
                         onClick={() => handleAddSlide(zone.id)}
                         disabled={disabled}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-spa-secondary text-white rounded-md hover:bg-spa-secondary-dark transition-colors text-sm disabled:opacity-50"
                       >
-                        <Plus className="w-4 h-4" />
                         Slide
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -504,25 +498,25 @@ export function SlideshowConfigPanel({
             })}
           </div>
         )}
+      </SectionCard>
 
-        <GlobalSlideshowSettings
-          config={config}
-          prestartMinutes={prestartMinutes}
-          disabled={disabled}
-          onChange={onChange}
-          onPrestartMinutesChange={onPrestartMinutesChange}
-        />
-      </div>
+      <GlobalSlideshowSettings
+        config={config}
+        prestartMinutes={prestartMinutes}
+        disabled={disabled}
+        onChange={onChange}
+        onPrestartMinutesChange={onPrestartMinutesChange}
+      />
 
       {showOpenPreviewButton && (
         <div className="flex justify-end">
-          <button
+          <Button
+            variant="secondary"
+            icon={Play}
             onClick={() => window.open('/display', '_blank')}
-            className="flex items-center gap-2 px-6 py-3 bg-spa-accent text-spa-text-primary rounded-md hover:bg-spa-accent-warm transition-colors font-medium"
           >
-            <Play className="w-5 h-5" />
             {previewButtonLabel}
-          </button>
+          </Button>
         </div>
       )}
 

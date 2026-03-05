@@ -17,6 +17,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Monitor, RefreshCw, Wifi, WifiOff, ToggleRight } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { SectionCard } from '@/components/SectionCard';
 
 export function DevicesPage() {
   const { data: devices = [], isLoading, error, refetch } = useDevices();
@@ -91,7 +92,7 @@ export function DevicesPage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
           title="Geräte"
           description="Verwalte Displays, Pairings und Ausspielmodi zentral an einem Ort."
@@ -118,25 +119,27 @@ export function DevicesPage() {
 
         <PendingPairings />
 
-        {pairedDevices.length === 0 && (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-              Keine gekoppelten Geräte
-            </h3>
-            <p className="text-spa-text-secondary">
-              Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten.
-            </p>
-          </div>
-        )}
-
-        <DeviceList
-          devices={pairedDevices}
-          onEdit={setEditingDevice}
-          onDelete={setDeletingDevice}
-          onReload={handleReload}
-          onRestart={handleRestart}
-        />
+        <SectionCard title="Gekoppelte Displays" icon={Monitor}>
+          {pairedDevices.length === 0 ? (
+            <div className="py-8 text-center">
+              <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
+                Keine gekoppelten Geräte
+              </h3>
+              <p className="text-spa-text-secondary">
+                Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten.
+              </p>
+            </div>
+          ) : (
+            <DeviceList
+              devices={pairedDevices}
+              onEdit={setEditingDevice}
+              onDelete={setDeletingDevice}
+              onReload={handleReload}
+              onRestart={handleRestart}
+            />
+          )}
+        </SectionCard>
 
         <DeviceEditDialog
           device={editingDevice}

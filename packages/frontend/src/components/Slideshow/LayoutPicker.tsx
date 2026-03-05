@@ -1,5 +1,7 @@
 import { LAYOUT_OPTIONS } from '@/types/slideshow.types';
 import type { LayoutType } from '@/types/slideshow.types';
+import { SectionCard } from '@/components/SectionCard';
+import { Layout } from 'lucide-react';
 import clsx from 'clsx';
 
 /** CSS-based layout preview thumbnails matching the provided design mockups */
@@ -107,8 +109,7 @@ export function LayoutPicker({
   onLayoutChange,
 }: LayoutPickerProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-spa-text-primary mb-4">Display Layout</h3>
+    <SectionCard title="Display Layout" icon={Layout}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {LAYOUT_OPTIONS.map((option) => (
           <button
@@ -137,6 +138,6 @@ export function LayoutPicker({
           </button>
         ))}
       </div>
-    </div>
+    </SectionCard>
   );
 }

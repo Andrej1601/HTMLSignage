@@ -12,6 +12,8 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
 import { DataTable, type Column } from '@/components/DataTable';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { StatCard } from '@/components/Dashboard/StatCard';
+import { SectionCard } from '@/components/SectionCard';
 
 interface User {
   id: string;
@@ -249,7 +251,7 @@ export function UsersPage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
           title="Benutzerverwaltung"
           description="Benutzerkonten, Rollen und Adminrechte zentral verwalten."
@@ -265,64 +267,41 @@ export function UsersPage() {
           ]}
         />
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-spa-bg-primary rounded-lg">
-                <UsersIcon className="w-6 h-6 text-spa-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Gesamt</p>
-                <p className="text-2xl font-bold text-spa-text-primary">{users.length}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-spa-info-light rounded-lg">
-                <Shield className="w-6 h-6 text-spa-info" />
-              </div>
-              <div>
-                <p className="text-sm text-spa-text-secondary">Administratoren</p>
-                <p className="text-2xl font-bold text-spa-info">
-                  {users.filter(u => u.roles.includes('admin')).length}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <StatCard title="Gesamt" value={users.length} icon={UsersIcon} color="primary" />
+          <StatCard title="Administratoren" value={users.filter(u => u.roles.includes('admin')).length} icon={Shield} color="info" />
         </div>
 
-        {/* Users List */}
-        {users.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-              Keine Benutzer
-            </h3>
-            <p className="text-spa-text-secondary mb-4">
-              Erstelle den ersten Benutzer, um loszulegen.
-            </p>
-            <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
-              Ersten Benutzer anlegen
-            </Button>
-          </div>
-        ) : (
-        <DataTable<User>
-          data={users}
-          keyFn={(u) => u.id}
-          mobileTitle={(u) => (
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
-                {u.username.charAt(0).toUpperCase()}
-              </div>
-              <span>{u.username}</span>
+        <SectionCard title="Benutzer" icon={UsersIcon}>
+          {users.length === 0 ? (
+            <div className="py-8 text-center">
+              <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
+                Keine Benutzer
+              </h3>
+              <p className="text-spa-text-secondary mb-4">
+                Erstelle den ersten Benutzer, um loszulegen.
+              </p>
+              <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
+                Ersten Benutzer anlegen
+              </Button>
             </div>
+          ) : (
+            <DataTable<User>
+              data={users}
+              keyFn={(u) => u.id}
+              mobileTitle={(u) => (
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+                    {u.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span>{u.username}</span>
+                </div>
+              )}
+              columns={userColumns}
+            />
           )}
-          columns={userColumns}
-        />
-        )}
+        </SectionCard>
 
         {/* Create/Edit Dialog */}
         {(isCreateDialogOpen || editingUser) && (

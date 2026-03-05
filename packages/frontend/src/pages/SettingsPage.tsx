@@ -24,6 +24,7 @@ import type {
 } from '@/types/settings.types';
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Wrench } from 'lucide-react';
 import { Button } from '@/components/Button';
+import { SectionCard } from '@/components/SectionCard';
 
 type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events' | 'system';
 
@@ -145,7 +146,7 @@ export function SettingsPage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         <PageHeader
           title="Einstellungen"
           description="Design, Schriften, Audio, Events und Systemfunktionen zentral konfigurieren."
@@ -169,63 +170,58 @@ export function SettingsPage() {
           ]}
         />
 
-        <div className="mb-6">
-          <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
-        </div>
+        <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <TabPanel id="theme" activeTab={activeTab}>
-            {localSettings.theme && (
-              <ThemeEditor
-                theme={localSettings.theme}
-                designStyle={localSettings.designStyle}
-                colorPalette={localSettings.colorPalette}
-                onChange={handleThemeChange}
-                onDesignStyleChange={handleDesignStyleChange}
-                onColorPaletteChange={handleColorPaletteChange}
+        <SectionCard noPadding>
+          <div className="p-6">
+            <TabPanel id="theme" activeTab={activeTab}>
+              {localSettings.theme && (
+                <ThemeEditor
+                  theme={localSettings.theme}
+                  designStyle={localSettings.designStyle}
+                  colorPalette={localSettings.colorPalette}
+                  onChange={handleThemeChange}
+                  onDesignStyleChange={handleDesignStyleChange}
+                  onColorPaletteChange={handleColorPaletteChange}
+                />
+              )}
+            </TabPanel>
+
+            <TabPanel id="audio" activeTab={activeTab}>
+              {localSettings.audio && (
+                <AudioSettings
+                  audio={localSettings.audio}
+                  onChange={handleAudioChange}
+                />
+              )}
+            </TabPanel>
+
+            <TabPanel id="aromas" activeTab={activeTab}>
+              <AromaLibraryManager
+                aromas={localSettings.aromas || []}
+                onChange={handleAromasChange}
               />
-            )}
-          </TabPanel>
+            </TabPanel>
 
-          <TabPanel id="audio" activeTab={activeTab}>
-            {localSettings.audio && (
-              <AudioSettings
-                audio={localSettings.audio}
-                onChange={handleAudioChange}
+            <TabPanel id="infos" activeTab={activeTab}>
+              <InfoManager
+                infos={localSettings.infos || []}
+                onChange={handleInfosChange}
               />
-            )}
-          </TabPanel>
+            </TabPanel>
 
-          <TabPanel id="aromas" activeTab={activeTab}>
-            <AromaLibraryManager
-              aromas={localSettings.aromas || []}
-              onChange={handleAromasChange}
-            />
-          </TabPanel>
+            <TabPanel id="events" activeTab={activeTab}>
+              <EventManager
+                events={localSettings.events || []}
+                onChange={handleEventsChange}
+              />
+            </TabPanel>
 
-          <TabPanel id="infos" activeTab={activeTab}>
-            <InfoManager
-              infos={localSettings.infos || []}
-              onChange={handleInfosChange}
-            />
-          </TabPanel>
-
-          <TabPanel id="events" activeTab={activeTab}>
-            <EventManager
-              events={localSettings.events || []}
-              onChange={handleEventsChange}
-            />
-          </TabPanel>
-
-          <TabPanel id="system" activeTab={activeTab}>
-            {isAdmin && <SystemMaintenance />}
-          </TabPanel>
-        </div>
-
-        {/* Version Info */}
-        <div className="mt-6 text-center text-sm text-spa-text-secondary">
-          Version: {localSettings.version}
-        </div>
+            <TabPanel id="system" activeTab={activeTab}>
+              {isAdmin && <SystemMaintenance />}
+            </TabPanel>
+          </div>
+        </SectionCard>
       </div>
     </Layout>
   );

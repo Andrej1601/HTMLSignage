@@ -21,7 +21,9 @@ import {
   syncScheduleWithSaunas,
 } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { Save, RefreshCw, Copy, Play, CalendarClock } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
+import { SectionCard } from '@/components/SectionCard';
+import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar } from 'lucide-react';
 import { Button } from '@/components/Button';
 import clsx from 'clsx';
 
@@ -299,57 +301,54 @@ export function SchedulePage() {
 
   return (
     <Layout>
-      <div>
+      <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-spa-text-primary">Aufgussplan</h2>
-            <p className="text-spa-text-secondary mt-1">
-              Version {localSchedule?.version || 1}
-              {isDirty && (
-                <span className="ml-2 text-spa-warning-dark font-medium">• Ungespeicherte Änderungen</span>
-              )}
-            </p>
-            <p className="text-xs text-spa-text-secondary mt-1">
-              Live: {PRESET_LABELS[livePreset]} ({livePreset}) · Bearbeitung: {PRESET_LABELS[editingPreset]} ({editingPreset})
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {/* Auto-Play Toggle */}
-            <Button
-              variant={localSchedule?.autoPlay ? 'secondary' : 'ghost'}
-              icon={Play}
-              onClick={handleAutoPlayToggle}
-              className={localSchedule?.autoPlay ? '!bg-spa-secondary !text-white !hover:bg-spa-secondary-dark' : ''}
-            >
-              Auto-Play
-            </Button>
-
-            {!localSchedule.autoPlay && (
+        <PageHeader
+          title="Aufgussplan"
+          description={`Version ${localSchedule?.version || 1} · Live: ${PRESET_LABELS[livePreset]} · Bearbeitung: ${PRESET_LABELS[editingPreset]}`}
+          icon={Calendar}
+          actions={(
+            <div className="flex flex-wrap gap-2">
               <Button
-                variant="ghost"
-                onClick={handleSetLivePreset}
-                disabled={editingPreset === livePreset}
-                className="border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10"
+                variant={localSchedule?.autoPlay ? 'secondary' : 'ghost'}
+                icon={Play}
+                onClick={handleAutoPlayToggle}
+                className={localSchedule?.autoPlay ? '!bg-spa-secondary !text-white !hover:bg-spa-secondary-dark' : ''}
               >
-                Auswahl live schalten
+                Auto-Play
               </Button>
-            )}
 
-            <Button variant="ghost" icon={RefreshCw} onClick={() => refetch()} disabled={isLoading}>
-              Neu laden
-            </Button>
+              {!localSchedule.autoPlay && (
+                <Button
+                  variant="ghost"
+                  onClick={handleSetLivePreset}
+                  disabled={editingPreset === livePreset}
+                  className="border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10"
+                >
+                  Auswahl live schalten
+                </Button>
+              )}
 
-            <Button icon={Save} onClick={handleSave} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
-              Speichern
-            </Button>
-          </div>
-        </div>
+              <Button variant="ghost" icon={RefreshCw} onClick={() => refetch()} disabled={isLoading}>
+                Neu laden
+              </Button>
+
+              <Button icon={Save} onClick={handleSave} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
+                Speichern
+              </Button>
+            </div>
+          )}
+          badges={[
+            { label: `Live: ${PRESET_LABELS[livePreset]}`, tone: 'success' },
+            { label: `Bearbeitung: ${PRESET_LABELS[editingPreset]}`, tone: 'info' },
+            ...(isDirty ? [{ label: 'Ungespeichert', tone: 'warning' as const }] : []),
+          ]}
+        />
 
         {/* Preset Tabs */}
-        <div className="mb-6">
+        <SectionCard title="Preset-Auswahl" icon={CalendarClock}>
           {localSchedule.autoPlay && activeEvent && (
-            <div className="mb-3 flex items-start gap-3 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-4 py-3">
+            <div className="mb-4 flex items-start gap-3 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-4 py-3">
               <CalendarClock className="mt-0.5 h-5 w-5 text-spa-accent" />
               <div>
                 <p className="text-sm font-semibold text-spa-text-primary">
@@ -363,7 +362,7 @@ export function SchedulePage() {
           )}
 
           {editingPreset !== livePreset && (
-            <div className="mb-3 rounded-lg border border-spa-secondary/30 bg-spa-secondary/10 px-4 py-3 text-xs text-spa-text-secondary">
+            <div className="mb-4 rounded-lg border border-spa-secondary/30 bg-spa-secondary/10 px-4 py-3 text-xs text-spa-text-secondary">
               Du bearbeitest {PRESET_LABELS[editingPreset]} ({editingPreset}), live läuft weiterhin {PRESET_LABELS[livePreset]} ({livePreset}).
             </div>
           )}
@@ -485,12 +484,11 @@ export function SchedulePage() {
               )}
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         {/* Sauna Status Info */}
         {settings?.saunas && settings.saunas.length > 0 && (
-          <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-semibold text-spa-text-primary mb-3">Sauna Status</h3>
+          <SectionCard title="Sauna-Status">
             <div className="flex flex-wrap gap-3">
               {settings.saunas
                 .sort((a: Sauna, b: Sauna) => a.order - b.order)
@@ -519,18 +517,20 @@ export function SchedulePage() {
                   </div>
                 ))}
             </div>
-          </div>
+          </SectionCard>
         )}
 
         {/* Grid */}
         {currentDaySchedule && (
-          <ScheduleGrid
-            daySchedule={currentDaySchedule}
-            onEditCell={handleEditCell}
-            onEditTime={handleEditTime}
-            onAddTimeRow={handleAddTimeRow}
-            onDeleteTimeRow={handleDeleteTimeRow}
-          />
+          <SectionCard title={`Tagesplan: ${PRESET_LABELS[editingPreset]}`} noPadding>
+            <ScheduleGrid
+              daySchedule={currentDaySchedule}
+              onEditCell={handleEditCell}
+              onEditTime={handleEditTime}
+              onAddTimeRow={handleAddTimeRow}
+              onDeleteTimeRow={handleDeleteTimeRow}
+            />
+          </SectionCard>
         )}
 
         {/* Cell Editor Dialog */}

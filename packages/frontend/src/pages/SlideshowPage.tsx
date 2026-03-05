@@ -15,6 +15,8 @@ import { migrateSettings } from '@/utils/slideshowMigration';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
+import { SectionCard } from '@/components/SectionCard';
+import { Button } from '@/components/Button';
 import { Monitor, RefreshCw, RotateCcw, Save, SlidersHorizontal } from 'lucide-react';
 
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
@@ -188,7 +190,11 @@ export function SlideshowPage() {
 
     setEditorConfig(overrideConfig || fallback);
     setEditorAudioOverride(parseAudioSettings(getDeviceOverrideSettings(device).audio));
-    setEditorPrestartMinutes(normalizePrestartMinutes(settings.display?.prestartMinutes, 10));
+    const overrideSettings = getDeviceOverrideSettings(device);
+    const overridePrestart = (overrideSettings.display as Record<string, unknown> | undefined)?.prestartMinutes;
+    setEditorPrestartMinutes(normalizePrestartMinutes(
+      overridePrestart ?? settings.display?.prestartMinutes, 10
+    ));
     setIsDirty(false);
   };
 
@@ -336,6 +342,10 @@ export function SlideshowPage() {
         ...editorConfig,
         version: (editorConfig.version || 1) + 1,
       },
+      display: {
+        ...((currentSettingsOverride.display as Record<string, unknown>) || {}),
+        prestartMinutes: editorPrestartMinutes,
+      },
     };
 
     if (editorAudioOverride) {
@@ -436,46 +446,28 @@ export function SlideshowPage() {
           badges={isDirty ? [{ label: 'Ungespeichert', tone: 'warning' as const }] : []}
           actions={
             <div className="flex gap-2">
-              <button
-                onClick={handleReloadCurrent}
-                disabled={isBusy}
-                className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-lg transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className="w-4 h-4" />
+              <Button variant="ghost" icon={RefreshCw} onClick={handleReloadCurrent} disabled={isBusy}>
                 Zurücksetzen
-              </button>
+              </Button>
 
               {hasActiveDeviceTarget && (
-                <button
-                  onClick={handleRemoveCurrentOverride}
-                  disabled={isBusy || !hasRemovableOverride}
-                  className="flex items-center gap-2 px-4 py-2 border border-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-bg-secondary transition-colors disabled:opacity-50"
-                >
-                  <RotateCcw className="w-4 h-4" />
+                <Button variant="secondary" icon={RotateCcw} onClick={handleRemoveCurrentOverride} disabled={isBusy || !hasRemovableOverride}>
                   Override entfernen
-                </button>
+                </Button>
               )}
 
-              <button
-                onClick={handleSaveCurrent}
-                disabled={!isDirty || isBusy}
-                className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                {isBusy ? 'Speichert...' : 'Speichern'}
-              </button>
+              <Button icon={Save} onClick={handleSaveCurrent} disabled={!isDirty || isBusy} loading={isBusy && isDirty} loadingText="Speichert...">
+                Speichern
+              </Button>
             </div>
           }
         />
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-spa-text-primary">Geräte-Ausspielung</h3>
-              <p className="text-xs text-spa-text-secondary mt-1">
-                Wähle ein Ziel, um globale Slideshow oder Geräte-Override zu bearbeiten.
-              </p>
-            </div>
+        <SectionCard
+          title="Geräte-Ausspielung"
+          description="Wähle ein Ziel, um globale Slideshow oder Geräte-Override zu bearbeiten."
+          icon={Monitor}
+          actions={
             <div className="flex flex-wrap gap-2 text-xs font-medium">
               <span className="rounded-full bg-spa-success-light px-3 py-1 text-spa-success-dark">
                 Global: {deviceSourceSummary.global}
@@ -492,8 +484,8 @@ export function SlideshowPage() {
                 </span>
               )}
             </div>
-          </div>
-
+          }
+        >
           <div className="space-y-3">
             {/* Global Slideshow Card */}
             <div
@@ -522,7 +514,8 @@ export function SlideshowPage() {
 
             {/* Device Cards */}
             {pairedDevices.length === 0 ? (
-              <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-sm text-spa-text-secondary">
+              <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-center text-sm text-spa-text-secondary">
+                <Monitor className="w-10 h-10 text-spa-text-secondary mx-auto mb-2" />
                 Keine gekoppelten Displays vorhanden.
               </div>
             ) : (
@@ -536,51 +529,49 @@ export function SlideshowPage() {
                   <div
                     key={device.id}
                     onClick={() => handleSelectTarget(toDeviceTarget(device.id))}
-                    className={`rounded-lg border p-4 cursor-pointer transition-colors ${
-                      isSelected ? 'border-spa-primary bg-spa-primary/5' : 'border-spa-bg-secondary hover:border-spa-primary/30'
+                    className={`rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-spa-primary bg-spa-primary/5 shadow-sm'
+                        : 'border-spa-bg-secondary hover:border-spa-primary/40 hover:shadow-sm'
                     }`}
                   >
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-center">
-                      <div className="lg:col-span-4">
-                        <div className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4 text-spa-primary" />
-                          <p className="font-semibold text-spa-text-primary">{device.name}</p>
-                          {isSelected && (
-                            <StatusBadge label="Im Editor aktiv" tone="success" showDot={false} />
-                          )}
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      {/* Device Info */}
+                      <div className="flex items-center gap-3 lg:flex-1 min-w-0">
+                        <div className={`flex-shrink-0 p-2 rounded-lg ${isSelected ? 'bg-spa-primary/10' : 'bg-spa-bg-primary'}`}>
+                          <Monitor className="h-5 w-5 text-spa-primary" />
                         </div>
-                        <p className="mt-1 font-mono text-xs text-spa-text-secondary">{device.id}</p>
-                        <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${statusColor}`}>
-                          <span className="h-2 w-2 rounded-full bg-current" />
-                          {getStatusLabel(status)}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-spa-text-primary">{device.name}</p>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor}`}>
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              {getStatusLabel(status)}
+                            </span>
+                            {isSelected && (
+                              <StatusBadge label="Im Editor" tone="success" showDot={false} />
+                            )}
+                          </div>
+                          <p className="text-xs text-spa-text-secondary mt-0.5">{source.detail}</p>
+                        </div>
+                      </div>
+
+                      {/* Mode + Source */}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <select
+                            value={device.mode}
+                            onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
+                            disabled={updateDevice.isPending}
+                            className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
+                          >
+                            <option value="auto">{getModeLabel('auto')}</option>
+                            <option value="override">{getModeLabel('override')}</option>
+                          </select>
+                        </div>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${source.badgeClass}`}>
+                          {source.label}
                         </span>
-                      </div>
-
-                      <div className="lg:col-span-3" onClick={(e) => e.stopPropagation()}>
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
-                          Modus
-                        </label>
-                        <select
-                          value={device.mode}
-                          onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
-                          disabled={updateDevice.isPending}
-                          className="w-full rounded-lg border border-spa-bg-secondary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
-                        >
-                          <option value="auto">{getModeLabel('auto')}</option>
-                          <option value="override">{getModeLabel('override')}</option>
-                        </select>
-                      </div>
-
-                      <div className="lg:col-span-5">
-                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
-                          Aktuelle Quelle
-                        </label>
-                        <div className="space-y-1">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${source.badgeClass}`}>
-                            {source.label}
-                          </span>
-                          <p className="text-xs text-spa-text-secondary">{source.detail}</p>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -588,7 +579,7 @@ export function SlideshowPage() {
               })
             )}
           </div>
-        </div>
+        </SectionCard>
 
         <SlideshowConfigPanel
           config={editorConfig}
@@ -597,10 +588,10 @@ export function SlideshowPage() {
             setIsDirty(true);
           }}
           prestartMinutes={editorPrestartMinutes}
-          onPrestartMinutesChange={!selectedDevice ? ((minutes) => {
+          onPrestartMinutesChange={(minutes) => {
             setEditorPrestartMinutes(normalizePrestartMinutes(minutes, editorPrestartMinutes));
             setIsDirty(true);
-          }) : undefined}
+          }}
           previewSchedule={previewPayload.schedule}
           previewSettings={previewPayload.settings}
           isDirty={isDirty}
