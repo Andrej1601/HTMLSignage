@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { mutationLimiter } from '../lib/rateLimiter.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
     res.json(mediaWithUrls);
   } catch (error) {
     console.error('[media] Error listing media:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
   }
 });
 
@@ -105,7 +106,7 @@ router.get('/tags', async (_req, res) => {
     res.json(tags);
   } catch (error) {
     console.error('[media] Error listing media tags:', error);
-    res.status(500).json({ error: 'fetch-tags-failed' });
+    res.status(500).json({ error: 'fetch-tags-failed', message: 'Tags konnten nicht geladen werden' });
   }
 });
 
@@ -122,7 +123,7 @@ router.get('/:id', async (req, res) => {
     });
 
     if (!media) {
-      return res.status(404).json({ error: 'not-found' });
+      return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
 
     res.json({
@@ -131,15 +132,15 @@ router.get('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('[media] Error fetching media:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
   }
 });
 
 // POST /api/media/upload - Upload file (auth required)
-router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/upload', authMiddleware, mutationLimiter, upload.single('file'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'no-file-uploaded' });
+      return res.status(400).json({ error: 'no-file-uploaded', message: 'Keine Datei hochgeladen' });
     }
 
     const mediaType = getMediaType(req.file.mimetype);
@@ -172,12 +173,12 @@ router.post('/upload', authMiddleware, upload.single('file'), async (req: AuthRe
       }
     }
 
-    res.status(500).json({ error: 'upload-failed' });
+    res.status(500).json({ error: 'upload-failed', message: 'Upload fehlgeschlagen' });
   }
 });
 
 // PATCH /api/media/:id/tags - Update media tags (auth required)
-router.patch('/:id/tags', authMiddleware, async (req: AuthRequest, res) => {
+router.patch('/:id/tags', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const tags = normalizeTags(req.body?.tags);
     const media = await prisma.media.update({
@@ -196,22 +197,22 @@ router.patch('/:id/tags', authMiddleware, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      return res.status(404).json({ error: 'not-found' });
+      return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
     console.error('[media] Error updating media tags:', error);
-    res.status(500).json({ error: 'update-tags-failed' });
+    res.status(500).json({ error: 'update-tags-failed', message: 'Tags konnten nicht aktualisiert werden' });
   }
 });
 
 // DELETE /api/media/:id - Delete media (auth required)
-router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const media = await prisma.media.findUnique({
       where: { id: req.params.id },
     });
 
     if (!media) {
-      return res.status(404).json({ error: 'not-found' });
+      return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
 
     // Delete file from filesystem
@@ -233,7 +234,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('[media] Error deleting media:', error);
-    res.status(500).json({ error: 'delete-failed' });
+    res.status(500).json({ error: 'delete-failed', message: 'Medium konnte nicht gelöscht werden' });
   }
 });
 

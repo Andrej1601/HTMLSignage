@@ -16,9 +16,10 @@ import { StatCard } from '@/components/Dashboard/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Monitor, RefreshCw, Wifi, WifiOff, ToggleRight } from 'lucide-react';
 import { Button } from '@/components/Button';
+import { ErrorAlert } from '@/components/ErrorAlert';
 
 export function DevicesPage() {
-  const { data: devices = [], isLoading, refetch } = useDevices();
+  const { data: devices = [], isLoading, error, refetch } = useDevices();
   const updateDevice = useUpdateDevice();
   const deleteDevice = useDeleteDevice();
   const sendCommand = useSendCommand();
@@ -66,6 +67,15 @@ export function DevicesPage() {
     );
   }
 
+  if (error) {
+    return (
+      <Layout>
+        <PageHeader title="Geräte" description="Verwalte Displays, Pairings und Ausspielmodi." icon={Monitor} />
+        <ErrorAlert error={error} onRetry={() => refetch()} />
+      </Layout>
+    );
+  }
+
   const pairedDevices = devices.filter((device) => device.pairedAt !== null);
   const pendingPairings = Math.max(devices.length - pairedDevices.length, 0);
 
@@ -107,6 +117,18 @@ export function DevicesPage() {
         </div>
 
         <PendingPairings />
+
+        {pairedDevices.length === 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
+              Keine gekoppelten Geräte
+            </h3>
+            <p className="text-spa-text-secondary">
+              Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten.
+            </p>
+          </div>
+        )}
 
         <DeviceList
           devices={pairedDevices}

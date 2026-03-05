@@ -161,6 +161,7 @@ function SortableSlideItem({
               : 'text-spa-text-secondary hover:bg-spa-bg-secondary'
           )}
           title={slide.enabled ? 'Deaktivieren' : 'Aktivieren'}
+          aria-label={slide.enabled ? 'Slide deaktivieren' : 'Slide aktivieren'}
         >
           {slide.enabled ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
         </button>
@@ -170,6 +171,7 @@ function SortableSlideItem({
           disabled={disabled}
           className="p-2 text-spa-secondary hover:bg-spa-secondary/10 rounded-md transition-colors disabled:opacity-40"
           title="Bearbeiten"
+          aria-label="Slide bearbeiten"
         >
           <Edit className="w-5 h-5" />
         </button>
@@ -177,8 +179,9 @@ function SortableSlideItem({
         <button
           onClick={() => onDelete(slide.id)}
           disabled={disabled}
-          className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-40"
+          className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors disabled:opacity-40"
           title="Löschen"
+          aria-label="Slide löschen"
         >
           <Trash2 className="w-5 h-5" />
         </button>
@@ -349,7 +352,7 @@ export function SlideshowConfigPanel({
             </p>
           </div>
           <span className={`text-xs font-medium px-3 py-1 rounded-full ${
-            isDirty ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+            isDirty ? 'bg-spa-warning-light text-spa-warning-dark' : 'bg-spa-success-light text-spa-success-dark'
           }`}>
             {isDirty ? 'Ungespeicherte Änderungen aktiv' : 'Gespeicherter Stand'}
           </span>
@@ -383,7 +386,7 @@ export function SlideshowConfigPanel({
                 className="sr-only peer"
                 disabled={disabled}
               />
-              <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
+              <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
             </label>
           </div>
 

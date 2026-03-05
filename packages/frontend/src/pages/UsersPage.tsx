@@ -11,6 +11,7 @@ import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
 import { DataTable, type Column } from '@/components/DataTable';
+import { ErrorAlert } from '@/components/ErrorAlert';
 
 interface User {
   id: string;
@@ -43,7 +44,7 @@ export function UsersPage() {
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
   // Fetch users
-  const { data: users = [], isLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
     queryKey: ['users', token],
     enabled: !!token,
     retry: false,
@@ -237,6 +238,15 @@ export function UsersPage() {
     );
   }
 
+  if (error) {
+    return (
+      <Layout>
+        <PageHeader title="Benutzerverwaltung" description="Benutzerkonten und Rollen verwalten." icon={UsersIcon} />
+        <ErrorAlert error={error} onRetry={() => refetch()} />
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div>
@@ -285,6 +295,20 @@ export function UsersPage() {
         </div>
 
         {/* Users List */}
+        {users.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
+              Keine Benutzer
+            </h3>
+            <p className="text-spa-text-secondary mb-4">
+              Erstelle den ersten Benutzer, um loszulegen.
+            </p>
+            <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
+              Ersten Benutzer anlegen
+            </Button>
+          </div>
+        ) : (
         <DataTable<User>
           data={users}
           keyFn={(u) => u.id}
@@ -298,6 +322,7 @@ export function UsersPage() {
           )}
           columns={userColumns}
         />
+        )}
 
         {/* Create/Edit Dialog */}
         {(isCreateDialogOpen || editingUser) && (
@@ -365,12 +390,12 @@ function UserDialog({
       return;
     }
 
-    if (password && password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein');
+    if (password && password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein');
       return;
     }
 
-    const data: any = {
+    const data: Record<string, unknown> = {
       username: username.trim(),
       email: email.trim() || undefined,
       roles,
@@ -442,7 +467,7 @@ function UserDialog({
           required={!user}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={6}
+          minLength={8}
         />
 
         <div>

@@ -6,7 +6,6 @@ import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget';
 import { PageHeader } from '@/components/PageHeader';
-import { type StatusTone } from '@/components/StatusBadge';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
@@ -14,8 +13,8 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { PRESET_LABELS } from '@/types/schedule.types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import {
-  Activity,
   Calendar,
+  Layers,
   Monitor,
   Settings,
   Wifi,
@@ -44,7 +43,7 @@ export function DashboardPage() {
     scheduleQuery, settingsQuery, devicesQuery, mediaQuery, backendHealthQuery,
     schedule, wsConnected,
     isAdmin,
-    liveState, planQuality, mediaStats, eventStats,
+    liveState, mediaStats, eventStats,
     runningSlideshows, systemChecks, updateLabel,
     activityItems,
   } = useDashboardData();
@@ -58,20 +57,24 @@ export function DashboardPage() {
   }
 
   const livePresetLabel = liveState.activePreset ? PRESET_LABELS[liveState.activePreset] : '-';
-  const planQualityTone: StatusTone =
-    (planQuality.inconsistentRows > 0 || planQuality.duplicateTimeRows > 0) ? 'danger'
-    : planQuality.emptyRows > 0 ? 'warning'
-    : 'success';
 
-  const systemHealthValue =
-    systemChecks.backendTone === 'success' && systemChecks.websocketTone === 'success'
-      ? 'OK'
-      : systemChecks.backendTone === 'danger' ? 'Fehler' : 'Warnung';
+  // Next event description
+  const nextEventDesc = (() => {
+    if (liveState.activeEvent) {
+      const endTime = liveState.activeEvent.endTime || '23:59';
+      return { value: `${liveState.activeEvent.name} (bis ${endTime})`, tone: 'info' as const };
+    }
+    if (eventStats.nextEvent) {
+      const d = eventStats.nextEvent.startDate.slice(5).replace('-', '.');
+      return { value: `${eventStats.nextEvent.name} ab ${d}., ${eventStats.nextEvent.startTime}`, tone: 'info' as const };
+    }
+    return { value: 'Kein aktives Event', tone: 'neutral' as const };
+  })();
 
-  const systemHealthColor: 'success' | 'warning' | 'danger' =
-    systemChecks.backendTone === 'danger' ? 'danger'
-    : systemChecks.websocketTone !== 'success' ? 'warning'
-    : 'success';
+  // Slideshow stats for the 3rd card
+  const totalActiveSlides = runningSlideshows.reduce((sum, g) => sum + g.slides.length, 0);
+  const globalSlideshow = runningSlideshows.find((g) => g.source === 'global');
+  const overrideCount = runningSlideshows.filter((g) => g.source === 'override').length;
 
   const hasLeftWidgets =
     widgetVisibility.operationsContent || widgetVisibility.activityFeed;
@@ -159,34 +162,39 @@ export function DashboardPage() {
             title="Tagesplan"
             value={livePresetLabel}
             icon={Play}
-            description={
-              liveState.activeEvent
-                ? `Event: ${liveState.activeEvent.name} · bis ${liveState.activeEvent.endTime || '23:59'}`
-                : eventStats.nextEvent
-                  ? `Event „${eventStats.nextEvent.name}" ab ${eventStats.nextEvent.startDate.slice(5).replace('-', '.')}.`
-                  : `${planQuality.fillRate}% befüllt · ${planQuality.emptyRows} leer`
-            }
-            color={planQualityTone === 'danger' ? 'danger' : planQualityTone === 'warning' ? 'warning' : 'primary'}
+            details={[
+              { label: 'Modus', value: schedule?.autoPlay ? 'Auto-Play' : 'Manuell', tone: schedule?.autoPlay ? 'success' : 'warning' },
+              { label: 'Nächster Event', value: nextEventDesc.value, tone: nextEventDesc.tone },
+            ]}
+            color={liveState.activeEvent ? 'info' : 'primary'}
             href="/schedule"
             ctaLabel="Zum Aufgussplan"
           />
           <StatCard
-            title="System"
-            value={systemHealthValue}
-            icon={Activity}
-            description={`${updateLabel} · WS ${wsConnected ? 'verbunden' : 'getrennt'}`}
-            color={systemHealthColor}
-            href="/settings"
-            ctaLabel="Zum System"
+            title="Slideshow"
+            value={`${totalActiveSlides} Slides`}
+            icon={Layers}
+            details={[
+              ...(globalSlideshow
+                ? [{ label: 'Layout', value: globalSlideshow.config.layout === 'split-view' ? 'Split View' : globalSlideshow.config.layout === 'full-rotation' ? 'Vollbild' : globalSlideshow.config.layout, tone: 'neutral' as const }]
+                : []),
+              ...(overrideCount > 0
+                ? [{ label: 'Overrides', value: `${overrideCount} Gerät(e)`, tone: 'warning' as const }]
+                : []),
+              { label: 'Geräte', value: `${liveState.onlineDevices} online`, tone: liveState.offlineDevices > 0 ? 'warning' as const : 'success' as const },
+            ]}
+            color="success"
+            href="/slideshow"
+            ctaLabel="Zur Slideshow"
           />
         </div>
 
         {activeWidgetCount === 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center justify-between gap-3">
+          <div className="rounded-lg border border-spa-warning/30 bg-spa-warning-light px-4 py-3 text-sm text-spa-warning-dark flex items-center justify-between gap-3">
             <span>Alle Widgets sind ausgeblendet. Aktiviere mindestens ein Widget für das Dashboard.</span>
             <button
               onClick={showAllWidgets}
-              className="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-spa-warning/15 hover:bg-spa-warning/25 text-spa-warning-dark font-medium transition-colors"
             >
               Widgets zurücksetzen
             </button>
@@ -202,10 +210,6 @@ export function DashboardPage() {
                   <OperationsContentWidget
                     liveState={liveState}
                     runningSlideshows={runningSlideshows}
-                    livePresetLabel={livePresetLabel}
-                    autoPlay={schedule?.autoPlay || false}
-                    activeEventName={liveState.activeEvent?.name || null}
-                    planQuality={planQuality}
                   />
                 )}
                 {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
@@ -268,7 +272,7 @@ export function DashboardPage() {
         )}
 
         {(scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error) && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+          <div className="rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark flex items-center gap-2" role="alert">
             <AlertCircle className="w-4 h-4" />
             Ein oder mehrere Datenquellen konnten nicht geladen werden. Bitte API- und Netzwerkstatus prüfen.
           </div>

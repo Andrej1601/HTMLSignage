@@ -48,8 +48,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
+      reconnectionDelayMax: 30000,
+      reconnectionAttempts: 50,
     });
 
     socket.on('connect', () => {

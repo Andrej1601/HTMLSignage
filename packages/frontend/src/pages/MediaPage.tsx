@@ -14,6 +14,7 @@ import { Dialog } from '@/components/Dialog';
 import { InputField } from '@/components/FormField';
 import { ImageIcon, RefreshCw, Upload, Filter, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
 import { Button } from '@/components/Button';
+import { ErrorAlert } from '@/components/ErrorAlert';
 
 type ViewMode = 'grid' | 'list';
 
@@ -57,7 +58,7 @@ export function MediaPage() {
     tag: tagFilter === 'all' ? undefined : tagFilter,
   }), [typeFilter, debouncedSearchQuery, tagFilter]);
 
-  const { data: media = [], isLoading, isFetching, refetch } = useMedia(filter);
+  const { data: media = [], isLoading, isFetching, error, refetch } = useMedia(filter);
   const { data: availableTags = [] } = useMediaTags();
   const deleteMedia = useDeleteMedia();
   const updateMediaTags = useUpdateMediaTags();
@@ -225,6 +226,8 @@ export function MediaPage() {
         {/* Media Grid or List */}
         {isLoading && media.length === 0 ? (
           <LoadingSpinner label="Lade Medien..." />
+        ) : error ? (
+          <ErrorAlert error={error} onRetry={() => refetch()} />
         ) : viewMode === 'grid' ? (
           <MediaGrid
             media={media}

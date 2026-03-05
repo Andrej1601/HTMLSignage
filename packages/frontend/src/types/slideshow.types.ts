@@ -107,8 +107,8 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
     description: 'Persistenter Bereich links, rotierender Content rechts',
     icon: '⬌',
     zones: [
-      { id: 'persistent', name: 'Persistenter Bereich', type: 'smart-persistent', position: 'left', size: 50 },
-      { id: 'main', name: 'Rotierender Content', type: 'rotating' },
+      { id: 'persistent', name: 'Linke Seite', type: 'smart-persistent', position: 'left', size: 50 },
+      { id: 'main', name: 'Rechte Seite', type: 'rotating' },
     ],
     supportsPersistentZone: true,
     supportedSlideTypes: ['content-panel', 'sauna-detail', 'media-image', 'media-video', 'infos', 'events'],

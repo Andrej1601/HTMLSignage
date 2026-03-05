@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
@@ -11,11 +10,13 @@ import { normalizeSaunaNameKey } from '@/types/schedule.types';
 import { OverviewSlide } from './OverviewSlide';
 import { ScheduleGridSlide } from './ScheduleGridSlide';
 import { TimelineScheduleSlide } from './TimelineScheduleSlide';
+import { ChronologicalListSlide } from './ChronologicalListSlide';
+import { InfosSlide } from './InfosSlide';
+import { EventsSlide } from './EventsSlide';
+
 import { SaunaDetailDashboard } from './SaunaDetailDashboard';
-import { Calendar, Flame, ShieldCheck } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { getDefaultSettings } from '@/types/settings.types';
-import type { InfoItem } from '@/types/settings.types';
-import { formatEventDateDE, formatEventTimeRangeDE, getUpcomingOrActiveEvents, withAlpha } from './wellnessDisplayUtils';
 import { buildUploadUrl, getMediaUploadUrl } from '@/utils/mediaUrl';
 
 interface SlideRendererProps {
@@ -103,6 +104,9 @@ function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; 
   if (designStyle === 'modern-timeline') {
     return <TimelineScheduleSlide schedule={schedule} settings={settings} />;
   }
+  if (designStyle === 'compact-tiles') {
+    return <ChronologicalListSlide schedule={schedule} settings={settings} />;
+  }
 
   return (
     <div className="w-full h-full">
@@ -139,7 +143,7 @@ function SaunaDetailSlide({
 
   const designStyle = settings.designStyle || 'modern-wellness';
 
-  if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline') && schedule) {
+  if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline' || designStyle === 'compact-tiles') && schedule) {
     return <SaunaDetailDashboard schedule={schedule} settings={settings} saunaId={sauna.id} />;
   }
 
@@ -364,306 +368,3 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
   );
 }
 
-function InfosSlide({ slide, settings, media }: { slide: SlideConfig; settings: Settings; media?: Media[] }) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [compact, setCompact] = useState(false);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const check = () => setCompact(el.clientHeight < 250);
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const accentGold = (theme as any).accentGold || theme.accent || '#A68A64';
-  const accentGreen = (theme as any).accentGreen || (theme as any).timeColBg || '#8F9779';
-  const textMain = (theme as any).textMain || theme.fg || '#3E2723';
-  const textMuted = (theme as any).textMuted || theme.fg || '#5D4037';
-
-  const infos: InfoItem[] = (settings as any).infos || [];
-  const selected = slide.infoId ? infos.find((i) => i.id === slide.infoId) : null;
-  const fallback = infos[0] || { id: 'default', title: 'Wellness Tipp', text: 'Bitte beachten Sie unsere Hinweise für einen angenehmen Aufenthalt.' };
-  const info = selected || fallback;
-  const imageUrl = info.imageId ? getMediaUploadUrl(media, info.imageId) : null;
-  const isBackground = info.imageMode === 'background' && imageUrl;
-
-  // Compact: no image, no icon-box — just title + text, maximising readable space
-  if (compact) {
-    return (
-      <div
-        ref={containerRef}
-        className="w-full h-full flex flex-col justify-center overflow-hidden"
-        style={{ padding: '6px 14px' }}
-      >
-        <h4
-          className="font-black uppercase truncate shrink-0"
-          style={{ fontSize: '11px', letterSpacing: '0.25em', color: accentGold, marginBottom: '4px' }}
-        >
-          <ShieldCheck style={{ width: '13px', height: '13px', color: accentGreen, display: 'inline', verticalAlign: '-2px', marginRight: '6px' }} />
-          {info.title || 'Info'}
-        </h4>
-        <p
-          className="font-bold uppercase tracking-tight italic border-l-3 overflow-hidden"
-          style={{
-            fontSize: '14px',
-            lineHeight: '1.35',
-            paddingLeft: '8px',
-            borderLeft: `3px solid ${accentGreen}30`,
-            color: isBackground ? 'rgba(255,255,255,0.9)' : textMuted,
-            display: '-webkit-box',
-            WebkitLineClamp: 4,
-            WebkitBoxOrient: 'vertical',
-          }}
-        >
-          {info.text}
-        </p>
-      </div>
-    );
-  }
-
-  if (isBackground) {
-    return (
-      <div ref={containerRef} className="w-full h-full relative flex flex-col justify-end overflow-hidden">
-        <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-        <div className="relative z-10" style={{ padding: 'clamp(12px,3%,32px)' }}>
-          <div className="flex items-center" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
-            <div
-              className="rounded-lg border shadow-sm shrink-0"
-              style={{
-                padding: 'clamp(6px, 1%, 14px)',
-                backgroundColor: `${accentGreen}20`,
-                borderColor: `${accentGreen}30`,
-              }}
-            >
-              <ShieldCheck style={{ width: 'clamp(16px, 2.5vw, 32px)', height: 'clamp(16px, 2.5vw, 32px)', color: accentGreen }} />
-            </div>
-            <h4
-              className="font-black uppercase truncate"
-              style={{ fontSize: 'clamp(10px, 1.5vw, 20px)', letterSpacing: '0.3em', color: '#FFFFFF' }}
-            >
-              {info.title || 'Info'}
-            </h4>
-          </div>
-          <p
-            className="font-bold uppercase tracking-tight italic border-l-4 overflow-hidden"
-            style={{
-              fontSize: 'clamp(14px, 2.2vw, 32px)',
-              lineHeight: '1.6',
-              paddingLeft: 'clamp(8px, 1%, 16px)',
-              color: 'rgba(255,255,255,0.9)',
-              borderLeftColor: `${accentGreen}40`,
-              display: '-webkit-box',
-              WebkitLineClamp: 6,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {info.text}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={containerRef} className="w-full h-full flex items-center overflow-hidden" style={{ padding: 'clamp(8px, 2%, 24px)' }}>
-      <div className="flex items-center w-full" style={{ gap: imageUrl ? 'clamp(12px,3%,32px)' : '0' }}>
-        {imageUrl && (
-          <div className="shrink-0 rounded-xl overflow-hidden shadow-md" style={{ width: '35%', maxHeight: '80%' }}>
-            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-          </div>
-        )}
-        <div className="flex flex-col justify-center min-w-0 flex-1">
-          <div className="flex items-center" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
-            <div
-              className="rounded-lg border shadow-sm shrink-0"
-              style={{
-                padding: 'clamp(6px, 1%, 14px)',
-                backgroundColor: `${accentGreen}10`,
-                borderColor: `${accentGreen}20`,
-              }}
-            >
-              <ShieldCheck style={{ width: 'clamp(16px, 2.5vw, 32px)', height: 'clamp(16px, 2.5vw, 32px)', color: accentGreen }} />
-            </div>
-            <h4
-              className="font-black uppercase truncate"
-              style={{ fontSize: 'clamp(10px, 1.5vw, 20px)', letterSpacing: '0.3em', color: accentGold }}
-            >
-              {info.title || 'Info'}
-            </h4>
-          </div>
-          <p
-            className="font-bold uppercase tracking-tight italic border-l-4 overflow-hidden"
-            style={{
-              fontSize: 'clamp(14px, 2.2vw, 32px)',
-              lineHeight: '1.6',
-              paddingLeft: 'clamp(8px, 1%, 16px)',
-              color: textMuted,
-              borderLeftColor: `${accentGreen}20`,
-              display: '-webkit-box',
-              WebkitLineClamp: 6,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {info.text}
-          </p>
-        </div>
-      </div>
-      <div className="sr-only" style={{ color: textMain }} />
-    </div>
-  );
-}
-
-function EventsSlide({ settings, media }: { settings: Settings; media?: Media[] }) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [layout, setLayout] = useState<'compact' | 'vertical' | 'horizontal'>('horizontal');
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const check = () => {
-      const h = el.clientHeight;
-      const w = el.clientWidth;
-      if (h < 250) setLayout('compact');
-      else if (h > w * 0.8) setLayout('vertical');
-      else setLayout('horizontal');
-    };
-    check();
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const accentGold = (theme as any).accentGold || theme.accent || '#A68A64';
-  const accentGreen = (theme as any).accentGreen || (theme as any).timeColBg || '#8F9779';
-  const textMain = (theme as any).textMain || theme.fg || '#3E2723';
-  const cardBg = (theme as any).cardBg || theme.cellBg || '#FFFFFF';
-  const cardBorder = (theme as any).cardBorder || theme.gridTable || '#EBE5D3';
-
-  const events = getUpcomingOrActiveEvents(settings, new Date());
-  const isCompact = layout === 'compact';
-  const isVertical = layout === 'vertical';
-
-  // Compact: no icon-box, no event images — just inline title + event cards with text only
-  if (isCompact) {
-    return (
-      <div ref={containerRef} className="w-full h-full flex flex-col justify-center overflow-hidden" style={{ padding: '6px 14px' }}>
-        <h4
-          className="font-black uppercase shrink-0"
-          style={{ fontSize: '11px', letterSpacing: '0.25em', color: accentGold, marginBottom: '6px' }}
-        >
-          <Calendar style={{ width: '13px', height: '13px', color: accentGold, display: 'inline', verticalAlign: '-2px', marginRight: '6px' }} />
-          Events
-        </h4>
-        <div className="flex gap-2 min-w-0">
-          {events.length === 0 ? (
-            <div
-              className="flex-1 rounded-xl border"
-              style={{ padding: '6px 10px', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6), color: textMain }}
-            >
-              <div className="font-black uppercase leading-tight" style={{ fontSize: '13px' }}>Keine Events</div>
-            </div>
-          ) : (
-            events.map((event) => (
-              <div
-                key={event.id}
-                className="flex-1 rounded-xl border overflow-hidden"
-                style={{ padding: '6px 10px', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6) }}
-              >
-                <div className="font-black uppercase tracking-wider" style={{ fontSize: '9px', color: accentGreen, marginBottom: '2px' }}>
-                  {formatEventDateDE(event)}
-                </div>
-                <div className="font-black uppercase leading-tight truncate" style={{ fontSize: '13px', color: textMain, marginBottom: '1px' }}>
-                  {event.name}
-                </div>
-                <div className="font-bold uppercase" style={{ fontSize: '10px', color: withAlpha(textMain, 0.58) }}>
-                  {formatEventTimeRangeDE(event)}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full flex flex-col overflow-hidden"
-      style={{ padding: 'clamp(12px, 2.5%, 28px)', justifyContent: 'center' }}
-    >
-      <div className="flex items-center shrink-0" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
-        <div
-          className="rounded-xl border shadow-sm shrink-0"
-          style={{ padding: 'clamp(6px, 1%, 14px)', backgroundColor: `${accentGold}10`, borderColor: `${accentGold}20` }}
-        >
-          <Calendar style={{ width: 'clamp(16px, 2.5vw, 32px)', height: 'clamp(16px, 2.5vw, 32px)', color: accentGold }} />
-        </div>
-        <h4
-          className="font-black uppercase"
-          style={{ fontSize: 'clamp(10px, 1.5vw, 20px)', letterSpacing: '0.3em', color: accentGold }}
-        >
-          Events
-        </h4>
-      </div>
-
-      <div
-        className={isVertical ? 'flex flex-col overflow-auto' : 'flex'}
-        style={{ gap: isVertical ? 'clamp(8px, 1.5%, 16px)' : 'clamp(8px, 1.5%, 24px)' }}
-      >
-        {events.length === 0 ? (
-          <div
-            className="flex-1 rounded-2xl border"
-            style={{ padding: 'clamp(8px, 1.5%, 20px)', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6), color: textMain }}
-          >
-            <div className="font-black uppercase leading-tight mb-1" style={{ fontSize: 'clamp(12px, 1.8vw, 24px)' }}>Keine Events geplant</div>
-            <div className="font-bold uppercase opacity-70" style={{ fontSize: 'clamp(8px, 1.2vw, 14px)' }}>Demnaechst mehr</div>
-          </div>
-        ) : (
-          events.map((event) => {
-            const eventImageUrl = event.imageId ? getMediaUploadUrl(media, event.imageId) : null;
-            return (
-              <div
-                key={event.id}
-                className={`rounded-2xl border overflow-hidden ${isVertical ? '' : 'flex-1'} ${isVertical && eventImageUrl ? 'flex' : ''}`}
-                style={{ backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6) }}
-              >
-                {eventImageUrl && (
-                  isVertical ? (
-                    <div className="w-24 shrink-0 overflow-hidden">
-                      <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="relative overflow-hidden" style={{ height: 'clamp(40px, 5vw, 80px)' }}>
-                      <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                    </div>
-                  )
-                )}
-                <div style={{ padding: 'clamp(8px, 1.5%, 20px)' }} className="min-w-0 flex-1">
-                  <div className="font-black uppercase tracking-widest mb-0.5" style={{ fontSize: 'clamp(9px, 1.3vw, 18px)', color: accentGreen }}>
-                    {formatEventDateDE(event)}
-                  </div>
-                  <div className="font-black uppercase leading-tight mb-0.5 truncate" style={{ fontSize: 'clamp(12px, 1.8vw, 24px)', color: textMain }}>
-                    {event.name}
-                  </div>
-                  <div className="font-bold uppercase" style={{ fontSize: 'clamp(9px, 1.2vw, 16px)', color: withAlpha(textMain, 0.58) }}>
-                    {formatEventTimeRangeDE(event)}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}

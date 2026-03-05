@@ -72,7 +72,7 @@ export function ResetPasswordPage() {
 
         {!token && (
           <div className="space-y-4">
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
               Der Reset-Link ist ungültig. Bitte fordere einen neuen Link an.
             </div>
             <Link to="/forgot-password" className="block text-center text-sm text-spa-primary hover:underline">
@@ -84,13 +84,13 @@ export function ResetPasswordPage() {
         {token && (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
                 {error}
               </div>
             )}
 
             {isSuccess && (
-              <div role="status" className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              <div role="status" className="p-3 bg-spa-success-light border border-spa-success/30 rounded-lg text-spa-success-dark text-sm">
                 Passwort erfolgreich geändert. Weiterleitung zur Anmeldung...
               </div>
             )}

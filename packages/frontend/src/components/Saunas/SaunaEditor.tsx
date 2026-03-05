@@ -336,6 +336,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                   {feature}
                   <button
                     onClick={() => handleRemoveFeature(index)}
+                    aria-label="Merkmal entfernen"
                     className="p-0.5 hover:bg-spa-primary/20 rounded-full transition-colors"
                   >
                     <X className="w-3 h-3" />

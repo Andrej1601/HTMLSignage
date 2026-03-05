@@ -1,20 +1,19 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { randomInt } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prisma.js';
 
-const DEFAULT_SECRET = 'your-secret-key-change-in-production';
-const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
-const JWT_EXPIRES_IN = '7d';
-
-// Warnung beim Start, wenn kein sicherer JWT_SECRET gesetzt ist
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET === DEFAULT_SECRET) {
-  console.warn(
-    '\n⚠️  WARNUNG: JWT_SECRET ist nicht gesetzt oder unsicher!\n' +
+if (!process.env.JWT_SECRET) {
+  console.error(
+    '\n  FATAL: JWT_SECRET ist nicht gesetzt!\n' +
     '   Bitte einen sicheren Wert in der .env-Datei setzen.\n' +
     '   Beispiel: JWT_SECRET=$(openssl rand -hex 32)\n'
   );
+  process.exit(1);
 }
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = '7d';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -83,14 +82,14 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     next();
   } catch (error) {
     console.error('[auth] Middleware error:', error);
-    res.status(500).json({ error: 'internal-error' });
+    res.status(500).json({ error: 'internal-error', message: 'Interner Serverfehler' });
   }
 }
 
 export function requireRole(role: string) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: 'unauthorized' });
+      res.status(401).json({ error: 'unauthorized', message: 'Nicht authentifiziert' });
       return;
     }
 
@@ -104,6 +103,5 @@ export function requireRole(role: string) {
 }
 
 export function generatePairingCode(): string {
-  // Generate a 6-digit pairing code
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }

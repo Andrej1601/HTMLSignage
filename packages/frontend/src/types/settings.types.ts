@@ -98,7 +98,7 @@ export interface HeaderSettings {
   height?: number; // percentage of screen height (default: 8)
 }
 
-export type DesignStyle = 'modern-wellness' | 'modern-timeline';
+export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
 export type ColorPaletteName =
   | 'standard-warm'
   | 'modern-spa'
@@ -106,6 +106,8 @@ export type ColorPaletteName =
   | 'fresh'
   | 'wellness-dark'
   | 'wellness-warm'
+  | 'ocean-breeze'
+  | 'alpine-wood'
   | 'custom';
 
 // Aroma/Scent for aufguss badges

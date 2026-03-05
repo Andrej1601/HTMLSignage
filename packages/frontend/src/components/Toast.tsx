@@ -10,17 +10,17 @@ const iconMap: Record<ToastType, typeof CheckCircle> = {
 };
 
 const styleMap: Record<ToastType, string> = {
-  success: 'bg-green-50 border-green-200 text-green-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-spa-success-light border-spa-success/30 text-spa-success-dark',
+  error: 'bg-spa-error-light border-spa-error/30 text-spa-error-dark',
+  warning: 'bg-spa-warning-light border-spa-warning/30 text-spa-warning-dark',
+  info: 'bg-spa-info-light border-spa-info/30 text-spa-info-dark',
 };
 
 const iconStyleMap: Record<ToastType, string> = {
-  success: 'text-green-500',
-  error: 'text-red-500',
-  warning: 'text-amber-500',
-  info: 'text-blue-500',
+  success: 'text-spa-success',
+  error: 'text-spa-error',
+  warning: 'text-spa-warning',
+  info: 'text-spa-info',
 };
 
 export function ToastContainer() {

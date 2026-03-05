@@ -376,8 +376,8 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                 className={clsx(
                   'flex items-center gap-2 px-4 py-2 rounded-md border-2 transition-colors w-full justify-center',
                   formData.isActive
-                    ? 'border-green-500 bg-green-50 text-green-700'
-                    : 'border-gray-300 bg-gray-50 text-gray-600'
+                    ? 'border-spa-success bg-spa-success-light text-spa-success-dark'
+                    : 'border-spa-bg-secondary bg-spa-bg-primary text-spa-text-secondary'
                 )}
               >
                 {formData.isActive ? (
@@ -466,7 +466,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                     }}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
+                  <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
                 </label>
               </div>
 
@@ -549,13 +549,13 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                         <h4 className="text-lg font-semibold text-spa-text-primary flex items-center gap-2">
                           {event.name}
                           {isCurrentlyActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-success-light text-spa-success-dark text-xs rounded-full">
+                              <span className="w-2 h-2 bg-spa-success rounded-full animate-pulse"></span>
                               Läuft jetzt
                             </span>
                           )}
                           {!event.isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-bg-secondary text-spa-text-secondary text-xs rounded-full">
                               Inaktiv
                             </span>
                           )}
@@ -571,8 +571,8 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                           className={clsx(
                             'p-2 rounded-md transition-colors',
                             event.isActive
-                              ? 'text-green-600 hover:bg-green-50'
-                              : 'text-gray-400 hover:bg-gray-50'
+                              ? 'text-spa-success hover:bg-spa-success-light'
+                              : 'text-spa-text-secondary hover:bg-spa-bg-primary'
                           )}
                           title={event.isActive ? 'Deaktivieren' : 'Aktivieren'}
                         >
@@ -586,13 +586,15 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                           onClick={() => handleStartEdit(event)}
                           className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
                           title="Bearbeiten"
+                          aria-label="Event bearbeiten"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(event.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors"
                           title="Löschen"
+                          aria-label="Event löschen"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -616,7 +618,7 @@ export function EventManager({ events, onChange }: EventManagerProps) {
                         Aufgussplan: {event.assignedPreset}
                       </div>
                       {(event.settingsOverrides?.designStyle || event.settingsOverrides?.colorPalette) && (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-info-light text-spa-info-dark rounded-full text-xs font-medium">
                           Design Override
                         </div>
                       )}

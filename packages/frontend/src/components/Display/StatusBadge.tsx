@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
+import type { ThemeColors } from '@/types/settings.types';
 
 interface StatusBadgeProps {
   status: 'ongoing' | 'prestart' | 'next' | null;
-  theme: any;
+  theme: ThemeColors;
   size?: 'sm' | 'md';
 }
 

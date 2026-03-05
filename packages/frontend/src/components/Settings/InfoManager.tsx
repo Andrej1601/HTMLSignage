@@ -276,13 +276,15 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                     onClick={() => handleStartEdit(item)}
                     className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
                     title="Bearbeiten"
+                    aria-label="Info bearbeiten"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors"
                     title="Löschen"
+                    aria-label="Info löschen"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

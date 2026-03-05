@@ -104,12 +104,17 @@ export function ThemeEditor({
             {
               id: 'modern-wellness' as const,
               title: 'Modern Wellness',
-              description: 'Klassisches Wellness-Grid (60/40) mit Saunakacheln.',
+              description: 'Klassisches Wellness-Grid mit Saunakacheln.',
             },
             {
               id: 'modern-timeline' as const,
               title: 'Modern Timeline',
-              description: 'Zeitachsen-Layout nach Design3 mit Timeline-Tabelle.',
+              description: 'Zeitachsen-Layout mit Timeline-Tabelle.',
+            },
+            {
+              id: 'compact-tiles' as const,
+              title: 'Chronologische Liste',
+              description: 'Alle Aufgüsse aller Saunas in einer gemeinsamen Zeitleiste.',
             },
           ].map((style) => (
             <button

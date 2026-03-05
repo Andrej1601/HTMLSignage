@@ -3,7 +3,7 @@
  * Handles backward compatibility when property names change
  */
 
-import type { Settings } from '@/types/settings.types';
+import type { Settings, ColorPaletteName } from '@/types/settings.types';
 import type { SlideshowConfig } from '@/types/slideshow.types';
 import { generateDashboardColors, getColorPalette } from '@/types/settings.types';
 
@@ -26,6 +26,7 @@ export function migrateSettings(settings: Settings): Settings {
     dashboard: 'modern-wellness',
     'modern-wellness': 'modern-wellness',
     'modern-timeline': 'modern-timeline',
+    'compact-tiles': 'compact-tiles',
   };
   const targetDesignStyle = legacyStyleMap[normalizedStyle] || 'modern-wellness';
   if (next.designStyle !== targetDesignStyle) {
@@ -36,7 +37,7 @@ export function migrateSettings(settings: Settings): Settings {
   // Ensure theme contains all design tokens needed by the modern display.
   // Preserve user overrides in `settings.theme`, but fill missing values from the selected palette.
   const paletteId = next.colorPalette || 'wellness-warm';
-  const paletteColors = getColorPalette(paletteId as any);
+  const paletteColors = getColorPalette(paletteId as ColorPaletteName);
   next.theme = generateDashboardColors({ ...paletteColors, ...(next.theme || {}) });
 
   if (!next.slideshow) {
@@ -50,14 +51,16 @@ export function migrateSettings(settings: Settings): Settings {
 
   // Migrate property names
   if ('scheduleGridPosition' in slideshow) {
-    (slideshow as any).persistentZonePosition = (slideshow as any).scheduleGridPosition;
-    delete (slideshow as any).scheduleGridPosition;
+    const legacy = slideshow as Record<string, unknown>;
+    (slideshow as SlideshowConfig).persistentZonePosition = legacy.scheduleGridPosition as SlideshowConfig['persistentZonePosition'];
+    delete legacy.scheduleGridPosition;
     migrated = true;
   }
 
   if ('scheduleGridSize' in slideshow) {
-    (slideshow as any).persistentZoneSize = (slideshow as any).scheduleGridSize;
-    delete (slideshow as any).scheduleGridSize;
+    const legacy = slideshow as Record<string, unknown>;
+    (slideshow as SlideshowConfig).persistentZoneSize = legacy.scheduleGridSize as number;
+    delete legacy.scheduleGridSize;
     migrated = true;
   }
 
@@ -65,7 +68,7 @@ export function migrateSettings(settings: Settings): Settings {
   if (slideshow.slides && Array.isArray(slideshow.slides)) {
     slideshow.slides = slideshow.slides.map(slide => {
       // Use any cast to compare with old string value that no longer exists in type
-      if ((slide as any).type === 'schedule-grid') {
+      if ((slide as unknown as Record<string, unknown>).type === 'schedule-grid') {
         migrated = true;
         return { ...slide, type: 'content-panel' as const };
       }

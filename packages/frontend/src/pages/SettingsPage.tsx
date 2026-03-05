@@ -23,6 +23,7 @@ import type {
   ColorPaletteName,
 } from '@/types/settings.types';
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Wrench } from 'lucide-react';
+import { Button } from '@/components/Button';
 
 type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events' | 'system';
 
@@ -151,29 +152,15 @@ export function SettingsPage() {
           icon={Wrench}
           actions={(
             <>
-              <button
-                onClick={handleReload}
-                disabled={isSaving}
-                className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                <RotateCcw className="w-4 h-4" />
+              <Button variant="ghost" icon={RotateCcw} onClick={handleReload} disabled={isSaving}>
                 Neu laden
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isSaving}
-                className="px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="secondary" onClick={handleReset} disabled={isSaving}>
                 Zurücksetzen
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!isDirty || isSaving}
-                className="px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                {isSaving ? 'Speichert...' : 'Speichern'}
-              </button>
+              </Button>
+              <Button icon={Save} onClick={handleSave} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
+                Speichern
+              </Button>
             </>
           )}
           badges={[

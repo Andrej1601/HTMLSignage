@@ -243,6 +243,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                     })()}
                     <button
                       onClick={() => handleRemoveAroma(index)}
+                      aria-label="Aroma entfernen"
                       className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"
                     >
                       <X className="w-3 h-3" />

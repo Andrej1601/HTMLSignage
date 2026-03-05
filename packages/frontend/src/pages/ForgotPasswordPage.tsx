@@ -46,7 +46,7 @@ export function ForgotPasswordPage() {
 
         {isSubmitted ? (
           <div className="space-y-4">
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+            <div className="p-4 bg-spa-success-light border border-spa-success/30 rounded-lg text-sm text-spa-success-dark">
               Falls ein Konto mit dieser E-Mail existiert, wurde ein Passwort-Reset-Link versendet.
             </div>
             <Link
@@ -59,7 +59,7 @@ export function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
                 {error}
               </div>
             )}

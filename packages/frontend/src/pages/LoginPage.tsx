@@ -75,7 +75,7 @@ export function LoginPage() {
 
         {/* Error Message */}
         {error && (
-          <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
             {error}
           </div>
         )}
@@ -171,7 +171,7 @@ export function LoginPage() {
 
             {/* Info */}
             {mode === 'register' && (
-              <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mt-6 p-3 bg-spa-info-light border border-spa-info/30 rounded-lg">
                 <p className="text-xs text-blue-700">
                   Dies ist der erste Benutzer und erhält automatisch Administrator-Rechte. Weitere Benutzer können nur von Administratoren angelegt werden.
                 </p>

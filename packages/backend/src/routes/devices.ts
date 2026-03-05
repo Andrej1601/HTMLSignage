@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { mutationLimiter } from '../lib/rateLimiter.js';
 import { isPlainRecord, deepMerge } from '../lib/utils.js';
 import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
 
@@ -37,7 +39,7 @@ const ControlCommandSchema = z.object({
 
 const OverridesSchema = z.object({
   schedule: ScheduleSchema.optional(),
-  settings: z.record(z.any()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
 }).refine((data) => Boolean(data.schedule) || Boolean(data.settings), {
   message: 'At least one override (schedule or settings) is required',
 });
@@ -58,7 +60,7 @@ router.get('/', async (req, res) => {
     res.json(devices);
   } catch (error) {
     console.error('[devices] Error listing:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
   }
 });
 
@@ -77,7 +79,7 @@ router.get('/pending', authMiddleware, async (req: AuthRequest, res) => {
     res.json(devices);
   } catch (error) {
     console.error('[devices] Error fetching pending devices:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
   }
 });
 
@@ -133,7 +135,7 @@ router.get('/:id/display-config', async (req, res) => {
     });
   } catch (error) {
     console.error('[devices] Error fetching display config:', error);
-    return res.status(500).json({ error: 'fetch-failed' });
+    return res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
   }
 });
 
@@ -149,18 +151,18 @@ router.get('/:id', async (req, res) => {
     });
 
     if (!device) {
-      return res.status(404).json({ error: 'not-found' });
+      return res.status(404).json({ error: 'not-found', message: 'Gerät nicht gefunden' });
     }
 
     res.json(device);
   } catch (error) {
     console.error('[devices] Error fetching device:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
   }
 });
 
 // POST /api/devices - Create new device (auth required)
-router.post('/', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateDeviceSchema.parse(req.body);
 
@@ -183,12 +185,12 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[devices] Error creating device:', error);
-    res.status(500).json({ error: 'create-failed' });
+    res.status(500).json({ error: 'create-failed', message: 'Gerät konnte nicht erstellt werden' });
   }
 });
 
 // PATCH /api/devices/:id - Update device (auth required)
-router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
+router.patch('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
 
@@ -208,12 +210,12 @@ router.patch('/:id', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[devices] Error updating device:', error);
-    res.status(500).json({ error: 'update-failed' });
+    res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
   }
 });
 
 // DELETE /api/devices/:id - Delete device (auth required)
-router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.device.delete({
       where: { id: req.params.id },
@@ -224,7 +226,7 @@ router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('[devices] Error deleting device:', error);
-    res.status(500).json({ error: 'delete-failed' });
+    res.status(500).json({ error: 'delete-failed', message: 'Gerät konnte nicht gelöscht werden' });
   }
 });
 
@@ -239,12 +241,12 @@ router.post('/:id/heartbeat', async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('[devices] Heartbeat error:', error);
-    res.status(500).json({ error: 'update-failed' });
+    res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
   }
 });
 
 // POST /api/devices/:id/control - Send control command (auth required)
-router.post('/:id/control', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/:id/control', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = ControlCommandSchema.parse(req.body);
 
@@ -259,12 +261,12 @@ router.post('/:id/control', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[devices] Error sending control command:', error);
-    res.status(500).json({ error: 'command-failed' });
+    res.status(500).json({ error: 'command-failed', message: 'Befehl konnte nicht ausgeführt werden' });
   }
 });
 
 // POST /api/devices/:id/overrides - Set device overrides (auth required)
-router.post('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/:id/overrides', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = OverridesSchema.parse(req.body);
 
@@ -272,12 +274,12 @@ router.post('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
       where: { deviceId: req.params.id },
       create: {
         deviceId: req.params.id,
-        schedule: validated.schedule || {},
-        settings: validated.settings || {},
+        schedule: (validated.schedule || {}) as unknown as Prisma.InputJsonValue,
+        settings: (validated.settings || {}) as unknown as Prisma.InputJsonValue,
       },
       update: {
-        schedule: validated.schedule,
-        settings: validated.settings,
+        schedule: validated.schedule as unknown as Prisma.InputJsonValue,
+        settings: validated.settings as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -301,12 +303,12 @@ router.post('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[devices] Error setting overrides:', error);
-    res.status(500).json({ error: 'overrides-failed' });
+    res.status(500).json({ error: 'overrides-failed', message: 'Überschreibungen konnten nicht gespeichert werden' });
   }
 });
 
 // DELETE /api/devices/:id/overrides - Clear device overrides (auth required)
-router.delete('/:id/overrides', authMiddleware, async (req: AuthRequest, res) => {
+router.delete('/:id/overrides', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.deviceOverride.deleteMany({
       where: { deviceId: req.params.id },
@@ -329,7 +331,7 @@ router.delete('/:id/overrides', authMiddleware, async (req: AuthRequest, res) =>
     res.json({ ok: true });
   } catch (error) {
     console.error('[devices] Error clearing overrides:', error);
-    res.status(500).json({ error: 'clear-overrides-failed' });
+    res.status(500).json({ error: 'clear-overrides-failed', message: 'Überschreibungen konnten nicht gelöscht werden' });
   }
 });
 
@@ -397,12 +399,12 @@ router.post('/request-pairing', async (req, res) => {
     });
   } catch (error) {
     console.error('[devices] Error requesting pairing:', error);
-    res.status(500).json({ error: 'pairing-request-failed' });
+    res.status(500).json({ error: 'pairing-request-failed', message: 'Kopplungsanfrage fehlgeschlagen' });
   }
 });
 
 // POST /api/devices/pair - Pair a device using pairing code (called by admin)
-router.post('/pair', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/pair', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = PairDeviceSchema.parse(req.body);
 
@@ -443,7 +445,7 @@ router.post('/pair', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[devices] Error pairing device:', error);
-    res.status(500).json({ error: 'pairing-failed' });
+    res.status(500).json({ error: 'pairing-failed', message: 'Kopplung fehlgeschlagen' });
   }
 });
 

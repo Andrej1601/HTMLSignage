@@ -204,7 +204,7 @@ function TimelineInfusionCard({
 
 export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSlideProps) {
   const defaults = getDefaultSettings();
-  const theme = (settings.theme || defaults.theme!) as any;
+  const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
   const [now, setNow] = useState(() => new Date());
@@ -356,6 +356,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
   const firstWord = titleWords[0] || 'Westfalenbad';
   const restWords = titleWords.slice(1).join(' ') || 'Hagen';
 
+  const timeColWidth = 'w-20';
   const gridTemplateColumns = `repeat(${Math.max(1, gridSaunas.length)}, minmax(0, 1fr))`;
 
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -528,7 +529,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
           }}
         >
           <div
-            className="w-20 shrink-0 flex items-center justify-center border-r"
+            className={`${timeColWidth} shrink-0 flex items-center justify-center border-r`}
             style={{
               borderColor: withAlpha(border, 0.8),
               backgroundColor: withAlpha(accentGold, 0.07),
@@ -592,7 +593,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
             style={{ minHeight: `${timeline.contentHeight}px` }}
           >
             <div
-              className="w-20 shrink-0 border-r relative"
+              className={`${timeColWidth} shrink-0 border-r relative`}
               style={{
                 borderColor: withAlpha(border, 0.7),
                 backgroundColor: withAlpha(accentGold, 0.05),

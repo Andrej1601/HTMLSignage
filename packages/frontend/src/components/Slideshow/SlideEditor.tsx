@@ -117,6 +117,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
           </h3>
           <button
             onClick={onClose}
+            aria-label="Schließen"
             className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
           >
             <X className="w-5 h-5" />

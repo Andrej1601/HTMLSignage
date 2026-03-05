@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { mutationLimiter } from '../lib/rateLimiter.js';
 
 const router = Router();
 
@@ -11,19 +12,19 @@ router.use(authMiddleware);
 const CreateUserSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email().optional(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   roles: z.array(z.string()).default(['viewer']),
 });
 
 const UpdateUserSchema = z.object({
   username: z.string().min(3).max(50).optional(),
   email: z.string().email().optional().nullable(),
-  password: z.string().min(6).optional(),
+  password: z.string().min(8).optional(),
   roles: z.array(z.string()).optional(),
 });
 
 // Middleware to check if user is admin
-function requireAdmin(req: AuthRequest, res: any, next: any): void {
+function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
   if (!req.user?.roles.includes('admin')) {
     res.status(403).json({ error: 'forbidden', message: 'Admin access required' });
     return;
@@ -49,12 +50,12 @@ router.get('/', requireAdmin, async (req: AuthRequest, res) => {
     res.json(users);
   } catch (error) {
     console.error('[users] Error listing users:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Benutzer konnten nicht geladen werden' });
   }
 });
 
 // POST /api/users - Create new user (Admin only)
-router.post('/', requireAdmin, async (req: AuthRequest, res) => {
+router.post('/', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateUserSchema.parse(req.body);
 
@@ -103,12 +104,12 @@ router.post('/', requireAdmin, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[users] Error creating user:', error);
-    res.status(500).json({ error: 'create-failed' });
+    res.status(500).json({ error: 'create-failed', message: 'Benutzer konnte nicht erstellt werden' });
   }
 });
 
 // PATCH /api/users/:id - Update user (Admin only)
-router.patch('/:id', requireAdmin, async (req: AuthRequest, res) => {
+router.patch('/:id', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateUserSchema.parse(req.body);
 
@@ -144,7 +145,7 @@ router.patch('/:id', requireAdmin, async (req: AuthRequest, res) => {
     }
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (validated.username) updateData.username = validated.username;
     if (validated.email !== undefined) updateData.email = validated.email;
     if (validated.roles) updateData.roles = validated.roles;
@@ -171,12 +172,12 @@ router.patch('/:id', requireAdmin, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[users] Error updating user:', error);
-    res.status(500).json({ error: 'update-failed' });
+    res.status(500).json({ error: 'update-failed', message: 'Benutzer konnte nicht aktualisiert werden' });
   }
 });
 
 // DELETE /api/users/:id - Delete user (Admin only)
-router.delete('/:id', requireAdmin, async (req: AuthRequest, res) => {
+router.delete('/:id', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
   try {
     // Prevent deleting yourself
     if (req.params.id === req.userId) {
@@ -199,7 +200,7 @@ router.delete('/:id', requireAdmin, async (req: AuthRequest, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('[users] Error deleting user:', error);
-    res.status(500).json({ error: 'delete-failed' });
+    res.status(500).json({ error: 'delete-failed', message: 'Benutzer konnte nicht gelöscht werden' });
   }
 });
 

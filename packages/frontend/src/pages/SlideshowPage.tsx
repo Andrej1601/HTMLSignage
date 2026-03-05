@@ -59,7 +59,7 @@ function getDeviceSlideshowSource(device: Device): {
     return {
       label: 'Override aktiv',
       detail: 'Dieses Display nutzt eine eigene Slideshow-/Settings-Konfiguration.',
-      badgeClass: 'bg-blue-100 text-blue-700',
+      badgeClass: 'bg-spa-info-light text-spa-info-dark',
       usesGlobal: false,
     };
   }
@@ -68,7 +68,7 @@ function getDeviceSlideshowSource(device: Device): {
     return {
       label: 'Global (kein Override)',
       detail: 'Modus ist Überschrieben, aber es sind keine Overrides gespeichert.',
-      badgeClass: 'bg-amber-100 text-amber-700',
+      badgeClass: 'bg-spa-warning-light text-spa-warning-dark',
       usesGlobal: true,
     };
   }
@@ -77,7 +77,7 @@ function getDeviceSlideshowSource(device: Device): {
     return {
       label: 'Global (Override hinterlegt)',
       detail: 'Override ist gespeichert, wird im Modus Automatisch aber nicht verwendet.',
-      badgeClass: 'bg-emerald-100 text-emerald-700',
+      badgeClass: 'bg-spa-success-light text-spa-success-dark',
       usesGlobal: true,
     };
   }
@@ -85,7 +85,7 @@ function getDeviceSlideshowSource(device: Device): {
   return {
     label: 'Global',
     detail: 'Dieses Display nutzt die globale Slideshow aus diesem Reiter.',
-    badgeClass: 'bg-emerald-100 text-emerald-700',
+    badgeClass: 'bg-spa-success-light text-spa-success-dark',
     usesGlobal: true,
   };
 }
@@ -477,17 +477,17 @@ export function SlideshowPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 text-xs font-medium">
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+              <span className="rounded-full bg-spa-success-light px-3 py-1 text-spa-success-dark">
                 Global: {deviceSourceSummary.global}
               </span>
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
+              <span className="rounded-full bg-spa-info-light px-3 py-1 text-spa-info-dark">
                 Override aktiv: {deviceSourceSummary.overrideActive}
               </span>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+              <span className="rounded-full bg-spa-warning-light px-3 py-1 text-spa-warning-dark">
                 Override hinterlegt: {deviceSourceSummary.overrideStoredInactive}
               </span>
               {deviceSourceSummary.overrideModeWithoutData > 0 && (
-                <span className="rounded-full bg-rose-100 px-3 py-1 text-rose-700">
+                <span className="rounded-full bg-spa-error-light px-3 py-1 text-spa-error-dark">
                   Modus Override ohne Daten: {deviceSourceSummary.overrideModeWithoutData}
                 </span>
               )}

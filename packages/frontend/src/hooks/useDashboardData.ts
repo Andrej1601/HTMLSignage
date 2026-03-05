@@ -224,7 +224,7 @@ export function useDashboardData() {
 
     groups.push({
       id: 'global', source: 'global', title: 'Globale Slideshow', config: globalConfig,
-      slides: getEnabledSlides(globalConfig).slice(0, 4), deviceNames: globalDeviceNames,
+      slides: getEnabledSlides(globalConfig), deviceNames: globalDeviceNames,
     });
 
     for (const device of liveState.onlinePairedDevices) {
@@ -237,7 +237,7 @@ export function useDashboardData() {
       overrideGroups.set(fingerprint, {
         id: `override-${overrideGroups.size + 1}`, source: 'override',
         title: `Override Slideshow ${overrideGroups.size + 1}`, config: overrideConfig,
-        slides: getEnabledSlides(overrideConfig).slice(0, 4), deviceNames: [device.name],
+        slides: getEnabledSlides(overrideConfig), deviceNames: [device.name],
       });
     }
 
@@ -282,13 +282,20 @@ export function useDashboardData() {
     const items: ActivityItem[] = [];
 
     for (const entry of (scheduleHistoryQuery.data || []).slice(0, 10)) {
+      const date = toValidDate(entry.createdAt);
+      const dateStr = date
+        ? date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          + ', ' + date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+        : 'Unbekannt';
       items.push({
         id: `schedule-${entry.id}`,
-        title: `Aufgussplan v${entry.version} gespeichert`,
-        description: entry.isActive ? 'Als aktiver Plan gesetzt' : 'Historische Planversion',
+        title: `Plan vom ${dateStr}`,
+        description: entry.isActive ? 'Aktiver Plan' : 'Historische Version',
         tone: entry.isActive ? 'success' : 'neutral',
-        timestamp: toValidDate(entry.createdAt),
+        timestamp: date,
         actor: 'Unbekannt',
+        category: 'plan',
+        details: entry.changeSummary ?? undefined,
       });
     }
 
@@ -302,6 +309,7 @@ export function useDashboardData() {
         tone: 'info',
         timestamp: toValidDate(item.createdAt),
         actor: item.user?.username || 'Unbekannt',
+        category: 'media',
       });
     }
 
@@ -316,6 +324,7 @@ export function useDashboardData() {
         tone: device.mode === 'override' ? 'warning' : 'neutral',
         timestamp: toValidDate(device.updatedAt) || toValidDate(device.pairedAt),
         actor: device.user?.username || 'Unbekannt',
+        category: 'device',
       });
     }
 
@@ -329,6 +338,7 @@ export function useDashboardData() {
           `${liveState.activeEvent.startDate}T${liveState.activeEvent.startTime}`
         ),
         actor: 'System',
+        category: 'system',
       });
     }
     if (liveState.offlineDevices > 0) {
@@ -338,6 +348,7 @@ export function useDashboardData() {
         description: 'Bitte Verbindungsstatus und Display-Clients prüfen',
         tone: 'warning',
         actor: 'System',
+        category: 'system',
       });
     }
     if (liveState.pendingPairings > 0) {
@@ -347,6 +358,7 @@ export function useDashboardData() {
         description: 'Neue Bildschirme warten auf Freigabe',
         tone: 'warning',
         actor: 'System',
+        category: 'system',
       });
     }
     if (systemStatusQuery.data?.hasUpdate && systemStatusQuery.data.latestRelease) {
@@ -356,6 +368,7 @@ export function useDashboardData() {
         description: `${systemStatusQuery.data.latestRelease.tag} — ${systemStatusQuery.data.latestRelease.name}`,
         tone: 'warning',
         actor: 'System',
+        category: 'system',
       });
     }
     if (settings) {
@@ -365,6 +378,7 @@ export function useDashboardData() {
         description: `Design: ${settings.designStyle || 'modern-wellness'}`,
         tone: 'success',
         actor: 'System',
+        category: 'system',
       });
     }
 

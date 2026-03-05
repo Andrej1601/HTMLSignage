@@ -33,7 +33,7 @@ const LoginSchema = z.object({
 const RegisterSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email().optional(),
-  password: z.string().min(6),
+  password: z.string().min(8),
 });
 
 const ForgotPasswordSchema = z.object({
@@ -42,7 +42,7 @@ const ForgotPasswordSchema = z.object({
 
 const ResetPasswordSchema = z.object({
   token: z.string().min(32).max(512),
-  password: z.string().min(6),
+  password: z.string().min(8),
 });
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
@@ -126,7 +126,7 @@ router.post('/register', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[auth] Registration error:', error);
-    res.status(500).json({ error: 'registration-failed' });
+    res.status(500).json({ error: 'registration-failed', message: 'Registrierung fehlgeschlagen' });
   }
 });
 
@@ -176,7 +176,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[auth] Login error:', error);
-    res.status(500).json({ error: 'login-failed' });
+    res.status(500).json({ error: 'login-failed', message: 'Anmeldung fehlgeschlagen' });
   }
 });
 
@@ -240,7 +240,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[auth] Forgot password error:', error);
-    return res.status(500).json({ error: 'forgot-password-failed' });
+    return res.status(500).json({ error: 'forgot-password-failed', message: 'Passwort-Reset fehlgeschlagen' });
   }
 });
 
@@ -294,7 +294,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
     console.error('[auth] Reset password error:', error);
-    return res.status(500).json({ error: 'reset-password-failed' });
+    return res.status(500).json({ error: 'reset-password-failed', message: 'Passwort konnte nicht zurückgesetzt werden' });
   }
 });
 
@@ -313,7 +313,7 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('[auth] Logout error:', error);
-    res.status(500).json({ error: 'logout-failed' });
+    res.status(500).json({ error: 'logout-failed', message: 'Abmeldung fehlgeschlagen' });
   }
 });
 
@@ -321,13 +321,13 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
 router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ error: 'unauthorized' });
+      return res.status(401).json({ error: 'unauthorized', message: 'Nicht authentifiziert' });
     }
 
     res.json(req.user);
   } catch (error) {
     console.error('[auth] Me error:', error);
-    res.status(500).json({ error: 'fetch-failed' });
+    res.status(500).json({ error: 'fetch-failed', message: 'Benutzerdaten konnten nicht geladen werden' });
   }
 });
 

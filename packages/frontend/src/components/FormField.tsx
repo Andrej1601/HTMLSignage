@@ -190,7 +190,7 @@ export function ToggleField({
             'after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px]',
             'after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all',
             'peer-checked:after:translate-x-full',
-            checked ? 'bg-spa-primary' : 'bg-gray-300',
+            checked ? 'bg-spa-primary' : 'bg-spa-bg-secondary',
           )}
         />
       </div>

@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center bg-spa-bg-primary p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <div className="mx-auto w-16 h-16 bg-spa-error-light rounded-full flex items-center justify-center mb-6">
               <AlertTriangle className="w-8 h-8 text-red-600" aria-hidden="true" />
             </div>
             <h1 className="text-2xl font-bold text-spa-text-primary mb-2">
@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <summary className="cursor-pointer text-sm text-spa-text-secondary hover:text-spa-text-primary">
                   Technische Details
                 </summary>
-                <pre className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 overflow-auto max-h-32">
+                <pre className="mt-2 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-xs text-spa-error-dark overflow-auto max-h-32">
                   {this.state.error.message}
                 </pre>
               </details>

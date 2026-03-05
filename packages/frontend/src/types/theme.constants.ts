@@ -91,6 +91,34 @@ export const COLOR_PALETTES: Array<{ id: ColorPaletteName; name: string; colors:
       statusLive: '#10B981', statusNext: '#A68A64', statusPrestart: '#F59E0B',
     },
   },
+  {
+    id: 'ocean-breeze',
+    name: 'Ocean Breeze',
+    colors: {
+      bg: '#EFF6FA', fg: '#1B3A4B', accent: '#3A8FB7',
+      gridTable: '#7BB8D0', cellBg: '#FFFFFF', boxFg: '#1B3A4B', timeColBg: '#3A8FB7',
+      flame: '#F28C38', zebra1: '#F5FAFD', zebra2: '#EAF4F9',
+      timeZebra1: '#3A8FB7', timeZebra2: '#2D7A9F',
+      headRowBg: '#2B6880', headRowFg: '#FFFFFF', cornerBg: '#1B4F66', cornerFg: '#FFFFFF',
+      dashboardBg: '#EFF6FA', cardBg: '#FFFFFF', cardBorder: '#B8D9E8',
+      textMain: '#1B3A4B', textMuted: '#4A7C90', accentGold: '#3A8FB7', accentGreen: '#2A9D8F',
+      statusLive: '#2A9D8F', statusNext: '#3A8FB7', statusPrestart: '#F28C38',
+    },
+  },
+  {
+    id: 'alpine-wood',
+    name: 'Alpine Holz',
+    colors: {
+      bg: '#F5F0EB', fg: '#3B2F2F', accent: '#8B5E3C',
+      gridTable: '#C4A882', cellBg: '#FBF8F5', boxFg: '#3B2F2F', timeColBg: '#6B8F71',
+      flame: '#D95030', zebra1: '#F9F5F0', zebra2: '#F0E8E0',
+      timeZebra1: '#6B8F71', timeZebra2: '#587A5E',
+      headRowBg: '#5A3E2B', headRowFg: '#F5F0EB', cornerBg: '#3B2F2F', cornerFg: '#E8D5BD',
+      dashboardBg: '#F5F0EB', cardBg: '#FBF8F5', cardBorder: '#D9C4AB',
+      textMain: '#3B2F2F', textMuted: '#6D5D4B', accentGold: '#8B5E3C', accentGreen: '#6B8F71',
+      statusLive: '#4A9B6E', statusNext: '#8B5E3C', statusPrestart: '#D4903A',
+    },
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

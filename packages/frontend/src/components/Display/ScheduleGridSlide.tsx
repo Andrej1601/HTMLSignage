@@ -168,7 +168,7 @@ function InfusionItemGrid({
 
 export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps) {
   const defaults = getDefaultSettings();
-  const theme = (settings.theme || defaults.theme!) as any;
+  const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
   const [now, setNow] = useState(() => new Date());

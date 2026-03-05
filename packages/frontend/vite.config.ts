@@ -28,6 +28,7 @@ export default defineConfig({
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'query-vendor': ['@tanstack/react-query'],
+          'animation-vendor': ['framer-motion'],
         },
       },
     },

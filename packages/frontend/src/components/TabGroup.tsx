@@ -1,3 +1,4 @@
+import { useRef, useCallback } from 'react';
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
 
@@ -14,9 +15,37 @@ interface TabGroupProps<T extends string> {
 }
 
 export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGroupProps<T>) {
+  const tabListRef = useRef<HTMLDivElement>(null);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const currentIndex = tabs.findIndex((t) => t.id === activeTab);
+      let nextIndex = -1;
+
+      if (e.key === 'ArrowRight') {
+        nextIndex = (currentIndex + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft') {
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = tabs.length - 1;
+      }
+
+      if (nextIndex >= 0) {
+        e.preventDefault();
+        onChange(tabs[nextIndex].id);
+        // Focus the new tab button
+        const buttons = tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+        buttons?.[nextIndex]?.focus();
+      }
+    },
+    [tabs, activeTab, onChange],
+  );
+
   return (
-    <div className="bg-white rounded-lg shadow-sm" role="tablist" aria-label="Reiter">
-      <div className="flex border-b border-spa-bg-secondary">
+    <div className="bg-white rounded-lg shadow-sm" role="tablist" aria-label="Reiter" ref={tabListRef}>
+      <div className="flex border-b border-spa-bg-secondary overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -27,16 +56,19 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
               aria-selected={isActive}
               aria-controls={`tabpanel-${tab.id}`}
               id={`tab-${tab.id}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => onChange(tab.id)}
+              onKeyDown={handleKeyDown}
               className={clsx(
-                'flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2',
+                'flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap min-w-0',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-inset',
                 isActive
                   ? 'text-spa-primary border-b-2 border-spa-primary'
                   : 'text-spa-text-secondary hover:text-spa-text-primary',
               )}
             >
-              {Icon && <Icon className="w-5 h-5" aria-hidden="true" />}
-              {tab.label}
+              {Icon && <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />}
+              <span className="truncate">{tab.label}</span>
             </button>
           );
         })}
@@ -59,6 +91,7 @@ export function TabPanel<T extends string>({ id, activeTab, children }: TabPanel
       role="tabpanel"
       id={`tabpanel-${id}`}
       aria-labelledby={`tab-${id}`}
+      tabIndex={0}
     >
       {children}
     </div>

@@ -2,11 +2,18 @@ import { Link } from 'react-router-dom';
 import { LucideIcon, ArrowRight } from 'lucide-react';
 import clsx from 'clsx';
 
+interface StatCardDetail {
+  label: string;
+  value: string;
+  tone?: 'success' | 'warning' | 'info' | 'neutral';
+}
+
 interface StatCardProps {
   title: string;
   value: string | number;
   icon: LucideIcon;
   description?: string;
+  details?: StatCardDetail[];
   color?: 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'violet';
   href?: string;
   ctaLabel?: string;
@@ -16,12 +23,19 @@ interface StatCardProps {
   };
 }
 
+const toneTextClasses: Record<string, string> = {
+  success: 'text-spa-success-dark',
+  warning: 'text-spa-warning-dark',
+  info: 'text-spa-info-dark',
+  neutral: 'text-spa-text-secondary',
+};
+
 const colorClasses: Record<NonNullable<StatCardProps['color']>, { iconBg: string; iconFg: string }> = {
   primary: { iconBg: 'bg-spa-primary/10', iconFg: 'text-spa-primary' },
-  success: { iconBg: 'bg-spa-secondary/15', iconFg: 'text-spa-secondary-dark' },
-  warning: { iconBg: 'bg-amber-100', iconFg: 'text-amber-700' },
-  danger: { iconBg: 'bg-red-100', iconFg: 'text-red-600' },
-  info: { iconBg: 'bg-spa-accent/15', iconFg: 'text-spa-primary-dark' },
+  success: { iconBg: 'bg-spa-success-light', iconFg: 'text-spa-success-dark' },
+  warning: { iconBg: 'bg-spa-warning-light', iconFg: 'text-spa-warning-dark' },
+  danger: { iconBg: 'bg-spa-error-light', iconFg: 'text-spa-error-dark' },
+  info: { iconBg: 'bg-spa-info-light', iconFg: 'text-spa-info-dark' },
   neutral: { iconBg: 'bg-spa-bg-secondary', iconFg: 'text-spa-text-secondary' },
   violet: { iconBg: 'bg-spa-primary-light/20', iconFg: 'text-spa-primary-dark' },
 };
@@ -31,6 +45,7 @@ export function StatCard({
   value,
   icon: Icon,
   description,
+  details,
   color = 'primary',
   href,
   ctaLabel,
@@ -55,8 +70,20 @@ export function StatCard({
             {description}
           </p>
         )}
+        {details && details.length > 0 && (
+          <div className="space-y-1 mt-1">
+            {details.map((d) => (
+              <div key={d.label} className="flex items-center justify-between text-xs">
+                <span className="text-spa-text-secondary">{d.label}</span>
+                <span className={clsx('font-medium', toneTextClasses[d.tone || 'neutral'] || 'text-spa-text-primary')}>
+                  {d.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {trend && (
-          <div className={clsx('text-sm font-medium mt-2', trend.isPositive ? 'text-green-600' : 'text-red-600')}>
+          <div className={clsx('text-sm font-medium mt-2', trend.isPositive ? 'text-spa-success-dark' : 'text-spa-error-dark')}>
             {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
           </div>
         )}

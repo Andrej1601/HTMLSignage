@@ -217,7 +217,7 @@ function InfusionItemDetail({
 
 export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetailDashboardProps) {
   const defaults = getDefaultSettings();
-  const theme = (settings.theme || defaults.theme!) as any;
+  const theme = settings.theme || defaults.theme!;
   const { data: media } = useMedia();
 
   const [now, setNow] = useState(() => new Date());
@@ -290,7 +290,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
 
   const infoBadges = useMemo(() => {
     if (!sauna) return [];
-    const raw = String((sauna as any).notice || sauna.description || '');
+    const raw = String(sauna.description || '');
     return raw
       .split(/\r?\n/g)
       .map((line) => line.trim())

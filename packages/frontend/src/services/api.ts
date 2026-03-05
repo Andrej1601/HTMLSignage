@@ -19,6 +19,7 @@ export interface ScheduleHistoryItem {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  changeSummary?: string[] | null;
 }
 
 export interface DeviceOverridesPayload {
@@ -200,7 +201,7 @@ export const scheduleApi = {
 
   // Get schedule history
   getHistory: async (limit = 10): Promise<ScheduleHistoryItem[]> => {
-    const { data } = await api.get<ScheduleHistoryItem[]>('/schedule/history', { params: { limit } });
+    const { data } = await api.get<ScheduleHistoryItem[]>('/schedule/history', { params: { limit, details: 'true' } });
     return data;
   },
 };

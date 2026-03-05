@@ -8,6 +8,8 @@ import { OverviewSlide } from '@/components/Display/OverviewSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { ScheduleGridSlide } from '@/components/Display/ScheduleGridSlide';
 import { TimelineScheduleSlide } from '@/components/Display/TimelineScheduleSlide';
+import { ChronologicalListSlide } from '@/components/Display/ChronologicalListSlide';
+
 import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
@@ -547,15 +549,17 @@ export function DisplayClientPage() {
   }
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
-  const isModernWellness = designStyle === 'modern-wellness';
-  const isModernTimeline = designStyle === 'modern-timeline';
-  const isModernDesign = isModernWellness || isModernTimeline;
+  const isModernDesign = ['modern-wellness', 'modern-timeline', 'compact-tiles'].includes(designStyle);
 
   const renderContentPanel = () => {
-    if (isModernTimeline) {
-      return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} />;
+    switch (designStyle) {
+      case 'modern-timeline':
+        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} />;
+      case 'compact-tiles':
+        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} />;
+      default:
+        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />;
     }
-    return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />;
   };
 
   // Safety: old configs might contain legacy layout strings; render them as split-view instead of breaking.
@@ -864,7 +868,7 @@ export function DisplayClientPage() {
 
           const topRightInfo = topRightZone ? getZoneInfo(topRightZone.id) : null;
 
-          const leftSize = leftZone?.size || (isModernTimeline ? 65 : 60);
+          const leftSize = leftZone?.size || (designStyle === 'modern-timeline' ? 65 : 60);
           const rightSize = 100 - leftSize;
           const topDurationSec = (topRightSlide?.duration ?? 12);
 
@@ -1267,6 +1271,18 @@ export function DisplayClientPage() {
               )}
             />
           ))}
+        </div>
+      )}
+
+      {/* Offline indicator (production) */}
+      {!ENV_IS_DEV && !isConnected && !isPreviewMode && (
+        <div
+          className="fixed bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium z-50"
+          style={{ backgroundColor: 'rgba(239, 68, 68, 0.85)', color: 'white' }}
+          aria-live="polite"
+        >
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          Offline
         </div>
       )}
 

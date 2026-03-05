@@ -123,10 +123,10 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       try {
         await uploadMutation.mutateAsync(file);
         uploadedCount += 1;
-      } catch (err: any) {
+      } catch (err: unknown) {
         failedUploads.push({
           file,
-          message: err?.message || 'Upload fehlgeschlagen',
+          message: err instanceof Error ? err.message : 'Upload fehlgeschlagen',
         });
       } finally {
         setUploadProgress({ uploaded: uploadedCount, total: filesToUpload.length });
