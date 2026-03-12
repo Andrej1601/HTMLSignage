@@ -443,7 +443,6 @@ export function SlideshowPage() {
               : 'Globaler Stand'
           }
           icon={SlidersHorizontal}
-          badges={isDirty ? [{ label: 'Ungespeichert', tone: 'warning' as const }] : []}
           actions={
             <div className="flex gap-2">
               <Button variant="ghost" icon={RefreshCw} onClick={handleReloadCurrent} disabled={isBusy}>
@@ -462,6 +461,16 @@ export function SlideshowPage() {
             </div>
           }
         />
+
+        {isDirty && (
+          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3 shadow-sm">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+            </span>
+            <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
+          </div>
+        )}
 
         <SectionCard
           title="Geräte-Ausspielung"
@@ -486,36 +495,34 @@ export function SlideshowPage() {
             </div>
           }
         >
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {/* Global Slideshow Card */}
             <div
               onClick={() => handleSelectTarget('global')}
-              className={`rounded-lg border p-4 cursor-pointer transition-colors ${
+              className={`rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${
                 target === 'global'
                   ? 'border-spa-primary bg-spa-primary/5'
                   : 'border-spa-bg-secondary hover:border-spa-primary/30'
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0 p-2 rounded-lg bg-spa-primary/10">
-                  <SlidersHorizontal className="h-5 w-5 text-spa-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-spa-text-primary">Globale Slideshow</p>
-                  <p className="text-xs text-spa-text-secondary mt-0.5">
-                    Standard-Konfiguration für alle Geräte im Auto-Modus
-                  </p>
-                </div>
+                <SlidersHorizontal className="h-4 w-4 text-spa-primary flex-shrink-0" />
+                <span className="font-semibold text-sm text-spa-text-primary flex-1">Globale Slideshow</span>
                 {target === 'global' && (
-                  <StatusBadge label="Im Editor aktiv" tone="success" showDot={false} />
+                  <StatusBadge label="Im Editor" tone="success" showDot={false} />
                 )}
               </div>
+              {target === 'global' && (
+                <p className="text-xs text-spa-text-secondary mt-1 ml-7">
+                  Standard-Konfiguration für alle Geräte im Auto-Modus
+                </p>
+              )}
             </div>
 
             {/* Device Cards */}
             {pairedDevices.length === 0 ? (
-              <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 p-6 text-center text-sm text-spa-text-secondary">
-                <Monitor className="w-10 h-10 text-spa-text-secondary mx-auto mb-2" />
+              <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 px-4 py-6 text-center text-sm text-spa-text-secondary">
+                <Monitor className="w-8 h-8 text-spa-text-secondary mx-auto mb-2" />
                 Keine gekoppelten Displays vorhanden.
               </div>
             ) : (
@@ -529,51 +536,39 @@ export function SlideshowPage() {
                   <div
                     key={device.id}
                     onClick={() => handleSelectTarget(toDeviceTarget(device.id))}
-                    className={`rounded-lg border-2 p-4 cursor-pointer transition-all ${
+                    className={`rounded-lg border px-4 py-2.5 cursor-pointer transition-all ${
                       isSelected
-                        ? 'border-spa-primary bg-spa-primary/5 shadow-sm'
-                        : 'border-spa-bg-secondary hover:border-spa-primary/40 hover:shadow-sm'
+                        ? 'border-spa-primary bg-spa-primary/5'
+                        : 'border-spa-bg-secondary hover:border-spa-primary/30'
                     }`}
                   >
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      {/* Device Info */}
-                      <div className="flex items-center gap-3 lg:flex-1 min-w-0">
-                        <div className={`flex-shrink-0 p-2 rounded-lg ${isSelected ? 'bg-spa-primary/10' : 'bg-spa-bg-primary'}`}>
-                          <Monitor className="h-5 w-5 text-spa-primary" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-spa-text-primary">{device.name}</p>
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor}`}>
-                              <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                              {getStatusLabel(status)}
-                            </span>
-                            {isSelected && (
-                              <StatusBadge label="Im Editor" tone="success" showDot={false} />
-                            )}
-                          </div>
-                          <p className="text-xs text-spa-text-secondary mt-0.5">{source.detail}</p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColor}`}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {getStatusLabel(status)}
+                      </span>
+                      <span className="font-semibold text-sm text-spa-text-primary flex-1 min-w-0 truncate">{device.name}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={device.mode}
+                          onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
+                          disabled={updateDevice.isPending}
+                          className="rounded-lg border border-spa-bg-secondary px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
+                        >
+                          <option value="auto">{getModeLabel('auto')}</option>
+                          <option value="override">{getModeLabel('override')}</option>
+                        </select>
                       </div>
-
-                      {/* Mode + Source */}
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <select
-                            value={device.mode}
-                            onChange={(event) => handleDeviceModeChange(device, event.target.value as 'auto' | 'override')}
-                            disabled={updateDevice.isPending}
-                            className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-60"
-                          >
-                            <option value="auto">{getModeLabel('auto')}</option>
-                            <option value="override">{getModeLabel('override')}</option>
-                          </select>
-                        </div>
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap ${source.badgeClass}`}>
-                          {source.label}
-                        </span>
-                      </div>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${source.badgeClass}`}>
+                        {source.label}
+                      </span>
+                      {isSelected && (
+                        <StatusBadge label="Im Editor" tone="success" showDot={false} />
+                      )}
                     </div>
+                    {isSelected && (
+                      <p className="text-xs text-spa-text-secondary mt-1 ml-[72px]">{source.detail}</p>
+                    )}
                   </div>
                 );
               })

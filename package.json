@@ -11,7 +11,11 @@
     "db:migrate": "pnpm --filter backend db:migrate",
     "db:studio": "pnpm --filter backend db:studio",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "kiosk": "pnpm --filter @htmlsignage/kiosk start",
+    "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
+    "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
+    "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -12,12 +12,14 @@ import {
   createEmptySlide,
   getEnabledSlides,
   getSlidesByZone,
+  getSlideTypeOption,
   getZonesForLayout,
   reorderSlides,
 } from '@/types/slideshow.types';
 import { Edit, Eye, EyeOff, GripVertical, Layers, Plus, Play, Trash2 } from 'lucide-react';
 import { SectionCard } from '@/components/SectionCard';
 import { Button } from '@/components/Button';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import clsx from 'clsx';
 import {
   DndContext,
@@ -113,13 +115,16 @@ function SortableSlideItem({
 
   const dragHandleProps = disabled ? {} : { ...attributes, ...listeners };
 
+  const typeOption = getSlideTypeOption(slide.type);
+  const typeLabel = typeOption?.label || slide.type;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'p-4 flex items-center gap-4 hover:bg-spa-bg-primary/50 transition-colors',
-        !slide.enabled && 'opacity-50',
+        'px-3 py-2.5 flex items-center gap-3 hover:bg-spa-bg-primary/50 transition-colors',
+        !slide.enabled && 'opacity-40',
         isDragging && 'z-50 shadow-lg'
       )}
     >
@@ -130,34 +135,41 @@ function SortableSlideItem({
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'
         )}
       >
-        <GripVertical className="w-5 h-5 text-spa-text-secondary hover:text-spa-primary" />
+        <GripVertical className="w-4 h-4 text-spa-text-secondary hover:text-spa-primary" />
       </div>
 
       <SlidePreview slide={slide} />
 
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-spa-primary text-white flex items-center justify-center font-bold text-sm">
+      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-spa-primary text-white flex items-center justify-center font-bold text-xs">
         {index + 1}
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="font-semibold text-spa-text-primary">{slide.title || slide.type}</span>
-          <span className="text-xs px-2 py-0.5 bg-spa-secondary/20 text-spa-secondary-dark rounded-full">
-            {slide.type}
+        <div className="flex items-center gap-2">
+          <span className={clsx('font-semibold text-sm text-spa-text-primary', !slide.enabled && 'line-through')}>
+            {slide.title || typeLabel}
           </span>
+          <span className="text-[11px] px-2 py-0.5 bg-spa-secondary/15 text-spa-secondary-dark rounded-full">
+            {typeLabel}
+          </span>
+          {!slide.enabled && (
+            <span className="text-[11px] px-2 py-0.5 bg-spa-error-light text-spa-error-dark rounded-full font-medium">
+              Deaktiviert
+            </span>
+          )}
         </div>
-        <div className="text-sm text-spa-text-secondary">
-          Dauer: {slide.duration}s
-          {slide.transition && ` • Übergang: ${slide.transition}`}
+        <div className="text-xs text-spa-text-secondary mt-0.5">
+          {slide.duration}s
+          {slide.transition && slide.transition !== 'none' && ` · ${slide.transition}`}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <button
           onClick={() => onToggleEnabled(slide.id)}
           disabled={disabled}
           className={clsx(
-            'p-2 rounded-md transition-colors disabled:opacity-40',
+            'p-1.5 rounded-md transition-colors disabled:opacity-40',
             slide.enabled
               ? 'text-spa-primary hover:bg-spa-primary/10'
               : 'text-spa-text-secondary hover:bg-spa-bg-secondary'
@@ -165,27 +177,27 @@ function SortableSlideItem({
           title={slide.enabled ? 'Deaktivieren' : 'Aktivieren'}
           aria-label={slide.enabled ? 'Slide deaktivieren' : 'Slide aktivieren'}
         >
-          {slide.enabled ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+          {slide.enabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>
 
         <button
           onClick={() => onEdit(slide)}
           disabled={disabled}
-          className="p-2 text-spa-secondary hover:bg-spa-secondary/10 rounded-md transition-colors disabled:opacity-40"
+          className="p-1.5 text-spa-secondary hover:bg-spa-secondary/10 rounded-md transition-colors disabled:opacity-40"
           title="Bearbeiten"
           aria-label="Slide bearbeiten"
         >
-          <Edit className="w-5 h-5" />
+          <Edit className="w-4 h-4" />
         </button>
 
         <button
           onClick={() => onDelete(slide.id)}
           disabled={disabled}
-          className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors disabled:opacity-40"
+          className="p-1.5 text-spa-error hover:bg-spa-error-light rounded-md transition-colors disabled:opacity-40"
           title="Löschen"
           aria-label="Slide löschen"
         >
-          <Trash2 className="w-5 h-5" />
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -214,6 +226,7 @@ export function SlideshowConfigPanel({
   const [editingSlide, setEditingSlide] = useState<SlideConfig | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
+  const [deletingSlideId, setDeletingSlideId] = useState<string | null>(null);
 
   const zones = useMemo(() => getZonesForLayout(config.layout), [config.layout]);
   const enabledSlides = useMemo(() => getEnabledSlides(config), [config]);
@@ -294,14 +307,18 @@ export function SlideshowConfigPanel({
   };
 
   const handleDeleteSlide = (id: string) => {
-    if (!window.confirm('Möchtest du diesen Slide wirklich löschen?')) return;
+    setDeletingSlideId(id);
+  };
 
-    const targetSlide = config.slides.find((slide) => slide.id === id);
-    if (!targetSlide) return;
+  const confirmDeleteSlide = () => {
+    if (!deletingSlideId) return;
+
+    const targetSlide = config.slides.find((slide) => slide.id === deletingSlideId);
+    if (!targetSlide) { setDeletingSlideId(null); return; }
 
     const zoneId = targetSlide.zoneId || 'main';
     const zoneSlides = getSlidesByZone(config.slides, zoneId)
-      .filter((slide) => slide.id !== id)
+      .filter((slide) => slide.id !== deletingSlideId)
       .map((slide, index) => ({
         ...slide,
         zoneId,
@@ -309,6 +326,7 @@ export function SlideshowConfigPanel({
       }));
 
     onChange(replaceZoneSlides(config, zoneId, zoneSlides));
+    setDeletingSlideId(null);
   };
 
   const handleToggleEnabled = (id: string) => {
@@ -414,6 +432,14 @@ export function SlideshowConfigPanel({
         onLayoutChange={handleLayoutChange}
       />
 
+      <GlobalSlideshowSettings
+        config={config}
+        prestartMinutes={prestartMinutes}
+        disabled={disabled}
+        onChange={onChange}
+        onPrestartMinutesChange={onPrestartMinutesChange}
+      />
+
       <SectionCard
         title="Slides nach Zone"
         description={`${config.slides.length} Slide${config.slides.length !== 1 ? 's' : ''} konfiguriert (${enabledSlides.length} aktiv). Per Drag & Drop die Reihenfolge ändern.`}
@@ -465,7 +491,22 @@ export function SlideshowConfigPanel({
 
                   {zoneSlides.length === 0 ? (
                     <div className="p-8 text-center">
-                      <p className="text-spa-text-secondary text-sm">Keine Slides in dieser Zone</p>
+                      <Layers className="w-8 h-8 text-spa-text-secondary mx-auto mb-2" />
+                      <p className="text-sm font-medium text-spa-text-secondary mb-1">Noch keine Slides</p>
+                      <p className="text-xs text-spa-text-secondary mb-3">
+                        {zone.type === 'persistent'
+                          ? 'Persistente Zone — Inhalt wird dauerhaft angezeigt.'
+                          : 'Rotierende Zone — Slides wechseln automatisch.'}
+                      </p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={Plus}
+                        onClick={() => handleAddSlide(zone.id)}
+                        disabled={disabled}
+                      >
+                        Slide hinzufügen
+                      </Button>
                     </div>
                   ) : (
                     <DndContext
@@ -500,14 +541,6 @@ export function SlideshowConfigPanel({
         )}
       </SectionCard>
 
-      <GlobalSlideshowSettings
-        config={config}
-        prestartMinutes={prestartMinutes}
-        disabled={disabled}
-        onChange={onChange}
-        onPrestartMinutesChange={onPrestartMinutesChange}
-      />
-
       {showOpenPreviewButton && (
         <div className="flex justify-end">
           <Button
@@ -532,6 +565,16 @@ export function SlideshowConfigPanel({
             ? handleSaveEditSlide(slide as SlideConfig)
             : handleSaveNewSlide(slide as Omit<SlideConfig, 'id'>)
         )}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deletingSlideId)}
+        title="Slide löschen?"
+        message={`Möchtest du diesen Slide wirklich löschen?`}
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={confirmDeleteSlide}
+        onCancel={() => setDeletingSlideId(null)}
       />
     </div>
   );
