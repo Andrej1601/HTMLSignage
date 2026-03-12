@@ -115,6 +115,57 @@ export interface Aroma {
   id: string;
   emoji: string;
   name: string;
+  color?: string; // hex color for badge, e.g. '#059669'
+}
+
+// 12 distinguishable colors for aroma badges (used as fallback when no color is set)
+export const AROMA_COLOR_PALETTE = [
+  '#059669', // emerald
+  '#d97706', // amber
+  '#7c3aed', // violet
+  '#db2777', // pink
+  '#0284c7', // sky
+  '#16a34a', // green
+  '#ea580c', // orange
+  '#0891b2', // cyan
+  '#4f46e5', // indigo
+  '#ca8a04', // yellow
+  '#9333ea', // purple
+  '#dc2626', // red
+] as const;
+
+/** Returns inline-style colors for an aroma badge. */
+export function getAromaDisplayColor(hex: string): {
+  bg: string; text: string; border: string;
+} {
+  return {
+    bg: `${hex}18`,
+    text: hex,
+    border: `${hex}40`,
+  };
+}
+
+/** Resolve a badge name to its aroma metadata + palette index. */
+export function resolveAromaForBadge(
+  badgeName: string,
+  aromas: Aroma[],
+): { emoji: string; name: string; color: string; index: number } {
+  const cleaned = badgeName.trim();
+  const idx = aromas.findIndex((a) => a.name.toLowerCase() === cleaned.toLowerCase());
+  if (idx >= 0) {
+    const a = aromas[idx];
+    return {
+      emoji: a.emoji,
+      name: a.name,
+      color: a.color || AROMA_COLOR_PALETTE[idx % AROMA_COLOR_PALETTE.length],
+      index: idx,
+    };
+  }
+  // Unknown aroma — hash name to pick a stable palette color
+  let hash = 0;
+  for (let i = 0; i < cleaned.length; i++) hash = (hash * 31 + cleaned.charCodeAt(i)) | 0;
+  const fallbackIdx = Math.abs(hash) % AROMA_COLOR_PALETTE.length;
+  return { emoji: '', name: cleaned, color: AROMA_COLOR_PALETTE[fallbackIdx], index: -1 };
 }
 
 // Info item (wellness tip / house rule / notice) shown in display.

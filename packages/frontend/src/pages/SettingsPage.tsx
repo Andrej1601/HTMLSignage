@@ -10,7 +10,7 @@ import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { EventManager } from '@/components/Settings/EventManager';
 import { SystemMaintenance } from '@/components/Settings/SystemMaintenance';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePermission } from '@/hooks/usePermission';
 import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type {
   Settings,
@@ -30,11 +30,10 @@ type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events' | 'system';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
-  const { user } = useAuth();
+  const canSystem = usePermission('system:manage');
   const [activeTab, setActiveTab] = useState<TabId>('theme');
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const isAdmin = Boolean(user?.roles.includes('admin'));
 
   useEffect(() => {
     if (settings) {
@@ -120,11 +119,11 @@ export function SettingsPage() {
       { id: 'infos', label: 'Infos', icon: Info },
       { id: 'events', label: 'Events', icon: Calendar },
     ];
-    if (isAdmin) {
+    if (canSystem) {
       items.push({ id: 'system', label: 'System', icon: Wrench });
     }
     return items;
-  }, [isAdmin]);
+  }, [canSystem]);
 
   if (isLoading) {
     return (
@@ -218,7 +217,7 @@ export function SettingsPage() {
             </TabPanel>
 
             <TabPanel id="system" activeTab={activeTab}>
-              {isAdmin && <SystemMaintenance />}
+              {canSystem && <SystemMaintenance />}
             </TabPanel>
           </div>
         </SectionCard>

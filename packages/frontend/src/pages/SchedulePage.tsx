@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
@@ -91,6 +91,16 @@ export function SchedulePage() {
       }
     }
   }, [settings?.saunas, localSchedule, editingPreset]);
+
+  const saunaColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (settings?.saunas) {
+      for (const s of settings.saunas) {
+        if (s.color) map[s.name] = s.color;
+      }
+    }
+    return map;
+  }, [settings?.saunas]);
 
   const now = new Date(eventClock);
   const livePreset: PresetKey = localSchedule
@@ -329,7 +339,7 @@ export function SchedulePage() {
                 </Button>
               )}
 
-              <Button variant="ghost" icon={RefreshCw} onClick={() => refetch()} disabled={isLoading}>
+              <Button variant="ghost" icon={RefreshCw} onClick={() => { setLocalSchedule(null); setIsDirty(false); refetch(); }} disabled={isLoading}>
                 Neu laden
               </Button>
 
@@ -338,12 +348,18 @@ export function SchedulePage() {
               </Button>
             </div>
           )}
-          badges={[
-            { label: `Live: ${PRESET_LABELS[livePreset]}`, tone: 'success' },
-            { label: `Bearbeitung: ${PRESET_LABELS[editingPreset]}`, tone: 'info' },
-            ...(isDirty ? [{ label: 'Ungespeichert', tone: 'warning' as const }] : []),
-          ]}
         />
+
+        {/* Unsaved changes banner */}
+        {isDirty && (
+          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3 shadow-sm">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
+            </span>
+            <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
+          </div>
+        )}
 
         {/* Preset Tabs */}
         <SectionCard title="Preset-Auswahl" icon={CalendarClock}>
@@ -525,6 +541,8 @@ export function SchedulePage() {
           <SectionCard title={`Tagesplan: ${PRESET_LABELS[editingPreset]}`} noPadding>
             <ScheduleGrid
               daySchedule={currentDaySchedule}
+              aromas={settings?.aromas || []}
+              saunaColors={saunaColors}
               onEditCell={handleEditCell}
               onEditTime={handleEditTime}
               onAddTimeRow={handleAddTimeRow}

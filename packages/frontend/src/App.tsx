@@ -42,13 +42,13 @@ function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/display" element={<DisplayClientPage />} />
               <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-              <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
-              <Route path="/saunas" element={<ProtectedRoute><SaunasPage /></ProtectedRoute>} />
-              <Route path="/slideshow" element={<ProtectedRoute><SlideshowPage /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/devices" element={<ProtectedRoute><DevicesPage /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
-              <Route path="/media" element={<ProtectedRoute><MediaPage /></ProtectedRoute>} />
+              <Route path="/schedule" element={<ProtectedRoute permission="schedule:write"><SchedulePage /></ProtectedRoute>} />
+              <Route path="/saunas" element={<ProtectedRoute permission="saunas:read"><SaunasPage /></ProtectedRoute>} />
+              <Route path="/slideshow" element={<ProtectedRoute permission="slideshow:manage"><SlideshowPage /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute permission="settings:manage"><SettingsPage /></ProtectedRoute>} />
+              <Route path="/devices" element={<ProtectedRoute permission="devices:manage"><DevicesPage /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute permission="users:manage"><UsersPage /></ProtectedRoute>} />
+              <Route path="/media" element={<ProtectedRoute permission="media:manage"><MediaPage /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

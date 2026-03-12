@@ -8,6 +8,8 @@ import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget'
 import { PageHeader } from '@/components/PageHeader';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermission';
+import type { Permission } from '@/utils/permissions';
 import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { PRESET_LABELS } from '@/types/schedule.types';
@@ -29,6 +31,7 @@ import {
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const perms = usePermissions();
   const widgetStorageKey = `htmlsignage_dashboard_widgets_${user?.id || 'anonymous'}`;
   const {
     widgetVisibility,
@@ -81,12 +84,13 @@ export function DashboardPage() {
   const hasRightWidgets =
     widgetVisibility.systemChecks || widgetVisibility.mediaInsights || widgetVisibility.quickActions;
 
-  const quickActions = [
-    { title: 'Aufgussplan bearbeiten', description: 'Wochenplan pflegen und Event-Presets verwalten', icon: Calendar, href: '/schedule', color: 'primary' as const },
-    { title: 'Gerätestatus', description: 'Offline-Displays, Pairings und Modi prüfen', icon: Monitor, href: '/devices', color: 'info' as const },
-    { title: 'Medien aktualisieren', description: 'Bilder, Audio und Video hochladen', icon: Upload, href: '/media', color: 'violet' as const },
-    { title: 'Systemwartung', description: 'Update-Status, Backup-Import und Export', icon: Settings, href: '/settings', color: 'success' as const },
+  const allQuickActions: { title: string; description: string; icon: typeof Calendar; href: string; color: 'primary' | 'info' | 'violet' | 'success'; permission?: Permission }[] = [
+    { title: 'Aufgussplan bearbeiten', description: 'Wochenplan pflegen und Event-Presets verwalten', icon: Calendar, href: '/schedule', color: 'primary', permission: 'schedule:write' },
+    { title: 'Gerätestatus', description: 'Offline-Displays, Pairings und Modi prüfen', icon: Monitor, href: '/devices', color: 'info', permission: 'devices:manage' },
+    { title: 'Medien aktualisieren', description: 'Bilder, Audio und Video hochladen', icon: Upload, href: '/media', color: 'violet', permission: 'media:manage' },
+    { title: 'Systemwartung', description: 'Update-Status, Backup-Import und Export', icon: Settings, href: '/settings', color: 'success', permission: 'settings:manage' },
   ];
+  const quickActions = allQuickActions.filter((a) => !a.permission || perms.has(a.permission));
 
   return (
     <Layout>

@@ -1,7 +1,8 @@
-import { Router, type Response, type NextFunction } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 
 const router = Router();
@@ -23,17 +24,8 @@ const UpdateUserSchema = z.object({
   roles: z.array(z.string()).optional(),
 });
 
-// Middleware to check if user is admin
-function requireAdmin(req: AuthRequest, res: Response, next: NextFunction): void {
-  if (!req.user?.roles.includes('admin')) {
-    res.status(403).json({ error: 'forbidden', message: 'Admin access required' });
-    return;
-  }
-  next();
-}
-
-// GET /api/users - List all users (Admin only)
-router.get('/', requireAdmin, async (req: AuthRequest, res) => {
+// GET /api/users - List all users (requires users:manage)
+router.get('/', requirePermission('users:manage'), async (req: AuthRequest, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -55,7 +47,7 @@ router.get('/', requireAdmin, async (req: AuthRequest, res) => {
 });
 
 // POST /api/users - Create new user (Admin only)
-router.post('/', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateUserSchema.parse(req.body);
 
@@ -109,7 +101,7 @@ router.post('/', requireAdmin, mutationLimiter, async (req: AuthRequest, res) =>
 });
 
 // PATCH /api/users/:id - Update user (Admin only)
-router.patch('/:id', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
+router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateUserSchema.parse(req.body);
 
@@ -177,7 +169,7 @@ router.patch('/:id', requireAdmin, mutationLimiter, async (req: AuthRequest, res
 });
 
 // DELETE /api/users/:id - Delete user (Admin only)
-router.delete('/:id', requireAdmin, mutationLimiter, async (req: AuthRequest, res) => {
+router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     // Prevent deleting yourself
     if (req.params.id === req.userId) {

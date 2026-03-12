@@ -14,6 +14,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { StatCard } from '@/components/Dashboard/StatCard';
 import { SectionCard } from '@/components/SectionCard';
+import { AVAILABLE_ROLES } from '@/utils/permissions';
 
 interface User {
   id: string;
@@ -169,20 +170,25 @@ export function UsersPage() {
       header: 'Rollen',
       render: (u) => (
         <div className="flex flex-wrap gap-1">
-          {u.roles.map((role) => (
-            <span
-              key={role}
-              className={`px-2 py-1 text-xs font-medium rounded ${
-                role === 'admin'
-                  ? 'bg-spa-warning-light text-spa-warning-dark'
-                  : role === 'editor'
-                  ? 'bg-spa-info-light text-spa-info-dark'
-                  : 'bg-spa-bg-secondary text-spa-text-secondary'
-              }`}
-            >
-              {role}
-            </span>
-          ))}
+          {u.roles.map((role) => {
+            const meta = AVAILABLE_ROLES.find((r) => r.value === role);
+            return (
+              <span
+                key={role}
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  role === 'admin'
+                    ? 'bg-spa-warning-light text-spa-warning-dark'
+                    : role === 'editor'
+                    ? 'bg-spa-info-light text-spa-info-dark'
+                    : role === 'saunameister'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-spa-bg-secondary text-spa-text-secondary'
+                }`}
+              >
+                {meta?.label || role}
+              </span>
+            );
+          })}
         </div>
       ),
     },
@@ -454,15 +460,18 @@ function UserDialog({
             Rollen
           </label>
           <div className="space-y-2">
-            {['admin', 'editor', 'viewer'].map((role) => (
-              <label key={role} className="flex items-center gap-2 cursor-pointer">
+            {AVAILABLE_ROLES.map((role) => (
+              <label key={role.value} className="flex items-start gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={roles.includes(role)}
-                  onChange={() => toggleRole(role)}
-                  className="w-4 h-4 text-spa-primary border-spa-bg-secondary rounded focus:ring-spa-primary"
+                  checked={roles.includes(role.value)}
+                  onChange={() => toggleRole(role.value)}
+                  className="w-4 h-4 mt-0.5 text-spa-primary border-spa-bg-secondary rounded focus:ring-spa-primary"
                 />
-                <span className="text-sm capitalize text-spa-text-primary">{role}</span>
+                <div>
+                  <span className="text-sm font-medium text-spa-text-primary">{role.label}</span>
+                  <p className="text-xs text-spa-text-secondary">{role.description}</p>
+                </div>
               </label>
             ))}
           </div>

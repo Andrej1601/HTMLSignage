@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { normalizeScheduleData, createDefaultSchedule } from '../lib/schedule.js';
 import { computeScheduleChangeSummary } from '../lib/scheduleDiff.js';
@@ -83,7 +84,7 @@ router.get('/history', async (req, res) => {
 });
 
 // POST /api/schedule - Save new schedule (auth required)
-router.post('/', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);

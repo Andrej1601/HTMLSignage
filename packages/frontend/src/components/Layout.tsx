@@ -3,6 +3,7 @@ import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, L
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission, type Permission } from '@/utils/permissions';
 import { useEffect, useMemo, useState } from 'react';
 
 type NavSectionKey = 'operations' | 'content' | 'admin';
@@ -12,6 +13,7 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   section: NavSectionKey;
+  permission?: Permission;
 }
 
 const SECTION_ORDER: NavSectionKey[] = ['operations', 'content', 'admin'];
@@ -34,21 +36,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = useMemo<NavItem[]>(() => {
-    const items: NavItem[] = [
+    const roles = user?.roles ?? [];
+    const allItems: NavItem[] = [
       { name: 'Dashboard', href: '/', icon: Home, section: 'operations' },
-      { name: 'Aufgussplan', href: '/schedule', icon: Calendar, section: 'operations' },
-      { name: 'Geräte', href: '/devices', icon: Monitor, section: 'operations' },
-      { name: 'Slideshow', href: '/slideshow', icon: Presentation, section: 'content' },
-      { name: 'Medien', href: '/media', icon: Image, section: 'content' },
-      { name: 'Saunas', href: '/saunas', icon: Flame, section: 'content' },
-      { name: 'Einstellungen', href: '/settings', icon: Settings, section: 'admin' },
+      { name: 'Aufgussplan', href: '/schedule', icon: Calendar, section: 'operations', permission: 'schedule:write' },
+      { name: 'Geräte', href: '/devices', icon: Monitor, section: 'operations', permission: 'devices:manage' },
+      { name: 'Slideshow', href: '/slideshow', icon: Presentation, section: 'content', permission: 'slideshow:manage' },
+      { name: 'Medien', href: '/media', icon: Image, section: 'content', permission: 'media:manage' },
+      { name: 'Saunas', href: '/saunas', icon: Flame, section: 'content', permission: 'saunas:read' },
+      { name: 'Einstellungen', href: '/settings', icon: Settings, section: 'admin', permission: 'settings:manage' },
+      { name: 'Benutzer', href: '/users', icon: Users, section: 'admin', permission: 'users:manage' },
     ];
 
-    if (user?.roles.includes('admin')) {
-      items.push({ name: 'Benutzer', href: '/users', icon: Users, section: 'admin' });
-    }
-
-    return items;
+    return allItems.filter((item) => !item.permission || hasPermission(roles, item.permission));
   }, [user?.roles]);
 
   const navigationSections = useMemo(() => {

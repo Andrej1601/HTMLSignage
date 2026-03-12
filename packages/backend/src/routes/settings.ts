@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { broadcastSettingsUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 
 const router = Router();
@@ -185,7 +186,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/settings (auth required)
-router.post('/', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, requirePermission('settings:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = SettingsSchema.parse(req.body);
 

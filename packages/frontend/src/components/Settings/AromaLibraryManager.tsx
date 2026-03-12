@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Aroma } from '@/types/settings.types';
+import { AROMA_COLOR_PALETTE, getAromaDisplayColor } from '@/types/settings.types';
 import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -11,19 +12,20 @@ interface AromaLibraryManagerProps {
 export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{ emoji: string; name: string }>({
+  const [formData, setFormData] = useState<{ emoji: string; name: string; color: string }>({
     emoji: '',
     name: '',
+    color: '',
   });
 
   const handleStartAdd = () => {
-    setFormData({ emoji: '🌿', name: '' });
+    setFormData({ emoji: '🌿', name: '', color: '' });
     setIsAdding(true);
     setEditingId(null);
   };
 
   const handleStartEdit = (aroma: Aroma) => {
-    setFormData({ emoji: aroma.emoji, name: aroma.name });
+    setFormData({ emoji: aroma.emoji, name: aroma.name, color: aroma.color || '' });
     setEditingId(aroma.id);
     setIsAdding(false);
   };
@@ -32,19 +34,23 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     if (!formData.name.trim()) return;
 
     if (isAdding) {
-      // Add new aroma
       const newAroma: Aroma = {
         id: Date.now().toString(),
         emoji: formData.emoji || '🌿',
         name: formData.name.trim(),
+        ...(formData.color ? { color: formData.color } : {}),
       };
       onChange([...aromas, newAroma]);
     } else if (editingId) {
-      // Update existing aroma
       onChange(
         aromas.map((a) =>
           a.id === editingId
-            ? { ...a, emoji: formData.emoji || '🌿', name: formData.name.trim() }
+            ? {
+                ...a,
+                emoji: formData.emoji || '🌿',
+                name: formData.name.trim(),
+                ...(formData.color ? { color: formData.color } : { color: undefined }),
+              }
             : a
         )
       );
@@ -62,7 +68,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
   const handleCancel = () => {
     setIsAdding(false);
     setEditingId(null);
-    setFormData({ emoji: '', name: '' });
+    setFormData({ emoji: '', name: '', color: '' });
   };
 
   // Emoji categories for better organization
@@ -161,6 +167,45 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                 autoFocus
               />
             </div>
+
+            {/* Color Picker */}
+            <div>
+              <label className="block text-sm font-medium text-spa-text-primary mb-2">
+                Badge-Farbe
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {AROMA_COLOR_PALETTE.map((hex) => {
+                  const isSelected = formData.color === hex;
+                  return (
+                    <button
+                      key={hex}
+                      onClick={() => setFormData({ ...formData, color: isSelected ? '' : hex })}
+                      className={clsx(
+                        'w-8 h-8 rounded-full border-2 transition-all hover:scale-110',
+                        isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-transparent'
+                      )}
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                    />
+                  );
+                })}
+              </div>
+              {formData.color && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium border"
+                    style={{
+                      ...(() => {
+                        const c = getAromaDisplayColor(formData.color);
+                        return { backgroundColor: c.bg, color: c.text, borderColor: c.border };
+                      })(),
+                    }}
+                  >
+                    {formData.emoji} {formData.name || 'Vorschau'}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-2 mt-4">
@@ -185,14 +230,22 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
 
       {/* Aroma List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {aromas.map((aroma) => (
+        {aromas.map((aroma, aromaIdx) => {
+          const hex = aroma.color || AROMA_COLOR_PALETTE[aromaIdx % AROMA_COLOR_PALETTE.length];
+          const dc = getAromaDisplayColor(hex);
+          return (
           <div
             key={aroma.id}
-            className="flex items-center justify-between p-3 bg-white border border-spa-bg-secondary rounded-md hover:shadow-sm transition-shadow"
+            className="flex items-center justify-between p-3 bg-white border rounded-md hover:shadow-sm transition-shadow"
+            style={{ borderColor: dc.border }}
           >
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{aroma.emoji}</span>
-              <span className="font-medium text-spa-text-primary">{aroma.name}</span>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium border"
+                style={{ backgroundColor: dc.bg, color: dc.text, borderColor: dc.border }}
+              >
+                {aroma.emoji} {aroma.name}
+              </span>
             </div>
             <div className="flex gap-1">
               <button
@@ -213,7 +266,8 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {aromas.length === 0 && !isAdding && (

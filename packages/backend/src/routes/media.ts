@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import fs from 'fs';
 import path from 'path';
@@ -137,7 +138,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/media/upload - Upload file (auth required)
-router.post('/upload', authMiddleware, mutationLimiter, upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/upload', authMiddleware, requirePermission('media:manage'), mutationLimiter, upload.single('file'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'no-file-uploaded', message: 'Keine Datei hochgeladen' });
@@ -178,7 +179,7 @@ router.post('/upload', authMiddleware, mutationLimiter, upload.single('file'), a
 });
 
 // PATCH /api/media/:id/tags - Update media tags (auth required)
-router.patch('/:id/tags', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const tags = normalizeTags(req.body?.tags);
     const media = await prisma.media.update({
@@ -205,7 +206,7 @@ router.patch('/:id/tags', authMiddleware, mutationLimiter, async (req: AuthReque
 });
 
 // DELETE /api/media/:id - Delete media (auth required)
-router.delete('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const media = await prisma.media.findUnique({
       where: { id: req.params.id },

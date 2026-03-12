@@ -12,6 +12,9 @@ import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
+import { usePermission } from '@/hooks/usePermission';
+import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
+import api from '@/services/api';
 import {
   DndContext,
   closestCenter,
@@ -34,6 +37,7 @@ function generateId(): string {
 
 export function SaunasPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
+  const canManage = usePermission('saunas:manage');
 
   const [localSaunas, setLocalSaunas] = useState<Sauna[]>([]);
   const [isDirty, setIsDirty] = useState(false);
@@ -166,6 +170,17 @@ export function SaunasPage() {
     refetch();
   };
 
+  // Saunameister: change status via dedicated endpoint (no settings:manage needed)
+  const handleStatusChange = async (saunaId: string, status: Sauna['status']) => {
+    try {
+      await api.patch(`/saunas/${saunaId}/status`, { status });
+      // Update local state optimistically
+      setLocalSaunas((prev) => prev.map((s) => s.id === saunaId ? { ...s, status } : s));
+    } catch (err) {
+      console.error('[saunas] Status update failed:', err);
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -195,12 +210,16 @@ export function SaunasPage() {
               <Button variant="ghost" icon={RefreshCw} onClick={handleReload} disabled={isLoading}>
                 Neu laden
               </Button>
-              <Button icon={Save} onClick={handleSaveAll} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
-                Speichern
-              </Button>
-              <Button variant="secondary" icon={Plus} onClick={handleAddSauna}>
-                Neue Sauna
-              </Button>
+              {canManage && (
+                <>
+                  <Button icon={Save} onClick={handleSaveAll} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
+                    Speichern
+                  </Button>
+                  <Button variant="secondary" icon={Plus} onClick={handleAddSauna}>
+                    Neue Sauna
+                  </Button>
+                </>
+              )}
             </>
           )}
           badges={[
@@ -221,15 +240,21 @@ export function SaunasPage() {
         </SectionCard>
 
         {/* Saunas Grid */}
-        <SectionCard title="Saunas" description="Per Drag & Drop die Reihenfolge ändern." icon={Flame}>
+        <SectionCard
+          title="Saunas"
+          description={canManage ? 'Per Drag & Drop die Reihenfolge ändern.' : 'Status der Saunas ändern.'}
+          icon={Flame}
+        >
           {localSaunas.length === 0 ? (
             <div className="py-8 text-center">
               <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
-              <Button icon={Plus} onClick={handleAddSauna}>
-                Erste Sauna hinzufügen
-              </Button>
+              {canManage && (
+                <Button icon={Plus} onClick={handleAddSauna}>
+                  Erste Sauna hinzufügen
+                </Button>
+              )}
             </div>
-          ) : (
+          ) : canManage ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={sortedIds} strategy={rectSortingStrategy}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -244,6 +269,38 @@ export function SaunasPage() {
                 </div>
               </SortableContext>
             </DndContext>
+          ) : (
+            /* Saunameister view: status-only cards */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sortedSaunas.map((sauna) => (
+                <div
+                  key={sauna.id}
+                  className="rounded-lg border border-spa-bg-secondary bg-white p-4 flex items-center gap-4"
+                  style={{ borderLeftWidth: 4, borderLeftColor: sauna.color || '#10b981' }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-spa-text-primary">{sauna.name}</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: SAUNA_STATUS_COLORS[sauna.status] }}
+                      />
+                      <span className="text-xs text-spa-text-secondary">{SAUNA_STATUS_LABELS[sauna.status]}</span>
+                    </div>
+                  </div>
+                  <select
+                    value={sauna.status}
+                    onChange={(e) => handleStatusChange(sauna.id, e.target.value as Sauna['status'])}
+                    className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  >
+                    <option value="active">Aufgüsse</option>
+                    <option value="no-aufguss">Keine Aufgüsse</option>
+                    <option value="out-of-order">Außer Betrieb</option>
+                    <option value="hidden">Ausgeblendet</option>
+                  </select>
+                </div>
+              ))}
+            </div>
           )}
         </SectionCard>
 

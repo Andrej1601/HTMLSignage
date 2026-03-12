@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { isPlainRecord, deepMerge } from '../lib/utils.js';
 import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
@@ -66,7 +67,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/devices/pending - Get all devices pending pairing (admin only)
 // IMPORTANT: Must be before /:id route to avoid "pending" being interpreted as an ID
-router.get('/pending', authMiddleware, async (req: AuthRequest, res) => {
+router.get('/pending', authMiddleware, requirePermission('devices:manage'), async (req: AuthRequest, res) => {
   try {
     const devices = await prisma.device.findMany({
       where: {
@@ -162,7 +163,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/devices - Create new device (auth required)
-router.post('/', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateDeviceSchema.parse(req.body);
 
@@ -190,7 +191,7 @@ router.post('/', authMiddleware, mutationLimiter, async (req: AuthRequest, res) 
 });
 
 // PATCH /api/devices/:id - Update device (auth required)
-router.patch('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
 
@@ -215,7 +216,7 @@ router.patch('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, r
 });
 
 // DELETE /api/devices/:id - Delete device (auth required)
-router.delete('/:id', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.device.delete({
       where: { id: req.params.id },
@@ -246,7 +247,7 @@ router.post('/:id/heartbeat', async (req, res) => {
 });
 
 // POST /api/devices/:id/control - Send control command (auth required)
-router.post('/:id/control', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/:id/control', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = ControlCommandSchema.parse(req.body);
 
@@ -266,7 +267,7 @@ router.post('/:id/control', authMiddleware, mutationLimiter, async (req: AuthReq
 });
 
 // POST /api/devices/:id/overrides - Set device overrides (auth required)
-router.post('/:id/overrides', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = OverridesSchema.parse(req.body);
 
@@ -308,7 +309,7 @@ router.post('/:id/overrides', authMiddleware, mutationLimiter, async (req: AuthR
 });
 
 // DELETE /api/devices/:id/overrides - Clear device overrides (auth required)
-router.delete('/:id/overrides', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.deviceOverride.deleteMany({
       where: { deviceId: req.params.id },
@@ -404,7 +405,7 @@ router.post('/request-pairing', async (req, res) => {
 });
 
 // POST /api/devices/pair - Pair a device using pairing code (called by admin)
-router.post('/pair', authMiddleware, mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/pair', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = PairDeviceSchema.parse(req.body);
 
