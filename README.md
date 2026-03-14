@@ -98,7 +98,7 @@ Auf Zielmaschine:
 ### Schritt-fuer-Schritt
 ```bash
 sudo apt update
-sudo apt install -y git curl ca-certificates
+sudo apt install -y git curl ca-certificates openssl
 
 git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
@@ -108,13 +108,13 @@ sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 
 ### Was der Installer automatisch macht
 1. Systempakete installieren/aktualisieren
-2. Neueste verfuegbare Node.js-Version von NodeSource installieren (`setup_current.x`)
-3. pnpm via corepack aktivieren
+2. Node.js `NODE_MAJOR` von NodeSource installieren (falls lokal zu alt)
+3. pnpm robust installieren (corepack bevorzugt, npm fallback)
 4. Repository auf `main` klonen/aktualisieren
-5. Dependencies installieren (`pnpm install --no-frozen-lockfile`)
+5. Dependencies installieren (`pnpm install --force --no-frozen-lockfile`)
 6. PostgreSQL einrichten (DB + User)
 7. `.env`-Dateien fuer Backend/Frontend erzeugen
-8. Prisma Client generieren + Migrationen ausfuehren
+8. Prisma v7 Client generieren + Migrationen ausfuehren
 9. Frontend/Backend bauen
 10. systemd-Services erstellen und starten:
    - `htmlsignage-backend.service`
@@ -143,6 +143,8 @@ sudo \
   APP_USER="$USER" \
   APP_DIR="/opt/HTMLSignage" \
   BRANCH="main" \
+  CLEAN_INSTALL="false" \
+  APT_UPGRADE="false" \
   DB_NAME="htmlsignage" \
   DB_USER="signage" \
   DB_PASS="<starkes-passwort>" \
@@ -151,6 +153,7 @@ sudo \
   FRONTEND_URL="*" \
   VITE_API_URL="" \
   JWT_SECRET="<starkes-secret>" \
+  SKIP_HEALTHCHECKS="false" \
   bash scripts/install-new-machine.sh
 ```
 
@@ -158,12 +161,15 @@ Bedeutung:
 - `APP_USER`: Linux-User, unter dem Services laufen
 - `APP_DIR`: Installationspfad
 - `BRANCH`: Git-Branch fuer Deployment
+- `CLEAN_INSTALL`: `true` = vorhandenes Repo-Verzeichnis komplett entfernen und frisch klonen
+- `APT_UPGRADE`: `true` = `apt-get upgrade -y` waehrend Installation ausfuehren
 - `DB_*`: PostgreSQL-Zugang
 - `BACKEND_PORT`, `FRONTEND_PORT`: Service-Ports
 - `FRONTEND_URL`: CORS-Whitelist (`*` erlaubt alle)
 - `VITE_API_URL`: Optional feste API-URL fuer Frontend-Build
   - leer: Frontend nutzt dynamischen Fallback (Host der aktuellen Seite + Port 3000)
 - `JWT_SECRET`: Signierschluessel fuer Auth-Tokens
+- `SKIP_HEALTHCHECKS`: `true` = Healthchecks am Ende ueberspringen
 
 ## Erstkonfiguration nach Installation
 1. Frontend im Browser oeffnen

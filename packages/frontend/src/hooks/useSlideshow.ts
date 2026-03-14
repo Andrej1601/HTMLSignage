@@ -373,6 +373,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     persistentZonePosition: slideshowConfig.persistentZonePosition,
     persistentZoneSize: slideshowConfig.persistentZoneSize,
     enableTransitions: slideshowConfig.enableTransitions,
+    defaultTransition: slideshowConfig.defaultTransition || 'fade',
     showSlideIndicators: slideshowConfig.showSlideIndicators,
     showZoneBorders: slideshowConfig.showZoneBorders !== false,
     nextSlide,

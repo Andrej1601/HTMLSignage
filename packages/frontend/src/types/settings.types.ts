@@ -99,7 +99,7 @@ export interface HeaderSettings {
 }
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type ColorPaletteName =
+export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
   | 'dark'
@@ -107,8 +107,10 @@ export type ColorPaletteName =
   | 'wellness-dark'
   | 'wellness-warm'
   | 'ocean-breeze'
-  | 'alpine-wood'
-  | 'custom';
+  | 'alpine-wood';
+
+// Includes built-in palette IDs and custom palette IDs (cuid strings)
+export type ColorPaletteName = BuiltinPaletteName | (string & {});
 
 // Aroma/Scent for aufguss badges
 export interface Aroma {

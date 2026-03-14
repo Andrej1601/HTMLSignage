@@ -6,7 +6,7 @@ Run these commands on a clean Ubuntu/Debian host:
 
 ```bash
 sudo apt update
-sudo apt install -y git curl ca-certificates
+sudo apt install -y git curl ca-certificates openssl
 
 git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
@@ -38,6 +38,9 @@ You can override defaults when needed:
 sudo \
   APP_USER="$USER" \
   APP_DIR="/opt/HTMLSignage" \
+  BRANCH="main" \
+  CLEAN_INSTALL="false" \
+  APT_UPGRADE="false" \
   DB_NAME="htmlsignage" \
   DB_USER="signage" \
   DB_PASS="strong-db-password" \
@@ -46,6 +49,7 @@ sudo \
   BACKEND_PORT="3000" \
   FRONTEND_PORT="5173" \
   JWT_SECRET="strong-jwt-secret" \
+  SKIP_HEALTHCHECKS="false" \
   bash scripts/install-new-machine.sh
 ```
 

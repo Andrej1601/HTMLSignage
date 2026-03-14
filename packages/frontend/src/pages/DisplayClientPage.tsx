@@ -31,7 +31,7 @@ import { devicesApi } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import {
   PREVIEW_CONFIG_EVENT,
@@ -473,6 +473,7 @@ export function DisplayClientPage() {
     totalSlides,
     layout,
     enableTransitions,
+    defaultTransition,
     showSlideIndicators,
     showZoneBorders,
     onVideoEnded,
@@ -483,6 +484,11 @@ export function DisplayClientPage() {
     settings: effectiveSettings,
     enabled: true,
   });
+
+  const resolveTransition = useCallback(
+    (slide: SlideConfig | null | undefined) => slide?.transition || defaultTransition,
+    [defaultTransition]
+  );
 
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
@@ -665,6 +671,7 @@ export function DisplayClientPage() {
                       slideKey={persistentSlide?.id || 'persistent'}
                       enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                       duration={0.6}
+                      transition={resolveTransition(persistentSlide)}
                     >
                       {renderZoneSlide(persistentSlide, persistentZone)}
                     </SlideTransition>
@@ -682,6 +689,7 @@ export function DisplayClientPage() {
                       slideKey={mainSlide?.id || 'main'}
                       enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
                       duration={0.6}
+                      transition={resolveTransition(mainSlide)}
                     >
                       {renderZoneSlide(mainSlide, mainZone)}
                     </SlideTransition>
@@ -703,6 +711,7 @@ export function DisplayClientPage() {
                       slideKey={mainSlide?.id || 'main'}
                       enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
                       duration={0.6}
+                      transition={resolveTransition(mainSlide)}
                     >
                       {renderZoneSlide(mainSlide, mainZone)}
                     </SlideTransition>
@@ -720,6 +729,7 @@ export function DisplayClientPage() {
                       slideKey={persistentSlide?.id || 'persistent'}
                       enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                       duration={0.6}
+                      transition={resolveTransition(persistentSlide)}
                     >
                       {renderZoneSlide(persistentSlide, persistentZone)}
                     </SlideTransition>
@@ -748,6 +758,7 @@ export function DisplayClientPage() {
                     slideKey={persistentSlide?.id || 'persistent'}
                     enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(persistentSlide)}
                   >
                     {renderZoneSlide(persistentSlide, persistentZone)}
                   </SlideTransition>
@@ -765,6 +776,7 @@ export function DisplayClientPage() {
                     slideKey={mainSlide?.id || 'main'}
                     enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(mainSlide)}
                   >
                     {renderZoneSlide(mainSlide, mainZone)}
                   </SlideTransition>
@@ -786,6 +798,7 @@ export function DisplayClientPage() {
                     slideKey={mainSlide?.id || 'main'}
                     enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(mainSlide)}
                   >
                     {renderZoneSlide(mainSlide, mainZone)}
                   </SlideTransition>
@@ -803,6 +816,7 @@ export function DisplayClientPage() {
                     slideKey={persistentSlide?.id || 'persistent'}
                     enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(persistentSlide)}
                   >
                     {renderZoneSlide(persistentSlide, persistentZone)}
                   </SlideTransition>
@@ -834,6 +848,7 @@ export function DisplayClientPage() {
               slideKey={slide?.id || currentSlideIndex}
               enabled={enableTransitions}
               duration={0.6}
+              transition={resolveTransition(slide)}
             >
               {needsPadding ? (
                 mediaSlide ? (
@@ -866,7 +881,9 @@ export function DisplayClientPage() {
           const topRightSlide = topRightZone ? getZoneSlide(topRightZone.id) : null;
           const bottomRightSlide = bottomRightZone ? getZoneSlide(bottomRightZone.id) : null;
 
+          const leftInfo = leftZone ? getZoneInfo(leftZone.id) : null;
           const topRightInfo = topRightZone ? getZoneInfo(topRightZone.id) : null;
+          const bottomRightInfo = bottomRightZone ? getZoneInfo(bottomRightZone.id) : null;
 
           const leftSize = leftZone?.size || (designStyle === 'modern-timeline' ? 65 : 60);
           const rightSize = 100 - leftSize;
@@ -892,45 +909,34 @@ export function DisplayClientPage() {
                   borderColor: showZoneBorders ? border : undefined,
                 }}
               >
-                <AnimatePresence mode="wait">
+                <SlideTransition
+                  slideKey={leftSlide?.id || `content-panel-${designStyle}`}
+                  enabled={enableTransitions && (leftInfo?.shouldRotate || false)}
+                  duration={0.6}
+                  transition={resolveTransition(leftSlide)}
+                >
                   {!leftSlide || leftSlide.type === 'content-panel' ? (
-                    <motion.div
-                      key={`content-panel-${designStyle}`}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 1 }}
-                      className="w-full h-full"
-                    >
-                      {renderContentPanel()}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key={leftSlide?.id || 'media-left'}
-                      initial={{ x: -100, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: 100, opacity: 0 }}
-                      transition={{ duration: 1.2 }}
-                      className="w-full h-full"
-                    >
-                      {leftSlide?.type?.startsWith('media-') ? (
-                        <div className="p-5 w-full h-full">
-                          <div className="w-full h-full rounded-[2.5rem] overflow-hidden border-[6px] border-white shadow-xl">
-                            <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
-                              slide={leftSlide}
-                              onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                    renderContentPanel()
+                  ) : leftSlide.type?.startsWith('media-') ? (
+                    <div className="p-5 w-full h-full">
+                      <div className="w-full h-full rounded-[2.5rem] overflow-hidden border-[6px] border-white shadow-xl">
+                        <SlideRenderer
+                          schedule={localSchedule}
+                          settings={effectiveSettings}
                           slide={leftSlide}
                           onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                         />
-                      )}
-                    </motion.div>
+                      </div>
+                    </div>
+                  ) : (
+                    <SlideRenderer
+                      schedule={localSchedule}
+                      settings={effectiveSettings}
+                      slide={leftSlide}
+                      onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
+                    />
                   )}
-                </AnimatePresence>
+                </SlideTransition>
               </div>
 
               {/* Right Panel (40%): Detail + Bottom */}
@@ -943,15 +949,13 @@ export function DisplayClientPage() {
               >
                 {/* Right Top */}
                 <div className="flex-1 relative overflow-hidden flex flex-col">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={topRightSlide?.id || topRightInfo?.currentSlideIndex || 0}
-                      initial={{ opacity: 0, x: 30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -30 }}
-                      transition={{ duration: 1.2, ease: 'easeOut' }}
-                      className="absolute inset-0 flex flex-col"
-                    >
+                  <SlideTransition
+                    slideKey={topRightSlide?.id || topRightInfo?.currentSlideIndex || 'top-fallback'}
+                    enabled={enableTransitions && (topRightInfo?.shouldRotate || false)}
+                    duration={0.6}
+                    transition={resolveTransition(topRightSlide)}
+                  >
+                    <div className="absolute inset-0 flex flex-col">
                       {topRightSlide?.type === 'sauna-detail' ? (
                         <SaunaDetailDashboard
                           schedule={localSchedule}
@@ -962,7 +966,9 @@ export function DisplayClientPage() {
                         topRightSlide.type?.startsWith('media-') ? (
                           <div className="p-5 w-full h-full">
                             <div className="w-full h-full rounded-[2.3rem] overflow-hidden border-[6px] border-white shadow-xl">
-                              <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                              <SlideRenderer
+                                schedule={localSchedule}
+                                settings={effectiveSettings}
                                 slide={topRightSlide}
                                 onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                               />
@@ -970,7 +976,9 @@ export function DisplayClientPage() {
                           </div>
                         ) : (
                           <div className="w-full h-full">
-                            <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                            <SlideRenderer
+                              schedule={localSchedule}
+                              settings={effectiveSettings}
                               slide={topRightSlide}
                               onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                             />
@@ -979,8 +987,8 @@ export function DisplayClientPage() {
                       ) : (
                         <SaunaDetailDashboard schedule={localSchedule} settings={effectiveSettings} saunaId={undefined} />
                       )}
-                    </motion.div>
-                  </AnimatePresence>
+                    </div>
+                  </SlideTransition>
                 </div>
 
                 {/* Right Bottom */}
@@ -991,43 +999,38 @@ export function DisplayClientPage() {
                     borderColor: showZoneBorders ? border : undefined,
                   }}
                 >
-                  <AnimatePresence mode="wait">
-                    {bottomRightSlide ? (
-                      <motion.div
-                        key={bottomRightSlide.id || 'bottom-slide'}
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -20, opacity: 0 }}
-                        className="w-full h-full"
-                      >
-                        {bottomRightSlide.type?.startsWith('media-') ? (
+                  <SlideTransition
+                    slideKey={bottomRightSlide?.id || 'bottom-fallback'}
+                    enabled={enableTransitions && (bottomRightInfo?.shouldRotate || false)}
+                    duration={0.6}
+                    transition={resolveTransition(bottomRightSlide)}
+                  >
+                    <div className="w-full h-full">
+                      {bottomRightSlide ? (
+                        bottomRightSlide.type?.startsWith('media-') ? (
                           <div className="p-2 w-full h-full">
                             <div className="w-full h-full rounded-[1.8rem] overflow-hidden border-4 border-white shadow-lg">
-                              <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                              <SlideRenderer
+                                schedule={localSchedule}
+                                settings={effectiveSettings}
                                 slide={bottomRightSlide}
                                 onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                               />
                             </div>
                           </div>
                         ) : (
-                          <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                          <SlideRenderer
+                            schedule={localSchedule}
+                            settings={effectiveSettings}
                             slide={bottomRightSlide}
                             onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                           />
-                        )}
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="bottom-fallback"
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: -20, opacity: 0 }}
-                        className="w-full h-full"
-                      >
+                        )
+                      ) : (
                         <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} media={mediaData} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      )}
+                    </div>
+                  </SlideTransition>
                 </div>
               </div>
 
@@ -1078,6 +1081,7 @@ export function DisplayClientPage() {
                   slideKey={leftSlide?.id || 'left'}
                   enabled={enableTransitions && (leftInfo?.shouldRotate || false)}
                   duration={0.6}
+                  transition={resolveTransition(leftSlide)}
                 >
                   {leftSlide.type === 'content-panel' ? (
                     <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />
@@ -1100,6 +1104,7 @@ export function DisplayClientPage() {
                     slideKey={topRightSlide?.id || `top-right-${topRightSlide?.saunaId || 0}`}
                     enabled={enableTransitions && (topRightInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(topRightSlide)}
                   >
                     {topRightSlide.type === 'sauna-detail' ? (
                       <SaunaDetailDashboard
@@ -1124,6 +1129,7 @@ export function DisplayClientPage() {
                     slideKey={bottomRightSlide?.id || `bottom-right-${bottomRightSlide?.saunaId || 1}`}
                     enabled={enableTransitions && (bottomRightInfo?.shouldRotate || false)}
                     duration={0.6}
+                    transition={resolveTransition(bottomRightSlide)}
                   >
                     {bottomRightSlide.type === 'sauna-detail' ? (
                       <SaunaDetailDashboard
@@ -1210,6 +1216,7 @@ export function DisplayClientPage() {
                         slideKey={slide?.id || `${zone.id}-empty`}
                         enabled={enableTransitions && (info?.shouldRotate || false)}
                         duration={0.6}
+                        transition={resolveTransition(slide)}
                       >
                         {renderCell(zone.id)}
                       </SlideTransition>
@@ -1286,8 +1293,8 @@ export function DisplayClientPage() {
         </div>
       )}
 
-      {/* Connection indicator (dev mode) */}
-      {ENV_IS_DEV && (
+      {/* Connection indicator (dev mode) - toggleable via showSlideIndicators */}
+      {ENV_IS_DEV && showSlideIndicators && (
         <div
           className="fixed top-4 right-4 px-3 py-2 rounded-lg text-xs font-mono z-50"
           style={{

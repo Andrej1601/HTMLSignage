@@ -17,6 +17,7 @@ import usersRouter from './routes/users.js';
 import mediaRouter from './routes/media.js';
 import systemRouter from './routes/system.js';
 import saunasRouter from './routes/saunas.js';
+import palettesRouter from './routes/palettes.js';
 
 
 dotenv.config();
@@ -106,6 +107,7 @@ app.use('/api/devices', devicesRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/saunas', saunasRouter);
+app.use('/api/palettes', palettesRouter);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

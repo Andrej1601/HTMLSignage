@@ -3,7 +3,7 @@ import type { Schedule, ScheduleResponse } from '@/types/schedule.types';
 import { createDefaultSchedule } from '@/types/schedule.types';
 import type { Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
 import type { Media, MediaFilter } from '@/types/media.types';
-import type { Settings } from '@/types/settings.types';
+import type { Settings, ThemeColors } from '@/types/settings.types';
 
 export interface ApiOkResponse {
   ok: boolean;
@@ -350,6 +350,37 @@ export const mediaApi = {
   // Update media tags
   updateMediaTags: async (id: string, tags: string[]): Promise<Media> => {
     const { data } = await api.patch<Media>(`/media/${id}/tags`, { tags });
+    return data;
+  },
+};
+
+// Custom Palettes API
+export interface CustomPalette {
+  id: string;
+  name: string;
+  colors: Partial<ThemeColors>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const palettesApi = {
+  getAll: async (): Promise<CustomPalette[]> => {
+    const { data } = await api.get<CustomPalette[]>('/palettes');
+    return data;
+  },
+
+  create: async (name: string, colors: Partial<ThemeColors>): Promise<CustomPalette> => {
+    const { data } = await api.post<CustomPalette>('/palettes', { name, colors });
+    return data;
+  },
+
+  update: async (id: string, name: string, colors: Partial<ThemeColors>): Promise<CustomPalette> => {
+    const { data } = await api.put<CustomPalette>(`/palettes/${id}`, { name, colors });
+    return data;
+  },
+
+  delete: async (id: string): Promise<ApiOkResponse> => {
+    const { data } = await api.delete<ApiOkResponse>(`/palettes/${id}`);
     return data;
   },
 };
