@@ -21,6 +21,12 @@ export interface CommandResult {
   stderr: string;
 }
 
+export interface RunCommandOptions {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+}
+
 export interface ReleaseInfo {
   tag: string;
   name: string;
@@ -71,16 +77,43 @@ export function trimLog(value: string): string {
   return value.slice(value.length - MAX_UPDATE_LOG_CHARS);
 }
 
-export async function runCommand(command: string, args: string[], cwd = REPO_ROOT): Promise<CommandResult> {
+export async function runCommand(
+  command: string,
+  args: string[],
+  cwdOrOptions: string | RunCommandOptions = REPO_ROOT,
+  maybeOptions?: RunCommandOptions,
+): Promise<CommandResult> {
+  const baseOptions = typeof cwdOrOptions === 'string' ? maybeOptions : cwdOrOptions;
+  const cwd = typeof cwdOrOptions === 'string'
+    ? cwdOrOptions
+    : (cwdOrOptions.cwd || REPO_ROOT);
+  const timeoutMs = Math.max(5000, baseOptions?.timeoutMs ?? 10 * 60 * 1000);
+  const env = {
+    ...process.env,
+    ...(baseOptions?.env || {}),
+  };
+
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd,
-      env: process.env,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let stdout = '';
     let stderr = '';
+    let finished = false;
+
+    const timeout = setTimeout(() => {
+      if (finished) return;
+      stderr = trimLog(`${stderr}\nCommand timed out after ${timeoutMs}ms`);
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!finished) {
+          child.kill('SIGKILL');
+        }
+      }, 2000).unref();
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk: Buffer | string) => {
       stdout = trimLog(stdout + chunk.toString());
@@ -91,11 +124,15 @@ export async function runCommand(command: string, args: string[], cwd = REPO_ROO
     });
 
     child.on('error', (error) => {
+      finished = true;
+      clearTimeout(timeout);
       stderr = trimLog(`${stderr}\n${String(error)}`);
       resolve({ code: 1, stdout, stderr });
     });
 
     child.on('close', (code) => {
+      finished = true;
+      clearTimeout(timeout);
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
@@ -175,7 +212,11 @@ export async function createDatabaseBackup(): Promise<string | null> {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFile = path.join(BACKUP_DIR, `db-backup-${stamp}.sql`);
 
-  const result = await runCommand('pg_dump', ['--clean', '--if-exists', '-f', backupFile], REPO_ROOT);
+  const result = await runCommand(
+    'pg_dump',
+    ['--clean', '--if-exists', '--format=plain', '--file', backupFile, dbUrl],
+    { cwd: REPO_ROOT, timeoutMs: 15 * 60 * 1000 },
+  );
   if (result.code !== 0) {
     console.error('[system] pg_dump failed:', result.stderr);
     return null;

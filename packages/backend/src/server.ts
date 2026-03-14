@@ -26,6 +26,9 @@ const app = express();
 const httpServer = createServer(app);
 const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim();
 const allowAllOrigins = configuredFrontendUrl === '' || configuredFrontendUrl === '*';
+const LOG_HTTP_REQUESTS = process.env.LOG_HTTP_REQUESTS === '1' || process.env.NODE_ENV === 'development';
+const parsedSlowThreshold = Number.parseInt(process.env.LOG_HTTP_SLOW_THRESHOLD_MS || '1500', 10);
+const LOG_HTTP_SLOW_THRESHOLD_MS = Number.isFinite(parsedSlowThreshold) ? parsedSlowThreshold : 1500;
 
 const isDevAllowedOrigin = (origin: string): boolean => {
   try {
@@ -85,8 +88,14 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  const startedAt = Date.now();
+  const timestamp = new Date(startedAt).toISOString();
+  res.on('finish', () => {
+    const duration = Date.now() - startedAt;
+    const shouldLog = LOG_HTTP_REQUESTS || res.statusCode >= 400 || duration >= LOG_HTTP_SLOW_THRESHOLD_MS;
+    if (!shouldLog) return;
+    console.log(`[${timestamp}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+  });
   next();
 });
 

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
 import { API_URL } from '@/config/env';
+import { ENV_IS_DEV } from '@/config/env';
 
 interface AuthContextType {
   user: User | null;
@@ -39,17 +40,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = await response.json();
           setUser(userData);
           setToken(storedToken);
-        } else {
+        } else if (response.status === 401 || response.status === 403) {
           // Token is invalid
           localStorage.removeItem('auth_token');
           setToken(null);
           setUser(null);
+        } else {
+          // Keep token on transient server errors/offline so session can recover.
+          setToken(storedToken);
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('auth_token');
-        setToken(null);
-        setUser(null);
+        if (ENV_IS_DEV) {
+          console.error('Auth check failed:', error);
+        }
+        // Keep token on network errors/offline mode.
+        setToken(storedToken);
       } finally {
         setIsLoading(false);
       }
@@ -57,6 +62,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     checkAuth();
   }, []);
+
+  // Retry user profile fetch while token exists (e.g. after temporary offline/server outage).
+  useEffect(() => {
+    if (!token || user || isLoading) return;
+
+    const retry = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          return;
+        }
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('auth_token');
+          setToken(null);
+          setUser(null);
+        }
+      } catch (error) {
+        if (ENV_IS_DEV) {
+          console.error('Auth retry failed:', error);
+        }
+      }
+    };
+
+    void retry();
+    const interval = window.setInterval(() => {
+      void retry();
+    }, 30_000);
+
+    return () => window.clearInterval(interval);
+  }, [token, user, isLoading]);
 
   const login = async (credentials: LoginRequest) => {
     const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -108,7 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
       } catch (error) {
-        console.error('Logout error:', error);
+        if (ENV_IS_DEV) {
+          console.error('Logout error:', error);
+        }
       }
     }
 

@@ -48,6 +48,28 @@ function generateBrowserId(): string {
   });
 }
 
+const DEVICE_TOKEN_STORAGE_KEY = 'device_auth_token';
+const DISPLAY_CACHED_SCHEDULE_KEY = 'display_cached_schedule';
+const DISPLAY_CACHED_SETTINGS_KEY = 'display_cached_settings';
+
+function readCachedValue<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedValue<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota/private mode errors.
+  }
+}
+
 const SUPPORTED_LAYOUTS: LayoutType[] = ['split-view', 'full-rotation', 'triple-view', 'grid-2x2'];
 
 function normalizeLayout(layout: unknown): LayoutType {
@@ -94,6 +116,9 @@ export function DisplayClientPage() {
   });
 
   const [pairingInfo, setPairingInfo] = useState<PairingResponse | null>(null);
+  const [deviceToken, setDeviceToken] = useState<string | null>(
+    () => localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY)
+  );
   const [isPairingLoading, setIsPairingLoading] = useState(true);
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
   const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
@@ -106,8 +131,16 @@ export function DisplayClientPage() {
   const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
   const { data: mediaData } = useMedia();
 
-  const [localSchedule, setLocalSchedule] = useState(schedule || createDefaultSchedule());
-  const [localSettings, setLocalSettings] = useState(fetchedSettings || getDefaultSettings());
+  const [localSchedule, setLocalSchedule] = useState<Schedule>(() => (
+    schedule ||
+    readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY) ||
+    createDefaultSchedule()
+  ));
+  const [localSettings, setLocalSettings] = useState<Settings>(() => (
+    fetchedSettings ||
+    readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY) ||
+    getDefaultSettings()
+  ));
   const [eventClock, setEventClock] = useState(() => Date.now());
 
   // Check pairing status
@@ -133,6 +166,10 @@ export function DisplayClientPage() {
 
         if (response.ok) {
           const data: PairingResponse = await response.json();
+          if (typeof data.deviceToken === 'string' && data.deviceToken.trim() !== '') {
+            localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, data.deviceToken);
+            if (isMounted) setDeviceToken(data.deviceToken);
+          }
           if (isMounted) {
             setPairingInfo((prev) => {
               if (
@@ -147,9 +184,13 @@ export function DisplayClientPage() {
               return data;
             });
           }
+        } else if (!silent && isMounted) {
+          console.warn('[Display] Pairing request failed with status', response.status);
         }
       } catch (error) {
-        console.error('[Display] Pairing check failed:', error);
+        if (ENV_IS_DEV) {
+          console.error('[Display] Pairing check failed:', error);
+        }
       } finally {
         if (!silent && isMounted) setIsPairingLoading(false);
       }
@@ -158,30 +199,40 @@ export function DisplayClientPage() {
     // First load: show a blocking loading state.
     checkPairing({ silent: false });
 
-    // Re-check pairing every 10 seconds
-    const interval = setInterval(() => checkPairing({ silent: true }), 10000);
+    // Re-check pairing only while device is still unpaired.
+    const interval = pairingInfo?.paired
+      ? null
+      : setInterval(() => checkPairing({ silent: true }), 30000);
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
-  }, [browserId, isPreviewMode]);
+  }, [browserId, isPreviewMode, pairingInfo?.paired]);
 
   const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
     if (!silent) setIsDisplayConfigLoading(true);
 
     try {
-      const displayConfig = await devicesApi.getDisplayConfig(deviceId);
+      const displayConfig = await devicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
       setLocalSchedule(displayConfig.schedule);
       setLocalSettings(migrateSettings(displayConfig.settings));
+      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, displayConfig.schedule);
+      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, displayConfig.settings);
       setHasLoadedDeviceConfig(true);
     } catch (error) {
-      console.error('[Display] Failed to load effective display config:', error);
-      setHasLoadedDeviceConfig(false);
+      if (ENV_IS_DEV) {
+        console.error('[Display] Failed to load effective display config:', error);
+      }
+      const cachedSchedule = readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
+      const cachedSettings = readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
+      if (cachedSchedule) setLocalSchedule(cachedSchedule);
+      if (cachedSettings) setLocalSettings(migrateSettings(cachedSettings));
+      setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
     } finally {
       if (!silent) setIsDisplayConfigLoading(false);
     }
-  }, []);
+  }, [deviceToken]);
 
   useEffect(() => {
     if (!isPreviewMode) return;
@@ -251,8 +302,13 @@ export function DisplayClientPage() {
       return;
     }
 
+    if (!deviceToken) {
+      setHasLoadedDeviceConfig(false);
+      return;
+    }
+
     refreshDeviceDisplayConfig(pairedDeviceId);
-  }, [pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig, isPreviewMode]);
+  }, [pairingInfo?.id, pairingInfo?.paired, deviceToken, refreshDeviceDisplayConfig, isPreviewMode]);
 
   // Update local state when global data is fetched (fallback while no paired device config is loaded yet)
   useEffect(() => {
@@ -260,6 +316,7 @@ export function DisplayClientPage() {
     if (isPreviewMode && hasPreviewPayload) return;
     if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
       setLocalSchedule(schedule);
+      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, schedule);
     }
   }, [schedule, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
 
@@ -268,6 +325,7 @@ export function DisplayClientPage() {
     if (isPreviewMode && hasPreviewPayload) return;
     if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
       setLocalSettings(fetchedSettings);
+      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, fetchedSettings);
     }
   }, [fetchedSettings, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
 
@@ -275,22 +333,29 @@ export function DisplayClientPage() {
   const { isConnected, subscribe } = useWebSocket({
     autoConnect: !isPreviewMode,
     onScheduleUpdate: (data) => {
-      console.log('[Display] Schedule updated via WebSocket');
+      if (ENV_IS_DEV) {
+        console.log('[Display] Schedule updated via WebSocket');
+      }
       const deviceId = pairedDeviceIdRef.current;
       if (deviceId) {
         refreshDeviceDisplayConfig(deviceId, { silent: true });
         return;
       }
       setLocalSchedule(data);
+      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, data);
     },
     onSettingsUpdate: (data) => {
-      console.log('[Display] Settings updated via WebSocket');
+      if (ENV_IS_DEV) {
+        console.log('[Display] Settings updated via WebSocket');
+      }
       const deviceId = pairedDeviceIdRef.current;
       if (deviceId) {
         refreshDeviceDisplayConfig(deviceId, { silent: true });
         return;
       }
-      setLocalSettings(migrateSettings(data));
+      const migrated = migrateSettings(data);
+      setLocalSettings(migrated);
+      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, migrated);
     },
     onDeviceUpdate: (data) => {
       const deviceId = pairedDeviceIdRef.current;
@@ -302,7 +367,9 @@ export function DisplayClientPage() {
       refreshDeviceDisplayConfig(deviceId, { silent: true });
     },
     onDeviceCommand: (command) => {
-      console.log('[Display] Command received:', command);
+      if (ENV_IS_DEV) {
+        console.log('[Display] Command received:', command);
+      }
       if (command === 'reload' || command === 'restart') {
         window.location.reload();
       }
@@ -318,29 +385,30 @@ export function DisplayClientPage() {
   useEffect(() => {
     if (isPreviewMode) return;
 
-    if (isConnected && pairingInfo?.paired && pairingInfo?.id) {
+    if (isConnected && pairingInfo?.paired && pairingInfo?.id && deviceToken) {
       subscribe('schedule');
       subscribe('settings');
-      subscribe('device', pairingInfo.id);
+      subscribe('device', pairingInfo.id, deviceToken);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, pairingInfo?.paired, pairingInfo?.id, isPreviewMode]);
+  }, [isConnected, pairingInfo?.paired, pairingInfo?.id, deviceToken, isPreviewMode]);
 
   // Heartbeat system (only when paired)
   useEffect(() => {
     if (isPreviewMode) return;
     if (!pairingInfo?.paired || !pairingInfo?.id) return;
+    if (!deviceToken) return;
 
     const sendHeartbeat = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/devices/${pairingInfo.id}/heartbeat`, {
-          method: 'POST',
-        });
-        if (response.ok) {
+        const response = await devicesApi.sendHeartbeat(pairingInfo.id, deviceToken);
+        if (response.ok && ENV_IS_DEV) {
           console.log('[Display] Heartbeat sent');
         }
       } catch (error) {
-        console.error('[Display] Heartbeat failed:', error);
+        if (ENV_IS_DEV) {
+          console.error('[Display] Heartbeat failed:', error);
+        }
       }
     };
 
@@ -351,7 +419,7 @@ export function DisplayClientPage() {
     const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [pairingInfo, isPreviewMode]);
+  }, [pairingInfo?.paired, pairingInfo?.id, deviceToken, isPreviewMode]);
 
   useEffect(() => {
     const interval = setInterval(() => setEventClock(Date.now()), 30000);

@@ -88,7 +88,23 @@ const backupUpload = multer({
   limits: {
     fileSize: 1024 * 1024 * 1024, // 1GB
   },
+  fileFilter: (_req, file, cb) => {
+    const lowerName = (file.originalname || '').toLowerCase();
+    if (lowerName.endsWith('.json') || file.mimetype === 'application/json' || file.mimetype === 'text/plain') {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Nur JSON-Backups sind erlaubt.'));
+  },
 });
+
+function resolveBackupFile(req: AuthRequest): Express.Multer.File | undefined {
+  if (req.file) return req.file;
+  const files = req.files as Record<string, Express.Multer.File[]> | Express.Multer.File[] | undefined;
+  if (!files) return undefined;
+  if (Array.isArray(files)) return files[0];
+  return files.backup?.[0] || files.backupFile?.[0] || files.file?.[0];
+}
 
 // GET /backup/export
 router.get('/backup/export', async (_req: AuthRequest, res) => {
@@ -164,11 +180,24 @@ router.get('/backup/export', async (_req: AuthRequest, res) => {
 });
 
 // POST /backup/import
-router.post('/backup/import', backupUpload.single('backup'), async (req: AuthRequest, res) => {
-  const filePath = req.file?.path;
-  const replaceMedia = req.body?.replaceMedia !== 'false';
+router.post(
+  '/backup/import',
+  backupUpload.fields([
+    { name: 'backup', maxCount: 1 },
+    { name: 'backupFile', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ]),
+  async (req: AuthRequest, res) => {
+  const backupFile = resolveBackupFile(req);
+  const filePath = backupFile?.path;
+  const replaceMediaRaw = req.body?.replaceMedia;
+  const replaceMedia = !(
+    replaceMediaRaw === 'false'
+    || replaceMediaRaw === '0'
+    || replaceMediaRaw === false
+  );
 
-  if (!req.file || !filePath) {
+  if (!backupFile || !filePath) {
     return res.status(400).json({ error: 'backup-file-required', message: 'Backup-Datei erforderlich' });
   }
 
@@ -317,6 +346,13 @@ router.post('/backup/import', backupUpload.single('backup'), async (req: AuthReq
     await Promise.all(
       writtenFiles.map((f) => fs.unlink(f).catch(() => {}))
     );
+
+    if (error instanceof SyntaxError) {
+      return res.status(400).json({
+        error: 'invalid-backup-json',
+        message: 'Backup-Datei enthält ungültiges JSON.',
+      });
+    }
 
     if (error instanceof z.ZodError) {
       return res.status(400).json({

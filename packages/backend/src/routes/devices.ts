@@ -4,13 +4,15 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/index.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, deviceAuthMiddleware, generateDeviceToken, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
-import { mutationLimiter } from '../lib/rateLimiter.js';
+import { mutationLimiter, pairingRequestLimiter, heartbeatLimiter } from '../lib/rateLimiter.js';
 import { isPlainRecord, deepMerge } from '../lib/utils.js';
 import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
 
 const router = Router();
+const DEFAULT_DEVICE_LIMIT = 250;
+const MAX_DEVICE_LIMIT = 1000;
 
 function normalizeSettingsData(raw: unknown): Record<string, unknown> {
   const data = isPlainRecord(raw) ? { ...raw } : {};
@@ -45,19 +47,40 @@ const OverridesSchema = z.object({
   message: 'At least one override (schedule or settings) is required',
 });
 
-// GET /api/devices - List all devices
-router.get('/', async (req, res) => {
-  try {
-    const devices = await prisma.device.findMany({
-      include: {
-        user: {
-          select: { username: true },
-        },
-        overrides: true,
-      },
-      orderBy: { lastSeen: 'desc' },
-    });
+const RequestPairingSchema = z.object({
+  browserId: z.string().min(20).max(128),
+});
 
+// GET /api/devices - List all devices (admin only)
+router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req: AuthRequest, res) => {
+  try {
+    const parsedLimit = Number.parseInt(String(_req.query.limit ?? ''), 10);
+    const parsedOffset = Number.parseInt(String(_req.query.offset ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), MAX_DEVICE_LIMIT)
+      : DEFAULT_DEVICE_LIMIT;
+    const offset = Number.isFinite(parsedOffset)
+      ? Math.min(Math.max(parsedOffset, 0), 10_000)
+      : 0;
+
+    const [devices, totalCount] = await Promise.all([
+      prisma.device.findMany({
+        include: {
+          user: {
+            select: { username: true },
+          },
+          overrides: true,
+        },
+        orderBy: { lastSeen: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.device.count(),
+    ]);
+
+    res.setHeader('X-Total-Count', String(totalCount));
+    res.setHeader('X-Result-Limit', String(limit));
+    res.setHeader('X-Result-Offset', String(offset));
     res.json(devices);
   } catch (error) {
     console.error('[devices] Error listing:', error);
@@ -69,14 +92,21 @@ router.get('/', async (req, res) => {
 // IMPORTANT: Must be before /:id route to avoid "pending" being interpreted as an ID
 router.get('/pending', authMiddleware, requirePermission('devices:manage'), async (req: AuthRequest, res) => {
   try {
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), MAX_DEVICE_LIMIT)
+      : DEFAULT_DEVICE_LIMIT;
+
     const devices = await prisma.device.findMany({
       where: {
         pairedAt: null,
         pairingCode: { not: null },
       },
       orderBy: { createdAt: 'desc' },
+      take: limit,
     });
 
+    res.setHeader('X-Result-Limit', String(limit));
     res.json(devices);
   } catch (error) {
     console.error('[devices] Error fetching pending devices:', error);
@@ -84,8 +114,8 @@ router.get('/pending', authMiddleware, requirePermission('devices:manage'), asyn
   }
 });
 
-// GET /api/devices/:id/display-config - Effective schedule/settings for a specific device
-router.get('/:id/display-config', async (req, res) => {
+// GET /api/devices/:id/display-config - Effective schedule/settings for a specific device (device token)
+router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest, res) => {
   try {
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
@@ -140,8 +170,8 @@ router.get('/:id/display-config', async (req, res) => {
   }
 });
 
-// GET /api/devices/:id - Get device details
-router.get('/:id', async (req, res) => {
+// GET /api/devices/:id - Get device details (admin only)
+router.get('/:id', authMiddleware, requirePermission('devices:manage'), async (req: AuthRequest, res) => {
   try {
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
@@ -232,7 +262,7 @@ router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutat
 });
 
 // POST /api/devices/:id/heartbeat - Device heartbeat
-router.post('/:id/heartbeat', async (req, res) => {
+router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.device.update({
       where: { id: req.params.id },
@@ -346,13 +376,11 @@ const PairDeviceSchema = z.object({
 });
 
 // POST /api/devices/request-pairing - Request a pairing code (called by unpaired device)
-router.post('/request-pairing', async (req, res) => {
+router.post('/request-pairing', pairingRequestLimiter, async (req, res) => {
   try {
-    const { browserId } = req.body;
-
-    if (!browserId) {
-      return res.status(400).json({ error: 'browser-id-required', message: 'Browser ID is required' });
-    }
+    const validated = RequestPairingSchema.parse(req.body);
+    const { browserId } = validated;
+    const deviceToken = generateDeviceToken(browserId);
 
     // Check if device with this browser ID already exists
     let device = await prisma.device.findUnique({ where: { id: browserId } });
@@ -364,6 +392,7 @@ router.post('/request-pairing', async (req, res) => {
         pairingCode: device.pairingCode,
         paired: !!device.pairedAt,
         name: device.name,
+        deviceToken,
       });
     }
 
@@ -397,8 +426,12 @@ router.post('/request-pairing', async (req, res) => {
       id: device.id,
       pairingCode,
       paired: false,
+      deviceToken,
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+    }
     console.error('[devices] Error requesting pairing:', error);
     res.status(500).json({ error: 'pairing-request-failed', message: 'Kopplungsanfrage fehlgeschlagen' });
   }

@@ -189,11 +189,20 @@ router.get('/', async (req, res) => {
 router.post('/', authMiddleware, requirePermission('settings:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = SettingsSchema.parse(req.body);
+    const latest = await prisma.settings.findFirst({
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+    const nextVersion = (latest?.version ?? 0) + 1;
+    const settingsToStore = {
+      ...validated,
+      version: nextVersion,
+    };
 
     const newSettings = await prisma.settings.create({
       data: {
-        version: validated.version,
-        data: validated as unknown as Prisma.InputJsonValue,
+        version: nextVersion,
+        data: settingsToStore as unknown as Prisma.InputJsonValue,
         isActive: true,
       },
     });
@@ -206,9 +215,9 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
       data: { isActive: false },
     });
 
-    broadcastSettingsUpdate(validated);
+    broadcastSettingsUpdate(settingsToStore);
 
-    res.json({ ok: true, version: validated.version });
+    res.json({ ok: true, version: nextVersion });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });

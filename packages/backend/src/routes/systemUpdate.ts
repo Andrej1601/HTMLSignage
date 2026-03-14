@@ -95,24 +95,50 @@ router.post('/update/run', async (req: AuthRequest, res) => {
       appendLog('Warnung: DB-Backup konnte nicht erstellt werden. Update wird fortgesetzt.');
     }
 
-    const steps: Array<{ label: string; command: string; args: string[] }> = [
-      { label: 'Fetching tags and branches', command: 'git', args: ['fetch', '--all', '--tags', '--prune'] },
-      { label: `Checking out ${tagName}`, command: 'git', args: ['checkout', tagName] },
+    const steps: Array<{ label: string; command: string; args: string[]; timeoutMs?: number }> = [
+      {
+        label: 'Fetching tags and branches',
+        command: 'git',
+        args: ['fetch', '--all', '--tags', '--prune'],
+        timeoutMs: 2 * 60 * 1000,
+      },
+      {
+        label: `Checking out ${tagName}`,
+        command: 'git',
+        args: ['checkout', tagName],
+        timeoutMs: 60 * 1000,
+      },
       {
         label: 'Installing dependencies',
         command: 'pnpm',
         args: ['install', '--force', '--no-frozen-lockfile', '--ignore-scripts=false'],
+        timeoutMs: 20 * 60 * 1000,
       },
-      { label: 'Applying Prisma migrations', command: 'pnpm', args: ['--filter', 'backend', 'prisma', 'migrate', 'deploy'] },
-      { label: 'Building backend', command: 'pnpm', args: ['--filter', 'backend', 'build'] },
-      { label: 'Building frontend', command: 'pnpm', args: ['--filter', 'frontend', 'build'] },
+      {
+        label: 'Applying Prisma migrations',
+        command: 'pnpm',
+        args: ['--filter', 'backend', 'prisma', 'migrate', 'deploy'],
+        timeoutMs: 10 * 60 * 1000,
+      },
+      {
+        label: 'Building backend',
+        command: 'pnpm',
+        args: ['--filter', 'backend', 'build'],
+        timeoutMs: 10 * 60 * 1000,
+      },
+      {
+        label: 'Building frontend',
+        command: 'pnpm',
+        args: ['--filter', 'frontend', 'build'],
+        timeoutMs: 15 * 60 * 1000,
+      },
     ];
 
     let rolledBack = false;
 
     for (const step of steps) {
       appendLog(`== ${step.label} ==`);
-      const result = await runCommand(step.command, step.args);
+      const result = await runCommand(step.command, step.args, { timeoutMs: step.timeoutMs });
       const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
       if (combinedOutput) {
         appendLog(combinedOutput);
@@ -121,11 +147,11 @@ router.post('/update/run', async (req: AuthRequest, res) => {
       if (result.code !== 0) {
         if (previousTag) {
           appendLog(`\n== Rollback auf ${previousTag} ==`);
-          const rollbackResult = await runCommand('git', ['checkout', previousTag]);
+          const rollbackResult = await runCommand('git', ['checkout', previousTag], { timeoutMs: 60 * 1000 });
           if (rollbackResult.code === 0) {
-            await runCommand('pnpm', ['install', '--force', '--no-frozen-lockfile', '--ignore-scripts=false']);
-            await runCommand('pnpm', ['--filter', 'backend', 'build']);
-            await runCommand('pnpm', ['--filter', 'frontend', 'build']);
+            await runCommand('pnpm', ['install', '--force', '--no-frozen-lockfile', '--ignore-scripts=false'], { timeoutMs: 20 * 60 * 1000 });
+            await runCommand('pnpm', ['--filter', 'backend', 'build'], { timeoutMs: 10 * 60 * 1000 });
+            await runCommand('pnpm', ['--filter', 'frontend', 'build'], { timeoutMs: 15 * 60 * 1000 });
             appendLog(`Rollback auf ${previousTag} erfolgreich.`);
             rolledBack = true;
           } else {

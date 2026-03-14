@@ -92,34 +92,17 @@ api.interceptors.request.use((config) => {
 });
 
 let hasWarnedDisplayConfigFallback = false;
-const DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY = 'htmlsignage_display_config_unavailable';
-
-function readDisplayConfigUnavailableFlag(): boolean | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const value = window.localStorage.getItem(DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY);
-    if (value === '1') return true;
-    if (value === '0') return false;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeDisplayConfigUnavailableFlag(value: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(DISPLAY_CONFIG_UNAVAILABLE_STORAGE_KEY, value ? '1' : '0');
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-let isDisplayConfigEndpointUnavailable: boolean | null = readDisplayConfigUnavailableFlag();
 
 function getAuthHeaders(token: string) {
   return {
     Authorization: `Bearer ${token}`,
+  };
+}
+
+function getDeviceHeaders(deviceToken?: string) {
+  if (!deviceToken) return undefined;
+  return {
+    'X-Device-Token': deviceToken,
   };
 }
 
@@ -252,8 +235,12 @@ export const devicesApi = {
   },
 
   // Send heartbeat (device pings this)
-  sendHeartbeat: async (id: string): Promise<ApiOkResponse> => {
-    const { data } = await api.post<ApiOkResponse>(`/devices/${id}/heartbeat`);
+  sendHeartbeat: async (id: string, deviceToken?: string): Promise<ApiOkResponse> => {
+    const { data } = await api.post<ApiOkResponse>(
+      `/devices/${id}/heartbeat`,
+      undefined,
+      { headers: getDeviceHeaders(deviceToken) },
+    );
     return data;
   },
 
@@ -276,23 +263,18 @@ export const devicesApi = {
   },
 
   // Get effective device display configuration (global + device overrides)
-  getDisplayConfig: async (id: string): Promise<DeviceDisplayConfigResponse> => {
-    if (isDisplayConfigEndpointUnavailable === true) {
-      return getDisplayConfigFallback(id);
-    }
-
+  getDisplayConfig: async (id: string, deviceToken?: string): Promise<DeviceDisplayConfigResponse> => {
     try {
-      const { data } = await api.get<DeviceDisplayConfigResponse>(`/devices/${id}/display-config`);
-      isDisplayConfigEndpointUnavailable = false;
-      writeDisplayConfigUnavailableFlag(false);
+      const { data } = await api.get<DeviceDisplayConfigResponse>(
+        `/devices/${id}/display-config`,
+        { headers: getDeviceHeaders(deviceToken) },
+      );
       return data;
     } catch (error) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
       if (status !== 404) throw error;
 
       // Compatibility fallback for older backends without /display-config endpoint.
-      isDisplayConfigEndpointUnavailable = true;
-      writeDisplayConfigUnavailableFlag(true);
       if (!hasWarnedDisplayConfigFallback) {
         // eslint-disable-next-line no-console
         console.warn('[api] /devices/:id/display-config returned 404, using client-side fallback merge');
@@ -308,6 +290,7 @@ export const mediaApi = {
   // Get all media
   getMedia: async (filter?: MediaFilter): Promise<Media[]> => {
     const params = new URLSearchParams();
+    params.append('limit', '500');
     if (filter?.type) params.append('type', filter.type);
     if (filter?.search) params.append('search', filter.search);
     if (filter?.tag) params.append('tag', filter.tag);
@@ -333,11 +316,7 @@ export const mediaApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const { data } = await api.post('/media/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const { data } = await api.post('/media/upload', formData);
     return data;
   },
 
@@ -414,10 +393,7 @@ export const systemApi = {
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
     const { data } = await api.post<SystemBackupImportResponse>('/system/backup/import', formData, {
-      headers: {
-        ...getAuthHeaders(token),
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: getAuthHeaders(token),
     });
     return data;
   },

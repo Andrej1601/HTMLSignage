@@ -88,12 +88,21 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
   try {
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);
+    const latest = await prisma.schedule.findFirst({
+      orderBy: { version: 'desc' },
+      select: { version: true },
+    });
+    const nextVersion = (latest?.version ?? 0) + 1;
+    const scheduleToStore = {
+      ...validated,
+      version: nextVersion,
+    };
 
     // Create new schedule
     const newSchedule = await prisma.schedule.create({
       data: {
-        version: validated.version,
-        data: validated as unknown as Prisma.InputJsonValue,
+        version: nextVersion,
+        data: scheduleToStore as unknown as Prisma.InputJsonValue,
         isActive: true,
       },
     });
@@ -108,14 +117,14 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
     });
 
     // Broadcast update via WebSocket
-    broadcastScheduleUpdate(validated);
+    broadcastScheduleUpdate(scheduleToStore);
 
     // Log audit event (TODO: implement when auth is ready)
     // await logAuditEvent(userId, 'schedule.update', newSchedule.id);
 
     res.json({ 
       ok: true, 
-      version: validated.version,
+      version: nextVersion,
       id: newSchedule.id 
     });
   } catch (error) {

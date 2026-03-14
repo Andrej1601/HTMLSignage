@@ -1,29 +1,52 @@
 import { Server as SocketIOServer } from 'socket.io';
+import { verifyDeviceToken } from '../lib/auth.js';
 
 let io: SocketIOServer | null = null;
+const LOG_WS = process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug';
 
 export function setupWebSocket(ioInstance: SocketIOServer) {
   io = ioInstance;
 
   io.on('connection', (socket) => {
-    console.log(`[ws] Client connected: ${socket.id}`);
+    if (LOG_WS) {
+      console.log(`[ws] Client connected: ${socket.id}`);
+    }
 
     // Subscribe to schedule updates
     socket.on('subscribe:schedule', () => {
       socket.join('schedule-updates');
-      console.log(`[ws] ${socket.id} subscribed to schedule updates`);
+      if (LOG_WS) {
+        console.log(`[ws] ${socket.id} subscribed to schedule updates`);
+      }
     });
 
     // Subscribe to settings updates
     socket.on('subscribe:settings', () => {
       socket.join('settings-updates');
-      console.log(`[ws] ${socket.id} subscribed to settings updates`);
+      if (LOG_WS) {
+        console.log(`[ws] ${socket.id} subscribed to settings updates`);
+      }
     });
 
     // Subscribe to device updates
-    socket.on('subscribe:device', (deviceId: string) => {
+    socket.on('subscribe:device', (payload: string | { deviceId?: string; deviceToken?: string }) => {
+      const deviceId = typeof payload === 'string' ? payload : payload?.deviceId;
+      const deviceToken = typeof payload === 'string' ? undefined : payload?.deviceToken;
+      if (!deviceId || !deviceToken) {
+        socket.emit('device:auth-error', { error: 'device-token-required' });
+        return;
+      }
+
+      const verified = verifyDeviceToken(deviceToken);
+      if (!verified || verified.deviceId !== deviceId) {
+        socket.emit('device:auth-error', { error: 'invalid-device-token' });
+        return;
+      }
+
       socket.join(`device:${deviceId}`);
-      console.log(`[ws] ${socket.id} subscribed to device ${deviceId}`);
+      if (LOG_WS) {
+        console.log(`[ws] ${socket.id} subscribed to device ${deviceId}`);
+      }
     });
 
     // Unsubscribe handlers
@@ -40,7 +63,9 @@ export function setupWebSocket(ioInstance: SocketIOServer) {
     });
 
     socket.on('disconnect', () => {
-      console.log(`[ws] Client disconnected: ${socket.id}`);
+      if (LOG_WS) {
+        console.log(`[ws] Client disconnected: ${socket.id}`);
+      }
     });
   });
 }
@@ -49,14 +74,18 @@ export function setupWebSocket(ioInstance: SocketIOServer) {
 export function broadcastScheduleUpdate(data: unknown) {
   if (io) {
     io.to('schedule-updates').emit('schedule:updated', data);
-    console.log('[ws] Broadcasted schedule update');
+    if (LOG_WS) {
+      console.log('[ws] Broadcasted schedule update');
+    }
   }
 }
 
 export function broadcastSettingsUpdate(data: unknown) {
   if (io) {
     io.to('settings-updates').emit('settings:updated', data);
-    console.log('[ws] Broadcasted settings update');
+    if (LOG_WS) {
+      console.log('[ws] Broadcasted settings update');
+    }
   }
 }
 
@@ -64,7 +93,9 @@ export function broadcastDeviceUpdate(data: unknown) {
   if (io) {
     // Broadcast to all connected clients (for device list updates)
     io.emit('device:updated', data);
-    console.log('[ws] Broadcasted device update');
+    if (LOG_WS) {
+      console.log('[ws] Broadcasted device update');
+    }
   }
 }
 
@@ -72,6 +103,8 @@ export function broadcastDeviceCommand(deviceId: string, data: unknown) {
   if (io) {
     // Broadcast to specific device
     io.to(`device:${deviceId}`).emit('device:command', data);
-    console.log(`[ws] Broadcasted device command for ${deviceId}`);
+    if (LOG_WS) {
+      console.log(`[ws] Broadcasted device command for ${deviceId}`);
+    }
   }
 }

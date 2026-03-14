@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { API_URL } from '@/config/env';
+import { ENV_IS_DEV } from '@/config/env';
 
 interface UseWebSocketOptions {
   url?: string;
@@ -40,50 +41,70 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   onDeviceUpdateRef.current = onDeviceUpdate;
 
   const connect = useCallback(() => {
-    if (socketRef.current?.connected) return;
+    if (socketRef.current) {
+      if (socketRef.current.connected) return;
+      socketRef.current.connect();
+      return;
+    }
 
-    console.log('[WebSocket] Connecting to', url);
+    if (ENV_IS_DEV) {
+      console.log('[WebSocket] Connecting to', url);
+    }
 
     const socket = io(url, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 30000,
-      reconnectionAttempts: 50,
+      reconnectionAttempts: Infinity,
+      randomizationFactor: 0.5,
+      timeout: 10000,
     });
 
     socket.on('connect', () => {
-      console.log('[WebSocket] Connected:', socket.id);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Connected:', socket.id);
+      }
       setIsConnected(true);
       setError(null);
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[WebSocket] Disconnected:', reason);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Disconnected:', reason);
+      }
       setIsConnected(false);
     });
 
     socket.on('connect_error', (err) => {
-      console.error('[WebSocket] Connection error:', err);
+      if (ENV_IS_DEV) {
+        console.error('[WebSocket] Connection error:', err);
+      }
       setError(err.message);
       setIsConnected(false);
     });
 
     // Schedule updates
     socket.on('schedule:updated', (data: Schedule) => {
-      console.log('[WebSocket] Schedule updated:', data);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Schedule updated:', data);
+      }
       onScheduleUpdateRef.current?.(data);
     });
 
     // Settings updates
     socket.on('settings:updated', (data: Settings) => {
-      console.log('[WebSocket] Settings updated:', data);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Settings updated:', data);
+      }
       onSettingsUpdateRef.current?.(data);
     });
 
     // Device commands
     socket.on('device:command', (data: { command?: string }) => {
-      console.log('[WebSocket] Device command:', data);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Device command:', data);
+      }
       if (data?.command) {
         onDeviceCommandRef.current?.(data.command);
       }
@@ -91,7 +112,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     // Device updates (mode/override changes, pairing updates, etc.)
     socket.on('device:updated', (data: Record<string, unknown>) => {
-      console.log('[WebSocket] Device updated:', data);
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Device updated:', data);
+      }
       onDeviceUpdateRef.current?.(data);
 
       const command = typeof data?.command === 'string' ? data.command : undefined;
@@ -105,17 +128,21 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
-      console.log('[WebSocket] Disconnecting');
+      if (ENV_IS_DEV) {
+        console.log('[WebSocket] Disconnecting');
+      }
       socketRef.current.disconnect();
       socketRef.current = null;
       setIsConnected(false);
     }
   }, []);
 
-  const subscribe = useCallback((channel: string, deviceId?: string) => {
+  const subscribe = useCallback((channel: string, deviceId?: string, deviceToken?: string) => {
     if (!socketRef.current) return;
 
-    console.log('[WebSocket] Subscribing to', channel, ...(deviceId ? [deviceId] : []));
+    if (ENV_IS_DEV) {
+      console.log('[WebSocket] Subscribing to', channel, ...(deviceId ? [deviceId] : []));
+    }
 
     switch (channel) {
       case 'schedule':
@@ -126,7 +153,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         break;
       case 'device':
         if (deviceId) {
-          socketRef.current.emit('subscribe:device', deviceId);
+          socketRef.current.emit('subscribe:device', {
+            deviceId,
+            deviceToken,
+          });
         }
         break;
     }
@@ -135,7 +165,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const unsubscribe = useCallback((channel: string, deviceId?: string) => {
     if (!socketRef.current) return;
 
-    console.log('[WebSocket] Unsubscribing from', channel, ...(deviceId ? [deviceId] : []));
+    if (ENV_IS_DEV) {
+      console.log('[WebSocket] Unsubscribing from', channel, ...(deviceId ? [deviceId] : []));
+    }
 
     switch (channel) {
       case 'schedule':

@@ -46,6 +46,8 @@ const ResetPasswordSchema = z.object({
 });
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SESSIONS_PER_USER = 10;
 
 function hashResetToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -56,6 +58,35 @@ function createResetToken(): { rawToken: string; tokenHash: string; expiresAt: D
   const tokenHash = hashResetToken(rawToken);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
   return { rawToken, tokenHash, expiresAt };
+}
+
+async function pruneSessions(userId: string): Promise<void> {
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lte: now } },
+        {
+          userId,
+          createdAt: {
+            lt: new Date(now.getTime() - SESSION_TTL_MS),
+          },
+        },
+      ],
+    },
+  });
+
+  const sessions = await prisma.session.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+  if (sessions.length > MAX_SESSIONS_PER_USER) {
+    const staleSessionIds = sessions.slice(MAX_SESSIONS_PER_USER).map((s) => s.id);
+    await prisma.session.deleteMany({
+      where: { id: { in: staleSessionIds } },
+    });
+  }
 }
 
 // POST /api/auth/register - Register new user (ONLY first user - becomes admin)
@@ -111,11 +142,12 @@ router.post('/register', authLimiter, async (req, res) => {
       data: {
         userId: user.id,
         token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       },
     });
+    await pruneSessions(user.id);
 
     res.json({
       user,
@@ -156,11 +188,12 @@ router.post('/login', authLimiter, async (req, res) => {
       data: {
         userId: user.id,
         token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       },
     });
+    await pruneSessions(user.id);
 
     res.json({
       user: {
