@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { API_URL } from '@/config/env';
+import { fetchApi } from '@/services/api';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -35,21 +35,13 @@ export function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+      await fetchApi('/auth/reset-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        data: {
           token,
           password,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || 'Passwort konnte nicht zurückgesetzt werden.');
-      }
 
       setIsSuccess(true);
       setTimeout(() => {

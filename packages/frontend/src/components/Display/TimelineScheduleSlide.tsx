@@ -23,6 +23,7 @@ const LOOP_PAUSE_MS = 900;
 interface TimelineScheduleSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
 }
 
 interface TimelineInfusion {
@@ -202,18 +203,21 @@ function TimelineInfusionCard({
   );
 }
 
-export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSlideProps) {
+export function TimelineScheduleSlide({ schedule, settings, now: nowProp }: TimelineScheduleSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
-  const [now, setNow] = useState(() => new Date());
+  const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
   const [viewportHeight, setViewportHeight] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 10_000);
+    if (nowProp) return undefined;
+    const t = setInterval(() => setClockNow(new Date()), 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [nowProp]);
+
+  const now = nowProp ?? clockNow;
 
   const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 

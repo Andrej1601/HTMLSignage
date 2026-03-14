@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
+import { fetchApi } from '@/services/api';
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -20,9 +20,8 @@ export function LoginPage() {
   useEffect(() => {
     const checkFirstUser = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`);
-        // If 401, no users exist, allow registration
-        setIsFirstUser(response.status === 401);
+        await fetchApi('/auth/me');
+        setIsFirstUser(false);
       } catch (error) {
         setIsFirstUser(true);
       } finally {

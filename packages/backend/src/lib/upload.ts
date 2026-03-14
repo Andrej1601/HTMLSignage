@@ -38,7 +38,6 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     'image/png',
     'image/gif',
     'image/webp',
-    'image/svg+xml',
     // Audio
     'audio/mpeg',
     'audio/mp3',

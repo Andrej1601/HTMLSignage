@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import { createServer } from 'http';
 import os from 'os';
 import { Server as SocketIOServer } from 'socket.io';
@@ -99,8 +100,24 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve uploaded files
-app.use('/uploads', express.static(UPLOAD_DIR));
+// Serve uploaded files with hardened headers.
+app.use('/uploads', (req, res, next) => {
+  const ext = path.extname(req.path).toLowerCase();
+  if (ext === '.svg') {
+    res.setHeader('Content-Disposition', 'attachment');
+    res.type('application/octet-stream');
+  }
+  next();
+}, express.static(UPLOAD_DIR, {
+  immutable: true,
+  maxAge: '30d',
+  setHeaders: (res, filePath) => {
+    if (path.extname(filePath).toLowerCase() === '.svg') {
+      res.setHeader('Content-Disposition', 'attachment');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+  },
+}));
 
 // Health check
 app.get('/health', (req, res) => {

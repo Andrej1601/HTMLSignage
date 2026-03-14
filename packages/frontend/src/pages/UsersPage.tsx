@@ -5,7 +5,6 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
 import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -15,6 +14,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { StatCard } from '@/components/Dashboard/StatCard';
 import { SectionCard } from '@/components/SectionCard';
 import { AVAILABLE_ROLES } from '@/utils/permissions';
+import { fetchApi } from '@/services/api';
 
 interface User {
   id: string;
@@ -53,20 +53,15 @@ export function UsersPage() {
     retry: false,
     queryFn: async () => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        await logout();
-        throw new Error('unauthorized');
+      try {
+        return await fetchApi<User[]>('/users', { token });
+      } catch (error) {
+        if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
+          await logout();
+          throw new Error('unauthorized');
+        }
+        throw error;
       }
-
-      if (!response.ok) throw new Error('Failed to fetch users');
-      return response.json();
     },
   });
 
@@ -74,20 +69,11 @@ export function UsersPage() {
   const createUser = useMutation({
     mutationFn: async (data: CreateUserData) => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users`, {
+      return fetchApi('/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        token,
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -99,20 +85,11 @@ export function UsersPage() {
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users/${id}`, {
+      return fetchApi(`/users/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        token,
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -124,18 +101,10 @@ export function UsersPage() {
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users/${id}`, {
+      return fetchApi(`/users/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        token,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });

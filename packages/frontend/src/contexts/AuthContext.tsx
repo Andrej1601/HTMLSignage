@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
-import { API_URL } from '@/config/env';
 import { ENV_IS_DEV } from '@/config/env';
+import { fetchApi } from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -14,47 +14,41 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
+const AUTH_FAILURE_PATTERN = /nicht authentifiziert|unauthorized|invalid token|session expired|user not found|no token provided/i;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
   const [isLoading, setIsLoading] = useState(true);
 
   // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('auth_token');
+      const storedToken = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
       if (!storedToken) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${storedToken}`,
-          },
+        const userData = await fetchApi<User>('/auth/me', {
+          token: storedToken,
         });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          setToken(storedToken);
-        } else if (response.status === 401 || response.status === 403) {
-          // Token is invalid
-          localStorage.removeItem('auth_token');
+        setUser(userData);
+        setToken(storedToken);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (AUTH_FAILURE_PATTERN.test(message)) {
+          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
           setToken(null);
           setUser(null);
         } else {
-          // Keep token on transient server errors/offline so session can recover.
           setToken(storedToken);
         }
-      } catch (error) {
         if (ENV_IS_DEV) {
           console.error('Auth check failed:', error);
         }
-        // Keep token on network errors/offline mode.
-        setToken(storedToken);
       } finally {
         setIsLoading(false);
       }
@@ -69,22 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const retry = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+        const userData = await fetchApi<User>('/auth/me', {
+          token,
         });
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          return;
-        }
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem('auth_token');
+        setUser(userData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (AUTH_FAILURE_PATTERN.test(message)) {
+          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
           setToken(null);
           setUser(null);
         }
-      } catch (error) {
         if (ENV_IS_DEV) {
           console.error('Auth retry failed:', error);
         }
@@ -100,53 +89,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, user, isLoading]);
 
   const login = async (credentials: LoginRequest) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const data = await fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
+      data: credentials,
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
-    }
-
-    const data: AuthResponse = await response.json();
     setUser(data.user);
     setToken(data.token);
-    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token);
   };
 
   const register = async (data: RegisterRequest) => {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
+    const authData = await fetchApi<AuthResponse>('/auth/register', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      data,
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
-    }
-
-    const authData: AuthResponse = await response.json();
     setUser(authData.user);
     setToken(authData.token);
-    localStorage.setItem('auth_token', authData.token);
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, authData.token);
   };
 
   const logout = async () => {
     if (token) {
       try {
-        await fetch(`${API_URL}/api/auth/logout`, {
+        await fetchApi('/auth/logout', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          token,
+          responseType: 'void',
         });
       } catch (error) {
         if (ENV_IS_DEV) {
@@ -157,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(null);
     setToken(null);
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   };
 
   const value = {

@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Monitor, Check, RefreshCw, Link as LinkIcon } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
 import { InputField } from '@/components/FormField';
+import { fetchApi } from '@/services/api';
 
 export function PendingPairings() {
   const { token, logout } = useAuth();
@@ -21,20 +21,15 @@ export function PendingPairings() {
     retry: false,
     queryFn: async () => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/devices/pending`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        await logout();
-        throw new Error('unauthorized');
+      try {
+        return await fetchApi<Device[]>('/devices/pending', { token });
+      } catch (error) {
+        if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
+          await logout();
+          throw new Error('unauthorized');
+        }
+        throw error;
       }
-
-      if (!response.ok) throw new Error('Failed to fetch pending devices');
-      return response.json();
     },
     refetchInterval: token ? 5000 : false, // Refresh every 5 seconds when authenticated
   });
@@ -43,20 +38,11 @@ export function PendingPairings() {
   const pairDevice = useMutation({
     mutationFn: async (data: { pairingCode: string; name: string }) => {
       if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/devices/pair`, {
+      return fetchApi('/devices/pair', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        token,
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Pairing failed');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });

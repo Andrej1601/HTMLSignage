@@ -28,6 +28,7 @@ const LOOP_PAUSE = 1200;
 interface ChronologicalListSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
 }
 
 interface MergedInfusion {
@@ -40,17 +41,20 @@ interface MergedInfusion {
   saunaAccent: string;
 }
 
-export function ChronologicalListSlide({ schedule, settings }: ChronologicalListSlideProps) {
+export function ChronologicalListSlide({ schedule, settings, now: nowProp }: ChronologicalListSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
-  const [now, setNow] = useState(() => new Date());
+  const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 10_000);
+    if (nowProp) return undefined;
+    const t = setInterval(() => setClockNow(new Date()), 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [nowProp]);
+
+  const now = nowProp ?? clockNow;
 
   const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
   const daySchedule = schedule.presets?.[activePresetKey];

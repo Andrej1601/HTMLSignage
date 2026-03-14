@@ -8,20 +8,22 @@ import { Flame } from 'lucide-react';
 interface OverviewSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
 }
 
-export function OverviewSlide({ schedule, settings }: OverviewSlideProps) {
+export function OverviewSlide({ schedule, settings, now: nowProp }: OverviewSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const fonts = settings.fonts || defaults.fonts!;
-  const [eventClock, setEventClock] = useState(() => Date.now());
+  const [eventClock, setEventClock] = useState(() => nowProp?.getTime() ?? Date.now());
 
   useEffect(() => {
+    if (nowProp) return undefined;
     const interval = setInterval(() => setEventClock(Date.now()), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [nowProp]);
 
-  const now = new Date(eventClock);
+  const now = nowProp ?? new Date(eventClock);
 
   const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 

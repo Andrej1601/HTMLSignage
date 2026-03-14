@@ -25,6 +25,7 @@ interface SlideRendererProps {
   schedule?: Schedule;
   settings?: Settings;
   media?: Media[];
+  now?: Date;
 }
 
 export function SlideRenderer({
@@ -33,6 +34,7 @@ export function SlideRenderer({
   schedule: scheduleProp,
   settings: settingsProp,
   media: mediaProp,
+  now,
 }: SlideRendererProps) {
   const { schedule: scheduleFromQuery } = useSchedule();
   const { settings: settingsFromQuery } = useSettings();
@@ -48,7 +50,7 @@ export function SlideRenderer({
 
   switch (slide.type) {
     case 'content-panel':
-      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} />;
+      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} />;
 
     case 'sauna-detail':
       return (
@@ -95,17 +97,27 @@ function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefin
 
 // Individual Slide Components
 
-function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; settings: Settings; slide: SlideConfig }) {
+function ContentPanelSlide({
+  schedule,
+  settings,
+  slide,
+  now,
+}: {
+  schedule: Schedule;
+  settings: Settings;
+  slide: SlideConfig;
+  now?: Date;
+}) {
   const designStyle = settings.designStyle || 'modern-wellness';
 
   if (designStyle === 'modern-wellness') {
-    return <ScheduleGridSlide schedule={schedule} settings={settings} />;
+    return <ScheduleGridSlide schedule={schedule} settings={settings} now={now} />;
   }
   if (designStyle === 'modern-timeline') {
-    return <TimelineScheduleSlide schedule={schedule} settings={settings} />;
+    return <TimelineScheduleSlide schedule={schedule} settings={settings} now={now} />;
   }
   if (designStyle === 'compact-tiles') {
-    return <ChronologicalListSlide schedule={schedule} settings={settings} />;
+    return <ChronologicalListSlide schedule={schedule} settings={settings} now={now} />;
   }
 
   return (
@@ -115,7 +127,7 @@ function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; 
           <h2 className="text-4xl font-bold">{slide.title}</h2>
         </div>
       )}
-      <OverviewSlide schedule={schedule} settings={settings} />
+      <OverviewSlide schedule={schedule} settings={settings} now={now} />
     </div>
   );
 }
@@ -367,4 +379,3 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
     </div>
   );
 }
-

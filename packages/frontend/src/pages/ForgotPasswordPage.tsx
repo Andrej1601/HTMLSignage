@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { API_URL } from '@/config/env';
+import { fetchApi } from '@/services/api';
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -14,17 +14,10 @@ export function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+      await fetchApi('/auth/forgot-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
+        data: { email },
       });
-
-      if (!response.ok) {
-        throw new Error('Passwort-Reset konnte nicht gestartet werden.');
-      }
 
       setIsSubmitted(true);
     } catch (err) {

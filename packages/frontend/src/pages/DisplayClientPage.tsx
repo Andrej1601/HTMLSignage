@@ -26,8 +26,8 @@ import {
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
-import { API_URL, ENV_IS_DEV } from '@/config/env';
-import { devicesApi } from '@/services/api';
+import { ENV_IS_DEV } from '@/config/env';
+import { devicesApi, fetchApi } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
@@ -156,38 +156,33 @@ export function DisplayClientPage() {
       const silent = Boolean(opts?.silent);
       if (!silent && isMounted) setIsPairingLoading(true);
       try {
-        const response = await fetch(`${API_URL}/api/devices/request-pairing`, {
+        const data = await fetchApi<PairingResponse>('/devices/request-pairing', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ browserId }),
+          data: { browserId },
         });
 
-        if (response.ok) {
-          const data: PairingResponse = await response.json();
-          if (typeof data.deviceToken === 'string' && data.deviceToken.trim() !== '') {
-            localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, data.deviceToken);
-            if (isMounted) setDeviceToken(data.deviceToken);
-          }
-          if (isMounted) {
-            setPairingInfo((prev) => {
-              if (
-                prev &&
-                prev.id === data.id &&
-                prev.paired === data.paired &&
-                prev.pairingCode === data.pairingCode &&
-                prev.name === data.name
-              ) {
-                return prev;
-              }
-              return data;
-            });
-          }
-        } else if (!silent && isMounted) {
-          console.warn('[Display] Pairing request failed with status', response.status);
+        if (typeof data.deviceToken === 'string' && data.deviceToken.trim() !== '') {
+          localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, data.deviceToken);
+          if (isMounted) setDeviceToken(data.deviceToken);
+        }
+        if (isMounted) {
+          setPairingInfo((prev) => {
+            if (
+              prev &&
+              prev.id === data.id &&
+              prev.paired === data.paired &&
+              prev.pairingCode === data.pairingCode &&
+              prev.name === data.name
+            ) {
+              return prev;
+            }
+            return data;
+          });
         }
       } catch (error) {
+        if (!silent && isMounted) {
+          console.warn('[Display] Pairing request failed', error);
+        }
         if (ENV_IS_DEV) {
           console.error('[Display] Pairing check failed:', error);
         }
@@ -624,15 +619,16 @@ export function DisplayClientPage() {
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
   const isModernDesign = ['modern-wellness', 'modern-timeline', 'compact-tiles'].includes(designStyle);
+  const displayNow = new Date(eventClock);
 
   const renderContentPanel = () => {
     switch (designStyle) {
       case 'modern-timeline':
-        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} />;
+        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
       case 'compact-tiles':
-        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} />;
+        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
       default:
-        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />;
+        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
     }
   };
 
@@ -648,7 +644,7 @@ export function DisplayClientPage() {
         {isModernDesign ? (
           renderContentPanel()
         ) : (
-          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} />
+          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />
         )}
       </div>
     );
@@ -703,7 +699,13 @@ export function DisplayClientPage() {
         const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
         const rendered = (
-          <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => zone && onVideoEnded(zone.id)} />
+          <SlideRenderer
+            schedule={localSchedule}
+            settings={effectiveSettings}
+            now={displayNow}
+            slide={slide}
+            onVideoEnded={() => zone && onVideoEnded(zone.id)}
+          />
         );
 
         if (!needsPadding) return rendered;
@@ -908,7 +910,13 @@ export function DisplayClientPage() {
           const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
           const rendered = (
-            <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+            <SlideRenderer
+              schedule={localSchedule}
+              settings={effectiveSettings}
+              now={displayNow}
+              slide={slide}
+              onVideoEnded={() => onVideoEnded(zoneId)}
+            />
           );
 
           return (
@@ -991,6 +999,7 @@ export function DisplayClientPage() {
                         <SlideRenderer
                           schedule={localSchedule}
                           settings={effectiveSettings}
+                          now={displayNow}
                           slide={leftSlide}
                           onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                         />
@@ -1037,6 +1046,7 @@ export function DisplayClientPage() {
                               <SlideRenderer
                                 schedule={localSchedule}
                                 settings={effectiveSettings}
+                                now={displayNow}
                                 slide={topRightSlide}
                                 onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                               />
@@ -1047,6 +1057,7 @@ export function DisplayClientPage() {
                             <SlideRenderer
                               schedule={localSchedule}
                               settings={effectiveSettings}
+                              now={displayNow}
                               slide={topRightSlide}
                               onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                             />
@@ -1081,6 +1092,7 @@ export function DisplayClientPage() {
                               <SlideRenderer
                                 schedule={localSchedule}
                                 settings={effectiveSettings}
+                                now={displayNow}
                                 slide={bottomRightSlide}
                                 onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                               />
@@ -1090,6 +1102,7 @@ export function DisplayClientPage() {
                           <SlideRenderer
                             schedule={localSchedule}
                             settings={effectiveSettings}
+                            now={displayNow}
                             slide={bottomRightSlide}
                             onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                           />
@@ -1152,9 +1165,9 @@ export function DisplayClientPage() {
                   transition={resolveTransition(leftSlide)}
                 >
                   {leftSlide.type === 'content-panel' ? (
-                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} />
+                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />
                   ) : (
-                    <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                    <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
                       slide={leftSlide}
                       onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                     />
@@ -1181,7 +1194,7 @@ export function DisplayClientPage() {
                         saunaId={topRightSlide.saunaId}
                       />
                     ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
                         slide={topRightSlide}
                         onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                       />
@@ -1206,7 +1219,7 @@ export function DisplayClientPage() {
                         saunaId={bottomRightSlide.saunaId}
                       />
                     ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings}
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
                         slide={bottomRightSlide}
                         onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                       />
@@ -1238,7 +1251,13 @@ export function DisplayClientPage() {
             const needsPadding = needsModernSlidePadding(isModernDesign, slide);
 
             const rendered = slide ? (
-              <SlideRenderer schedule={localSchedule} settings={effectiveSettings} slide={slide} onVideoEnded={() => onVideoEnded(zoneId)} />
+              <SlideRenderer
+                schedule={localSchedule}
+                settings={effectiveSettings}
+                now={displayNow}
+                slide={slide}
+                onVideoEnded={() => onVideoEnded(zoneId)}
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
                 Keine Slides

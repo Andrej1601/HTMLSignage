@@ -8,7 +8,7 @@ import {
   Upload,
   RefreshCw,
   Calendar,
-  FileJson,
+  FileArchive,
   HardDrive,
 } from 'lucide-react';
 
@@ -25,7 +25,7 @@ function errorMessage(error: unknown, fallback: string): string {
 function backupFilename(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `htmlsignage-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}.json`;
+  return `htmlsignage-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}.zip`;
 }
 
 function formatDate(iso: string): string {
@@ -123,7 +123,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
     e.preventDefault();
     setIsDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file && (file.name.endsWith('.json') || file.type === 'application/json')) {
+    if (file && (file.name.endsWith('.zip') || file.type === 'application/zip')) {
       handleFileSelect(file);
     }
   };
@@ -149,7 +149,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               <h5 className="text-sm font-semibold text-spa-text-primary">Export</h5>
             </div>
             <p className="text-xs text-spa-text-secondary mb-3 flex-1">
-              Erstellt eine vollständige Sicherung aller Daten als JSON-Datei (inkl. Medien als Base64).
+              Erstellt eine vollständige Sicherung aller Daten als ZIP-Backup mit Manifest und Medien-Dateien.
             </p>
             {lastExportDate && (
               <p className="text-xs text-spa-text-secondary mb-3 flex items-center gap-1">
@@ -199,13 +199,13 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".json,application/json"
+                accept=".zip,application/zip"
                 onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
                 className="hidden"
               />
               {backupFile ? (
                 <>
-                  <FileJson className="w-5 h-5 text-spa-secondary" />
+                  <FileArchive className="w-5 h-5 text-spa-secondary" />
                   <span className="text-xs font-medium text-spa-text-primary">{backupFile.name}</span>
                   <span className="text-xs text-spa-text-secondary">{formatFileSize(backupFile.size)}</span>
                 </>
@@ -213,7 +213,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
                 <>
                   <Upload className="w-5 h-5 text-spa-text-secondary" />
                   <span className="text-xs text-spa-text-secondary">
-                    JSON-Datei hierher ziehen oder klicken
+                    ZIP-Backup hierher ziehen oder klicken
                   </span>
                 </>
               )}

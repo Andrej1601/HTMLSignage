@@ -19,6 +19,7 @@ try {
 }
 
 const DISPLAY_URL = `${config.serverUrl.replace(/\/$/, '')}/display`;
+const HEALTH_URL = `${config.serverUrl.replace(/\/$/, '')}/health`;
 const OFFLINE_PATH = path.join(__dirname, 'offline.html');
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ const OFFLINE_PATH = path.join(__dirname, 'offline.html');
 const INITIAL_RETRY_MS = 3000;
 const MAX_RETRY_MS = 30000;
 let retryMs = INITIAL_RETRY_MS;
+let retryTimer = null;
 
 function checkServerReachable(url) {
   return new Promise((resolve) => {
@@ -39,6 +41,16 @@ function checkServerReachable(url) {
     req.on('error', () => resolve(false));
     req.on('timeout', () => { req.destroy(); resolve(false); });
   });
+}
+
+function scheduleReload(delayMs) {
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+  }
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    loadDisplay();
+  }, delayMs);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,19 +79,19 @@ function createWindow() {
   // ---- Crash Recovery ----
   mainWindow.webContents.on('crashed', (_event, killed) => {
     console.error(`[Kiosk] Renderer ${killed ? 'killed' : 'crashed'} – Neustart in 3s`);
-    setTimeout(() => loadDisplay(), 3000);
+    scheduleReload(3000);
   });
 
   mainWindow.webContents.on('unresponsive', () => {
     console.warn('[Kiosk] Seite reagiert nicht – Neustart in 5s');
-    setTimeout(() => loadDisplay(), 5000);
+    scheduleReload(5000);
   });
 
   mainWindow.webContents.on('did-fail-load', (_e, code, desc) => {
     if (code === -3) return; // Aborted – ignorieren (z.B. bei schnellem Reload)
     console.warn(`[Kiosk] Laden fehlgeschlagen (${code}: ${desc}) – Retry in ${retryMs}ms`);
     showOffline();
-    setTimeout(() => loadDisplay(), retryMs);
+    scheduleReload(retryMs);
     retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
   });
 
@@ -128,6 +140,10 @@ function createWindow() {
 
 function loadDisplay() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
   console.log(`[Kiosk] Lade ${DISPLAY_URL}`);
   isOffline = false;
   mainWindow.loadURL(DISPLAY_URL).catch(() => {
@@ -150,7 +166,7 @@ function startWatchdog() {
   if (watchdogInterval) clearInterval(watchdogInterval);
 
   watchdogInterval = setInterval(async () => {
-    const reachable = await checkServerReachable(DISPLAY_URL);
+    const reachable = await checkServerReachable(HEALTH_URL);
 
     if (!reachable && !isOffline) {
       console.warn('[Kiosk] Server nicht erreichbar – wechsle zu Offline-Seite');
@@ -207,12 +223,14 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (watchdogInterval) clearInterval(watchdogInterval);
+  if (retryTimer) clearTimeout(retryTimer);
   app.quit();
 });
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (watchdogInterval) clearInterval(watchdogInterval);
+  if (retryTimer) clearTimeout(retryTimer);
 });
 
 // Unhandled Errors abfangen – nicht abstürzen

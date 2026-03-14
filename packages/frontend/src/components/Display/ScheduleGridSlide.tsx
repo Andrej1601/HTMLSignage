@@ -18,6 +18,7 @@ import {
 interface ScheduleGridSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
 }
 
 interface SaunaInfusionItem extends InfusionListItem {
@@ -166,18 +167,21 @@ function InfusionItemGrid({
   );
 }
 
-export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps) {
+export function ScheduleGridSlide({ schedule, settings, now: nowProp }: ScheduleGridSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
-  const [now, setNow] = useState(() => new Date());
+  const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
 
   useEffect(() => {
+    if (nowProp) return undefined;
     // Minute-level clock + status changes don't need 1s resolution.
-    const t = setInterval(() => setNow(new Date()), 10_000);
+    const t = setInterval(() => setClockNow(new Date()), 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [nowProp]);
+
+  const now = nowProp ?? clockNow;
 
   const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
 

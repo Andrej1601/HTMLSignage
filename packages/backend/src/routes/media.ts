@@ -5,7 +5,6 @@ import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
-import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
 import { fileTypeFromFile } from 'file-type';
@@ -44,16 +43,6 @@ function normalizeTags(value: unknown): string[] {
   return [...unique];
 }
 
-async function isLikelySvg(filePath: string): Promise<boolean> {
-  try {
-    const content = await fsPromises.readFile(filePath, 'utf-8');
-    const head = content.slice(0, 2048).toLowerCase();
-    return head.includes('<svg');
-  } catch {
-    return false;
-  }
-}
-
 async function validateUploadedFile(file: Express.Multer.File): Promise<{
   ok: boolean;
   detectedMime?: string;
@@ -61,17 +50,6 @@ async function validateUploadedFile(file: Express.Multer.File): Promise<{
 }> {
   const incomingMime = file.mimetype.toLowerCase();
   const compatible = MIME_SIGNATURE_COMPATIBILITY[incomingMime];
-
-  if (incomingMime === 'image/svg+xml') {
-    const svgValid = await isLikelySvg(file.path);
-    if (!svgValid) {
-      return {
-        ok: false,
-        message: 'Dateiinhalt passt nicht zum angegebenen SVG-Dateityp.',
-      };
-    }
-    return { ok: true, detectedMime: incomingMime };
-  }
 
   if (!compatible) {
     return {
@@ -233,7 +211,7 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), mutati
     const signatureCheck = await validateUploadedFile(req.file);
     if (!signatureCheck.ok) {
       try {
-        fs.unlinkSync(req.file.path);
+        await fsPromises.unlink(req.file.path);
       } catch (unlinkError) {
         console.error('[media] Error deleting invalid upload:', unlinkError);
       }
@@ -269,7 +247,7 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), mutati
     // Clean up uploaded file on error
     if (req.file) {
       try {
-        fs.unlinkSync(req.file.path);
+        await fsPromises.unlink(req.file.path);
       } catch (unlinkError) {
         console.error('[media] Error deleting file after error:', unlinkError);
       }
@@ -320,11 +298,12 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
     // Delete file from filesystem
     const filePath = path.join(UPLOAD_DIR, media.filename);
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await fsPromises.unlink(filePath);
     } catch (fsError) {
-      console.error('[media] Error deleting file from disk:', fsError);
+      const code = (fsError as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        console.error('[media] Error deleting file from disk:', fsError);
+      }
       // Continue with database deletion even if file deletion fails
     }
 

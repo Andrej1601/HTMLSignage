@@ -6,8 +6,7 @@ import { useMedia } from '@/hooks/useMedia';
 import { useSettings } from '@/hooks/useSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { API_URL } from '@/config/env';
-import { systemApi } from '@/services/api';
+import { fetchApi, systemApi } from '@/services/api';
 import { formatFileSize, type Media } from '@/types/media.types';
 import { resolveLivePresetKey, type PresetKey } from '@/types/schedule.types';
 import { getActiveEvent } from '@/types/settings.types';
@@ -117,9 +116,7 @@ export function useDashboardData() {
   const backendHealthQuery = useQuery({
     queryKey: ['dashboard-health'],
     queryFn: async (): Promise<{ status: string; timestamp?: string }> => {
-      const response = await fetch(`${API_URL}/health`);
-      if (!response.ok) throw new Error(`Health check failed (${response.status})`);
-      return response.json();
+      return fetchApi('/health');
     },
     refetchInterval: 30000,
   });
