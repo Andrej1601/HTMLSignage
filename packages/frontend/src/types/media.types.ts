@@ -74,8 +74,7 @@ export const ACCEPTED_IMAGE_TYPES = [
   'image/jpg',
   'image/png',
   'image/gif',
-  'image/webp',
-  'image/svg+xml'
+  'image/webp'
 ];
 
 export const ACCEPTED_AUDIO_TYPES = [

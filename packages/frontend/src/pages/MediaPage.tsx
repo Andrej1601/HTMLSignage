@@ -16,6 +16,7 @@ import { ImageIcon, RefreshCw, Upload, Filter, Music, Film, LayoutGrid, List, Tr
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { SectionCard } from '@/components/SectionCard';
+import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 
 type ViewMode = 'grid' | 'list';
 
@@ -372,70 +373,88 @@ function MediaListView({
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden divide-y divide-spa-bg-secondary">
       {media.map((item) => (
-        <div
+        <MediaListRow
           key={item.id}
-          className="flex items-center gap-4 p-3 hover:bg-spa-bg-primary transition-colors"
-        >
-          {/* Thumbnail */}
-          <div className="w-12 h-12 rounded-lg bg-spa-bg-primary overflow-hidden flex-shrink-0">
-            {item.type === 'image' ? (
-              <img
-                src={toAbsoluteMediaUrl(item.url)}
-                alt={item.originalName}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                {item.type === 'audio' ? (
-                  <Music className="w-5 h-5 text-spa-primary/40" />
-                ) : (
-                  <Film className="w-5 h-5 text-spa-primary/40" />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Name */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-spa-text-primary truncate">{item.originalName}</p>
-            <p className="text-xs text-spa-text-secondary">{item.type} &middot; {formatFileSize(item.size)}</p>
-            {item.tags && item.tags.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {item.tags.slice(0, 5).map((tag) => (
-                  <span
-                    key={`${item.id}-list-${tag}`}
-                    className="inline-flex items-center rounded-full bg-spa-secondary/15 px-2 py-0.5 text-[11px] text-spa-text-primary"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Date */}
-          <span className="text-xs text-spa-text-secondary hidden sm:block">
-            {new Date(item.createdAt).toLocaleDateString('de-DE')}
-          </span>
-
-          {/* Actions */}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={Edit3}
-            onClick={() => onEditTags(item)}
-            aria-label={`${item.originalName} Tags bearbeiten`}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            icon={Trash2}
-            onClick={() => onDelete(item)}
-            aria-label={`${item.originalName} löschen`}
-          />
-        </div>
+          item={item}
+          onDelete={onDelete}
+          onEditTags={onEditTags}
+        />
       ))}
+    </div>
+  );
+}
+
+function MediaListRow({
+  item,
+  onDelete,
+  onEditTags,
+}: {
+  item: Media;
+  onDelete: (media: Media) => void;
+  onEditTags: (media: Media) => void;
+}) {
+  const mediaUrl = toAbsoluteMediaUrl(item.url);
+  const { summary } = useMediaMetadata(mediaUrl, item.type);
+
+  return (
+    <div className="flex items-center gap-4 p-3 hover:bg-spa-bg-primary transition-colors">
+      <div className="w-12 h-12 rounded-lg bg-spa-bg-primary overflow-hidden flex-shrink-0">
+        {item.type === 'image' ? (
+          <img
+            src={mediaUrl}
+            alt={item.originalName}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            {item.type === 'audio' ? (
+              <Music className="w-5 h-5 text-spa-primary/40" />
+            ) : (
+              <Film className="w-5 h-5 text-spa-primary/40" />
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-spa-text-primary truncate">{item.originalName}</p>
+        <p className="text-xs text-spa-text-secondary">
+          {item.type} &middot; {formatFileSize(item.size)}
+          {summary ? ` · ${summary}` : ''}
+        </p>
+        {item.tags && item.tags.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {item.tags.slice(0, 5).map((tag) => (
+              <span
+                key={`${item.id}-list-${tag}`}
+                className="inline-flex items-center rounded-full bg-spa-secondary/15 px-2 py-0.5 text-[11px] text-spa-text-primary"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <span className="text-xs text-spa-text-secondary hidden sm:block">
+        {new Date(item.createdAt).toLocaleDateString('de-DE')}
+      </span>
+
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={Edit3}
+        onClick={() => onEditTags(item)}
+        aria-label={`${item.originalName} Tags bearbeiten`}
+      />
+      <Button
+        variant="danger"
+        size="sm"
+        icon={Trash2}
+        onClick={() => onDelete(item)}
+        aria-label={`${item.originalName} löschen`}
+      />
     </div>
   );
 }

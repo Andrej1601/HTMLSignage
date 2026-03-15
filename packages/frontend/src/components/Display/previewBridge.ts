@@ -8,5 +8,5 @@ export const PREVIEW_REQUEST_READY_EVENT = 'htmlsignage:preview-request-ready';
 export interface PreviewConfigPayload {
   schedule: Schedule;
   settings: Settings;
+  deviceId?: string | null;
 }
-

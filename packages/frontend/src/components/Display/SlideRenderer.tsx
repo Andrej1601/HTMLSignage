@@ -13,8 +13,9 @@ import { TimelineScheduleSlide } from './TimelineScheduleSlide';
 import { ChronologicalListSlide } from './ChronologicalListSlide';
 import { InfosSlide } from './InfosSlide';
 import { EventsSlide } from './EventsSlide';
-
 import { SaunaDetailDashboard } from './SaunaDetailDashboard';
+import { ResilientImage } from './ResilientImage';
+import { ResilientVideo } from './ResilientVideo';
 import { Flame } from 'lucide-react';
 import { getDefaultSettings } from '@/types/settings.types';
 import { buildUploadUrl, getMediaUploadUrl } from '@/utils/mediaUrl';
@@ -26,6 +27,7 @@ interface SlideRendererProps {
   settings?: Settings;
   media?: Media[];
   now?: Date;
+  deviceId?: string;
 }
 
 export function SlideRenderer({
@@ -35,6 +37,7 @@ export function SlideRenderer({
   settings: settingsProp,
   media: mediaProp,
   now,
+  deviceId,
 }: SlideRendererProps) {
   const { schedule: scheduleFromQuery } = useSchedule();
   const { settings: settingsFromQuery } = useSettings();
@@ -50,7 +53,7 @@ export function SlideRenderer({
 
   switch (slide.type) {
     case 'content-panel':
-      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} />;
+      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
 
     case 'sauna-detail':
       return (
@@ -60,6 +63,7 @@ export function SlideRenderer({
           schedule={schedule}
           settings={settings}
           media={media}
+          deviceId={deviceId}
         />
       );
 
@@ -102,22 +106,24 @@ function ContentPanelSlide({
   settings,
   slide,
   now,
+  deviceId,
 }: {
   schedule: Schedule;
   settings: Settings;
   slide: SlideConfig;
   now?: Date;
+  deviceId?: string;
 }) {
   const designStyle = settings.designStyle || 'modern-wellness';
 
   if (designStyle === 'modern-wellness') {
-    return <ScheduleGridSlide schedule={schedule} settings={settings} now={now} />;
+    return <ScheduleGridSlide schedule={schedule} settings={settings} now={now} deviceId={deviceId} />;
   }
   if (designStyle === 'modern-timeline') {
-    return <TimelineScheduleSlide schedule={schedule} settings={settings} now={now} />;
+    return <TimelineScheduleSlide schedule={schedule} settings={settings} now={now} deviceId={deviceId} />;
   }
   if (designStyle === 'compact-tiles') {
-    return <ChronologicalListSlide schedule={schedule} settings={settings} now={now} />;
+    return <ChronologicalListSlide schedule={schedule} settings={settings} now={now} deviceId={deviceId} />;
   }
 
   return (
@@ -127,7 +133,7 @@ function ContentPanelSlide({
           <h2 className="text-4xl font-bold">{slide.title}</h2>
         </div>
       )}
-      <OverviewSlide schedule={schedule} settings={settings} now={now} />
+      <OverviewSlide schedule={schedule} settings={settings} now={now} deviceId={deviceId} />
     </div>
   );
 }
@@ -138,12 +144,14 @@ function SaunaDetailSlide({
   schedule,
   settings,
   media,
+  deviceId,
 }: {
   sauna?: Sauna;
   slide: SlideConfig;
   schedule: Schedule;
   settings: Settings;
   media?: Media[];
+  deviceId?: string;
 }) {
   if (!sauna) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Sauna nicht gefunden</div>;
@@ -156,23 +164,26 @@ function SaunaDetailSlide({
   const designStyle = settings.designStyle || 'modern-wellness';
 
   if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline' || designStyle === 'compact-tiles') && schedule) {
-    return <SaunaDetailDashboard schedule={schedule} settings={settings} saunaId={sauna.id} />;
+    return <SaunaDetailDashboard schedule={schedule} settings={settings} saunaId={sauna.id} media={media} deviceId={deviceId} />;
   }
 
   // Find image filename if imageId is set
   const imageUrl = getMediaUploadUrl(media, sauna.imageId);
 
   return (
-    <div
-      className="w-full h-screen flex items-center justify-center p-16"
-      style={{
-        backgroundColor: theme.bg,
-        backgroundImage: imageUrl ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url(${imageUrl})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      <div className="max-w-6xl w-full">
+    <div className="w-full h-screen flex items-center justify-center p-16 relative overflow-hidden" style={{ backgroundColor: theme.bg }}>
+      {imageUrl && (
+        <>
+          <ResilientImage
+            src={imageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            fallback={<div className="absolute inset-0" style={{ backgroundColor: theme.bg }} />}
+          />
+          <div className="absolute inset-0 bg-black/45" />
+        </>
+      )}
+      <div className="max-w-6xl w-full relative">
         {/* Card-Style Container */}
         <div
           className="rounded-3xl p-12 shadow-2xl backdrop-blur-sm"
@@ -340,10 +351,15 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
 
   return (
     <div className="w-full h-full relative">
-      <img
+      <ResilientImage
         src={buildUploadUrl(media.filename)}
         alt={media.originalName}
         className="w-full h-full object-cover"
+        fallback={
+          <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
+            Bild konnte nicht geladen werden
+          </div>
+        }
       />
       {slide.showTitle && slide.title && (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
@@ -363,13 +379,19 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
 
   return (
     <div className="w-full h-full relative bg-black">
-      <video
+      <ResilientVideo
         src={buildUploadUrl(media.filename)}
         className="w-full h-full object-contain"
         autoPlay
         loop={shouldLoop}
         muted
+        playsInline
         onEnded={onVideoEnded}
+        fallback={
+          <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
+            Video konnte nicht geladen werden
+          </div>
+        }
       />
       {slide.showTitle && slide.title && (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">

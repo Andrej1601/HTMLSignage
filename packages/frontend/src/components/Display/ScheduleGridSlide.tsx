@@ -19,6 +19,7 @@ interface ScheduleGridSlideProps {
   schedule: Schedule;
   settings: Settings;
   now?: Date;
+  deviceId?: string;
 }
 
 interface SaunaInfusionItem extends InfusionListItem {
@@ -167,7 +168,7 @@ function InfusionItemGrid({
   );
 }
 
-export function ScheduleGridSlide({ schedule, settings, now: nowProp }: ScheduleGridSlideProps) {
+export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }: ScheduleGridSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
@@ -183,7 +184,7 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp }: Schedule
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets?.[activePresetKey];
 

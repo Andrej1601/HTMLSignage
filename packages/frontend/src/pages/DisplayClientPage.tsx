@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toJpeg } from 'html-to-image';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
@@ -14,22 +15,14 @@ import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard'
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
-import {
-  generateDashboardColors,
-  getActiveEvent,
-  getColorPalette,
-  getDefaultSettings,
-  type ColorPaletteName,
-  type Settings,
-  type ThemeColors,
-} from '@/types/settings.types';
+import { getDefaultSettings, type Settings } from '@/types/settings.types';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { PairingResponse } from '@/types/auth.types';
 import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
+import type { Media } from '@/types/media.types';
 import { ENV_IS_DEV } from '@/config/env';
 import { devicesApi, fetchApi } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
-import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -38,6 +31,15 @@ import {
   PREVIEW_READY_EVENT,
   PREVIEW_REQUEST_READY_EVENT,
 } from '@/components/Display/previewBridge';
+import { isPlainRecord } from '@/utils/objectUtils';
+import { normalizeAudioSettings } from '@/utils/audioUtils';
+import { clearDisplayAssetCache, prefetchDisplayAssets } from '@/utils/displayAssetCache';
+import { useResilientMediaSource } from '@/hooks/useResilientMediaSource';
+import {
+  applyActiveEventSettings,
+  collectDisplayAssetUrls,
+  resolveAudioSourceUrl,
+} from '@/utils/displaySettings';
 
 // Generate a unique browser ID (UUID v4)
 function generateBrowserId(): string {
@@ -51,6 +53,7 @@ function generateBrowserId(): string {
 const DEVICE_TOKEN_STORAGE_KEY = 'device_auth_token';
 const DISPLAY_CACHED_SCHEDULE_KEY = 'display_cached_schedule';
 const DISPLAY_CACHED_SETTINGS_KEY = 'display_cached_settings';
+const DISPLAY_CACHED_MEDIA_KEY = 'display_cached_media';
 
 function readCachedValue<T>(key: string): T | null {
   try {
@@ -92,11 +95,9 @@ interface PreviewConfigMessage {
   payload?: {
     schedule?: unknown;
     settings?: unknown;
+    deviceId?: unknown;
   };
 }
-
-import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
-import { normalizeAudioSettings } from '@/utils/audioUtils';
 
 export function DisplayClientPage() {
   const location = useLocation();
@@ -123,13 +124,21 @@ export function DisplayClientPage() {
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
   const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
   const [hasPreviewPayload, setHasPreviewPayload] = useState(false);
+  const [previewDeviceId, setPreviewDeviceId] = useState<string | null>(null);
   const [isAudioBlocked, setIsAudioBlocked] = useState(false);
   const pairedDeviceIdRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const displayRootRef = useRef<HTMLDivElement | null>(null);
+  const snapshotUploadInFlightRef = useRef(false);
 
   const { schedule, isLoading: scheduleLoading } = useSchedule();
   const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
   const { data: mediaData } = useMedia();
+  const cachedMedia = useMemo(
+    () => readCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
+    [],
+  );
+  const mediaItems = mediaData && mediaData.length > 0 ? mediaData : cachedMedia;
 
   const [localSchedule, setLocalSchedule] = useState<Schedule>(() => (
     schedule ||
@@ -142,6 +151,11 @@ export function DisplayClientPage() {
     getDefaultSettings()
   ));
   const [eventClock, setEventClock] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!mediaData || mediaData.length === 0) return;
+    writeCachedValue(DISPLAY_CACHED_MEDIA_KEY, mediaData);
+  }, [mediaData]);
 
   // Check pairing status
   useEffect(() => {
@@ -269,6 +283,8 @@ export function DisplayClientPage() {
         setLocalSettings(migrateSettings(incomingSettings as unknown as Settings));
         setHasPreviewPayload(true);
       }
+
+      setPreviewDeviceId(typeof payload.deviceId === 'string' && payload.deviceId.trim() !== '' ? payload.deviceId : null);
     };
 
     window.addEventListener('message', handlePreviewMessage);
@@ -283,6 +299,7 @@ export function DisplayClientPage() {
   useEffect(() => {
     if (!isPreviewMode) {
       setHasPreviewPayload(false);
+      setPreviewDeviceId(null);
     }
   }, [isPreviewMode]);
 
@@ -369,9 +386,11 @@ export function DisplayClientPage() {
         window.location.reload();
       }
       if (command === 'clear-cache') {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
+        void clearDisplayAssetCache().finally(() => {
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.reload();
+        });
       }
     },
   });
@@ -421,48 +440,44 @@ export function DisplayClientPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const effectiveSettings = useMemo(() => {
-    const baseSettings = migrateSettings(localSettings || getDefaultSettings());
-    const activeEvent = getActiveEvent(baseSettings, new Date(eventClock));
-    const overrides = activeEvent?.settingsOverrides;
+  const displayDeviceId = isPreviewMode
+    ? previewDeviceId
+    : pairingInfo?.paired
+      ? pairingInfo.id
+      : null;
 
-    if (!isPlainRecord(overrides)) {
-      return baseSettings;
-    }
-
-    const merged = deepMergeRecords(
-      baseSettings as unknown as Record<string, unknown>,
-      overrides
-    ) as unknown as Settings;
-
-    const overridePalette =
-      typeof overrides.colorPalette === 'string'
-        ? (overrides.colorPalette as ColorPaletteName)
-        : undefined;
-    if (overridePalette) {
-      const paletteTheme = generateDashboardColors(getColorPalette(overridePalette));
-      const overrideTheme = isPlainRecord(overrides.theme)
-        ? (overrides.theme as Partial<ThemeColors>)
-        : undefined;
-      merged.colorPalette = overridePalette;
-      merged.theme = generateDashboardColors({
-        ...paletteTheme,
-        ...(overrideTheme || {}),
-      });
-    }
-
-    return migrateSettings(merged);
-  }, [localSettings, eventClock]);
+  const effectiveSettings = useMemo(
+    () => applyActiveEventSettings(
+      migrateSettings(localSettings || getDefaultSettings()),
+      new Date(eventClock),
+      displayDeviceId,
+    ).settings,
+    [displayDeviceId, localSettings, eventClock],
+  );
 
   const effectiveAudio = useMemo(
     () => normalizeAudioSettings(effectiveSettings.audio),
-    [effectiveSettings.audio]
+    [effectiveSettings.audio],
   );
 
-  const effectiveAudioSrc = useMemo(
-    () => (effectiveAudio.enabled && effectiveAudio.src ? toAbsoluteMediaUrl(effectiveAudio.src) : ''),
-    [effectiveAudio.enabled, effectiveAudio.src]
+  const effectiveAudioSourceUrl = useMemo(
+    () => resolveAudioSourceUrl(effectiveSettings.audio, mediaItems),
+    [effectiveSettings.audio, mediaItems],
   );
+
+  const {
+    resolvedSrc: effectiveAudioSrc,
+    handleError: handleAudioError,
+  } = useResilientMediaSource(effectiveAudioSourceUrl);
+
+  const displayAssetUrls = useMemo(
+    () => collectDisplayAssetUrls(effectiveSettings, mediaItems),
+    [effectiveSettings, mediaItems],
+  );
+
+  useEffect(() => {
+    void prefetchDisplayAssets(displayAssetUrls);
+  }, [displayAssetUrls]);
 
   const tryPlayAudio = useCallback(async () => {
     const audio = audioRef.current;
@@ -527,7 +542,7 @@ export function DisplayClientPage() {
       window.removeEventListener('pointerdown', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
     };
-  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio]);
+  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSourceUrl, tryPlayAudio]);
 
   // Slideshow
   const {
@@ -552,6 +567,106 @@ export function DisplayClientPage() {
     (slide: SlideConfig | null | undefined) => slide?.transition || defaultTransition,
     [defaultTransition]
   );
+
+  const defaults = getDefaultSettings();
+  const themeColors = effectiveSettings.theme || defaults.theme!;
+  const safeLayout = normalizeLayout(layout);
+  const hasAnyZoneSlides = zones.some((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
+  const isLoading =
+    isPreviewMode
+      ? scheduleLoading || settingsLoading
+      : ((!pairingInfo?.paired && (scheduleLoading || settingsLoading)) ||
+          (pairingInfo?.paired && isDisplayConfigLoading && !hasLoadedDeviceConfig));
+  const canCaptureSnapshots = Boolean(
+    !isPreviewMode &&
+    pairingInfo?.paired &&
+    pairingInfo?.id &&
+    deviceToken &&
+    !isLoading
+  );
+
+  const captureLiveSnapshot = useCallback(async () => {
+    if (!canCaptureSnapshots || !pairingInfo?.id || !deviceToken) return;
+
+    const snapshotTarget = displayRootRef.current || document.body;
+    if (!snapshotTarget || snapshotUploadInFlightRef.current) return;
+
+    snapshotUploadInFlightRef.current = true;
+
+    try {
+      if ('fonts' in document) {
+        await (document as Document & { fonts?: FontFaceSet }).fonts?.ready;
+      }
+      await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
+
+      const snapshotOptions = {
+        backgroundColor: themeColors.dashboardBg || themeColors.bg || '#000000',
+        cacheBust: true,
+        pixelRatio: 0.5,
+        quality: 0.6,
+        skipFonts: false,
+        fetchRequestInit: {
+          cache: 'no-store' as RequestCache,
+          credentials: 'include' as RequestCredentials,
+        },
+        filter: (element: HTMLElement) =>
+          (element as HTMLElement | undefined)?.dataset?.snapshotIgnore !== 'true',
+      };
+
+      let imageDataUrl: string;
+      try {
+        imageDataUrl = await toJpeg(snapshotTarget, snapshotOptions);
+      } catch (error) {
+        console.warn('[Display] Snapshot render failed, retrying with reduced options:', error);
+        imageDataUrl = await toJpeg(snapshotTarget, {
+          ...snapshotOptions,
+          pixelRatio: 0.35,
+          quality: 0.45,
+          skipFonts: true,
+        });
+      }
+      await devicesApi.uploadSnapshot(pairingInfo.id, imageDataUrl, deviceToken);
+    } catch (error) {
+      console.warn('[Display] Snapshot capture failed:', error);
+    } finally {
+      snapshotUploadInFlightRef.current = false;
+    }
+  }, [
+    canCaptureSnapshots,
+    deviceToken,
+    pairingInfo?.id,
+    themeColors.bg,
+    themeColors.dashboardBg,
+  ]);
+
+  useEffect(() => {
+    if (!canCaptureSnapshots || !pairingInfo?.id) return;
+
+    const initialTimer = window.setTimeout(() => {
+      void captureLiveSnapshot();
+    }, 5000);
+
+    const interval = window.setInterval(() => {
+      void captureLiveSnapshot();
+    }, 90_000);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(interval);
+    };
+  }, [canCaptureSnapshots, captureLiveSnapshot, pairingInfo?.id]);
+
+  useEffect(() => {
+    if (!canCaptureSnapshots || !pairingInfo?.id) return;
+
+    const timer = window.setTimeout(() => {
+      void captureLiveSnapshot();
+    }, 2500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [canCaptureSnapshots, captureLiveSnapshot, currentSlideIndex, pairingInfo?.id, safeLayout]);
 
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
@@ -596,13 +711,6 @@ export function DisplayClientPage() {
     );
   }
 
-  // Loading state
-  const isLoading =
-    isPreviewMode
-      ? scheduleLoading || settingsLoading
-      : ((!pairingInfo?.paired && (scheduleLoading || settingsLoading)) ||
-          (pairingInfo?.paired && isDisplayConfigLoading && !hasLoadedDeviceConfig));
-
   if (isLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -624,35 +732,26 @@ export function DisplayClientPage() {
   const renderContentPanel = () => {
     switch (designStyle) {
       case 'modern-timeline':
-        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
+        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
       case 'compact-tiles':
-        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
+        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
       default:
-        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />;
+        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
     }
   };
-
-  // Safety: old configs might contain legacy layout strings; render them as split-view instead of breaking.
-  const safeLayout = normalizeLayout(layout);
-
-  const hasAnyZoneSlides = zones.some((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
 
   // If no slides configured, show default overview
   if (!hasAnyZoneSlides) {
     return (
-      <div className="w-full h-screen overflow-hidden">
+      <div ref={displayRootRef} className="w-full h-screen overflow-hidden">
         {isModernDesign ? (
           renderContentPanel()
         ) : (
-          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />
+          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />
         )}
       </div>
     );
   }
-
-  // Get defaults for header and theme
-  const defaults = getDefaultSettings();
-  const themeColors = effectiveSettings.theme || defaults.theme!;
 
   // Render based on layout
   const renderLayout = () => {
@@ -702,7 +801,9 @@ export function DisplayClientPage() {
           <SlideRenderer
             schedule={localSchedule}
             settings={effectiveSettings}
+            media={mediaItems}
             now={displayNow}
+            deviceId={displayDeviceId || undefined}
             slide={slide}
             onVideoEnded={() => zone && onVideoEnded(zone.id)}
           />
@@ -913,7 +1014,9 @@ export function DisplayClientPage() {
             <SlideRenderer
               schedule={localSchedule}
               settings={effectiveSettings}
+              media={mediaItems}
               now={displayNow}
+              deviceId={displayDeviceId || undefined}
               slide={slide}
               onVideoEnded={() => onVideoEnded(zoneId)}
             />
@@ -999,7 +1102,9 @@ export function DisplayClientPage() {
                         <SlideRenderer
                           schedule={localSchedule}
                           settings={effectiveSettings}
+                          media={mediaItems}
                           now={displayNow}
+                          deviceId={displayDeviceId || undefined}
                           slide={leftSlide}
                           onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                         />
@@ -1009,6 +1114,8 @@ export function DisplayClientPage() {
                     <SlideRenderer
                       schedule={localSchedule}
                       settings={effectiveSettings}
+                      media={mediaItems}
+                      deviceId={displayDeviceId || undefined}
                       slide={leftSlide}
                       onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                     />
@@ -1038,6 +1145,8 @@ export function DisplayClientPage() {
                           schedule={localSchedule}
                           settings={effectiveSettings}
                           saunaId={topRightSlide.saunaId}
+                          media={mediaItems}
+                          deviceId={displayDeviceId || undefined}
                         />
                       ) : topRightSlide ? (
                         topRightSlide.type?.startsWith('media-') ? (
@@ -1046,7 +1155,9 @@ export function DisplayClientPage() {
                               <SlideRenderer
                                 schedule={localSchedule}
                                 settings={effectiveSettings}
+                                media={mediaItems}
                                 now={displayNow}
+                                deviceId={displayDeviceId || undefined}
                                 slide={topRightSlide}
                                 onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                               />
@@ -1057,14 +1168,16 @@ export function DisplayClientPage() {
                             <SlideRenderer
                               schedule={localSchedule}
                               settings={effectiveSettings}
+                              media={mediaItems}
                               now={displayNow}
+                              deviceId={displayDeviceId || undefined}
                               slide={topRightSlide}
                               onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                             />
                           </div>
                         )
                       ) : (
-                        <SaunaDetailDashboard schedule={localSchedule} settings={effectiveSettings} saunaId={undefined} />
+                        <SaunaDetailDashboard schedule={localSchedule} settings={effectiveSettings} saunaId={undefined} media={mediaItems} deviceId={displayDeviceId || undefined} />
                       )}
                     </div>
                   </SlideTransition>
@@ -1092,7 +1205,9 @@ export function DisplayClientPage() {
                               <SlideRenderer
                                 schedule={localSchedule}
                                 settings={effectiveSettings}
+                                media={mediaItems}
                                 now={displayNow}
+                                deviceId={displayDeviceId || undefined}
                                 slide={bottomRightSlide}
                                 onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                               />
@@ -1102,13 +1217,15 @@ export function DisplayClientPage() {
                           <SlideRenderer
                             schedule={localSchedule}
                             settings={effectiveSettings}
+                            media={mediaItems}
                             now={displayNow}
+                            deviceId={displayDeviceId || undefined}
                             slide={bottomRightSlide}
                             onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                           />
                         )
                       ) : (
-                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} media={mediaData} />
+                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} media={mediaItems} />
                       )}
                     </div>
                   </SlideTransition>
@@ -1165,9 +1282,11 @@ export function DisplayClientPage() {
                   transition={resolveTransition(leftSlide)}
                 >
                   {leftSlide.type === 'content-panel' ? (
-                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} />
+                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />
                   ) : (
                     <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
+                      media={mediaItems}
+                      deviceId={displayDeviceId || undefined}
                       slide={leftSlide}
                       onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
                     />
@@ -1192,9 +1311,12 @@ export function DisplayClientPage() {
                         schedule={localSchedule}
                         settings={effectiveSettings}
                         saunaId={topRightSlide.saunaId}
+                        media={mediaItems}
+                        deviceId={displayDeviceId || undefined}
                       />
                     ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} media={mediaItems} now={displayNow}
+                        deviceId={displayDeviceId || undefined}
                         slide={topRightSlide}
                         onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
                       />
@@ -1217,9 +1339,12 @@ export function DisplayClientPage() {
                         schedule={localSchedule}
                         settings={effectiveSettings}
                         saunaId={bottomRightSlide.saunaId}
+                        media={mediaItems}
+                        deviceId={displayDeviceId || undefined}
                       />
                     ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
+                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} media={mediaItems} now={displayNow}
+                        deviceId={displayDeviceId || undefined}
                         slide={bottomRightSlide}
                         onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
                       />
@@ -1254,7 +1379,9 @@ export function DisplayClientPage() {
               <SlideRenderer
                 schedule={localSchedule}
                 settings={effectiveSettings}
+                media={mediaItems}
                 now={displayNow}
+                deviceId={displayDeviceId || undefined}
                 slide={slide}
                 onVideoEnded={() => onVideoEnded(zoneId)}
               />
@@ -1324,10 +1451,11 @@ export function DisplayClientPage() {
   };
 
   return (
-    <div
-      className="w-full h-screen overflow-hidden flex flex-col"
-      style={{ backgroundColor: themeColors.dashboardBg || themeColors.bg }}
-    >
+      <div
+        ref={displayRootRef}
+        className="w-full h-screen overflow-hidden flex flex-col"
+        style={{ backgroundColor: themeColors.dashboardBg || themeColors.bg }}
+      >
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative">
         {renderLayout()}
@@ -1338,9 +1466,12 @@ export function DisplayClientPage() {
         preload="auto"
         playsInline
         className="hidden"
+        onError={() => {
+          void handleAudioError();
+        }}
       />
 
-      {isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSrc) && (
+      {isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
         <button
           onClick={() => {
             void tryPlayAudio();
@@ -1383,6 +1514,7 @@ export function DisplayClientPage() {
       {/* Connection indicator (dev mode) - toggleable via showSlideIndicators */}
       {ENV_IS_DEV && showSlideIndicators && (
         <div
+          data-snapshot-ignore="true"
           className="fixed top-4 right-4 px-3 py-2 rounded-lg text-xs font-mono z-50"
           style={{
             backgroundColor: isConnected ? '#10B981' : '#EF4444',

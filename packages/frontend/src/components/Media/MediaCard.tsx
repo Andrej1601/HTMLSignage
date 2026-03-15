@@ -4,6 +4,7 @@ import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 
 interface MediaCardProps {
   media: Media;
@@ -16,6 +17,7 @@ export function MediaCard({ media, onDelete, onEditTags }: MediaCardProps) {
 
   // Construct full URL for media
   const mediaUrl = toAbsoluteMediaUrl(media.url);
+  const { summary: mediaSummary } = useMediaMetadata(mediaUrl, media.type);
 
   const getIcon = () => {
     switch (media.type) {
@@ -134,6 +136,11 @@ export function MediaCard({ media, onDelete, onEditTags }: MediaCardProps) {
           <span>{formatFileSize(media.size)}</span>
           <span>{new Date(media.createdAt).toLocaleDateString('de-DE')}</span>
         </div>
+        {mediaSummary && (
+          <div className="mt-1 text-xs text-spa-text-secondary">
+            {mediaSummary}
+          </div>
+        )}
       </div>
     </div>
   );

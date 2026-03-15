@@ -7,6 +7,7 @@ import { broadcastScheduleUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 import { normalizeScheduleData, createDefaultSchedule } from '../lib/schedule.js';
 import { computeScheduleChangeSummary } from '../lib/scheduleDiff.js';
 import type { Schedule } from '../types/schedule.types.js';
@@ -119,8 +120,14 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
     // Broadcast update via WebSocket
     broadcastScheduleUpdate(scheduleToStore);
 
-    // Log audit event (TODO: implement when auth is ready)
-    // await logAuditEvent(userId, 'schedule.update', newSchedule.id);
+    await logAuditEvent(req, {
+      action: 'schedule.update',
+      resource: newSchedule.id,
+      details: {
+        version: nextVersion,
+        presets: Object.keys(validated.presets || {}),
+      },
+    });
 
     res.json({ 
       ok: true, 

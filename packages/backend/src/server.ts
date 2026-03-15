@@ -2,12 +2,14 @@ import express from 'express';
 import path from 'path';
 import { createServer } from 'http';
 import os from 'os';
+import crypto from 'crypto';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
 import { prisma } from './lib/prisma.js';
+import { startMaintenanceScheduler, stopMaintenanceScheduler } from './lib/maintenance.js';
 import { setupWebSocket } from './websocket/index.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 import scheduleRouter from './routes/schedule.js';
@@ -19,6 +21,7 @@ import mediaRouter from './routes/media.js';
 import systemRouter from './routes/system.js';
 import saunasRouter from './routes/saunas.js';
 import palettesRouter from './routes/palettes.js';
+import slideshowWorkflowRouter from './routes/slideshowWorkflow.js';
 
 
 dotenv.config();
@@ -87,15 +90,29 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  (req as typeof req & { requestId?: string }).requestId = requestId;
+  res.setHeader('X-Request-ID', requestId);
+  next();
+});
+
 // Request logging
 app.use((req, res, next) => {
   const startedAt = Date.now();
-  const timestamp = new Date(startedAt).toISOString();
   res.on('finish', () => {
     const duration = Date.now() - startedAt;
     const shouldLog = LOG_HTTP_REQUESTS || res.statusCode >= 400 || duration >= LOG_HTTP_SLOW_THRESHOLD_MS;
     if (!shouldLog) return;
-    console.log(`[${timestamp}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+    console.log(JSON.stringify({
+      type: 'http_request',
+      timestamp: new Date(startedAt).toISOString(),
+      requestId: (req as typeof req & { requestId?: string }).requestId || null,
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: duration,
+    }));
   });
   next();
 });
@@ -134,18 +151,29 @@ app.use('/api/media', mediaRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/saunas', saunasRouter);
 app.use('/api/palettes', palettesRouter);
+app.use('/api/slideshow', slideshowWorkflowRouter);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[ERROR]', err);
+  const requestId = (req as typeof req & { requestId?: string }).requestId || null;
+  console.error(JSON.stringify({
+    type: 'http_error',
+    requestId,
+    method: req.method,
+    path: req.path,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  }));
   res.status(500).json({ 
     error: 'internal-server-error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred'
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred',
+    requestId,
   });
 });
 
 // WebSocket Setup
 setupWebSocket(io);
+startMaintenanceScheduler();
 
 // Start server
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -171,10 +199,19 @@ httpServer.listen(PORT, HOST, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+const shutdown = async (signal: string) => {
+  console.log(`${signal} signal received: closing HTTP server`);
+  stopMaintenanceScheduler();
   httpServer.close(() => {
     console.log('HTTP server closed');
   });
   await prisma.$disconnect();
+};
+
+process.on('SIGTERM', async () => {
+  await shutdown('SIGTERM');
+});
+
+process.on('SIGINT', async () => {
+  await shutdown('SIGINT');
 });

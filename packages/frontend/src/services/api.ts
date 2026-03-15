@@ -3,7 +3,8 @@ import type { Schedule, ScheduleResponse } from '@/types/schedule.types';
 import { createDefaultSchedule } from '@/types/schedule.types';
 import type { Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
 import type { Media, MediaFilter } from '@/types/media.types';
-import type { Settings, ThemeColors } from '@/types/settings.types';
+import type { AudioSettings, Settings, ThemeColors } from '@/types/settings.types';
+import type { SlideshowConfig } from '@/types/slideshow.types';
 import { API_URL } from '@/config/env';
 
 export interface ApiOkResponse {
@@ -37,6 +38,11 @@ export interface DeviceDisplayConfigResponse {
   settings: Settings;
 }
 
+export interface DeviceSnapshotUploadResponse extends ApiOkResponse {
+  snapshotUrl: string | null;
+  snapshotCapturedAt: string | null;
+}
+
 export interface GitHubRelease {
   tag: string;
   name: string;
@@ -52,17 +58,57 @@ export interface SystemReleasesResponse extends ApiOkResponse {
   olderReleases: GitHubRelease[];
   isDirty: boolean;
   isRunning: boolean;
+  activeJob?: SystemJob | null;
   checkedAt: string;
 }
 
-export interface SystemUpdateRunResponse extends ApiOkResponse {
-  newVersion: string;
-  targetVersion: string;
+export type SystemJobType = 'system-update' | 'backup-import';
+export type SystemJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface SystemJobProgress {
+  stage: string;
+  message: string;
+  percent?: number;
+}
+
+export interface SystemJobErrorInfo {
+  code: string;
+  message: string;
+  requestId?: string | null;
+}
+
+export interface SystemJob {
+  id: string;
+  type: SystemJobType;
+  title: string;
+  status: SystemJobStatus;
+  requestId: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdBy: {
+    id: string;
+    username: string;
+    email: string | null;
+  } | null;
+  progress: SystemJobProgress | null;
   log: string;
-  finishedAt: string;
-  note?: string;
-  backupPath?: string;
-  rolledBack?: boolean;
+  result: Record<string, unknown> | null;
+  error: SystemJobErrorInfo | null;
+}
+
+export interface SystemJobStartResponse extends ApiOkResponse {
+  jobId: string;
+  job: SystemJob;
+  message: string;
+}
+
+export interface SystemJobListResponse extends ApiOkResponse {
+  items: SystemJob[];
+}
+
+export interface SystemJobDetailResponse extends ApiOkResponse {
+  job: SystemJob;
 }
 
 export interface SystemBackupImportResponse extends ApiOkResponse {
@@ -72,6 +118,164 @@ export interface SystemBackupImportResponse extends ApiOkResponse {
   importedScheduleVersion?: number;
   importedSettingsVersion?: number;
   warnings?: string[];
+}
+
+export interface BackupPreviewMediaItem {
+  originalName: string;
+  filename: string;
+  type: string;
+  size: number;
+  tags: string[];
+  willRename: boolean;
+  uploadedByMissing: boolean;
+}
+
+export interface SystemBackupPreviewResponse extends ApiOkResponse {
+  backup: {
+    formatVersion: number;
+    exportedAt: string;
+    appVersion: string | null;
+    mediaCount: number;
+    checksumValid: boolean;
+  };
+  current: {
+    appVersion: string;
+    scheduleVersion: number | null;
+    settingsVersion: number | null;
+    mediaCount: number;
+  };
+  importPlan: {
+    replaceMedia: boolean;
+    importedMedia: number;
+    scheduleWillReplace: boolean;
+    settingsWillReplace: boolean;
+    renamedMediaFiles: number;
+  };
+  conflicts: {
+    mediaIdConflicts: number;
+    filenameConflicts: number;
+    missingUsers: number;
+  };
+  previewMedia: BackupPreviewMediaItem[];
+  warnings: string[];
+}
+
+export interface AuditLogItem {
+  id: string;
+  action: string;
+  resource: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  timestamp: string;
+  user: {
+    id: string;
+    username: string;
+    email: string | null;
+  } | null;
+}
+
+export interface SystemAuditLogResponse extends ApiOkResponse {
+  items: AuditLogItem[];
+  nextCursor: string | null;
+  unavailable: boolean;
+}
+
+export interface SystemRuntimeWarning {
+  id: string;
+  level: 'warning' | 'danger';
+  category: 'disk' | 'devices' | 'media' | 'maintenance';
+  title: string;
+  detail: string;
+}
+
+export interface SystemMaintenanceSnapshot {
+  state: 'idle' | 'running' | 'ok' | 'error';
+  lastRunAt: string | null;
+  lastDurationMs: number | null;
+  deletedExpiredSessions: number;
+  removedOrphanUploadFiles: number;
+  removedOldBackupFiles: number;
+  removedOldLogFiles: number;
+  errors: string[];
+}
+
+export interface SystemRuntimeStatusResponse {
+  ok: true;
+  checkedAt: string;
+  version: string;
+  disk: {
+    path: string;
+    totalBytes: number;
+    usedBytes: number;
+    availableBytes: number;
+    usagePercent: number;
+  };
+  devices: {
+    total: number;
+    paired: number;
+    pending: number;
+    online: number;
+    offline: number;
+    stale: number;
+    neverSeen: number;
+  };
+  media: {
+    dbCount: number;
+    filesOnDisk: number;
+    missingFiles: number;
+    orphanFiles: number;
+    totalBytes: number;
+  };
+  maintenance: SystemMaintenanceSnapshot;
+  warnings: SystemRuntimeWarning[];
+}
+
+export type SlideshowWorkflowTargetType = 'global' | 'device';
+export type SlideshowWorkflowAction =
+  | 'slideshow.draft.save'
+  | 'slideshow.draft.discard'
+  | 'slideshow.publish'
+  | 'slideshow.rollback';
+
+export interface SlideshowWorkflowSnapshot {
+  config: SlideshowConfig;
+  prestartMinutes: number;
+  audioOverride: AudioSettings | null;
+}
+
+export interface SlideshowWorkflowEntry {
+  id: string;
+  action: SlideshowWorkflowAction;
+  timestamp: string;
+  snapshot: SlideshowWorkflowSnapshot;
+  user: {
+    id: string;
+    username: string;
+    email: string | null;
+  } | null;
+  metadata: {
+    settingsVersion: number | null;
+    deviceMode: string | null;
+    targetName: string | null;
+  };
+}
+
+export interface SlideshowWorkflowStateResponse extends ApiOkResponse {
+  target: {
+    targetType: SlideshowWorkflowTargetType;
+    targetId: string | null;
+    name: string;
+  };
+  live: {
+    updatedAt: string | null;
+    settingsVersion: number | null;
+    deviceMode: string | null;
+    hasStoredOverride: boolean;
+    snapshot: SlideshowWorkflowSnapshot | null;
+  };
+  draft: SlideshowWorkflowEntry | null;
+  history: SlideshowWorkflowEntry[];
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
@@ -197,9 +401,14 @@ export async function fetchApi<T = unknown>(url: string, options: FetchApiOption
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const requestHeaders = new Headers(headers);
+  const storedToken = token || (
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+      : null
+  );
 
-  if (token && !requestHeaders.has('Authorization')) {
-    requestHeaders.set('Authorization', `Bearer ${token}`);
+  if (storedToken && !requestHeaders.has('Authorization')) {
+    requestHeaders.set('Authorization', `Bearer ${storedToken}`);
   }
 
   const requestBody = body ?? buildFetchBody(data, requestHeaders);
@@ -345,6 +554,19 @@ export const devicesApi = {
     return data;
   },
 
+  uploadSnapshot: async (
+    id: string,
+    imageDataUrl: string,
+    deviceToken?: string,
+  ): Promise<DeviceSnapshotUploadResponse> => {
+    const { data } = await api.post<DeviceSnapshotUploadResponse>(
+      `/devices/${id}/snapshot`,
+      { imageDataUrl },
+      { headers: getDeviceHeaders(deviceToken) },
+    );
+    return data;
+  },
+
   // Send control command (reload, restart, clear-cache)
   sendCommand: async (id: string, command: DeviceControlCommand): Promise<ApiOkResponse> => {
     const { data } = await api.post<ApiOkResponse>(`/devices/${id}/control`, command);
@@ -466,6 +688,13 @@ export const palettesApi = {
 };
 
 export const systemApi = {
+  getRuntimeStatus: async (token: string): Promise<SystemRuntimeStatusResponse> => {
+    const { data } = await api.get<SystemRuntimeStatusResponse>('/system/runtime-status', {
+      headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+
   getReleases: async (token: string): Promise<SystemReleasesResponse> => {
     const { data } = await api.get<SystemReleasesResponse>('/system/update/status', {
       headers: getAuthHeaders(token),
@@ -473,8 +702,8 @@ export const systemApi = {
     return data;
   },
 
-  runUpdate: async (token: string, targetVersion: string): Promise<SystemUpdateRunResponse> => {
-    const { data } = await api.post<SystemUpdateRunResponse>('/system/update/run', { targetVersion }, {
+  runUpdate: async (token: string, targetVersion: string): Promise<SystemJobStartResponse> => {
+    const { data } = await api.post<SystemJobStartResponse>('/system/update/run', { targetVersion }, {
       headers: getAuthHeaders(token),
     });
     return data;
@@ -488,15 +717,137 @@ export const systemApi = {
     return data as Blob;
   },
 
-  importBackup: async (token: string, backupFile: File, replaceMedia = true): Promise<SystemBackupImportResponse> => {
+  importBackup: async (token: string, backupFile: File, replaceMedia = true): Promise<SystemJobStartResponse> => {
     const formData = new FormData();
     formData.append('backup', backupFile);
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
-    const { data } = await api.post<SystemBackupImportResponse>('/system/backup/import', formData, {
+    const { data } = await api.post<SystemJobStartResponse>('/system/backup/import', formData, {
       headers: getAuthHeaders(token),
     });
     return data;
+  },
+
+  previewBackupImport: async (token: string, backupFile: File, replaceMedia = true): Promise<SystemBackupPreviewResponse> => {
+    const formData = new FormData();
+    formData.append('backup', backupFile);
+    formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
+
+    const { data } = await api.post<SystemBackupPreviewResponse>('/system/backup/import/preview', formData, {
+      headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+
+  getAuditLog: async (token: string, limit = 50, cursor?: string | null): Promise<SystemAuditLogResponse> => {
+    const { data } = await api.get<SystemAuditLogResponse>('/system/audit', {
+      headers: getAuthHeaders(token),
+      params: {
+        limit,
+        ...(cursor ? { cursor } : {}),
+      },
+    });
+    return data;
+  },
+
+  listJobs: async (token: string, limit = 20): Promise<SystemJobListResponse> => {
+    const { data } = await api.get<SystemJobListResponse>('/system/jobs', {
+      headers: getAuthHeaders(token),
+      params: { limit },
+    });
+    return data;
+  },
+
+  getJob: async (token: string, jobId: string): Promise<SystemJobDetailResponse> => {
+    const { data } = await api.get<SystemJobDetailResponse>(`/system/jobs/${jobId}`, {
+      headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+};
+
+export const slideshowWorkflowApi = {
+  getState: async (targetType: SlideshowWorkflowTargetType, targetId?: string): Promise<SlideshowWorkflowStateResponse> => {
+    const params = new URLSearchParams();
+    params.set('targetType', targetType);
+    if (targetType === 'device' && targetId) {
+      params.set('targetId', targetId);
+    }
+
+    return await fetchApi<SlideshowWorkflowStateResponse>(`/slideshow/workflow?${params.toString()}`);
+  },
+
+  saveDraft: async (
+    targetType: SlideshowWorkflowTargetType,
+    snapshot: SlideshowWorkflowSnapshot,
+    targetId?: string,
+  ): Promise<ApiOkResponse> => {
+    return await fetchApi<ApiOkResponse>('/slideshow/workflow/draft', {
+      method: 'POST',
+      data: {
+        targetType,
+        targetId,
+        ...snapshot,
+      },
+    });
+  },
+
+  discardDraft: async (targetType: SlideshowWorkflowTargetType, targetId?: string): Promise<ApiOkResponse> => {
+    return await fetchApi<ApiOkResponse>('/slideshow/workflow/discard', {
+      method: 'POST',
+      data: {
+        targetType,
+        targetId,
+      },
+    });
+  },
+
+  publish: async (
+    targetType: SlideshowWorkflowTargetType,
+    snapshot: SlideshowWorkflowSnapshot,
+    targetId?: string,
+  ): Promise<ApiOkResponse> => {
+    return await fetchApi<ApiOkResponse>('/slideshow/workflow/publish', {
+      method: 'POST',
+      data: {
+        targetType,
+        targetId,
+        ...snapshot,
+      },
+    });
+  },
+
+  rollback: async (
+    targetType: SlideshowWorkflowTargetType,
+    sourceHistoryId: string,
+    snapshot: SlideshowWorkflowSnapshot,
+    targetId?: string,
+  ): Promise<ApiOkResponse> => {
+    return await fetchApi<ApiOkResponse>('/slideshow/workflow/rollback', {
+      method: 'POST',
+      data: {
+        targetType,
+        targetId,
+        sourceHistoryId,
+        snapshot,
+      },
+    });
+  },
+
+  deleteHistoryEntry: async (
+    targetType: SlideshowWorkflowTargetType,
+    historyId: string,
+    targetId?: string,
+  ): Promise<ApiOkResponse> => {
+    const params = new URLSearchParams();
+    params.set('targetType', targetType);
+    if (targetType === 'device' && targetId) {
+      params.set('targetId', targetId);
+    }
+
+    return await fetchApi<ApiOkResponse>(`/slideshow/workflow/history/${historyId}?${params.toString()}`, {
+      method: 'DELETE',
+    });
   },
 };
 

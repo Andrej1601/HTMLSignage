@@ -3,21 +3,31 @@ import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SlideshowConfigPanel } from '@/components/Slideshow/SlideshowConfigPanel';
+import { SlideshowWorkflowPanel } from '@/components/Slideshow/SlideshowWorkflowPanel';
 import { useClearOverrides, useDevices, useSetOverrides, useUpdateDevice } from '@/hooks/useDevices';
+import {
+  useDeleteSlideshowHistoryEntry,
+  useDiscardSlideshowDraft,
+  usePublishSlideshow,
+  useRollbackSlideshow,
+  useSaveSlideshowDraft,
+  useSlideshowWorkflow,
+} from '@/hooks/useSlideshowWorkflow';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { Device } from '@/types/device.types';
 import { getDeviceStatus, getModeLabel, getStatusColor, getStatusLabel } from '@/types/device.types';
 import { createDefaultSlideshowConfig, type SlideshowConfig } from '@/types/slideshow.types';
-import type { AudioSettings, Settings } from '@/types/settings.types';
+import { getActiveEvent, type AudioSettings, type Settings } from '@/types/settings.types';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SectionCard } from '@/components/SectionCard';
 import { Button } from '@/components/Button';
-import { Monitor, RefreshCw, RotateCcw, Save, SlidersHorizontal } from 'lucide-react';
+import type { SlideshowWorkflowEntry, SlideshowWorkflowSnapshot } from '@/services/api';
+import { Monitor, RefreshCw, Rocket, RotateCcw, Save, SlidersHorizontal, Undo2 } from 'lucide-react';
 
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
 import { parseAudioSettings } from '@/utils/audioUtils';
@@ -32,16 +42,24 @@ function isScheduleOverride(value: unknown): value is Schedule {
   );
 }
 
-function getOverrideSlideshowConfig(device: Device | null): SlideshowConfig | null {
-  const settings = getDeviceOverrideSettings(device);
-  const raw = settings.slideshow;
-  if (!isPlainRecord(raw) || !Array.isArray(raw.slides)) return null;
+function normalizeEditorConfig(raw: unknown, fallback?: SlideshowConfig | null): SlideshowConfig {
+  const base = fallback || createDefaultSlideshowConfig();
+  if (!isPlainRecord(raw) || !Array.isArray(raw.slides)) {
+    return base;
+  }
 
   return {
-    ...createDefaultSlideshowConfig(),
+    ...base,
     ...raw,
     slides: raw.slides as SlideshowConfig['slides'],
   };
+}
+
+function getOverrideSlideshowConfig(device: Device | null, fallback?: SlideshowConfig | null): SlideshowConfig | null {
+  const settings = getDeviceOverrideSettings(device);
+  const raw = settings.slideshow;
+  if (!isPlainRecord(raw) || !Array.isArray(raw.slides)) return fallback || null;
+  return normalizeEditorConfig(raw, fallback);
 }
 
 function hasStoredSlideshowOrAudioOverride(device: Device | null): boolean {
@@ -110,12 +128,17 @@ function normalizePrestartMinutes(value: unknown, fallback = 10): number {
 }
 
 export function SlideshowPage() {
-  const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
+  const { settings, isLoading, error, refetch } = useSettings();
   const { schedule } = useSchedule();
   const { data: devices = [] } = useDevices();
   const updateDevice = useUpdateDevice();
   const setOverrides = useSetOverrides();
   const clearOverrides = useClearOverrides();
+  const saveDraft = useSaveSlideshowDraft();
+  const discardDraft = useDiscardSlideshowDraft();
+  const publishSlideshow = usePublishSlideshow();
+  const rollbackSlideshow = useRollbackSlideshow();
+  const deleteHistoryEntry = useDeleteSlideshowHistoryEntry();
 
   const pairedDevices = useMemo(
     () => devices.filter((device) => Boolean(device.pairedAt)),
@@ -127,15 +150,23 @@ export function SlideshowPage() {
   const [editorAudioOverride, setEditorAudioOverride] = useState<AudioSettings | null>(null);
   const [editorPrestartMinutes, setEditorPrestartMinutes] = useState(10);
   const [isDirty, setIsDirty] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<{ type: 'switch-target'; nextTarget: EditorTarget } | { type: 'reset' } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<
+    | { type: 'switch-target'; nextTarget: EditorTarget }
+    | { type: 'reset' }
+    | { type: 'delete-history'; entry: SlideshowWorkflowEntry }
+    | null
+  >(null);
 
   const selectedDeviceId = parseDeviceId(target);
   const selectedDevice = useMemo(
     () => pairedDevices.find((device) => device.id === selectedDeviceId) || null,
     [pairedDevices, selectedDeviceId]
   );
+  const workflowTargetType = selectedDevice ? 'device' : 'global';
+  const workflowState = useSlideshowWorkflow(workflowTargetType, selectedDevice?.id);
 
   const previewSchedule = schedule || createDefaultSchedule();
+  const activeEvent = useMemo(() => (settings ? getActiveEvent(settings, new Date()) : null), [settings]);
 
   const deviceSourceSummary = useMemo(() => {
     const summary = {
@@ -172,13 +203,20 @@ export function SlideshowPage() {
     setIsDirty(false);
   }, [selectedDevice, selectedDeviceId]);
 
-  const loadEditorFromTarget = (targetToLoad: EditorTarget) => {
+  const loadEditorFromTarget = useCallback((targetToLoad: EditorTarget, draftSnapshot?: SlideshowWorkflowSnapshot | null) => {
     if (!settings) return;
 
     if (targetToLoad === 'global') {
-      setEditorConfig(settings.slideshow || createDefaultSlideshowConfig());
+      const liveConfig = settings.slideshow || createDefaultSlideshowConfig();
+      const config = draftSnapshot?.config
+        ? normalizeEditorConfig(draftSnapshot.config, liveConfig)
+        : liveConfig;
+      setEditorConfig(config);
       setEditorAudioOverride(null);
-      setEditorPrestartMinutes(normalizePrestartMinutes(settings.display?.prestartMinutes, 10));
+      setEditorPrestartMinutes(normalizePrestartMinutes(
+        draftSnapshot?.prestartMinutes ?? settings.display?.prestartMinutes,
+        10,
+      ));
       setIsDirty(false);
       return;
     }
@@ -186,22 +224,39 @@ export function SlideshowPage() {
     const deviceId = parseDeviceId(targetToLoad);
     const device = pairedDevices.find((entry) => entry.id === deviceId) || null;
     const fallback = settings.slideshow || createDefaultSlideshowConfig();
-    const overrideConfig = getOverrideSlideshowConfig(device);
 
+    if (draftSnapshot?.config) {
+      setEditorConfig(normalizeEditorConfig(draftSnapshot.config, fallback));
+      setEditorAudioOverride(draftSnapshot.audioOverride ? parseAudioSettings(draftSnapshot.audioOverride) : null);
+      setEditorPrestartMinutes(normalizePrestartMinutes(draftSnapshot.prestartMinutes, settings.display?.prestartMinutes));
+      setIsDirty(false);
+      return;
+    }
+
+    const overrideConfig = getOverrideSlideshowConfig(device, fallback);
     setEditorConfig(overrideConfig || fallback);
     setEditorAudioOverride(parseAudioSettings(getDeviceOverrideSettings(device).audio));
     const overrideSettings = getDeviceOverrideSettings(device);
     const overridePrestart = (overrideSettings.display as Record<string, unknown> | undefined)?.prestartMinutes;
     setEditorPrestartMinutes(normalizePrestartMinutes(
-      overridePrestart ?? settings.display?.prestartMinutes, 10
+      overridePrestart ?? settings.display?.prestartMinutes,
+      10,
     ));
     setIsDirty(false);
-  };
+  }, [pairedDevices, settings]);
 
   useEffect(() => {
     if (!settings || isDirty) return;
-    loadEditorFromTarget(target);
-  }, [settings?.version, selectedDevice?.updatedAt, target]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
+  }, [
+    settings,
+    target,
+    selectedDevice?.updatedAt,
+    workflowState.data?.draft?.id,
+    workflowState.data?.live.updatedAt,
+    isDirty,
+    loadEditorFromTarget,
+  ]);
 
   const previewPayload = useMemo(() => {
     if (!settings || !editorConfig) return null;
@@ -246,8 +301,8 @@ export function SlideshowPage() {
     const mergedSettings = migrateSettings(
       deepMergeRecords(
         globalSettings as unknown as Record<string, unknown>,
-        settingsOverride
-      ) as unknown as Settings
+        settingsOverride,
+      ) as unknown as Settings,
     );
 
     const effectiveSchedule = selectedDevice.mode === 'override' && scheduleOverride
@@ -260,10 +315,25 @@ export function SlideshowPage() {
     };
   }, [editorAudioOverride, editorConfig, editorPrestartMinutes, isDirty, previewSchedule, selectedDevice, settings]);
 
+  const currentSnapshot = useMemo<SlideshowWorkflowSnapshot | null>(() => {
+    if (!editorConfig) return null;
+    return {
+      config: editorConfig,
+      prestartMinutes: editorPrestartMinutes,
+      audioOverride: selectedDevice ? editorAudioOverride : null,
+    };
+  }, [editorAudioOverride, editorConfig, editorPrestartMinutes, selectedDevice]);
+
   const hasActiveDeviceTarget = Boolean(selectedDevice);
   const hasRemovableOverride = hasStoredSlideshowOrAudioOverride(selectedDevice);
-
-  const isBusy = isSaving || setOverrides.isPending || clearOverrides.isPending || updateDevice.isPending;
+  const hasSavedDraft = Boolean(workflowState.data?.draft);
+  const workflowBusy = saveDraft.isPending
+    || discardDraft.isPending
+    || publishSlideshow.isPending
+    || rollbackSlideshow.isPending
+    || deleteHistoryEntry.isPending;
+  const isBusy = workflowBusy || workflowState.isFetching || setOverrides.isPending || clearOverrides.isPending || updateDevice.isPending;
+  const canPublish = Boolean(currentSnapshot) && (isDirty || hasSavedDraft);
 
   const handleSelectTarget = (nextTarget: EditorTarget) => {
     if (nextTarget === target) return;
@@ -283,13 +353,7 @@ export function SlideshowPage() {
       return;
     }
 
-    if (target === 'global') {
-      setIsDirty(false);
-      refetch();
-      return;
-    }
-
-    loadEditorFromTarget(target);
+    loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
   };
 
   const handleConfirmAction = useCallback(() => {
@@ -299,72 +363,93 @@ export function SlideshowPage() {
       setTarget(confirmAction.nextTarget);
       setIsDirty(false);
     } else if (confirmAction.type === 'reset') {
-      if (target === 'global') {
-        setIsDirty(false);
-        refetch();
-      } else {
-        loadEditorFromTarget(target);
-      }
+      loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
+    } else if (confirmAction.type === 'delete-history') {
+      deleteHistoryEntry.mutate({
+        targetType: workflowTargetType,
+        targetId: selectedDevice?.id,
+        historyId: confirmAction.entry.id,
+      });
     }
 
     setConfirmAction(null);
-  }, [confirmAction, target, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmAction, deleteHistoryEntry, loadEditorFromTarget, selectedDevice?.id, target, workflowState.data?.draft?.snapshot, workflowTargetType]);
 
-  const handleSaveCurrent = () => {
-    if (!settings || !editorConfig) return;
+  const handleSaveDraftCurrent = () => {
+    if (!currentSnapshot) return;
 
-    if (!selectedDevice) {
-      const updatedSettings = {
-        ...settings,
-        display: {
-          ...(settings.display || {}),
-          prestartMinutes: editorPrestartMinutes,
-        },
-        slideshow: {
-          ...editorConfig,
-          version: (editorConfig.version || 1) + 1,
-        },
-        version: (settings.version || 1) + 1,
-      };
-
-      save(updatedSettings, {
-        onSuccess: () => {
-          setIsDirty(false);
-        },
-      });
-      return;
-    }
-
-    const currentSettingsOverride = getDeviceOverrideSettings(selectedDevice);
-    const nextSettings: Record<string, unknown> = {
-      ...currentSettingsOverride,
-      slideshow: {
-        ...editorConfig,
-        version: (editorConfig.version || 1) + 1,
-      },
-      display: {
-        ...((currentSettingsOverride.display as Record<string, unknown>) || {}),
-        prestartMinutes: editorPrestartMinutes,
-      },
-    };
-
-    if (editorAudioOverride) {
-      nextSettings.audio = editorAudioOverride;
-    } else {
-      delete nextSettings.audio;
-    }
-
-    setOverrides.mutate(
+    saveDraft.mutate(
       {
-        id: selectedDevice.id,
-        overrides: { settings: nextSettings as Partial<Settings> },
+        targetType: workflowTargetType,
+        targetId: selectedDevice?.id,
+        snapshot: currentSnapshot,
       },
       {
         onSuccess: () => {
           setIsDirty(false);
         },
-      }
+      },
     );
+  };
+
+  const handlePublishCurrent = () => {
+    if (!currentSnapshot) return;
+
+    publishSlideshow.mutate(
+      {
+        targetType: workflowTargetType,
+        targetId: selectedDevice?.id,
+        snapshot: currentSnapshot,
+      },
+      {
+        onSuccess: () => {
+          setIsDirty(false);
+          void refetch();
+        },
+      },
+    );
+  };
+
+  const handleDiscardCurrentDraft = () => {
+    discardDraft.mutate(
+      {
+        targetType: workflowTargetType,
+        targetId: selectedDevice?.id,
+      },
+      {
+        onSuccess: () => {
+          setIsDirty(false);
+          void refetch();
+          loadEditorFromTarget(target, null);
+        },
+      },
+    );
+  };
+
+  const handleLoadHistoryEntry = (entry: SlideshowWorkflowEntry) => {
+    loadEditorFromTarget(target, entry.snapshot);
+    setIsDirty(true);
+  };
+
+  const handleRollbackEntry = (entry: SlideshowWorkflowEntry) => {
+    rollbackSlideshow.mutate(
+      {
+        targetType: workflowTargetType,
+        targetId: selectedDevice?.id,
+        sourceHistoryId: entry.id,
+        snapshot: entry.snapshot,
+      },
+      {
+        onSuccess: () => {
+          setIsDirty(false);
+          void refetch();
+        },
+      },
+    );
+  };
+
+  const handleDeleteHistoryEntry = (entry: SlideshowWorkflowEntry) => {
+    setConfirmAction({ type: 'delete-history', entry });
   };
 
   const handleRemoveCurrentOverride = () => {
@@ -393,16 +478,16 @@ export function SlideshowPage() {
         },
         {
           onSuccess: () => {
-            loadEditorFromTarget(target);
+            loadEditorFromTarget(target, null);
           },
-        }
+        },
       );
       return;
     }
 
     clearOverrides.mutate(selectedDevice.id, {
       onSuccess: () => {
-        loadEditorFromTarget(target);
+        loadEditorFromTarget(target, null);
       },
     });
   };
@@ -439,12 +524,12 @@ export function SlideshowPage() {
           title="Slideshow Konfiguration"
           description={
             hasActiveDeviceTarget
-              ? `Override-Editor für ${selectedDevice?.name || 'Gerät'}`
-              : 'Globaler Stand'
+              ? `Override-Workflow für ${selectedDevice?.name || 'Gerät'}`
+              : 'Globaler Workflow mit Entwurf und Veröffentlichung'
           }
           icon={SlidersHorizontal}
           actions={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="ghost" icon={RefreshCw} onClick={handleReloadCurrent} disabled={isBusy}>
                 Zurücksetzen
               </Button>
@@ -455,8 +540,31 @@ export function SlideshowPage() {
                 </Button>
               )}
 
-              <Button icon={Save} onClick={handleSaveCurrent} disabled={!isDirty || isBusy} loading={isBusy && isDirty} loadingText="Speichert...">
-                Speichern
+              {hasSavedDraft && (
+                <Button variant="ghost" icon={Undo2} onClick={handleDiscardCurrentDraft} disabled={isBusy}>
+                  Entwurf verwerfen
+                </Button>
+              )}
+
+              <Button
+                variant="secondary"
+                icon={Save}
+                onClick={handleSaveDraftCurrent}
+                disabled={!isDirty || isBusy}
+                loading={saveDraft.isPending}
+                loadingText="Speichere Entwurf..."
+              >
+                Entwurf speichern
+              </Button>
+
+              <Button
+                icon={Rocket}
+                onClick={handlePublishCurrent}
+                disabled={!canPublish || isBusy}
+                loading={publishSlideshow.isPending}
+                loadingText="Veröffentliche..."
+              >
+                Live veröffentlichen
               </Button>
             </div>
           }
@@ -468,7 +576,9 @@ export function SlideshowPage() {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
               <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
             </span>
-            <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
+            <span className="text-sm font-semibold text-amber-800">
+              Ungespeicherte Änderungen — als Entwurf sichern oder direkt bewusst live veröffentlichen.
+            </span>
           </div>
         )}
 
@@ -496,7 +606,6 @@ export function SlideshowPage() {
           }
         >
           <div className="space-y-1.5">
-            {/* Global Slideshow Card */}
             <div
               onClick={() => handleSelectTarget('global')}
               className={`rounded-lg border px-4 py-2.5 cursor-pointer transition-colors ${
@@ -508,6 +617,9 @@ export function SlideshowPage() {
               <div className="flex items-center gap-3">
                 <SlidersHorizontal className="h-4 w-4 text-spa-primary flex-shrink-0" />
                 <span className="font-semibold text-sm text-spa-text-primary flex-1">Globale Slideshow</span>
+                {target === 'global' && workflowState.data?.draft && (
+                  <StatusBadge label="Entwurf" tone="warning" showDot={false} />
+                )}
                 {target === 'global' && (
                   <StatusBadge label="Im Editor" tone="success" showDot={false} />
                 )}
@@ -519,7 +631,6 @@ export function SlideshowPage() {
               )}
             </div>
 
-            {/* Device Cards */}
             {pairedDevices.length === 0 ? (
               <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/40 px-4 py-6 text-center text-sm text-spa-text-secondary">
                 <Monitor className="w-8 h-8 text-spa-text-secondary mx-auto mb-2" />
@@ -562,6 +673,9 @@ export function SlideshowPage() {
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap ${source.badgeClass}`}>
                         {source.label}
                       </span>
+                      {isSelected && workflowState.data?.draft && (
+                        <StatusBadge label="Entwurf" tone="warning" showDot={false} />
+                      )}
                       {isSelected && (
                         <StatusBadge label="Im Editor" tone="success" showDot={false} />
                       )}
@@ -575,6 +689,26 @@ export function SlideshowPage() {
             )}
           </div>
         </SectionCard>
+
+        {workflowState.data && (
+          <SlideshowWorkflowPanel
+            targetLabel={workflowState.data.target.name}
+            targetType={workflowTargetType}
+            liveUpdatedAt={workflowState.data.live.updatedAt}
+            liveSettingsVersion={workflowState.data.live.settingsVersion}
+            draft={workflowState.data.draft}
+            history={workflowState.data.history}
+            activeEvent={activeEvent}
+            schedule={schedule}
+            selectedDevice={selectedDevice}
+            disabled={isBusy}
+            isWorking={workflowBusy}
+            onDiscardDraft={handleDiscardCurrentDraft}
+            onLoadHistoryEntry={handleLoadHistoryEntry}
+            onRollbackEntry={handleRollbackEntry}
+            onDeleteHistoryEntry={handleDeleteHistoryEntry}
+          />
+        )}
 
         <SlideshowConfigPanel
           config={editorConfig}
@@ -607,13 +741,15 @@ export function SlideshowPage() {
 
         <ConfirmDialog
           isOpen={confirmAction !== null}
-          title="Ungespeicherte Änderungen"
+          title={confirmAction?.type === 'delete-history' ? 'Stand löschen' : 'Ungespeicherte Änderungen'}
           message={
             confirmAction?.type === 'switch-target'
               ? 'Ungespeicherte Änderungen verwerfen und Ziel wechseln?'
-              : 'Ungespeicherte Änderungen verwerfen?'
+              : confirmAction?.type === 'delete-history'
+                ? 'Diesen Stand nur aus der Verlaufsliste löschen? Der aktuelle Live-Stand bleibt unverändert.'
+                : 'Ungespeicherte Änderungen verwerfen?'
           }
-          confirmLabel="Verwerfen"
+          confirmLabel={confirmAction?.type === 'delete-history' ? 'Löschen' : 'Verwerfen'}
           variant="warning"
           onConfirm={handleConfirmAction}
           onCancel={() => setConfirmAction(null)}

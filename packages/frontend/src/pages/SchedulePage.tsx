@@ -6,6 +6,7 @@ import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
+import { useDevices } from '@/hooks/useDevices';
 import { getActiveEvent } from '@/types/settings.types';
 import type { Schedule, PresetKey, Entry } from '@/types/schedule.types';
 import type { Sauna } from '@/types/sauna.types';
@@ -23,13 +24,25 @@ import {
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
-import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar } from 'lucide-react';
+import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/Button';
 import clsx from 'clsx';
+import { getModeLabel } from '@/types/device.types';
+import { hasDeviceOverrides } from '@/utils/deviceUtils';
+
+function formatDateTimeLocalInput(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  const hours = String(value.getHours()).padStart(2, '0');
+  const minutes = String(value.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
 
 export function SchedulePage() {
   const { schedule, isLoading, error, save, isSaving, refetch } = useSchedule();
   const { settings } = useSettings();
+  const { data: devices } = useDevices();
 
   // Local state
   const [localSchedule, setLocalSchedule] = useState<Schedule | null>(null);
@@ -37,6 +50,8 @@ export function SchedulePage() {
   const [isDirty, setIsDirty] = useState(false);
   const [showCopyMenu, setShowCopyMenu] = useState(false);
   const [eventClock, setEventClock] = useState(() => Date.now());
+  const [simulationDateTime, setSimulationDateTime] = useState(() => formatDateTimeLocalInput(new Date()));
+  const [simulationDeviceId, setSimulationDeviceId] = useState<string>('');
 
   // Cell editor state
   const [editingCell, setEditingCell] = useState<{
@@ -103,6 +118,18 @@ export function SchedulePage() {
   }, [settings?.saunas]);
 
   const now = new Date(eventClock);
+  const pairedDevices = useMemo(
+    () => (devices || []).filter((device) => Boolean(device.pairedAt)),
+    [devices],
+  );
+  const simulationNow = useMemo(() => {
+    const parsed = simulationDateTime ? new Date(simulationDateTime) : new Date();
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }, [simulationDateTime]);
+  const selectedSimulationDevice = useMemo(
+    () => pairedDevices.find((device) => device.id === simulationDeviceId) || null,
+    [pairedDevices, simulationDeviceId],
+  );
   const livePreset: PresetKey = localSchedule
     ? resolveLivePresetKey(localSchedule, settings, now)
     : getTodayPresetKey(now);
@@ -111,6 +138,12 @@ export function SchedulePage() {
   const currentDaySchedule = localSchedule?.presets?.[editingPreset];
   const activeEvent = settings ? getActiveEvent(settings, now) : null;
   const activeEventPreset = activeEvent?.assignedPreset;
+  const simulatedEvent = settings
+    ? getActiveEvent(settings, simulationNow, simulationDeviceId || undefined)
+    : null;
+  const simulatedPreset: PresetKey = localSchedule
+    ? resolveLivePresetKey(localSchedule, settings, simulationNow, simulationDeviceId || undefined)
+    : getTodayPresetKey(simulationNow);
 
   // Handle preset tab change
   const handlePresetChange = (preset: PresetKey) => {
@@ -360,6 +393,72 @@ export function SchedulePage() {
             <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
           </div>
         )}
+
+        <SectionCard
+          title="Simulation"
+          description="Prüfen Sie vorab, welcher Plan für einen Zeitpunkt und optional für ein bestimmtes Gerät live wäre."
+          icon={MonitorSmartphone}
+        >
+          <div className="grid gap-4 xl:grid-cols-[260px_260px_1fr]">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-spa-text-primary">Zeitpunkt</label>
+              <input
+                type="datetime-local"
+                value={simulationDateTime}
+                onChange={(event) => setSimulationDateTime(event.target.value)}
+                className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-spa-text-primary">Gerätefilter</label>
+              <select
+                value={simulationDeviceId}
+                onChange={(event) => setSimulationDeviceId(event.target.value)}
+                className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              >
+                <option value="">Kein Gerät filtern</option>
+                {pairedDevices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl bg-spa-bg-primary px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Live-Preset</div>
+                <div className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  {PRESET_LABELS[simulatedPreset]}
+                </div>
+                <div className="mt-1 text-xs text-spa-text-secondary">{simulatedPreset}</div>
+              </div>
+
+              <div className="rounded-xl bg-spa-bg-primary px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Aktives Event</div>
+                <div className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  {simulatedEvent ? simulatedEvent.name : 'Keins'}
+                </div>
+                <div className="mt-1 text-xs text-spa-text-secondary">
+                  {simulatedEvent ? `${PRESET_LABELS[simulatedEvent.assignedPreset]} · bis ${simulatedEvent.endTime || '23:59'}` : 'Auto-Play / manueller Tagesplan'}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-spa-bg-primary px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Gerätekontext</div>
+                <div className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  {selectedSimulationDevice ? selectedSimulationDevice.name : 'Global'}
+                </div>
+                <div className="mt-1 text-xs text-spa-text-secondary">
+                  {selectedSimulationDevice
+                    ? `${getModeLabel(selectedSimulationDevice.mode)}${hasDeviceOverrides(selectedSimulationDevice) ? ' · Override hinterlegt' : ''}`
+                    : 'ohne Gerätefilter'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </SectionCard>
 
         {/* Preset Tabs */}
         <SectionCard title="Preset-Auswahl" icon={CalendarClock}>

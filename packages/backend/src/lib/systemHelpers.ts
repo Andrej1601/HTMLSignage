@@ -13,6 +13,7 @@ export const REPO_ROOT = path.resolve(__dirname, '../../../../');
 export const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
 export const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
 export const MAX_UPDATE_LOG_CHARS = 200_000;
+export const MAX_UPDATE_LOG_LINES = 400;
 export const BACKUP_DIR = path.join(REPO_ROOT, 'backups');
 
 export interface CommandResult {
@@ -73,8 +74,17 @@ export function normalizeScheduleData(raw: unknown): Schedule {
 }
 
 export function trimLog(value: string): string {
-  if (value.length <= MAX_UPDATE_LOG_CHARS) return value;
-  return value.slice(value.length - MAX_UPDATE_LOG_CHARS);
+  let next = value;
+  if (next.length > MAX_UPDATE_LOG_CHARS) {
+    next = next.slice(next.length - MAX_UPDATE_LOG_CHARS);
+  }
+
+  const lines = next.split(/\r?\n/);
+  if (lines.length > MAX_UPDATE_LOG_LINES) {
+    next = lines.slice(lines.length - MAX_UPDATE_LOG_LINES).join('\n');
+  }
+
+  return next;
 }
 
 export async function runCommand(
@@ -261,14 +271,19 @@ export async function clearUploadDirectory(): Promise<void> {
   );
 }
 
-export function makeUniqueFilename(baseName: string, used: Set<string>): string {
+export function makeUniqueFilename(
+  baseName: string,
+  used: Set<string>,
+  options?: { checkUploadDir?: boolean },
+): string {
   const parsed = path.parse(baseName);
   const stem = parsed.name || 'media-file';
   const ext = parsed.ext || '';
+  const checkUploadDir = options?.checkUploadDir !== false;
 
   let candidate = `${stem}${ext}`;
   let index = 1;
-  while (used.has(candidate) || existsSync(path.join(UPLOAD_DIR, candidate))) {
+  while (used.has(candidate) || (checkUploadDir && existsSync(path.join(UPLOAD_DIR, candidate)))) {
     candidate = `${stem}-${index}${ext}`;
     index += 1;
   }

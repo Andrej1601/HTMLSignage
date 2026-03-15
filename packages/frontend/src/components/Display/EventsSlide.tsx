@@ -5,6 +5,7 @@ import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { Calendar } from 'lucide-react';
 import { formatEventDateDE, formatEventTimeRangeDE, getUpcomingOrActiveEvents, withAlpha } from './wellnessDisplayUtils';
+import { ResilientImage } from './ResilientImage';
 
 interface EventsSlideProps {
   settings: Settings;
@@ -113,11 +114,21 @@ export function EventsSlide({ settings, media }: EventsSlideProps) {
                 {eventImageUrl && (
                   isVertical ? (
                     <div className="w-24 shrink-0 overflow-hidden">
-                      <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
+                      <ResilientImage
+                        src={eventImageUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        fallback={<div className="w-full h-full bg-spa-bg-secondary" />}
+                      />
                     </div>
                   ) : (
                     <div className="relative overflow-hidden" style={{ height: 'clamp(40px, 5vw, 80px)' }}>
-                      <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
+                      <ResilientImage
+                        src={eventImageUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        fallback={<div className="w-full h-full bg-spa-bg-secondary" />}
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                     </div>
                   )

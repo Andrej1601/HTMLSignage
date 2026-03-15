@@ -19,6 +19,7 @@ import {
 } from '@/types/device.types';
 import { hasDeviceOverrides } from '@/utils/deviceUtils';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
+import { DeviceSnapshotPreview } from './DeviceSnapshotPreview';
 
 interface DeviceCardProps {
   device: Device;
@@ -85,6 +86,12 @@ export function DeviceCard({
       </div>
 
       <div className="p-4 space-y-3">
+        <DeviceSnapshotPreview
+          snapshotUrl={device.snapshotUrl}
+          capturedAt={device.snapshotCapturedAt}
+          alt={`Live-Snapshot von ${device.name}`}
+        />
+
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-spa-text-secondary">ID</p>

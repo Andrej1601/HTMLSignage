@@ -6,23 +6,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission, type Permission } from '@/utils/permissions';
 import { useEffect, useMemo, useState } from 'react';
 
-type NavSectionKey = 'operations' | 'content' | 'admin';
-
 interface NavItem {
   name: string;
   href: string;
   icon: LucideIcon;
-  section: NavSectionKey;
   permission?: Permission;
 }
-
-const SECTION_ORDER: NavSectionKey[] = ['operations', 'content', 'admin'];
-
-const SECTION_LABELS: Record<NavSectionKey, string> = {
-  operations: 'Betrieb',
-  content: 'Inhalte',
-  admin: 'Administration',
-};
 
 function isRouteActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
@@ -38,28 +27,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
     const allItems: NavItem[] = [
-      { name: 'Dashboard', href: '/', icon: Home, section: 'operations' },
-      { name: 'Aufgussplan', href: '/schedule', icon: Calendar, section: 'operations', permission: 'schedule:write' },
-      { name: 'Geräte', href: '/devices', icon: Monitor, section: 'operations', permission: 'devices:manage' },
-      { name: 'Slideshow', href: '/slideshow', icon: Presentation, section: 'content', permission: 'slideshow:manage' },
-      { name: 'Medien', href: '/media', icon: Image, section: 'content', permission: 'media:manage' },
-      { name: 'Saunas', href: '/saunas', icon: Flame, section: 'content', permission: 'saunas:read' },
-      { name: 'Einstellungen', href: '/settings', icon: Settings, section: 'admin', permission: 'settings:manage' },
-      { name: 'Benutzer', href: '/users', icon: Users, section: 'admin', permission: 'users:manage' },
+      { name: 'Dashboard', href: '/', icon: Home },
+      { name: 'Aufgussplan', href: '/schedule', icon: Calendar, permission: 'schedule:write' },
+      { name: 'Geräte', href: '/devices', icon: Monitor, permission: 'devices:manage' },
+      { name: 'Slideshow', href: '/slideshow', icon: Presentation, permission: 'slideshow:manage' },
+      { name: 'Medien', href: '/media', icon: Image, permission: 'media:manage' },
+      { name: 'Saunen', href: '/saunas', icon: Flame, permission: 'saunas:read' },
+      { name: 'Einstellungen', href: '/settings', icon: Settings, permission: 'settings:manage' },
+      { name: 'Benutzer', href: '/users', icon: Users, permission: 'users:manage' },
     ];
 
     return allItems.filter((item) => !item.permission || hasPermission(roles, item.permission));
   }, [user?.roles]);
-
-  const navigationSections = useMemo(() => {
-    return SECTION_ORDER
-      .map((section) => ({
-        key: section,
-        label: SECTION_LABELS[section],
-        items: navigation.filter((item) => item.section === section),
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [navigation]);
 
   const activeNavigation = useMemo(() => {
     return navigation.find((item) => isRouteActive(location.pathname, item.href)) || null;
@@ -109,37 +88,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Navigation */}
-          <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-4" aria-label="Hauptnavigation">
-            {navigationSections.map((section) => (
-              <div key={section.key} className="space-y-1">
-                <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/60">
-                  {section.label}
-                </p>
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = isRouteActive(location.pathname, item.href);
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={clsx(
-                        'group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl border transition-all',
-                        isActive
-                          ? 'bg-white text-spa-primary border-white shadow-sm'
-                          : 'border-transparent text-white/90 hover:bg-white/10 hover:border-white/20 hover:text-white'
-                      )}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Icon className={clsx('h-5 w-5', isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white')} />
-                        {item.name}
-                      </span>
-                      <span className={clsx('h-2 w-2 rounded-full transition-colors', isActive ? 'bg-spa-primary' : 'bg-transparent group-hover:bg-white/50')} />
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+          <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-1.5" aria-label="Hauptnavigation">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = isRouteActive(location.pathname, item.href);
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={clsx(
+                    'group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl border transition-all',
+                    isActive
+                      ? 'bg-white text-spa-primary border-white shadow-sm'
+                      : 'border-transparent text-white/90 hover:bg-white/10 hover:border-white/20 hover:text-white'
+                  )}
+                >
+                  <span className="flex items-center gap-3">
+                    <Icon className={clsx('h-5 w-5', isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white')} />
+                    {item.name}
+                  </span>
+                  <span className={clsx('h-2 w-2 rounded-full transition-colors', isActive ? 'bg-spa-primary' : 'bg-transparent group-hover:bg-white/50')} />
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Logout Button */}
@@ -201,35 +173,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
 
               {/* Navigation */}
-              <nav className="flex-1 px-2 py-4 space-y-4 overflow-y-auto" aria-label="Hauptnavigation">
-                {navigationSections.map((section) => (
-                  <div key={section.key} className="space-y-1">
-                    <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/60">
-                      {section.label}
-                    </p>
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = isRouteActive(location.pathname, item.href);
-                      return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={clsx(
-                            'group flex items-center px-3 py-3 text-base font-medium rounded-md transition-colors',
-                            isActive
-                              ? 'bg-spa-primary-dark text-white'
-                              : 'text-white/90 hover:bg-spa-primary-light hover:text-white'
-                          )}
-                        >
-                          <Icon className="mr-3 flex-shrink-0 h-6 w-6" />
-                          {item.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))}
+              <nav className="flex-1 px-2 py-4 space-y-1.5 overflow-y-auto" aria-label="Hauptnavigation">
+                {navigation.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = isRouteActive(location.pathname, item.href);
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={clsx(
+                        'group flex items-center px-3 py-3 text-base font-medium rounded-md transition-colors',
+                        isActive
+                          ? 'bg-spa-primary-dark text-white'
+                          : 'text-white/90 hover:bg-spa-primary-light hover:text-white'
+                      )}
+                    >
+                      <Icon className="mr-3 flex-shrink-0 h-6 w-6" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
               </nav>
 
               {/* Logout Button */}

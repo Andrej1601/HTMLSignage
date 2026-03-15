@@ -17,6 +17,8 @@ export interface Device {
   updatedAt: string;
   status?: DeviceStatus; // Computed on frontend
   overrides?: DeviceOverride;
+  snapshotUrl?: string | null;
+  snapshotCapturedAt?: string | null;
   user?: {
     username: string;
   };

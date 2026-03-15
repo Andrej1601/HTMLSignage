@@ -191,6 +191,7 @@ export interface Event {
   endTime?: string;
   assignedPreset: 'Evt1' | 'Evt2';
   isActive: boolean;
+  targetDeviceIds?: string[];
   settingsOverrides?: EventSettingsOverrides;
 }
 
@@ -234,10 +235,24 @@ export function isEventActive(event: Event, now: Date = new Date()): boolean {
   return now >= startDateTime && now <= endDateTime;
 }
 
-export function getActiveEvent(settings: Settings, now: Date = new Date()): Event | null {
+export function eventTargetsDevice(event: Event, deviceId?: string | null): boolean {
+  const targets = Array.isArray(event.targetDeviceIds)
+    ? event.targetDeviceIds.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+
+  if (targets.length === 0) return true;
+  if (!deviceId) return true;
+  return targets.includes(deviceId);
+}
+
+export function getActiveEvent(
+  settings: Settings,
+  now: Date = new Date(),
+  deviceId?: string | null,
+): Event | null {
   if (!settings.events) return null;
   const activeEvents = settings.events
-    .filter((event) => isEventActive(event, now))
+    .filter((event) => isEventActive(event, now) && eventTargetsDevice(event, deviceId))
     .sort((a, b) => {
       const aStart = new Date(`${a.startDate}T${a.startTime}`);
       const bStart = new Date(`${b.startDate}T${b.startTime}`);

@@ -37,6 +37,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { SLIDESHOW_TEMPLATES, applySlideshowTemplate } from './slideshowTemplates';
 
 interface SortableSlideItemProps {
   slide: SlideConfig;
@@ -227,6 +228,7 @@ export function SlideshowConfigPanel({
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('main');
   const [deletingSlideId, setDeletingSlideId] = useState<string | null>(null);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
   const zones = useMemo(() => getZonesForLayout(config.layout), [config.layout]);
   const enabledSlides = useMemo(() => getEnabledSlides(config), [config]);
@@ -360,6 +362,9 @@ export function SlideshowConfigPanel({
   };
 
   const canEditAudio = showAudioOverride && Boolean(onAudioOverrideChange);
+  const pendingTemplate = pendingTemplateId
+    ? SLIDESHOW_TEMPLATES.find((template) => template.id === pendingTemplateId) || null
+    : null;
 
   return (
     <div className="space-y-6">
@@ -425,6 +430,39 @@ export function SlideshowConfigPanel({
           )}
         </SectionCard>
       )}
+
+      <SectionCard
+        title="Schnellstart-Vorlagen"
+        description="Vorgebaute Slideshow-Grundgerüste für typische Wellness- und Event-Szenarien."
+        icon={Layers}
+      >
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          {SLIDESHOW_TEMPLATES.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => setPendingTemplateId(template.id)}
+              disabled={disabled}
+              className={clsx(
+                'rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-sm disabled:opacity-50',
+                template.accent === 'primary' && 'border-spa-primary/20 bg-spa-primary/5',
+                template.accent === 'info' && 'border-spa-info/20 bg-spa-info-light/50',
+                template.accent === 'success' && 'border-spa-success/20 bg-spa-success-light/50',
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-spa-text-primary">{template.label}</span>
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-spa-text-secondary">
+                  {template.layout}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-spa-text-secondary">
+                {template.description}
+              </p>
+            </button>
+          ))}
+        </div>
+      </SectionCard>
 
       <LayoutPicker
         layout={config.layout}
@@ -575,6 +613,22 @@ export function SlideshowConfigPanel({
         variant="danger"
         onConfirm={confirmDeleteSlide}
         onCancel={() => setDeletingSlideId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(pendingTemplate)}
+        title="Vorlage anwenden?"
+        message={pendingTemplate
+          ? `Die Vorlage "${pendingTemplate.label}" ersetzt die aktuelle Slide-Struktur und das Layout. Bereits gesetzte globale Einstellungen bleiben erhalten.`
+          : 'Vorlage anwenden?'
+        }
+        confirmLabel="Vorlage anwenden"
+        onConfirm={() => {
+          if (!pendingTemplate) return;
+          onChange(applySlideshowTemplate(config, pendingTemplate));
+          setPendingTemplateId(null);
+        }}
+        onCancel={() => setPendingTemplateId(null)}
       />
     </div>
   );

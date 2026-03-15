@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { useUploadMedia } from '@/hooks/useMedia';
 import {
@@ -7,7 +7,9 @@ import {
   ACCEPTED_AUDIO_TYPES,
   ACCEPTED_VIDEO_TYPES,
   formatFileSize,
+  getMediaType,
 } from '@/types/media.types';
+import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 
 interface MediaUploadProps {
   onUploadComplete?: () => void;
@@ -218,7 +220,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
           </div>
 
           <p className="text-xs text-spa-text-secondary">
-            Unterstützt: Bilder (JPG, PNG, GIF, WebP, SVG), Audio (MP3, WAV, OGG), Video (MP4, WebM)
+            Unterstützt: Bilder (JPG, PNG, GIF, WebP), Audio (MP3, WAV, OGG, WebM), Video (MP4, WebM, OGG)
             <br />
             Max. Dateigröße: 50MB
           </p>
@@ -249,23 +251,13 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
           <div className="max-h-56 overflow-y-auto space-y-2 mb-4 pr-1">
             {selectedFiles.map((file, index) => (
-              <div
+              <UploadQueueRow
                 key={getFileKey(file)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-spa-bg-secondary px-3 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-spa-text-primary truncate">{file.name}</p>
-                  <p className="text-xs text-spa-text-secondary">{formatFileSize(file.size)}</p>
-                </div>
-                <button
-                  onClick={() => handleRemoveFile(index)}
-                  disabled={isUploading}
-                  className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50"
-                  aria-label={`${file.name} entfernen`}
-                >
-                  <X className="w-4 h-4 text-spa-text-secondary" />
-                </button>
-              </div>
+                file={file}
+                index={index}
+                isUploading={isUploading}
+                onRemove={handleRemoveFile}
+              />
             ))}
           </div>
 
@@ -317,6 +309,48 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function UploadQueueRow({
+  file,
+  index,
+  isUploading,
+  onRemove,
+}: {
+  file: File;
+  index: number;
+  isUploading: boolean;
+  onRemove: (index: number) => void;
+}) {
+  const [previewUrl] = useState(() => URL.createObjectURL(file));
+  const mediaType = getMediaType(file.type);
+  const { summary } = useMediaMetadata(previewUrl, mediaType);
+
+  useEffect(() => {
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-spa-bg-secondary px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-spa-text-primary truncate">{file.name}</p>
+        <p className="text-xs text-spa-text-secondary">
+          {formatFileSize(file.size)}
+          {summary ? ` · ${summary}` : ''}
+        </p>
+      </div>
+      <button
+        onClick={() => onRemove(index)}
+        disabled={isUploading}
+        className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50"
+        aria-label={`${file.name} entfernen`}
+      >
+        <X className="w-4 h-4 text-spa-text-secondary" />
+      </button>
     </div>
   );
 }

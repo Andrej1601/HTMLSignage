@@ -11,6 +11,7 @@ import {
   getUpcomingOrActiveEvents,
   withAlpha,
 } from './wellnessDisplayUtils';
+import { ResilientImage } from './ResilientImage';
 
 const INTERVAL_MS = 8000;
 
@@ -139,7 +140,12 @@ export function WellnessBottomPanel({ settings, theme, media }: WellnessBottomPa
                     >
                       {eventImageUrl && (
                         <div className="w-20 shrink-0 overflow-hidden">
-                          <img src={eventImageUrl} alt="" className="w-full h-full object-cover" />
+                          <ResilientImage
+                            src={eventImageUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            fallback={<div className="w-full h-full bg-spa-bg-secondary" />}
+                          />
                         </div>
                       )}
                       <div className="p-4 min-w-0 flex-1">

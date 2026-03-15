@@ -4,6 +4,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
 import { TabGroup, TabPanel, type Tab } from '@/components/TabGroup';
 import { useSettings } from '@/hooks/useSettings';
+import { useSchedule } from '@/hooks/useSchedule';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
@@ -30,6 +31,7 @@ type TabId = 'theme' | 'audio' | 'aromas' | 'infos' | 'events' | 'system';
 
 export function SettingsPage() {
   const { settings, isLoading, save, isSaving, refetch } = useSettings();
+  const { schedule } = useSchedule();
   const canSystem = usePermission('system:manage');
   const [activeTab, setActiveTab] = useState<TabId>('theme');
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
@@ -212,6 +214,8 @@ export function SettingsPage() {
             <TabPanel id="events" activeTab={activeTab}>
               <EventManager
                 events={localSettings.events || []}
+                settings={localSettings}
+                schedule={schedule}
                 onChange={handleEventsChange}
               />
             </TabPanel>

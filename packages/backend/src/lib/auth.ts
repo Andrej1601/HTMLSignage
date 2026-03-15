@@ -25,6 +25,7 @@ export interface AuthRequest extends Request {
     roles: string[];
   };
   deviceId?: string;
+  requestId?: string;
 }
 
 export async function hashPassword(password: string): Promise<string> {

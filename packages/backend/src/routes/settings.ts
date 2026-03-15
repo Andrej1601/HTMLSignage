@@ -6,6 +6,7 @@ import { broadcastSettingsUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 
 const router = Router();
 
@@ -216,6 +217,16 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
     });
 
     broadcastSettingsUpdate(settingsToStore);
+    await logAuditEvent(req, {
+      action: 'settings.update',
+      resource: newSettings.id,
+      details: {
+        version: nextVersion,
+        designStyle: validated.designStyle || null,
+        eventCount: validated.events?.length || 0,
+        infoCount: validated.infos?.length || 0,
+      },
+    });
 
     res.json({ ok: true, version: nextVersion });
   } catch (error) {

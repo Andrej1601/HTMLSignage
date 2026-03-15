@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 
 const router = Router();
 
@@ -89,6 +90,14 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
         updatedAt: true,
       },
     });
+    await logAuditEvent(req, {
+      action: 'user.create',
+      resource: user.id,
+      details: {
+        username: user.username,
+        roles: user.roles,
+      },
+    });
 
     res.json(user);
   } catch (error) {
@@ -157,6 +166,16 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
         updatedAt: true,
       },
     });
+    await logAuditEvent(req, {
+      action: 'user.update',
+      resource: updatedUser.id,
+      details: {
+        username: updatedUser.username,
+        roles: updatedUser.roles,
+        email: updatedUser.email,
+        passwordChanged: Boolean(validated.password),
+      },
+    });
 
     res.json(updatedUser);
   } catch (error) {
@@ -187,6 +206,13 @@ router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async 
 
     await prisma.user.delete({
       where: { id: req.params.id },
+    });
+    await logAuditEvent(req, {
+      action: 'user.delete',
+      resource: user.id,
+      details: {
+        username: user.username,
+      },
     });
 
     res.json({ ok: true });

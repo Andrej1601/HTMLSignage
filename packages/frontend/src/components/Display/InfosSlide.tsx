@@ -5,6 +5,7 @@ import { getDefaultSettings } from '@/types/settings.types';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { useCompactDetector } from '@/hooks/useResponsiveLayout';
 import { ShieldCheck } from 'lucide-react';
+import { ResilientImage } from './ResilientImage';
 
 interface InfosSlideProps {
   slide: SlideConfig;
@@ -65,7 +66,12 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
   if (isBackground) {
     return (
       <div ref={containerRef} className="w-full h-full relative flex flex-col justify-end overflow-hidden">
-        <img src={imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <ResilientImage
+          src={imageUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          fallback={<div className="absolute inset-0 bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary" />}
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         <div className="relative z-10" style={{ padding: 'clamp(12px,3%,32px)' }}>
           <div className="flex items-center" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
@@ -111,7 +117,12 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
       <div className="flex items-center w-full" style={{ gap: imageUrl ? 'clamp(12px,3%,32px)' : '0' }}>
         {imageUrl && (
           <div className="shrink-0 rounded-xl overflow-hidden shadow-md" style={{ width: '35%', maxHeight: '80%' }}>
-            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            <ResilientImage
+              src={imageUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              fallback={<div className="w-full h-full min-h-[140px] bg-spa-bg-secondary" />}
+            />
           </div>
         )}
         <div className="flex flex-col justify-center min-w-0 flex-1">

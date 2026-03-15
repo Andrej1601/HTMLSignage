@@ -10,6 +10,7 @@ import {
 interface DisplayLivePreviewProps {
   schedule: Schedule;
   settings: Settings;
+  deviceId?: string | null;
   src?: string;
   title?: string;
   aspectRatio?: string;
@@ -19,6 +20,7 @@ interface DisplayLivePreviewProps {
 export function DisplayLivePreview({
   schedule,
   settings,
+  deviceId,
   src = '/display?preview=1',
   title = 'Display Vorschau',
   aspectRatio = '16 / 9',
@@ -27,7 +29,10 @@ export function DisplayLivePreview({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isReady, setIsReady] = useState(false);
 
-  const payload = useMemo(() => ({ schedule, settings }), [schedule, settings]);
+  const payload = useMemo(
+    () => ({ schedule, settings, deviceId }),
+    [deviceId, schedule, settings],
+  );
 
   const postToFrame = useCallback((message: unknown) => {
     const frame = iframeRef.current?.contentWindow;

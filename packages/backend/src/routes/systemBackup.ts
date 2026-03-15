@@ -11,6 +11,8 @@ import unzipper from 'unzipper';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../lib/auth.js';
+import { logAuditEvent } from '../lib/audit.js';
+import { createSystemJob, findRunningSystemJob, runSystemJob } from '../lib/systemJobs.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { UPLOAD_DIR } from '../lib/upload.js';
 import { broadcastScheduleUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
@@ -53,6 +55,47 @@ interface PreparedImportMedia {
   updatedAt: Date;
   size: number;
   sourcePath: string;
+}
+
+interface BackupPreviewMediaItem {
+  originalName: string;
+  filename: string;
+  type: string;
+  size: number;
+  tags: string[];
+  willRename: boolean;
+  uploadedByMissing: boolean;
+}
+
+interface BackupImportPreviewResponse {
+  ok: true;
+  backup: {
+    formatVersion: number;
+    exportedAt: string;
+    appVersion: string | null;
+    mediaCount: number;
+    checksumValid: boolean;
+  };
+  current: {
+    appVersion: string;
+    scheduleVersion: number | null;
+    settingsVersion: number | null;
+    mediaCount: number;
+  };
+  importPlan: {
+    replaceMedia: boolean;
+    importedMedia: number;
+    scheduleWillReplace: boolean;
+    settingsWillReplace: boolean;
+    renamedMediaFiles: number;
+  };
+  conflicts: {
+    mediaIdConflicts: number;
+    filenameConflicts: number;
+    missingUsers: number;
+  };
+  previewMedia: BackupPreviewMediaItem[];
+  warnings: string[];
 }
 
 const BackupManifestMediaSchema = z.object({
@@ -156,11 +199,14 @@ function createPreparedMediaRecord(
   item: BackupManifestMediaItem,
   validUserIds: Set<string>,
   usedFilenames: Set<string>,
+  replaceMedia: boolean,
   sourcePath: string,
   size: number,
 ): PreparedImportMedia {
   const safeFile = sanitizeFilename(item.filename || item.originalName);
-  const filename = makeUniqueFilename(safeFile, usedFilenames);
+  const filename = makeUniqueFilename(safeFile, usedFilenames, {
+    checkUploadDir: !replaceMedia,
+  });
   const id = item.id && item.id.trim().length > 0
     ? item.id
     : `backup-media-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -197,6 +243,7 @@ async function prepareZipMedia(
   manifest: ZipBackupManifest,
   validUserIds: Set<string>,
   usedFilenames: Set<string>,
+  replaceMedia: boolean,
   tempDir: string,
 ): Promise<PreparedImportMedia[]> {
   const directory = await unzipper.Open.file(filePath) as ZipDirectory;
@@ -213,10 +260,157 @@ async function prepareZipMedia(
     const tempPath = path.join(tempDir, `${crypto.randomUUID()}-${sanitizeFilename(item.filename || item.originalName)}`);
     await pipeline(entry.stream(), createWriteStream(tempPath));
     const stats = await fs.stat(tempPath);
-    prepared.push(createPreparedMediaRecord(item, validUserIds, usedFilenames, tempPath, stats.size));
+    prepared.push(createPreparedMediaRecord(item, validUserIds, usedFilenames, replaceMedia, tempPath, stats.size));
   }
 
   return prepared;
+}
+
+async function inspectZipMedia(
+  filePath: string,
+  manifest: ZipBackupManifest,
+  validUserIds: Set<string>,
+  existingMediaIds: Set<string>,
+  existingFilenames: Set<string>,
+  replaceMedia: boolean,
+): Promise<{
+  previewMedia: BackupPreviewMediaItem[];
+  renamedMediaFiles: number;
+  filenameConflicts: number;
+  mediaIdConflicts: number;
+  missingUsers: number;
+}> {
+  const directory = await unzipper.Open.file(filePath) as ZipDirectory;
+  const entries = new Map(directory.files.map((entry) => [entry.path, entry]));
+  const usedFilenames = replaceMedia ? new Set<string>() : new Set(existingFilenames);
+  const previewMedia: BackupPreviewMediaItem[] = [];
+  let renamedMediaFiles = 0;
+  let filenameConflicts = 0;
+  let mediaIdConflicts = 0;
+  let missingUsers = 0;
+
+  for (const item of manifest.media) {
+    const archivePath = item.archivePath || `media/${item.filename}`;
+    const entry = entries.get(archivePath);
+    if (!entry || entry.type !== 'File') {
+      throw new Error(`media-entry-missing:${archivePath}`);
+    }
+
+    const safeFilename = sanitizeFilename(item.filename || item.originalName);
+    const resolvedFilename = makeUniqueFilename(safeFilename, usedFilenames, {
+      checkUploadDir: !replaceMedia,
+    });
+    const willRename = resolvedFilename !== safeFilename;
+    const uploadedByMissing = Boolean(item.uploadedBy && !validUserIds.has(item.uploadedBy));
+    const size = typeof item.size === 'number'
+      ? item.size
+      : Number((entry as { vars?: { uncompressedSize?: number } }).vars?.uncompressedSize ?? 0);
+
+    if (willRename) {
+      renamedMediaFiles += 1;
+      filenameConflicts += 1;
+    }
+    if (item.id && existingMediaIds.has(item.id)) {
+      mediaIdConflicts += 1;
+    }
+    if (uploadedByMissing) {
+      missingUsers += 1;
+    }
+
+    if (previewMedia.length < 8) {
+      previewMedia.push({
+        originalName: item.originalName,
+        filename: resolvedFilename,
+        type: item.type,
+        size,
+        tags: item.tags,
+        willRename,
+        uploadedByMissing,
+      });
+    }
+  }
+
+  return {
+    previewMedia,
+    renamedMediaFiles,
+    filenameConflicts,
+    mediaIdConflicts,
+    missingUsers,
+  };
+}
+
+async function buildImportPreview(
+  filePath: string,
+  replaceMedia: boolean,
+): Promise<BackupImportPreviewResponse> {
+  const warnings: string[] = [];
+  const [existingUsers, localVersion, latestSchedule, latestSettings, currentMedia] = await Promise.all([
+    prisma.user.findMany({ select: { id: true } }),
+    readLocalVersion(),
+    prisma.schedule.findFirst({ orderBy: { version: 'desc' }, select: { version: true } }),
+    prisma.settings.findFirst({ orderBy: { version: 'desc' }, select: { version: true } }),
+    prisma.media.findMany({ select: { id: true, filename: true } }),
+  ]);
+
+  const validUserIds = new Set(existingUsers.map((user) => user.id));
+  const existingMediaIds = new Set(currentMedia.map((item) => item.id));
+  const existingFilenames = new Set(currentMedia.map((item) => item.filename));
+
+  const manifest = await readZipManifest(filePath);
+  let checksumValid = true;
+  if (manifest.checksum) {
+    const { checksum, ...manifestBase } = manifest;
+    checksumValid = createBackupChecksum(manifestBase) === checksum;
+    if (!checksumValid) {
+      throw new Error('checksum-mismatch');
+    }
+  }
+
+  normalizeBackupWarnings(manifest, warnings);
+
+  const mediaInspection = await inspectZipMedia(
+    filePath,
+    manifest,
+    validUserIds,
+    existingMediaIds,
+    existingFilenames,
+    replaceMedia,
+  );
+
+  if (mediaInspection.missingUsers > 0) {
+    warnings.push(`${mediaInspection.missingUsers} Benutzerreferenz(en) aus dem Backup existieren lokal nicht mehr.`);
+  }
+
+  return {
+    ok: true,
+    backup: {
+      formatVersion: manifest.formatVersion,
+      exportedAt: manifest.exportedAt,
+      appVersion: manifest.appVersion || null,
+      mediaCount: manifest.media.length,
+      checksumValid,
+    },
+    current: {
+      appVersion: localVersion,
+      scheduleVersion: latestSchedule?.version ?? null,
+      settingsVersion: latestSettings?.version ?? null,
+      mediaCount: currentMedia.length,
+    },
+    importPlan: {
+      replaceMedia,
+      importedMedia: manifest.media.length,
+      scheduleWillReplace: true,
+      settingsWillReplace: true,
+      renamedMediaFiles: mediaInspection.renamedMediaFiles,
+    },
+    conflicts: {
+      mediaIdConflicts: mediaInspection.mediaIdConflicts,
+      filenameConflicts: mediaInspection.filenameConflicts,
+      missingUsers: mediaInspection.missingUsers,
+    },
+    previewMedia: mediaInspection.previewMedia,
+    warnings: normalizeImportWarnings(warnings, localVersion),
+  };
 }
 
 async function importBackupData(
@@ -343,6 +537,26 @@ function normalizeImportWarnings(warnings: string[], localVersion: string): stri
   });
 }
 
+function parseReplaceMedia(raw: unknown): boolean {
+  return !(
+    raw === 'false'
+    || raw === '0'
+    || raw === false
+  );
+}
+
+function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
+  return {
+    userId: req.userId,
+    user: req.user,
+    ip: req.ip,
+    headers: {
+      'user-agent': req.headers['user-agent'] || '',
+    },
+    requestId: req.requestId,
+  } as AuthRequest;
+}
+
 router.get('/backup/export', async (_req: AuthRequest, res) => {
   try {
     const [scheduleRow, settingsRow, mediaRows, appVersion] = await Promise.all([
@@ -410,6 +624,13 @@ router.get('/backup/export', async (_req: AuthRequest, res) => {
 
     await archive.finalize();
     await archiveDone;
+    await logAuditEvent(_req, {
+      action: 'system.backup.export',
+      details: {
+        mediaCount: manifest.media.length,
+        formatVersion: manifest.formatVersion,
+      },
+    });
   } catch (error) {
     console.error('[system] Error exporting backup:', error);
     if (!res.headersSent) {
@@ -420,7 +641,7 @@ router.get('/backup/export', async (_req: AuthRequest, res) => {
   }
 });
 
-router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, res) => {
+router.post('/backup/import/preview', backupUploadMiddleware, async (req: AuthRequest, res) => {
   const backupFile = resolveBackupFile(req);
   const filePath = backupFile?.path;
   const replaceMediaRaw = req.body?.replaceMedia;
@@ -434,48 +655,18 @@ router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, r
     return res.status(400).json({ error: 'backup-file-required', message: 'Backup-Datei erforderlich' });
   }
 
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'htmlsignage-backup-import-'));
-  const warnings: string[] = [];
-  const writtenFiles: string[] = [];
-
   try {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-
-    const [existingUsers, localVersion] = await Promise.all([
-      prisma.user.findMany({ select: { id: true } }),
-      readLocalVersion(),
-    ]);
-
-    const validUserIds = new Set(existingUsers.map((user) => user.id));
-    const usedFilenames = replaceMedia ? new Set<string>() : await listUploadFiles();
-
-    const manifest = await readZipManifest(filePath);
-    if (manifest.checksum) {
-      const { checksum, ...manifestBase } = manifest;
-      if (createBackupChecksum(manifestBase) !== checksum) {
-        return res.status(400).json({
-          error: 'checksum-mismatch',
-          message: 'Backup-Datei ist beschädigt (Checksum stimmt nicht überein).',
-        });
-      }
-    }
-
-    normalizeBackupWarnings(manifest, warnings);
-    const preparedMedia = await prepareZipMedia(filePath, manifest, validUserIds, usedFilenames, tempDir);
-    const result = await importBackupData(preparedMedia, manifest.schedule, manifest.settings, replaceMedia, writtenFiles);
-
-    return res.json({
-      ok: true,
-      importedMedia: preparedMedia.length,
-      replaceMedia,
-      importedAt: new Date().toISOString(),
-      importedScheduleVersion: result.scheduleVersion,
-      importedSettingsVersion: result.settingsVersion,
-      warnings: normalizeImportWarnings(warnings, localVersion),
+    const preview = await buildImportPreview(filePath, replaceMedia);
+    await logAuditEvent(req, {
+      action: 'system.backup.preview',
+      details: {
+        fileName: backupFile.originalname,
+        replaceMedia,
+        importedMedia: preview.importPlan.importedMedia,
+      },
     });
+    return res.json(preview);
   } catch (error) {
-    await Promise.all(writtenFiles.map((file) => fs.unlink(file).catch(() => {})));
-
     if (error instanceof SyntaxError) {
       return res.status(400).json({
         error: 'invalid-backup-json',
@@ -497,6 +688,13 @@ router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, r
       });
     }
 
+    if (error instanceof Error && error.message === 'checksum-mismatch') {
+      return res.status(400).json({
+        error: 'checksum-mismatch',
+        message: 'Backup-Datei ist beschädigt (Checksum stimmt nicht überein).',
+      });
+    }
+
     if (error instanceof Error && error.message.startsWith('media-entry-missing:')) {
       const archivePath = error.message.split(':').slice(1).join(':');
       return res.status(400).json({
@@ -505,14 +703,153 @@ router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, r
       });
     }
 
-    console.error('[system] Error importing backup:', error);
-    return res.status(500).json({ error: 'backup-import-failed', message: 'Backup-Import fehlgeschlagen' });
+    console.error('[system] Error previewing backup import:', error);
+    return res.status(500).json({ error: 'backup-preview-failed', message: 'Backup-Vorschau fehlgeschlagen' });
   } finally {
-    await Promise.all([
-      fs.unlink(filePath).catch(() => {}),
-      fs.rm(tempDir, { recursive: true, force: true }).catch(() => {}),
-    ]);
+    await fs.unlink(filePath).catch(() => {});
   }
+});
+
+router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, res) => {
+  const backupFile = resolveBackupFile(req);
+  const filePath = backupFile?.path;
+  const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);
+
+  if (!backupFile || !filePath) {
+    return res.status(400).json({
+      error: 'backup-file-required',
+      message: 'Backup-Datei erforderlich',
+      requestId: req.requestId ?? null,
+    });
+  }
+
+  const runningJob = findRunningSystemJob('backup-import');
+  if (runningJob) {
+    return res.status(409).json({
+      error: 'backup-import-in-progress',
+      message: 'Ein Backup-Import läuft bereits',
+      job: runningJob,
+      requestId: req.requestId ?? null,
+    });
+  }
+
+  const auditRequest = createAuditRequestSnapshot(req);
+  const job = createSystemJob({
+    type: 'backup-import',
+    title: `Backup importieren: ${backupFile.originalname}`,
+    requestId: req.requestId ?? null,
+    createdBy: req.user
+      ? {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+        }
+      : null,
+  });
+
+  runSystemJob(job.id, async (context) => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'htmlsignage-backup-import-'));
+    const warnings: string[] = [];
+    const writtenFiles: string[] = [];
+
+    try {
+      context.setProgress('prepare', 'Backup wird validiert', 10);
+      await fs.mkdir(UPLOAD_DIR, { recursive: true });
+
+      const [existingUsers, localVersion] = await Promise.all([
+        prisma.user.findMany({ select: { id: true } }),
+        readLocalVersion(),
+      ]);
+
+      const validUserIds = new Set(existingUsers.map((user) => user.id));
+      const usedFilenames = replaceMedia ? new Set<string>() : await listUploadFiles();
+
+      const manifest = await readZipManifest(filePath);
+      if (manifest.checksum) {
+        const { checksum, ...manifestBase } = manifest;
+        if (createBackupChecksum(manifestBase) !== checksum) {
+          context.fail('checksum-mismatch', 'Backup-Datei ist beschädigt (Checksum stimmt nicht überein).');
+          return;
+        }
+      }
+
+      normalizeBackupWarnings(manifest, warnings);
+
+      context.setProgress('media', 'Medien werden vorbereitet', 40);
+      const preparedMedia = await prepareZipMedia(filePath, manifest, validUserIds, usedFilenames, replaceMedia, tempDir);
+
+      context.setProgress('import', 'Backup wird eingespielt', 75);
+      const result = await importBackupData(preparedMedia, manifest.schedule, manifest.settings, replaceMedia, writtenFiles);
+      const normalizedWarnings = normalizeImportWarnings(warnings, localVersion);
+
+      const successResult = {
+        importedMedia: preparedMedia.length,
+        replaceMedia,
+        importedAt: new Date().toISOString(),
+        importedScheduleVersion: result.scheduleVersion,
+        importedSettingsVersion: result.settingsVersion,
+        warnings: normalizedWarnings,
+      };
+
+      context.appendLog(`Backup importiert: ${preparedMedia.length} Medien, Plan v${result.scheduleVersion}, Settings v${result.settingsVersion}.`);
+      context.succeed(successResult);
+
+      await logAuditEvent(auditRequest, {
+        action: 'system.backup.import',
+        details: {
+          fileName: backupFile.originalname,
+          replaceMedia,
+          importedMedia: preparedMedia.length,
+          importedScheduleVersion: result.scheduleVersion,
+          importedSettingsVersion: result.settingsVersion,
+          warnings: normalizedWarnings,
+          requestId: auditRequest.requestId ?? null,
+          jobId: context.job.id,
+        },
+      });
+    } catch (error) {
+      await Promise.all(writtenFiles.map((file) => fs.unlink(file).catch(() => {})));
+
+      if (error instanceof SyntaxError) {
+        context.fail('invalid-backup-json', 'manifest.json enthält ungültiges JSON.');
+      } else if (error instanceof z.ZodError) {
+        context.fail('invalid-backup-format', 'Backup-Format ist ungültig.', {
+          details: error.errors,
+        });
+      } else if (error instanceof Error && error.message === 'manifest-missing') {
+        context.fail('invalid-backup-format', 'ZIP-Backup enthält keine manifest.json.');
+      } else if (error instanceof Error && error.message.startsWith('media-entry-missing:')) {
+        const archivePath = error.message.split(':').slice(1).join(':');
+        context.fail('backup-media-missing', `Medien-Datei fehlt im Backup: ${archivePath}`);
+      } else {
+        const message = error instanceof Error ? error.message : 'Backup-Import fehlgeschlagen';
+        console.error('[system] Error importing backup:', error);
+        context.fail('backup-import-failed', message);
+      }
+
+      await logAuditEvent(auditRequest, {
+        action: 'system.backup.import.failed',
+        details: {
+          fileName: backupFile.originalname,
+          replaceMedia,
+          requestId: auditRequest.requestId ?? null,
+          jobId: context.job.id,
+        },
+      });
+    } finally {
+      await Promise.all([
+        fs.unlink(filePath).catch(() => {}),
+        fs.rm(tempDir, { recursive: true, force: true }).catch(() => {}),
+      ]);
+    }
+  });
+
+  return res.status(202).json({
+    ok: true,
+    jobId: job.id,
+    job,
+    message: `Backup-Import für ${backupFile.originalname} wurde gestartet.`,
+  });
 });
 
 export default router;

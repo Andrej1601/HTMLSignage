@@ -24,6 +24,7 @@ interface TimelineScheduleSlideProps {
   schedule: Schedule;
   settings: Settings;
   now?: Date;
+  deviceId?: string;
 }
 
 interface TimelineInfusion {
@@ -203,7 +204,7 @@ function TimelineInfusionCard({
   );
 }
 
-export function TimelineScheduleSlide({ schedule, settings, now: nowProp }: TimelineScheduleSlideProps) {
+export function TimelineScheduleSlide({ schedule, settings, now: nowProp, deviceId }: TimelineScheduleSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
@@ -219,7 +220,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp }: Time
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets?.[activePresetKey];
 

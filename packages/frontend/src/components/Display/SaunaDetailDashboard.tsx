@@ -4,17 +4,21 @@ import { normalizeSaunaNameKey, resolveLivePresetKey } from '@/types/schedule.ty
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { useMedia } from '@/hooks/useMedia';
+import type { Media } from '@/types/media.types';
 import { Bell, Flame, Thermometer, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
 import { clampFlamesTo4, getScentEmoji, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { buildScheduleSaunaIndexMap, resolveScheduleSaunaIndex, timeToMinutes } from './displayScheduleUtils';
+import { ResilientImage } from './ResilientImage';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
   settings: Settings;
   saunaId?: string;
+  media?: Media[];
+  deviceId?: string;
 }
 
 interface SaunaInfusionDetailItem extends InfusionListItem {
@@ -215,10 +219,11 @@ function InfusionItemDetail({
   );
 }
 
-export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetailDashboardProps) {
+export function SaunaDetailDashboard({ schedule, settings, saunaId, media: mediaProp, deviceId }: SaunaDetailDashboardProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
-  const { data: media } = useMedia();
+  const { data: mediaFromQuery } = useMedia();
+  const media = mediaProp || mediaFromQuery;
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -236,7 +241,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
     );
   }, [settings.saunas, saunaId]);
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets?.[activePresetKey];
   const scheduleSaunaIndexByKey = useMemo(
@@ -258,9 +263,6 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
     if (!sauna?.imageId) return null;
     return getMediaUploadUrl(media, sauna.imageId);
   }, [media, sauna?.imageId]);
-
-  const fallbackImage =
-    'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&q=80&w=1200';
 
   const infusions: SaunaInfusionDetailItem[] = useMemo(() => {
     if (!sauna || !daySchedule?.rows || !daySchedule.saunas) return [];
@@ -309,7 +311,19 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId }: SaunaDetai
   return (
     <div className="w-full h-full p-8 flex flex-col" style={{ backgroundColor: bgRight, color: textMain }}>
       <div className="relative h-28 w-full rounded-[2rem] overflow-hidden mb-4 shadow-lg shrink-0 border-4 border-white">
-        <img src={saunaImageUrl || fallbackImage} className="w-full h-full object-cover" alt={sauna.name} />
+        <ResilientImage
+          src={saunaImageUrl}
+          className="w-full h-full object-cover"
+          alt={sauna.name}
+          fallback={
+            <div
+              className="w-full h-full flex items-center justify-center text-sm font-semibold uppercase tracking-[0.2em]"
+              style={{ backgroundColor: withAlpha(accentGreen, 0.18), color: accentGold }}
+            >
+              Sauna
+            </div>
+          }
+        />
         <div
           className="absolute inset-0"
           style={{

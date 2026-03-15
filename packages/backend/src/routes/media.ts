@@ -5,6 +5,7 @@ import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 import fsPromises from 'fs/promises';
 import path from 'path';
 import { fileTypeFromFile } from 'file-type';
@@ -236,6 +237,16 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), mutati
         uploadedBy: req.userId ?? null,
       },
     });
+    await logAuditEvent(req, {
+      action: 'media.upload',
+      resource: media.id,
+      details: {
+        filename: media.originalName,
+        type: media.type,
+        size: media.size,
+        tags: media.tags,
+      },
+    });
 
     res.json({
       ...media,
@@ -268,6 +279,13 @@ router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mut
         user: {
           select: { username: true },
         },
+      },
+    });
+    await logAuditEvent(req, {
+      action: 'media.tags.update',
+      resource: media.id,
+      details: {
+        tags,
       },
     });
 
@@ -310,6 +328,14 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
     // Delete from database
     await prisma.media.delete({
       where: { id: req.params.id },
+    });
+    await logAuditEvent(req, {
+      action: 'media.delete',
+      resource: media.id,
+      details: {
+        filename: media.originalName,
+        type: media.type,
+      },
     });
 
     res.json({ ok: true });

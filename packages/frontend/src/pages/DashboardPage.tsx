@@ -5,6 +5,8 @@ import { OperationsContentWidget } from '@/components/Dashboard/OperationsConten
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget';
+import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
+import { OperationsPulseWidget } from '@/components/Dashboard/OperationsPulseWidget';
 import { PageHeader } from '@/components/PageHeader';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +29,7 @@ import {
   Play,
   SlidersHorizontal,
   LayoutDashboard,
+  ShieldAlert,
 } from 'lucide-react';
 
 export function DashboardPage() {
@@ -48,6 +51,8 @@ export function DashboardPage() {
     isAdmin,
     liveState, mediaStats, eventStats,
     runningSlideshows, systemChecks, updateLabel,
+    runtimeStatus, deviceMonitoring,
+    activeSystemJobs, attentionItems,
     activityItems,
   } = useDashboardData();
 
@@ -102,8 +107,21 @@ export function DashboardPage() {
           badges={[
             { label: liveState.activeEvent ? `Event: ${liveState.activeEvent.name}` : 'Kein Event aktiv', tone: liveState.activeEvent ? 'info' as const : 'neutral' as const },
             { label: schedule?.autoPlay ? 'Auto-Play' : 'Manuell', tone: schedule?.autoPlay ? 'success' as const : 'warning' as const },
+            { label: attentionItems.length > 0 ? `${attentionItems.length} offene Punkte` : 'Betrieb stabil', tone: attentionItems.length > 0 ? attentionItems[0]?.tone || 'warning' : 'success' as const },
           ]}
         />
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr,0.85fr]">
+          <AttentionBoardWidget items={attentionItems} />
+          <OperationsPulseWidget
+            liveState={liveState}
+            activeSystemJobs={activeSystemJobs}
+            runningSlideshows={runningSlideshows}
+            nextEventLabel={nextEventDesc.value}
+            activePreset={liveState.activePreset}
+            autoPlay={Boolean(schedule?.autoPlay)}
+          />
+        </div>
 
         {/* Compact Widget Toolbar */}
         <div className="flex items-center justify-between gap-3">
@@ -214,6 +232,7 @@ export function DashboardPage() {
                   <OperationsContentWidget
                     liveState={liveState}
                     runningSlideshows={runningSlideshows}
+                    deviceMonitoring={deviceMonitoring}
                   />
                 )}
                 {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
@@ -236,6 +255,7 @@ export function DashboardPage() {
                     updateTone={systemChecks.updateTone}
                     isAdmin={isAdmin}
                     updateLabel={updateLabel}
+                    runtimeStatus={runtimeStatus}
                   />
                 )}
                 {widgetVisibility.mediaInsights && (
@@ -254,7 +274,7 @@ export function DashboardPage() {
                   <div>
                     <h3 className="text-lg font-semibold text-spa-text-primary mb-4 flex items-center gap-2">
                       <CheckCircle className="w-5 h-5" />
-                      Schnellzugriff
+                      Direktzugriffe
                     </h3>
                     <div className="space-y-3">
                       {quickActions.map((action) => (
@@ -279,6 +299,13 @@ export function DashboardPage() {
           <div className="rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark flex items-center gap-2" role="alert">
             <AlertCircle className="w-4 h-4" />
             Ein oder mehrere Datenquellen konnten nicht geladen werden. Bitte API- und Netzwerkstatus prüfen.
+          </div>
+        )}
+
+        {attentionItems.length === 0 && activeSystemJobs.length === 0 && (
+          <div className="rounded-2xl border border-spa-success/20 bg-spa-success-light/60 px-4 py-3 text-sm text-spa-success-dark flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4" />
+            Kein akuter Eingriff nötig. Nutze den Dashboard-Bereich jetzt vor allem für Planung, Vorschau und Qualitätskontrolle.
           </div>
         )}
       </div>

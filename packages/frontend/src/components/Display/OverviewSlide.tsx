@@ -9,9 +9,10 @@ interface OverviewSlideProps {
   schedule: Schedule;
   settings: Settings;
   now?: Date;
+  deviceId?: string;
 }
 
-export function OverviewSlide({ schedule, settings, now: nowProp }: OverviewSlideProps) {
+export function OverviewSlide({ schedule, settings, now: nowProp, deviceId }: OverviewSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const fonts = settings.fonts || defaults.fonts!;
@@ -25,7 +26,7 @@ export function OverviewSlide({ schedule, settings, now: nowProp }: OverviewSlid
 
   const now = nowProp ?? new Date(eventClock);
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets[activePresetKey];
 

@@ -7,8 +7,15 @@ import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../websocket/inde
 import { authMiddleware, deviceAuthMiddleware, generateDeviceToken, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter, pairingRequestLimiter, heartbeatLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 import { isPlainRecord, deepMerge } from '../lib/utils.js';
 import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
+import {
+  attachDeviceSnapshotMeta,
+  attachDeviceSnapshotMetaList,
+  deleteDeviceSnapshot,
+  saveDeviceSnapshot,
+} from '../lib/deviceSnapshots.js';
 
 const router = Router();
 const DEFAULT_DEVICE_LIMIT = 250;
@@ -51,6 +58,16 @@ const RequestPairingSchema = z.object({
   browserId: z.string().min(20).max(128),
 });
 
+const DeviceSnapshotSchema = z.object({
+  imageDataUrl: z.string().min(100).max(6_000_000),
+});
+
+function decodeSnapshotDataUrl(imageDataUrl: string): Buffer | null {
+  const match = imageDataUrl.match(/^data:image\/jpeg;base64,([a-zA-Z0-9+/=\s]+)$/);
+  if (!match) return null;
+  return Buffer.from(match[1], 'base64');
+}
+
 // GET /api/devices - List all devices (admin only)
 router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req: AuthRequest, res) => {
   try {
@@ -81,7 +98,8 @@ router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req
     res.setHeader('X-Total-Count', String(totalCount));
     res.setHeader('X-Result-Limit', String(limit));
     res.setHeader('X-Result-Offset', String(offset));
-    res.json(devices);
+    const devicesWithSnapshots = await attachDeviceSnapshotMetaList(devices);
+    res.json(devicesWithSnapshots);
   } catch (error) {
     console.error('[devices] Error listing:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
@@ -185,10 +203,35 @@ router.get('/:id', authMiddleware, requirePermission('devices:manage'), async (r
       return res.status(404).json({ error: 'not-found', message: 'Gerät nicht gefunden' });
     }
 
-    res.json(device);
+    const deviceWithSnapshot = await attachDeviceSnapshotMeta(device);
+    res.json(deviceWithSnapshot);
   } catch (error) {
     console.error('[devices] Error fetching device:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
+  }
+});
+
+// POST /api/devices/:id/snapshot - Upload live device snapshot
+router.post('/:id/snapshot', deviceAuthMiddleware, heartbeatLimiter, async (req: AuthRequest, res) => {
+  try {
+    const validated = DeviceSnapshotSchema.parse(req.body);
+    const buffer = decodeSnapshotDataUrl(validated.imageDataUrl);
+    if (!buffer) {
+      return res.status(400).json({ error: 'invalid-snapshot', message: 'Snapshot muss als JPEG Data-URL gesendet werden' });
+    }
+
+    if (buffer.length > 4 * 1024 * 1024) {
+      return res.status(400).json({ error: 'snapshot-too-large', message: 'Snapshot ist zu groß' });
+    }
+
+    const meta = await saveDeviceSnapshot(req.params.id, buffer);
+    return res.json({ ok: true, ...meta });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+    }
+    console.error('[devices] Error saving snapshot:', error);
+    return res.status(500).json({ error: 'snapshot-save-failed', message: 'Snapshot konnte nicht gespeichert werden' });
   }
 });
 
@@ -209,6 +252,14 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
     });
 
     broadcastDeviceUpdate(device);
+    await logAuditEvent(req, {
+      action: 'device.create',
+      resource: device.id,
+      details: {
+        mode: device.mode,
+        name: device.name,
+      },
+    });
 
     res.json(device);
   } catch (error) {
@@ -234,6 +285,11 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
     });
 
     broadcastDeviceUpdate(device);
+    await logAuditEvent(req, {
+      action: 'device.update',
+      resource: device.id,
+      details: validated,
+    });
 
     res.json(device);
   } catch (error) {
@@ -248,11 +304,22 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
 // DELETE /api/devices/:id - Delete device (auth required)
 router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
+    const existing = await prisma.device.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, name: true, mode: true },
+    });
+
     await prisma.device.delete({
       where: { id: req.params.id },
     });
+    await deleteDeviceSnapshot(req.params.id);
 
     broadcastDeviceUpdate({ id: req.params.id, deleted: true });
+    await logAuditEvent(req, {
+      action: 'device.delete',
+      resource: req.params.id,
+      details: existing,
+    });
 
     res.json({ ok: true });
   } catch (error) {
@@ -284,6 +351,13 @@ router.post('/:id/control', authMiddleware, requirePermission('devices:manage'),
     // Broadcast control command to the targeted device.
     broadcastDeviceCommand(req.params.id, {
       command: validated.action,
+    });
+    await logAuditEvent(req, {
+      action: 'device.command',
+      resource: req.params.id,
+      details: {
+        command: validated.action,
+      },
     });
 
     res.json({ ok: true });
@@ -327,6 +401,14 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
     } else {
       broadcastDeviceUpdate({ id: req.params.id, overridesUpdated: true });
     }
+    await logAuditEvent(req, {
+      action: 'device.override.update',
+      resource: req.params.id,
+      details: {
+        hasSchedule: Boolean(validated.schedule),
+        hasSettings: Boolean(validated.settings),
+      },
+    });
 
     res.json({ ok: true });
   } catch (error) {
@@ -358,6 +440,10 @@ router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manag
     } else {
       broadcastDeviceUpdate({ id: req.params.id, overridesCleared: true });
     }
+    await logAuditEvent(req, {
+      action: 'device.override.clear',
+      resource: req.params.id,
+    });
 
     res.json({ ok: true });
   } catch (error) {
@@ -472,6 +558,13 @@ router.post('/pair', authMiddleware, requirePermission('devices:manage'), mutati
     });
 
     broadcastDeviceUpdate({ ...pairedDevice, paired: true });
+    await logAuditEvent(req, {
+      action: 'device.pair',
+      resource: pairedDevice.id,
+      details: {
+        name: pairedDevice.name,
+      },
+    });
 
     res.json(pairedDevice);
   } catch (error) {

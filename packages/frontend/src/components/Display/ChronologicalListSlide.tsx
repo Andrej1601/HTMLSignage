@@ -29,6 +29,7 @@ interface ChronologicalListSlideProps {
   schedule: Schedule;
   settings: Settings;
   now?: Date;
+  deviceId?: string;
 }
 
 interface MergedInfusion {
@@ -41,7 +42,7 @@ interface MergedInfusion {
   saunaAccent: string;
 }
 
-export function ChronologicalListSlide({ schedule, settings, now: nowProp }: ChronologicalListSlideProps) {
+export function ChronologicalListSlide({ schedule, settings, now: nowProp, deviceId }: ChronologicalListSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
@@ -56,7 +57,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp }: Chr
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
   const daySchedule = schedule.presets?.[activePresetKey];
 
   const scheduleSaunaIndexByKey = useMemo(
