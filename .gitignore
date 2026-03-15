@@ -33,6 +33,10 @@ nginx-*.conf
 .env.local
 .env.*.local
 
+# Local agent/assistant config
+.claude/skills/
+.claude/settings.local.json
+
 # Build outputs
 dist/
 build/
