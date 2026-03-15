@@ -15,6 +15,7 @@ import {
 } from '@/hooks/useSlideshowWorkflow';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
+import { useMedia } from '@/hooks/useMedia';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { Device } from '@/types/device.types';
 import { getDeviceStatus, getModeLabel, getStatusColor, getStatusLabel } from '@/types/device.types';
@@ -25,6 +26,7 @@ import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SectionCard } from '@/components/SectionCard';
+import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
 import { Button } from '@/components/Button';
 import type { SlideshowWorkflowEntry, SlideshowWorkflowSnapshot } from '@/services/api';
 import { Monitor, RefreshCw, Rocket, RotateCcw, Save, SlidersHorizontal, Undo2 } from 'lucide-react';
@@ -32,6 +34,7 @@ import { Monitor, RefreshCw, Rocket, RotateCcw, Save, SlidersHorizontal, Undo2 }
 import { isPlainRecord, deepMergeRecords } from '@/utils/objectUtils';
 import { parseAudioSettings } from '@/utils/audioUtils';
 import { hasDeviceOverrides, getDeviceOverrideSettings } from '@/utils/deviceUtils';
+import { getSlideshowQualityIssues } from '@/utils/editorQuality';
 
 function isScheduleOverride(value: unknown): value is Schedule {
   if (!isPlainRecord(value)) return false;
@@ -130,6 +133,7 @@ function normalizePrestartMinutes(value: unknown, fallback = 10): number {
 export function SlideshowPage() {
   const { settings, isLoading, error, refetch } = useSettings();
   const { schedule } = useSchedule();
+  const { data: media = [] } = useMedia();
   const { data: devices = [] } = useDevices();
   const updateDevice = useUpdateDevice();
   const setOverrides = useSetOverrides();
@@ -247,11 +251,13 @@ export function SlideshowPage() {
 
   useEffect(() => {
     if (!settings || isDirty) return;
-    loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
+    const draftSnapshot = workflowState.data?.draft?.snapshot || null;
+    loadEditorFromTarget(target, draftSnapshot);
   }, [
     settings,
     target,
     selectedDevice?.updatedAt,
+    workflowState.data?.draft?.snapshot,
     workflowState.data?.draft?.id,
     workflowState.data?.live.updatedAt,
     isDirty,
@@ -314,6 +320,13 @@ export function SlideshowPage() {
       settings: mergedSettings,
     };
   }, [editorAudioOverride, editorConfig, editorPrestartMinutes, isDirty, previewSchedule, selectedDevice, settings]);
+
+  const slideshowQualityIssues = useMemo(() => getSlideshowQualityIssues({
+    config: editorConfig,
+    settings: previewPayload?.settings || settings,
+    media,
+    audioOverride: selectedDevice ? editorAudioOverride : null,
+  }), [editorAudioOverride, editorConfig, media, previewPayload?.settings, selectedDevice, settings]);
 
   const currentSnapshot = useMemo<SlideshowWorkflowSnapshot | null>(() => {
     if (!editorConfig) return null;
@@ -582,6 +595,16 @@ export function SlideshowPage() {
           </div>
         )}
 
+        <EditorQualityAssistant
+          description={selectedDevice
+            ? `Prüft das aktuelle Override für ${selectedDevice.name} auf leere Zonen, tote Referenzen und Audio-Probleme.`
+            : 'Prüft die globale Slideshow auf ausspielbare Slides, vollständige Zonen und gültige Referenzen.'}
+          issues={slideshowQualityIssues}
+          okMessage={selectedDevice
+            ? `Das Override für ${selectedDevice.name} ist aktuell ohne erkennbare Konfigurationsprobleme aufgebaut.`
+            : 'Die globale Slideshow ist aktuell ohne erkennbare Konfigurationsprobleme aufgebaut.'}
+        />
+
         <SectionCard
           title="Geräte-Ausspielung"
           description="Wähle ein Ziel, um globale Slideshow oder Geräte-Override zu bearbeiten."
@@ -723,6 +746,8 @@ export function SlideshowPage() {
           }}
           previewSchedule={previewPayload.schedule}
           previewSettings={previewPayload.settings}
+          scenarioDefaultDeviceId={selectedDevice?.id || null}
+          scenarioAllowedDeviceIds={selectedDevice ? [selectedDevice.id] : undefined}
           isDirty={isDirty}
           disabled={isBusy}
           showAudioOverride={Boolean(selectedDevice)}

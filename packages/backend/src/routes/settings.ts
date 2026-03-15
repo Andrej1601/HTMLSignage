@@ -64,6 +64,14 @@ const HeaderSettingsSchema = z.object({
   height: z.number().optional(),
 }).passthrough().optional();
 
+const MaintenanceScreenSchema = z.object({
+  label: z.string().optional(),
+  headline: z.string().optional(),
+  message: z.string().optional(),
+  showDeviceName: z.boolean().optional(),
+  backgroundImageId: z.string().optional(),
+}).passthrough().optional();
+
 const SaunaInfoSchema = z.object({
   temperature: z.number().optional(),
   humidity: z.number().optional(),
@@ -106,6 +114,7 @@ const SlideshowConfigSchema = z.object({
 }).passthrough().optional();
 
 const EventSettingsOverridesSchema = z.object({
+  displayAppearance: z.enum(['wellness-stage', 'editorial-resort']).optional(),
   designStyle: z.enum(['modern-wellness', 'modern-timeline', 'compact-tiles']).optional(),
   colorPalette: z.string().optional(),
   theme: z.record(z.string(), z.string()).optional(),
@@ -127,7 +136,9 @@ const SettingsSchema = z.object({
   display: DisplaySettingsSchema,
   audio: AudioSettingsSchema,
   header: HeaderSettingsSchema,
+  maintenanceScreen: MaintenanceScreenSchema,
   saunas: z.array(SaunaSchema).optional(),
+  displayAppearance: z.enum(['wellness-stage', 'editorial-resort']).optional(),
   designStyle: z.enum(['modern-wellness', 'modern-timeline', 'compact-tiles']).optional(),
   colorPalette: z.string().optional(),
   slideshow: SlideshowConfigSchema,
@@ -222,6 +233,7 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
       resource: newSettings.id,
       details: {
         version: nextVersion,
+        displayAppearance: validated.displayAppearance || null,
         designStyle: validated.designStyle || null,
         eventCount: validated.events?.length || 0,
         infoCount: validated.infos?.length || 0,

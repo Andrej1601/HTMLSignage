@@ -5,6 +5,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import {
@@ -352,6 +353,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
   const statusLive = theme.statusLive || '#10B981';
   const statusPrestart = theme.statusPrestart || '#F59E0B';
   const prestartMinutes = resolvePrestartMinutes(settings);
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
 
   const rawLogoText = (header.logoText || '').trim();
   const logoText = (!rawLogoText || /^html\s*signage$/i.test(rawLogoText))
@@ -478,8 +480,9 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
   const hasVerticalOverflow = viewportHeight > 0 && (timeline.contentHeight - viewportHeight) > 4;
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden p-6" style={{ backgroundColor: leftBg, color: textMain }}>
-      <header className="mb-4 flex justify-between items-end z-10 w-full px-1 gap-4 shrink-0">
+    <div className={`w-full h-full flex flex-col overflow-hidden ${isEditorial ? 'p-4' : 'p-6'}`} style={{ backgroundColor: leftBg, color: textMain }}>
+      {!isEditorial && (
+        <header className="mb-4 flex justify-between items-end z-10 w-full px-1 gap-4 shrink-0">
         <div className="flex items-center gap-5 min-w-0">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md border"
@@ -517,7 +520,8 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
             {formatClockDE(now)}
           </p>
         </div>
-      </header>
+        </header>
+      )}
 
       <div
         className="flex-1 min-h-0 rounded-[2rem] border shadow-sm overflow-hidden relative flex flex-col"

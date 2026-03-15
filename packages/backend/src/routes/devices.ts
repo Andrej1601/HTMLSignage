@@ -20,6 +20,12 @@ import {
 const router = Router();
 const DEFAULT_DEVICE_LIMIT = 250;
 const MAX_DEVICE_LIMIT = 1000;
+const DEVICE_ADMIN_INCLUDE = {
+  user: {
+    select: { username: true },
+  },
+  overrides: true,
+} satisfies Prisma.DeviceInclude;
 
 function normalizeSettingsData(raw: unknown): Record<string, unknown> {
   const data = isPlainRecord(raw) ? { ...raw } : {};
@@ -33,18 +39,75 @@ function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
   return isPlainRecord(raw) && Object.keys(raw).length > 0;
 }
 
+function normalizeDeviceGroupName(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readDeviceFleetState(device: unknown): { groupName: string | null; maintenanceMode: boolean } {
+  if (!isPlainRecord(device)) {
+    return { groupName: null, maintenanceMode: false };
+  }
+
+  return {
+    groupName: normalizeDeviceGroupName(typeof device.groupName === 'string' ? device.groupName : null),
+    maintenanceMode: device.maintenanceMode === true,
+  };
+}
+
+async function loadAdminDevicesByIds(deviceIds: string[]) {
+  return prisma.device.findMany({
+    where: { id: { in: deviceIds } },
+    include: DEVICE_ADMIN_INCLUDE,
+  });
+}
+
+const DeviceIdListSchema = z.array(z.string().min(1)).min(1).max(100).transform((ids) => (
+  Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)))
+));
+
 const CreateDeviceSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().min(1),
+  groupName: z.string().trim().max(80).nullable().optional(),
   mode: z.enum(['auto', 'override']).optional().default('auto'),
+  maintenanceMode: z.boolean().optional().default(false),
 });
 
 const UpdateDeviceSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  groupName: z.string().trim().max(80).nullable().optional(),
   mode: z.enum(['auto', 'override']).optional(),
+  maintenanceMode: z.boolean().optional(),
 });
 
 const ControlCommandSchema = z.object({
   action: z.enum(['reload', 'restart', 'clear-cache']),
+});
+
+const BulkUpdateDeviceSchema = z.object({
+  deviceIds: DeviceIdListSchema,
+  updates: z.object({
+    groupName: z.string().trim().max(80).nullable().optional(),
+    mode: z.enum(['auto', 'override']).optional(),
+    maintenanceMode: z.boolean().optional(),
+  }).superRefine((value, ctx) => {
+    if (
+      value.groupName === undefined &&
+      value.mode === undefined &&
+      value.maintenanceMode === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one update field is required',
+      });
+    }
+  }),
+});
+
+const BulkControlCommandSchema = z.object({
+  deviceIds: DeviceIdListSchema,
+  command: ControlCommandSchema,
 });
 
 const OverridesSchema = z.object({
@@ -82,12 +145,7 @@ router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req
 
     const [devices, totalCount] = await Promise.all([
       prisma.device.findMany({
-        include: {
-          user: {
-            select: { username: true },
-          },
-          overrides: true,
-        },
+        include: DEVICE_ADMIN_INCLUDE,
         orderBy: { lastSeen: 'desc' },
         take: limit,
         skip: offset,
@@ -164,6 +222,7 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
     const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
     const hasScheduleOverride = Boolean(overrideSchedule);
     const hasSettingsOverride = hasSettingsOverrideData(device.overrides?.settings);
+    const fleetState = readDeviceFleetState(device);
 
     const isOverrideMode = device.mode === 'override';
     const effectiveSchedule = isOverrideMode && hasScheduleOverride
@@ -176,6 +235,7 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
 
     return res.json({
       deviceId: device.id,
+      maintenanceMode: fleetState.maintenanceMode,
       mode: device.mode,
       hasScheduleOverride,
       hasSettingsOverride,
@@ -193,10 +253,7 @@ router.get('/:id', authMiddleware, requirePermission('devices:manage'), async (r
   try {
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      include: {
-        user: { select: { username: true } },
-        overrides: true,
-      },
+      include: DEVICE_ADMIN_INCLUDE,
     });
 
     if (!device) {
@@ -239,23 +296,27 @@ router.post('/:id/snapshot', deviceAuthMiddleware, heartbeatLimiter, async (req:
 router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateDeviceSchema.parse(req.body);
+    const nextDeviceData = {
+      name: validated.name,
+      groupName: normalizeDeviceGroupName(validated.groupName),
+      maintenanceMode: validated.maintenanceMode,
+      mode: validated.mode,
+      pairedAt: new Date(),
+    } as Prisma.DeviceCreateInput;
 
     const device = await prisma.device.create({
-      data: {
-        name: validated.name,
-        mode: validated.mode,
-        pairedAt: new Date(),
-      },
-      include: {
-        overrides: true,
-      },
+      data: nextDeviceData,
+      include: DEVICE_ADMIN_INCLUDE,
     });
+    const fleetState = readDeviceFleetState(device);
 
     broadcastDeviceUpdate(device);
     await logAuditEvent(req, {
       action: 'device.create',
       resource: device.id,
       details: {
+        groupName: fleetState.groupName,
+        maintenanceMode: fleetState.maintenanceMode,
         mode: device.mode,
         name: device.name,
       },
@@ -275,20 +336,29 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
 router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
+    const updates: Record<string, unknown> = {};
+
+    if (validated.name !== undefined) updates.name = validated.name;
+    if (validated.mode !== undefined) updates.mode = validated.mode;
+    if (validated.groupName !== undefined) updates.groupName = normalizeDeviceGroupName(validated.groupName);
+    if (validated.maintenanceMode !== undefined) updates.maintenanceMode = validated.maintenanceMode;
 
     const device = await prisma.device.update({
       where: { id: req.params.id },
-      data: validated,
-      include: {
-        overrides: true,
-      },
+      data: updates as Prisma.DeviceUpdateInput,
+      include: DEVICE_ADMIN_INCLUDE,
     });
 
     broadcastDeviceUpdate(device);
     await logAuditEvent(req, {
       action: 'device.update',
       resource: device.id,
-      details: validated,
+      details: {
+        ...validated,
+        groupName: validated.groupName === undefined
+          ? undefined
+          : normalizeDeviceGroupName(validated.groupName),
+      },
     });
 
     res.json(device);
@@ -328,6 +398,66 @@ router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutat
   }
 });
 
+// PATCH /api/devices/bulk/update - Bulk update device fleet properties (auth required)
+router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+  try {
+    const validated = BulkUpdateDeviceSchema.parse(req.body);
+    const devices = await loadAdminDevicesByIds(validated.deviceIds);
+    const foundIds = new Set(devices.map((device) => device.id));
+    const missingIds = validated.deviceIds.filter((id) => !foundIds.has(id));
+
+    if (missingIds.length > 0) {
+      return res.status(404).json({
+        error: 'not-found',
+        message: 'Ein oder mehrere Geräte wurden nicht gefunden',
+        missingIds,
+      });
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (validated.updates.mode !== undefined) updates.mode = validated.updates.mode;
+    if (validated.updates.maintenanceMode !== undefined) updates.maintenanceMode = validated.updates.maintenanceMode;
+    if (validated.updates.groupName !== undefined) {
+      updates.groupName = normalizeDeviceGroupName(validated.updates.groupName);
+    }
+
+    await prisma.device.updateMany({
+      where: { id: { in: validated.deviceIds } },
+      data: updates as Prisma.DeviceUpdateManyMutationInput,
+    });
+
+    const updatedDevices = await loadAdminDevicesByIds(validated.deviceIds);
+    updatedDevices.forEach((device) => broadcastDeviceUpdate(device));
+
+    await logAuditEvent(req, {
+      action: 'device.bulk.update',
+      resource: null,
+      details: {
+        affectedCount: updatedDevices.length,
+        deviceIds: updatedDevices.map((device) => device.id),
+        updates: {
+          ...validated.updates,
+          groupName: validated.updates.groupName === undefined
+            ? undefined
+            : normalizeDeviceGroupName(validated.updates.groupName),
+        },
+      },
+    });
+
+    return res.json({
+      ok: true,
+      affectedCount: updatedDevices.length,
+      deviceIds: updatedDevices.map((device) => device.id),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+    }
+    console.error('[devices] Error bulk updating devices:', error);
+    return res.status(500).json({ error: 'bulk-update-failed', message: 'Geräte konnten nicht gesammelt aktualisiert werden' });
+  }
+});
+
 // POST /api/devices/:id/heartbeat - Device heartbeat
 router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req: AuthRequest, res) => {
   try {
@@ -340,6 +470,55 @@ router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req
   } catch (error) {
     console.error('[devices] Heartbeat error:', error);
     res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
+  }
+});
+
+// POST /api/devices/bulk/control - Send one command to multiple devices
+router.post('/bulk/control', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+  try {
+    const validated = BulkControlCommandSchema.parse(req.body);
+    const devices = await prisma.device.findMany({
+      where: { id: { in: validated.deviceIds } },
+      select: { id: true, name: true },
+    });
+    const foundIds = new Set(devices.map((device) => device.id));
+    const missingIds = validated.deviceIds.filter((id) => !foundIds.has(id));
+
+    if (missingIds.length > 0) {
+      return res.status(404).json({
+        error: 'not-found',
+        message: 'Ein oder mehrere Geräte wurden nicht gefunden',
+        missingIds,
+      });
+    }
+
+    devices.forEach((device) => {
+      broadcastDeviceCommand(device.id, {
+        command: validated.command.action,
+      });
+    });
+
+    await logAuditEvent(req, {
+      action: 'device.bulk.command',
+      resource: null,
+      details: {
+        affectedCount: devices.length,
+        deviceIds: devices.map((device) => device.id),
+        command: validated.command.action,
+      },
+    });
+
+    return res.json({
+      ok: true,
+      affectedCount: devices.length,
+      deviceIds: devices.map((device) => device.id),
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+    }
+    console.error('[devices] Error sending bulk control command:', error);
+    return res.status(500).json({ error: 'bulk-command-failed', message: 'Befehle konnten nicht an die Geräte gesendet werden' });
   }
 });
 
@@ -390,10 +569,7 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
 
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      include: {
-        user: { select: { username: true } },
-        overrides: true,
-      },
+      include: DEVICE_ADMIN_INCLUDE,
     });
 
     if (device) {
@@ -429,10 +605,7 @@ router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manag
 
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      include: {
-        user: { select: { username: true } },
-        overrides: true,
-      },
+      include: DEVICE_ADMIN_INCLUDE,
     });
 
     if (device) {
@@ -458,7 +631,8 @@ router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manag
 
 const PairDeviceSchema = z.object({
   pairingCode: z.string().length(6),
-  name: z.string().min(1).optional(),
+  name: z.string().trim().min(1).optional(),
+  groupName: z.string().trim().max(80).nullable().optional(),
 });
 
 // POST /api/devices/request-pairing - Request a pairing code (called by unpaired device)
@@ -545,23 +719,21 @@ router.post('/pair', authMiddleware, requirePermission('devices:manage'), mutati
       where: { id: device.id },
       data: {
         name: validated.name || device.name,
+        groupName: normalizeDeviceGroupName(validated.groupName),
         pairedBy: req.userId,
         pairedAt: new Date(),
         pairingCode: null, // Clear pairing code after successful pairing
-      },
-      include: {
-        user: {
-          select: { username: true },
-        },
-        overrides: true,
-      },
+      } as Prisma.DeviceUpdateInput,
+      include: DEVICE_ADMIN_INCLUDE,
     });
+    const pairedFleetState = readDeviceFleetState(pairedDevice);
 
     broadcastDeviceUpdate({ ...pairedDevice, paired: true });
     await logAuditEvent(req, {
       action: 'device.pair',
       resource: pairedDevice.id,
       details: {
+        groupName: pairedFleetState.groupName,
         name: pairedDevice.name,
       },
     });

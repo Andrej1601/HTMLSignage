@@ -3,12 +3,23 @@ import { mediaApi } from '@/services/api';
 import { toast } from '@/stores/toastStore';
 import type { MediaFilter } from '@/types/media.types';
 
+interface MediaQueryOptions {
+  enabled?: boolean;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  staleTime?: number;
+}
+
 // Get all media
-export function useMedia(filter?: MediaFilter) {
+export function useMedia(filter?: MediaFilter, options?: MediaQueryOptions) {
   return useQuery({
     queryKey: ['media', filter],
     queryFn: () => mediaApi.getMedia(filter),
     placeholderData: keepPreviousData,
+    enabled: options?.enabled,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
+    refetchOnReconnect: options?.refetchOnReconnect,
+    staleTime: options?.staleTime,
   });
 }
 

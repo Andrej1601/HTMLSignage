@@ -4,7 +4,14 @@ import { toast } from '@/stores/toastStore';
 import type { Settings } from '@/types/settings.types';
 import { migrateSettings } from '@/utils/slideshowMigration';
 
-export function useSettings() {
+interface SettingsQueryOptions {
+  enabled?: boolean;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  staleTime?: number;
+}
+
+export function useSettings(options?: SettingsQueryOptions) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -14,6 +21,10 @@ export function useSettings() {
       // Migrate old settings to new format
       return migrateSettings(settings);
     },
+    enabled: options?.enabled,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
+    refetchOnReconnect: options?.refetchOnReconnect,
+    staleTime: options?.staleTime,
   });
 
   const saveMutation = useMutation({

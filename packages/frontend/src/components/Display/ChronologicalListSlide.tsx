@@ -5,6 +5,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import {
   clampFlamesTo4,
@@ -79,6 +80,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const border = theme.gridTable || '#EBE5D3';
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
 
   // Merge all infusions from all saunas into one sorted list
   const allInfusions = useMemo(() => {
@@ -213,11 +215,11 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
   return (
     <div
-      className="w-full h-full flex flex-col font-sans select-none overflow-hidden p-8"
+      className={`w-full h-full flex flex-col font-sans select-none overflow-hidden ${isEditorial ? 'p-5' : 'p-8'}`}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
-      {/* Header */}
-      <header className="mb-5 flex justify-between items-center z-20 w-full shrink-0">
+      {!isEditorial && (
+        <header className="mb-5 flex justify-between items-center z-20 w-full shrink-0">
         <div className="flex items-center gap-5 min-w-0 flex-1">
           <div
             className="w-14 h-14 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
@@ -253,10 +255,11 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
             {formatClockDE(now)}
           </p>
         </div>
-      </header>
+        </header>
+      )}
 
       {/* Sauna legend */}
-      <div className="flex flex-wrap gap-4 mb-4 shrink-0 px-1">
+      <div className={`flex flex-wrap gap-4 shrink-0 px-1 ${isEditorial ? 'mb-3' : 'mb-4'}`}>
         {visibleSaunas
           .filter((s) => s.status !== 'out-of-order')
           .map((sauna, idx) => {

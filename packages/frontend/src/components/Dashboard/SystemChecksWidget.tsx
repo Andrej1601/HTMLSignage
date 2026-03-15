@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, AlertTriangle, HardDrive, Wrench } from 'lucide-react';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
-import type { SystemRuntimeStatusResponse } from '@/services/api';
+import type { SystemRuntimeHistoryResponse, SystemRuntimeStatusResponse } from '@/services/api';
 import { formatFileSize } from '@/types/media.types';
 import { formatRelativeTime, toValidDate } from '@/utils/dateUtils';
+import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
+import {
+  RuntimeHistoryDetailDialog,
+  type RuntimeHistoryDetailMetric,
+} from '@/components/Dashboard/RuntimeHistoryDetailDialog';
 
 interface SystemChecksWidgetProps {
   backendStatus: 'ok' | 'error' | 'unknown';
@@ -15,6 +21,7 @@ interface SystemChecksWidgetProps {
   isAdmin: boolean;
   updateLabel: string;
   runtimeStatus: SystemRuntimeStatusResponse | null;
+  runtimeHistory: SystemRuntimeHistoryResponse | null;
 }
 
 function getMaintenanceBadge(state: SystemRuntimeStatusResponse['maintenance']['state']): {
@@ -52,6 +59,17 @@ function getCategoryLabel(category: SystemRuntimeStatusResponse['warnings'][numb
   }
 }
 
+function getDeltaTone(delta: number, positiveIsGood: boolean): string {
+  if (delta === 0) return 'text-spa-text-secondary';
+  const improved = positiveIsGood ? delta > 0 : delta < 0;
+  return improved ? 'text-spa-success-dark' : 'text-spa-error-dark';
+}
+
+function formatSignedValue(delta: number, suffix = ''): string {
+  if (delta === 0) return `0${suffix}`;
+  return `${delta > 0 ? '+' : ''}${delta}${suffix}`;
+}
+
 export function SystemChecksWidget({
   backendStatus,
   backendTone,
@@ -62,26 +80,28 @@ export function SystemChecksWidget({
   isAdmin,
   updateLabel,
   runtimeStatus,
+  runtimeHistory,
 }: SystemChecksWidgetProps) {
+  const [selectedHistoryMetric, setSelectedHistoryMetric] = useState<RuntimeHistoryDetailMetric | null>(null);
   const warnings = runtimeStatus?.warnings || [];
   const maintenance = runtimeStatus?.maintenance;
   const maintenanceBadge = maintenance ? getMaintenanceBadge(maintenance.state) : null;
+  const historySummary = runtimeHistory?.summary || null;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <h3 className="text-lg font-semibold text-spa-text-primary flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          System-Checks
-        </h3>
+    <DashboardWidgetFrame
+      title="System-Checks"
+      description="API, Laufzeitstatus, Speicherlage und Housekeeping im Blick."
+      icon={Activity}
+      actions={(
         <Link
           to="/settings"
-          className="text-xs font-semibold text-spa-primary hover:text-spa-primary-dark transition-colors"
+          className="text-xs font-semibold text-spa-primary transition-colors hover:text-spa-primary-dark"
         >
           Zum System
         </Link>
-      </div>
-
+      )}
+    >
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm text-spa-text-secondary">Backend API</span>
@@ -175,6 +195,95 @@ export function SystemChecksWidget({
           </div>
         </div>
 
+        <div className="rounded-lg bg-spa-bg-primary p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
+              Verlauf letzte {runtimeHistory?.periodHours || 24}h
+            </p>
+            {historySummary ? (
+              <span className="text-xs text-spa-text-secondary">
+                {historySummary.sampleCount} Punkte
+              </span>
+            ) : (
+              <StatusBadge label="Lädt" tone="neutral" />
+            )}
+          </div>
+
+          {historySummary && historySummary.sampleCount > 0 ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryMetric('heartbeats')}
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+                  Heartbeats
+                </p>
+                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  Ø {historySummary.avgOnlineDevices}
+                </p>
+                <p className="text-xs text-spa-text-secondary">
+                  Max. {historySummary.maxStaleDevices} überfällig
+                </p>
+                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.staleDevices, false)}`}>
+                  Überfällig {formatSignedValue(historySummary.deltas.staleDevices)}
+                </p>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
+                  Details öffnen
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryMetric('warnings')}
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+                  Warnlagen
+                </p>
+                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  Peak {historySummary.maxSystemWarningCount}
+                </p>
+                <p className="text-xs text-spa-text-secondary">
+                  Aktiver Verlauf seit {historySummary.coverageHours}h · ohne Heartbeats
+                </p>
+                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.systemWarningCount, false)}`}>
+                  Warnungen {formatSignedValue(historySummary.deltas.systemWarningCount)}
+                </p>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
+                  Details öffnen
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryMetric('disk')}
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+                  Speichertrend
+                </p>
+                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
+                  Peak {historySummary.maxDiskUsagePercent}%
+                </p>
+                <p className="text-xs text-spa-text-secondary">
+                  Letzte Probe {historySummary.lastPointAt ? formatRelativeTime(toValidDate(historySummary.lastPointAt)) : 'unbekannt'}
+                </p>
+                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.diskUsagePercent, false)}`}>
+                  Speicher {formatSignedValue(historySummary.deltas.diskUsagePercent, '%')}
+                </p>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
+                  Details öffnen
+                </p>
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-spa-bg-secondary bg-white px-3 py-3 text-xs text-spa-text-secondary">
+              Noch nicht genug Verlaufsdaten vorhanden. Die Historie füllt sich im laufenden Betrieb automatisch.
+            </div>
+          )}
+        </div>
+
         <div>
           <div className="flex items-center justify-between gap-3 mb-2">
             <p className="text-sm font-semibold text-spa-text-primary flex items-center gap-2">
@@ -216,6 +325,13 @@ export function SystemChecksWidget({
           )}
         </div>
       </div>
-    </div>
+
+      <RuntimeHistoryDetailDialog
+        metric={selectedHistoryMetric}
+        runtimeHistory={runtimeHistory}
+        runtimeStatus={runtimeStatus}
+        onClose={() => setSelectedHistoryMetric(null)}
+      />
+    </DashboardWidgetFrame>
   );
 }

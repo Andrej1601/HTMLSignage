@@ -33,10 +33,19 @@ import { isPlainRecord } from '@/utils/objectUtils';
 import { hasDeviceOverrides, getDeviceOverrideSettings } from '@/utils/deviceUtils';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
 import { resolveEffectiveDeviceSettings } from '@/utils/displaySettings';
+import {
+  getDisplayAppearanceLabel,
+  getScheduleDesignStyleLabel,
+} from '@/config/displayDesignStyles';
 import type { ActivityItem } from '@/components/Dashboard/ActivityFeedWidget';
 import type { RunningSlideshowGroup } from '@/components/Dashboard/LiveOperationsWidget';
 import type { StatusTone } from '@/components/StatusBadge';
 import { formatAuditActionLabel, getAuditActionMeta, summarizeAuditDetails } from '@/utils/auditLog';
+import type { SystemJob } from '@/services/api';
+
+const EMPTY_DEVICES: Device[] = [];
+const EMPTY_MEDIA: Media[] = [];
+const EMPTY_SYSTEM_JOBS: SystemJob[] = [];
 
 function getLatestMediaItem(media: Media[]): Media | null {
   if (media.length === 0) return null;
@@ -242,8 +251,8 @@ export function useDashboardData() {
 
   const schedule = scheduleQuery.schedule;
   const settings = settingsQuery.settings;
-  const devices = devicesQuery.data || [];
-  const media = mediaQuery.data || [];
+  const devices = devicesQuery.data ?? EMPTY_DEVICES;
+  const media = mediaQuery.data ?? EMPTY_MEDIA;
 
   const backendHealthQuery = useQuery({
     queryKey: ['dashboard-health'],
@@ -256,6 +265,13 @@ export function useDashboardData() {
     queryFn: () => systemApi.getRuntimeStatus(token!),
     enabled: Boolean(token),
     refetchInterval: 30000,
+  });
+
+  const runtimeHistoryQuery = useQuery({
+    queryKey: ['dashboard-runtime-history'],
+    queryFn: () => systemApi.getRuntimeHistory(token!, 24),
+    enabled: Boolean(token),
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const systemStatusQuery = useQuery({
@@ -495,6 +511,7 @@ export function useDashboardData() {
   }, [liveState.pairedDevices, media, settings]);
 
   const runtimeStatus = runtimeStatusQuery.data || null;
+  const runtimeHistory = runtimeHistoryQuery.data || null;
 
   const systemChecks = useMemo<DashboardSystemChecks>(() => {
     const backendTone: StatusTone =
@@ -544,7 +561,7 @@ export function useDashboardData() {
     return `v${systemStatusQuery.data?.currentVersion || '?'}`;
   }, [systemStatusQuery.data]);
 
-  const systemJobs = systemJobsQuery.data?.items || [];
+  const systemJobs = systemJobsQuery.data?.items ?? EMPTY_SYSTEM_JOBS;
   const activeSystemJobs = useMemo(
     () => systemJobs.filter((job) => job.status === 'queued' || job.status === 'running'),
     [systemJobs],
@@ -650,7 +667,7 @@ export function useDashboardData() {
     return items
       .sort((a, b) => a.priority - b.priority || a.title.localeCompare(b.title, 'de-DE'))
       .slice(0, 6)
-      .map(({ priority, ...item }) => item);
+      .map(({ priority: _priority, ...item }) => item);
   }, [activeSystemJobs, eventStats.nextEvent, liveState, planQuality, runtimeStatus?.warnings]);
 
   const activityItems = useMemo<ActivityItem[]>(() => {
@@ -775,7 +792,7 @@ export function useDashboardData() {
       items.push({
         id: 'settings-version',
         title: `Einstellungen v${settings.version} geladen`,
-        description: `Design: ${settings.designStyle || 'modern-wellness'}`,
+        description: `Design: ${getDisplayAppearanceLabel(settings.displayAppearance)} · ${getScheduleDesignStyleLabel(settings.designStyle || 'modern-wellness')}`,
         tone: 'success',
         actor: 'System',
         category: 'system',
@@ -795,6 +812,7 @@ export function useDashboardData() {
     mediaQuery,
     backendHealthQuery,
     runtimeStatusQuery,
+    runtimeHistoryQuery,
     systemStatusQuery,
     schedule,
     settings,
@@ -811,6 +829,7 @@ export function useDashboardData() {
     runningSlideshows,
     deviceMonitoring,
     runtimeStatus,
+    runtimeHistory,
     systemChecks,
     updateLabel,
     systemJobs,

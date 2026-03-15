@@ -98,7 +98,16 @@ export interface HeaderSettings {
   height?: number; // percentage of screen height (default: 8)
 }
 
+export interface MaintenanceScreenSettings {
+  label?: string;
+  headline?: string;
+  message?: string;
+  showDeviceName?: boolean;
+  backgroundImageId?: string;
+}
+
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
+export type DisplayAppearance = 'wellness-stage' | 'editorial-resort';
 export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
@@ -196,6 +205,7 @@ export interface Event {
 }
 
 export interface EventSettingsOverrides {
+  displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
   colorPalette?: ColorPaletteName;
   theme?: Partial<ThemeColors>;
@@ -209,6 +219,7 @@ export interface EventSettingsOverrides {
 
 export interface Settings {
   version: number;
+  displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
   colorPalette?: ColorPaletteName;
   theme?: ThemeColors;
@@ -217,6 +228,7 @@ export interface Settings {
   display?: DisplaySettings;
   audio?: AudioSettings;
   header?: HeaderSettings;
+  maintenanceScreen?: MaintenanceScreenSettings;
   saunas?: Sauna[];
   slideshow?: SlideshowConfig;
   aromas?: Aroma[];

@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Monitor } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { SlidePreview } from '@/components/Slideshow/SlidePreview';
-import { getEnabledSlides, type SlideshowConfig, type SlideConfig } from '@/types/slideshow.types';
+import type { SlideshowConfig, SlideConfig } from '@/types/slideshow.types';
 
 interface LiveState {
   onlineDevices: number;
@@ -25,10 +24,9 @@ export interface RunningSlideshowGroup {
 
 interface LiveOperationsWidgetProps {
   liveState: LiveState;
-  runningSlideshows: RunningSlideshowGroup[];
 }
 
-export function LiveOperationsWidget({ liveState, runningSlideshows }: LiveOperationsWidgetProps) {
+export function LiveOperationsWidget({ liveState }: LiveOperationsWidgetProps) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
       <div className="flex items-center justify-between mb-4 gap-3">
@@ -63,56 +61,6 @@ export function LiveOperationsWidget({ liveState, runningSlideshows }: LiveOpera
       </div>
       <div className="mt-4 text-sm text-spa-text-secondary">
         <span className="font-medium text-spa-text-primary">{liveState.devicesWithOverrides}</span> Gerät(e) haben gespeicherte Overrides.
-      </div>
-
-      <div className="mt-5 pt-4 border-t border-spa-bg-secondary">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-spa-text-primary">Aktive Slideshow-Ausspielungen</p>
-          <Link
-            to="/slideshow"
-            className="text-xs font-semibold text-spa-primary hover:text-spa-primary-dark transition-colors"
-          >
-            Slideshow verwalten
-          </Link>
-        </div>
-        <div className="mt-3 space-y-3">
-          {runningSlideshows.map((group) => (
-            <div key={group.id} className="rounded-lg border border-spa-bg-secondary p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <StatusBadge
-                    label={group.source === 'global' ? 'Global' : 'Override'}
-                    tone={group.source === 'global' ? 'success' : 'info'}
-                    showDot={false}
-                  />
-                  <p className="text-sm font-semibold text-spa-text-primary">{group.title}</p>
-                </div>
-                <span className="text-xs text-spa-text-secondary">
-                  {getEnabledSlides(group.config).length} aktive Slides
-                </span>
-              </div>
-              <p className="text-xs text-spa-text-secondary mt-1">
-                Läuft auf: {group.deviceNames.length > 0 ? group.deviceNames.join(', ') : 'keinem aktiven Gerät'}
-              </p>
-
-              {group.slides.length > 0 ? (
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                  {group.slides.map((slide) => (
-                    <SlidePreview
-                      key={`${group.id}-${slide.id}`}
-                      slide={slide}
-                      className="w-28 h-[63px] flex-shrink-0"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-spa-text-secondary mt-2">
-                  Keine aktiven Slides konfiguriert.
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );

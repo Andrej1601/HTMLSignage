@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { CalendarDays, Image, Monitor, Settings, ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
 import { formatRelativeTime } from '@/utils/dateUtils';
+import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
 
 export type ActivityCategory = 'plan' | 'media' | 'device' | 'system';
 
@@ -57,11 +58,11 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
-      <h3 className="text-lg font-semibold text-spa-text-primary mb-4">
-        Letzte Aktivitäten
-      </h3>
-
+    <DashboardWidgetFrame
+      title="Letzte Aktivitäten"
+      description="Änderungen an Plänen, Medien, Geräten und Systemzustand mit schnellem Kontext."
+      icon={CalendarDays}
+    >
       {/* Filter Pills */}
       <div className="flex flex-wrap gap-1.5 mb-4">
         {CATEGORY_PILLS.map(({ key, label, icon: Icon }) => {
@@ -147,6 +148,6 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
           );
         })}
       </div>
-    </div>
+    </DashboardWidgetFrame>
   );
 }

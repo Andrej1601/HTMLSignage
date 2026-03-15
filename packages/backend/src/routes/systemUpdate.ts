@@ -1,20 +1,26 @@
 import { Router } from 'express';
+import { spawn } from 'child_process';
 import { z } from 'zod';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import type { AuthRequest } from '../lib/auth.js';
 import { logAuditEvent } from '../lib/audit.js';
 import {
+  REPO_ROOT,
   readLocalVersion,
   fetchGitHubReleases,
-  checkDirtyTree,
   compareVersions,
-  getCurrentGitTag,
+  collectSystemUpdatePreflight,
+  collectSystemUpdateVerification,
   createDatabaseBackup,
+  resolveSystemUpdateRestartPlan,
   runCommand,
 } from '../lib/systemHelpers.js';
 import { createSystemJob, findRunningSystemJob, runSystemJob } from '../lib/systemJobs.js';
 
 const router = Router();
+const FINALIZER_SCRIPT_PATH = fileURLToPath(new URL('../scripts/systemUpdateFinalize.js', import.meta.url));
+const BACKEND_WORKDIR = path.join(REPO_ROOT, 'packages/backend');
 
 function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
   return {
@@ -32,10 +38,10 @@ function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
 router.get('/update/status', async (req: AuthRequest, res) => {
   try {
     const activeJob = findRunningSystemJob('system-update');
-    const [currentVersion, releases, isDirty] = await Promise.all([
+    const [currentVersion, releases, preflight] = await Promise.all([
       readLocalVersion(),
       fetchGitHubReleases(),
-      checkDirtyTree(),
+      collectSystemUpdatePreflight(),
     ]);
 
     const stableReleases = releases.filter((release) => !release.prerelease);
@@ -45,6 +51,7 @@ router.get('/update/status', async (req: AuthRequest, res) => {
     const olderReleases = stableReleases.slice(1).filter(
       (release) => compareVersions(release.tag, currentVersion) < 0,
     );
+    const workingTreeCheck = preflight.checks.find((check) => check.id === 'working-tree');
 
     res.json({
       ok: true,
@@ -52,9 +59,10 @@ router.get('/update/status', async (req: AuthRequest, res) => {
       latestRelease,
       hasUpdate,
       olderReleases,
-      isDirty,
+      isDirty: workingTreeCheck?.status === 'error',
       isRunning: Boolean(activeJob),
       activeJob,
+      preflight,
       checkedAt: new Date().toISOString(),
     });
   } catch (error) {
@@ -95,6 +103,25 @@ router.post('/update/run', async (req: AuthRequest, res) => {
   const { targetVersion } = parsed.data;
   const tagName = targetVersion.startsWith('v') ? targetVersion : `v${targetVersion}`;
   const auditRequest = createAuditRequestSnapshot(req);
+  const preflight = await collectSystemUpdatePreflight();
+
+  if (!preflight.ready) {
+    await logAuditEvent(auditRequest, {
+      action: 'system.update.blocked',
+      details: {
+        targetVersion: tagName,
+        blockers: preflight.blockers,
+        requestId: auditRequest.requestId ?? null,
+      },
+    });
+
+    return res.status(409).json({
+      error: 'update-preflight-failed',
+      message: 'Update-Preflight fehlgeschlagen.',
+      preflight,
+      requestId: req.requestId ?? null,
+    });
+  }
 
   const job = createSystemJob({
     type: 'system-update',
@@ -114,15 +141,11 @@ router.post('/update/run', async (req: AuthRequest, res) => {
     let backupPath: string | undefined;
 
     try {
-      context.setProgress('preflight', 'Arbeitsbaum wird geprüft', 5);
-      const isDirty = await checkDirtyTree();
-      if (isDirty) {
-        context.appendLog('Working tree has local changes. Aborting update to avoid conflicts.');
-        context.fail('working-tree-dirty', 'Lokale Änderungen blockieren das Update.');
-        return;
-      }
-
-      const previousTag = await getCurrentGitTag();
+      context.setProgress('preflight', 'Update-Preflight wird geprueft', 5);
+      context.appendLog('== Update-Preflight ==');
+      preflight.checks.forEach((check) => {
+        context.appendLog(`[${check.status.toUpperCase()}] ${check.label}: ${check.detail}`);
+      });
 
       context.setProgress('backup', 'Datenbank-Backup wird erstellt', 10);
       context.appendLog('== Erstelle Datenbank-Backup ==');
@@ -130,8 +153,15 @@ router.post('/update/run', async (req: AuthRequest, res) => {
       if (backupPath) {
         context.appendLog(`DB-Backup erstellt: ${path.basename(backupPath)}`);
       } else {
-        context.appendLog('Warnung: DB-Backup konnte nicht erstellt werden. Update wird fortgesetzt.');
+        context.fail('backup-failed', 'Datenbank-Backup konnte nicht erstellt werden.', {
+          targetVersion: tagName,
+          preflight,
+        });
+        return;
       }
+
+      const previousTagResult = await runCommand('git', ['describe', '--tags', '--exact-match', 'HEAD'], { timeoutMs: 30 * 1000 });
+      const previousTag = previousTagResult.code === 0 ? previousTagResult.stdout.trim() : null;
 
       const steps: Array<{ label: string; command: string; args: string[]; timeoutMs?: number; percent: number }> = [
         {
@@ -225,28 +255,74 @@ router.post('/update/run', async (req: AuthRequest, res) => {
         }
       }
 
-      context.setProgress('finalize', 'Version wird geprüft', 98);
+      context.setProgress('verify', 'Build-Artefakte werden geprueft', 96);
+      const verification = await collectSystemUpdateVerification(tagName);
+      verification.checks.forEach((check) => {
+        context.appendLog(`[${check.status.toUpperCase()}] ${check.label}: ${check.detail}`);
+      });
+
+      if (!verification.ready) {
+        context.fail('verification-failed', 'Post-Update-Verifikation fehlgeschlagen.', {
+          targetVersion: tagName,
+          backupPath: backupPath ? path.basename(backupPath) : undefined,
+          rolledBack,
+          verification,
+          preflight,
+        });
+        return;
+      }
+
+      const restartPlan = await resolveSystemUpdateRestartPlan(process.pid);
+      if (!restartPlan.autoRestartReady) {
+        context.fail('restart-plan-missing', 'Kein automatischer Restart-Pfad verfuegbar.', {
+          targetVersion: tagName,
+          backupPath: backupPath ? path.basename(backupPath) : undefined,
+          rolledBack,
+          verification,
+          preflight,
+          restartPlan,
+        });
+        return;
+      }
+
+      context.setProgress('finalize', 'Update wird finalisiert und Dienste werden neu gestartet', 98);
       const newVersion = await readLocalVersion();
-      const successResult = {
+      const baseResult = {
         newVersion,
         targetVersion: tagName,
-        finishedAt: new Date().toISOString(),
-        note: 'Update abgeschlossen. Bitte Backend-/Frontend-Dienste neu starten.',
         backupPath: backupPath ? path.basename(backupPath) : undefined,
         rolledBack,
+        preflight,
+        buildVerification: verification,
       };
 
-      context.succeed(successResult);
-      await logAuditEvent(auditRequest, {
-        action: 'system.update.run',
-        details: {
-          targetVersion: tagName,
-          newVersion,
-          backupPath: backupPath ? path.basename(backupPath) : null,
-          requestId: auditRequest.requestId ?? null,
-          jobId: context.job.id,
+      context.appendLog(`Restart-Strategie: ${restartPlan.summary}`);
+      context.appendLog('Update-Finalizer wird gestartet und fuehrt Restart plus Healthchecks aus.');
+
+      const finalizer = spawn(
+        process.execPath,
+        [FINALIZER_SCRIPT_PATH],
+        {
+          cwd: BACKEND_WORKDIR,
+          detached: true,
+          stdio: 'ignore',
+          env: {
+            ...process.env,
+            SYSTEM_UPDATE_FINALIZE_JOB_ID: context.job.id,
+            SYSTEM_UPDATE_FINALIZE_TARGET_TAG: tagName,
+            SYSTEM_UPDATE_FINALIZE_BACKEND_PID: String(process.pid),
+            SYSTEM_UPDATE_FINALIZE_RESTART_PLAN: JSON.stringify(restartPlan),
+            SYSTEM_UPDATE_FINALIZE_RESULT_BASE: JSON.stringify(baseResult),
+            SYSTEM_UPDATE_FINALIZE_AUDIT: JSON.stringify({
+              requestId: auditRequest.requestId ?? null,
+              userId: auditRequest.userId ?? null,
+              username: auditRequest.user?.username ?? null,
+              email: auditRequest.user?.email ?? null,
+            }),
+          },
         },
-      });
+      );
+      finalizer.unref();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
       context.appendLog(`Unexpected error: ${message}`);

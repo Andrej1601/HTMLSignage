@@ -71,7 +71,9 @@ model Device {
   id          String    @id @default(cuid())
   name        String
   pairingCode String?   @unique // 6-digit code for pairing
+  groupName   String?
   mode        String    @default("auto") // "auto" | "override"
+  maintenanceMode Boolean @default(false)
   pairedBy    String?
   pairedAt    DateTime?
   lastSeen    DateTime?
@@ -82,7 +84,9 @@ model Device {
   overrides DeviceOverride?
 
   @@index([pairedBy])
+  @@index([groupName])
   @@index([lastSeen])
+  @@index([maintenanceMode])
   @@index([pairingCode])
   @@map("devices")
 }

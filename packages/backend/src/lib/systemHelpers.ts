@@ -36,6 +36,50 @@ export interface ReleaseInfo {
   prerelease: boolean;
 }
 
+export type SystemUpdateCheckStatus = 'ok' | 'warning' | 'error';
+
+export interface SystemUpdateCheck {
+  id: string;
+  label: string;
+  status: SystemUpdateCheckStatus;
+  detail: string;
+}
+
+export interface SystemUpdatePreflight {
+  ready: boolean;
+  checks: SystemUpdateCheck[];
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface SystemUpdateVerification {
+  ready: boolean;
+  checks: SystemUpdateCheck[];
+  manualActions: string[];
+}
+
+export type SystemUpdateRestartStrategy = 'command' | 'self-process' | 'manual';
+
+export interface SystemUpdateRestartPlan {
+  strategy: SystemUpdateRestartStrategy;
+  autoRestartReady: boolean;
+  currentService: string | null;
+  backendService: string;
+  frontendService: string;
+  backendHealthUrl: string;
+  frontendHealthUrl: string;
+  restartCommand: string | null;
+  frontendRestartCommand: string | null;
+  summary: string;
+}
+
+export interface SystemUpdateVerificationOptions {
+  restartSummary?: string | null;
+  backendHealth?: { url: string; ok: boolean; detail: string } | null;
+  frontendHealth?: { url: string; ok: boolean; detail: string } | null;
+  manualActions?: string[];
+}
+
 export interface GitHubApiRelease {
   tag_name: string;
   name: string | null;
@@ -237,6 +281,321 @@ export async function createDatabaseBackup(): Promise<string | null> {
 export async function getCurrentGitTag(): Promise<string | null> {
   const result = await runCommand('git', ['describe', '--tags', '--exact-match', 'HEAD']);
   return result.code === 0 ? result.stdout.trim() : null;
+}
+
+export async function getCurrentGitRef(): Promise<string | null> {
+  const result = await runCommand('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+  return result.code === 0 ? result.stdout.trim() : null;
+}
+
+async function hasCommand(command: string): Promise<boolean> {
+  const result = await runCommand('sh', ['-lc', `command -v ${command}`], { timeoutMs: 15_000 });
+  return result.code === 0;
+}
+
+function getEnvValue(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
+export async function getSystemdServiceFromCgroup(pid = process.pid): Promise<string | null> {
+  try {
+    const raw = await fs.readFile(`/proc/${pid}/cgroup`, 'utf-8');
+    const match = raw.match(/\/([^/\n]+\.service)(?:\n|$)/);
+    return match?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveSystemUpdateRestartPlan(pid = process.pid): Promise<SystemUpdateRestartPlan> {
+  const backendService = getEnvValue('SYSTEM_UPDATE_BACKEND_SERVICE') || 'htmlsignage-backend.service';
+  const frontendService = getEnvValue('SYSTEM_UPDATE_FRONTEND_SERVICE') || 'htmlsignage-frontend.service';
+  const backendHealthUrl = getEnvValue('SYSTEM_UPDATE_BACKEND_HEALTH_URL')
+    || `http://127.0.0.1:${process.env.PORT || '3000'}/health`;
+  const frontendHealthUrl = getEnvValue('SYSTEM_UPDATE_FRONTEND_HEALTH_URL')
+    || 'http://127.0.0.1:5173/';
+  const restartCommand = getEnvValue('SYSTEM_UPDATE_RESTART_COMMAND');
+  const frontendRestartCommand = getEnvValue('SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND');
+  const currentService = await getSystemdServiceFromCgroup(pid);
+
+  if (restartCommand) {
+    return {
+      strategy: 'command',
+      autoRestartReady: true,
+      currentService,
+      backendService,
+      frontendService,
+      backendHealthUrl,
+      frontendHealthUrl,
+      restartCommand,
+      frontendRestartCommand,
+      summary: 'Restart ueber SYSTEM_UPDATE_RESTART_COMMAND konfiguriert.',
+    };
+  }
+
+  if (currentService === backendService) {
+    return {
+      strategy: 'self-process',
+      autoRestartReady: true,
+      currentService,
+      backendService,
+      frontendService,
+      backendHealthUrl,
+      frontendHealthUrl,
+      restartCommand: null,
+      frontendRestartCommand,
+      summary: `Backend laeuft unter ${backendService} und kann per Self-Restart finalisiert werden.`,
+    };
+  }
+
+  return {
+    strategy: 'manual',
+    autoRestartReady: false,
+    currentService,
+    backendService,
+    frontendService,
+    backendHealthUrl,
+    frontendHealthUrl,
+    restartCommand: null,
+    frontendRestartCommand,
+    summary: currentService
+      ? `Aktueller Dienst ist ${currentService}; erwartet wird ${backendService} oder SYSTEM_UPDATE_RESTART_COMMAND.`
+      : 'Kein automatischer Restart-Pfad erkannt. SYSTEM_UPDATE_RESTART_COMMAND fehlt und der Backend-Prozess laeuft nicht unter der erwarteten systemd-Unit.',
+  };
+}
+
+export async function waitForHttpOk(
+  url: string,
+  options?: { attempts?: number; delayMs?: number; timeoutMs?: number },
+): Promise<{ ok: boolean; detail: string }> {
+  const attempts = Math.max(1, options?.attempts ?? 15);
+  const delayMs = Math.max(250, options?.delayMs ?? 2000);
+  const timeoutMs = Math.max(1000, options?.timeoutMs ?? 5000);
+  let lastDetail = `Keine Antwort von ${url}.`;
+
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.ok) {
+        return {
+          ok: true,
+          detail: `${url} antwortet mit HTTP ${response.status}.`,
+        };
+      }
+      lastDetail = `${url} antwortet mit HTTP ${response.status}.`;
+    } catch (error) {
+      lastDetail = error instanceof Error ? `${url} ist nicht erreichbar: ${error.message}` : `${url} ist nicht erreichbar.`;
+    }
+
+    if (index < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return {
+    ok: false,
+    detail: lastDetail,
+  };
+}
+
+function buildPreflightResult(checks: SystemUpdateCheck[]): SystemUpdatePreflight {
+  return {
+    ready: checks.every((check) => check.status !== 'error'),
+    checks,
+    blockers: checks.filter((check) => check.status === 'error').map((check) => check.detail),
+    warnings: checks.filter((check) => check.status === 'warning').map((check) => check.detail),
+  };
+}
+
+export async function collectSystemUpdatePreflight(): Promise<SystemUpdatePreflight> {
+  const checks: SystemUpdateCheck[] = [];
+
+  const [gitAvailable, pnpmAvailable, pgDumpAvailable, isDirty, currentTag, currentRef, restartPlan] = await Promise.all([
+    hasCommand('git'),
+    hasCommand('pnpm'),
+    hasCommand('pg_dump'),
+    checkDirtyTree(),
+    getCurrentGitTag(),
+    getCurrentGitRef(),
+    resolveSystemUpdateRestartPlan(),
+  ]);
+
+  checks.push({
+    id: 'git',
+    label: 'Git CLI',
+    status: gitAvailable ? 'ok' : 'error',
+    detail: gitAvailable ? 'Git ist verfuegbar.' : 'Git ist auf dem Host nicht verfuegbar.',
+  });
+  checks.push({
+    id: 'pnpm',
+    label: 'pnpm',
+    status: pnpmAvailable ? 'ok' : 'error',
+    detail: pnpmAvailable ? 'pnpm ist verfuegbar.' : 'pnpm ist auf dem Host nicht verfuegbar.',
+  });
+  checks.push({
+    id: 'github-config',
+    label: 'GitHub-Zugang',
+    status: process.env.GITHUB_TOKEN && process.env.GITHUB_REPO ? 'ok' : 'error',
+    detail: process.env.GITHUB_TOKEN && process.env.GITHUB_REPO
+      ? `Release-Quelle: ${process.env.GITHUB_REPO}`
+      : 'GITHUB_TOKEN oder GITHUB_REPO fehlt.',
+  });
+  checks.push({
+    id: 'database-url',
+    label: 'Datenbank-URL',
+    status: process.env.DATABASE_URL ? 'ok' : 'error',
+    detail: process.env.DATABASE_URL
+      ? 'DATABASE_URL ist gesetzt.'
+      : 'DATABASE_URL fehlt. Backup und Migrationen koennen nicht sicher ausgefuehrt werden.',
+  });
+  checks.push({
+    id: 'pg-dump',
+    label: 'Backup-Werkzeug',
+    status: pgDumpAvailable ? 'ok' : 'error',
+    detail: pgDumpAvailable
+      ? 'pg_dump ist verfuegbar.'
+      : 'pg_dump fehlt. Datenbank-Backups koennen nicht erstellt werden.',
+  });
+  checks.push({
+    id: 'working-tree',
+    label: 'Arbeitsbaum',
+    status: isDirty ? 'error' : 'ok',
+    detail: isDirty
+      ? 'Lokale, tracked Aenderungen blockieren das Update.'
+      : 'Arbeitsbaum ist sauber.',
+  });
+  checks.push({
+    id: 'git-ref',
+    label: 'Aktueller Git-Ref',
+    status: currentTag ? 'ok' : 'warning',
+    detail: currentTag
+      ? `Aktueller Stand: ${currentTag}`
+      : `HEAD ist nicht auf einem exakten Tag (${currentRef || 'unbekannt'}).`,
+  });
+  checks.push({
+    id: 'restart-strategy',
+    label: 'Runner-Finalisierung',
+    status: restartPlan.autoRestartReady ? 'ok' : 'error',
+    detail: restartPlan.summary,
+  });
+  checks.push({
+    id: 'backend-health',
+    label: 'Backend-Healthcheck',
+    status: 'ok',
+    detail: `Backend wird nach dem Update ueber ${restartPlan.backendHealthUrl} geprueft.`,
+  });
+  checks.push({
+    id: 'frontend-health',
+    label: 'Frontend-Healthcheck',
+    status: 'ok',
+    detail: `Frontend wird nach dem Update ueber ${restartPlan.frontendHealthUrl} geprueft.`,
+  });
+
+  return buildPreflightResult(checks);
+}
+
+export async function collectSystemUpdateVerification(
+  targetTag: string,
+  options: SystemUpdateVerificationOptions = {},
+): Promise<SystemUpdateVerification> {
+  const [currentVersion, currentTag, currentRef] = await Promise.all([
+    readLocalVersion(),
+    getCurrentGitTag(),
+    getCurrentGitRef(),
+  ]);
+
+  const backendDistPath = path.join(REPO_ROOT, 'packages/backend/dist/server.js');
+  const frontendDistPath = path.join(REPO_ROOT, 'packages/frontend/dist/index.html');
+  const backendDistReady = existsSync(backendDistPath);
+  const frontendDistReady = existsSync(frontendDistPath);
+
+  const checks: SystemUpdateCheck[] = [
+    {
+      id: 'git-tag',
+      label: 'Git-Checkout',
+      status: currentTag === targetTag ? 'ok' : 'warning',
+      detail: currentTag === targetTag
+        ? `HEAD steht auf ${targetTag}.`
+        : `Aktueller Ref: ${currentTag || currentRef || 'unbekannt'}.`,
+    },
+    {
+      id: 'backend-dist',
+      label: 'Backend-Build',
+      status: backendDistReady ? 'ok' : 'error',
+      detail: backendDistReady
+        ? 'packages/backend/dist/server.js ist vorhanden.'
+        : 'Backend-Buildartefakt fehlt.',
+    },
+    {
+      id: 'frontend-dist',
+      label: 'Frontend-Build',
+      status: frontendDistReady ? 'ok' : 'error',
+      detail: frontendDistReady
+        ? 'packages/frontend/dist/index.html ist vorhanden.'
+        : 'Frontend-Buildartefakt fehlt.',
+    },
+    {
+      id: 'package-version',
+      label: 'Paketversion',
+      status: compareVersions(currentVersion, targetTag) === 0 ? 'ok' : 'warning',
+      detail: compareVersions(currentVersion, targetTag) === 0
+        ? `package.json meldet ${currentVersion}.`
+        : `package.json meldet ${currentVersion}, Ziel-Tag ist ${targetTag}.`,
+    },
+  ];
+
+  if (options.restartSummary) {
+    checks.push({
+      id: 'runner-finalization',
+      label: 'Runner-Finalisierung',
+      status: 'ok',
+      detail: options.restartSummary,
+    });
+  } else {
+    checks.push({
+      id: 'restart-required',
+      label: 'Dienst-Neustart',
+      status: 'warning',
+      detail: 'Backend- und Frontend-Dienste muessen nach dem Update kontrolliert neu gestartet werden.',
+    });
+  }
+
+  if (options.backendHealth) {
+    checks.push({
+      id: 'backend-health',
+      label: 'Backend-Healthcheck',
+      status: options.backendHealth.ok ? 'ok' : 'error',
+      detail: options.backendHealth.detail,
+    });
+  }
+
+  if (options.frontendHealth) {
+    checks.push({
+      id: 'frontend-health',
+      label: 'Frontend-Healthcheck',
+      status: options.frontendHealth.ok ? 'ok' : 'error',
+      detail: options.frontendHealth.detail,
+    });
+  }
+
+  const manualActions = options.manualActions ?? (
+    options.backendHealth || options.frontendHealth
+      ? ['Optional: Dashboard, /settings und /display kurz als Smoke-Test pruefen.']
+      : [
+          'Backend-Dienst neu starten und /health pruefen.',
+          'Frontend-Preview bzw. Webserver neu laden.',
+          'Anschliessend Dashboard, /settings und /display kurz als Smoke-Test pruefen.',
+        ]
+  );
+
+  return {
+    ready: checks.every((check) => check.status !== 'error'),
+    checks,
+    manualActions,
+  };
 }
 
 export function parseDateOrFallback(raw: string | undefined): Date {

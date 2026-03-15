@@ -333,7 +333,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
         clearZoneTimer(zoneId);
       }
     });
-  }, [enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide, slideshowConfig.defaultDuration]);
+  }, [clearAllZoneTimers, enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide, slideshowConfig.defaultDuration]);
 
   // Helper to get current slide for a zone
   const getZoneSlide = useCallback(

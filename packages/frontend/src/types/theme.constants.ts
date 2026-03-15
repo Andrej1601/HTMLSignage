@@ -3,6 +3,7 @@
  * Separated from settings.types.ts to keep that file pure type definitions.
  */
 import type { ColorPaletteName, ThemeColors, Settings } from './settings.types';
+import { DEFAULT_MAINTENANCE_SCREEN_SETTINGS } from '@/config/maintenanceScreen';
 
 // ─── Color Palettes ──────────────────────────────────────────────────────────
 
@@ -150,6 +151,7 @@ export function getDefaultSettings(): Settings {
   const paletteColors = getColorPalette(paletteId);
   return {
     version: 1,
+    displayAppearance: 'wellness-stage',
     designStyle: 'modern-wellness',
     colorPalette: paletteId,
     theme: generateDashboardColors(paletteColors) as ThemeColors,
@@ -174,6 +176,7 @@ export function getDefaultSettings(): Settings {
       enabled: true, showLogo: true, logoText: 'Westfalenbad Hagen',
       showClock: true, showDate: true, subtitle: 'Saunawelt', height: 8,
     },
+    maintenanceScreen: { ...DEFAULT_MAINTENANCE_SCREEN_SETTINGS },
     aromas: [
       { id: '1', emoji: '🌿', name: 'Eukalyptus' },
       { id: '2', emoji: '🍋', name: 'Zitrone' },

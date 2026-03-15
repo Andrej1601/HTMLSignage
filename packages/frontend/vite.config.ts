@@ -25,10 +25,47 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'query-vendor': ['@tanstack/react-query'],
-          'animation-vendor': ['framer-motion'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/')
+          ) {
+            return 'react-vendor';
+          }
+
+          if (
+            id.includes('/node_modules/react-router/') ||
+            id.includes('/node_modules/react-router-dom/') ||
+            id.includes('/node_modules/@remix-run/router/')
+          ) {
+            return 'router-vendor';
+          }
+
+          if (
+            id.includes('/node_modules/@tanstack/react-query/') ||
+            id.includes('/node_modules/@tanstack/query-core/')
+          ) {
+            return 'query-vendor';
+          }
+
+          if (
+            id.includes('/node_modules/socket.io-client/') ||
+            id.includes('/node_modules/engine.io-client/') ||
+            id.includes('/node_modules/socket.io-parser/') ||
+            id.includes('/node_modules/engine.io-parser/') ||
+            id.includes('/node_modules/@socket.io/')
+          ) {
+            return 'socket-vendor';
+          }
+
+          if (id.includes('/node_modules/framer-motion/')) {
+            return 'animation-vendor';
+          }
+
+          return undefined;
         },
       },
     },

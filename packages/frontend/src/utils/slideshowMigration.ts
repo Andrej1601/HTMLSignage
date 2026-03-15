@@ -6,6 +6,10 @@
 import type { Settings, ColorPaletteName } from '@/types/settings.types';
 import type { SlideshowConfig } from '@/types/slideshow.types';
 import { generateDashboardColors, getColorPalette } from '@/types/settings.types';
+import {
+  DEFAULT_DISPLAY_APPEARANCE,
+  EDITORIAL_DISPLAY_APPEARANCE,
+} from '@/config/displayDesignStyles';
 
 /**
  * Migrates old slideshow config to new naming conventions
@@ -28,10 +32,57 @@ export function migrateSettings(settings: Settings): Settings {
     'modern-timeline': 'modern-timeline',
     'compact-tiles': 'compact-tiles',
   };
+  const normalizedAppearance = String(next.displayAppearance || '').trim().toLowerCase();
+  const targetDisplayAppearance =
+    normalizedAppearance === EDITORIAL_DISPLAY_APPEARANCE || normalizedStyle === EDITORIAL_DISPLAY_APPEARANCE
+      ? EDITORIAL_DISPLAY_APPEARANCE
+      : DEFAULT_DISPLAY_APPEARANCE;
   const targetDesignStyle = legacyStyleMap[normalizedStyle] || 'modern-wellness';
+
+  if (next.displayAppearance !== targetDisplayAppearance) {
+    next.displayAppearance = targetDisplayAppearance;
+    migrated = true;
+  }
   if (next.designStyle !== targetDesignStyle) {
     next.designStyle = targetDesignStyle;
     migrated = true;
+  }
+
+  if (next.events && Array.isArray(next.events)) {
+    next.events = next.events.map((event) => {
+      if (!event.settingsOverrides) return event;
+
+      const overrides = { ...event.settingsOverrides };
+      const overrideStyle = String(overrides.designStyle || '').trim().toLowerCase();
+      const overrideAppearance = String(overrides.displayAppearance || '').trim().toLowerCase();
+
+      const targetOverrideAppearance =
+        overrideAppearance === EDITORIAL_DISPLAY_APPEARANCE || overrideStyle === EDITORIAL_DISPLAY_APPEARANCE
+          ? EDITORIAL_DISPLAY_APPEARANCE
+          : overrideAppearance === DEFAULT_DISPLAY_APPEARANCE
+            ? DEFAULT_DISPLAY_APPEARANCE
+            : undefined;
+
+      const targetOverrideStyle = legacyStyleMap[overrideStyle];
+
+      if (targetOverrideAppearance && overrides.displayAppearance !== targetOverrideAppearance) {
+        overrides.displayAppearance = targetOverrideAppearance;
+        migrated = true;
+      }
+
+      if (overrideStyle && !targetOverrideStyle) {
+        delete overrides.designStyle;
+        migrated = true;
+      } else if (targetOverrideStyle && overrides.designStyle !== targetOverrideStyle) {
+        overrides.designStyle = targetOverrideStyle;
+        migrated = true;
+      }
+
+      return {
+        ...event,
+        settingsOverrides: overrides,
+      };
+    });
   }
 
   // Ensure theme contains all design tokens needed by the modern display.

@@ -1,7 +1,15 @@
 import axios from 'axios';
 import type { Schedule, ScheduleResponse } from '@/types/schedule.types';
 import { createDefaultSchedule } from '@/types/schedule.types';
-import type { Device, CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
+import type {
+  BulkDeviceActionResponse,
+  BulkDeviceControlRequest,
+  BulkDeviceUpdateRequest,
+  CreateDeviceRequest,
+  Device,
+  DeviceControlCommand,
+  UpdateDeviceRequest,
+} from '@/types/device.types';
 import type { Media, MediaFilter } from '@/types/media.types';
 import type { AudioSettings, Settings, ThemeColors } from '@/types/settings.types';
 import type { SlideshowConfig } from '@/types/slideshow.types';
@@ -31,6 +39,7 @@ export interface DeviceOverridesPayload {
 
 export interface DeviceDisplayConfigResponse {
   deviceId: string;
+  maintenanceMode: boolean;
   mode: 'auto' | 'override';
   hasScheduleOverride: boolean;
   hasSettingsOverride: boolean;
@@ -51,6 +60,28 @@ export interface GitHubRelease {
   prerelease: boolean;
 }
 
+export type SystemUpdateCheckStatus = 'ok' | 'warning' | 'error';
+
+export interface SystemUpdateCheck {
+  id: string;
+  label: string;
+  status: SystemUpdateCheckStatus;
+  detail: string;
+}
+
+export interface SystemUpdatePreflight {
+  ready: boolean;
+  checks: SystemUpdateCheck[];
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface SystemUpdateVerification {
+  ready: boolean;
+  checks: SystemUpdateCheck[];
+  manualActions: string[];
+}
+
 export interface SystemReleasesResponse extends ApiOkResponse {
   currentVersion: string;
   latestRelease: GitHubRelease | null;
@@ -59,6 +90,7 @@ export interface SystemReleasesResponse extends ApiOkResponse {
   isDirty: boolean;
   isRunning: boolean;
   activeJob?: SystemJob | null;
+  preflight: SystemUpdatePreflight;
   checkedAt: string;
 }
 
@@ -229,6 +261,47 @@ export interface SystemRuntimeStatusResponse {
   };
   maintenance: SystemMaintenanceSnapshot;
   warnings: SystemRuntimeWarning[];
+}
+
+export interface SystemRuntimeHistoryPoint {
+  timestamp: string;
+  diskUsagePercent: number;
+  pairedDevices: number;
+  onlineDevices: number;
+  offlineDevices: number;
+  staleDevices: number;
+  neverSeenDevices: number;
+  missingMediaFiles: number;
+  orphanMediaFiles: number;
+  warningCount: number;
+  deviceWarningCount: number;
+  systemWarningCount: number;
+  maintenanceState: 'idle' | 'running' | 'ok' | 'error';
+}
+
+export interface SystemRuntimeHistorySummary {
+  sampleCount: number;
+  firstPointAt: string | null;
+  lastPointAt: string | null;
+  coverageHours: number;
+  maxDiskUsagePercent: number;
+  maxStaleDevices: number;
+  maxWarningCount: number;
+  maxSystemWarningCount: number;
+  avgOnlineDevices: number;
+  deltas: {
+    diskUsagePercent: number;
+    onlineDevices: number;
+    staleDevices: number;
+    warningCount: number;
+    systemWarningCount: number;
+  };
+}
+
+export interface SystemRuntimeHistoryResponse extends ApiOkResponse {
+  periodHours: number;
+  points: SystemRuntimeHistoryPoint[];
+  summary: SystemRuntimeHistorySummary;
 }
 
 export type SlideshowWorkflowTargetType = 'global' | 'device';
@@ -461,6 +534,7 @@ async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfig
 
   return {
     deviceId: device.id,
+    maintenanceMode: Boolean(device.maintenanceMode),
     mode: device.mode,
     hasScheduleOverride,
     hasSettingsOverride,
@@ -538,6 +612,12 @@ export const devicesApi = {
     return data;
   },
 
+  // Bulk update devices
+  bulkUpdateDevices: async (payload: BulkDeviceUpdateRequest): Promise<BulkDeviceActionResponse> => {
+    const { data } = await api.patch<BulkDeviceActionResponse>('/devices/bulk/update', payload);
+    return data;
+  },
+
   // Delete device
   deleteDevice: async (id: string): Promise<ApiOkResponse> => {
     const { data } = await api.delete<ApiOkResponse>(`/devices/${id}`);
@@ -573,6 +653,12 @@ export const devicesApi = {
     return data;
   },
 
+  // Send one command to multiple devices
+  bulkSendCommand: async (payload: BulkDeviceControlRequest): Promise<BulkDeviceActionResponse> => {
+    const { data } = await api.post<BulkDeviceActionResponse>('/devices/bulk/control', payload);
+    return data;
+  },
+
   // Set device overrides
   setOverrides: async (id: string, overrides: DeviceOverridesPayload): Promise<ApiOkResponse> => {
     const { data } = await api.post<ApiOkResponse>(`/devices/${id}/overrides`, overrides);
@@ -599,7 +685,6 @@ export const devicesApi = {
 
       // Compatibility fallback for older backends without /display-config endpoint.
       if (!hasWarnedDisplayConfigFallback) {
-        // eslint-disable-next-line no-console
         console.warn('[api] /devices/:id/display-config returned 404, using client-side fallback merge');
         hasWarnedDisplayConfigFallback = true;
       }
@@ -691,6 +776,14 @@ export const systemApi = {
   getRuntimeStatus: async (token: string): Promise<SystemRuntimeStatusResponse> => {
     const { data } = await api.get<SystemRuntimeStatusResponse>('/system/runtime-status', {
       headers: getAuthHeaders(token),
+    });
+    return data;
+  },
+
+  getRuntimeHistory: async (token: string, hours = 24): Promise<SystemRuntimeHistoryResponse> => {
+    const { data } = await api.get<SystemRuntimeHistoryResponse>('/system/runtime-history', {
+      headers: getAuthHeaders(token),
+      params: { hours },
     });
     return data;
   },

@@ -22,7 +22,7 @@ export function LoginPage() {
       try {
         await fetchApi('/auth/me');
         setIsFirstUser(false);
-      } catch (error) {
+      } catch {
         setIsFirstUser(true);
       } finally {
         setCheckingFirstUser(false);

@@ -3,11 +3,13 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { prisma } from './prisma.js';
 import { BACKUP_DIR, REPO_ROOT, readLocalVersion } from './systemHelpers.js';
+import { recordRuntimeStatusSnapshot } from './runtimeHistory.js';
 import { UPLOAD_DIR } from './upload.js';
 
 const ONLINE_THRESHOLD_MINUTES = 5;
 const STALE_THRESHOLD_MINUTES = 30;
 const MAINTENANCE_INTERVAL_MS = 30 * 60 * 1000;
+const RUNTIME_HISTORY_INTERVAL_MS = 5 * 60 * 1000;
 const ORPHAN_UPLOAD_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const OLD_FILE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAINTENANCE_STALE_THRESHOLD_MS = MAINTENANCE_INTERVAL_MS * 2;
@@ -70,6 +72,7 @@ export interface SystemRuntimeStatus {
 }
 
 let maintenanceTimer: NodeJS.Timeout | null = null;
+let runtimeHistoryTimer: NodeJS.Timeout | null = null;
 let maintenanceRunning = false;
 let maintenanceSnapshot: MaintenanceSnapshot = {
   state: 'idle',
@@ -207,12 +210,29 @@ export function startMaintenanceScheduler(): void {
     void runMaintenanceCycle();
   }, MAINTENANCE_INTERVAL_MS);
   maintenanceTimer.unref?.();
+
+  if (!runtimeHistoryTimer) {
+    void collectSystemRuntimeStatus().catch((error) => {
+      console.error('[runtime] Initial runtime history snapshot failed:', error);
+    });
+    runtimeHistoryTimer = setInterval(() => {
+      void collectSystemRuntimeStatus().catch((error) => {
+        console.error('[runtime] Runtime history snapshot failed:', error);
+      });
+    }, RUNTIME_HISTORY_INTERVAL_MS);
+    runtimeHistoryTimer.unref?.();
+  }
 }
 
 export function stopMaintenanceScheduler(): void {
-  if (!maintenanceTimer) return;
-  clearInterval(maintenanceTimer);
-  maintenanceTimer = null;
+  if (maintenanceTimer) {
+    clearInterval(maintenanceTimer);
+    maintenanceTimer = null;
+  }
+  if (runtimeHistoryTimer) {
+    clearInterval(runtimeHistoryTimer);
+    runtimeHistoryTimer = null;
+  }
 }
 
 export function getMaintenanceSnapshot(): MaintenanceSnapshot {
@@ -405,8 +425,11 @@ export async function collectSystemRuntimeStatus(): Promise<SystemRuntimeStatus>
     maintenance,
   };
 
-  return {
+  const runtimeStatus = {
     ...baseStatus,
     warnings: buildWarnings(baseStatus),
   };
+
+  await recordRuntimeStatusSnapshot(runtimeStatus);
+  return runtimeStatus;
 }

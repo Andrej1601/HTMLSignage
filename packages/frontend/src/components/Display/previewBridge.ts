@@ -9,4 +9,7 @@ export interface PreviewConfigPayload {
   schedule: Schedule;
   settings: Settings;
   deviceId?: string | null;
+  deviceName?: string | null;
+  previewAt?: string | null;
+  maintenanceMode?: boolean;
 }

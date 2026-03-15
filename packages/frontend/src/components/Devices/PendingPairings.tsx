@@ -13,6 +13,7 @@ export function PendingPairings() {
   const queryClient = useQueryClient();
   const [pairingDevice, setPairingDevice] = useState<Device | null>(null);
   const [deviceName, setDeviceName] = useState('');
+  const [groupName, setGroupName] = useState('');
 
   // Fetch pending devices (unpaired with pairing codes)
   const { data: pendingDevices = [], refetch, isLoading } = useQuery<Device[]>({
@@ -36,7 +37,7 @@ export function PendingPairings() {
 
   // Pair device mutation
   const pairDevice = useMutation({
-    mutationFn: async (data: { pairingCode: string; name: string }) => {
+    mutationFn: async (data: { pairingCode: string; name: string; groupName?: string | null }) => {
       if (!token) throw new Error('unauthorized');
       return fetchApi('/devices/pair', {
         method: 'POST',
@@ -49,12 +50,14 @@ export function PendingPairings() {
       queryClient.invalidateQueries({ queryKey: ['devices', 'pending'] });
       setPairingDevice(null);
       setDeviceName('');
+      setGroupName('');
     },
   });
 
   const handlePairClick = (device: Device) => {
     setPairingDevice(device);
     setDeviceName(device.name);
+    setGroupName(device.groupName || '');
   };
 
   const handlePairSubmit = (e: React.FormEvent) => {
@@ -64,6 +67,7 @@ export function PendingPairings() {
     pairDevice.mutate({
       pairingCode: pairingDevice.pairingCode,
       name: deviceName.trim(),
+      groupName: groupName.trim() || null,
     });
   };
 
@@ -71,6 +75,7 @@ export function PendingPairings() {
     if (!pairDevice.isPending) {
       setPairingDevice(null);
       setDeviceName('');
+      setGroupName('');
     }
   };
 
@@ -191,6 +196,15 @@ export function PendingPairings() {
             disabled={pairDevice.isPending}
             hint="Gib dem Gerät einen aussagekräftigen Namen zur Identifikation"
             autoFocus
+          />
+
+          <InputField
+            label="Gerätegruppe"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="z.B. Saunawelt West"
+            disabled={pairDevice.isPending}
+            hint="Optional: Das Gerät wird direkt in eine Gruppe einsortiert."
           />
         </form>
       </Dialog>

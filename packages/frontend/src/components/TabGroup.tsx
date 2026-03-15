@@ -44,8 +44,13 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-sm" role="tablist" aria-label="Reiter" ref={tabListRef}>
-      <div className="flex border-b border-spa-bg-secondary overflow-x-auto">
+    <div
+      className="rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-1 shadow-sm backdrop-blur-sm"
+      role="tablist"
+      aria-label="Reiter"
+      ref={tabListRef}
+    >
+      <div className="flex gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -60,11 +65,11 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
               onClick={() => onChange(tab.id)}
               onKeyDown={handleKeyDown}
               className={clsx(
-                'flex-1 px-6 py-4 font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap min-w-0',
+                'flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 font-medium transition-all',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-inset',
                 isActive
-                  ? 'text-spa-primary border-b-2 border-spa-primary'
-                  : 'text-spa-text-secondary hover:text-spa-text-primary',
+                  ? 'bg-spa-primary text-white shadow-sm'
+                  : 'text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary',
               )}
             >
               {Icon && <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />}

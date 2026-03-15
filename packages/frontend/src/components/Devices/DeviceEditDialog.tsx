@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Monitor } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
-import { InputField } from '@/components/FormField';
+import { InputField, ToggleField } from '@/components/FormField';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
 
 interface DeviceEditDialogProps {
@@ -21,13 +21,17 @@ export function DeviceEditDialog({
   isSaving
 }: DeviceEditDialogProps) {
   const [name, setName] = useState('');
+  const [groupName, setGroupName] = useState('');
   const [mode, setMode] = useState<'auto' | 'override'>('auto');
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (device) {
       setName(device.name);
+      setGroupName(device.groupName || '');
       setMode(device.mode);
+      setMaintenanceMode(Boolean(device.maintenanceMode));
       setError('');
     }
   }, [device]);
@@ -44,14 +48,18 @@ export function DeviceEditDialog({
 
     onSave(device.id, {
       name: name.trim(),
-      mode
+      groupName: groupName.trim() || null,
+      mode,
+      maintenanceMode,
     });
   };
 
   const handleClose = () => {
     if (!isSaving) {
       setName('');
+      setGroupName('');
       setMode('auto');
+      setMaintenanceMode(false);
       setError('');
       onClose();
     }
@@ -111,6 +119,15 @@ export function DeviceEditDialog({
           autoFocus
         />
 
+        <InputField
+          label="Gerätegruppe"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder="z.B. Saunawelt West"
+          disabled={isSaving}
+          hint="Hilft beim Filtern, Gruppieren und bei Bulk-Aktionen."
+        />
+
         {/* Mode Selection */}
         <div>
           <label className="block text-sm font-medium text-spa-text-primary mb-1">
@@ -153,6 +170,16 @@ export function DeviceEditDialog({
               </div>
             </label>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4">
+          <ToggleField
+            label="Wartungsmodus"
+            description="Markiert das Gerät für Service-, Rollout- oder Diagnosearbeiten."
+            checked={maintenanceMode}
+            onChange={setMaintenanceMode}
+            disabled={isSaving}
+          />
         </div>
       </form>
     </Dialog>

@@ -7,6 +7,9 @@ import { TimeEditor } from '@/components/Schedule/TimeEditor';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useDevices } from '@/hooks/useDevices';
+import { usePersistentEditorDraft } from '@/hooks/usePersistentEditorDraft';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { useAuth } from '@/contexts/AuthContext';
 import { getActiveEvent } from '@/types/settings.types';
 import type { Schedule, PresetKey, Entry } from '@/types/schedule.types';
 import type { Sauna } from '@/types/sauna.types';
@@ -24,11 +27,14 @@ import {
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
+import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
+import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/Button';
 import clsx from 'clsx';
 import { getModeLabel } from '@/types/device.types';
 import { hasDeviceOverrides } from '@/utils/deviceUtils';
+import { getScheduleQualityIssues } from '@/utils/editorQuality';
 
 function formatDateTimeLocalInput(value: Date): string {
   const year = value.getFullYear();
@@ -40,6 +46,7 @@ function formatDateTimeLocalInput(value: Date): string {
 }
 
 export function SchedulePage() {
+  const { user } = useAuth();
   const { schedule, isLoading, error, save, isSaving, refetch } = useSchedule();
   const { settings } = useSettings();
   const { data: devices } = useDevices();
@@ -66,9 +73,24 @@ export function SchedulePage() {
     currentTime: string;
   } | null>(null);
 
+  const draftStorageKey = `htmlsignage_editor_draft_schedule_${user?.id || 'anonymous'}`;
+
+  const draftState = usePersistentEditorDraft<Schedule, { editingPreset: PresetKey }>({
+    storageKey: draftStorageKey,
+    value: localSchedule,
+    meta: { editingPreset },
+    isDirty,
+    enabled: Boolean(localSchedule),
+  });
+
+  useUnsavedChangesGuard({
+    when: isDirty,
+    message: 'Es gibt ungespeicherte Änderungen im Aufgussplan. Wirklich verlassen?',
+  });
+
   // Initialize local schedule from server data
   useEffect(() => {
-    if (schedule && !localSchedule) {
+    if (schedule && !localSchedule && !draftState.hasRecoveredDraft) {
       setLocalSchedule(schedule);
       // Set active preset based on autoPlay
       if (schedule.autoPlay) {
@@ -79,7 +101,7 @@ export function SchedulePage() {
         setEditingPreset(getTodayPresetKey());
       }
     }
-  }, [schedule, localSchedule, settings]);
+  }, [draftState.hasRecoveredDraft, schedule, localSchedule, settings]);
 
   useEffect(() => {
     const interval = setInterval(() => setEventClock(Date.now()), 30000);
@@ -138,6 +160,11 @@ export function SchedulePage() {
   const currentDaySchedule = localSchedule?.presets?.[editingPreset];
   const activeEvent = settings ? getActiveEvent(settings, now) : null;
   const activeEventPreset = activeEvent?.assignedPreset;
+  const scheduleQualityIssues = useMemo(() => getScheduleQualityIssues({
+    schedule: localSchedule,
+    presetKey: editingPreset,
+    settings,
+  }), [editingPreset, localSchedule, settings]);
   const simulatedEvent = settings
     ? getActiveEvent(settings, simulationNow, simulationDeviceId || undefined)
     : null;
@@ -320,10 +347,38 @@ export function SchedulePage() {
 
     save(scheduleToSave, {
       onSuccess: () => {
+        draftState.clearDraft();
         setIsDirty(false);
         refetch();
       },
     });
+  };
+
+  const resetToLiveSchedule = () => {
+    if (!schedule) return;
+    setLocalSchedule(schedule);
+    if (schedule.autoPlay) {
+      setEditingPreset(resolveLivePresetKey(schedule, settings));
+    } else if (schedule.activePreset) {
+      setEditingPreset(schedule.activePreset);
+    } else {
+      setEditingPreset(getTodayPresetKey());
+    }
+    setIsDirty(false);
+  };
+
+  const handleRestoreDraft = () => {
+    const restored = draftState.restoreDraft();
+    if (!restored) return;
+
+    setLocalSchedule(restored.value);
+    setEditingPreset(restored.meta?.editingPreset || getTodayPresetKey());
+    setIsDirty(true);
+  };
+
+  const handleDiscardDraft = () => {
+    draftState.clearDraft();
+    resetToLiveSchedule();
   };
 
   if (isLoading || !localSchedule) {
@@ -372,7 +427,7 @@ export function SchedulePage() {
                 </Button>
               )}
 
-              <Button variant="ghost" icon={RefreshCw} onClick={() => { setLocalSchedule(null); setIsDirty(false); refetch(); }} disabled={isLoading}>
+              <Button variant="ghost" icon={RefreshCw} onClick={() => { draftState.clearDraft(); setLocalSchedule(null); setIsDirty(false); refetch(); }} disabled={isLoading}>
                 Neu laden
               </Button>
 
@@ -381,7 +436,37 @@ export function SchedulePage() {
               </Button>
             </div>
           )}
+          badges={[
+            { label: `Live v${schedule?.version || localSchedule.version}`, tone: 'info' },
+            draftState.hasStoredDraft
+              ? {
+                  label: draftState.hasRecoveredDraft ? 'Entwurf wiederhergestellt' : 'Lokaler Entwurf vorhanden',
+                  tone: draftState.hasRecoveredDraft ? 'info' as const : 'warning' as const,
+                }
+              : { label: 'Live-Stand', tone: 'neutral' as const },
+            { label: localSchedule.autoPlay ? 'Auto-Play' : 'Manuell', tone: localSchedule.autoPlay ? 'success' as const : 'warning' as const },
+            { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' as const : 'success' as const },
+          ]}
         />
+
+        {draftState.hasStoredDraft && !draftState.hasRecoveredDraft && !isDirty && (
+          <DraftRecoveryBanner
+            mode="available"
+            entityLabel="Aufgussplan"
+            updatedAt={draftState.draftUpdatedAt}
+            onRestore={handleRestoreDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
+
+        {draftState.hasRecoveredDraft && (
+          <DraftRecoveryBanner
+            mode="restored"
+            entityLabel="Aufgussplan"
+            updatedAt={draftState.draftUpdatedAt}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
 
         {/* Unsaved changes banner */}
         {isDirty && (
@@ -393,6 +478,12 @@ export function SchedulePage() {
             <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
           </div>
         )}
+
+        <EditorQualityAssistant
+          description={`Direkte Plausibilitätschecks für ${PRESET_LABELS[editingPreset]} und den aktuellen Redaktionsstand.`}
+          issues={scheduleQualityIssues}
+          okMessage={`Für ${PRESET_LABELS[editingPreset]} wurden aktuell keine strukturellen Planprobleme erkannt.`}
+        />
 
         <SectionCard
           title="Simulation"

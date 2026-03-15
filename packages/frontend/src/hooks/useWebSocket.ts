@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { API_URL } from '@/config/env';
@@ -12,6 +12,16 @@ interface UseWebSocketOptions {
   onSettingsUpdate?: (data: Settings) => void;
   onDeviceCommand?: (command: string) => void;
   onDeviceUpdate?: (data: Record<string, unknown>) => void;
+}
+
+let socketIoClientPromise: Promise<typeof import('socket.io-client')> | null = null;
+
+function loadSocketIoClient() {
+  if (!socketIoClientPromise) {
+    socketIoClientPromise = import('socket.io-client');
+  }
+
+  return socketIoClientPromise;
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
@@ -27,6 +37,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const connectPromiseRef = useRef<Promise<void> | null>(null);
+  const disconnectRequestedRef = useRef(false);
 
   // Store callbacks in refs so the socket listeners always call the latest version
   // without causing reconnects when the callbacks change identity.
@@ -40,93 +52,110 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   onDeviceCommandRef.current = onDeviceCommand;
   onDeviceUpdateRef.current = onDeviceUpdate;
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
+    disconnectRequestedRef.current = false;
+
     if (socketRef.current) {
       if (socketRef.current.connected) return;
       socketRef.current.connect();
       return;
     }
 
+    if (connectPromiseRef.current) {
+      return connectPromiseRef.current;
+    }
+
     if (ENV_IS_DEV) {
       console.log('[WebSocket] Connecting to', url);
     }
 
-    const socket = io(url, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 30000,
-      reconnectionAttempts: Infinity,
-      randomizationFactor: 0.5,
-      timeout: 10000,
+    connectPromiseRef.current = (async () => {
+      const { io } = await loadSocketIoClient();
+
+      if (disconnectRequestedRef.current || socketRef.current) {
+        return;
+      }
+
+      const socket = io(url, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 30000,
+        reconnectionAttempts: Infinity,
+        randomizationFactor: 0.5,
+        timeout: 10000,
+      });
+
+      socket.on('connect', () => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Connected:', socket.id);
+        }
+        setIsConnected(true);
+        setError(null);
+      });
+
+      socket.on('disconnect', (reason) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Disconnected:', reason);
+        }
+        setIsConnected(false);
+      });
+
+      socket.on('connect_error', (err) => {
+        if (ENV_IS_DEV) {
+          console.error('[WebSocket] Connection error:', err);
+        }
+        setError(err.message);
+        setIsConnected(false);
+      });
+
+      // Keep listeners stable via refs without reconnecting on each render.
+      socket.on('schedule:updated', (data: Schedule) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Schedule updated:', data);
+        }
+        onScheduleUpdateRef.current?.(data);
+      });
+
+      socket.on('settings:updated', (data: Settings) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Settings updated:', data);
+        }
+        onSettingsUpdateRef.current?.(data);
+      });
+
+      socket.on('device:command', (data: { command?: string }) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Device command:', data);
+        }
+        if (data?.command) {
+          onDeviceCommandRef.current?.(data.command);
+        }
+      });
+
+      socket.on('device:updated', (data: Record<string, unknown>) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Device updated:', data);
+        }
+        onDeviceUpdateRef.current?.(data);
+
+        const command = typeof data?.command === 'string' ? data.command : undefined;
+        if (command) {
+          onDeviceCommandRef.current?.(command);
+        }
+      });
+
+      socketRef.current = socket;
+    })().finally(() => {
+      connectPromiseRef.current = null;
     });
 
-    socket.on('connect', () => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Connected:', socket.id);
-      }
-      setIsConnected(true);
-      setError(null);
-    });
-
-    socket.on('disconnect', (reason) => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Disconnected:', reason);
-      }
-      setIsConnected(false);
-    });
-
-    socket.on('connect_error', (err) => {
-      if (ENV_IS_DEV) {
-        console.error('[WebSocket] Connection error:', err);
-      }
-      setError(err.message);
-      setIsConnected(false);
-    });
-
-    // Schedule updates
-    socket.on('schedule:updated', (data: Schedule) => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Schedule updated:', data);
-      }
-      onScheduleUpdateRef.current?.(data);
-    });
-
-    // Settings updates
-    socket.on('settings:updated', (data: Settings) => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Settings updated:', data);
-      }
-      onSettingsUpdateRef.current?.(data);
-    });
-
-    // Device commands
-    socket.on('device:command', (data: { command?: string }) => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Device command:', data);
-      }
-      if (data?.command) {
-        onDeviceCommandRef.current?.(data.command);
-      }
-    });
-
-    // Device updates (mode/override changes, pairing updates, etc.)
-    socket.on('device:updated', (data: Record<string, unknown>) => {
-      if (ENV_IS_DEV) {
-        console.log('[WebSocket] Device updated:', data);
-      }
-      onDeviceUpdateRef.current?.(data);
-
-      const command = typeof data?.command === 'string' ? data.command : undefined;
-      if (command) {
-        onDeviceCommandRef.current?.(command);
-      }
-    });
-
-    socketRef.current = socket;
+    return connectPromiseRef.current;
   }, [url]);
 
   const disconnect = useCallback(() => {
+    disconnectRequestedRef.current = true;
+
     if (socketRef.current) {
       if (ENV_IS_DEV) {
         console.log('[WebSocket] Disconnecting');
@@ -186,7 +215,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   useEffect(() => {
     if (autoConnect) {
-      connect();
+      void connect();
     }
 
     return () => {

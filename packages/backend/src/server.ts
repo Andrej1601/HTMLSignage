@@ -33,6 +33,8 @@ const allowAllOrigins = configuredFrontendUrl === '' || configuredFrontendUrl ==
 const LOG_HTTP_REQUESTS = process.env.LOG_HTTP_REQUESTS === '1' || process.env.NODE_ENV === 'development';
 const parsedSlowThreshold = Number.parseInt(process.env.LOG_HTTP_SLOW_THRESHOLD_MS || '1500', 10);
 const LOG_HTTP_SLOW_THRESHOLD_MS = Number.isFinite(parsedSlowThreshold) ? parsedSlowThreshold : 1500;
+const parsedShutdownTimeout = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || '10000', 10);
+const SHUTDOWN_TIMEOUT_MS = Number.isFinite(parsedShutdownTimeout) ? parsedShutdownTimeout : 10000;
 
 const isDevAllowedOrigin = (origin: string): boolean => {
   try {
@@ -154,7 +156,7 @@ app.use('/api/palettes', palettesRouter);
 app.use('/api/slideshow', slideshowWorkflowRouter);
 
 // Error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const requestId = (req as typeof req & { requestId?: string }).requestId || null;
   console.error(JSON.stringify({
     type: 'http_error',
@@ -199,19 +201,71 @@ httpServer.listen(PORT, HOST, () => {
 });
 
 // Graceful shutdown
-const shutdown = async (signal: string) => {
-  console.log(`${signal} signal received: closing HTTP server`);
-  stopMaintenanceScheduler();
-  httpServer.close(() => {
-    console.log('HTTP server closed');
+let shutdownPromise: Promise<void> | null = null;
+
+function closeHttpServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    httpServer.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
   });
-  await prisma.$disconnect();
+}
+
+function closeSocketServer(): Promise<void> {
+  return new Promise((resolve) => {
+    io.close(() => resolve());
+  });
+}
+
+const shutdown = async (signal: string) => {
+  if (shutdownPromise) {
+    await shutdownPromise;
+    return;
+  }
+
+  shutdownPromise = (async () => {
+    console.log(`${signal} signal received: closing services`);
+    stopMaintenanceScheduler();
+
+    const timeout = setTimeout(() => {
+      console.error(`Graceful shutdown exceeded ${SHUTDOWN_TIMEOUT_MS}ms`);
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    timeout.unref?.();
+
+    try {
+      const results = await Promise.allSettled([
+        closeSocketServer(),
+        closeHttpServer(),
+        prisma.$disconnect(),
+      ]);
+
+      const rejected = results.find((result) => result.status === 'rejected');
+      if (rejected && rejected.status === 'rejected') {
+        throw rejected.reason;
+      }
+
+      console.log('Shutdown completed successfully');
+      process.exit(0);
+    } catch (error) {
+      console.error('Shutdown failed', error);
+      process.exit(1);
+    } finally {
+      clearTimeout(timeout);
+    }
+  })();
+
+  await shutdownPromise;
 };
 
-process.on('SIGTERM', async () => {
-  await shutdown('SIGTERM');
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
 });
 
-process.on('SIGINT', async () => {
-  await shutdown('SIGINT');
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
 });

@@ -3,6 +3,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
@@ -228,6 +229,7 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
   const leftBg = theme.zebra1 || '#F7F3E9';
   const border = theme.gridTable || '#EBE5D3';
   const textMain = theme.textMain || theme.fg || '#3E2723';
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
 
   if (!daySchedule || !daySchedule.rows || daySchedule.rows.length === 0) {
     return (
@@ -261,45 +263,47 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
 
   return (
     <div
-      className="w-full h-full flex font-sans select-none overflow-hidden p-8"
+      className={`w-full h-full flex font-sans select-none overflow-hidden ${isEditorial ? 'p-5' : 'p-8'}`}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
       <div className="w-full h-full flex flex-col overflow-hidden">
-        <header className="mb-6 flex justify-between items-center z-20 w-full">
-          <div className="flex items-center gap-5 min-w-0 flex-1">
+        {!isEditorial && (
+          <header className="mb-6 flex justify-between items-center z-20 w-full">
+            <div className="flex items-center gap-5 min-w-0 flex-1">
+              <div
+                className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
+                style={{ borderColor: border }}
+              >
+                <Waves className="w-8 h-8" style={{ color: accentGreen }} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-1 opacity-90" style={{ color: accentGreen }}>
+                  {header.subtitle && header.subtitle.trim() !== '' ? header.subtitle : 'Saunawelt'}
+                </p>
+                <h1 className="text-3xl font-black uppercase tracking-tighter leading-none whitespace-nowrap overflow-hidden text-ellipsis">
+                  {firstWord}{' '}
+                  <span style={{ color: accentGold }}>
+                    {restWords}
+                  </span>
+                </h1>
+              </div>
+            </div>
+
             <div
-              className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
+              className="bg-white/80 backdrop-blur-md px-7 py-4 rounded-3xl border text-right shadow-sm shrink-0 ml-4"
               style={{ borderColor: border }}
             >
-              <Waves className="w-8 h-8" style={{ color: accentGreen }} />
-            </div>
-            <div className="min-w-0">
-              <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-1 opacity-90" style={{ color: accentGreen }}>
-                {header.subtitle && header.subtitle.trim() !== '' ? header.subtitle : 'Saunawelt'}
+              <p className="text-[11px] font-black uppercase tracking-widest mb-0.5" style={{ color: accentGold }}>
+                {formatLongDateDE(now)}
               </p>
-              <h1 className="text-3xl font-black uppercase tracking-tighter leading-none whitespace-nowrap overflow-hidden text-ellipsis">
-                {firstWord}{' '}
-                <span style={{ color: accentGold }}>
-                  {restWords}
-                </span>
-              </h1>
+              <p className="text-4xl font-black font-mono leading-none" style={{ color: textMain }}>
+                {formatClockDE(now)}
+              </p>
             </div>
-          </div>
+          </header>
+        )}
 
-          <div
-            className="bg-white/80 backdrop-blur-md px-7 py-4 rounded-3xl border text-right shadow-sm shrink-0 ml-4"
-            style={{ borderColor: border }}
-          >
-            <p className="text-[11px] font-black uppercase tracking-widest mb-0.5" style={{ color: accentGold }}>
-              {formatLongDateDE(now)}
-            </p>
-            <p className="text-4xl font-black font-mono leading-none" style={{ color: textMain }}>
-              {formatClockDE(now)}
-            </p>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-3 gap-x-8 gap-y-6 flex-1 overflow-hidden px-2" style={{ gridTemplateRows: gridRowTemplate }}>
+        <div className={`grid grid-cols-3 flex-1 overflow-hidden ${isEditorial ? 'gap-x-6 gap-y-4' : 'gap-x-8 gap-y-6 px-2'}`} style={{ gridTemplateRows: gridRowTemplate }}>
           {gridSaunas.map((sauna, idx) => {
             const isOutOfOrder = sauna.status === 'out-of-order';
             const saunaIndex = resolveScheduleSaunaIndex(

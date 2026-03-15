@@ -9,7 +9,9 @@ export interface Device {
   id: string;
   name: string;
   pairingCode?: string | null;
+  groupName?: string | null;
   mode: DeviceMode;
+  maintenanceMode?: boolean;
   pairedBy?: string;
   pairedAt?: string;
   lastSeen?: string;
@@ -33,16 +35,40 @@ export interface DeviceOverride {
 
 export interface CreateDeviceRequest {
   name: string;
+  groupName?: string | null;
   mode?: DeviceMode;
 }
 
 export interface UpdateDeviceRequest {
   name?: string;
+  groupName?: string | null;
   mode?: DeviceMode;
+  maintenanceMode?: boolean;
 }
 
 export interface DeviceControlCommand {
   action: 'reload' | 'restart' | 'clear-cache';
+}
+
+export interface BulkDeviceUpdateRequest {
+  deviceIds: string[];
+  updates: UpdateDeviceRequest;
+}
+
+export interface BulkDeviceControlRequest {
+  deviceIds: string[];
+  command: DeviceControlCommand;
+}
+
+export interface BulkDeviceActionResponse {
+  ok: boolean;
+  affectedCount: number;
+  deviceIds: string[];
+}
+
+export function getDeviceGroupLabel(groupName?: string | null): string {
+  const trimmed = typeof groupName === 'string' ? groupName.trim() : '';
+  return trimmed.length > 0 ? trimmed : 'Ohne Gruppe';
 }
 
 // Helper functions

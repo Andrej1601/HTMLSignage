@@ -1,23 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { ThemeColors, DesignStyle, ColorPaletteName } from '@/types/settings.types';
+import type {
+  ThemeColors,
+  DesignStyle,
+  ColorPaletteName,
+  DisplayAppearance,
+} from '@/types/settings.types';
 import { COLOR_PALETTES, generateDashboardColors } from '@/types/settings.types';
+import {
+  DISPLAY_APPEARANCE_OPTIONS,
+  SCHEDULE_DESIGN_STYLE_OPTIONS,
+} from '@/config/displayDesignStyles';
 import { palettesApi, type CustomPalette } from '@/services/api';
 import { Palette, ChevronDown, ChevronUp, Plus, Trash2, Save, X } from 'lucide-react';
 
 interface ThemeEditorProps {
   theme: ThemeColors;
+  displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
   colorPalette?: ColorPaletteName;
   onChange: (theme: ThemeColors) => void;
+  onDisplayAppearanceChange?: (appearance: DisplayAppearance) => void;
   onDesignStyleChange?: (style: DesignStyle) => void;
   onColorPaletteChange?: (palette: ColorPaletteName) => void;
 }
 
 export function ThemeEditor({
   theme,
+  displayAppearance,
   designStyle,
   colorPalette,
   onChange,
+  onDisplayAppearanceChange,
   onDesignStyleChange,
   onColorPaletteChange,
 }: ThemeEditorProps) {
@@ -94,59 +107,59 @@ export function ThemeEditor({
 
   const colorGroups = [
     {
-      title: 'Haupt-Farben',
+      title: 'Basis & Fallback',
       colors: [
-        { key: 'bg' as keyof ThemeColors, label: 'Hintergrund', description: 'Haupt-Hintergrundfarbe' },
-        { key: 'fg' as keyof ThemeColors, label: 'Vordergrund', description: 'Haupt-Textfarbe' },
-        { key: 'accent' as keyof ThemeColors, label: 'Akzent', description: 'Akzent-/Highlight-Farbe' },
+        { key: 'bg' as keyof ThemeColors, label: 'Basis-Hintergrund', description: 'Grundfläche für einfache Slides und Fallbacks' },
+        { key: 'fg' as keyof ThemeColors, label: 'Basis-Text', description: 'Standard-Textfarbe für einfache Slides und Fallbacks' },
+        { key: 'accent' as keyof ThemeColors, label: 'Primärakzent', description: 'Hauptakzent für Marker, Linien und Hervorhebungen' },
       ],
     },
     {
-      title: 'Grid/Tabelle',
+      title: 'Linien & Flächen',
       colors: [
-        { key: 'gridTable' as keyof ThemeColors, label: 'Grid-Linien', description: 'Farbe der Grid-Linien' },
-        { key: 'cellBg' as keyof ThemeColors, label: 'Zellen-BG', description: 'Hintergrund der Zellen' },
-        { key: 'timeColBg' as keyof ThemeColors, label: 'Zeit-Spalte', description: 'Zeit-Spalten-Hintergrund' },
+        { key: 'gridTable' as keyof ThemeColors, label: 'Linien & Trenner', description: 'Trenner, Rasterlinien und Fallback-Rahmen' },
+        { key: 'cellBg' as keyof ThemeColors, label: 'Innenflächen', description: 'Innenflächen von Karten, Zellen und Detailboxen' },
+        { key: 'timeColBg' as keyof ThemeColors, label: 'Sekundärakzent', description: 'Sekundärer Akzent; früher Zeitspalte, heute auch Highlight-Fallback' },
       ],
     },
     {
-      title: 'Zebra-Streifen',
+      title: 'Wechselflächen',
       colors: [
-        { key: 'zebra1' as keyof ThemeColors, label: 'Zebra 1', description: 'Erste Zebra-Farbe' },
-        { key: 'zebra2' as keyof ThemeColors, label: 'Zebra 2', description: 'Zweite Zebra-Farbe' },
-        { key: 'timeZebra1' as keyof ThemeColors, label: 'Zeit Zebra 1', description: 'Zeit-Spalte Zebra 1' },
-        { key: 'timeZebra2' as keyof ThemeColors, label: 'Zeit Zebra 2', description: 'Zeit-Spalte Zebra 2' },
+        { key: 'zebra1' as keyof ThemeColors, label: 'Fläche A', description: 'Erste alternierende Fläche, z. B. linke oder gerade Bereiche' },
+        { key: 'zebra2' as keyof ThemeColors, label: 'Fläche B', description: 'Zweite alternierende Fläche, z. B. rechte oder ungerade Bereiche' },
+        { key: 'timeZebra1' as keyof ThemeColors, label: 'Reserve A', description: 'Reservierter Altwert aus älteren Zeitspalten-Layouts' },
+        { key: 'timeZebra2' as keyof ThemeColors, label: 'Reserve B', description: 'Reservierter Altwert aus älteren Zeitspalten-Layouts' },
       ],
     },
     {
-      title: 'Kopfzeile',
+      title: 'Plan-Header (klassisch)',
       colors: [
-        { key: 'headRowBg' as keyof ThemeColors, label: 'Kopf-BG', description: 'Kopfzeilen-Hintergrund' },
-        { key: 'headRowFg' as keyof ThemeColors, label: 'Kopf-Text', description: 'Kopfzeilen-Textfarbe' },
-        { key: 'cornerBg' as keyof ThemeColors, label: 'Ecke-BG', description: 'Ecken-Hintergrund' },
-        { key: 'cornerFg' as keyof ThemeColors, label: 'Ecke-Text', description: 'Ecken-Textfarbe' },
+        { key: 'headRowBg' as keyof ThemeColors, label: 'Header-Hintergrund', description: 'Kopfzeile im klassischen Plan-/Tabellenlayout' },
+        { key: 'headRowFg' as keyof ThemeColors, label: 'Header-Text', description: 'Textfarbe im klassischen Plan-/Tabellenlayout' },
+        { key: 'cornerBg' as keyof ThemeColors, label: 'Plan-Ecke Hintergrund', description: 'Reservierter Altwert für Tabellenecken' },
+        { key: 'cornerFg' as keyof ThemeColors, label: 'Plan-Ecke Text', description: 'Reservierter Altwert für Tabellenecken' },
       ],
     },
     {
-      title: 'Spezial',
+      title: 'Spezial & Legacy',
       colors: [
-        { key: 'flame' as keyof ThemeColors, label: 'Flamme', description: 'Flammen-Icon-Farbe' },
-        { key: 'boxFg' as keyof ThemeColors, label: 'Box-Text', description: 'Text in Boxen' },
+        { key: 'flame' as keyof ThemeColors, label: 'Flammen-Symbol', description: 'Aufguss-/Hitze-Symbol und Badge-Akzent' },
+        { key: 'boxFg' as keyof ThemeColors, label: 'Tabellen-/Box-Text', description: 'Text in klassischen Planboxen und Legacy-Komponenten' },
       ],
     },
     {
-      title: 'Slideshow (Modern)',
+      title: 'Display-Oberfläche',
       colors: [
-        { key: 'dashboardBg' as keyof ThemeColors, label: 'Panel-Hintergrund', description: 'Grundflaeche der Slideshow' },
-        { key: 'cardBg' as keyof ThemeColors, label: 'Karten-BG', description: 'Hintergrund der Infokarten' },
-        { key: 'cardBorder' as keyof ThemeColors, label: 'Karten-Rahmen', description: 'Rahmenfarbe der Karten' },
-        { key: 'textMain' as keyof ThemeColors, label: 'Haupttext', description: 'Primaerer Slideshow-Text' },
-        { key: 'textMuted' as keyof ThemeColors, label: 'Sekundaertext', description: 'Dezenter Zusatztext' },
-        { key: 'accentGold' as keyof ThemeColors, label: 'Akzent 1', description: 'Headline-/Highlight-Akzent' },
-        { key: 'accentGreen' as keyof ThemeColors, label: 'Akzent 2', description: 'Sekundaerer Akzent' },
-        { key: 'statusLive' as keyof ThemeColors, label: 'Status Live', description: 'Aktiv-/Live-Indikator' },
-        { key: 'statusNext' as keyof ThemeColors, label: 'Status Naechster', description: 'Naechster Slot/Status' },
-        { key: 'statusPrestart' as keyof ThemeColors, label: 'Status Bald', description: 'Prestart-/Bald-Indikator' },
+        { key: 'dashboardBg' as keyof ThemeColors, label: 'Display-Grundfläche', description: 'Hintergrund der modernen Display-Ansicht' },
+        { key: 'cardBg' as keyof ThemeColors, label: 'Kartenfläche', description: 'Hintergrund von Karten, Panels und Modulen' },
+        { key: 'cardBorder' as keyof ThemeColors, label: 'Karten-Trenner', description: 'Rahmen und Linien zwischen Karten und Modulen' },
+        { key: 'textMain' as keyof ThemeColors, label: 'Primärtext', description: 'Haupttext in modernen Display-Layouts' },
+        { key: 'textMuted' as keyof ThemeColors, label: 'Sekundärtext', description: 'Dezentere Texte, Metadaten und Nebentexte' },
+        { key: 'accentGold' as keyof ThemeColors, label: 'Akzent warm', description: 'Warmer Hauptakzent für Titel, Logos und Highlights' },
+        { key: 'accentGreen' as keyof ThemeColors, label: 'Akzent kühl', description: 'Kühler Zweitakzent für Panels, Listen und Highlights' },
+        { key: 'statusLive' as keyof ThemeColors, label: 'Status: Läuft', description: 'Aktiver Live-/Läuft-Indikator' },
+        { key: 'statusNext' as keyof ThemeColors, label: 'Status: Nächster', description: 'Badge für den nächsten Slot' },
+        { key: 'statusPrestart' as keyof ThemeColors, label: 'Status: Gleich', description: 'Badge für bald startende Slots' },
       ],
     },
   ];
@@ -230,27 +243,33 @@ export function ThemeEditor({
 
   return (
     <div className="space-y-6">
-      {/* Design Style */}
+      {/* Display Appearance */}
       <div>
-        <h3 className="text-lg font-semibold text-spa-text-primary mb-3">Design-Stil</h3>
+        <h3 className="text-lg font-semibold text-spa-text-primary mb-3">Visuelle Aufmachung</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {[
-            {
-              id: 'modern-wellness' as const,
-              title: 'Modern Wellness',
-              description: 'Klassisches Wellness-Grid mit Saunakacheln.',
-            },
-            {
-              id: 'modern-timeline' as const,
-              title: 'Modern Timeline',
-              description: 'Zeitachsen-Layout mit Timeline-Tabelle.',
-            },
-            {
-              id: 'compact-tiles' as const,
-              title: 'Chronologische Liste',
-              description: 'Alle Aufguesse aller Saunas in einer gemeinsamen Zeitleiste.',
-            },
-          ].map((style) => (
+          {DISPLAY_APPEARANCE_OPTIONS.map((appearance) => (
+            <button
+              key={appearance.id}
+              onClick={() => onDisplayAppearanceChange?.(appearance.id)}
+              disabled={!onDisplayAppearanceChange}
+              className={`p-4 border-2 rounded-lg transition-all text-left ${
+                displayAppearance === appearance.id
+                  ? 'border-spa-accent bg-spa-accent/5 shadow-sm'
+                  : 'border-spa-secondary/20 hover:border-spa-accent/60'
+              }`}
+            >
+              <div className="font-semibold text-spa-text-primary">{appearance.title}</div>
+              <div className="text-xs text-spa-text-secondary mt-1">{appearance.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Schedule Style */}
+      <div>
+        <h3 className="text-lg font-semibold text-spa-text-primary mb-3">Plan-Darstellung</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {SCHEDULE_DESIGN_STYLE_OPTIONS.map((style) => (
             <button
               key={style.id}
               onClick={() => onDesignStyleChange?.(style.id)}
@@ -364,6 +383,9 @@ export function ThemeEditor({
 
         {showAdvanced && (
           <div className="space-y-6 p-4 bg-spa-bg-secondary rounded-lg">
+            <div className="rounded-lg border border-spa-secondary/20 bg-white/80 px-4 py-3 text-sm text-spa-text-secondary">
+              Einige Farbschlüssel stammen aus älteren Layouts. Die Namen unten beschreiben deshalb die heutige tatsächliche Wirkung im Display, nicht zwingend den historischen internen Feldnamen.
+            </div>
             {colorGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
                 <h4 className="font-semibold text-spa-text-primary mb-3">{group.title}</h4>

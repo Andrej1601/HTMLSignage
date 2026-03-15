@@ -47,7 +47,7 @@ export function verifyUserToken(token: string): { userId: string } | null {
     // Device tokens should never pass user auth checks.
     if (payload.tokenType === 'device') return null;
     return { userId: payload.userId };
-  } catch (error) {
+  } catch {
     return null;
   }
 }

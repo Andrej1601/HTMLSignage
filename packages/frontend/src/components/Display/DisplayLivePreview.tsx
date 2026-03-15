@@ -11,6 +11,9 @@ interface DisplayLivePreviewProps {
   schedule: Schedule;
   settings: Settings;
   deviceId?: string | null;
+  deviceName?: string | null;
+  previewAt?: string | null;
+  maintenanceMode?: boolean;
   src?: string;
   title?: string;
   aspectRatio?: string;
@@ -21,6 +24,9 @@ export function DisplayLivePreview({
   schedule,
   settings,
   deviceId,
+  deviceName,
+  previewAt,
+  maintenanceMode = false,
   src = '/display?preview=1',
   title = 'Display Vorschau',
   aspectRatio = '16 / 9',
@@ -30,8 +36,8 @@ export function DisplayLivePreview({
   const [isReady, setIsReady] = useState(false);
 
   const payload = useMemo(
-    () => ({ schedule, settings, deviceId }),
-    [deviceId, schedule, settings],
+    () => ({ schedule, settings, deviceId, deviceName, previewAt, maintenanceMode }),
+    [deviceId, deviceName, maintenanceMode, previewAt, schedule, settings],
   );
 
   const postToFrame = useCallback((message: unknown) => {

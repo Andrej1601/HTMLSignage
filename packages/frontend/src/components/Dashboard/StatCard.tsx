@@ -53,7 +53,7 @@ export function StatCard({
 }: StatCardProps) {
   const selectedColor = colorClasses[color];
   const cardClasses = clsx(
-    'bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary transition-all',
+    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-6 shadow-sm backdrop-blur-sm transition-all',
     href ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'hover:shadow-md'
   );
   const cardContent = (
@@ -94,7 +94,7 @@ export function StatCard({
           </div>
         )}
       </div>
-      <div className={clsx('p-3 rounded-lg', selectedColor.iconBg)}>
+      <div className={clsx('rounded-xl p-3', selectedColor.iconBg)}>
         <Icon className={clsx('w-6 h-6', selectedColor.iconFg)} />
       </div>
     </div>

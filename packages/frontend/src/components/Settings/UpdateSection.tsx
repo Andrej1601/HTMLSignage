@@ -6,6 +6,10 @@ import {
   type GitHubRelease,
   type SystemJob,
   type SystemReleasesResponse,
+  type SystemUpdateCheck,
+  type SystemUpdateCheckStatus,
+  type SystemUpdatePreflight,
+  type SystemUpdateVerification,
 } from '@/services/api';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { getVisibleJobLog } from './jobLog';
@@ -66,6 +70,52 @@ function getJobTone(job: SystemJob | null): 'success' | 'warning' | 'error' | 'i
   return 'warning';
 }
 
+function getCheckTone(status: SystemUpdateCheckStatus): string {
+  if (status === 'ok') return 'border-spa-success/20 bg-spa-success-light text-spa-success-dark';
+  if (status === 'error') return 'border-spa-error/25 bg-spa-error-light text-spa-error-dark';
+  return 'border-spa-warning/25 bg-spa-warning-light text-spa-warning-dark';
+}
+
+function isUpdateCheckStatus(value: unknown): value is SystemUpdateCheckStatus {
+  return value === 'ok' || value === 'warning' || value === 'error';
+}
+
+function isUpdateCheck(value: unknown): value is SystemUpdateCheck {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SystemUpdateCheck>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.label === 'string' &&
+    typeof candidate.detail === 'string' &&
+    isUpdateCheckStatus(candidate.status)
+  );
+}
+
+function parseVerification(value: unknown): SystemUpdateVerification | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<SystemUpdateVerification>;
+  if (
+    typeof candidate.ready !== 'boolean' ||
+    !Array.isArray(candidate.checks) ||
+    !candidate.checks.every(isUpdateCheck) ||
+    !Array.isArray(candidate.manualActions) ||
+    candidate.manualActions.some((action) => typeof action !== 'string')
+  ) {
+    return null;
+  }
+
+  return {
+    ready: candidate.ready,
+    checks: candidate.checks,
+    manualActions: candidate.manualActions,
+  };
+}
+
+function deriveDirtyFromPreflight(preflight: SystemUpdatePreflight | null): boolean {
+  if (!preflight) return false;
+  return preflight.checks.some((check) => check.id === 'working-tree' && check.status === 'error');
+}
+
 interface UpdateSectionProps {
   onFeedback: (feedback: { type: 'success' | 'error' | 'warning'; message: string } | null) => void;
 }
@@ -83,11 +133,18 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
   const notifiedTerminalJobRef = useRef<string | null>(null);
 
   const canRunActions = useMemo(() => Boolean(token), [token]);
+  const preflight = releases?.preflight || null;
   const isRunningUpdate = latestJob?.status === 'queued' || latestJob?.status === 'running';
+  const isUpdateBlocked = !preflight?.ready;
   const updateResult = latestJob?.result && typeof latestJob.result === 'object' ? latestJob.result : null;
   const updateBackupPath = typeof updateResult?.backupPath === 'string' ? updateResult.backupPath : null;
   const updateNote = typeof updateResult?.note === 'string' ? updateResult.note : null;
   const updateRolledBack = Boolean(updateResult && 'rolledBack' in updateResult && updateResult.rolledBack);
+  const updateVerification = useMemo(
+    () => parseVerification(updateResult?.verification),
+    [updateResult],
+  );
+  const effectiveIsDirty = releases?.isDirty || deriveDirtyFromPreflight(preflight);
   const visibleJobLog = useMemo(
     () => getVisibleJobLog(latestJob?.log || ''),
     [latestJob?.log],
@@ -114,9 +171,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
     try {
       const response = await systemApi.listJobs(token, 10);
       const updateJob = response.items.find((job) => job.type === 'system-update') || null;
-      if (updateJob) {
-        setLatestJob(updateJob);
-      }
+      setLatestJob(updateJob);
     } catch {
       // Secondary status polling should not spam the UI.
     }
@@ -189,12 +244,21 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
       await loadReleases();
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const data = error.response?.data as { job?: SystemJob } | undefined;
+        const data = error.response?.data as { job?: SystemJob; preflight?: SystemUpdatePreflight } | undefined;
         if (data?.job) {
           setLatestJob(data.job);
         }
+        const nextPreflight = data?.preflight;
+        if (nextPreflight) {
+          setReleases((current) => current ? {
+            ...current,
+            preflight: nextPreflight,
+            isDirty: deriveDirtyFromPreflight(nextPreflight),
+          } : current);
+        }
       }
       onFeedback({ type: 'error', message: errorMessage(error, 'Systemupdate konnte nicht gestartet werden.') });
+      void loadReleases();
     } finally {
       setIsStartingUpdate(false);
     }
@@ -231,10 +295,84 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
           </button>
         </div>
 
-        {releases?.isDirty && (
-          <div className="mt-3 flex items-center gap-2 rounded-lg border border-spa-warning/30 bg-spa-warning-light px-3 py-2 text-sm text-spa-warning-dark">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Lokale uncommittete Änderungen vorhanden. Update wird blockiert.
+        {preflight && (
+          <div className="mt-4 rounded-lg border border-spa-bg-secondary bg-spa-bg-primary p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h5 className="text-sm font-semibold text-spa-text-primary">Update-Preflight</h5>
+                <p className="mt-1 text-sm text-spa-text-secondary">
+                  Vor jedem Update werden Host, Git-Stand, Backup-Voraussetzungen und Build-Werkzeuge geprueft.
+                </p>
+              </div>
+              <span className={`inline-flex items-center gap-1 self-start rounded-full px-2.5 py-1 text-xs font-semibold ${
+                preflight.ready
+                  ? 'bg-spa-success-light text-spa-success-dark'
+                  : 'bg-spa-error-light text-spa-error-dark'
+              }`}>
+                {preflight.ready ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                {preflight.ready ? 'Update freigegeben' : 'Update blockiert'}
+              </span>
+            </div>
+
+            {effectiveIsDirty && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-spa-warning/30 bg-spa-warning-light px-3 py-2 text-sm text-spa-warning-dark">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Lokale uncommittete Aenderungen vorhanden. Bitte zuerst committen oder bereinigen.
+              </div>
+            )}
+
+            {!preflight.ready && preflight.blockers.length > 0 && (
+              <div className="mt-3 rounded-lg border border-spa-error/25 bg-spa-error-light p-3 text-sm text-spa-error-dark">
+                <div className="flex items-center gap-2 font-semibold">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  Blocker vor dem Update
+                </div>
+                <ul className="mt-2 space-y-1 pl-5">
+                  {preflight.blockers.map((blocker) => (
+                    <li key={blocker} className="list-disc">
+                      {blocker}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {preflight.ready && preflight.warnings.length > 0 && (
+              <div className="mt-3 rounded-lg border border-spa-warning/30 bg-spa-warning-light p-3 text-sm text-spa-warning-dark">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Info className="h-4 w-4 shrink-0" />
+                  Hinweise vor dem Update
+                </div>
+                <ul className="mt-2 space-y-1 pl-5">
+                  {preflight.warnings.map((warning) => (
+                    <li key={warning} className="list-disc">
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {preflight.checks.map((check) => (
+                <div
+                  key={check.id}
+                  className={`rounded-lg border px-3 py-3 text-sm ${getCheckTone(check.status)}`}
+                >
+                  <div className="flex items-center gap-2 font-semibold">
+                    {check.status === 'ok' ? (
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    ) : check.status === 'error' ? (
+                      <ShieldAlert className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Info className="h-4 w-4 shrink-0" />
+                    )}
+                    {check.label}
+                  </div>
+                  <p className="mt-1 text-xs leading-relaxed opacity-90">{check.detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -269,7 +407,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
               </div>
               <button
                 onClick={() => handleUpdateRequest(releases.latestRelease!, false)}
-                disabled={!canRunActions || isStartingUpdate || isRunningUpdate || releases.isDirty}
+                disabled={!canRunActions || isStartingUpdate || isRunningUpdate || isUpdateBlocked}
                 className="flex shrink-0 items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-white hover:bg-spa-primary-dark disabled:opacity-50"
               >
                 <ArrowUpCircle className="h-4 w-4" />
@@ -319,7 +457,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
                     </div>
                     <button
                       onClick={() => handleUpdateRequest(release, true)}
-                      disabled={!canRunActions || isStartingUpdate || isRunningUpdate || releases.isDirty}
+                      disabled={!canRunActions || isStartingUpdate || isRunningUpdate || isUpdateBlocked}
                       className="flex shrink-0 items-center gap-1.5 rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-50"
                     >
                       <ArrowDownCircle className="h-3.5 w-3.5" />
@@ -386,6 +524,66 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
               <div className="mt-3 flex items-center gap-2 rounded-lg border border-spa-primary/20 bg-spa-primary/5 p-3 text-sm text-spa-text-primary">
                 <Info className="h-4 w-4 shrink-0 text-spa-primary" />
                 <span>{updateNote}</span>
+              </div>
+            )}
+
+            {updateVerification && (
+              <div className="mt-3 rounded-lg border border-spa-bg-secondary bg-white p-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h5 className="text-sm font-semibold text-spa-text-primary">
+                      Post-Update-Verifikation
+                    </h5>
+                    <p className="mt-1 text-xs text-spa-text-secondary">
+                      Build-Artefakte und Zielstand wurden nach dem Update erneut geprueft.
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 self-start rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    updateVerification.ready
+                      ? 'bg-spa-success-light text-spa-success-dark'
+                      : 'bg-spa-error-light text-spa-error-dark'
+                  }`}>
+                    {updateVerification.ready ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ShieldAlert className="h-3.5 w-3.5" />}
+                    {updateVerification.ready ? 'Verifikation ok' : 'Verifikation fehlgeschlagen'}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {updateVerification.checks.map((check) => (
+                    <div
+                      key={check.id}
+                      className={`rounded-lg border px-3 py-3 text-sm ${getCheckTone(check.status)}`}
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        {check.status === 'ok' ? (
+                          <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        ) : check.status === 'error' ? (
+                          <ShieldAlert className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <Info className="h-4 w-4 shrink-0" />
+                        )}
+                        {check.label}
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed opacity-90">{check.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {updateVerification.manualActions.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-spa-warning/30 bg-spa-warning-light p-3 text-sm text-spa-warning-dark">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <Info className="h-4 w-4 shrink-0" />
+                      Manuelle Naechste Schritte
+                    </div>
+                    <ul className="mt-2 space-y-1 pl-5">
+                      {updateVerification.manualActions.map((action) => (
+                        <li key={action} className="list-disc">
+                          {action}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,450 +1,61 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toJpeg } from 'html-to-image';
-import { useSchedule } from '@/hooks/useSchedule';
-import { useSettings } from '@/hooks/useSettings';
-import { useMedia } from '@/hooks/useMedia';
-import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSlideshow } from '@/hooks/useSlideshow';
-import { OverviewSlide } from '@/components/Display/OverviewSlide';
-import { SlideRenderer } from '@/components/Display/SlideRenderer';
-import { ScheduleGridSlide } from '@/components/Display/ScheduleGridSlide';
-import { TimelineScheduleSlide } from '@/components/Display/TimelineScheduleSlide';
-import { ChronologicalListSlide } from '@/components/Display/ChronologicalListSlide';
-
-import { SaunaDetailDashboard } from '@/components/Display/SaunaDetailDashboard';
-import { SlideTransition } from '@/components/Display/SlideTransition';
-import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
-import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
-import { getDefaultSettings, type Settings } from '@/types/settings.types';
-import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
-import type { PairingResponse } from '@/types/auth.types';
-import type { LayoutType, SlideConfig, Zone } from '@/types/slideshow.types';
-import type { Media } from '@/types/media.types';
+import { useDisplayClientRuntime } from '@/hooks/useDisplayClientRuntime';
+import { useDisplaySnapshotCapture } from '@/hooks/useDisplaySnapshotCapture';
+import { DisplayLayoutRenderer } from '@/components/Display/DisplayLayoutRenderer';
+import { preloadDisplayModules } from '@/components/Display/displayDynamicModules';
+import { normalizeDisplayLayout } from '@/components/Display/displayLayoutUtils';
+import { getDefaultSettings } from '@/types/settings.types';
+import type { SlideConfig } from '@/types/slideshow.types';
 import { ENV_IS_DEV } from '@/config/env';
-import { devicesApi, fetchApi } from '@/services/api';
-import { migrateSettings } from '@/utils/slideshowMigration';
-import clsx from 'clsx';
-import { motion } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
 import {
-  PREVIEW_CONFIG_EVENT,
-  PREVIEW_READY_EVENT,
-  PREVIEW_REQUEST_READY_EVENT,
-} from '@/components/Display/previewBridge';
-import { isPlainRecord } from '@/utils/objectUtils';
+  DEFAULT_DISPLAY_APPEARANCE,
+  isModernScheduleDesignStyleValue,
+} from '@/config/displayDesignStyles';
+import { migrateSettings } from '@/utils/slideshowMigration';
+import { classNames } from '@/utils/classNames';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
-import { clearDisplayAssetCache, prefetchDisplayAssets } from '@/utils/displayAssetCache';
+import { prefetchDisplayAssets } from '@/utils/displayAssetCache';
 import { useResilientMediaSource } from '@/hooks/useResilientMediaSource';
+import { normalizeMaintenanceScreenSettings } from '@/config/maintenanceScreen';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import {
   applyActiveEventSettings,
   collectDisplayAssetUrls,
   resolveAudioSourceUrl,
 } from '@/utils/displaySettings';
 
-// Generate a unique browser ID (UUID v4)
-function generateBrowserId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
+type TransitionType = NonNullable<SlideConfig['transition']>;
 
-const DEVICE_TOKEN_STORAGE_KEY = 'device_auth_token';
-const DISPLAY_CACHED_SCHEDULE_KEY = 'display_cached_schedule';
-const DISPLAY_CACHED_SETTINGS_KEY = 'display_cached_settings';
-const DISPLAY_CACHED_MEDIA_KEY = 'display_cached_media';
-
-function readCachedValue<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedValue<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Ignore storage quota/private mode errors.
-  }
-}
-
-const SUPPORTED_LAYOUTS: LayoutType[] = ['split-view', 'full-rotation', 'triple-view', 'grid-2x2'];
-
-function normalizeLayout(layout: unknown): LayoutType {
-  return SUPPORTED_LAYOUTS.includes(layout as LayoutType)
-    ? (layout as LayoutType)
-    : 'split-view';
-}
-
-function isMediaSlide(slide: SlideConfig | null | undefined): boolean {
-  return Boolean(slide && typeof slide.type === 'string' && slide.type.startsWith('media-'));
-}
-
-function needsModernSlidePadding(isModernDesign: boolean, slide: SlideConfig | null | undefined): boolean {
-  if (!isModernDesign || !slide) return false;
-  return isMediaSlide(slide) || slide.type === 'infos' || slide.type === 'events';
-}
-
-interface PreviewConfigMessage {
-  type: string;
-  payload?: {
-    schedule?: unknown;
-    settings?: unknown;
-    deviceId?: unknown;
-  };
+function readDisplayPreviewFlag(): boolean {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('preview') === '1';
 }
 
 export function DisplayClientPage() {
-  const location = useLocation();
-  const isPreviewMode = useMemo(
-    () => new URLSearchParams(location.search).get('preview') === '1',
-    [location.search]
-  );
-
-  // Get or create unique browser ID (persists across page reloads)
-  const [browserId] = useState(() => {
-    let id = localStorage.getItem('browserId');
-    if (!id) {
-      id = generateBrowserId();
-      localStorage.setItem('browserId', id);
-    }
-    return id;
-  });
-
-  const [pairingInfo, setPairingInfo] = useState<PairingResponse | null>(null);
-  const [deviceToken, setDeviceToken] = useState<string | null>(
-    () => localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY)
-  );
-  const [isPairingLoading, setIsPairingLoading] = useState(true);
-  const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
-  const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
-  const [hasPreviewPayload, setHasPreviewPayload] = useState(false);
-  const [previewDeviceId, setPreviewDeviceId] = useState<string | null>(null);
+  const isPreviewMode = readDisplayPreviewFlag();
   const [isAudioBlocked, setIsAudioBlocked] = useState(false);
-  const pairedDeviceIdRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const displayRootRef = useRef<HTMLDivElement | null>(null);
-  const snapshotUploadInFlightRef = useRef(false);
-
-  const { schedule, isLoading: scheduleLoading } = useSchedule();
-  const { settings: fetchedSettings, isLoading: settingsLoading } = useSettings();
-  const { data: mediaData } = useMedia();
-  const cachedMedia = useMemo(
-    () => readCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
-    [],
-  );
-  const mediaItems = mediaData && mediaData.length > 0 ? mediaData : cachedMedia;
-
-  const [localSchedule, setLocalSchedule] = useState<Schedule>(() => (
-    schedule ||
-    readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY) ||
-    createDefaultSchedule()
-  ));
-  const [localSettings, setLocalSettings] = useState<Settings>(() => (
-    fetchedSettings ||
-    readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY) ||
-    getDefaultSettings()
-  ));
-  const [eventClock, setEventClock] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!mediaData || mediaData.length === 0) return;
-    writeCachedValue(DISPLAY_CACHED_MEDIA_KEY, mediaData);
-  }, [mediaData]);
-
-  // Check pairing status
-  useEffect(() => {
-    if (isPreviewMode) {
-      setIsPairingLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    const checkPairing = async (opts?: { silent?: boolean }) => {
-      const silent = Boolean(opts?.silent);
-      if (!silent && isMounted) setIsPairingLoading(true);
-      try {
-        const data = await fetchApi<PairingResponse>('/devices/request-pairing', {
-          method: 'POST',
-          data: { browserId },
-        });
-
-        if (typeof data.deviceToken === 'string' && data.deviceToken.trim() !== '') {
-          localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, data.deviceToken);
-          if (isMounted) setDeviceToken(data.deviceToken);
-        }
-        if (isMounted) {
-          setPairingInfo((prev) => {
-            if (
-              prev &&
-              prev.id === data.id &&
-              prev.paired === data.paired &&
-              prev.pairingCode === data.pairingCode &&
-              prev.name === data.name
-            ) {
-              return prev;
-            }
-            return data;
-          });
-        }
-      } catch (error) {
-        if (!silent && isMounted) {
-          console.warn('[Display] Pairing request failed', error);
-        }
-        if (ENV_IS_DEV) {
-          console.error('[Display] Pairing check failed:', error);
-        }
-      } finally {
-        if (!silent && isMounted) setIsPairingLoading(false);
-      }
-    };
-
-    // First load: show a blocking loading state.
-    checkPairing({ silent: false });
-
-    // Re-check pairing only while device is still unpaired.
-    const interval = pairingInfo?.paired
-      ? null
-      : setInterval(() => checkPairing({ silent: true }), 30000);
-    return () => {
-      isMounted = false;
-      if (interval) clearInterval(interval);
-    };
-  }, [browserId, isPreviewMode, pairingInfo?.paired]);
-
-  const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
-    const silent = Boolean(options?.silent);
-    if (!silent) setIsDisplayConfigLoading(true);
-
-    try {
-      const displayConfig = await devicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
-      setLocalSchedule(displayConfig.schedule);
-      setLocalSettings(migrateSettings(displayConfig.settings));
-      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, displayConfig.schedule);
-      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, displayConfig.settings);
-      setHasLoadedDeviceConfig(true);
-    } catch (error) {
-      if (ENV_IS_DEV) {
-        console.error('[Display] Failed to load effective display config:', error);
-      }
-      const cachedSchedule = readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
-      const cachedSettings = readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
-      if (cachedSchedule) setLocalSchedule(cachedSchedule);
-      if (cachedSettings) setLocalSettings(migrateSettings(cachedSettings));
-      setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
-    } finally {
-      if (!silent) setIsDisplayConfigLoading(false);
-    }
-  }, [deviceToken]);
-
-  useEffect(() => {
-    if (!isPreviewMode) return;
-
-    const notifyParentReady = () => {
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: PREVIEW_READY_EVENT }, window.location.origin);
-      }
-    };
-
-    const handlePreviewMessage = (event: MessageEvent<PreviewConfigMessage>) => {
-      if (event.origin !== window.location.origin) return;
-      const message = event.data;
-      if (!message || typeof message.type !== 'string') return;
-
-      if (message.type === PREVIEW_REQUEST_READY_EVENT) {
-        notifyParentReady();
-        return;
-      }
-
-      if (message.type !== PREVIEW_CONFIG_EVENT) return;
-
-      const payload = message.payload;
-      if (!payload) return;
-
-      const incomingSchedule = payload.schedule;
-      if (
-        isPlainRecord(incomingSchedule) &&
-        typeof incomingSchedule.version === 'number' &&
-        isPlainRecord(incomingSchedule.presets) &&
-        typeof incomingSchedule.autoPlay === 'boolean'
-      ) {
-        setLocalSchedule(incomingSchedule as unknown as Schedule);
-        setHasPreviewPayload(true);
-      }
-
-      const incomingSettings = payload.settings;
-      if (isPlainRecord(incomingSettings)) {
-        setLocalSettings(migrateSettings(incomingSettings as unknown as Settings));
-        setHasPreviewPayload(true);
-      }
-
-      setPreviewDeviceId(typeof payload.deviceId === 'string' && payload.deviceId.trim() !== '' ? payload.deviceId : null);
-    };
-
-    window.addEventListener('message', handlePreviewMessage);
-
-    notifyParentReady();
-
-    return () => {
-      window.removeEventListener('message', handlePreviewMessage);
-    };
-  }, [isPreviewMode]);
-
-  useEffect(() => {
-    if (!isPreviewMode) {
-      setHasPreviewPayload(false);
-      setPreviewDeviceId(null);
-    }
-  }, [isPreviewMode]);
-
-  useEffect(() => {
-    if (isPreviewMode) return;
-
-    const pairedDeviceId = pairingInfo?.paired ? pairingInfo.id : null;
-    pairedDeviceIdRef.current = pairedDeviceId;
-
-    if (!pairedDeviceId) {
-      setHasLoadedDeviceConfig(false);
-      return;
-    }
-
-    if (!deviceToken) {
-      setHasLoadedDeviceConfig(false);
-      return;
-    }
-
-    refreshDeviceDisplayConfig(pairedDeviceId);
-  }, [pairingInfo?.id, pairingInfo?.paired, deviceToken, refreshDeviceDisplayConfig, isPreviewMode]);
-
-  // Update local state when global data is fetched (fallback while no paired device config is loaded yet)
-  useEffect(() => {
-    if (!schedule) return;
-    if (isPreviewMode && hasPreviewPayload) return;
-    if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
-      setLocalSchedule(schedule);
-      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, schedule);
-    }
-  }, [schedule, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
-
-  useEffect(() => {
-    if (!fetchedSettings) return;
-    if (isPreviewMode && hasPreviewPayload) return;
-    if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
-      setLocalSettings(fetchedSettings);
-      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, fetchedSettings);
-    }
-  }, [fetchedSettings, pairingInfo?.paired, hasLoadedDeviceConfig, hasPreviewPayload, isPreviewMode]);
-
-  // WebSocket for real-time updates
-  const { isConnected, subscribe } = useWebSocket({
-    autoConnect: !isPreviewMode,
-    onScheduleUpdate: (data) => {
-      if (ENV_IS_DEV) {
-        console.log('[Display] Schedule updated via WebSocket');
-      }
-      const deviceId = pairedDeviceIdRef.current;
-      if (deviceId) {
-        refreshDeviceDisplayConfig(deviceId, { silent: true });
-        return;
-      }
-      setLocalSchedule(data);
-      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, data);
-    },
-    onSettingsUpdate: (data) => {
-      if (ENV_IS_DEV) {
-        console.log('[Display] Settings updated via WebSocket');
-      }
-      const deviceId = pairedDeviceIdRef.current;
-      if (deviceId) {
-        refreshDeviceDisplayConfig(deviceId, { silent: true });
-        return;
-      }
-      const migrated = migrateSettings(data);
-      setLocalSettings(migrated);
-      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, migrated);
-    },
-    onDeviceUpdate: (data) => {
-      const deviceId = pairedDeviceIdRef.current;
-      if (!deviceId) return;
-
-      const updatedDeviceId = typeof data.id === 'string' ? data.id : null;
-      if (updatedDeviceId && updatedDeviceId !== deviceId) return;
-
-      refreshDeviceDisplayConfig(deviceId, { silent: true });
-    },
-    onDeviceCommand: (command) => {
-      if (ENV_IS_DEV) {
-        console.log('[Display] Command received:', command);
-      }
-      if (command === 'reload' || command === 'restart') {
-        window.location.reload();
-      }
-      if (command === 'clear-cache') {
-        void clearDisplayAssetCache().finally(() => {
-          localStorage.clear();
-          sessionStorage.clear();
-          window.location.reload();
-        });
-      }
-    },
-  });
-
-  // Subscribe to updates once connected and paired
-  useEffect(() => {
-    if (isPreviewMode) return;
-
-    if (isConnected && pairingInfo?.paired && pairingInfo?.id && deviceToken) {
-      subscribe('schedule');
-      subscribe('settings');
-      subscribe('device', pairingInfo.id, deviceToken);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, pairingInfo?.paired, pairingInfo?.id, deviceToken, isPreviewMode]);
-
-  // Heartbeat system (only when paired)
-  useEffect(() => {
-    if (isPreviewMode) return;
-    if (!pairingInfo?.paired || !pairingInfo?.id) return;
-    if (!deviceToken) return;
-
-    const sendHeartbeat = async () => {
-      try {
-        const response = await devicesApi.sendHeartbeat(pairingInfo.id, deviceToken);
-        if (response.ok && ENV_IS_DEV) {
-          console.log('[Display] Heartbeat sent');
-        }
-      } catch (error) {
-        if (ENV_IS_DEV) {
-          console.error('[Display] Heartbeat failed:', error);
-        }
-      }
-    };
-
-    // Send initial heartbeat
-    sendHeartbeat();
-
-    // Send heartbeat every 2 minutes
-    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [pairingInfo?.paired, pairingInfo?.id, deviceToken, isPreviewMode]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setEventClock(Date.now()), 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const displayDeviceId = isPreviewMode
-    ? previewDeviceId
-    : pairingInfo?.paired
-      ? pairingInfo.id
-      : null;
+  const lastPrefetchedAssetSignatureRef = useRef<string | null>(null);
+  const lastPreloadedModuleSignatureRef = useRef<string | null>(null);
+  const {
+    displayDeviceId,
+    displayDeviceName,
+    eventClock,
+    isConnected,
+    isDisplayConfigLoading,
+    isPairingLoading,
+    hasLoadedDeviceConfig,
+    maintenanceMode,
+    localSchedule,
+    localSettings,
+    mediaItems,
+    pairingInfo,
+    scheduleLoading,
+    settingsLoading,
+    deviceToken,
+  } = useDisplayClientRuntime(isPreviewMode);
 
   const effectiveSettings = useMemo(
     () => applyActiveEventSettings(
@@ -465,6 +76,16 @@ export function DisplayClientPage() {
     [effectiveSettings.audio, mediaItems],
   );
 
+  const maintenanceScreen = useMemo(
+    () => normalizeMaintenanceScreenSettings(effectiveSettings.maintenanceScreen),
+    [effectiveSettings.maintenanceScreen],
+  );
+
+  const maintenanceBackgroundUrl = useMemo(
+    () => getMediaUploadUrl(mediaItems, maintenanceScreen.backgroundImageId),
+    [maintenanceScreen.backgroundImageId, mediaItems],
+  );
+
   const {
     resolvedSrc: effectiveAudioSrc,
     handleError: handleAudioError,
@@ -474,14 +95,46 @@ export function DisplayClientPage() {
     () => collectDisplayAssetUrls(effectiveSettings, mediaItems),
     [effectiveSettings, mediaItems],
   );
+  const displayAssetSignature = useMemo(
+    () => displayAssetUrls.join('|'),
+    [displayAssetUrls],
+  );
+  const displayModulePreloadSignature = useMemo(() => {
+    const slideSignature = (effectiveSettings.slideshow?.slides || [])
+      .map((slide) => `${slide.id}:${slide.type}`)
+      .join('|');
+
+    return `${effectiveSettings.designStyle || 'modern-wellness'}|${slideSignature}`;
+  }, [effectiveSettings.designStyle, effectiveSettings.slideshow?.slides]);
 
   useEffect(() => {
+    if (lastPrefetchedAssetSignatureRef.current === displayAssetSignature) {
+      return;
+    }
+
+    lastPrefetchedAssetSignatureRef.current = displayAssetSignature;
     void prefetchDisplayAssets(displayAssetUrls);
-  }, [displayAssetUrls]);
+  }, [displayAssetSignature, displayAssetUrls]);
+
+  useEffect(() => {
+    if (lastPreloadedModuleSignatureRef.current === displayModulePreloadSignature) {
+      return;
+    }
+
+    lastPreloadedModuleSignatureRef.current = displayModulePreloadSignature;
+    preloadDisplayModules({
+      designStyle: effectiveSettings.designStyle,
+      slides: effectiveSettings.slideshow?.slides,
+    });
+  }, [
+    displayModulePreloadSignature,
+    effectiveSettings.designStyle,
+    effectiveSettings.slideshow?.slides,
+  ]);
 
   const tryPlayAudio = useCallback(async () => {
     const audio = audioRef.current;
-    if (!audio || !effectiveAudio.enabled || !effectiveAudioSrc) return;
+    if (!audio || maintenanceMode || !effectiveAudio.enabled || !effectiveAudioSrc) return;
 
     try {
       audio.muted = false;
@@ -504,13 +157,13 @@ export function DisplayClientPage() {
       setIsAudioBlocked(true);
       console.warn('[Display] Audio autoplay blocked:', error);
     }
-  }, [effectiveAudio.enabled, effectiveAudio.volume, effectiveAudioSrc]);
+  }, [effectiveAudio.enabled, effectiveAudio.volume, effectiveAudioSrc, maintenanceMode]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (!effectiveAudio.enabled || !effectiveAudioSrc) {
+    if (maintenanceMode || !effectiveAudio.enabled || !effectiveAudioSrc) {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
@@ -526,7 +179,7 @@ export function DisplayClientPage() {
     audio.loop = effectiveAudio.loop;
     audio.volume = effectiveAudio.volume;
     void tryPlayAudio();
-  }, [effectiveAudio.enabled, effectiveAudio.loop, effectiveAudio.volume, effectiveAudioSrc, tryPlayAudio]);
+  }, [effectiveAudio.enabled, effectiveAudio.loop, effectiveAudio.volume, effectiveAudioSrc, maintenanceMode, tryPlayAudio]);
 
   useEffect(() => {
     if (!isAudioBlocked || !effectiveAudio.enabled || !effectiveAudioSrc) return;
@@ -542,7 +195,7 @@ export function DisplayClientPage() {
       window.removeEventListener('pointerdown', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
     };
-  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSourceUrl, tryPlayAudio]);
+  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio]);
 
   // Slideshow
   const {
@@ -564,14 +217,13 @@ export function DisplayClientPage() {
   });
 
   const resolveTransition = useCallback(
-    (slide: SlideConfig | null | undefined) => slide?.transition || defaultTransition,
+    (slide: SlideConfig | null | undefined): TransitionType => slide?.transition || defaultTransition,
     [defaultTransition]
   );
 
   const defaults = getDefaultSettings();
   const themeColors = effectiveSettings.theme || defaults.theme!;
-  const safeLayout = normalizeLayout(layout);
-  const hasAnyZoneSlides = zones.some((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
+  const safeLayout = normalizeDisplayLayout(layout);
   const isLoading =
     isPreviewMode
       ? scheduleLoading || settingsLoading
@@ -584,89 +236,15 @@ export function DisplayClientPage() {
     deviceToken &&
     !isLoading
   );
-
-  const captureLiveSnapshot = useCallback(async () => {
-    if (!canCaptureSnapshots || !pairingInfo?.id || !deviceToken) return;
-
-    const snapshotTarget = displayRootRef.current || document.body;
-    if (!snapshotTarget || snapshotUploadInFlightRef.current) return;
-
-    snapshotUploadInFlightRef.current = true;
-
-    try {
-      if ('fonts' in document) {
-        await (document as Document & { fonts?: FontFaceSet }).fonts?.ready;
-      }
-      await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
-
-      const snapshotOptions = {
-        backgroundColor: themeColors.dashboardBg || themeColors.bg || '#000000',
-        cacheBust: true,
-        pixelRatio: 0.5,
-        quality: 0.6,
-        skipFonts: false,
-        fetchRequestInit: {
-          cache: 'no-store' as RequestCache,
-          credentials: 'include' as RequestCredentials,
-        },
-        filter: (element: HTMLElement) =>
-          (element as HTMLElement | undefined)?.dataset?.snapshotIgnore !== 'true',
-      };
-
-      let imageDataUrl: string;
-      try {
-        imageDataUrl = await toJpeg(snapshotTarget, snapshotOptions);
-      } catch (error) {
-        console.warn('[Display] Snapshot render failed, retrying with reduced options:', error);
-        imageDataUrl = await toJpeg(snapshotTarget, {
-          ...snapshotOptions,
-          pixelRatio: 0.35,
-          quality: 0.45,
-          skipFonts: true,
-        });
-      }
-      await devicesApi.uploadSnapshot(pairingInfo.id, imageDataUrl, deviceToken);
-    } catch (error) {
-      console.warn('[Display] Snapshot capture failed:', error);
-    } finally {
-      snapshotUploadInFlightRef.current = false;
-    }
-  }, [
+  useDisplaySnapshotCapture({
     canCaptureSnapshots,
+    currentSlideIndex,
+    deviceId: pairingInfo?.id || null,
     deviceToken,
-    pairingInfo?.id,
-    themeColors.bg,
-    themeColors.dashboardBg,
-  ]);
-
-  useEffect(() => {
-    if (!canCaptureSnapshots || !pairingInfo?.id) return;
-
-    const initialTimer = window.setTimeout(() => {
-      void captureLiveSnapshot();
-    }, 5000);
-
-    const interval = window.setInterval(() => {
-      void captureLiveSnapshot();
-    }, 90_000);
-
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
-    };
-  }, [canCaptureSnapshots, captureLiveSnapshot, pairingInfo?.id]);
-
-  useEffect(() => {
-    if (!canCaptureSnapshots || !pairingInfo?.id) return;
-
-    const timer = window.setTimeout(() => {
-      void captureLiveSnapshot();
-    }, 2500);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [canCaptureSnapshots, captureLiveSnapshot, currentSlideIndex, pairingInfo?.id, safeLayout]);
+    displayRootRef,
+    layoutKey: safeLayout,
+    snapshotBackgroundColor: themeColors.dashboardBg || themeColors.bg || '#000000',
+  });
 
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
@@ -711,6 +289,43 @@ export function DisplayClientPage() {
     );
   }
 
+  if (!isLoading && maintenanceMode) {
+    return (
+      <div
+        ref={displayRootRef}
+        className="flex h-screen w-full items-center justify-center text-white"
+        style={
+          maintenanceBackgroundUrl
+            ? {
+                backgroundImage: `linear-gradient(135deg, rgba(12, 8, 4, 0.58), rgba(34, 24, 16, 0.82)), url(${maintenanceBackgroundUrl})`,
+                backgroundPosition: 'center',
+                backgroundSize: 'cover',
+              }
+            : {
+                backgroundImage: 'radial-gradient(circle at top, #f2ebdf 0%, #d6b998 45%, #7f674d 100%)',
+              }
+        }
+      >
+        <div className="max-w-3xl rounded-[2rem] border border-white/20 bg-black/15 px-12 py-14 text-center shadow-2xl backdrop-blur-xl">
+          <div className="text-xs font-semibold uppercase tracking-[0.35em] text-white/75">
+            {maintenanceScreen.label}
+          </div>
+          <h1 className="mt-5 text-5xl font-semibold tracking-tight">
+            {maintenanceScreen.headline}
+          </h1>
+          <p className="mt-6 text-xl leading-relaxed text-white/85">
+            {maintenanceScreen.message}
+          </p>
+          {maintenanceScreen.showDeviceName && displayDeviceName && (
+            <div className="mt-8 inline-flex rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-medium text-white/85">
+              {displayDeviceName}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-white">
@@ -726,739 +341,39 @@ export function DisplayClientPage() {
   }
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
-  const isModernDesign = ['modern-wellness', 'modern-timeline', 'compact-tiles'].includes(designStyle);
+  const displayAppearance = effectiveSettings.displayAppearance || DEFAULT_DISPLAY_APPEARANCE;
+  const isModernDesign = isModernScheduleDesignStyleValue(designStyle);
   const displayNow = new Date(eventClock);
 
-  const renderContentPanel = () => {
-    switch (designStyle) {
-      case 'modern-timeline':
-        return <TimelineScheduleSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
-      case 'compact-tiles':
-        return <ChronologicalListSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
-      default:
-        return <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />;
-    }
-  };
-
-  // If no slides configured, show default overview
-  if (!hasAnyZoneSlides) {
-    return (
-      <div ref={displayRootRef} className="w-full h-screen overflow-hidden">
-        {isModernDesign ? (
-          renderContentPanel()
-        ) : (
-          <OverviewSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />
-        )}
-      </div>
-    );
-  }
-
-  // Render based on layout
-  const renderLayout = () => {
-    const renderSplitLikeLayout = () => {
-      // Get zones for this layout
-      const splitZones = zones.filter((z) => z.id === 'persistent' || z.id === 'main');
-      const persistentZone = splitZones.find((z) => z.id === 'persistent');
-      const mainZone = splitZones.find((z) => z.id === 'main');
-
-      const gridSizePercent = persistentZone?.size || 50;
-      const isVertical = persistentZone?.position === 'left' || persistentZone?.position === 'right';
-      const scheduleFirst = persistentZone?.position === 'left' || persistentZone?.position === 'top';
-
-      // Get slides for each zone
-      const persistentSlide = persistentZone ? getZoneSlide(persistentZone.id) : null;
-      const persistentInfo = persistentZone ? getZoneInfo(persistentZone.id) : null;
-      const mainSlide = mainZone ? getZoneSlide(mainZone.id) : null;
-      const mainInfo = mainZone ? getZoneInfo(mainZone.id) : null;
-
-      const theme = themeColors;
-      const leftBg = theme.zebra1 || '#F7F3E9';
-      const rightBg = theme.zebra2 || '#F2EDE1';
-      const border = theme.gridTable || '#EBE5D3';
-
-      const hasPersistent = Boolean(persistentSlide);
-      const hasMain = Boolean(mainSlide);
-
-      const persistentSize = hasPersistent && hasMain ? gridSizePercent : hasPersistent ? 100 : 0;
-      const mainSize = hasPersistent && hasMain ? 100 - gridSizePercent : hasMain ? 100 : 0;
-
-      const renderZoneSlide = (
-        slide: SlideConfig | null,
-        zone?: Zone,
-      ) => {
-        if (!slide) {
-          return (
-            <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
-              Keine Slides
-            </div>
-          );
-        }
-
-        const mediaSlide = isMediaSlide(slide);
-        const needsPadding = needsModernSlidePadding(isModernDesign, slide);
-
-        const rendered = (
-          <SlideRenderer
-            schedule={localSchedule}
-            settings={effectiveSettings}
-            media={mediaItems}
-            now={displayNow}
-            deviceId={displayDeviceId || undefined}
-            slide={slide}
-            onVideoEnded={() => zone && onVideoEnded(zone.id)}
-          />
-        );
-
-        if (!needsPadding) return rendered;
-
-        if (mediaSlide) {
-          return (
-            <div className="p-8 w-full h-full">
-              <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
-                {rendered}
-              </div>
-            </div>
-          );
-        }
-
-        return <div className="p-8 w-full h-full">{rendered}</div>;
-      };
-
-      if (isVertical) {
-        return (
-          <div className="w-full h-full flex">
-            {scheduleFirst ? (
-              <>
-                {hasPersistent && (
-                  <div
-                    className={clsx(isModernDesign && hasMain && showZoneBorders && 'border-r')}
-                    style={{
-                      width: `${persistentSize}%`,
-                      borderColor: isModernDesign && showZoneBorders ? border : undefined,
-                      backgroundColor: isModernDesign ? leftBg : undefined,
-                    }}
-                  >
-                    <SlideTransition
-                      slideKey={persistentSlide?.id || 'persistent'}
-                      enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                      duration={0.6}
-                      transition={resolveTransition(persistentSlide)}
-                    >
-                      {renderZoneSlide(persistentSlide, persistentZone)}
-                    </SlideTransition>
-                  </div>
-                )}
-
-                {hasMain && (
-                  <div
-                    style={{
-                      width: `${mainSize}%`,
-                      backgroundColor: isModernDesign ? rightBg : undefined,
-                    }}
-                  >
-                    <SlideTransition
-                      slideKey={mainSlide?.id || 'main'}
-                      enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                      duration={0.6}
-                      transition={resolveTransition(mainSlide)}
-                    >
-                      {renderZoneSlide(mainSlide, mainZone)}
-                    </SlideTransition>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {hasMain && (
-                  <div
-                    className={clsx(isModernDesign && hasPersistent && showZoneBorders && 'border-r')}
-                    style={{
-                      width: `${mainSize}%`,
-                      borderColor: isModernDesign && showZoneBorders ? border : undefined,
-                      backgroundColor: isModernDesign ? leftBg : undefined,
-                    }}
-                  >
-                    <SlideTransition
-                      slideKey={mainSlide?.id || 'main'}
-                      enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                      duration={0.6}
-                      transition={resolveTransition(mainSlide)}
-                    >
-                      {renderZoneSlide(mainSlide, mainZone)}
-                    </SlideTransition>
-                  </div>
-                )}
-
-                {hasPersistent && (
-                  <div
-                    style={{
-                      width: `${persistentSize}%`,
-                      backgroundColor: isModernDesign ? rightBg : undefined,
-                    }}
-                  >
-                    <SlideTransition
-                      slideKey={persistentSlide?.id || 'persistent'}
-                      enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                      duration={0.6}
-                      transition={resolveTransition(persistentSlide)}
-                    >
-                      {renderZoneSlide(persistentSlide, persistentZone)}
-                    </SlideTransition>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        );
-      }
-
-      return (
-        <div className="w-full h-full flex flex-col">
-          {scheduleFirst ? (
-            <>
-              {hasPersistent && (
-                <div
-                  className={clsx(isModernDesign && hasMain && showZoneBorders && 'border-b')}
-                  style={{
-                    height: `${persistentSize}%`,
-                    borderColor: isModernDesign && showZoneBorders ? border : undefined,
-                    backgroundColor: isModernDesign ? leftBg : undefined,
-                  }}
-                >
-                  <SlideTransition
-                    slideKey={persistentSlide?.id || 'persistent'}
-                    enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(persistentSlide)}
-                  >
-                    {renderZoneSlide(persistentSlide, persistentZone)}
-                  </SlideTransition>
-                </div>
-              )}
-
-              {hasMain && (
-                <div
-                  style={{
-                    height: `${mainSize}%`,
-                    backgroundColor: isModernDesign ? rightBg : undefined,
-                  }}
-                >
-                  <SlideTransition
-                    slideKey={mainSlide?.id || 'main'}
-                    enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(mainSlide)}
-                  >
-                    {renderZoneSlide(mainSlide, mainZone)}
-                  </SlideTransition>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {hasMain && (
-                <div
-                  className={clsx(isModernDesign && hasPersistent && showZoneBorders && 'border-b')}
-                  style={{
-                    height: `${mainSize}%`,
-                    borderColor: isModernDesign && showZoneBorders ? border : undefined,
-                    backgroundColor: isModernDesign ? leftBg : undefined,
-                  }}
-                >
-                  <SlideTransition
-                    slideKey={mainSlide?.id || 'main'}
-                    enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(mainSlide)}
-                  >
-                    {renderZoneSlide(mainSlide, mainZone)}
-                  </SlideTransition>
-                </div>
-              )}
-
-              {hasPersistent && (
-                <div
-                  style={{
-                    height: `${persistentSize}%`,
-                    backgroundColor: isModernDesign ? rightBg : undefined,
-                  }}
-                >
-                  <SlideTransition
-                    slideKey={persistentSlide?.id || 'persistent'}
-                    enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(persistentSlide)}
-                  >
-                    {renderZoneSlide(persistentSlide, persistentZone)}
-                  </SlideTransition>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      );
-    };
-
-    switch (safeLayout) {
-      case 'full-rotation':
-        {
-          const zoneWithSlides = zones.find((z) => (getZoneInfo(z.id)?.totalSlides ?? 0) > 0);
-          const zoneId = zoneWithSlides?.id || zones[0]?.id || 'main';
-          const slide = getZoneSlide(zoneId) || currentSlide;
-          if (!slide) return null;
-
-          const mediaSlide = isMediaSlide(slide);
-          const needsPadding = needsModernSlidePadding(isModernDesign, slide);
-
-          const rendered = (
-            <SlideRenderer
-              schedule={localSchedule}
-              settings={effectiveSettings}
-              media={mediaItems}
-              now={displayNow}
-              deviceId={displayDeviceId || undefined}
-              slide={slide}
-              onVideoEnded={() => onVideoEnded(zoneId)}
-            />
-          );
-
-          return (
-            <SlideTransition
-              slideKey={slide?.id || currentSlideIndex}
-              enabled={enableTransitions}
-              duration={0.6}
-              transition={resolveTransition(slide)}
-            >
-              {needsPadding ? (
-                mediaSlide ? (
-                  <div className="p-8 w-full h-full">
-                    <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
-                      {rendered}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 w-full h-full">{rendered}</div>
-                )
-              ) : (
-                rendered
-              )}
-            </SlideTransition>
-          );
-        }
-
-      case 'split-view':
-        return renderSplitLikeLayout();
-
-      case 'triple-view':
-        if (isModernDesign) {
-          const tripleZones = zones.filter((z) => z.id === 'left' || z.id === 'top-right' || z.id === 'bottom-right');
-          const leftZone = tripleZones.find((z) => z.id === 'left');
-          const topRightZone = tripleZones.find((z) => z.id === 'top-right');
-          const bottomRightZone = tripleZones.find((z) => z.id === 'bottom-right');
-
-          const leftSlide = leftZone ? getZoneSlide(leftZone.id) : null;
-          const topRightSlide = topRightZone ? getZoneSlide(topRightZone.id) : null;
-          const bottomRightSlide = bottomRightZone ? getZoneSlide(bottomRightZone.id) : null;
-
-          const leftInfo = leftZone ? getZoneInfo(leftZone.id) : null;
-          const topRightInfo = topRightZone ? getZoneInfo(topRightZone.id) : null;
-          const bottomRightInfo = bottomRightZone ? getZoneInfo(bottomRightZone.id) : null;
-
-          const leftSize = leftZone?.size || (designStyle === 'modern-timeline' ? 65 : 60);
-          const rightSize = 100 - leftSize;
-          const topDurationSec = (topRightSlide?.duration ?? 12);
-
-          const theme = themeColors;
-          const leftBg = theme.zebra1 || '#F7F3E9';
-          const rightBg = theme.zebra2 || '#F2EDE1';
-          const border = theme.gridTable || '#EBE5D3';
-          const bottomBg = withAlpha(rightBg, 0.6);
-
-          const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
-          const accentGold = theme.accentGold || theme.accent || '#A68A64';
-
-          return (
-            <div className="w-full h-full flex relative overflow-hidden">
-              {/* Left Panel: Content grid/timeline or media */}
-              <div
-                className={clsx('h-full relative overflow-hidden', showZoneBorders && 'border-r')}
-                style={{
-                  width: `${leftSize}%`,
-                  backgroundColor: leftBg,
-                  borderColor: showZoneBorders ? border : undefined,
-                }}
-              >
-                <SlideTransition
-                  slideKey={leftSlide?.id || `content-panel-${designStyle}`}
-                  enabled={enableTransitions && (leftInfo?.shouldRotate || false)}
-                  duration={0.6}
-                  transition={resolveTransition(leftSlide)}
-                >
-                  {!leftSlide || leftSlide.type === 'content-panel' ? (
-                    renderContentPanel()
-                  ) : leftSlide.type?.startsWith('media-') ? (
-                    <div className="p-5 w-full h-full">
-                      <div className="w-full h-full rounded-[2.5rem] overflow-hidden border-[6px] border-white shadow-xl">
-                        <SlideRenderer
-                          schedule={localSchedule}
-                          settings={effectiveSettings}
-                          media={mediaItems}
-                          now={displayNow}
-                          deviceId={displayDeviceId || undefined}
-                          slide={leftSlide}
-                          onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <SlideRenderer
-                      schedule={localSchedule}
-                      settings={effectiveSettings}
-                      media={mediaItems}
-                      deviceId={displayDeviceId || undefined}
-                      slide={leftSlide}
-                      onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
-                    />
-                  )}
-                </SlideTransition>
-              </div>
-
-              {/* Right Panel (40%): Detail + Bottom */}
-              <div
-                className="h-full flex flex-col relative overflow-hidden"
-                style={{
-                  width: `${rightSize}%`,
-                  backgroundColor: rightBg,
-                }}
-              >
-                {/* Right Top */}
-                <div className="flex-1 relative overflow-hidden flex flex-col">
-                  <SlideTransition
-                    slideKey={topRightSlide?.id || topRightInfo?.currentSlideIndex || 'top-fallback'}
-                    enabled={enableTransitions && (topRightInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(topRightSlide)}
-                  >
-                    <div className="absolute inset-0 flex flex-col">
-                      {topRightSlide?.type === 'sauna-detail' ? (
-                        <SaunaDetailDashboard
-                          schedule={localSchedule}
-                          settings={effectiveSettings}
-                          saunaId={topRightSlide.saunaId}
-                          media={mediaItems}
-                          deviceId={displayDeviceId || undefined}
-                        />
-                      ) : topRightSlide ? (
-                        topRightSlide.type?.startsWith('media-') ? (
-                          <div className="p-5 w-full h-full">
-                            <div className="w-full h-full rounded-[2.3rem] overflow-hidden border-[6px] border-white shadow-xl">
-                              <SlideRenderer
-                                schedule={localSchedule}
-                                settings={effectiveSettings}
-                                media={mediaItems}
-                                now={displayNow}
-                                deviceId={displayDeviceId || undefined}
-                                slide={topRightSlide}
-                                onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-full h-full">
-                            <SlideRenderer
-                              schedule={localSchedule}
-                              settings={effectiveSettings}
-                              media={mediaItems}
-                              now={displayNow}
-                              deviceId={displayDeviceId || undefined}
-                              slide={topRightSlide}
-                              onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
-                            />
-                          </div>
-                        )
-                      ) : (
-                        <SaunaDetailDashboard schedule={localSchedule} settings={effectiveSettings} saunaId={undefined} media={mediaItems} deviceId={displayDeviceId || undefined} />
-                      )}
-                    </div>
-                  </SlideTransition>
-                </div>
-
-                {/* Right Bottom */}
-                <div
-                  className={clsx('h-44 p-4 relative shrink-0 overflow-hidden', showZoneBorders && 'border-t')}
-                  style={{
-                    backgroundColor: bottomBg,
-                    borderColor: showZoneBorders ? border : undefined,
-                  }}
-                >
-                  <SlideTransition
-                    slideKey={bottomRightSlide?.id || 'bottom-fallback'}
-                    enabled={enableTransitions && (bottomRightInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(bottomRightSlide)}
-                  >
-                    <div className="w-full h-full">
-                      {bottomRightSlide ? (
-                        bottomRightSlide.type?.startsWith('media-') ? (
-                          <div className="p-2 w-full h-full">
-                            <div className="w-full h-full rounded-[1.8rem] overflow-hidden border-4 border-white shadow-lg">
-                              <SlideRenderer
-                                schedule={localSchedule}
-                                settings={effectiveSettings}
-                                media={mediaItems}
-                                now={displayNow}
-                                deviceId={displayDeviceId || undefined}
-                                slide={bottomRightSlide}
-                                onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <SlideRenderer
-                            schedule={localSchedule}
-                            settings={effectiveSettings}
-                            media={mediaItems}
-                            now={displayNow}
-                            deviceId={displayDeviceId || undefined}
-                            slide={bottomRightSlide}
-                            onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
-                          />
-                        )
-                      ) : (
-                        <WellnessBottomPanel settings={effectiveSettings} theme={themeColors} media={mediaItems} />
-                      )}
-                    </div>
-                  </SlideTransition>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              {(topRightInfo?.shouldRotate || false) && (
-                <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/[0.03]">
-                  <motion.div
-                    key={topRightSlide?.id || topRightInfo?.currentSlideIndex || 0}
-                    initial={{ width: '0%' }}
-                    animate={{ width: '100%' }}
-                    transition={{ duration: topDurationSec, ease: 'linear' }}
-                    className="h-full"
-                    style={{
-                      background: `linear-gradient(to right, ${accentGreen}, ${accentGold})`,
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        }
-
-        // Get zones for this layout
-        const tripleZones = zones.filter((z) => z.id === 'left' || z.id === 'top-right' || z.id === 'bottom-right');
-        const leftZone = tripleZones.find((z) => z.id === 'left');
-        const topRightZone = tripleZones.find((z) => z.id === 'top-right');
-        const bottomRightZone = tripleZones.find((z) => z.id === 'bottom-right');
-
-        const leftSlide = leftZone ? getZoneSlide(leftZone.id) : null;
-        const topRightSlide = topRightZone ? getZoneSlide(topRightZone.id) : null;
-        const bottomRightSlide = bottomRightZone ? getZoneSlide(bottomRightZone.id) : null;
-
-        // Get sizes from zones
-        const leftSize = leftZone?.size || 66;
-        const topRightSize = topRightZone?.size || 50;
-
-        // Get zone info to check if should rotate
-        const leftInfo = leftZone ? getZoneInfo(leftZone.id) : null;
-        const topRightInfo = topRightZone ? getZoneInfo(topRightZone.id) : null;
-        const bottomRightInfo = bottomRightZone ? getZoneInfo(bottomRightZone.id) : null;
-
-        return (
-          <div className="w-full h-full flex">
-            {/* Left Panel */}
-            {leftSlide && (
-              <div style={{ width: `${leftSize}%` }}>
-                <SlideTransition
-                  slideKey={leftSlide?.id || 'left'}
-                  enabled={enableTransitions && (leftInfo?.shouldRotate || false)}
-                  duration={0.6}
-                  transition={resolveTransition(leftSlide)}
-                >
-                  {leftSlide.type === 'content-panel' ? (
-                    <ScheduleGridSlide schedule={localSchedule} settings={effectiveSettings} now={displayNow} deviceId={displayDeviceId || undefined} />
-                  ) : (
-                    <SlideRenderer schedule={localSchedule} settings={effectiveSettings} now={displayNow}
-                      media={mediaItems}
-                      deviceId={displayDeviceId || undefined}
-                      slide={leftSlide}
-                      onVideoEnded={() => leftZone && onVideoEnded(leftZone.id)}
-                    />
-                  )}
-                </SlideTransition>
-              </div>
-            )}
-
-            {/* Right Panel - Split Top/Bottom */}
-            <div style={{ width: `${100 - leftSize}%` }} className="flex flex-col">
-              {/* Top Right */}
-              {topRightSlide && (
-                <div style={{ height: `${topRightSize}%` }}>
-                  <SlideTransition
-                    slideKey={topRightSlide?.id || `top-right-${topRightSlide?.saunaId || 0}`}
-                    enabled={enableTransitions && (topRightInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(topRightSlide)}
-                  >
-                    {topRightSlide.type === 'sauna-detail' ? (
-                      <SaunaDetailDashboard
-                        schedule={localSchedule}
-                        settings={effectiveSettings}
-                        saunaId={topRightSlide.saunaId}
-                        media={mediaItems}
-                        deviceId={displayDeviceId || undefined}
-                      />
-                    ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} media={mediaItems} now={displayNow}
-                        deviceId={displayDeviceId || undefined}
-                        slide={topRightSlide}
-                        onVideoEnded={() => topRightZone && onVideoEnded(topRightZone.id)}
-                      />
-                    )}
-                  </SlideTransition>
-                </div>
-              )}
-
-              {/* Bottom Right */}
-              {bottomRightSlide && (
-                <div style={{ height: `${100 - topRightSize}%` }}>
-                  <SlideTransition
-                    slideKey={bottomRightSlide?.id || `bottom-right-${bottomRightSlide?.saunaId || 1}`}
-                    enabled={enableTransitions && (bottomRightInfo?.shouldRotate || false)}
-                    duration={0.6}
-                    transition={resolveTransition(bottomRightSlide)}
-                  >
-                    {bottomRightSlide.type === 'sauna-detail' ? (
-                      <SaunaDetailDashboard
-                        schedule={localSchedule}
-                        settings={effectiveSettings}
-                        saunaId={bottomRightSlide.saunaId}
-                        media={mediaItems}
-                        deviceId={displayDeviceId || undefined}
-                      />
-                    ) : (
-                      <SlideRenderer schedule={localSchedule} settings={effectiveSettings} media={mediaItems} now={displayNow}
-                        deviceId={displayDeviceId || undefined}
-                        slide={bottomRightSlide}
-                        onVideoEnded={() => bottomRightZone && onVideoEnded(bottomRightZone.id)}
-                      />
-                    )}
-                  </SlideTransition>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case 'grid-2x2':
-        {
-          const theme = themeColors;
-          const border = theme.gridTable || '#EBE5D3';
-          const bgBase = theme.dashboardBg || theme.bg || '#FDFBF7';
-          const bg1 = theme.zebra1 || bgBase;
-          const bg2 = theme.zebra2 || bgBase;
-
-          const cellBgForIndex = (idx: number) => {
-            // Checker pattern (TL/TR/BL/BR): 1/2/2/1
-            return idx === 0 || idx === 3 ? bg1 : bg2;
-          };
-
-          const renderCell = (zoneId: string) => {
-            const slide = getZoneSlide(zoneId);
-
-            const mediaSlide = isMediaSlide(slide);
-            const needsPadding = needsModernSlidePadding(isModernDesign, slide);
-
-            const rendered = slide ? (
-              <SlideRenderer
-                schedule={localSchedule}
-                settings={effectiveSettings}
-                media={mediaItems}
-                now={displayNow}
-                deviceId={displayDeviceId || undefined}
-                slide={slide}
-                onVideoEnded={() => onVideoEnded(zoneId)}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-spa-text-secondary">
-                Keine Slides
-              </div>
-            );
-
-            if (!slide || !needsPadding) return rendered;
-
-            if (mediaSlide) {
-              return (
-                <div className="p-6 w-full h-full">
-                  <div className="w-full h-full rounded-[2rem] overflow-hidden border-4 border-white shadow-lg">
-                    {rendered}
-                  </div>
-                </div>
-              );
-            }
-
-            return <div className="p-6 w-full h-full">{rendered}</div>;
-          };
-
-          return (
-            <div className="w-full h-full p-8" style={{ backgroundColor: isModernDesign ? bgBase : undefined }}>
-              <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-6">
-                {zones.slice(0, 4).map((zone, idx) => {
-                  const info = getZoneInfo(zone.id);
-                  const slide = getZoneSlide(zone.id);
-
-                  return (
-                    <div
-                      key={zone.id}
-                      className={clsx(
-                        'relative overflow-hidden',
-                        isModernDesign ? 'rounded-[2rem]' : '',
-                        isModernDesign && showZoneBorders ? 'border' : ''
-                      )}
-                      style={{
-                        borderColor: isModernDesign && showZoneBorders ? border : undefined,
-                        backgroundColor: isModernDesign ? cellBgForIndex(idx) : undefined,
-                      }}
-                    >
-                      <SlideTransition
-                        slideKey={slide?.id || `${zone.id}-empty`}
-                        enabled={enableTransitions && (info?.shouldRotate || false)}
-                        duration={0.6}
-                        transition={resolveTransition(slide)}
-                      >
-                        {renderCell(zone.id)}
-                      </SlideTransition>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }
-
-      default:
-        {
-          // Should never happen because safeLayout normalizes unknown values.
-          return renderSplitLikeLayout();
-        }
-    }
-  };
-
   return (
-      <div
-        ref={displayRootRef}
-        className="w-full h-screen overflow-hidden flex flex-col"
-        style={{ backgroundColor: themeColors.dashboardBg || themeColors.bg }}
-      >
+    <div
+      ref={displayRootRef}
+      className="w-full h-screen overflow-hidden flex flex-col"
+      style={{ backgroundColor: themeColors.dashboardBg || themeColors.bg }}
+    >
       {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative">
-        {renderLayout()}
+        <DisplayLayoutRenderer
+          currentSlide={currentSlide}
+          currentSlideIndex={currentSlideIndex}
+          currentTime={displayNow}
+          displayAppearance={displayAppearance}
+          designStyle={designStyle}
+          displayDeviceId={displayDeviceId || undefined}
+          effectiveSettings={effectiveSettings}
+          enableTransitions={enableTransitions}
+          getZoneInfo={getZoneInfo}
+          getZoneSlide={getZoneSlide}
+          isModernDesign={isModernDesign}
+          localSchedule={localSchedule}
+          mediaItems={mediaItems}
+          onVideoEnded={onVideoEnded}
+          resolveTransition={resolveTransition}
+          safeLayout={safeLayout}
+          showZoneBorders={showZoneBorders}
+          themeColors={themeColors}
+          zones={zones}
+        />
       </div>
 
       <audio
@@ -1488,7 +403,7 @@ export function DisplayClientPage() {
           {Array.from({ length: totalSlides }).map((_, i) => (
             <div
               key={i}
-              className={clsx(
+              className={classNames(
                 'w-3 h-3 rounded-full transition-all',
                 i === currentSlideIndex
                   ? 'bg-white w-8'

@@ -23,33 +23,53 @@ import { DeviceSnapshotPreview } from './DeviceSnapshotPreview';
 
 interface DeviceCardProps {
   device: Device;
+  selected: boolean;
+  onToggleSelection: (deviceId: string) => void;
   onEdit: (device: Device) => void;
   onDelete: (device: Device) => void;
   onReload: (device: Device) => void;
   onRestart: (device: Device) => void;
+  onClearCache: (device: Device) => void;
+  onToggleMaintenance: (device: Device) => void;
 }
 
 export function DeviceCard({
   device,
+  selected,
+  onToggleSelection,
   onEdit,
   onDelete,
   onReload,
   onRestart,
+  onClearCache,
+  onToggleMaintenance,
 }: DeviceCardProps) {
   const status = getDeviceStatus(device.lastSeen);
   const statusColor = getStatusColor(status);
   const hasOverrides = hasDeviceOverrides(device);
   const isOverrideMode = device.mode === 'override';
   const isOverrideActive = hasOverrides && isOverrideMode;
+  const hasGroup = typeof device.groupName === 'string' && device.groupName.trim() !== '';
   const modeBadgeClass = isOverrideMode
     ? 'bg-spa-info-light text-spa-info-dark'
     : 'bg-spa-bg-secondary text-spa-text-secondary';
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary hover:shadow-md transition-shadow">
+    <div className={`bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow ${
+      selected ? 'border-spa-primary ring-1 ring-spa-primary/20' : 'border-spa-bg-secondary'
+    }`}>
       <div className="p-4 border-b border-spa-bg-secondary">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3 flex-1">
+            <label className="flex items-center self-start mt-1">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggleSelection(device.id)}
+                aria-label={`${device.name} auswählen`}
+                className="h-4 w-4 rounded border-spa-bg-secondary text-spa-primary focus:ring-spa-primary"
+              />
+            </label>
             <div className="p-2 bg-spa-bg-primary rounded-lg">
               <Monitor className="w-6 h-6 text-spa-primary" />
             </div>
@@ -57,7 +77,7 @@ export function DeviceCard({
               <h3 className="text-lg font-semibold text-spa-text-primary truncate">
                 {device.name}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${statusColor}`}>
                   <Circle className="w-2 h-2 fill-current" />
                   {getStatusLabel(status)}
@@ -66,6 +86,17 @@ export function DeviceCard({
                   <Settings className="w-3 h-3" />
                   {getModeLabel(device.mode)}
                 </span>
+                {hasGroup && (
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-spa-bg-primary text-spa-text-secondary">
+                    {device.groupName}
+                  </span>
+                )}
+                {device.maintenanceMode && (
+                  <span className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-spa-warning-light text-spa-warning-dark">
+                    <AlertCircle className="w-3 h-3" />
+                    Wartung
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -78,7 +109,9 @@ export function DeviceCard({
               [
                 { label: 'Neu laden', icon: RefreshCw, onClick: () => onReload(device) },
                 { label: 'Neustart', icon: Power, onClick: () => onRestart(device) },
+                { label: 'Cache leeren', icon: RefreshCw, onClick: () => onClearCache(device) },
               ],
+              [{ label: device.maintenanceMode ? 'Wartungsmodus beenden' : 'Wartungsmodus aktivieren', icon: AlertCircle, onClick: () => onToggleMaintenance(device) }],
               [{ label: 'Löschen', icon: Trash2, onClick: () => onDelete(device), variant: 'danger' }],
             ]}
           />
@@ -92,7 +125,7 @@ export function DeviceCard({
           alt={`Live-Snapshot von ${device.name}`}
         />
 
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-spa-text-secondary">ID</p>
             <p className="text-spa-text-primary font-mono text-xs mt-1 truncate">
@@ -105,6 +138,12 @@ export function DeviceCard({
               {formatLastSeen(device.lastSeen)}
             </p>
           </div>
+          <div>
+            <p className="text-spa-text-secondary">Gruppe</p>
+            <p className="text-spa-text-primary font-medium mt-1">
+              {hasGroup ? device.groupName : 'Ohne Gruppe'}
+            </p>
+          </div>
         </div>
 
         {device.pairedAt && (
@@ -113,6 +152,20 @@ export function DeviceCard({
             <div className="flex-1 min-w-0">
               <p className="text-spa-text-secondary">
                 Gekoppelt am {new Date(device.pairedAt).toLocaleDateString('de-DE')}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {device.maintenanceMode && (
+          <div className="flex items-start gap-2 text-sm rounded-lg p-3 bg-spa-warning-light">
+            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-spa-warning-dark" />
+            <div className="flex-1">
+              <p className="font-medium text-spa-warning-dark">
+                Wartungsmodus aktiv
+              </p>
+              <p className="text-xs mt-1 text-spa-warning-dark/80">
+                Dieses Display ist für Wartung oder Rollout-Arbeiten markiert und kann gesammelt angesteuert werden.
               </p>
             </div>
           </div>

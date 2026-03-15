@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { DisplayLivePreview } from '@/components/Display/DisplayLivePreview';
+import { useMemo, useState } from 'react';
+import { DisplayScenarioPreview } from '@/components/Display/DisplayScenarioPreview';
 import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
@@ -14,11 +14,20 @@ import {
   type AudioSettings,
   type ColorPaletteName,
   type DesignStyle,
+  type DisplayAppearance,
   type Event,
   type EventSettingsOverrides,
   type Settings,
 } from '@/types/settings.types';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
+import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
+import {
+  DISPLAY_APPEARANCE_OPTIONS,
+  SCHEDULE_DESIGN_STYLE_OPTIONS,
+  getDisplayAppearanceLabel,
+  getScheduleDesignStyleLabel,
+} from '@/config/displayDesignStyles';
+import { getEventQualityIssues } from '@/utils/editorQuality';
 import {
   ArrowLeft,
   ArrowRight,
@@ -71,10 +80,6 @@ function formatDateInput(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-function formatTimeInput(value: Date): string {
-  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
-}
-
 function createBlankEvent(): EventDraft {
   const today = formatDateInput(new Date());
   return {
@@ -97,6 +102,7 @@ function normalizeOverrides(raw?: EventSettingsOverrides): EventSettingsOverride
 
   const next: EventSettingsOverrides = {};
 
+  if (raw.displayAppearance) next.displayAppearance = raw.displayAppearance;
   if (raw.designStyle) next.designStyle = raw.designStyle;
   if (raw.colorPalette) next.colorPalette = raw.colorPalette;
   if (raw.theme && Object.keys(raw.theme).length > 0) next.theme = raw.theme;
@@ -135,19 +141,13 @@ function getEventBounds(event: Pick<EventDraft, 'startDate' | 'startTime' | 'end
 }
 
 function buildPreviewEvent(draft: EventDraft, editingId: string | null): Event {
-  const now = new Date();
-  const start = new Date(now.getTime() - 5 * 60 * 1000);
-  const end = new Date(now.getTime() + 90 * 60 * 1000);
-
   return {
     id: editingId || 'event-preview',
     ...draft,
     name: draft.name.trim() || 'Event-Vorschau',
     description: draft.description?.trim() || undefined,
-    startDate: formatDateInput(start),
-    startTime: formatTimeInput(start),
-    endDate: formatDateInput(end),
-    endTime: formatTimeInput(end),
+    endDate: draft.endDate || draft.startDate,
+    endTime: draft.endTime || '23:59',
     isActive: true,
     targetDeviceIds: sanitizeTargetDeviceIds(draft.targetDeviceIds),
     settingsOverrides: normalizeOverrides(draft.settingsOverrides),
@@ -184,7 +184,6 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
   const [assistantMode, setAssistantMode] = useState<AssistantMode>('idle');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
-  const [previewDeviceId, setPreviewDeviceId] = useState<string | null>(null);
   const [formData, setFormData] = useState<EventDraft>(() => createBlankEvent());
 
   const pairedDevices = useMemo(
@@ -207,25 +206,10 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
     () => pairedDevices.filter((device) => normalizedFormData.targetDeviceIds?.includes(device.id)),
     [normalizedFormData.targetDeviceIds, pairedDevices],
   );
-  const selectedTargetDeviceIds = normalizedFormData.targetDeviceIds || [];
-
-  useEffect(() => {
-    const previewOptions = selectedTargetDevices.length > 0 ? selectedTargetDevices : pairedDevices;
-    if (selectedTargetDeviceIds.length > 0 && previewOptions.length === 0) {
-      if (previewDeviceId !== selectedTargetDeviceIds[0]) {
-        setPreviewDeviceId(selectedTargetDeviceIds[0]);
-      }
-      return;
-    }
-    if (previewOptions.length === 0) {
-      if (previewDeviceId !== null) setPreviewDeviceId(null);
-      return;
-    }
-
-    if (!previewDeviceId || !previewOptions.some((device) => device.id === previewDeviceId)) {
-      setPreviewDeviceId(previewOptions[0].id);
-    }
-  }, [pairedDevices, previewDeviceId, selectedTargetDeviceIds, selectedTargetDevices]);
+  const selectedTargetDeviceIds = useMemo(
+    () => normalizedFormData.targetDeviceIds ?? [],
+    [normalizedFormData.targetDeviceIds],
+  );
 
   const { start: startDateTime, end: endDateTime } = useMemo(
     () => getEventBounds(normalizedFormData),
@@ -249,7 +233,6 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
   }), [previewEvent, settings]);
 
   const previewSchedule = schedule || createDefaultSchedule();
-  const previewDeviceOptions = selectedTargetDevices.length > 0 ? selectedTargetDevices : pairedDevices;
   const previewTargetLabel = selectedTargetDevices.length > 0
     ? selectedTargetDevices.length === 1
       ? selectedTargetDevices[0].name
@@ -260,6 +243,18 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
   const effectivePrestartMinutes = normalizedFormData.settingsOverrides?.display?.prestartMinutes
     ?? settings.display?.prestartMinutes
     ?? 10;
+  const eventQualityIssues = useMemo(() => getEventQualityIssues({
+    events,
+    devices: pairedDevices,
+    media: media || [],
+    schedule,
+    draft: assistantMode === 'idle'
+      ? null
+      : {
+          id: editingId || undefined,
+          ...normalizedFormData,
+        },
+  }), [assistantMode, editingId, events, media, normalizedFormData, pairedDevices, schedule]);
 
   const canSave = Boolean(
     normalizedFormData.name.trim() &&
@@ -374,6 +369,7 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
       };
 
       if ('audio' in patch && !patch.audio) delete merged.audio;
+      if ('displayAppearance' in patch && !patch.displayAppearance) delete merged.displayAppearance;
       if ('designStyle' in patch && !patch.designStyle) delete merged.designStyle;
       if ('colorPalette' in patch && !patch.colorPalette) delete merged.colorPalette;
 
@@ -415,6 +411,16 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
           </Button>
         )}
       </div>
+
+      <EditorQualityAssistant
+        description={assistantMode === 'idle'
+          ? 'Prüft die bestehende Event-Bibliothek auf leere Event-Pläne, Konflikte und veraltete Referenzen.'
+          : 'Prüft den aktuellen Event-Entwurf direkt im Bearbeitungskontext auf Konflikte und fehlende Bausteine.'}
+        issues={eventQualityIssues}
+        okMessage={assistantMode === 'idle'
+          ? 'Für die vorhandenen Events wurden aktuell keine auffälligen Konfigurationsprobleme erkannt.'
+          : 'Der aktuelle Event-Entwurf ist aus Sicht der Redaktionslogik aktuell konsistent vorbereitet.'}
+      />
 
       {assistantMode !== 'idle' && (
         <SectionCard
@@ -753,7 +759,26 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
             {currentStepId === 'design' && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-spa-text-primary">Designstil</label>
+                  <label className="mb-2 block text-sm font-medium text-spa-text-primary">Visuelle Aufmachung</label>
+                  <select
+                    value={formData.settingsOverrides?.displayAppearance || ''}
+                    onChange={(event) => {
+                      const value = event.target.value as DisplayAppearance | '';
+                      updateOverrides({ displayAppearance: value || undefined });
+                    }}
+                    className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  >
+                    <option value="">Globale Aufmachung übernehmen</option>
+                    {DISPLAY_APPEARANCE_OPTIONS.map((appearance) => (
+                      <option key={appearance.id} value={appearance.id}>
+                        {appearance.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-spa-text-primary">Plan-Darstellung</label>
                   <select
                     value={formData.settingsOverrides?.designStyle || ''}
                     onChange={(event) => {
@@ -762,10 +787,12 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
                     }}
                     className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
                   >
-                    <option value="">Globalen Stil übernehmen</option>
-                    <option value="modern-wellness">Modern Wellness</option>
-                    <option value="modern-timeline">Modern Timeline</option>
-                    <option value="compact-tiles">Compact Tiles</option>
+                    <option value="">Globale Plan-Darstellung übernehmen</option>
+                    {SCHEDULE_DESIGN_STYLE_OPTIONS.map((style) => (
+                      <option key={style.id} value={style.id}>
+                        {style.title}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -792,7 +819,10 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
                   <div className="font-medium text-spa-text-primary">Aktuelle Event-Overrides</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-spa-text-primary">
-                      Stil: {formData.settingsOverrides?.designStyle ? formData.settingsOverrides.designStyle : 'Global'}
+                      Aufmachung: {formData.settingsOverrides?.displayAppearance ? getDisplayAppearanceLabel(formData.settingsOverrides.displayAppearance) : 'Global'}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-spa-text-primary">
+                      Plan: {formData.settingsOverrides?.designStyle ? getScheduleDesignStyleLabel(formData.settingsOverrides.designStyle) : 'Global'}
                     </span>
                     <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-spa-text-primary">
                       Palette: {formData.settingsOverrides?.colorPalette ? formData.settingsOverrides.colorPalette : 'Global'}
@@ -866,7 +896,13 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
                     <div>
                       <div className="font-medium text-spa-text-primary">Design</div>
                       <div>
-                        {previewEvent.settingsOverrides?.designStyle || 'Global'}
+                        {previewEvent.settingsOverrides?.displayAppearance
+                          ? getDisplayAppearanceLabel(previewEvent.settingsOverrides.displayAppearance)
+                          : 'Global'}
+                        {' · '}
+                        {previewEvent.settingsOverrides?.designStyle
+                          ? getScheduleDesignStyleLabel(previewEvent.settingsOverrides.designStyle)
+                          : 'Global'}
                         {previewEvent.settingsOverrides?.colorPalette ? ` · ${previewEvent.settingsOverrides.colorPalette}` : ''}
                       </div>
                     </div>
@@ -878,29 +914,16 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
                       <div className="font-medium text-spa-text-primary">Audio</div>
                       <div>{previewEvent.settingsOverrides?.audio ? 'Event-Audio aktiv' : 'Global / aus'}</div>
                     </div>
-                    {previewDeviceOptions.length > 0 && (
-                      <div>
-                        <label className="mb-2 block font-medium text-spa-text-primary">Vorschau für Gerät</label>
-                        <select
-                          value={previewDeviceId || ''}
-                          onChange={(event) => setPreviewDeviceId(event.target.value || null)}
-                          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                        >
-                          {previewDeviceOptions.map((device) => (
-                            <option key={device.id} value={device.id}>
-                              {device.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
                   </div>
 
-                  <DisplayLivePreview
+                  <DisplayScenarioPreview
                     schedule={previewSchedule}
                     settings={previewSettings}
-                    deviceId={previewDeviceId}
-                    className="shadow-sm"
+                    devices={pairedDevices}
+                    allowedDeviceIds={selectedTargetDeviceIds.length > 0 ? selectedTargetDeviceIds : undefined}
+                    defaultDeviceId={selectedTargetDevices[0]?.id || pairedDevices[0]?.id || null}
+                    defaultPreviewAt={startDateTime || undefined}
+                    previewClassName="shadow-sm"
                   />
                 </div>
               </div>

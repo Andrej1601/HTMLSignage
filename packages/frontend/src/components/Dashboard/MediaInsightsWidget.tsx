@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Image, Music, Play } from 'lucide-react';
 import { formatFileSize } from '@/types/media.types';
 import { formatRelativeTime } from '@/utils/dateUtils';
+import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
 
 interface MediaInsightsWidgetProps {
   images: number;
@@ -21,19 +22,19 @@ export function MediaInsightsWidget({
   latestMediaDate,
 }: MediaInsightsWidgetProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 border border-spa-bg-secondary">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <h3 className="text-lg font-semibold text-spa-text-primary flex items-center gap-2">
-          <Image className="w-5 h-5" />
-          Medien-Insights
-        </h3>
+    <DashboardWidgetFrame
+      title="Medien-Insights"
+      description="Bestand, Medientypen und letzte Uploads für die Ausspielung."
+      icon={Image}
+      actions={(
         <Link
           to="/media"
-          className="text-xs font-semibold text-spa-primary hover:text-spa-primary-dark transition-colors"
+          className="text-xs font-semibold text-spa-primary transition-colors hover:text-spa-primary-dark"
         >
           Zur Mediathek
         </Link>
-      </div>
+      )}
+    >
       <div className="space-y-3 text-sm text-spa-text-secondary">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-2"><Image className="w-4 h-4" /> Bilder</span>
@@ -63,6 +64,6 @@ export function MediaInsightsWidget({
           </div>
         )}
       </div>
-    </div>
+    </DashboardWidgetFrame>
   );
 }
