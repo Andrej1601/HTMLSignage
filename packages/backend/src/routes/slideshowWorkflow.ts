@@ -6,59 +6,29 @@ import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { listAuditLogs, logAuditEvent } from '../lib/audit.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import {
+  buildDeviceWorkflowOverrideSettings,
+  buildGlobalSettingsWorkflowPayload,
+  buildLiveDeviceWorkflowSnapshot,
+  buildLiveGlobalWorkflowSnapshot,
+  buildWorkflowActionAuditDetails,
+  buildWorkflowHistoryDeleteAuditDetails,
+  cloneWorkflowJson,
+  createWorkflowHistoryEntry,
+  getCurrentWorkflowDraftEntry,
+  getWorkflowTargetNameFromDetails,
+  HISTORY_ACTIONS,
+  matchesWorkflowTarget,
+  normalizeWorkflowSnapshot,
+  type WorkflowSnapshot,
+  WORKFLOW_ACTIONS,
+  WorkflowSnapshotSchema,
+  WorkflowTargetSchema,
+} from '../lib/slideshowWorkflow.js';
 import { isPlainRecord } from '../lib/utils.js';
 import { broadcastDeviceUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
 
 const router = Router();
-const WORKFLOW_ACTIONS = [
-  'slideshow.draft.save',
-  'slideshow.draft.discard',
-  'slideshow.publish',
-  'slideshow.rollback',
-] as const;
-const HISTORY_ACTIONS = ['slideshow.publish', 'slideshow.rollback'] as const;
-
-type WorkflowAction = typeof WORKFLOW_ACTIONS[number];
-type WorkflowTargetType = 'global' | 'device';
-
-const SlideshowConfigSchema = z.object({
-  version: z.number().optional(),
-  layout: z.string().optional(),
-  slides: z.array(z.object({
-    id: z.string(),
-    type: z.string(),
-    enabled: z.boolean(),
-    duration: z.number(),
-    order: z.number(),
-  }).passthrough()).optional(),
-  defaultDuration: z.number().optional(),
-  defaultTransition: z.string().optional(),
-  enableTransitions: z.boolean().optional(),
-}).passthrough();
-
-const AudioSettingsSchema = z.object({
-  enabled: z.boolean(),
-  src: z.string().optional(),
-  mediaId: z.string().optional(),
-  volume: z.number(),
-  loop: z.boolean(),
-}).passthrough();
-
-const WorkflowSnapshotSchema = z.object({
-  config: SlideshowConfigSchema,
-  prestartMinutes: z.number().min(0).max(120),
-  audioOverride: AudioSettingsSchema.nullable().optional(),
-});
-
-const WorkflowTargetSchema = z.discriminatedUnion('targetType', [
-  z.object({
-    targetType: z.literal('global'),
-  }),
-  z.object({
-    targetType: z.literal('device'),
-    targetId: z.string().min(1),
-  }),
-]);
 
 const SaveDraftSchema = z.intersection(WorkflowTargetSchema, WorkflowSnapshotSchema);
 const PublishSchema = z.intersection(WorkflowTargetSchema, WorkflowSnapshotSchema);
@@ -77,164 +47,6 @@ const DeleteHistorySchema = z.intersection(
     historyId: z.string().min(1),
   }),
 );
-
-interface WorkflowSnapshot {
-  config: Record<string, unknown>;
-  prestartMinutes: number;
-  audioOverride: Record<string, unknown> | null;
-}
-
-function cloneJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function normalizeSnapshot(raw: unknown): WorkflowSnapshot | null {
-  const parsed = WorkflowSnapshotSchema.safeParse(raw);
-  if (!parsed.success) return null;
-
-  return {
-    config: cloneJson(parsed.data.config) as Record<string, unknown>,
-    prestartMinutes: parsed.data.prestartMinutes,
-    audioOverride: parsed.data.audioOverride ? cloneJson(parsed.data.audioOverride) as Record<string, unknown> : null,
-  };
-}
-
-function getDetailsTarget(details: unknown): { targetType: WorkflowTargetType; targetId: string | null } | null {
-  if (!isPlainRecord(details)) return null;
-  const targetType = details.targetType;
-  const targetId = details.targetId;
-  if (targetType !== 'global' && targetType !== 'device') return null;
-  return {
-    targetType,
-    targetId: typeof targetId === 'string' && targetId.trim() !== '' ? targetId : null,
-  };
-}
-
-function matchesTarget(details: unknown, targetType: WorkflowTargetType, targetId: string | null): boolean {
-  const target = getDetailsTarget(details);
-  if (!target || target.targetType !== targetType) return false;
-  if (targetType === 'global') return true;
-  return target.targetId === targetId;
-}
-
-function getSnapshotFromDetails(details: unknown): WorkflowSnapshot | null {
-  if (!isPlainRecord(details)) return null;
-  return normalizeSnapshot(details.snapshot);
-}
-
-function toAuditDetails(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-}
-
-function getCurrentDraftEntry<T extends { action: string; details: unknown }>(logs: T[]): T | null {
-  for (const log of logs) {
-    if (log.action === 'slideshow.draft.save') {
-      return getSnapshotFromDetails(log.details) ? log : null;
-    }
-    if (log.action === 'slideshow.publish' || log.action === 'slideshow.rollback' || log.action === 'slideshow.draft.discard') {
-      return null;
-    }
-  }
-  return null;
-}
-
-function getSlideshowVersion(raw: unknown): number {
-  if (!isPlainRecord(raw)) return 1;
-  const value = raw.version;
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
-}
-
-function normalizeDisplaySettings(raw: unknown): Record<string, unknown> {
-  return isPlainRecord(raw) ? { ...raw } : {};
-}
-
-function buildGlobalSettingsPayload(baseData: unknown, snapshot: WorkflowSnapshot): Record<string, unknown> {
-  const next = isPlainRecord(baseData) ? cloneJson(baseData) as Record<string, unknown> : {};
-  const currentSlideshow = isPlainRecord(next.slideshow) ? next.slideshow : {};
-  next.display = {
-    ...normalizeDisplaySettings(next.display),
-    prestartMinutes: snapshot.prestartMinutes,
-  };
-  next.slideshow = {
-    ...cloneJson(snapshot.config),
-    version: getSlideshowVersion(currentSlideshow) + 1,
-  };
-  return next;
-}
-
-function buildDeviceOverrideSettings(baseSettings: unknown, snapshot: WorkflowSnapshot): Record<string, unknown> {
-  const next = isPlainRecord(baseSettings) ? cloneJson(baseSettings) as Record<string, unknown> : {};
-  const currentSlideshow = isPlainRecord(next.slideshow) ? next.slideshow : {};
-  next.display = {
-    ...normalizeDisplaySettings(next.display),
-    prestartMinutes: snapshot.prestartMinutes,
-  };
-  next.slideshow = {
-    ...cloneJson(snapshot.config),
-    version: getSlideshowVersion(currentSlideshow) + 1,
-  };
-
-  if (snapshot.audioOverride) {
-    next.audio = cloneJson(snapshot.audioOverride);
-  } else {
-    delete next.audio;
-  }
-
-  return next;
-}
-
-function buildLiveGlobalSnapshot(settingsData: unknown): WorkflowSnapshot | null {
-  if (!isPlainRecord(settingsData)) return null;
-  const slideshow = isPlainRecord(settingsData.slideshow) ? cloneJson(settingsData.slideshow) as Record<string, unknown> : null;
-  if (!slideshow) return null;
-  const display = normalizeDisplaySettings(settingsData.display);
-  return {
-    config: slideshow,
-    prestartMinutes: typeof display.prestartMinutes === 'number' ? display.prestartMinutes : 10,
-    audioOverride: null,
-  };
-}
-
-function buildLiveDeviceSnapshot(settingsData: unknown): WorkflowSnapshot | null {
-  if (!isPlainRecord(settingsData)) return null;
-  const slideshow = isPlainRecord(settingsData.slideshow) ? cloneJson(settingsData.slideshow) as Record<string, unknown> : null;
-  if (!slideshow) return null;
-  const display = normalizeDisplaySettings(settingsData.display);
-  const audioOverride = isPlainRecord(settingsData.audio)
-    ? cloneJson(settingsData.audio) as Record<string, unknown>
-    : null;
-  return {
-    config: slideshow,
-    prestartMinutes: typeof display.prestartMinutes === 'number' ? display.prestartMinutes : 10,
-    audioOverride,
-  };
-}
-
-function createWorkflowHistoryEntry(
-  log: {
-    id: string;
-    action: string;
-    timestamp: Date;
-    user: { id: string; username: string; email: string | null } | null;
-    details: Prisma.JsonValue | null;
-  },
-) {
-  const snapshot = getSnapshotFromDetails(log.details);
-  if (!snapshot) return null;
-  const details = isPlainRecord(log.details) ? log.details : {};
-  return {
-    id: log.id,
-    action: log.action as WorkflowAction,
-    timestamp: log.timestamp,
-    snapshot,
-    user: log.user,
-    metadata: {
-      settingsVersion: typeof details.settingsVersion === 'number' ? details.settingsVersion : null,
-      deviceMode: typeof details.deviceMode === 'string' ? details.deviceMode : null,
-      targetName: typeof details.targetName === 'string' ? details.targetName : null,
-    },
-  };
-}
 
 async function findHistoryLog(historyId: string) {
   return await prisma.auditLog.findUnique({
@@ -257,7 +69,7 @@ async function publishGlobal(req: AuthRequest, snapshot: WorkflowSnapshot, actio
     prisma.settings.findFirst({ orderBy: { version: 'desc' }, select: { version: true } }),
   ]);
   const nextVersion = (latest?.version ?? 0) + 1;
-  const payload = buildGlobalSettingsPayload(currentActive?.data, snapshot);
+  const payload = buildGlobalSettingsWorkflowPayload(currentActive?.data, snapshot);
   payload.version = nextVersion;
 
   const created = await prisma.settings.create({
@@ -280,9 +92,8 @@ async function publishGlobal(req: AuthRequest, snapshot: WorkflowSnapshot, actio
   await logAuditEvent(req, {
     action,
     resource: created.id,
-    details: toAuditDetails({
+    details: buildWorkflowActionAuditDetails({
       targetType: 'global',
-      targetId: null,
       targetName: 'Globale Slideshow',
       settingsVersion: nextVersion,
       sourceHistoryId: sourceHistoryId || null,
@@ -309,9 +120,9 @@ async function publishDevice(
     return { status: 404 as const, body: { error: 'not-found', message: 'Gerät nicht gefunden' } };
   }
 
-  const nextSettings = buildDeviceOverrideSettings(device.overrides?.settings, snapshot);
+  const nextSettings = buildDeviceWorkflowOverrideSettings(device.overrides?.settings, snapshot);
   const nextSchedule = isPlainRecord(device.overrides?.schedule)
-    ? cloneJson(device.overrides?.schedule)
+    ? cloneWorkflowJson(device.overrides?.schedule)
     : {};
 
   await prisma.deviceOverride.upsert({
@@ -339,7 +150,7 @@ async function publishDevice(
   await logAuditEvent(req, {
     action,
     resource: targetId,
-    details: toAuditDetails({
+    details: buildWorkflowActionAuditDetails({
       targetType: 'device',
       targetId,
       targetName: device.name,
@@ -371,8 +182,8 @@ router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), a
         : Promise.resolve(null),
     ]);
 
-    const relevantLogs = auditResult.items.filter((log) => matchesTarget(log.details, targetType, targetId));
-    const draftLog = getCurrentDraftEntry(relevantLogs);
+    const relevantLogs = auditResult.items.filter((log) => matchesWorkflowTarget(log.details, targetType, targetId));
+    const draftLog = getCurrentWorkflowDraftEntry(relevantLogs);
     const draftEntry = draftLog ? createWorkflowHistoryEntry(draftLog) : null;
     const history = relevantLogs
       .filter((log) => log.action === 'slideshow.publish' || log.action === 'slideshow.rollback')
@@ -385,8 +196,8 @@ router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), a
     }
 
     const liveSnapshot = targetType === 'global'
-      ? buildLiveGlobalSnapshot(activeSettings?.data)
-      : buildLiveDeviceSnapshot(device?.overrides?.settings);
+      ? buildLiveGlobalWorkflowSnapshot(activeSettings?.data)
+      : buildLiveDeviceWorkflowSnapshot(device?.overrides?.settings);
 
     return res.json({
       ok: true,
@@ -425,7 +236,7 @@ router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), a
 router.post('/workflow/draft', authMiddleware, requirePermission('slideshow:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = SaveDraftSchema.parse(req.body);
-    const snapshot = normalizeSnapshot(validated);
+    const snapshot = normalizeWorkflowSnapshot(validated);
     if (!snapshot) {
       return res.status(400).json({ error: 'validation-failed', message: 'Entwurf ist ungültig' });
     }
@@ -445,7 +256,7 @@ router.post('/workflow/draft', authMiddleware, requirePermission('slideshow:mana
     await logAuditEvent(req, {
       action: 'slideshow.draft.save',
       resource: validated.targetType === 'global' ? null : validated.targetId,
-      details: toAuditDetails({
+      details: buildWorkflowActionAuditDetails({
         targetType: validated.targetType,
         targetId: validated.targetType === 'global' ? null : validated.targetId,
         targetName,
@@ -482,7 +293,7 @@ router.post('/workflow/discard', authMiddleware, requirePermission('slideshow:ma
     await logAuditEvent(req, {
       action: 'slideshow.draft.discard',
       resource: validated.targetType === 'global' ? null : validated.targetId,
-      details: toAuditDetails({
+      details: buildWorkflowActionAuditDetails({
         targetType: validated.targetType,
         targetId: validated.targetType === 'global' ? null : validated.targetId,
         targetName,
@@ -514,7 +325,7 @@ router.delete('/workflow/history/:historyId', authMiddleware, requirePermission(
       return res.status(404).json({ error: 'not-found', message: 'Verlaufseintrag nicht gefunden' });
     }
 
-    if (!matchesTarget(log.details, validated.targetType, targetId)) {
+    if (!matchesWorkflowTarget(log.details, validated.targetType, targetId)) {
       return res.status(404).json({ error: 'not-found', message: 'Verlaufseintrag gehört nicht zu diesem Ziel' });
     }
 
@@ -525,14 +336,12 @@ router.delete('/workflow/history/:historyId', authMiddleware, requirePermission(
     await logAuditEvent(req, {
       action: 'slideshow.history.delete',
       resource: validated.historyId,
-      details: toAuditDetails({
+      details: buildWorkflowHistoryDeleteAuditDetails({
         targetType: validated.targetType,
         targetId,
         deletedAction: log.action,
         deletedTimestamp: log.timestamp,
-        targetName: isPlainRecord(log.details) && typeof log.details.targetName === 'string'
-          ? log.details.targetName
-          : null,
+        targetName: getWorkflowTargetNameFromDetails(log.details),
       }),
     });
 
@@ -549,7 +358,7 @@ router.delete('/workflow/history/:historyId', authMiddleware, requirePermission(
 router.post('/workflow/publish', authMiddleware, requirePermission('slideshow:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = PublishSchema.parse(req.body);
-    const snapshot = normalizeSnapshot(validated);
+    const snapshot = normalizeWorkflowSnapshot(validated);
     if (!snapshot) {
       return res.status(400).json({ error: 'validation-failed', message: 'Slideshow-Stand ist ungültig' });
     }
@@ -576,7 +385,7 @@ router.post('/workflow/publish', authMiddleware, requirePermission('slideshow:ma
 router.post('/workflow/rollback', authMiddleware, requirePermission('slideshow:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = RollbackSchema.parse(req.body);
-    const snapshot = normalizeSnapshot(validated.snapshot);
+    const snapshot = normalizeWorkflowSnapshot(validated.snapshot);
     if (!snapshot) {
       return res.status(400).json({ error: 'validation-failed', message: 'Rollback-Stand ist ungültig' });
     }

@@ -12,6 +12,8 @@ import { clampFlamesTo4, getScentEmoji, resolvePrestartMinutes, withAlpha } from
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { buildScheduleSaunaIndexMap, resolveScheduleSaunaIndex, timeToMinutes } from './displayScheduleUtils';
 import { ResilientImage } from './ResilientImage';
+import { classNames } from '@/utils/classNames';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
@@ -76,6 +78,7 @@ function InfusionItemDetail({
   statusPrestart,
   aromas,
   compact = false,
+  ultraCompact = false,
 }: {
   infusion: SaunaInfusionDetailItem;
   status: 'ONGOING' | 'PRESTART' | 'UPCOMING' | 'FINISHED';
@@ -88,6 +91,7 @@ function InfusionItemDetail({
   statusPrestart: string;
   aromas?: Settings['aromas'];
   compact?: boolean;
+  ultraCompact?: boolean;
 }) {
   const isActive = status === 'ONGOING' || status === 'PRESTART' || status === 'UPCOMING';
   const isOngoing = status === 'ONGOING';
@@ -122,10 +126,40 @@ function InfusionItemDetail({
   const scentBg = isOngoing ? withAlpha(statusLive, 0.12) : withAlpha(accentGreen, 0.10);
   const scentBorder = isOngoing ? withAlpha(statusLive, 0.25) : withAlpha(accentGreen, 0.20);
   const scentFg = isOngoing ? withAlpha(statusLive, 0.95) : withAlpha(textMain, 0.75);
+  const cardClassName = ultraCompact
+    ? 'mb-2.5 min-h-[78px] p-3'
+    : compact
+      ? 'mb-3 min-h-[96px] p-4'
+      : 'mb-5 min-h-[130px] p-5';
+  const timeClassName = ultraCompact
+    ? 'text-[24px] font-black font-mono leading-none'
+    : compact
+      ? 'text-[30px] font-black font-mono leading-none'
+      : 'text-3xl font-black font-mono';
+  const titleClassName = ultraCompact
+    ? 'text-[12px] max-w-[170px]'
+    : compact
+      ? 'text-[15px] max-w-[200px]'
+      : 'text-[17px] max-w-[240px]';
+  const badgeClassName = ultraCompact
+    ? 'gap-1 px-2 py-0.5 text-[9px]'
+    : compact
+      ? 'gap-1 px-2.5 py-1 text-[10px]'
+      : 'gap-1.5 px-3 py-1.5 text-[11px]';
+  const stateClassName = ultraCompact
+    ? 'text-[8px] px-2.5 py-0.5'
+    : compact
+      ? 'text-[9px] px-3 py-1'
+      : 'text-[10px] px-3.5 py-1.5';
 
   return (
     <div
-      className={`rounded-[2rem] border transition-all flex flex-col justify-center shadow-sm relative overflow-hidden ${compact ? 'mb-3 min-h-[96px] p-4' : 'mb-5 min-h-[130px] p-5'} ${isFinished ? 'opacity-60' : ''}`}
+      className={classNames(
+        'rounded-[2rem] border transition-all flex flex-col justify-center shadow-sm relative overflow-hidden',
+        ultraCompact ? 'rounded-[1.45rem]' : compact ? 'rounded-[1.7rem]' : 'rounded-[2rem]',
+        cardClassName,
+        isFinished && 'opacity-60',
+      )}
       style={{
         backgroundColor: containerBg,
         borderColor: containerBorder,
@@ -134,13 +168,13 @@ function InfusionItemDetail({
       <div className={`flex justify-between items-center ${compact ? 'mb-1.5' : 'mb-2'}`}>
         <div className="flex items-center gap-3 min-w-0">
           <span
-            className={compact ? 'text-[30px] font-black font-mono leading-none' : 'text-3xl font-black font-mono'}
+            className={timeClassName}
             style={{ color: timeColor }}
           >
             {infusion.time}
           </span>
           <span
-            className={`font-black uppercase tracking-tight leading-tight truncate ${compact ? 'text-[15px] max-w-[200px]' : 'text-[17px] max-w-[240px]'}`}
+            className={classNames('font-black uppercase tracking-tight leading-tight truncate', titleClassName)}
             style={{ color: titleColor }}
           >
             {infusion.title}
@@ -157,7 +191,7 @@ function InfusionItemDetail({
         {infusion.scents.map((scent, i) => (
           <div
             key={`${infusion.id}-${i}`}
-            className={`flex items-center rounded-full font-bold uppercase tracking-wider border shadow-sm ${compact ? 'gap-1 px-2.5 py-1 text-[10px]' : 'gap-1.5 px-3 py-1.5 text-[11px]'}`}
+            className={classNames('flex items-center rounded-full font-bold uppercase tracking-wider border shadow-sm', badgeClassName)}
             style={{
               backgroundColor: scentBg,
               borderColor: scentBorder,
@@ -185,7 +219,7 @@ function InfusionItemDetail({
             <motion.span
               animate={{ opacity: [1, 0.4, 1] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
-              className={`font-black tracking-[0.15em] rounded-full shadow-sm border ${compact ? 'text-[9px] px-3 py-1' : 'text-[10px] px-3.5 py-1.5'}`}
+              className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
               style={{
                 color: statusLive,
                 backgroundColor: withAlpha(statusLive, 0.18),
@@ -196,7 +230,7 @@ function InfusionItemDetail({
             </motion.span>
           ) : (
             <span
-              className={`font-black tracking-[0.15em] rounded-full shadow-sm border ${compact ? 'text-[9px] px-3 py-1' : 'text-[10px] px-3.5 py-1.5'}`}
+              className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
               style={{
                 color: statusPrestart,
                 backgroundColor: withAlpha(statusPrestart, 0.18),
@@ -212,7 +246,7 @@ function InfusionItemDetail({
       {isFinished && (
         <div className={`absolute flex items-center ${compact ? 'bottom-3 right-4' : 'bottom-4 right-5'}`}>
           <span
-            className={`font-black tracking-[0.15em] rounded-full shadow-sm border ${compact ? 'text-[9px] px-3 py-1' : 'text-[10px] px-3.5 py-1.5'}`}
+            className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
             style={{
               color: withAlpha(textMain, 0.55),
               backgroundColor: withAlpha(borderColor, 0.18),
@@ -233,6 +267,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
   const media = mediaProp;
 
   const [now, setNow] = useState(() => new Date());
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 10_000);
     return () => clearInterval(t);
@@ -307,10 +342,13 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
       .filter(Boolean)
       .slice(0, 2);
   }, [sauna]);
+  const isCompactLayout = profile.isCompact || profile.isNarrow;
+  const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
+  const visibleInfoBadges = isUltraCompactLayout ? infoBadges.slice(0, 1) : infoBadges;
 
   if (!sauna) {
     return (
-      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgRight, color: textMain }}>
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgRight, color: textMain }}>
         <p className="text-lg opacity-70">Keine Sauna ausgewählt</p>
       </div>
     );
@@ -320,8 +358,8 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
     const titleOverlayColor = withAlpha('#1F1711', 0.62);
     const titleTextColor = '#FFF7EA';
 
-    return (
-      <div className="relative h-full w-full overflow-hidden" style={{ backgroundColor: bgRight, color: textMain }}>
+      return (
+      <div ref={containerRef} className="relative h-full w-full overflow-hidden" style={{ backgroundColor: bgRight, color: textMain }}>
         {saunaImageUrl ? (
           <>
             <ResilientImage
@@ -346,11 +384,14 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
           />
         )}
 
-        <div className="relative z-10 flex h-full flex-col p-6">
+        <div className={classNames('relative z-10 flex h-full flex-col', isUltraCompactLayout ? 'p-3' : isCompactLayout ? 'p-4' : 'p-6')}>
           <div className="shrink-0 px-1">
             <div className="flex items-start justify-between gap-4">
               <div
-                className="min-w-0 rounded-[1.75rem] border px-5 py-4 backdrop-blur-xl"
+                className={classNames(
+                  'min-w-0 border backdrop-blur-xl',
+                  isUltraCompactLayout ? 'rounded-[1.15rem] px-3 py-2.5' : isCompactLayout ? 'rounded-[1.4rem] px-4 py-3' : 'rounded-[1.75rem] px-5 py-4',
+                )}
                 style={{
                   borderColor: withAlpha('#FFFFFF', 0.14),
                   backgroundColor: titleOverlayColor,
@@ -358,7 +399,10 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                 }}
               >
                 <h2
-                  className="text-[2.55rem] font-black uppercase tracking-tighter leading-[0.92] [text-wrap:balance]"
+                  className={classNames(
+                    'font-black uppercase tracking-tighter leading-[0.92] [text-wrap:balance]',
+                    isUltraCompactLayout ? 'text-[1.45rem]' : isCompactLayout ? 'text-[1.9rem]' : 'text-[2.55rem]',
+                  )}
                   style={{
                     color: titleTextColor,
                     textShadow: `0 4px 18px ${withAlpha('#000000', 0.26)}`,
@@ -366,12 +410,15 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                 >
                   {sauna.name}
                 </h2>
-                {infoBadges.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {infoBadges.map((text, idx) => (
+                {visibleInfoBadges.length > 0 && (
+                  <div className={classNames(isCompactLayout ? 'mt-2 flex flex-wrap gap-1.5' : 'mt-3 flex flex-wrap gap-2')}>
+                    {visibleInfoBadges.map((text, idx) => (
                       <div
                         key={`${sauna.id}-info-${idx}`}
-                        className="inline-flex max-w-full items-center gap-2 rounded-full border px-3.5 py-1.5 text-[11px] font-bold tracking-wide"
+                        className={classNames(
+                          'inline-flex max-w-full items-center rounded-full border font-bold tracking-wide',
+                          isUltraCompactLayout ? 'gap-1.5 px-2.5 py-1 text-[9px]' : isCompactLayout ? 'gap-2 px-3 py-1 text-[10px]' : 'gap-2 px-3.5 py-1.5 text-[11px]',
+                        )}
                         style={{
                           color: titleTextColor,
                           borderColor: withAlpha('#FFFFFF', 0.16),
@@ -389,7 +436,10 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
               <div className="flex flex-wrap justify-end gap-2 shrink-0">
                 {sauna.info?.temperature != null && (
                   <div
-                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                    className={classNames(
+                      'inline-flex items-center gap-1.5 rounded-full border font-semibold',
+                      isUltraCompactLayout ? 'px-2 py-1 text-[9px]' : isCompactLayout ? 'px-2.5 py-1 text-[10px]' : 'px-3 py-1.5 text-[11px]',
+                    )}
                     style={{
                       color: textMain,
                       borderColor: withAlpha(cardBorder, 0.55),
@@ -402,7 +452,10 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                 )}
                 {sauna.info?.capacity != null && (
                   <div
-                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                    className={classNames(
+                      'inline-flex items-center gap-1.5 rounded-full border font-semibold',
+                      isUltraCompactLayout ? 'px-2 py-1 text-[9px]' : isCompactLayout ? 'px-2.5 py-1 text-[10px]' : 'px-3 py-1.5 text-[11px]',
+                    )}
                     style={{
                       color: textMain,
                       borderColor: withAlpha(cardBorder, 0.55),
@@ -418,14 +471,23 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
           </div>
 
           <div
-            className="mt-4 flex flex-1 min-h-0 flex-col overflow-hidden rounded-[2.15rem] border p-5 backdrop-blur-md"
+            className={classNames(
+              'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden border backdrop-blur-md',
+              isUltraCompactLayout ? 'rounded-[1.35rem] p-3' : isCompactLayout ? 'rounded-[1.7rem] p-4' : 'rounded-[2.15rem] p-5',
+            )}
             style={{
               backgroundColor: withAlpha(cardBg, 0.78),
               borderColor: withAlpha(cardBorder, 0.95),
             }}
           >
-            <h4 className="mb-3 flex shrink-0 items-center gap-4 text-[11px] font-black uppercase tracking-[0.4em]" style={{ color: accentGreen }}>
-              <div className="h-0.5 w-8 rounded-full opacity-40" style={{ backgroundColor: accentGreen }} />
+            <h4
+              className={classNames(
+                'flex shrink-0 items-center font-black uppercase',
+                isCompactLayout ? 'mb-2 gap-2.5 text-[9px] tracking-[0.22em]' : 'mb-3 gap-4 text-[11px] tracking-[0.4em]',
+              )}
+              style={{ color: accentGreen }}
+            >
+              <div className={classNames('rounded-full opacity-40', isCompactLayout ? 'h-0.5 w-5' : 'h-0.5 w-8')} style={{ backgroundColor: accentGreen }} />
               Programm
             </h4>
 
@@ -451,6 +513,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                       statusPrestart={statusPrestart}
                       aromas={settings.aromas}
                       compact
+                      ultraCompact={isCompactLayout}
                     />
                   )}
                 />
@@ -463,8 +526,12 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
   }
 
   return (
-    <div className="w-full h-full p-8 flex flex-col" style={{ backgroundColor: bgRight, color: textMain }}>
-      <div className="relative h-28 w-full rounded-[2rem] overflow-hidden mb-4 shadow-lg shrink-0 border-4 border-white">
+    <div
+      ref={containerRef}
+      className={classNames('w-full h-full flex flex-col', isUltraCompactLayout ? 'p-4' : isCompactLayout ? 'p-5' : 'p-8')}
+      style={{ backgroundColor: bgRight, color: textMain }}
+    >
+      <div className={classNames('relative w-full overflow-hidden shadow-lg shrink-0 border-4 border-white', isUltraCompactLayout ? 'mb-3 h-20 rounded-[1.4rem]' : isCompactLayout ? 'mb-3 h-24 rounded-[1.6rem]' : 'mb-4 h-28 rounded-[2rem]')}>
         <ResilientImage
           src={saunaImageUrl}
           className="w-full h-full object-cover"
@@ -486,15 +553,21 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
         />
       </div>
 
-      <div className="flex items-center gap-3 mb-2 px-1">
+      <div className={classNames('flex items-center px-1', isCompactLayout ? 'mb-1.5 gap-2' : 'mb-2 gap-3')}>
         <span
-          className="text-white text-[10px] font-black px-3.5 py-1.5 rounded-full uppercase tracking-widest shadow-sm shrink-0"
+          className={classNames(
+            'text-white font-black rounded-full uppercase shadow-sm shrink-0',
+            isUltraCompactLayout ? 'px-2.5 py-1 text-[8px] tracking-[0.16em]' : isCompactLayout ? 'px-3 py-1 text-[9px] tracking-[0.18em]' : 'px-3.5 py-1.5 text-[10px] tracking-widest',
+          )}
           style={{ backgroundColor: accentGreen }}
         >
           Portrait
         </span>
         <div
-          className="flex items-center gap-3 text-[13px] font-bold bg-white/40 px-3.5 py-1.5 rounded-full border border-white/60"
+          className={classNames(
+            'flex items-center font-bold bg-white/40 rounded-full border border-white/60',
+            isUltraCompactLayout ? 'gap-2 px-2.5 py-1 text-[10px]' : isCompactLayout ? 'gap-2.5 px-3 py-1 text-[11px]' : 'gap-3 px-3.5 py-1.5 text-[13px]',
+          )}
           style={{ color: accentGold }}
         >
           {sauna.info?.temperature != null && (
@@ -510,23 +583,32 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
         </div>
       </div>
 
-      <h2 className="text-5xl font-black uppercase tracking-tighter mb-4 leading-none px-1" style={{ color: textMain }}>
+      <h2
+        className={classNames(
+          'font-black uppercase tracking-tighter leading-none px-1',
+          isUltraCompactLayout ? 'mb-2 text-[2rem]' : isCompactLayout ? 'mb-3 text-[2.6rem]' : 'mb-4 text-5xl',
+        )}
+        style={{ color: textMain }}
+      >
         {sauna.name}
       </h2>
 
       <AnimatePresence>
-        {infoBadges.length > 0 && (
+        {visibleInfoBadges.length > 0 && (
           <motion.div
             initial={{ height: 0, opacity: 0, marginBottom: 0 }}
             animate={{ height: 'auto', opacity: 1, marginBottom: 8 }}
             exit={{ height: 0, opacity: 0, marginBottom: 0 }}
             className="overflow-hidden shrink-0"
           >
-            <div className="flex flex-col gap-2">
-              {infoBadges.map((text, idx) => (
+            <div className={classNames('flex flex-col', isCompactLayout ? 'gap-1.5' : 'gap-2')}>
+              {visibleInfoBadges.map((text, idx) => (
                 <div
                   key={`${sauna.id}-info-${idx}`}
-                  className="text-white p-3 px-5 rounded-3xl flex items-center gap-3 shadow-sm border border-white/20"
+                  className={classNames(
+                    'text-white rounded-3xl flex items-center shadow-sm border border-white/20',
+                    isUltraCompactLayout ? 'gap-2 p-2.5 px-3.5' : isCompactLayout ? 'gap-2.5 p-3 px-4' : 'gap-3 p-3 px-5',
+                  )}
                   style={{ backgroundColor: accentGreen }}
                 >
                   {idx === 0 ? (
@@ -542,7 +624,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                       <Bell className="w-5 h-5" />
                     </div>
                   )}
-                  <p className="text-[13px] font-black uppercase tracking-tight leading-snug italic">
+                  <p className={classNames(isCompactLayout ? 'text-[11px]' : 'text-[13px]', 'font-black uppercase tracking-tight leading-snug italic')}>
                     {text}
                   </p>
                 </div>
@@ -553,14 +635,23 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
       </AnimatePresence>
 
       <div
-        className="flex-1 border-2 rounded-[2.5rem] p-8 backdrop-blur-md flex flex-col min-h-0 shadow-sm overflow-hidden"
+        className={classNames(
+          'flex-1 border-2 backdrop-blur-md flex flex-col min-h-0 shadow-sm overflow-hidden',
+          isUltraCompactLayout ? 'rounded-[1.5rem] p-4' : isCompactLayout ? 'rounded-[2rem] p-5' : 'rounded-[2.5rem] p-8',
+        )}
         style={{
           backgroundColor: withAlpha(cardBg, 0.65),
           borderColor: withAlpha(cardBorder, 1),
         }}
       >
-        <h4 className="font-black uppercase text-[11px] tracking-[0.4em] mb-4 flex items-center gap-4 shrink-0" style={{ color: accentGreen }}>
-          <div className="w-8 h-0.5 rounded-full opacity-40" style={{ backgroundColor: accentGreen }} />
+        <h4
+          className={classNames(
+            'font-black uppercase flex items-center shrink-0',
+            isCompactLayout ? 'mb-2.5 gap-2.5 text-[9px] tracking-[0.2em]' : 'mb-4 gap-4 text-[11px] tracking-[0.4em]',
+          )}
+          style={{ color: accentGreen }}
+        >
+          <div className={classNames('h-0.5 rounded-full opacity-40', isCompactLayout ? 'w-5' : 'w-8')} style={{ backgroundColor: accentGreen }} />
           Programm
         </h4>
 
@@ -585,6 +676,8 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                   statusLive={statusLive}
                   statusPrestart={statusPrestart}
                   aromas={settings.aromas}
+                  compact={isCompactLayout}
+                  ultraCompact={isUltraCompactLayout}
                 />
               )}
             />

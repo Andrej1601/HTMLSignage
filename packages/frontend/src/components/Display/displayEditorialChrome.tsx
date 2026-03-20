@@ -3,6 +3,7 @@ import type { Settings, ThemeColors } from '@/types/settings.types';
 import { Waves } from 'lucide-react';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface EditorialTokens {
   accentCool: string;
@@ -120,10 +121,18 @@ export function DisplayEditorialStage({
   children,
 }: DisplayEditorialStageProps) {
   const tokens = getEditorialTokens(theme);
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
+  const isCompact = profile.isCompact;
+  const isUltraCompact = profile.isUltraCompact;
 
   return (
     <div
-      className={classNames('relative h-full w-full overflow-hidden p-5', className)}
+      ref={containerRef}
+      className={classNames(
+        'relative flex h-full w-full flex-col overflow-hidden',
+        isUltraCompact ? 'p-3' : isCompact ? 'p-4' : 'p-5',
+        className,
+      )}
       style={getEditorialStageStyle(theme)}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -140,35 +149,56 @@ export function DisplayEditorialStage({
           style={{ backgroundColor: withAlpha(tokens.accentWarm, 0.1) }}
         />
         <div
-          className="absolute inset-[2.25rem] rounded-[2.75rem] border"
+          className={classNames(
+            'absolute border',
+            isUltraCompact
+              ? 'inset-[1rem] rounded-[1.4rem]'
+              : isCompact
+                ? 'inset-[1.4rem] rounded-[1.9rem]'
+                : 'inset-[2.25rem] rounded-[2.75rem]',
+          )}
           style={{ borderColor: withAlpha(tokens.border, 0.28) }}
         />
       </div>
 
       {(subtitle || title || meta) && (
-        <div className="relative z-10 mb-4 flex items-center justify-between gap-4 px-2">
+        <div
+          className={classNames(
+            'relative z-10 flex items-center justify-between px-1',
+            isUltraCompact ? 'mb-2 gap-2' : isCompact ? 'mb-3 gap-3' : 'mb-4 gap-4 px-2',
+          )}
+        >
           {subtitle || title ? (
             <div
-              className="inline-flex max-w-[70%] items-center gap-3 rounded-full border px-3.5 py-2"
+              className={classNames(
+                'inline-flex max-w-[72%] items-center rounded-full border',
+                isUltraCompact ? 'gap-2 px-2.5 py-1.5' : isCompact ? 'gap-2.5 px-3 py-1.5' : 'gap-3 px-3.5 py-2',
+              )}
               style={{
                 borderColor: withAlpha(tokens.accentWarm, 0.28),
                 backgroundColor: withAlpha(tokens.card, 0.58),
               }}
             >
               <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border"
+                className={classNames(
+                  'flex shrink-0 items-center justify-center rounded-full border',
+                  isUltraCompact ? 'h-6 w-6' : isCompact ? 'h-7 w-7' : 'h-8 w-8',
+                )}
                 style={{
                   color: tokens.accentWarm,
                   borderColor: withAlpha(tokens.accentWarm, 0.22),
                   backgroundColor: withAlpha(tokens.accentWarm, 0.1),
                 }}
               >
-                <Waves className="h-4 w-4" />
+                <Waves className={classNames(isUltraCompact ? 'h-3 w-3' : 'h-4 w-4')} />
               </div>
-              <div className="flex min-w-0 items-baseline gap-2.5 whitespace-nowrap">
+              <div className={classNames('flex min-w-0 items-baseline whitespace-nowrap', isCompact ? 'gap-2' : 'gap-2.5')}>
                 {subtitle ? (
                   <span
-                    className="shrink-0 text-[10px] font-black uppercase tracking-[0.3em]"
+                    className={classNames(
+                      'shrink-0 font-black uppercase',
+                      isUltraCompact ? 'text-[8px] tracking-[0.22em]' : isCompact ? 'text-[9px] tracking-[0.24em]' : 'text-[10px] tracking-[0.3em]',
+                    )}
                     style={{ color: tokens.accentWarm }}
                   >
                     {subtitle}
@@ -176,7 +206,10 @@ export function DisplayEditorialStage({
                 ) : null}
                 {title ? (
                   <span
-                    className="truncate text-[15px] font-semibold tracking-tight"
+                    className={classNames(
+                      'truncate font-semibold tracking-tight',
+                      isUltraCompact ? 'text-[12px]' : isCompact ? 'text-[13px]' : 'text-[15px]',
+                    )}
                     style={{ color: tokens.textMain }}
                   >
                     {title}
@@ -189,7 +222,10 @@ export function DisplayEditorialStage({
           )}
           {meta ? (
             <div
-              className="rounded-full border px-4 py-2 text-[11px] font-semibold"
+              className={classNames(
+                'rounded-full border font-semibold',
+                isUltraCompact ? 'px-2.5 py-1 text-[9px]' : isCompact ? 'px-3 py-1.5 text-[10px]' : 'px-4 py-2 text-[11px]',
+              )}
               style={{
                 color: tokens.textMuted,
                 borderColor: withAlpha(tokens.accentCool, 0.24),
@@ -202,7 +238,7 @@ export function DisplayEditorialStage({
         </div>
       )}
 
-      <div className={classNames('relative z-10 h-full', contentClassName)}>{children}</div>
+      <div className={classNames('relative z-10 min-h-0 flex-1', contentClassName)}>{children}</div>
     </div>
   );
 }
@@ -218,11 +254,16 @@ export function DisplayEditorialPanel({
 }: DisplayEditorialPanelProps) {
   const tokens = getEditorialTokens(theme);
   const labelColor = tone === 'glass' ? tokens.accentCool : tokens.accentWarm;
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLElement>();
+  const isCompact = profile.isCompact;
+  const isUltraCompact = profile.isUltraCompact;
 
   return (
     <section
+      ref={containerRef}
       className={classNames(
         'relative flex h-full min-h-0 flex-col overflow-hidden rounded-[2.25rem] border backdrop-blur-xl',
+        isUltraCompact ? 'rounded-[1.3rem]' : isCompact ? 'rounded-[1.65rem]' : 'rounded-[2.25rem]',
         className,
       )}
       style={getEditorialPanelStyle(theme, tone)}
@@ -235,10 +276,18 @@ export function DisplayEditorialPanel({
       />
 
       {(label || meta) && (
-        <div className="relative z-10 flex shrink-0 items-center justify-between gap-4 px-6 pb-4 pt-5">
+        <div
+          className={classNames(
+            'relative z-10 flex shrink-0 items-center justify-between',
+            isUltraCompact ? 'gap-2 px-3 pb-2.5 pt-3' : isCompact ? 'gap-3 px-4 pb-3 pt-3.5' : 'gap-4 px-6 pb-4 pt-5',
+          )}
+        >
           {label ? (
             <div
-              className="text-[11px] font-black uppercase tracking-[0.34em]"
+              className={classNames(
+                'font-black uppercase',
+                isUltraCompact ? 'text-[9px] tracking-[0.2em]' : isCompact ? 'text-[10px] tracking-[0.26em]' : 'text-[11px] tracking-[0.34em]',
+              )}
               style={{ color: labelColor }}
             >
               {label}
@@ -248,7 +297,10 @@ export function DisplayEditorialPanel({
           )}
           {meta ? (
             <div
-              className="text-[11px] font-semibold"
+              className={classNames(
+                'font-semibold',
+                isUltraCompact ? 'text-[9px]' : isCompact ? 'text-[10px]' : 'text-[11px]',
+              )}
               style={{ color: withAlpha(tokens.textMuted, 0.92) }}
             >
               {meta}

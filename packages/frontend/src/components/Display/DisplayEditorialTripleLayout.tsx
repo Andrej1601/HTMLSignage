@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
+import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -15,58 +16,11 @@ import {
   getEditorialStageMeta,
 } from '@/components/Display/displayEditorialChrome';
 import { classNames } from '@/utils/classNames';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface DisplayEditorialTripleLayoutProps {
   context: DisplayLayoutContext;
   zoneStates: TripleZoneStateMap;
-}
-
-interface AnimatedProgressBarProps {
-  durationSec: number;
-  endColor: string;
-  startColor: string;
-}
-
-function AnimatedProgressBar({
-  durationSec,
-  endColor,
-  startColor,
-}: AnimatedProgressBarProps) {
-  const [isActive, setIsActive] = useState(false);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setIsActive(true);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, []);
-
-  return (
-    <div
-      className="h-full origin-left"
-      style={{
-        background: `linear-gradient(to right, ${startColor}, ${endColor})`,
-        transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
-        transition: `transform ${durationSec}s linear`,
-        willChange: 'transform',
-      }}
-    />
-  );
-}
-
-function getPanelLabel(zoneState: TripleZoneStateMap['topRight']): string {
-  const slide = zoneState.slide;
-
-  if (!slide) return 'Spotlight';
-  if (slide.type === 'sauna-detail') return 'Sauna Fokus';
-  if (slide.type === 'infos') return 'Hinweise';
-  if (slide.type === 'events') return 'Events';
-  if (slide.type === 'content-panel') return 'Programm';
-  if (slide.type.startsWith('media-')) return 'Bühnenmoment';
-  return slide.title?.trim() || 'Spotlight';
 }
 
 export function DisplayEditorialTripleLayout({
@@ -76,19 +30,30 @@ export function DisplayEditorialTripleLayout({
   const {
     currentTime,
     displayAppearance,
+    enableTransitions,
     effectiveSettings,
     renderContentPanel,
+    resolveTransition,
     themeColors,
     mediaItems,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
   const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
 
-  const leftSize = left.zone?.size || 60;
-  const rightSize = 100 - leftSize;
+  const isPortrait = profile.isPortrait;
+  const isCompact = profile.isCompact;
+  const leftSize = isPortrait ? 100 : (left.zone?.size || 60);
+  const rightSize = isPortrait ? 100 : 100 - leftSize;
   const topDurationSec = topRight.slide?.duration ?? 12;
   const accentWarm = themeColors.accentGold || themeColors.accent || '#A68A64';
   const accentCool = themeColors.accentGreen || themeColors.timeColBg || '#8F9779';
+  const stageContentClassName = isPortrait ? 'gap-3' : isCompact ? 'gap-3.5' : 'gap-5';
+  const rightBottomClassName = isPortrait
+    ? 'flex-[0.9] min-h-0'
+    : isCompact
+      ? 'h-40 shrink-0'
+      : 'h-56 shrink-0';
 
   const renderLeftPanel = () => {
     if (!left.slide || left.slide.type === 'content-panel') {
@@ -156,56 +121,90 @@ export function DisplayEditorialTripleLayout({
       subtitle={stageMeta.subtitle}
       title={stageMeta.title}
       meta={stageMeta.meta}
-      contentClassName="h-[calc(100%-4.25rem)]"
     >
-      <div className="flex h-full gap-5">
-        <div style={{ width: `${leftSize}%` }}>
+      <div
+        ref={containerRef}
+        className={classNames('h-full min-h-0', isPortrait ? 'flex flex-col' : 'flex', stageContentClassName)}
+      >
+        <div
+          className={classNames(isPortrait && 'min-h-0 flex-[1.2]')}
+          style={{ width: isPortrait ? '100%' : `${leftSize}%` }}
+        >
           <DisplayEditorialPanel
             theme={themeColors}
-            label="Programm des Tages"
-            meta={!left.slide || left.slide.type === 'content-panel' ? 'Live-Übersicht' : undefined}
             tone="paper"
           >
-            {renderLeftPanel()}
+            <SlideTransition
+              slideKey={left.slide?.id || left.info?.currentSlideIndex || 'left-fallback'}
+              enabled={enableTransitions && (left.info?.shouldRotate || false)}
+              duration={0.6}
+              transition={resolveTransition(left.slide)}
+            >
+              <div className="h-full w-full">
+                {renderLeftPanel()}
+              </div>
+            </SlideTransition>
           </DisplayEditorialPanel>
         </div>
 
-        <div className="flex h-full flex-col gap-5" style={{ width: `${rightSize}%` }}>
-          <div className="flex-1 min-h-0">
+        <div
+          className={classNames('flex min-h-0 flex-col', isPortrait ? 'flex-1' : 'h-full', stageContentClassName)}
+          style={{ width: isPortrait ? '100%' : `${rightSize}%` }}
+        >
+          <div className="relative flex-1 min-h-0">
+            {(topRight.info?.shouldRotate || false) && (
+              <SlideProgressIndicator
+                key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
+                className={classNames(
+                  'absolute left-1/2 z-20 -translate-x-1/2',
+                  isPortrait ? 'bottom-2.5' : 'bottom-3',
+                )}
+                compact
+                durationSec={topDurationSec}
+                startColor={accentCool}
+                endColor={accentWarm}
+                surfaceColor={themeColors.cardBg || themeColors.cellBg || '#FFFFFF'}
+                borderColor={themeColors.cardBorder || themeColors.gridTable || '#EBE5D3'}
+              />
+            )}
             <DisplayEditorialPanel
               theme={themeColors}
-              label={getPanelLabel(topRight)}
-              meta={topRight.info?.shouldRotate ? 'Rotation aktiv' : undefined}
               tone="glass"
             >
-              {renderTopRightPanel()}
+              <SlideTransition
+                slideKey={topRight.slide?.id || topRight.info?.currentSlideIndex || 'top-fallback'}
+                enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
+                duration={0.6}
+                transition={resolveTransition(topRight.slide)}
+              >
+                <div className="h-full w-full">
+                  {renderTopRightPanel()}
+                </div>
+              </SlideTransition>
             </DisplayEditorialPanel>
           </div>
 
-          <div className="h-56 shrink-0">
+          <div className={classNames('relative', rightBottomClassName)}>
             <DisplayEditorialPanel
               theme={themeColors}
-              label={bottomRight.slide ? getPanelLabel(bottomRight) : 'Hinweise & Service'}
-              meta={bottomRight.slide ? undefined : 'Infos und Events'}
               tone="accent"
-              contentClassName={classNames(!bottomRight.slide && 'px-6 pb-5')}
+              contentClassName={classNames(!bottomRight.slide && (isCompact ? 'px-4 py-4' : 'px-6 py-5'))}
             >
-              {renderBottomRightPanel()}
+              <SlideTransition
+                slideKey={bottomRight.slide?.id || bottomRight.info?.currentSlideIndex || 'bottom-fallback'}
+                enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
+                duration={0.6}
+                transition={resolveTransition(bottomRight.slide)}
+              >
+                <div className="h-full w-full">
+                  {renderBottomRightPanel()}
+                </div>
+              </SlideTransition>
             </DisplayEditorialPanel>
           </div>
         </div>
       </div>
 
-      {(topRight.info?.shouldRotate || false) && (
-        <div className="pointer-events-none absolute bottom-5 left-1/2 z-20 h-2 w-56 -translate-x-1/2 overflow-hidden rounded-full bg-black/10">
-          <AnimatedProgressBar
-            key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
-            durationSec={topDurationSec}
-            startColor={accentCool}
-            endColor={accentWarm}
-          />
-        </div>
-      )}
     </DisplayEditorialStage>
   );
 }

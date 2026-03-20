@@ -1,33 +1,31 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
+import {
+  buildRuntimeWarnings,
+  classifyLogFiles,
+  selectBackupFilesToRemove,
+  selectOldFrontendAssets,
+  selectOrphanUploadFiles,
+  selectStaleDeviceSnapshotFiles,
+  summarizeDeviceRuntime,
+  summarizeMediaRuntime,
+  type FileEntryMeta,
+  type RuntimeWarning,
+} from './maintenancePolicy.js';
 import { prisma } from './prisma.js';
 import { BACKUP_DIR, REPO_ROOT, readLocalVersion } from './systemHelpers.js';
 import { recordRuntimeStatusSnapshot } from './runtimeHistory.js';
 import { UPLOAD_DIR } from './upload.js';
+import { DEVICE_SNAPSHOT_DIR } from './deviceSnapshots.js';
 
-const ONLINE_THRESHOLD_MINUTES = 5;
-const STALE_THRESHOLD_MINUTES = 30;
 const MAINTENANCE_INTERVAL_MS = 30 * 60 * 1000;
 const RUNTIME_HISTORY_INTERVAL_MS = 5 * 60 * 1000;
-const ORPHAN_UPLOAD_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-const OLD_FILE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-const MAINTENANCE_STALE_THRESHOLD_MS = MAINTENANCE_INTERVAL_MS * 2;
-const DISK_WARNING_PERCENT = 85;
-const DISK_DANGER_PERCENT = 95;
+const AUDIT_LOG_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+const LOG_TAIL_LINE_COUNT = 2_000;
 const LOG_DIR = path.join(REPO_ROOT, 'logs');
-
-export type RuntimeWarningLevel = 'warning' | 'danger';
-export type RuntimeWarningCategory = 'disk' | 'devices' | 'media' | 'maintenance';
+const FRONTEND_DIST_ASSET_DIR = path.join(REPO_ROOT, 'packages', 'frontend', 'dist', 'assets');
 export type MaintenanceState = 'idle' | 'running' | 'ok' | 'error';
-
-export interface RuntimeWarning {
-  id: string;
-  level: RuntimeWarningLevel;
-  category: RuntimeWarningCategory;
-  title: string;
-  detail: string;
-}
 
 export interface MaintenanceSnapshot {
   state: MaintenanceState;
@@ -35,8 +33,11 @@ export interface MaintenanceSnapshot {
   lastDurationMs: number | null;
   deletedExpiredSessions: number;
   removedOrphanUploadFiles: number;
+  removedStaleDeviceSnapshots: number;
   removedOldBackupFiles: number;
   removedOldLogFiles: number;
+  trimmedLargeLogFiles: number;
+  removedExpiredAuditLogs: number;
   errors: string[];
 }
 
@@ -80,23 +81,13 @@ let maintenanceSnapshot: MaintenanceSnapshot = {
   lastDurationMs: null,
   deletedExpiredSessions: 0,
   removedOrphanUploadFiles: 0,
+  removedStaleDeviceSnapshots: 0,
   removedOldBackupFiles: 0,
   removedOldLogFiles: 0,
+  trimmedLargeLogFiles: 0,
+  removedExpiredAuditLogs: 0,
   errors: [],
 };
-
-interface FileEntryMeta {
-  name: string;
-  absolutePath: string;
-  size: number;
-  mtimeMs: number;
-}
-
-function minutesSince(value: Date | null | undefined): number | null {
-  if (!value) return null;
-  const diffMs = Date.now() - value.getTime();
-  return diffMs >= 0 ? diffMs / 60000 : 0;
-}
 
 async function listFileMeta(directory: string, filter?: (entry: string) => boolean): Promise<FileEntryMeta[]> {
   if (!existsSync(directory)) return [];
@@ -124,13 +115,15 @@ async function cleanupExpiredSessions(now: Date): Promise<number> {
 
 async function cleanupOrphanUploads(now: Date): Promise<number> {
   const mediaRows = await prisma.media.findMany({ select: { filename: true } });
-  const referenced = new Set(mediaRows.map((item) => item.filename));
   const uploadFiles = await listFileMeta(UPLOAD_DIR);
+  const removableFiles = selectOrphanUploadFiles(
+    uploadFiles,
+    new Set(mediaRows.map((item) => item.filename)),
+    now.getTime(),
+  );
 
   let removed = 0;
-  for (const file of uploadFiles) {
-    if (referenced.has(file.name)) continue;
-    if (now.getTime() - file.mtimeMs < ORPHAN_UPLOAD_MAX_AGE_MS) continue;
+  for (const file of removableFiles) {
     await fs.unlink(file.absolutePath).catch(() => {});
     removed += 1;
   }
@@ -138,16 +131,97 @@ async function cleanupOrphanUploads(now: Date): Promise<number> {
   return removed;
 }
 
-async function cleanupOldFiles(directory: string, extensionFilter?: string[]): Promise<number> {
-  const files = await listFileMeta(directory, (name) => {
-    if (!extensionFilter || extensionFilter.length === 0) return true;
-    return extensionFilter.some((ext) => name.toLowerCase().endsWith(ext));
+async function cleanupDeviceSnapshots(now: Date): Promise<number> {
+  const snapshotFiles = await listFileMeta(DEVICE_SNAPSHOT_DIR, (name) => name.toLowerCase().endsWith('.jpg'));
+  if (snapshotFiles.length === 0) return 0;
+
+  const devices = await prisma.device.findMany({
+    select: {
+      id: true,
+      lastSeen: true,
+    },
   });
+  const removableFiles = selectStaleDeviceSnapshotFiles(
+    snapshotFiles,
+    new Map(devices.map((device) => [device.id, device])),
+    now.getTime(),
+  );
 
   let removed = 0;
-  const threshold = Date.now() - OLD_FILE_RETENTION_MS;
-  for (const file of files) {
-    if (file.mtimeMs > threshold) continue;
+  for (const file of removableFiles) {
+    await fs.unlink(file.absolutePath).catch(() => {});
+    removed += 1;
+  }
+
+  return removed;
+}
+
+async function cleanupAuditLogs(now: Date): Promise<number> {
+  const result = await prisma.auditLog.deleteMany({
+    where: {
+      timestamp: {
+        lt: new Date(now.getTime() - AUDIT_LOG_RETENTION_MS),
+      },
+    },
+  });
+  return result.count;
+}
+
+async function cleanupBackupFiles(now: Date): Promise<number> {
+  const files = await listFileMeta(BACKUP_DIR, (name) => (
+    name.toLowerCase().endsWith('.sql') || name.toLowerCase().endsWith('.zip')
+  ));
+  if (files.length === 0) return 0;
+  const removableFiles = selectBackupFilesToRemove(files, now.getTime());
+  let removed = 0;
+
+  for (const file of removableFiles) {
+    await fs.unlink(file.absolutePath).catch(() => {});
+    removed += 1;
+  }
+
+  return removed;
+}
+
+async function cleanupLogFiles(now: Date): Promise<{ removed: number; trimmed: number }> {
+  const logFiles = await listFileMeta(LOG_DIR, (name) => name.toLowerCase().endsWith('.log'));
+  const { removable, trimmable } = classifyLogFiles(logFiles, now.getTime());
+  let removed = 0;
+  let trimmed = 0;
+
+  for (const file of removable) {
+    await fs.unlink(file.absolutePath).catch(() => {});
+    removed += 1;
+  }
+
+  for (const file of trimmable) {
+    const raw = await fs.readFile(file.absolutePath, 'utf-8').catch(() => null);
+    if (raw === null) continue;
+
+    const nextContent = raw
+      .split(/\r?\n/)
+      .slice(-LOG_TAIL_LINE_COUNT)
+      .join('\n')
+      .trimStart();
+    const tempFile = `${file.absolutePath}.tmp`;
+    await fs.writeFile(tempFile, `${nextContent}\n`, 'utf-8');
+    await fs.rename(tempFile, file.absolutePath);
+    trimmed += 1;
+  }
+
+  return { removed, trimmed };
+}
+
+async function cleanupOldFrontendAssets(now: Date): Promise<number> {
+  const assetFiles = await listFileMeta(FRONTEND_DIST_ASSET_DIR, (name) => (
+    name.toLowerCase().endsWith('.js') ||
+    name.toLowerCase().endsWith('.css')
+  ));
+  if (assetFiles.length === 0) return 0;
+  const removableFiles = selectOldFrontendAssets(assetFiles, now.getTime());
+  let removed = 0;
+
+  for (const file of removableFiles) {
     await fs.unlink(file.absolutePath).catch(() => {});
     removed += 1;
   }
@@ -171,11 +245,22 @@ export async function runMaintenanceCycle(): Promise<MaintenanceSnapshot> {
   maintenanceSnapshot = nextSnapshot;
 
   try {
-    const [deletedExpiredSessions, removedOrphanUploadFiles, removedOldBackupFiles, removedOldLogFiles] = await Promise.all([
+    const [
+      deletedExpiredSessions,
+      removedOrphanUploadFiles,
+      removedStaleDeviceSnapshots,
+      removedOldBackupFiles,
+      removedExpiredAuditLogs,
+      logCleanup,
+      _removedOldFrontendAssets,
+    ] = await Promise.all([
       cleanupExpiredSessions(now),
       cleanupOrphanUploads(now),
-      cleanupOldFiles(BACKUP_DIR, ['.sql', '.zip']),
-      cleanupOldFiles(LOG_DIR, ['.log']),
+      cleanupDeviceSnapshots(now),
+      cleanupBackupFiles(now),
+      cleanupAuditLogs(now),
+      cleanupLogFiles(now),
+      cleanupOldFrontendAssets(now),
     ]);
 
     maintenanceSnapshot = {
@@ -184,8 +269,11 @@ export async function runMaintenanceCycle(): Promise<MaintenanceSnapshot> {
       lastDurationMs: Date.now() - startedAt,
       deletedExpiredSessions,
       removedOrphanUploadFiles,
+      removedStaleDeviceSnapshots,
       removedOldBackupFiles,
-      removedOldLogFiles,
+      removedOldLogFiles: logCleanup.removed,
+      trimmedLargeLogFiles: logCleanup.trimmed,
+      removedExpiredAuditLogs,
       errors: [],
     };
   } catch (error) {
@@ -239,107 +327,6 @@ export function getMaintenanceSnapshot(): MaintenanceSnapshot {
   return { ...maintenanceSnapshot };
 }
 
-function buildWarnings(runtime: Omit<SystemRuntimeStatus, 'warnings'>): RuntimeWarning[] {
-  const warnings: RuntimeWarning[] = [];
-
-  if (runtime.disk.usagePercent >= DISK_DANGER_PERCENT) {
-    warnings.push({
-      id: 'disk-danger',
-      level: 'danger',
-      category: 'disk',
-      title: 'Datenträger fast voll',
-      detail: `Die Partition bei ${runtime.disk.path} ist zu ${runtime.disk.usagePercent}% belegt.`,
-    });
-  } else if (runtime.disk.usagePercent >= DISK_WARNING_PERCENT) {
-    warnings.push({
-      id: 'disk-warning',
-      level: 'warning',
-      category: 'disk',
-      title: 'Datenträgerauslastung erhöht',
-      detail: `Die Partition bei ${runtime.disk.path} ist zu ${runtime.disk.usagePercent}% belegt.`,
-    });
-  }
-
-  if (runtime.devices.neverSeen > 0) {
-    warnings.push({
-      id: 'devices-never-seen',
-      level: 'warning',
-      category: 'devices',
-      title: 'Geräte ohne Heartbeat',
-      detail: `${runtime.devices.neverSeen} gekoppelte Geräte haben noch nie ein Heartbeat gesendet.`,
-    });
-  }
-
-  if (runtime.devices.stale > 0) {
-    warnings.push({
-      id: 'devices-stale',
-      level: runtime.devices.stale >= 2 ? 'danger' : 'warning',
-      category: 'devices',
-      title: 'Geräte mit ausbleibenden Heartbeats',
-      detail: `${runtime.devices.stale} Geräte haben seit mehr als ${STALE_THRESHOLD_MINUTES} Minuten kein Heartbeat gesendet.`,
-    });
-  } else if (runtime.devices.offline > 0) {
-    warnings.push({
-      id: 'devices-offline',
-      level: 'warning',
-      category: 'devices',
-      title: 'Geräte offline',
-      detail: `${runtime.devices.offline} Geräte sind seit mehr als ${ONLINE_THRESHOLD_MINUTES} Minuten nicht mehr online.`,
-    });
-  }
-
-  if (runtime.media.missingFiles > 0) {
-    warnings.push({
-      id: 'media-missing',
-      level: 'warning',
-      category: 'media',
-      title: 'Medienreferenzen ohne Datei',
-      detail: `${runtime.media.missingFiles} Datenbankeinträge verweisen auf fehlende Dateien im Upload-Verzeichnis.`,
-    });
-  }
-
-  if (runtime.media.orphanFiles > 0) {
-    warnings.push({
-      id: 'media-orphan',
-      level: 'warning',
-      category: 'media',
-      title: 'Verwaiste Upload-Dateien',
-      detail: `${runtime.media.orphanFiles} Dateien liegen ohne Datenbankreferenz im Upload-Verzeichnis.`,
-    });
-  }
-
-  if (runtime.maintenance.errors.length > 0) {
-    warnings.push({
-      id: 'maintenance-error',
-      level: 'danger',
-      category: 'maintenance',
-      title: 'Wartungsjob mit Fehlern',
-      detail: runtime.maintenance.errors.join(' | '),
-    });
-  } else if (!runtime.maintenance.lastRunAt) {
-    warnings.push({
-      id: 'maintenance-pending',
-      level: 'warning',
-      category: 'maintenance',
-      title: 'Wartungsjob noch nicht gelaufen',
-      detail: 'Die automatische Bereinigung wurde seit dem Start noch nicht erfolgreich ausgeführt.',
-    });
-  } else {
-    const lastRunAt = new Date(runtime.maintenance.lastRunAt).getTime();
-    if (Number.isFinite(lastRunAt) && Date.now() - lastRunAt > MAINTENANCE_STALE_THRESHOLD_MS) {
-      warnings.push({
-        id: 'maintenance-stale',
-        level: 'warning',
-        category: 'maintenance',
-        title: 'Wartungsjob ist überfällig',
-        detail: 'Die automatische Bereinigung ist seit längerer Zeit nicht mehr erfolgreich gelaufen.',
-      });
-    }
-  }
-
-  return warnings;
-}
-
 export async function collectSystemRuntimeStatus(): Promise<SystemRuntimeStatus> {
   const [version, statFs, deviceRows, mediaRows, uploadFiles, maintenance] = await Promise.all([
     readLocalVersion(),
@@ -366,34 +353,8 @@ export async function collectSystemRuntimeStatus(): Promise<SystemRuntimeStatus>
   const usedBytes = Math.max(0, totalBytes - availableBytes);
   const usagePercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 1000) / 10 : 0;
 
-  const pairedDevices = deviceRows.filter((device) => Boolean(device.pairedAt));
-  let online = 0;
-  let offline = 0;
-  let stale = 0;
-  let neverSeen = 0;
-
-  pairedDevices.forEach((device) => {
-    const ageMinutes = minutesSince(device.lastSeen);
-    if (ageMinutes === null) {
-      neverSeen += 1;
-      return;
-    }
-    if (ageMinutes < ONLINE_THRESHOLD_MINUTES) {
-      online += 1;
-      return;
-    }
-    if (ageMinutes < STALE_THRESHOLD_MINUTES) {
-      offline += 1;
-      return;
-    }
-    stale += 1;
-  });
-
-  const uploadFileNames = new Set(uploadFiles.map((file) => file.name));
-  const missingFiles = mediaRows.filter((item) => !uploadFileNames.has(item.filename)).length;
-  const referencedFiles = new Set(mediaRows.map((item) => item.filename));
-  const orphanFiles = uploadFiles.filter((file) => !referencedFiles.has(file.name)).length;
-  const uploadBytes = uploadFiles.reduce((sum, file) => sum + file.size, 0);
+  const deviceSummary = summarizeDeviceRuntime(deviceRows);
+  const mediaSummary = summarizeMediaRuntime(mediaRows, uploadFiles);
 
   const baseStatus: Omit<SystemRuntimeStatus, 'warnings'> = {
     ok: true,
@@ -408,26 +369,26 @@ export async function collectSystemRuntimeStatus(): Promise<SystemRuntimeStatus>
     },
     devices: {
       total: deviceRows.length,
-      paired: pairedDevices.length,
-      pending: Math.max(deviceRows.length - pairedDevices.length, 0),
-      online,
-      offline,
-      stale,
-      neverSeen,
+      paired: deviceSummary.paired,
+      pending: Math.max(deviceRows.length - deviceSummary.paired, 0),
+      online: deviceSummary.online,
+      offline: deviceSummary.offline,
+      stale: deviceSummary.stale,
+      neverSeen: deviceSummary.neverSeen,
     },
     media: {
       dbCount: mediaRows.length,
       filesOnDisk: uploadFiles.length,
-      missingFiles,
-      orphanFiles,
-      totalBytes: uploadBytes,
+      missingFiles: mediaSummary.missingFiles,
+      orphanFiles: mediaSummary.orphanFiles,
+      totalBytes: mediaSummary.totalBytes,
     },
     maintenance,
   };
 
   const runtimeStatus = {
     ...baseStatus,
-    warnings: buildWarnings(baseStatus),
+    warnings: buildRuntimeWarnings(baseStatus),
   };
 
   await recordRuntimeStatusSnapshot(runtimeStatus);

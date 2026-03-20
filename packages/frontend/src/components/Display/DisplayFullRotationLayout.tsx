@@ -66,7 +66,6 @@ export function DisplayFullRotationLayout({
       >
         <DisplayEditorialPanel
           theme={context.themeColors}
-          label={slide.type === 'content-panel' ? 'Programm des Tages' : 'Bühnenansicht'}
           tone="paper"
         >
           <SlideTransition

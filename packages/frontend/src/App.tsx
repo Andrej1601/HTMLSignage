@@ -9,6 +9,7 @@ import {
 } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteErrorPage } from './components/RouteErrorPage';
 import { ToastContainer } from './components/Toast';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 
@@ -47,7 +48,7 @@ function AppRouteShell() {
 
 const router = createBrowserRouter(
   createRoutesFromElements(
-    <Route element={<AppRouteShell />}>
+    <Route element={<AppRouteShell />} errorElement={<RouteErrorPage />}>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />

@@ -1,153 +1,506 @@
 import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
-import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
-import { Calendar } from 'lucide-react';
-import { formatEventDateDE, formatEventTimeRangeDE, getUpcomingOrActiveEvents, withAlpha } from './wellnessDisplayUtils';
+import { useDisplayViewportProfile } from './useDisplayViewportProfile';
+import { Calendar, Clock3 } from 'lucide-react';
+import { withAlpha } from './wellnessDisplayUtils';
 import { ResilientImage } from './ResilientImage';
+import {
+  buildEventPresentationData,
+  buildEventsSlideLayout,
+  type EventPresentation,
+} from './eventsSlideUtils';
 
 interface EventsSlideProps {
   settings: Settings;
   media?: Media[];
 }
 
+const TWO_LINE_CLAMP = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical' as const,
+  WebkitLineClamp: 2,
+  overflow: 'hidden',
+};
+
+const THREE_LINE_CLAMP = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical' as const,
+  WebkitLineClamp: 3,
+  overflow: 'hidden',
+};
+
+const FOUR_LINE_CLAMP = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical' as const,
+  WebkitLineClamp: 4,
+  overflow: 'hidden',
+};
+
+function EventStatusBadge({
+  label,
+  background,
+  textColor,
+  compact = false,
+}: {
+  label: string;
+  background: string;
+  textColor: string;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className="shrink-0 rounded-full border font-black uppercase"
+      style={{
+        padding: compact ? '6px 10px' : '8px 14px',
+        fontSize: compact ? 'clamp(8px, 0.82vw, 10px)' : 'clamp(9px, 1vw, 12px)',
+        letterSpacing: compact ? '0.16em' : '0.18em',
+        color: textColor,
+        backgroundColor: background,
+        borderColor: withAlpha(background, 0.94),
+        boxShadow: `0 12px 28px ${withAlpha(background, 0.22)}`,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function EventTimeChip({
+  label,
+  textMuted,
+  background,
+  border,
+  compact = false,
+}: {
+  label: string;
+  textMuted: string;
+  background: string;
+  border: string;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className="inline-flex items-center gap-2 rounded-full border font-bold uppercase"
+      style={{
+        padding: compact ? '7px 11px' : '9px 14px',
+        fontSize: compact ? 'clamp(10px, 0.95vw, 12px)' : 'clamp(10px, 1vw, 13px)',
+        color: textMuted,
+        backgroundColor: withAlpha(background, 0.82),
+        borderColor: withAlpha(border, 0.72),
+      }}
+    >
+      <Clock3 style={{ width: compact ? '12px' : '14px', height: compact ? '12px' : '14px' }} />
+      {label}
+    </div>
+  );
+}
+
+function SecondaryEventCard({
+  event,
+  accentGreen,
+  textMain,
+  textMuted,
+  cardBg,
+  cardBorder,
+  showImage,
+  showDescription,
+  imagePlacement,
+}: {
+  event: EventPresentation;
+  accentGreen: string;
+  textMain: string;
+  textMuted: string;
+  cardBg: string;
+  cardBorder: string;
+  showImage: boolean;
+  showDescription: boolean;
+  imagePlacement: 'top' | 'side';
+}) {
+  const sideImage = showImage && imagePlacement === 'side' && Boolean(event.imageUrl);
+  const topImage = showImage && imagePlacement === 'top' && Boolean(event.imageUrl);
+
+  return (
+    <div
+      className={`relative min-h-0 overflow-hidden rounded-[1.55rem] border ${sideImage ? 'grid grid-cols-[minmax(7.5rem,34%)_minmax(0,1fr)]' : 'flex flex-col'}`}
+      style={{
+        background: `linear-gradient(160deg, ${withAlpha(cardBg, 0.96)} 0%, ${withAlpha(cardBg, 0.76)} 100%)`,
+        borderColor: withAlpha(cardBorder, 0.68),
+        boxShadow: `0 18px 34px ${withAlpha(textMain, 0.08)}`,
+      }}
+    >
+      {sideImage ? (
+        <div className="relative min-h-full overflow-hidden">
+          <ResilientImage
+            src={event.imageUrl!}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={<div className="h-full w-full bg-spa-bg-secondary" />}
+          />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.14), rgba(255,255,255,0.02))' }} />
+        </div>
+      ) : null}
+
+      {topImage ? (
+        <div className="relative overflow-hidden" style={{ height: 'clamp(100px, 17vh, 158px)' }}>
+          <ResilientImage
+            src={event.imageUrl!}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={<div className="h-full w-full bg-spa-bg-secondary" />}
+          />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.92), rgba(255,255,255,0.1))' }} />
+        </div>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col justify-between" style={{ padding: 'clamp(12px, 1.8%, 18px)' }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-black uppercase tracking-widest" style={{ fontSize: 'clamp(8px, 0.92vw, 12px)', color: accentGreen }}>
+              {event.dateLabel}
+            </div>
+            <div className="mt-1.5 font-black uppercase leading-tight" style={{ fontSize: 'clamp(15px, 1.45vw, 22px)', color: textMain, ...TWO_LINE_CLAMP }}>
+              {event.name}
+            </div>
+          </div>
+          <EventStatusBadge
+            label={event.badgeLabel}
+            background={event.badgeBackground}
+            textColor={event.badgeTextColor}
+            compact
+          />
+        </div>
+
+        <div className="mt-3 min-w-0">
+          <EventTimeChip
+            label={event.timeLabel}
+            textMuted={textMuted}
+            background={cardBg}
+            border={cardBorder}
+            compact
+          />
+          {showDescription && event.description ? (
+            <p
+              className="mt-3"
+              style={{
+                fontSize: 'clamp(11px, 1.05vw, 14px)',
+                lineHeight: 1.5,
+                color: textMuted,
+                ...(sideImage ? TWO_LINE_CLAMP : THREE_LINE_CLAMP),
+              }}
+            >
+              {event.description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LeadEventCard({
+  event,
+  textMain,
+  textMuted,
+  cardBg,
+  cardBorder,
+  accentGold,
+  accentGreen,
+  showDescription,
+}: {
+  event: EventPresentation;
+  textMain: string;
+  textMuted: string;
+  cardBg: string;
+  cardBorder: string;
+  accentGold: string;
+  accentGreen: string;
+  showDescription: boolean;
+}) {
+  const imageMode = Boolean(event.imageUrl);
+  const leadTextMain = imageMode ? '#FFFDF8' : textMain;
+  const leadTextMuted = imageMode ? withAlpha('#FFFDF8', 0.9) : textMuted;
+  const leadDateColor = imageMode ? withAlpha('#F4E7C8', 0.96) : accentGreen;
+  const leadChipBackground = imageMode ? withAlpha('#171412', 0.78) : cardBg;
+  const leadChipBorder = imageMode ? withAlpha('#FFFDF8', 0.18) : cardBorder;
+  const leadHeaderBackground = imageMode ? withAlpha('#171412', 0.72) : withAlpha(cardBg, 0.86);
+  const leadHeaderBorder = imageMode ? withAlpha('#FFFDF8', 0.14) : withAlpha(cardBorder, 0.72);
+
+  return (
+    <div
+      className="relative min-h-0 overflow-hidden rounded-[1.95rem] border"
+      style={{
+        backgroundColor: withAlpha(cardBg, 0.4),
+        borderColor: withAlpha(cardBorder, 0.72),
+        boxShadow: `0 30px 60px ${withAlpha(textMain, 0.1)}`,
+      }}
+    >
+      {event.imageUrl ? (
+        <>
+          <div className="absolute inset-0 overflow-hidden">
+            <ResilientImage
+              src={event.imageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+              fallback={<div className="h-full w-full bg-spa-bg-secondary" />}
+            />
+          </div>
+          <div
+            className="absolute inset-0"
+            style={{
+              background: [
+                `linear-gradient(120deg, ${withAlpha('#0E0B09', 0.84)} 0%, ${withAlpha('#0E0B09', 0.48)} 42%, ${withAlpha('#0E0B09', 0.12)} 100%)`,
+                `linear-gradient(to top, ${withAlpha('#120F0D', 0.92)} 0%, ${withAlpha('#120F0D', 0.56)} 34%, ${withAlpha('#120F0D', 0.1)} 100%)`,
+              ].join(','),
+            }}
+          />
+        </>
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: [
+              `radial-gradient(circle at 18% 22%, ${withAlpha(accentGold, 0.2)} 0%, transparent 34%)`,
+              `radial-gradient(circle at 100% 0%, ${withAlpha(accentGreen, 0.18)} 0%, transparent 38%)`,
+              `linear-gradient(145deg, ${withAlpha(cardBg, 0.98)} 0%, ${withAlpha(cardBg, 0.88)} 45%, ${withAlpha(accentGold, 0.12)} 100%)`,
+            ].join(','),
+          }}
+        />
+      )}
+
+      <div className="relative z-10 flex h-full min-h-0 flex-col justify-between" style={{ padding: 'clamp(16px, 2.4%, 28px)' }}>
+        <div className="flex items-start justify-between gap-3">
+          <div
+            className="inline-flex items-center gap-2 rounded-full border px-3 py-2 font-black uppercase"
+            style={{
+              fontSize: 'clamp(8px, 0.9vw, 11px)',
+              letterSpacing: '0.22em',
+              color: imageMode ? withAlpha('#FFF6E4', 0.96) : accentGold,
+              backgroundColor: leadHeaderBackground,
+              borderColor: leadHeaderBorder,
+            }}
+          >
+            <Calendar style={{ width: '13px', height: '13px' }} />
+            Events
+          </div>
+
+          <EventStatusBadge
+            label={event.badgeLabel}
+            background={event.badgeBackground}
+            textColor={event.badgeTextColor}
+          />
+        </div>
+
+        <div className="min-w-0">
+          <div className="font-black uppercase tracking-[0.24em]" style={{ fontSize: 'clamp(10px, 1.08vw, 14px)', color: leadDateColor }}>
+            {event.dateLabel}
+          </div>
+          <div
+            className="mt-3 font-black uppercase leading-[0.94]"
+            style={{
+              fontSize: 'clamp(26px, 3.3vw, 46px)',
+              color: leadTextMain,
+              textShadow: event.imageUrl ? `0 16px 34px ${withAlpha('#000000', 0.34)}` : 'none',
+              ...TWO_LINE_CLAMP,
+            }}
+          >
+            {event.name}
+          </div>
+
+          <div className="mt-4">
+            <EventTimeChip
+              label={event.timeLabel}
+              textMuted={leadTextMuted}
+              background={leadChipBackground}
+              border={leadChipBorder}
+            />
+          </div>
+
+          {event.description && showDescription ? (
+            <div
+              className="mt-4 rounded-[1.35rem] border"
+              style={{
+                padding: 'clamp(12px, 1.8%, 18px)',
+                backgroundColor: imageMode ? withAlpha('#171412', 0.68) : withAlpha(cardBg, 0.82),
+                borderColor: imageMode ? withAlpha('#FFFDF8', 0.14) : withAlpha(cardBorder, 0.68),
+                maxWidth: 'min(90%, 44rem)',
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 'clamp(13px, 1.28vw, 18px)',
+                  lineHeight: 1.58,
+                  color: leadTextMuted,
+                  ...FOUR_LINE_CLAMP,
+                }}
+              >
+                {event.description}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventsSlide({ settings, media }: EventsSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
-  const { containerRef, layout } = useResponsiveLayout();
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
   const textMain = theme.textMain || theme.fg || '#3E2723';
+  const textMuted = theme.textMuted || withAlpha(textMain, 0.72);
   const cardBg = theme.cardBg || theme.cellBg || '#FFFFFF';
   const cardBorder = theme.cardBorder || theme.gridTable || '#EBE5D3';
+  const statusLive = theme.statusLive || '#10B981';
+  const statusSoon = theme.statusPrestart || '#F59E0B';
+  const statusNext = theme.statusNext || accentGold;
 
-  const events = getUpcomingOrActiveEvents(settings, new Date());
-  const isCompact = layout === 'compact';
-  const isVertical = layout === 'vertical';
+  const allEvents = buildEventPresentationData(settings, media, new Date(), {
+    accentGold,
+    accentGreen,
+    statusLive,
+    statusSoon,
+    statusNext,
+  });
 
-  if (isCompact) {
+  const layout = buildEventsSlideLayout(profile);
+  const events = allEvents.slice(0, layout.maxEvents);
+  const leadEvent = events[0];
+  const secondaryEvents = events.slice(1);
+
+  const showLeadDescription = Boolean(leadEvent?.description) && layout.showLeadDescriptionSpace;
+  const showSecondaryImages = layout.showSecondaryImages;
+  const showSecondaryDescriptions = layout.showSecondaryDescriptions;
+  const secondaryImagePlacement = layout.secondaryImagePlacement;
+
+  if (events.length === 0) {
     return (
-      <div ref={containerRef} className="w-full h-full flex flex-col justify-center overflow-hidden" style={{ padding: '6px 14px' }}>
-        <h4
-          className="font-black uppercase shrink-0"
-          style={{ fontSize: '11px', letterSpacing: '0.25em', color: accentGold, marginBottom: '6px' }}
+      <div ref={containerRef} className="h-full w-full overflow-hidden" style={{ padding: 'clamp(12px, 2.4%, 28px)' }}>
+        <div
+          className="flex h-full flex-col justify-between rounded-[1.95rem] border"
+          style={{
+            padding: 'clamp(16px, 2.6%, 28px)',
+            background: [
+              `radial-gradient(circle at 14% 18%, ${withAlpha(accentGold, 0.16)} 0%, transparent 32%)`,
+              `radial-gradient(circle at 100% 0%, ${withAlpha(accentGreen, 0.14)} 0%, transparent 35%)`,
+              `linear-gradient(155deg, ${withAlpha(cardBg, 0.98)} 0%, ${withAlpha(cardBg, 0.92)} 100%)`,
+            ].join(','),
+            borderColor: withAlpha(cardBorder, 0.72),
+          }}
         >
-          <Calendar style={{ width: '13px', height: '13px', color: accentGold, display: 'inline', verticalAlign: '-2px', marginRight: '6px' }} />
-          Events
-        </h4>
-        <div className="flex gap-2 min-w-0">
-          {events.length === 0 ? (
-            <div
-              className="flex-1 rounded-xl border"
-              style={{ padding: '6px 10px', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6), color: textMain }}
-            >
-              <div className="font-black uppercase leading-tight" style={{ fontSize: '13px' }}>Keine Events</div>
+          <div
+            className="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-2 font-black uppercase"
+            style={{
+              fontSize: 'clamp(8px, 0.9vw, 11px)',
+              letterSpacing: '0.22em',
+              color: accentGold,
+              backgroundColor: withAlpha(cardBg, 0.86),
+              borderColor: withAlpha(cardBorder, 0.72),
+            }}
+          >
+            <Calendar style={{ width: '13px', height: '13px' }} />
+            Events
+          </div>
+
+          <div className="max-w-[42rem]">
+            <div className="font-black uppercase tracking-[0.22em]" style={{ fontSize: 'clamp(10px, 1vw, 14px)', color: accentGreen }}>
+              Aktuell ruhig
             </div>
-          ) : (
-            events.map((event) => (
-              <div
-                key={event.id}
-                className="flex-1 rounded-xl border overflow-hidden"
-                style={{ padding: '6px 10px', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6) }}
-              >
-                <div className="font-black uppercase tracking-wider" style={{ fontSize: '9px', color: accentGreen, marginBottom: '2px' }}>
-                  {formatEventDateDE(event)}
-                </div>
-                <div className="font-black uppercase leading-tight truncate" style={{ fontSize: '13px', color: textMain, marginBottom: '1px' }}>
-                  {event.name}
-                </div>
-                <div className="font-bold uppercase" style={{ fontSize: '10px', color: withAlpha(textMain, 0.58) }}>
-                  {formatEventTimeRangeDE(event)}
-                </div>
-              </div>
-            ))
-          )}
+            <div className="mt-3 font-black uppercase leading-[0.96]" style={{ fontSize: 'clamp(24px, 3.2vw, 44px)', color: textMain }}>
+              Keine Events geplant
+            </div>
+            <p className="mt-4" style={{ fontSize: 'clamp(13px, 1.25vw, 18px)', lineHeight: 1.55, color: textMuted }}>
+              Sobald neue Termine angelegt und aktiviert sind, werden sie hier automatisch großflächig und informativ angezeigt.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (layout.isCompact && leadEvent) {
+    return (
+      <div ref={containerRef} className="h-full w-full overflow-hidden" style={{ padding: '8px 12px' }}>
+        <div className="grid h-full min-h-0 gap-2" style={{ gridTemplateRows: secondaryEvents[0] ? 'minmax(0, 1.15fr) minmax(0, 0.85fr)' : '1fr' }}>
+          <LeadEventCard
+            event={leadEvent}
+            textMain={textMain}
+            textMuted={textMuted}
+            cardBg={cardBg}
+            cardBorder={cardBorder}
+            accentGold={accentGold}
+            accentGreen={accentGreen}
+            showDescription={Boolean(leadEvent.description) && profile.height >= 210}
+          />
+
+          {secondaryEvents[0] ? (
+            <SecondaryEventCard
+              event={secondaryEvents[0]}
+              accentGreen={accentGreen}
+              textMain={textMain}
+              textMuted={textMuted}
+              cardBg={cardBg}
+              cardBorder={cardBorder}
+              showImage={false}
+              showDescription={Boolean(secondaryEvents[0].description)}
+              imagePlacement="top"
+            />
+          ) : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full flex flex-col overflow-hidden"
-      style={{ padding: 'clamp(12px, 2.5%, 28px)', justifyContent: 'center' }}
-    >
-      <div className="flex items-center shrink-0" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
-        <div
-          className="rounded-xl border shadow-sm shrink-0"
-          style={{ padding: 'clamp(6px, 1%, 14px)', backgroundColor: `${accentGold}10`, borderColor: `${accentGold}20` }}
-        >
-          <Calendar style={{ width: 'clamp(16px, 2.5vw, 32px)', height: 'clamp(16px, 2.5vw, 32px)', color: accentGold }} />
-        </div>
-        <h4
-          className="font-black uppercase"
-          style={{ fontSize: 'clamp(10px, 1.5vw, 20px)', letterSpacing: '0.3em', color: accentGold }}
-        >
-          Events
-        </h4>
-      </div>
-
+    <div ref={containerRef} className="h-full w-full overflow-hidden" style={{ padding: 'clamp(12px, 2.4%, 28px)' }}>
       <div
-        className={isVertical ? 'flex flex-col overflow-auto' : 'flex'}
-        style={{ gap: isVertical ? 'clamp(8px, 1.5%, 16px)' : 'clamp(8px, 1.5%, 24px)' }}
+        className="grid h-full min-h-0"
+        style={{
+          gap: layout.isVertical ? 'clamp(10px, 1.8%, 18px)' : 'clamp(12px, 2%, 22px)',
+          gridTemplateRows: secondaryEvents.length > 0
+            ? (layout.isVertical ? 'minmax(0, 1.08fr) minmax(0, 0.92fr)' : 'minmax(0, 1.02fr) minmax(0, 0.98fr)')
+            : '1fr',
+        }}
       >
-        {events.length === 0 ? (
+        <LeadEventCard
+          event={leadEvent}
+          textMain={textMain}
+          textMuted={textMuted}
+          cardBg={cardBg}
+          cardBorder={cardBorder}
+          accentGold={accentGold}
+          accentGreen={accentGreen}
+          showDescription={showLeadDescription}
+        />
+
+        {secondaryEvents.length > 0 ? (
           <div
-            className="flex-1 rounded-2xl border"
-            style={{ padding: 'clamp(8px, 1.5%, 20px)', backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6), color: textMain }}
+            className="grid min-h-0 auto-rows-fr"
+            style={{
+              gap: 'clamp(10px, 1.7%, 16px)',
+              gridTemplateColumns: '1fr',
+            }}
           >
-            <div className="font-black uppercase leading-tight mb-1" style={{ fontSize: 'clamp(12px, 1.8vw, 24px)' }}>Keine Events geplant</div>
-            <div className="font-bold uppercase opacity-70" style={{ fontSize: 'clamp(8px, 1.2vw, 14px)' }}>Demnaechst mehr</div>
-          </div>
-        ) : (
-          events.map((event) => {
-            const eventImageUrl = event.imageId ? getMediaUploadUrl(media, event.imageId) : null;
-            return (
-              <div
+            {secondaryEvents.map((event) => (
+              <SecondaryEventCard
                 key={event.id}
-                className={`rounded-2xl border overflow-hidden ${isVertical ? '' : 'flex-1'} ${isVertical && eventImageUrl ? 'flex' : ''}`}
-                style={{ backgroundColor: withAlpha(cardBg, 0.35), borderColor: withAlpha(cardBorder, 0.6) }}
-              >
-                {eventImageUrl && (
-                  isVertical ? (
-                    <div className="w-24 shrink-0 overflow-hidden">
-                      <ResilientImage
-                        src={eventImageUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        fallback={<div className="w-full h-full bg-spa-bg-secondary" />}
-                      />
-                    </div>
-                  ) : (
-                    <div className="relative overflow-hidden" style={{ height: 'clamp(40px, 5vw, 80px)' }}>
-                      <ResilientImage
-                        src={eventImageUrl}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        fallback={<div className="w-full h-full bg-spa-bg-secondary" />}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                    </div>
-                  )
-                )}
-                <div style={{ padding: 'clamp(8px, 1.5%, 20px)' }} className="min-w-0 flex-1">
-                  <div className="font-black uppercase tracking-widest mb-0.5" style={{ fontSize: 'clamp(9px, 1.3vw, 18px)', color: accentGreen }}>
-                    {formatEventDateDE(event)}
-                  </div>
-                  <div className="font-black uppercase leading-tight mb-0.5 truncate" style={{ fontSize: 'clamp(12px, 1.8vw, 24px)', color: textMain }}>
-                    {event.name}
-                  </div>
-                  <div className="font-bold uppercase" style={{ fontSize: 'clamp(9px, 1.2vw, 16px)', color: withAlpha(textMain, 0.58) }}>
-                    {formatEventTimeRangeDE(event)}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+                event={event}
+                accentGreen={accentGreen}
+                textMain={textMain}
+                textMuted={textMuted}
+                cardBg={cardBg}
+                cardBorder={cardBorder}
+                showImage={showSecondaryImages}
+                showDescription={showSecondaryDescriptions}
+                imagePlacement={secondaryImagePlacement}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

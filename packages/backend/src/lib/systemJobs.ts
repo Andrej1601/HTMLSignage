@@ -49,7 +49,7 @@ export interface CreateSystemJobInput {
 
 export interface PublicSystemJob<Result = Record<string, unknown> | null> extends SystemJobRecord<Result> {}
 
-interface RunSystemJobContext {
+export interface RunSystemJobContext {
   readonly job: SystemJobRecord;
   setProgress: (stage: string, message: string, percent?: number) => void;
   appendLog: (chunk: string) => void;

@@ -186,7 +186,13 @@ export function SystemChecksWidget({
                 </p>
                 <p>
                   Bereinigt: <span className="font-semibold text-spa-text-primary">{maintenance.deletedExpiredSessions}</span> Sessions,
-                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedOrphanUploadFiles}</span> Uploads
+                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedOrphanUploadFiles}</span> Uploads,
+                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedStaleDeviceSnapshots}</span> Snapshots
+                </p>
+                <p>
+                  Aufbewahrung: <span className="font-semibold text-spa-text-primary">{maintenance.removedExpiredAuditLogs}</span> Audit-Einträge,
+                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedOldBackupFiles}</span> Backups,
+                  <span className="font-semibold text-spa-text-primary"> {maintenance.trimmedLargeLogFiles}</span> Logs gekürzt
                 </p>
               </div>
             ) : (

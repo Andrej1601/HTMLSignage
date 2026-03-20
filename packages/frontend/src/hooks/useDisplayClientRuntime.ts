@@ -15,28 +15,25 @@ import {
   PREVIEW_READY_EVENT,
   PREVIEW_REQUEST_READY_EVENT,
 } from '@/components/Display/previewBridge';
-import { isPlainRecord } from '@/utils/objectUtils';
 import { clearDisplayAssetCache } from '@/utils/displayAssetCache';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import { getDefaultSettings, type Settings } from '@/types/settings.types';
-
-const DEVICE_TOKEN_STORAGE_KEY = 'device_auth_token';
-const BROWSER_ID_STORAGE_KEY = 'browserId';
-const DISPLAY_CACHED_SCHEDULE_KEY = 'display_cached_schedule';
-const DISPLAY_CACHED_SETTINGS_KEY = 'display_cached_settings';
-const DISPLAY_CACHED_MEDIA_KEY = 'display_cached_media';
-
-interface PreviewConfigMessage {
-  type: string;
-  payload?: {
-    schedule?: unknown;
-    settings?: unknown;
-    deviceId?: unknown;
-    deviceName?: unknown;
-    previewAt?: unknown;
-    maintenanceMode?: unknown;
-  };
-}
+import {
+  areDisplayMediaListsEqual,
+  BROWSER_ID_STORAGE_KEY,
+  clearDisplayClientStorage,
+  DEVICE_TOKEN_STORAGE_KEY,
+  DISPLAY_CACHED_MEDIA_KEY,
+  DISPLAY_CACHED_SCHEDULE_KEY,
+  DISPLAY_CACHED_SETTINGS_KEY,
+  generateDisplayBrowserId,
+  parsePreviewConfigPayload,
+  readDisplayCachedValue,
+  resolveDisplayIdentity,
+  shouldUseFallbackDisplayConfig,
+  writeDisplayCachedValue,
+  type PreviewConfigMessage,
+} from './displayClientRuntime.utils';
 
 export interface DisplayClientRuntimeState {
   displayDeviceId: string | null;
@@ -56,57 +53,11 @@ export interface DisplayClientRuntimeState {
   deviceToken: string | null;
 }
 
-function generateBrowserId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
-    const random = (Math.random() * 16) | 0;
-    const value = char === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
-
-function readCachedValue<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedValue<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Ignore storage quota/private mode errors.
-  }
-}
-
-function clearDisplayClientStorage(): void {
-  localStorage.removeItem(DISPLAY_CACHED_SCHEDULE_KEY);
-  localStorage.removeItem(DISPLAY_CACHED_SETTINGS_KEY);
-  localStorage.removeItem(DISPLAY_CACHED_MEDIA_KEY);
-}
-
-function areMediaListsEqual(left: Media[], right: Media[]): boolean {
-  if (left === right) return true;
-  if (left.length !== right.length) return false;
-
-  return left.every((item, index) => {
-    const other = right[index];
-    return (
-      item?.id === other?.id &&
-      item?.updatedAt === other?.updatedAt &&
-      item?.filename === other?.filename
-    );
-  });
-}
-
 export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRuntimeState {
   const [browserId] = useState(() => {
     let id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
     if (!id) {
-      id = generateBrowserId();
+      id = generateDisplayBrowserId();
       localStorage.setItem(BROWSER_ID_STORAGE_KEY, id);
     }
     return id;
@@ -133,18 +84,66 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
   const displayConfigRefreshVersionRef = useRef(0);
 
   const cachedMedia = useMemo(
-    () => readCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
+    () => readDisplayCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
     [],
   );
   const [mediaItems, setMediaItems] = useState<Media[]>(() => cachedMedia);
 
   const [localSchedule, setLocalSchedule] = useState<Schedule>(() => (
-    readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY) || createDefaultSchedule()
+    readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY) || createDefaultSchedule()
   ));
   const [localSettings, setLocalSettings] = useState<Settings>(() => (
-    readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY) || getDefaultSettings()
+    readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY) || getDefaultSettings()
   ));
-  const shouldUseFallbackConfigQueries = isPreviewMode || !pairingInfo?.paired || !hasLoadedDeviceConfig;
+  const shouldUseFallbackConfigQueries = shouldUseFallbackDisplayConfig({
+    isPreviewMode,
+    paired: Boolean(pairingInfo?.paired),
+    hasLoadedDeviceConfig,
+  });
+
+  const applySchedule = useCallback((schedule: Schedule, options?: { persist?: boolean }) => {
+    setLocalSchedule(schedule);
+    if (options?.persist !== false) {
+      writeDisplayCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, schedule);
+    }
+  }, []);
+
+  const applySettings = useCallback((
+    settings: Settings,
+    options?: { persist?: boolean; cacheValue?: unknown },
+  ) => {
+    setLocalSettings(settings);
+    if (options?.persist !== false) {
+      writeDisplayCachedValue(
+        DISPLAY_CACHED_SETTINGS_KEY,
+        (options?.cacheValue ?? settings) as Settings,
+      );
+    }
+  }, []);
+
+  const applyPreviewPayload = useCallback((payload: PreviewConfigMessage['payload']) => {
+    const parsedPayload = parsePreviewConfigPayload(payload);
+    if (!parsedPayload) return;
+
+    if (parsedPayload.schedule) {
+      applySchedule(parsedPayload.schedule, { persist: false });
+      setHasPreviewPayload(true);
+    }
+
+    if (parsedPayload.settings) {
+      applySettings(
+        migrateSettings(parsedPayload.settings as unknown as Settings),
+        { persist: false },
+      );
+      setHasPreviewPayload(true);
+    }
+
+    setPreviewDeviceId(parsedPayload.deviceId);
+    setPreviewDeviceName(parsedPayload.deviceName);
+    setPreviewClockOverride(parsedPayload.previewClock);
+    setEventClock(parsedPayload.previewClock ?? Date.now());
+    setMaintenanceMode(parsedPayload.maintenanceMode);
+  }, [applySchedule, applySettings]);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,8 +152,8 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       try {
         const data = await displayMediaApi.getMedia();
         if (!isMounted || data.length === 0) return;
-        setMediaItems((prev) => (areMediaListsEqual(prev, data) ? prev : data));
-        writeCachedValue(DISPLAY_CACHED_MEDIA_KEY, data);
+        setMediaItems((prev) => (areDisplayMediaListsEqual(prev, data) ? prev : data));
+        writeDisplayCachedValue(DISPLAY_CACHED_MEDIA_KEY, data);
       } catch (error) {
         if (ENV_IS_DEV) {
           console.warn('[Display] Media preload failed:', error);
@@ -250,28 +249,31 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     displayConfigRefreshInFlightRef.current = true;
     if (!silent) setIsDisplayConfigLoading(true);
 
-    try {
-      const displayConfig = await displayDevicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
-      if (requestVersion !== displayConfigRefreshVersionRef.current) {
-        return;
-      }
+      try {
+        const displayConfig = await displayDevicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
+        if (requestVersion !== displayConfigRefreshVersionRef.current) {
+          return;
+        }
 
-      setLocalSchedule(displayConfig.schedule);
-      setLocalSettings(migrateSettings(displayConfig.settings));
-      setMaintenanceMode(Boolean(displayConfig.maintenanceMode));
-      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, displayConfig.schedule);
-      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, displayConfig.settings);
-      setHasLoadedDeviceConfig(true);
-    } catch (error) {
-      if (ENV_IS_DEV) {
-        console.error('[Display] Failed to load effective display config:', error);
-      }
-      const cachedSchedule = readCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
-      const cachedSettings = readCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
-      if (cachedSchedule) setLocalSchedule(cachedSchedule);
-      if (cachedSettings) setLocalSettings(migrateSettings(cachedSettings));
-      setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
-    } finally {
+        applySchedule(displayConfig.schedule);
+        applySettings(
+          migrateSettings(displayConfig.settings),
+          { cacheValue: displayConfig.settings },
+        );
+        setMaintenanceMode(Boolean(displayConfig.maintenanceMode));
+        setHasLoadedDeviceConfig(true);
+      } catch (error) {
+        if (ENV_IS_DEV) {
+          console.error('[Display] Failed to load effective display config:', error);
+        }
+        const cachedSchedule = readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
+        const cachedSettings = readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
+        if (cachedSchedule) applySchedule(cachedSchedule, { persist: false });
+        if (cachedSettings) {
+          applySettings(migrateSettings(cachedSettings), { persist: false });
+        }
+        setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
+      } finally {
       displayConfigRefreshInFlightRef.current = false;
       if (!silent) setIsDisplayConfigLoading(false);
 
@@ -281,7 +283,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         void refreshDeviceDisplayConfig(queued.deviceId, { silent: queued.silent });
       }
     }
-  }, [deviceToken]);
+  }, [applySchedule, applySettings, deviceToken]);
 
   useEffect(() => {
     if (!isPreviewMode) return;
@@ -303,39 +305,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       }
 
       if (message.type !== PREVIEW_CONFIG_EVENT) return;
-
-      const payload = message.payload;
-      if (!payload) return;
-
-      const incomingSchedule = payload.schedule;
-      if (
-        isPlainRecord(incomingSchedule) &&
-        typeof incomingSchedule.version === 'number' &&
-        isPlainRecord(incomingSchedule.presets) &&
-        typeof incomingSchedule.autoPlay === 'boolean'
-      ) {
-        setLocalSchedule(incomingSchedule as unknown as Schedule);
-        setHasPreviewPayload(true);
-      }
-
-      const incomingSettings = payload.settings;
-      if (isPlainRecord(incomingSettings)) {
-        setLocalSettings(migrateSettings(incomingSettings as unknown as Settings));
-        setHasPreviewPayload(true);
-      }
-
-      setPreviewDeviceId(typeof payload.deviceId === 'string' && payload.deviceId.trim() !== '' ? payload.deviceId : null);
-      setPreviewDeviceName(
-        typeof payload.deviceName === 'string' && payload.deviceName.trim() !== ''
-          ? payload.deviceName
-          : null,
-      );
-      const previewAtRaw = typeof payload.previewAt === 'string' ? payload.previewAt : '';
-      const previewAtTimestamp = previewAtRaw ? Date.parse(previewAtRaw) : Number.NaN;
-      const nextPreviewClock = Number.isFinite(previewAtTimestamp) ? previewAtTimestamp : null;
-      setPreviewClockOverride(nextPreviewClock);
-      setEventClock(nextPreviewClock ?? Date.now());
-      setMaintenanceMode(payload.maintenanceMode === true);
+      applyPreviewPayload(message.payload);
     };
 
     window.addEventListener('message', handlePreviewMessage);
@@ -344,7 +314,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     return () => {
       window.removeEventListener('message', handlePreviewMessage);
     };
-  }, [isPreviewMode]);
+  }, [applyPreviewPayload, isPreviewMode]);
 
   useEffect(() => {
     if (!isPreviewMode) {
@@ -385,8 +355,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         if (!isMounted) return;
         if (isPreviewMode && hasPreviewPayload) return;
         if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
-          setLocalSchedule(schedule);
-          writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, schedule);
+          applySchedule(schedule);
         }
       } catch (error) {
         if (ENV_IS_DEV) {
@@ -405,6 +374,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       isMounted = false;
     };
   }, [
+    applySchedule,
     hasLoadedDeviceConfig,
     hasPreviewPayload,
     isPreviewMode,
@@ -427,8 +397,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         if (!isMounted) return;
         if (isPreviewMode && hasPreviewPayload) return;
         if (!pairingInfo?.paired || !hasLoadedDeviceConfig) {
-          setLocalSettings(settings);
-          writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, settings);
+          applySettings(settings);
         }
       } catch (error) {
         if (ENV_IS_DEV) {
@@ -447,6 +416,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       isMounted = false;
     };
   }, [
+    applySettings,
     hasLoadedDeviceConfig,
     hasPreviewPayload,
     isPreviewMode,
@@ -465,8 +435,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         void refreshDeviceDisplayConfig(deviceId, { silent: true });
         return;
       }
-      setLocalSchedule(data);
-      writeCachedValue(DISPLAY_CACHED_SCHEDULE_KEY, data);
+      applySchedule(data);
     },
     onSettingsUpdate: (data) => {
       if (ENV_IS_DEV) {
@@ -477,9 +446,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         void refreshDeviceDisplayConfig(deviceId, { silent: true });
         return;
       }
-      const migrated = migrateSettings(data);
-      setLocalSettings(migrated);
-      writeCachedValue(DISPLAY_CACHED_SETTINGS_KEY, migrated);
+      applySettings(migrateSettings(data));
     },
     onDeviceUpdate: (data) => {
       const deviceId = pairedDeviceIdRef.current;
@@ -557,16 +524,12 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     return () => window.clearInterval(interval);
   }, [previewClockOverride]);
 
-  const displayDeviceId = isPreviewMode
-    ? previewDeviceId
-    : pairingInfo?.paired
-      ? pairingInfo.id
-      : null;
-  const displayDeviceName = isPreviewMode
-    ? previewDeviceName
-    : pairingInfo?.paired
-      ? (pairingInfo.name || null)
-      : null;
+  const { displayDeviceId, displayDeviceName } = resolveDisplayIdentity({
+    isPreviewMode,
+    previewDeviceId,
+    previewDeviceName,
+    pairingInfo,
+  });
 
   return {
     displayDeviceId,

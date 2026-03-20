@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─── HTMLSignage Disk Cleanup & Monitor ───────────────────────────────────────
 # Runs via cron to prevent disk-full situations.
-# Logs to /var/log/htmlsignage-disk.log (or stdout if not writable).
+# Logs to /opt/HTMLSignage/logs/disk-cleanup.log (or stdout if not writable).
 
 set -euo pipefail
 
@@ -43,10 +43,10 @@ if [ -d "$PRISMA_CACHE" ]; then
   fi
 fi
 
-# 4. Truncate old application logs (keep last 1000 lines)
-for logfile in /opt/HTMLSignage/packages/backend/*.log; do
-  if [ -f "$logfile" ] && [ "$(wc -l < "$logfile")" -gt 1000 ]; then
-    tail -1000 "$logfile" > "${logfile}.tmp" && mv "${logfile}.tmp" "$logfile"
+# 4. Truncate old application logs (keep last 2000 lines)
+for logfile in /opt/HTMLSignage/logs/*.log; do
+  if [ -f "$logfile" ] && [ "$(wc -l < "$logfile")" -gt 2000 ]; then
+    tail -2000 "$logfile" > "${logfile}.tmp" && mv "${logfile}.tmp" "$logfile"
     log "Truncated $logfile"
   fi
 done 2>/dev/null || true

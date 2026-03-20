@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
+import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -12,46 +12,11 @@ import {
 } from '@/components/Display/displayTripleLayoutUtils';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface DisplayModernTripleLayoutProps {
   context: DisplayLayoutContext;
   zoneStates: TripleZoneStateMap;
-}
-
-interface AnimatedProgressBarProps {
-  durationSec: number;
-  endColor: string;
-  startColor: string;
-}
-
-function AnimatedProgressBar({
-  durationSec,
-  endColor,
-  startColor,
-}: AnimatedProgressBarProps) {
-  const [isActive, setIsActive] = useState(false);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setIsActive(true);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, []);
-
-  return (
-    <div
-      className="h-full origin-left"
-      style={{
-        background: `linear-gradient(to right, ${startColor}, ${endColor})`,
-        transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
-        transition: `transform ${durationSec}s linear`,
-        willChange: 'transform',
-      }}
-    />
-  );
 }
 
 export function DisplayModernTripleLayout({
@@ -69,9 +34,12 @@ export function DisplayModernTripleLayout({
     mediaItems,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
-  const leftSize = left.zone?.size || (designStyle === 'modern-timeline' ? 65 : 60);
-  const rightSize = 100 - leftSize;
+  const isPortrait = profile.isPortrait;
+  const isCompact = profile.isCompact;
+  const leftSize = isPortrait ? 100 : (left.zone?.size || (designStyle === 'modern-timeline' ? 65 : 60));
+  const rightSize = isPortrait ? 100 : 100 - leftSize;
   const topDurationSec = topRight.slide?.duration ?? 12;
 
   const leftBg = themeColors.zebra1 || '#F7F3E9';
@@ -81,6 +49,11 @@ export function DisplayModernTripleLayout({
 
   const accentGreen = themeColors.accentGreen || themeColors.timeColBg || '#8F9779';
   const accentGold = themeColors.accentGold || themeColors.accent || '#A68A64';
+  const bottomPanelClassName = isPortrait
+    ? 'flex-[0.9] min-h-0 p-2.5'
+    : isCompact
+      ? 'h-32 p-3'
+      : 'h-44 p-4';
 
   const renderLeftPanel = () => {
     if (!left.slide || left.slide.type === 'content-panel') {
@@ -139,11 +112,21 @@ export function DisplayModernTripleLayout({
   };
 
   return (
-    <div className="w-full h-full flex relative overflow-hidden">
+    <div
+      ref={containerRef}
+      className={classNames(
+        'w-full h-full relative overflow-hidden',
+        isPortrait ? 'flex flex-col' : 'flex',
+      )}
+    >
       <div
-        className={classNames('h-full relative overflow-hidden', showZoneBorders && 'border-r')}
+        className={classNames(
+          'h-full relative overflow-hidden',
+          showZoneBorders && (isPortrait ? 'border-b' : 'border-r'),
+        )}
         style={{
-          width: `${leftSize}%`,
+          width: isPortrait ? '100%' : `${leftSize}%`,
+          height: isPortrait ? '54%' : '100%',
           backgroundColor: leftBg,
           borderColor: showZoneBorders ? border : undefined,
         }}
@@ -159,13 +142,29 @@ export function DisplayModernTripleLayout({
       </div>
 
       <div
-        className="h-full flex flex-col relative overflow-hidden"
+        className="flex min-h-0 flex-col relative overflow-hidden"
         style={{
-          width: `${rightSize}%`,
+          width: isPortrait ? '100%' : `${rightSize}%`,
+          height: isPortrait ? '46%' : '100%',
           backgroundColor: rightBg,
         }}
       >
         <div className="flex-1 relative overflow-hidden flex flex-col">
+          {(topRight.info?.shouldRotate || false) && (
+            <SlideProgressIndicator
+              key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
+              className={classNames(
+                'absolute left-1/2 z-20 -translate-x-1/2',
+                isPortrait ? 'bottom-2.5' : 'bottom-3',
+              )}
+              compact
+              durationSec={topDurationSec}
+              startColor={accentGreen}
+              endColor={accentGold}
+              surfaceColor={rightBg}
+              borderColor={border}
+            />
+          )}
           <SlideTransition
             slideKey={topRight.slide?.id || topRight.info?.currentSlideIndex || 'top-fallback'}
             enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
@@ -179,7 +178,7 @@ export function DisplayModernTripleLayout({
         </div>
 
         <div
-          className={classNames('h-44 p-4 relative shrink-0 overflow-hidden', showZoneBorders && 'border-t')}
+          className={classNames('relative shrink-0 overflow-hidden', bottomPanelClassName, showZoneBorders && 'border-t')}
           style={{
             backgroundColor: bottomBg,
             borderColor: showZoneBorders ? border : undefined,
@@ -197,17 +196,6 @@ export function DisplayModernTripleLayout({
           </SlideTransition>
         </div>
       </div>
-
-      {(topRight.info?.shouldRotate || false) && (
-        <div className="absolute bottom-0 left-0 w-full h-1.5 bg-black/[0.03]">
-          <AnimatedProgressBar
-            key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
-            durationSec={topDurationSec}
-            startColor={accentGreen}
-            endColor={accentGold}
-          />
-        </div>
-      )}
     </div>
   );
 }

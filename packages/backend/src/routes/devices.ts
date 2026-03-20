@@ -8,14 +8,30 @@ import { authMiddleware, deviceAuthMiddleware, generateDeviceToken, type AuthReq
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter, pairingRequestLimiter, heartbeatLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
-import { isPlainRecord, deepMerge } from '../lib/utils.js';
-import { normalizeScheduleData, DEFAULT_HEADER } from '../lib/schedule.js';
+import { normalizeScheduleData } from '../lib/schedule.js';
 import {
   attachDeviceSnapshotMeta,
   attachDeviceSnapshotMetaList,
   deleteDeviceSnapshot,
   saveDeviceSnapshot,
 } from '../lib/deviceSnapshots.js';
+import {
+  buildBulkDeviceCommandAuditDetails,
+  buildBulkDeviceUpdateAuditDetails,
+  buildBulkDeviceUpdateData,
+  buildDeviceCreateAuditDetails,
+  buildDeviceCreateData,
+  buildDeviceDisplayConfigPayload,
+  buildDevicePairAuditDetails,
+  buildDeviceUpdateAuditDetails,
+  buildDeviceUpdateData,
+  decodeSnapshotDataUrl,
+  findMissingEntityIds,
+  generateUniquePairingCode,
+  normalizeDeviceGroupName,
+  normalizeSettingsData,
+  readDeviceFleetState,
+} from '../lib/deviceManagement.js';
 
 const router = Router();
 const DEFAULT_DEVICE_LIMIT = 250;
@@ -26,35 +42,6 @@ const DEVICE_ADMIN_INCLUDE = {
   },
   overrides: true,
 } satisfies Prisma.DeviceInclude;
-
-function normalizeSettingsData(raw: unknown): Record<string, unknown> {
-  const data = isPlainRecord(raw) ? { ...raw } : {};
-  if (!isPlainRecord(data.header)) {
-    data.header = { ...DEFAULT_HEADER };
-  }
-  return data;
-}
-
-function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
-  return isPlainRecord(raw) && Object.keys(raw).length > 0;
-}
-
-function normalizeDeviceGroupName(value: string | null | undefined): string | null {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function readDeviceFleetState(device: unknown): { groupName: string | null; maintenanceMode: boolean } {
-  if (!isPlainRecord(device)) {
-    return { groupName: null, maintenanceMode: false };
-  }
-
-  return {
-    groupName: normalizeDeviceGroupName(typeof device.groupName === 'string' ? device.groupName : null),
-    maintenanceMode: device.maintenanceMode === true,
-  };
-}
 
 async function loadAdminDevicesByIds(deviceIds: string[]) {
   return prisma.device.findMany({
@@ -124,12 +111,6 @@ const RequestPairingSchema = z.object({
 const DeviceSnapshotSchema = z.object({
   imageDataUrl: z.string().min(100).max(6_000_000),
 });
-
-function decodeSnapshotDataUrl(imageDataUrl: string): Buffer | null {
-  const match = imageDataUrl.match(/^data:image\/jpeg;base64,([a-zA-Z0-9+/=\s]+)$/);
-  if (!match) return null;
-  return Buffer.from(match[1], 'base64');
-}
 
 // GET /api/devices - List all devices (admin only)
 router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req: AuthRequest, res) => {
@@ -220,28 +201,17 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
 
     const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);
     const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
-    const hasScheduleOverride = Boolean(overrideSchedule);
-    const hasSettingsOverride = hasSettingsOverrideData(device.overrides?.settings);
     const fleetState = readDeviceFleetState(device);
 
-    const isOverrideMode = device.mode === 'override';
-    const effectiveSchedule = isOverrideMode && hasScheduleOverride
-      ? overrideSchedule
-      : globalSchedule;
-
-    const effectiveSettings = isOverrideMode && hasSettingsOverride
-      ? deepMerge(globalSettings, normalizeSettingsData(device.overrides?.settings)) as Record<string, unknown>
-      : globalSettings;
-
-    return res.json({
+    return res.json(buildDeviceDisplayConfigPayload({
       deviceId: device.id,
       maintenanceMode: fleetState.maintenanceMode,
-      mode: device.mode,
-      hasScheduleOverride,
-      hasSettingsOverride,
-      schedule: effectiveSchedule,
-      settings: effectiveSettings,
-    });
+      mode: device.mode as 'auto' | 'override',
+      globalSchedule,
+      globalSettings,
+      overrideSchedule,
+      overrideSettings: device.overrides?.settings,
+    }));
   } catch (error) {
     console.error('[devices] Error fetching display config:', error);
     return res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
@@ -296,16 +266,13 @@ router.post('/:id/snapshot', deviceAuthMiddleware, heartbeatLimiter, async (req:
 router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = CreateDeviceSchema.parse(req.body);
-    const nextDeviceData = {
-      name: validated.name,
-      groupName: normalizeDeviceGroupName(validated.groupName),
-      maintenanceMode: validated.maintenanceMode,
-      mode: validated.mode,
-      pairedAt: new Date(),
-    } as Prisma.DeviceCreateInput;
-
     const device = await prisma.device.create({
-      data: nextDeviceData,
+      data: buildDeviceCreateData({
+        name: validated.name,
+        groupName: validated.groupName,
+        maintenanceMode: validated.maintenanceMode,
+        mode: validated.mode,
+      }),
       include: DEVICE_ADMIN_INCLUDE,
     });
     const fleetState = readDeviceFleetState(device);
@@ -314,12 +281,12 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
     await logAuditEvent(req, {
       action: 'device.create',
       resource: device.id,
-      details: {
+      details: buildDeviceCreateAuditDetails({
         groupName: fleetState.groupName,
         maintenanceMode: fleetState.maintenanceMode,
         mode: device.mode,
         name: device.name,
-      },
+      }),
     });
 
     res.json(device);
@@ -336,16 +303,9 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
 router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
-    const updates: Record<string, unknown> = {};
-
-    if (validated.name !== undefined) updates.name = validated.name;
-    if (validated.mode !== undefined) updates.mode = validated.mode;
-    if (validated.groupName !== undefined) updates.groupName = normalizeDeviceGroupName(validated.groupName);
-    if (validated.maintenanceMode !== undefined) updates.maintenanceMode = validated.maintenanceMode;
-
     const device = await prisma.device.update({
       where: { id: req.params.id },
-      data: updates as Prisma.DeviceUpdateInput,
+      data: buildDeviceUpdateData(validated),
       include: DEVICE_ADMIN_INCLUDE,
     });
 
@@ -353,12 +313,7 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
     await logAuditEvent(req, {
       action: 'device.update',
       resource: device.id,
-      details: {
-        ...validated,
-        groupName: validated.groupName === undefined
-          ? undefined
-          : normalizeDeviceGroupName(validated.groupName),
-      },
+      details: buildDeviceUpdateAuditDetails(validated),
     });
 
     res.json(device);
@@ -403,8 +358,7 @@ router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage')
   try {
     const validated = BulkUpdateDeviceSchema.parse(req.body);
     const devices = await loadAdminDevicesByIds(validated.deviceIds);
-    const foundIds = new Set(devices.map((device) => device.id));
-    const missingIds = validated.deviceIds.filter((id) => !foundIds.has(id));
+    const missingIds = findMissingEntityIds(validated.deviceIds, devices);
 
     if (missingIds.length > 0) {
       return res.status(404).json({
@@ -414,16 +368,9 @@ router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage')
       });
     }
 
-    const updates: Record<string, unknown> = {};
-    if (validated.updates.mode !== undefined) updates.mode = validated.updates.mode;
-    if (validated.updates.maintenanceMode !== undefined) updates.maintenanceMode = validated.updates.maintenanceMode;
-    if (validated.updates.groupName !== undefined) {
-      updates.groupName = normalizeDeviceGroupName(validated.updates.groupName);
-    }
-
     await prisma.device.updateMany({
       where: { id: { in: validated.deviceIds } },
-      data: updates as Prisma.DeviceUpdateManyMutationInput,
+      data: buildBulkDeviceUpdateData(validated.updates),
     });
 
     const updatedDevices = await loadAdminDevicesByIds(validated.deviceIds);
@@ -432,16 +379,10 @@ router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage')
     await logAuditEvent(req, {
       action: 'device.bulk.update',
       resource: null,
-      details: {
-        affectedCount: updatedDevices.length,
+      details: buildBulkDeviceUpdateAuditDetails({
         deviceIds: updatedDevices.map((device) => device.id),
-        updates: {
-          ...validated.updates,
-          groupName: validated.updates.groupName === undefined
-            ? undefined
-            : normalizeDeviceGroupName(validated.updates.groupName),
-        },
-      },
+        updates: validated.updates,
+      }),
     });
 
     return res.json({
@@ -481,8 +422,7 @@ router.post('/bulk/control', authMiddleware, requirePermission('devices:manage')
       where: { id: { in: validated.deviceIds } },
       select: { id: true, name: true },
     });
-    const foundIds = new Set(devices.map((device) => device.id));
-    const missingIds = validated.deviceIds.filter((id) => !foundIds.has(id));
+    const missingIds = findMissingEntityIds(validated.deviceIds, devices);
 
     if (missingIds.length > 0) {
       return res.status(404).json({
@@ -501,11 +441,10 @@ router.post('/bulk/control', authMiddleware, requirePermission('devices:manage')
     await logAuditEvent(req, {
       action: 'device.bulk.command',
       resource: null,
-      details: {
-        affectedCount: devices.length,
+      details: buildBulkDeviceCommandAuditDetails({
         deviceIds: devices.map((device) => device.id),
         command: validated.command.action,
-      },
+      }),
     });
 
     return res.json({
@@ -656,20 +595,10 @@ router.post('/request-pairing', pairingRequestLimiter, async (req, res) => {
       });
     }
 
-    // Generate deterministic pairing code from browser ID (first 6 digits of hash)
-    const crypto = await import('crypto');
-    const hash = crypto.createHash('sha256').update(browserId).digest('hex');
-    let pairingCode = parseInt(hash.substring(0, 8), 16).toString().substring(0, 6).padStart(6, '0');
-
-    // Ensure code is unique (very unlikely collision, but check anyway)
-    let existingCode = await prisma.device.findUnique({ where: { pairingCode } });
-    let attempt = 0;
-    while (existingCode && attempt < 10) {
-      const hashAttempt = crypto.createHash('sha256').update(browserId + attempt).digest('hex');
-      pairingCode = parseInt(hashAttempt.substring(0, 8), 16).toString().substring(0, 6).padStart(6, '0');
-      existingCode = await prisma.device.findUnique({ where: { pairingCode } });
-      attempt++;
-    }
+    const pairingCode = await generateUniquePairingCode(
+      browserId,
+      async (candidate) => Boolean(await prisma.device.findUnique({ where: { pairingCode: candidate } })),
+    );
 
     // Create new device with browser ID as primary key
     device = await prisma.device.create({
@@ -732,10 +661,10 @@ router.post('/pair', authMiddleware, requirePermission('devices:manage'), mutati
     await logAuditEvent(req, {
       action: 'device.pair',
       resource: pairedDevice.id,
-      details: {
+      details: buildDevicePairAuditDetails({
         groupName: pairedFleetState.groupName,
         name: pairedDevice.name,
-      },
+      }),
     });
 
     res.json(pairedDevice);

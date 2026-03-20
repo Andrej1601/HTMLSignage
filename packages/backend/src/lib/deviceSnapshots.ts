@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { UPLOAD_DIR } from './upload.js';
 
-const DEVICE_SNAPSHOT_DIR = path.join(UPLOAD_DIR, 'device-snapshots');
+export const DEVICE_SNAPSHOT_DIR = path.join(UPLOAD_DIR, 'device-snapshots');
 
 export interface DeviceSnapshotMeta {
   snapshotUrl: string | null;

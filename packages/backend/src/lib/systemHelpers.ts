@@ -4,7 +4,26 @@ import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
+import {
+  buildSystemUpdatePreflight,
+  buildSystemUpdatePreflightChecks,
+  buildSystemUpdateRestartPlan,
+  buildSystemUpdateVerification,
+  type SystemUpdatePreflight,
+  type SystemUpdateRestartPlan,
+  type SystemUpdateVerification,
+  type SystemUpdateVerificationOptions,
+} from './systemUpdateStatus.js';
 import { UPLOAD_DIR } from './upload.js';
+export type {
+  SystemUpdateCheck,
+  SystemUpdateCheckStatus,
+  SystemUpdatePreflight,
+  SystemUpdateRestartPlan,
+  SystemUpdateRestartStrategy,
+  SystemUpdateVerification,
+  SystemUpdateVerificationOptions,
+} from './systemUpdateStatus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,50 +53,6 @@ export interface ReleaseInfo {
   body: string;
   publishedAt: string;
   prerelease: boolean;
-}
-
-export type SystemUpdateCheckStatus = 'ok' | 'warning' | 'error';
-
-export interface SystemUpdateCheck {
-  id: string;
-  label: string;
-  status: SystemUpdateCheckStatus;
-  detail: string;
-}
-
-export interface SystemUpdatePreflight {
-  ready: boolean;
-  checks: SystemUpdateCheck[];
-  blockers: string[];
-  warnings: string[];
-}
-
-export interface SystemUpdateVerification {
-  ready: boolean;
-  checks: SystemUpdateCheck[];
-  manualActions: string[];
-}
-
-export type SystemUpdateRestartStrategy = 'command' | 'self-process' | 'manual';
-
-export interface SystemUpdateRestartPlan {
-  strategy: SystemUpdateRestartStrategy;
-  autoRestartReady: boolean;
-  currentService: string | null;
-  backendService: string;
-  frontendService: string;
-  backendHealthUrl: string;
-  frontendHealthUrl: string;
-  restartCommand: string | null;
-  frontendRestartCommand: string | null;
-  summary: string;
-}
-
-export interface SystemUpdateVerificationOptions {
-  restartSummary?: string | null;
-  backendHealth?: { url: string; ok: boolean; detail: string } | null;
-  frontendHealth?: { url: string; ok: boolean; detail: string } | null;
-  manualActions?: string[];
 }
 
 export interface GitHubApiRelease {
@@ -319,50 +294,15 @@ export async function resolveSystemUpdateRestartPlan(pid = process.pid): Promise
   const frontendRestartCommand = getEnvValue('SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND');
   const currentService = await getSystemdServiceFromCgroup(pid);
 
-  if (restartCommand) {
-    return {
-      strategy: 'command',
-      autoRestartReady: true,
-      currentService,
-      backendService,
-      frontendService,
-      backendHealthUrl,
-      frontendHealthUrl,
-      restartCommand,
-      frontendRestartCommand,
-      summary: 'Restart ueber SYSTEM_UPDATE_RESTART_COMMAND konfiguriert.',
-    };
-  }
-
-  if (currentService === backendService) {
-    return {
-      strategy: 'self-process',
-      autoRestartReady: true,
-      currentService,
-      backendService,
-      frontendService,
-      backendHealthUrl,
-      frontendHealthUrl,
-      restartCommand: null,
-      frontendRestartCommand,
-      summary: `Backend laeuft unter ${backendService} und kann per Self-Restart finalisiert werden.`,
-    };
-  }
-
-  return {
-    strategy: 'manual',
-    autoRestartReady: false,
+  return buildSystemUpdateRestartPlan({
     currentService,
     backendService,
     frontendService,
     backendHealthUrl,
     frontendHealthUrl,
-    restartCommand: null,
+    restartCommand,
     frontendRestartCommand,
-    summary: currentService
-      ? `Aktueller Dienst ist ${currentService}; erwartet wird ${backendService} oder SYSTEM_UPDATE_RESTART_COMMAND.`
-      : 'Kein automatischer Restart-Pfad erkannt. SYSTEM_UPDATE_RESTART_COMMAND fehlt und der Backend-Prozess laeuft nicht unter der erwarteten systemd-Unit.',
-  };
+  });
 }
 
 export async function waitForHttpOk(
@@ -401,18 +341,7 @@ export async function waitForHttpOk(
   };
 }
 
-function buildPreflightResult(checks: SystemUpdateCheck[]): SystemUpdatePreflight {
-  return {
-    ready: checks.every((check) => check.status !== 'error'),
-    checks,
-    blockers: checks.filter((check) => check.status === 'error').map((check) => check.detail),
-    warnings: checks.filter((check) => check.status === 'warning').map((check) => check.detail),
-  };
-}
-
 export async function collectSystemUpdatePreflight(): Promise<SystemUpdatePreflight> {
-  const checks: SystemUpdateCheck[] = [];
-
   const [gitAvailable, pnpmAvailable, pgDumpAvailable, isDirty, currentTag, currentRef, restartPlan] = await Promise.all([
     hasCommand('git'),
     hasCommand('pnpm'),
@@ -423,78 +352,18 @@ export async function collectSystemUpdatePreflight(): Promise<SystemUpdatePrefli
     resolveSystemUpdateRestartPlan(),
   ]);
 
-  checks.push({
-    id: 'git',
-    label: 'Git CLI',
-    status: gitAvailable ? 'ok' : 'error',
-    detail: gitAvailable ? 'Git ist verfuegbar.' : 'Git ist auf dem Host nicht verfuegbar.',
-  });
-  checks.push({
-    id: 'pnpm',
-    label: 'pnpm',
-    status: pnpmAvailable ? 'ok' : 'error',
-    detail: pnpmAvailable ? 'pnpm ist verfuegbar.' : 'pnpm ist auf dem Host nicht verfuegbar.',
-  });
-  checks.push({
-    id: 'github-config',
-    label: 'GitHub-Zugang',
-    status: process.env.GITHUB_TOKEN && process.env.GITHUB_REPO ? 'ok' : 'error',
-    detail: process.env.GITHUB_TOKEN && process.env.GITHUB_REPO
-      ? `Release-Quelle: ${process.env.GITHUB_REPO}`
-      : 'GITHUB_TOKEN oder GITHUB_REPO fehlt.',
-  });
-  checks.push({
-    id: 'database-url',
-    label: 'Datenbank-URL',
-    status: process.env.DATABASE_URL ? 'ok' : 'error',
-    detail: process.env.DATABASE_URL
-      ? 'DATABASE_URL ist gesetzt.'
-      : 'DATABASE_URL fehlt. Backup und Migrationen koennen nicht sicher ausgefuehrt werden.',
-  });
-  checks.push({
-    id: 'pg-dump',
-    label: 'Backup-Werkzeug',
-    status: pgDumpAvailable ? 'ok' : 'error',
-    detail: pgDumpAvailable
-      ? 'pg_dump ist verfuegbar.'
-      : 'pg_dump fehlt. Datenbank-Backups koennen nicht erstellt werden.',
-  });
-  checks.push({
-    id: 'working-tree',
-    label: 'Arbeitsbaum',
-    status: isDirty ? 'error' : 'ok',
-    detail: isDirty
-      ? 'Lokale, tracked Aenderungen blockieren das Update.'
-      : 'Arbeitsbaum ist sauber.',
-  });
-  checks.push({
-    id: 'git-ref',
-    label: 'Aktueller Git-Ref',
-    status: currentTag ? 'ok' : 'warning',
-    detail: currentTag
-      ? `Aktueller Stand: ${currentTag}`
-      : `HEAD ist nicht auf einem exakten Tag (${currentRef || 'unbekannt'}).`,
-  });
-  checks.push({
-    id: 'restart-strategy',
-    label: 'Runner-Finalisierung',
-    status: restartPlan.autoRestartReady ? 'ok' : 'error',
-    detail: restartPlan.summary,
-  });
-  checks.push({
-    id: 'backend-health',
-    label: 'Backend-Healthcheck',
-    status: 'ok',
-    detail: `Backend wird nach dem Update ueber ${restartPlan.backendHealthUrl} geprueft.`,
-  });
-  checks.push({
-    id: 'frontend-health',
-    label: 'Frontend-Healthcheck',
-    status: 'ok',
-    detail: `Frontend wird nach dem Update ueber ${restartPlan.frontendHealthUrl} geprueft.`,
-  });
-
-  return buildPreflightResult(checks);
+  return buildSystemUpdatePreflight(buildSystemUpdatePreflightChecks({
+    gitAvailable,
+    pnpmAvailable,
+    pgDumpAvailable,
+    hasGitHubConfig: Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
+    githubRepo: process.env.GITHUB_REPO ?? null,
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+    isDirty,
+    currentTag,
+    currentRef,
+    restartPlan,
+  }));
 }
 
 export async function collectSystemUpdateVerification(
@@ -512,90 +381,16 @@ export async function collectSystemUpdateVerification(
   const backendDistReady = existsSync(backendDistPath);
   const frontendDistReady = existsSync(frontendDistPath);
 
-  const checks: SystemUpdateCheck[] = [
-    {
-      id: 'git-tag',
-      label: 'Git-Checkout',
-      status: currentTag === targetTag ? 'ok' : 'warning',
-      detail: currentTag === targetTag
-        ? `HEAD steht auf ${targetTag}.`
-        : `Aktueller Ref: ${currentTag || currentRef || 'unbekannt'}.`,
-    },
-    {
-      id: 'backend-dist',
-      label: 'Backend-Build',
-      status: backendDistReady ? 'ok' : 'error',
-      detail: backendDistReady
-        ? 'packages/backend/dist/server.js ist vorhanden.'
-        : 'Backend-Buildartefakt fehlt.',
-    },
-    {
-      id: 'frontend-dist',
-      label: 'Frontend-Build',
-      status: frontendDistReady ? 'ok' : 'error',
-      detail: frontendDistReady
-        ? 'packages/frontend/dist/index.html ist vorhanden.'
-        : 'Frontend-Buildartefakt fehlt.',
-    },
-    {
-      id: 'package-version',
-      label: 'Paketversion',
-      status: compareVersions(currentVersion, targetTag) === 0 ? 'ok' : 'warning',
-      detail: compareVersions(currentVersion, targetTag) === 0
-        ? `package.json meldet ${currentVersion}.`
-        : `package.json meldet ${currentVersion}, Ziel-Tag ist ${targetTag}.`,
-    },
-  ];
-
-  if (options.restartSummary) {
-    checks.push({
-      id: 'runner-finalization',
-      label: 'Runner-Finalisierung',
-      status: 'ok',
-      detail: options.restartSummary,
-    });
-  } else {
-    checks.push({
-      id: 'restart-required',
-      label: 'Dienst-Neustart',
-      status: 'warning',
-      detail: 'Backend- und Frontend-Dienste muessen nach dem Update kontrolliert neu gestartet werden.',
-    });
-  }
-
-  if (options.backendHealth) {
-    checks.push({
-      id: 'backend-health',
-      label: 'Backend-Healthcheck',
-      status: options.backendHealth.ok ? 'ok' : 'error',
-      detail: options.backendHealth.detail,
-    });
-  }
-
-  if (options.frontendHealth) {
-    checks.push({
-      id: 'frontend-health',
-      label: 'Frontend-Healthcheck',
-      status: options.frontendHealth.ok ? 'ok' : 'error',
-      detail: options.frontendHealth.detail,
-    });
-  }
-
-  const manualActions = options.manualActions ?? (
-    options.backendHealth || options.frontendHealth
-      ? ['Optional: Dashboard, /settings und /display kurz als Smoke-Test pruefen.']
-      : [
-          'Backend-Dienst neu starten und /health pruefen.',
-          'Frontend-Preview bzw. Webserver neu laden.',
-          'Anschliessend Dashboard, /settings und /display kurz als Smoke-Test pruefen.',
-        ]
-  );
-
-  return {
-    ready: checks.every((check) => check.status !== 'error'),
-    checks,
-    manualActions,
-  };
+  return buildSystemUpdateVerification({
+    currentVersion,
+    currentTag,
+    currentRef,
+    targetTag,
+    backendDistReady,
+    frontendDistReady,
+    options,
+    compareVersions,
+  });
 }
 
 export function parseDateOrFallback(raw: string | undefined): Date {

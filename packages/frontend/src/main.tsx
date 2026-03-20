@@ -1,6 +1,10 @@
 import React, { startTransition } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import {
+  clearChunkRecoveryAttempt,
+  installChunkLoadRecovery,
+} from './utils/chunkLoadRecovery';
 
 function isDisplayBootstrapPath(pathname: string): boolean {
   const normalizedPath = pathname.replace(/\/+$/, '') || '/';
@@ -39,6 +43,7 @@ async function bootstrap(): Promise<void> {
     : await import('./AdminApp');
 
   const RootApp = appModule.default;
+  clearChunkRecoveryAttempt();
 
   startTransition(() => {
     root.render(
@@ -49,4 +54,5 @@ async function bootstrap(): Promise<void> {
   });
 }
 
+installChunkLoadRecovery();
 void bootstrap();

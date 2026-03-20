@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { SlideConfig } from '@/types/slideshow.types';
+import { getEffectiveMediaFit, type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
@@ -147,12 +147,14 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Bild nicht gefunden</div>;
   }
 
+  const fitMode = getEffectiveMediaFit(slide);
+
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-black">
       <ResilientImage
         src={buildUploadUrl(media.filename)}
         alt={media.originalName}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
         fallback={
           <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
             Bild konnte nicht geladen werden
@@ -174,12 +176,13 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
   }
 
   const shouldLoop = slide.videoPlayback === 'loop-duration' || slide.videoPlayback === 'duration';
+  const fitMode = getEffectiveMediaFit(slide);
 
   return (
     <div className="w-full h-full relative bg-black">
       <ResilientVideo
         src={buildUploadUrl(media.filename)}
-        className="w-full h-full object-contain"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
         autoPlay
         loop={shouldLoop}
         muted

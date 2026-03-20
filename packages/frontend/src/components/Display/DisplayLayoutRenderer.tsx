@@ -62,6 +62,10 @@ export function DisplayLayoutRenderer({
     rendered: ReactElement,
     options?: SlidePaddingOptions,
   ): ReactElement => {
+    if (slide && isMediaSlide(slide) && isEditorialDisplayAppearance(displayAppearance)) {
+      return rendered;
+    }
+
     if (!slide || !needsModernSlidePadding(isModernDesign, slide)) {
       return rendered;
     }
@@ -143,12 +147,9 @@ export function DisplayLayoutRenderer({
           subtitle={stageMeta.subtitle}
           title={stageMeta.title}
           meta={stageMeta.meta}
-          contentClassName="h-[calc(100%-4.25rem)]"
         >
           <DisplayEditorialPanel
             theme={themeColors}
-            label="Programm des Tages"
-            meta="Live-Übersicht"
             tone="paper"
           >
             {renderContentPanel()}

@@ -9,6 +9,8 @@ import {
   renderTripleSaunaDetail,
   renderTripleSlideRenderer,
 } from '@/components/Display/displayTripleLayoutUtils';
+import { classNames } from '@/utils/classNames';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface DisplayClassicTripleLayoutProps {
   context: DisplayLayoutContext;
@@ -34,14 +36,24 @@ export function DisplayClassicTripleLayout({
     resolveTransition,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
-  const leftSize = left.zone?.size || 66;
+  const isPortrait = profile.isPortrait;
+  const leftSize = isPortrait ? 100 : (left.zone?.size || 66);
   const topRightSize = topRight.zone?.size || 50;
 
   return (
-    <div className="w-full h-full flex">
+    <div
+      ref={containerRef}
+      className={classNames('w-full h-full', isPortrait ? 'flex flex-col' : 'flex')}
+    >
       {left.slide && (
-        <div style={{ width: `${leftSize}%` }}>
+        <div
+          style={{
+            width: isPortrait ? '100%' : `${leftSize}%`,
+            height: isPortrait ? '54%' : '100%',
+          }}
+        >
           <SlideTransition
             slideKey={left.slide.id || 'left'}
             enabled={enableTransitions && (left.info?.shouldRotate || false)}
@@ -64,9 +76,15 @@ export function DisplayClassicTripleLayout({
         </div>
       )}
 
-      <div style={{ width: `${100 - leftSize}%` }} className="flex flex-col">
+      <div
+        style={{
+          width: isPortrait ? '100%' : `${100 - leftSize}%`,
+          height: isPortrait ? '46%' : '100%',
+        }}
+        className="flex min-h-0 flex-col"
+      >
         {topRight.slide && (
-          <div style={{ height: `${topRightSize}%` }}>
+          <div style={{ height: isPortrait ? '56%' : `${topRightSize}%` }}>
             <SlideTransition
               slideKey={topRight.slide.id || `top-right-${topRight.slide.saunaId || 0}`}
               enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
@@ -83,7 +101,7 @@ export function DisplayClassicTripleLayout({
         )}
 
         {bottomRight.slide && (
-          <div style={{ height: `${100 - topRightSize}%` }}>
+          <div style={{ height: isPortrait ? '44%' : `${100 - topRightSize}%` }}>
             <SlideTransition
               slideKey={bottomRight.slide.id || `bottom-right-${bottomRight.slide.saunaId || 1}`}
               enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}

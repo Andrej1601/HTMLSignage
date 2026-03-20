@@ -20,8 +20,6 @@ import {
   SPECIAL_PRESETS,
   getTodayPresetKey,
   resolveLivePresetKey,
-  sortTimeRows,
-  copyDaySchedule,
   syncScheduleWithSaunas,
 } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -35,15 +33,18 @@ import clsx from 'clsx';
 import { getModeLabel } from '@/types/device.types';
 import { hasDeviceOverrides } from '@/utils/deviceUtils';
 import { getScheduleQualityIssues } from '@/utils/editorQuality';
-
-function formatDateTimeLocalInput(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  const hours = String(value.getHours()).padStart(2, '0');
-  const minutes = String(value.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
+import {
+  formatDateTimeLocalInput,
+  resolveInitialEditingPreset,
+  withAddedTimeRow,
+  withAutoPlayToggled,
+  withCellEntry,
+  withCopiedPreset,
+  withDeletedTimeRow,
+  withIncrementedScheduleVersion,
+  withManualActivePreset,
+  withUpdatedTimeRow,
+} from './schedulePage.utils';
 
 export function SchedulePage() {
   const { user } = useAuth();
@@ -92,14 +93,7 @@ export function SchedulePage() {
   useEffect(() => {
     if (schedule && !localSchedule && !draftState.hasRecoveredDraft) {
       setLocalSchedule(schedule);
-      // Set active preset based on autoPlay
-      if (schedule.autoPlay) {
-        setEditingPreset(resolveLivePresetKey(schedule, settings));
-      } else if (schedule.activePreset) {
-        setEditingPreset(schedule.activePreset);
-      } else {
-        setEditingPreset(getTodayPresetKey());
-      }
+      setEditingPreset(resolveInitialEditingPreset(schedule, settings));
     }
   }, [draftState.hasRecoveredDraft, schedule, localSchedule, settings]);
 
@@ -181,10 +175,7 @@ export function SchedulePage() {
     if (!localSchedule || localSchedule.autoPlay) return;
     if (localSchedule.activePreset === editingPreset) return;
 
-    setLocalSchedule({
-      ...localSchedule,
-      activePreset: editingPreset,
-    });
+    setLocalSchedule(withManualActivePreset(localSchedule, editingPreset));
     setIsDirty(true);
   };
 
@@ -192,17 +183,7 @@ export function SchedulePage() {
   const handleAutoPlayToggle = () => {
     if (!localSchedule) return;
 
-    const newAutoPlay = !localSchedule.autoPlay;
-    const weekdayPreset = getTodayPresetKey(now);
-    const manualPresetFallback: PresetKey = activeEvent
-      ? weekdayPreset
-      : (livePreset === 'Evt1' || livePreset === 'Evt2' ? weekdayPreset : livePreset);
-
-    setLocalSchedule({
-      ...localSchedule,
-      autoPlay: newAutoPlay,
-      activePreset: newAutoPlay ? undefined : manualPresetFallback,
-    });
+    setLocalSchedule(withAutoPlayToggled(localSchedule, settings, now));
     setIsDirty(true);
   };
 
@@ -210,16 +191,7 @@ export function SchedulePage() {
   const handleCopyFrom = (sourcePreset: PresetKey) => {
     if (!localSchedule) return;
 
-    const sourceDaySchedule = localSchedule.presets[sourcePreset];
-    const copiedSchedule = copyDaySchedule(sourceDaySchedule);
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: copiedSchedule,
-      },
-    });
+    setLocalSchedule(withCopiedPreset(localSchedule, sourcePreset, editingPreset));
     setIsDirty(true);
     setShowCopyMenu(false);
   };
@@ -251,39 +223,9 @@ export function SchedulePage() {
     if (!localSchedule || !currentDaySchedule || !editingTime) return;
 
     if (editingTime.timeRowIndex === -1) {
-      // Adding new time row
-      const newRow = {
-        time: newTime,
-        entries: currentDaySchedule.saunas.map(() => null),
-      };
-      const updatedRows = sortTimeRows([...currentDaySchedule.rows, newRow]);
-
-      setLocalSchedule({
-        ...localSchedule,
-        presets: {
-          ...localSchedule.presets,
-          [editingPreset]: {
-            ...currentDaySchedule,
-            rows: updatedRows,
-          },
-        },
-      });
+      setLocalSchedule(withAddedTimeRow(localSchedule, editingPreset, newTime));
     } else {
-      // Editing existing time
-      const updatedRows = [...currentDaySchedule.rows];
-      updatedRows[editingTime.timeRowIndex].time = newTime;
-      const sortedRows = sortTimeRows(updatedRows);
-
-      setLocalSchedule({
-        ...localSchedule,
-        presets: {
-          ...localSchedule.presets,
-          [editingPreset]: {
-            ...currentDaySchedule,
-            rows: sortedRows,
-          },
-        },
-      });
+      setLocalSchedule(withUpdatedTimeRow(localSchedule, editingPreset, editingTime.timeRowIndex, newTime));
     }
 
     setIsDirty(true);
@@ -294,18 +236,7 @@ export function SchedulePage() {
   const handleDeleteTimeRow = (timeRowIndex: number) => {
     if (!localSchedule || !currentDaySchedule) return;
 
-    const updatedRows = currentDaySchedule.rows.filter((_, i) => i !== timeRowIndex);
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: {
-          ...currentDaySchedule,
-          rows: updatedRows,
-        },
-      },
-    });
+    setLocalSchedule(withDeletedTimeRow(localSchedule, editingPreset, timeRowIndex));
     setIsDirty(true);
   };
 
@@ -313,19 +244,15 @@ export function SchedulePage() {
   const handleSaveCell = (entry: Entry | null) => {
     if (!localSchedule || !currentDaySchedule || !editingCell) return;
 
-    const updatedRows = [...currentDaySchedule.rows];
-    updatedRows[editingCell.timeRowIndex].entries[editingCell.saunaIndex] = entry;
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: {
-          ...currentDaySchedule,
-          rows: updatedRows,
-        },
-      },
-    });
+    setLocalSchedule(
+      withCellEntry(
+        localSchedule,
+        editingPreset,
+        editingCell.timeRowIndex,
+        editingCell.saunaIndex,
+        entry,
+      ),
+    );
     setIsDirty(true);
     setEditingCell(null);
   };
@@ -340,10 +267,7 @@ export function SchedulePage() {
   const handleSave = () => {
     if (!localSchedule) return;
 
-    const scheduleToSave = {
-      ...localSchedule,
-      version: (localSchedule.version || 1) + 1,
-    };
+    const scheduleToSave = withIncrementedScheduleVersion(localSchedule);
 
     save(scheduleToSave, {
       onSuccess: () => {
@@ -357,13 +281,7 @@ export function SchedulePage() {
   const resetToLiveSchedule = () => {
     if (!schedule) return;
     setLocalSchedule(schedule);
-    if (schedule.autoPlay) {
-      setEditingPreset(resolveLivePresetKey(schedule, settings));
-    } else if (schedule.activePreset) {
-      setEditingPreset(schedule.activePreset);
-    } else {
-      setEditingPreset(getTodayPresetKey());
-    }
+    setEditingPreset(resolveInitialEditingPreset(schedule, settings));
     setIsDirty(false);
   };
 

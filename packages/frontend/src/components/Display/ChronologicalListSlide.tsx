@@ -6,6 +6,7 @@ import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { classNames } from '@/utils/classNames';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import {
   clampFlamesTo4,
@@ -21,6 +22,7 @@ import {
   resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 const SCROLL_SPEED = 14;
 const START_DELAY = 4000;
@@ -49,6 +51,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const header = settings.header || defaults.header!;
 
   const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   useEffect(() => {
     if (nowProp) return undefined;
@@ -81,6 +84,9 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isCompactLayout = profile.isCompact || profile.isNarrow;
+  const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
+  const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
 
   // Merge all infusions from all saunas into one sorted list
   const allInfusions = useMemo(() => {
@@ -215,26 +221,41 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
   return (
     <div
-      className={`w-full h-full flex flex-col font-sans select-none overflow-hidden ${isEditorial ? 'p-5' : 'p-8'}`}
+      ref={containerRef}
+      className={classNames(
+        'w-full h-full flex flex-col font-sans select-none overflow-hidden',
+        isEditorial ? (isCompactLayout ? 'p-3.5' : 'p-5') : isCompactLayout ? 'p-4' : 'p-8',
+      )}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
       {!isEditorial && (
-        <header className="mb-5 flex justify-between items-center z-20 w-full shrink-0">
-        <div className="flex items-center gap-5 min-w-0 flex-1">
+        <header className={classNames('z-20 w-full shrink-0', compactHeader ? 'mb-3 flex flex-col gap-3' : 'mb-5 flex items-center justify-between')}>
+        <div className={classNames('flex items-center min-w-0 flex-1', isCompactLayout ? 'gap-3' : 'gap-5')}>
           <div
-            className="w-14 h-14 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
+            className={classNames(
+              'bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0',
+              isCompactLayout ? 'h-11 w-11' : 'h-14 w-14',
+            )}
             style={{ borderColor: border }}
           >
-            <Waves className="w-7 h-7" style={{ color: accentGreen }} />
+            <Waves className={classNames(isCompactLayout ? 'h-5 w-5' : 'h-7 w-7')} style={{ color: accentGreen }} />
           </div>
           <div className="min-w-0">
             <p
-              className="font-black uppercase tracking-[0.4em] text-[10px] mb-1 opacity-90"
+              className={classNames(
+                'font-black uppercase opacity-90',
+                isUltraCompactLayout ? 'mb-0.5 text-[8px] tracking-[0.22em]' : isCompactLayout ? 'mb-0.5 text-[9px] tracking-[0.28em]' : 'mb-1 text-[10px] tracking-[0.4em]',
+              )}
               style={{ color: accentGreen }}
             >
               {header.subtitle?.trim() || 'Aufgussplan'}
             </p>
-            <h1 className="text-2xl font-black uppercase tracking-tighter leading-none whitespace-nowrap overflow-hidden text-ellipsis">
+            <h1
+              className={classNames(
+                'font-black uppercase tracking-tighter leading-none overflow-hidden text-ellipsis',
+                isUltraCompactLayout ? 'text-[22px] whitespace-normal' : isCompactLayout ? 'text-[26px]' : 'text-2xl whitespace-nowrap',
+              )}
+            >
               {firstWord}{' '}
               <span style={{ color: accentGold }}>{restWords}</span>
             </h1>
@@ -242,16 +263,28 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
         </div>
 
         <div
-          className="bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl border text-right shadow-sm shrink-0 ml-4"
+          className={classNames(
+            'bg-white/80 backdrop-blur-md border text-right shadow-sm shrink-0',
+            compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'ml-3 rounded-2xl px-4 py-2.5' : 'ml-4 rounded-2xl px-6 py-3',
+          )}
           style={{ borderColor: border }}
         >
           <p
-            className="text-[11px] font-black uppercase tracking-widest mb-0.5"
+            className={classNames(
+              'font-black uppercase mb-0.5',
+              isCompactLayout ? 'text-[9px] tracking-[0.18em]' : 'text-[11px] tracking-widest',
+            )}
             style={{ color: accentGold }}
           >
             {formatLongDateDE(now)}
           </p>
-          <p className="text-3xl font-black font-mono leading-none" style={{ color: textMain }}>
+          <p
+            className={classNames(
+              'font-black font-mono leading-none',
+              isUltraCompactLayout ? 'text-[28px]' : isCompactLayout ? 'text-[32px]' : 'text-3xl',
+            )}
+            style={{ color: textMain }}
+          >
             {formatClockDE(now)}
           </p>
         </div>
@@ -259,7 +292,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
       )}
 
       {/* Sauna legend */}
-      <div className={`flex flex-wrap gap-4 shrink-0 px-1 ${isEditorial ? 'mb-3' : 'mb-4'}`}>
+      <div className={classNames('flex flex-wrap shrink-0 px-1', isEditorial ? 'mb-3' : 'mb-4', isCompactLayout ? 'gap-2.5' : 'gap-4')}>
         {visibleSaunas
           .filter((s) => s.status !== 'out-of-order')
           .map((sauna, idx) => {
@@ -271,7 +304,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                   style={{ backgroundColor: accent }}
                 />
                 <span
-                  className="text-[11px] font-bold uppercase tracking-wider"
+                  className={classNames(
+                    'font-bold uppercase',
+                    isUltraCompactLayout ? 'text-[9px] tracking-[0.08em]' : 'text-[11px] tracking-wider',
+                  )}
                   style={{ color: textMuted }}
                 >
                   {sauna.name}
@@ -317,7 +353,11 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
             return (
               <div
                 key={infusion.id}
-                className={`flex items-center gap-5 px-5 py-4 border-b transition-all ${isFinished ? 'opacity-60' : ''}`}
+                className={classNames(
+                  'flex items-center border-b transition-all',
+                  isUltraCompactLayout ? 'gap-2.5 px-3 py-2.5' : isCompactLayout ? 'gap-3.5 px-4 py-3' : 'gap-5 px-5 py-4',
+                  isFinished && 'opacity-60',
+                )}
                 style={{
                   backgroundColor: rowBg,
                   borderColor: withAlpha(border, 0.3),
@@ -326,9 +366,12 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                 }}
               >
                 {/* Time */}
-                <div className="shrink-0 w-20 text-right">
+                <div className={classNames('shrink-0 text-right', isUltraCompactLayout ? 'w-14' : isCompactLayout ? 'w-16' : 'w-20')}>
                   <span
-                    className="text-[26px] font-black font-mono leading-none tracking-tight"
+                    className={classNames(
+                      'font-black font-mono leading-none tracking-tight',
+                      isUltraCompactLayout ? 'text-[18px]' : isCompactLayout ? 'text-[22px]' : 'text-[26px]',
+                    )}
                     style={{
                       color: isOngoing
                         ? statusLive
@@ -344,13 +387,16 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                 </div>
 
                 {/* Sauna dot + name */}
-                <div className="shrink-0 w-40 flex items-center gap-2.5 min-w-0">
+                <div className={classNames('shrink-0 flex items-center min-w-0', isUltraCompactLayout ? 'w-24 gap-1.5' : isCompactLayout ? 'w-28 gap-2' : 'w-40 gap-2.5')}>
                   <div
-                    className="w-3 h-3 rounded-full shrink-0"
+                    className={classNames('rounded-full shrink-0', isCompactLayout ? 'h-2.5 w-2.5' : 'h-3 w-3')}
                     style={{ backgroundColor: infusion.saunaAccent }}
                   />
                   <span
-                    className="text-[13px] font-black uppercase tracking-wider truncate"
+                    className={classNames(
+                      'font-black uppercase truncate',
+                      isUltraCompactLayout ? 'text-[9px] tracking-[0.08em]' : isCompactLayout ? 'text-[10px] tracking-[0.1em]' : 'text-[13px] tracking-wider',
+                    )}
                     style={{ color: isFinished ? withAlpha(textMuted, 0.5) : textMuted }}
                   >
                     {infusion.saunaName}
@@ -360,7 +406,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                 {/* Infusion title */}
                 <div className="flex-1 min-w-0">
                   <span
-                    className="text-[18px] font-black uppercase tracking-tight truncate block"
+                    className={classNames(
+                      'font-black uppercase tracking-tight truncate block',
+                      isUltraCompactLayout ? 'text-[12px]' : isCompactLayout ? 'text-[15px]' : 'text-[18px]',
+                    )}
                     style={{ color: isFinished ? withAlpha(textMain, 0.5) : textMain }}
                   >
                     {infusion.title}
@@ -372,7 +421,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                   {[1, 2, 3, 4].map((lvl) => (
                     <Flame
                       key={lvl}
-                      size={14}
+                      size={isCompactLayout ? 12 : 14}
                       className={lvl <= infusion.intensity ? 'fill-current' : ''}
                       style={{
                         color:
@@ -390,7 +439,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
                 {/* Duration */}
                 <div
-                  className="shrink-0 text-[11px] font-black px-2.5 py-1 rounded-full border"
+                  className={classNames(
+                    'shrink-0 font-black rounded-full border',
+                    isUltraCompactLayout ? 'text-[8px] px-1.5 py-0.5' : isCompactLayout ? 'text-[9px] px-2 py-0.5' : 'text-[11px] px-2.5 py-1',
+                  )}
                   style={{
                     color: withAlpha(textMuted, isFinished ? 0.4 : 0.7),
                     borderColor: withAlpha(border, 0.5),
@@ -401,12 +453,15 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                 </div>
 
                 {/* Status badge */}
-                <div className="shrink-0 w-20 text-center">
+                <div className={classNames('shrink-0 text-center', isUltraCompactLayout ? 'w-14' : isCompactLayout ? 'w-16' : 'w-20')}>
                   {isOngoing && (
                     <motion.span
                       animate={{ opacity: [1, 0.4, 1] }}
                       transition={{ repeat: Infinity, duration: 2 }}
-                      className="text-[10px] font-black tracking-widest px-3 py-1 rounded-full border"
+                      className={classNames(
+                        'font-black rounded-full border',
+                        isUltraCompactLayout ? 'text-[8px] tracking-[0.08em] px-2 py-0.5' : isCompactLayout ? 'text-[9px] tracking-[0.1em] px-2.5 py-0.5' : 'text-[10px] tracking-widest px-3 py-1',
+                      )}
                       style={{
                         color: statusLive,
                         backgroundColor: withAlpha(statusLive, 0.15),
@@ -418,7 +473,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                   )}
                   {isPrestart && (
                     <span
-                      className="text-[10px] font-black tracking-widest px-3 py-1 rounded-full border"
+                      className={classNames(
+                        'font-black rounded-full border',
+                        isUltraCompactLayout ? 'text-[8px] tracking-[0.08em] px-2 py-0.5' : isCompactLayout ? 'text-[9px] tracking-[0.1em] px-2.5 py-0.5' : 'text-[10px] tracking-widest px-3 py-1',
+                      )}
                       style={{
                         color: statusPrestart,
                         backgroundColor: withAlpha(statusPrestart, 0.12),
@@ -430,7 +488,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
                   )}
                   {isFinished && (
                     <span
-                      className="text-[9px] font-black tracking-widest uppercase"
+                      className={classNames(
+                        'font-black uppercase',
+                        isUltraCompactLayout ? 'text-[8px] tracking-[0.08em]' : 'text-[9px] tracking-widest',
+                      )}
                       style={{ color: withAlpha(textMain, 0.3) }}
                     >
                       Vorbei

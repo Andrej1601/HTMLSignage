@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { SlideConfig } from '@/types/slideshow.types';
+import { getEffectiveMediaFit, type SlideConfig } from '@/types/slideshow.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
 import type { Media } from '@/types/media.types';
@@ -40,7 +40,7 @@ export const SlidePreview = memo(function SlidePreview({ slide, className = '' }
       return (
         <MediaImagePreview
           className={`${baseClasses} ${className}`}
-          mediaId={slide.mediaId}
+          slide={slide}
           media={media}
         />
       );
@@ -49,7 +49,7 @@ export const SlidePreview = memo(function SlidePreview({ slide, className = '' }
       return (
         <MediaVideoPreview
           className={`${baseClasses} ${className}`}
-          mediaId={slide.mediaId}
+          slide={slide}
           media={media}
         />
       );
@@ -150,13 +150,14 @@ function SaunaDetailPreview({ className, saunaId, settings, media }: SaunaDetail
 // Media Image Preview
 interface MediaPreviewProps {
   className: string;
-  mediaId?: string;
+  slide: SlideConfig;
   media?: Media[];
 }
 
-function MediaImagePreview({ className, mediaId, media }: MediaPreviewProps) {
-  const mediaItem = media?.find((m) => m.id === mediaId);
-  const imageUrl = getMediaUploadUrl(media, mediaId);
+function MediaImagePreview({ className, slide, media }: MediaPreviewProps) {
+  const mediaItem = media?.find((m) => m.id === slide.mediaId);
+  const imageUrl = getMediaUploadUrl(media, slide.mediaId);
+  const fitMode = getEffectiveMediaFit(slide);
 
   if (!mediaItem || !imageUrl) {
     return (
@@ -167,11 +168,11 @@ function MediaImagePreview({ className, mediaId, media }: MediaPreviewProps) {
   }
 
   return (
-    <div className={className}>
+    <div className={`${className} ${fitMode === 'contain' ? 'bg-black' : ''}`}>
       <img
         src={imageUrl}
         alt={mediaItem.originalName}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
         loading="lazy"
       />
       <div className="absolute bottom-1 left-1 bg-black/60 text-white px-1.5 py-0.5 rounded text-[8px]">
@@ -182,9 +183,10 @@ function MediaImagePreview({ className, mediaId, media }: MediaPreviewProps) {
 }
 
 // Media Video Preview
-function MediaVideoPreview({ className, mediaId, media }: MediaPreviewProps) {
-  const mediaItem = media?.find((m) => m.id === mediaId);
-  const videoUrl = getMediaUploadUrl(media, mediaId);
+function MediaVideoPreview({ className, slide, media }: MediaPreviewProps) {
+  const mediaItem = media?.find((m) => m.id === slide.mediaId);
+  const videoUrl = getMediaUploadUrl(media, slide.mediaId);
+  const fitMode = getEffectiveMediaFit(slide);
 
   if (!mediaItem || !videoUrl) {
     return (
@@ -198,7 +200,7 @@ function MediaVideoPreview({ className, mediaId, media }: MediaPreviewProps) {
     <div className={className}>
       <video
         src={videoUrl}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
         muted
         playsInline
         preload="metadata"

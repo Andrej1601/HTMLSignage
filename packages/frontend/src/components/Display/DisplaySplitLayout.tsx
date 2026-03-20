@@ -54,17 +54,14 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
       slide: typeof persistentSlide,
       info: typeof persistentInfo,
       zone: typeof persistentZone,
-      label: string,
       tone: 'paper' | 'glass',
     ) => (
       <DisplayEditorialPanel
         theme={themeColors}
-        label={label}
-        meta={info?.shouldRotate ? 'Rotation aktiv' : undefined}
         tone={tone}
       >
         <SlideTransition
-          slideKey={slide?.id || `${zone?.id || label}-empty`}
+          slideKey={slide?.id || `${zone?.id || tone}-empty`}
           enabled={enableTransitions && (info?.shouldRotate || false)}
           duration={0.6}
           transition={resolveTransition(slide)}
@@ -88,12 +85,12 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <>
                 {hasPersistent && (
                   <div style={{ width: `${persistentSize}%` }}>
-                    {renderPanel(persistentSlide, persistentInfo, persistentZone, 'Planbereich', 'paper')}
+                    {renderPanel(persistentSlide, persistentInfo, persistentZone, 'paper')}
                   </div>
                 )}
                 {hasMain && (
                   <div style={{ width: `${mainSize}%` }}>
-                    {renderPanel(mainSlide, mainInfo, mainZone, 'Rotation', 'glass')}
+                    {renderPanel(mainSlide, mainInfo, mainZone, 'glass')}
                   </div>
                 )}
               </>
@@ -101,12 +98,12 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <>
                 {hasMain && (
                   <div style={{ width: `${mainSize}%` }}>
-                    {renderPanel(mainSlide, mainInfo, mainZone, 'Rotation', 'paper')}
+                    {renderPanel(mainSlide, mainInfo, mainZone, 'paper')}
                   </div>
                 )}
                 {hasPersistent && (
                   <div style={{ width: `${persistentSize}%` }}>
-                    {renderPanel(persistentSlide, persistentInfo, persistentZone, 'Planbereich', 'glass')}
+                    {renderPanel(persistentSlide, persistentInfo, persistentZone, 'glass')}
                   </div>
                 )}
               </>
@@ -129,12 +126,12 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
             <>
               {hasPersistent && (
                 <div style={{ height: `${persistentSize}%` }}>
-                  {renderPanel(persistentSlide, persistentInfo, persistentZone, 'Planbereich', 'paper')}
+                  {renderPanel(persistentSlide, persistentInfo, persistentZone, 'paper')}
                 </div>
               )}
               {hasMain && (
                 <div style={{ height: `${mainSize}%` }}>
-                  {renderPanel(mainSlide, mainInfo, mainZone, 'Rotation', 'glass')}
+                  {renderPanel(mainSlide, mainInfo, mainZone, 'glass')}
                 </div>
               )}
             </>
@@ -142,12 +139,12 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
             <>
               {hasMain && (
                 <div style={{ height: `${mainSize}%` }}>
-                  {renderPanel(mainSlide, mainInfo, mainZone, 'Rotation', 'paper')}
+                  {renderPanel(mainSlide, mainInfo, mainZone, 'paper')}
                 </div>
               )}
               {hasPersistent && (
                 <div style={{ height: `${persistentSize}%` }}>
-                  {renderPanel(persistentSlide, persistentInfo, persistentZone, 'Planbereich', 'glass')}
+                  {renderPanel(persistentSlide, persistentInfo, persistentZone, 'glass')}
                 </div>
               )}
             </>

@@ -85,8 +85,6 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
               <DisplayEditorialPanel
                 key={zone.id}
                 theme={themeColors}
-                label={`Zone ${index + 1}`}
-                meta={info?.shouldRotate ? 'Rotation aktiv' : undefined}
                 tone={index % 2 === 0 ? 'paper' : 'glass'}
               >
                 <SlideTransition

@@ -41,3 +41,5 @@ nginx-*.conf
 dist/
 build/
 logs/
+packages/frontend/dist-rollout-*/
+packages/frontend/dist-rollback/

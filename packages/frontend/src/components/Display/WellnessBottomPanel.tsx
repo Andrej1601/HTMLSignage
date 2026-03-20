@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Calendar, ShieldCheck } from 'lucide-react';
 import type { Settings, ThemeColors } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import {
   formatEventDateDE,
@@ -183,10 +183,10 @@ export function WellnessBottomPanel({ displayAppearance, settings, theme, media 
                     </div>
                   </div>
                 </div>
-                <div className="mt-5 text-sm leading-relaxed" style={{ color: textMuted }}>
-                  Die rechte Bühne zeigt saisonale Highlights, Aktionen und kommende Programmpunkte.
-                </div>
+              <div className="mt-5 text-sm leading-relaxed" style={{ color: textMuted }}>
+                Die rechte Bühne zeigt saisonale Highlights, Aktionen und kommende Programmpunkte.
               </div>
+            </div>
 
               <div className="grid min-h-0 grid-cols-1 gap-3">
                 {events.length === 0 ? (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { SlideConfig, SlideType } from '@/types/slideshow.types';
-import { SLIDE_TYPE_OPTIONS, getSlideTypeOption } from '@/types/slideshow.types';
+import { SLIDE_TYPE_OPTIONS, getEffectiveMediaFit, getSlideTypeOption } from '@/types/slideshow.types';
 import type { Media } from '@/types/media.types';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
@@ -50,6 +50,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
         saunaId: slide.saunaId,
         mediaId: slide.mediaId,
         videoPlayback: slide.videoPlayback,
+        mediaFit: slide.mediaFit,
         infoId: slide.infoId,
         title: slide.title,
         showTitle: slide.showTitle,
@@ -103,10 +104,11 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       ...formData,
       type: newType,
       saunaId: undefined,
-      mediaId: undefined,
-      videoPlayback: undefined,
-      infoId: undefined,
-    });
+        mediaId: undefined,
+        videoPlayback: undefined,
+        mediaFit: undefined,
+        infoId: undefined,
+      });
     setError('');
   };
 
@@ -178,6 +180,52 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             selectedId={formData.mediaId}
             onSelect={(id) => setFormData({ ...formData, mediaId: id })}
           />
+        )}
+
+        {(formData.type === 'media-image' || formData.type === 'media-video') && (
+          <div className="space-y-3 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary/60 p-4">
+            <div>
+              <label className="block text-sm font-medium text-spa-text-primary">
+                Bild-/Videodarstellung
+              </label>
+              <p className="mt-1 text-xs text-spa-text-secondary">
+                Für Preislisten, Tabellen oder Infografiken eignet sich "vollständig sichtbar", damit keine Inhalte abgeschnitten werden.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {[
+                {
+                  value: 'cover',
+                  label: 'Fläche füllen',
+                  description: 'Nutzt die gesamte Bühne, kann Ränder zuschneiden.',
+                },
+                {
+                  value: 'contain',
+                  label: 'Vollständig sichtbar',
+                  description: 'Zeigt das ganze Medium, bei Bedarf mit Rand.',
+                },
+              ].map((option) => {
+                const isActive = getEffectiveMediaFit(formData) === option.value;
+
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, mediaFit: option.value as SlideConfig['mediaFit'] })}
+                    className={clsx(
+                      'rounded-xl border p-3 text-left transition-all',
+                      isActive
+                        ? 'border-spa-primary bg-spa-primary/5 shadow-sm'
+                        : 'border-spa-bg-secondary hover:border-spa-primary/50'
+                    )}
+                  >
+                    <div className="text-sm font-semibold text-spa-text-primary">{option.label}</div>
+                    <div className="mt-1 text-xs text-spa-text-secondary">{option.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {formData.type === 'media-video' && (

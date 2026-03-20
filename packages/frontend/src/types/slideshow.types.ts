@@ -22,6 +22,10 @@ export type VideoPlaybackMode =
   | 'complete' // Play until video ends
   | 'loop-duration'; // Loop video for duration
 
+export type MediaFitMode =
+  | 'cover' // Fill available area, may crop edges
+  | 'contain'; // Show full media, may add letterboxing
+
 // Zone types
 export type ZoneType =
   | 'persistent' // Always visible, static content (deprecated - use 'smart-persistent')
@@ -50,6 +54,7 @@ export interface SlideConfig {
   saunaId?: string; // For sauna-detail
   mediaId?: string; // For media-image, media-video
   videoPlayback?: VideoPlaybackMode; // For media-video
+  mediaFit?: MediaFitMode; // For media-image, media-video
   infoId?: string; // For infos
 
   // Display options
@@ -274,6 +279,11 @@ export function getLayoutOption(type: LayoutType): LayoutOption | undefined {
 
 export function getSlideTypeOption(type: SlideType): SlideTypeOption | undefined {
   return SLIDE_TYPE_OPTIONS.find((opt) => opt.type === type);
+}
+
+export function getEffectiveMediaFit(slide: Pick<SlideConfig, 'type' | 'mediaFit'>): MediaFitMode {
+  if (slide.mediaFit) return slide.mediaFit;
+  return slide.type === 'media-video' ? 'contain' : 'cover';
 }
 
 export function getEnabledSlides(config: SlideshowConfig): SlideConfig[] {
