@@ -132,6 +132,10 @@ function SortableSlideItem({
     >
       <div
         {...dragHandleProps}
+        role="button"
+        tabIndex={0}
+        aria-label={`Slide ${index + 1} verschieben: ${slide.title || typeLabel}`}
+        aria-roledescription="Drag-Handle"
         className={clsx(
           'flex items-center touch-none',
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'
@@ -406,6 +410,7 @@ export function SlideshowConfigPanel({
                 }}
                 className="sr-only peer"
                 disabled={disabled}
+                aria-label={audioTitle}
               />
               <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
             </label>

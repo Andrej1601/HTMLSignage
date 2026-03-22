@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
@@ -344,7 +345,7 @@ function LeadEventCard({
   );
 }
 
-export function EventsSlide({ settings, media }: EventsSlideProps) {
+export const EventsSlide = memo(function EventsSlide({ settings, media }: EventsSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
@@ -504,4 +505,4 @@ export function EventsSlide({ settings, media }: EventsSlideProps) {
       </div>
     </div>
   );
-}
+});

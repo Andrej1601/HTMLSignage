@@ -192,7 +192,7 @@ export function ThemeEditor({
       >
         <button
           onClick={() => applyPalette(id, colors)}
-          className="w-full text-left"
+          className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-accent focus-visible:ring-offset-2 rounded-lg"
         >
           <div className="flex items-center justify-between mb-2">
             <div className={`font-medium ${isActive ? 'text-spa-accent' : 'text-spa-text-primary group-hover:text-spa-accent'} transition-colors`}>
@@ -252,7 +252,7 @@ export function ThemeEditor({
               key={appearance.id}
               onClick={() => onDisplayAppearanceChange?.(appearance.id)}
               disabled={!onDisplayAppearanceChange}
-              className={`p-4 border-2 rounded-lg transition-all text-left ${
+              className={`p-4 border-2 rounded-lg transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-accent focus-visible:ring-offset-2 ${
                 displayAppearance === appearance.id
                   ? 'border-spa-accent bg-spa-accent/5 shadow-sm'
                   : 'border-spa-secondary/20 hover:border-spa-accent/60'
@@ -274,7 +274,7 @@ export function ThemeEditor({
               key={style.id}
               onClick={() => onDesignStyleChange?.(style.id)}
               disabled={!onDesignStyleChange}
-              className={`p-4 border-2 rounded-lg transition-all text-left ${
+              className={`p-4 border-2 rounded-lg transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-accent focus-visible:ring-offset-2 ${
                 designStyle === style.id
                   ? 'border-spa-accent bg-spa-accent/5 shadow-sm'
                   : 'border-spa-secondary/20 hover:border-spa-accent/60'
@@ -396,6 +396,7 @@ export function ThemeEditor({
                         type="color"
                         value={theme[key] || '#000000'}
                         onChange={(e) => updateColor(key, e.target.value)}
+                        aria-label={`Farbe: ${label}`}
                         className="w-12 h-12 rounded cursor-pointer border-2 border-spa-secondary/30"
                       />
                       <div className="flex-1">

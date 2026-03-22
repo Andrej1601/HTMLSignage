@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { PageHeader } from '@/components/PageHeader';
 import { TabGroup, TabPanel, type Tab } from '@/components/TabGroup';
-import { DisplayScenarioPreview } from '@/components/Display/DisplayScenarioPreview';
 import { useSettings } from '@/hooks/useSettings';
 import { useSchedule } from '@/hooks/useSchedule';
 import { usePersistentEditorDraft } from '@/hooks/usePersistentEditorDraft';
@@ -12,24 +11,18 @@ import { ThemeEditor } from '@/components/Settings/ThemeEditor';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
-import { EventManager } from '@/components/Settings/EventManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
-import { SystemMaintenance } from '@/components/Settings/SystemMaintenance';
 import { usePermission } from '@/hooks/usePermission';
+
+const EventManager = lazy(() => import('@/components/Settings/EventManager').then(m => ({ default: m.EventManager })));
+const SystemMaintenance = lazy(() => import('@/components/Settings/SystemMaintenance').then(m => ({ default: m.SystemMaintenance })));
+const DisplayScenarioPreview = lazy(() => import('@/components/Display/DisplayScenarioPreview').then(m => ({ default: m.DisplayScenarioPreview })));
 import { useAuth } from '@/contexts/AuthContext';
 import { createDefaultSchedule } from '@/types/schedule.types';
 import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type {
   Settings,
-  ThemeColors,
-  AudioSettings as AudioSettingsType,
-  Aroma,
-  Event,
-  InfoItem,
-  DesignStyle,
-  DisplayAppearance,
   ColorPaletteName,
-  MaintenanceScreenSettings,
 } from '@/types/settings.types';
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Monitor, Wrench } from 'lucide-react';
 import { Button } from '@/components/Button';
@@ -68,49 +61,14 @@ export function SettingsPage() {
     setIsDirty(false);
   }, [draftState.hasRecoveredDraft, isDirty, settings]);
 
-  const handleThemeChange = (theme: ThemeColors) => {
-    setLocalSettings((prev) => (prev ? { ...prev, theme } : prev));
-    setIsDirty(true);
-  };
-
-  const handleDisplayAppearanceChange = (displayAppearance: DisplayAppearance) => {
-    setLocalSettings((prev) => (prev ? { ...prev, displayAppearance } : prev));
-    setIsDirty(true);
-  };
-
-  const handleDesignStyleChange = (designStyle: DesignStyle) => {
-    setLocalSettings((prev) => (prev ? { ...prev, designStyle } : prev));
+  const updateField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
+    setLocalSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
     setIsDirty(true);
   };
 
   const handleColorPaletteChange = (colorPalette: ColorPaletteName) => {
     const paletteTheme = generateDashboardColors(getColorPalette(colorPalette));
     setLocalSettings((prev) => (prev ? { ...prev, colorPalette, theme: paletteTheme } : prev));
-    setIsDirty(true);
-  };
-
-  const handleAudioChange = (audio: AudioSettingsType) => {
-    setLocalSettings((prev) => (prev ? { ...prev, audio } : prev));
-    setIsDirty(true);
-  };
-
-  const handleMaintenanceScreenChange = (maintenanceScreen: MaintenanceScreenSettings) => {
-    setLocalSettings((prev) => (prev ? { ...prev, maintenanceScreen } : prev));
-    setIsDirty(true);
-  };
-
-  const handleAromasChange = (aromas: Aroma[]) => {
-    setLocalSettings((prev) => (prev ? { ...prev, aromas } : prev));
-    setIsDirty(true);
-  };
-
-  const handleInfosChange = (infos: InfoItem[]) => {
-    setLocalSettings((prev) => (prev ? { ...prev, infos } : prev));
-    setIsDirty(true);
-  };
-
-  const handleEventsChange = (events: Event[]) => {
-    setLocalSettings((prev) => (prev ? { ...prev, events } : prev));
     setIsDirty(true);
   };
 
@@ -269,9 +227,9 @@ export function SettingsPage() {
                   displayAppearance={localSettings.displayAppearance}
                   designStyle={localSettings.designStyle}
                   colorPalette={localSettings.colorPalette}
-                  onChange={handleThemeChange}
-                  onDisplayAppearanceChange={handleDisplayAppearanceChange}
-                  onDesignStyleChange={handleDesignStyleChange}
+                  onChange={(theme) => updateField('theme', theme)}
+                  onDisplayAppearanceChange={(v) => updateField('displayAppearance', v)}
+                  onDesignStyleChange={(v) => updateField('designStyle', v)}
                   onColorPaletteChange={handleColorPaletteChange}
                 />
               )}
@@ -281,7 +239,7 @@ export function SettingsPage() {
               {localSettings.audio && (
                 <AudioSettings
                   audio={localSettings.audio}
-                  onChange={handleAudioChange}
+                  onChange={(audio) => updateField('audio', audio)}
                 />
               )}
             </TabPanel>
@@ -289,35 +247,41 @@ export function SettingsPage() {
             <TabPanel id="maintenance" activeTab={activeTab}>
               <MaintenanceScreenEditor
                 value={localSettings.maintenanceScreen}
-                onChange={handleMaintenanceScreenChange}
+                onChange={(v) => updateField('maintenanceScreen', v)}
               />
             </TabPanel>
 
             <TabPanel id="aromas" activeTab={activeTab}>
               <AromaLibraryManager
                 aromas={localSettings.aromas || []}
-                onChange={handleAromasChange}
+                onChange={(aromas) => updateField('aromas', aromas)}
               />
             </TabPanel>
 
             <TabPanel id="infos" activeTab={activeTab}>
               <InfoManager
                 infos={localSettings.infos || []}
-                onChange={handleInfosChange}
+                onChange={(infos) => updateField('infos', infos)}
               />
             </TabPanel>
 
             <TabPanel id="events" activeTab={activeTab}>
-              <EventManager
-                events={localSettings.events || []}
-                settings={localSettings}
-                schedule={schedule}
-                onChange={handleEventsChange}
-              />
+              <Suspense fallback={<LoadingSpinner label="Lade Event-Manager..." />}>
+                <EventManager
+                  events={localSettings.events || []}
+                  settings={localSettings}
+                  schedule={schedule}
+                  onChange={(events) => updateField('events', events)}
+                />
+              </Suspense>
             </TabPanel>
 
             <TabPanel id="system" activeTab={activeTab}>
-              {canSystem && <SystemMaintenance />}
+              {canSystem && (
+                <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
+                  <SystemMaintenance />
+                </Suspense>
+              )}
             </TabPanel>
           </div>
         </SectionCard>
@@ -327,10 +291,12 @@ export function SettingsPage() {
           description="Ungespeicherte Einstellungen direkt über den echten Display-Pfad für Gerät, Uhrzeit und Event-Kontext prüfen."
           icon={Monitor}
         >
-          <DisplayScenarioPreview
-            schedule={schedule || createDefaultSchedule()}
-            settings={localSettings}
-          />
+          <Suspense fallback={<LoadingSpinner label="Lade Vorschau..." />}>
+            <DisplayScenarioPreview
+              schedule={schedule || createDefaultSchedule()}
+              settings={localSettings}
+            />
+          </Suspense>
         </SectionCard>
       </div>
     </Layout>

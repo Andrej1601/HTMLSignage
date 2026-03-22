@@ -11,6 +11,7 @@ import { InfosSlide } from './InfosSlide';
 import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
 import { ResilientVideo } from './ResilientVideo';
+import { SlideErrorBoundary } from './SlideErrorBoundary';
 import { buildUploadUrl } from '@/utils/mediaUrl';
 
 interface SlideRendererProps {
@@ -32,37 +33,45 @@ function SlideRendererComponent({
   now,
   deviceId,
 }: SlideRendererProps) {
-  switch (slide.type) {
-    case 'content-panel':
-      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
+  const content = (() => {
+    switch (slide.type) {
+      case 'content-panel':
+        return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
 
-    case 'sauna-detail':
-      return (
-        <SaunaDetailSlide
-          sauna={getSauna(settings, slide.saunaId)}
-          slide={slide}
-          schedule={schedule}
-          settings={settings}
-          media={media}
-          deviceId={deviceId}
-        />
-      );
+      case 'sauna-detail':
+        return (
+          <SaunaDetailSlide
+            sauna={getSauna(settings, slide.saunaId)}
+            slide={slide}
+            schedule={schedule}
+            settings={settings}
+            media={media}
+            deviceId={deviceId}
+          />
+        );
 
-    case 'media-image':
-      return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
+      case 'media-image':
+        return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
 
-    case 'media-video':
-      return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
+      case 'media-video':
+        return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
 
-    case 'infos':
-      return <InfosSlide slide={slide} settings={settings} media={media} />;
+      case 'infos':
+        return <InfosSlide slide={slide} settings={settings} media={media} />;
 
-    case 'events':
-      return <EventsSlide settings={settings} media={media} />;
+      case 'events':
+        return <EventsSlide settings={settings} media={media} />;
 
-    default:
-      return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
-  }
+      default:
+        return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
+    }
+  })();
+
+  return (
+    <SlideErrorBoundary slideKey={slide.id}>
+      {content}
+    </SlideErrorBoundary>
+  );
 }
 
 function areSlideRendererPropsEqual(prev: SlideRendererProps, next: SlideRendererProps): boolean {

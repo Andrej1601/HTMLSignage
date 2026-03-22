@@ -214,6 +214,7 @@ export function DisplayClientPage() {
   } = useSlideshow({
     settings: effectiveSettings,
     enabled: true,
+    media: mediaItems,
   });
 
   const resolveTransition = useCallback(

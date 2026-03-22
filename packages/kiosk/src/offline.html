@@ -42,12 +42,40 @@
       color: #888;
       line-height: 1.5;
     }
-    .dot-pulse {
-      display: inline-block;
-      animation: pulse 1.5s ease-in-out infinite;
+    .countdown {
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #666;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.3; }
+    .countdown strong {
+      color: #c9956b;
+      font-variant-numeric: tabular-nums;
+    }
+    .retry-btn {
+      margin-top: 1.25rem;
+      padding: 0.6rem 1.5rem;
+      background: #c9956b;
+      color: #0a0a0a;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .retry-btn:hover { opacity: 0.85; }
+    .retry-btn:active { opacity: 0.7; }
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 6px;
+      vertical-align: middle;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 0.4; }
       50% { opacity: 1; }
     }
   </style>
@@ -55,8 +83,30 @@
 <body>
   <div class="container">
     <div class="spinner"></div>
-    <h1>Verbindung wird hergestellt<span class="dot-pulse">...</span></h1>
-    <p>Die Verbindung zum HTMLSignage-Server wird aufgebaut. Bitte warten.</p>
+    <h1>Verbindung wird hergestellt</h1>
+    <p><span class="status-dot"></span>Der Server ist momentan nicht erreichbar.</p>
+    <div class="countdown" id="countdown">Nächster Versuch in <strong id="timer">15</strong>s</div>
+    <button class="retry-btn" id="retryBtn" onclick="retryNow()">Jetzt erneut versuchen</button>
   </div>
+
+  <script>
+    var seconds = 15;
+    var timerEl = document.getElementById('timer');
+    var interval = setInterval(function() {
+      seconds--;
+      if (timerEl) timerEl.textContent = seconds;
+      if (seconds <= 0) {
+        clearInterval(interval);
+        retryNow();
+      }
+    }, 1000);
+
+    function retryNow() {
+      clearInterval(interval);
+      // In Electron, the watchdog in main.js will handle reconnection.
+      // Triggering a reload of the offline page nudges the watchdog check.
+      window.location.reload();
+    }
+  </script>
 </body>
 </html>

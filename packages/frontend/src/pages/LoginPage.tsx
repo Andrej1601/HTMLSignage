@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/services/api';
+import { Button } from '@/components/Button';
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -134,13 +135,14 @@ export function LoginPage() {
             )}
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={isLoading}
-            className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            fullWidth
+            loading={isLoading}
+            loadingText="Lädt..."
           >
-            {isLoading ? 'Lädt...' : mode === 'login' ? 'Anmelden' : 'Administrator erstellen'}
-          </button>
+            {mode === 'login' ? 'Anmelden' : 'Administrator erstellen'}
+          </Button>
 
           {mode === 'login' && (
             <div className="text-right">

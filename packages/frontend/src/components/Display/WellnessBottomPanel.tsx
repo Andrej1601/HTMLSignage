@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Calendar, ShieldCheck } from 'lucide-react';
 import type { Settings, ThemeColors } from '@/types/settings.types';
@@ -54,7 +54,7 @@ function AnimatedWellnessPanel({ children }: AnimatedWellnessPanelProps) {
   );
 }
 
-export function WellnessBottomPanel({ displayAppearance, settings, theme, media }: WellnessBottomPanelProps) {
+export const WellnessBottomPanel = memo(function WellnessBottomPanel({ displayAppearance, settings, theme, media }: WellnessBottomPanelProps) {
   const defaults = getDefaultSettings();
   const resolvedTheme = theme || (settings.theme || defaults.theme!) as ThemeColors;
 
@@ -353,4 +353,4 @@ export function WellnessBottomPanel({ displayAppearance, settings, theme, media 
       )}
     </div>
   );
-}
+});

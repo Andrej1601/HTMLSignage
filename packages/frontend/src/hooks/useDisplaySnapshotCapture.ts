@@ -90,11 +90,11 @@ export function useDisplaySnapshotCapture({
     if (!canCaptureSnapshots || !deviceId) return;
 
     const initialTimer = window.setTimeout(() => {
-      void captureLiveSnapshot({ force: true });
+      if (!snapshotUploadInFlightRef.current) void captureLiveSnapshot({ force: true });
     }, 5000);
 
     const interval = window.setInterval(() => {
-      void captureLiveSnapshot({ force: true });
+      if (!snapshotUploadInFlightRef.current) void captureLiveSnapshot({ force: true });
     }, 90_000);
 
     return () => {
@@ -107,7 +107,7 @@ export function useDisplaySnapshotCapture({
     if (!canCaptureSnapshots || !deviceId) return;
 
     const timer = window.setTimeout(() => {
-      void captureLiveSnapshot();
+      if (!snapshotUploadInFlightRef.current) void captureLiveSnapshot();
     }, 2500);
 
     return () => {

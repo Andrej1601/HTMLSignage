@@ -45,7 +45,16 @@ export function DropdownMenu({
   return (
     <div className="relative">
       {trigger ? (
-        <div onClick={() => setOpen((prev) => !prev)}>{trigger(open)}</div>
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className="appearance-none bg-transparent border-none p-0 cursor-pointer"
+        >
+          {trigger(open)}
+        </button>
       ) : (
         <button
           onClick={() => setOpen((prev) => !prev)}

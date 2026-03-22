@@ -99,6 +99,7 @@ export function AudioConfigEditor({
               checked={normalized.enabled}
               onChange={(e) => updateAudio({ enabled: e.target.checked })}
               className="sr-only peer"
+              aria-label={enableLabel}
             />
             <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
           </label>
@@ -142,6 +143,7 @@ export function AudioConfigEditor({
               <input
                 type="file"
                 accept="audio/*"
+                aria-label="Audio-Datei hochladen"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
@@ -184,6 +186,7 @@ export function AudioConfigEditor({
               step="0.05"
               value={clampVolume(normalized.volume)}
               onChange={(e) => updateAudio({ volume: parseFloat(e.target.value) })}
+              aria-label={`Lautstärke: ${Math.round(clampVolume(normalized.volume) * 100)}%`}
               className="w-full h-2 bg-spa-bg-secondary rounded-lg appearance-none cursor-pointer accent-spa-primary"
             />
           </div>
@@ -199,6 +202,7 @@ export function AudioConfigEditor({
                 checked={normalized.loop}
                 onChange={(e) => updateAudio({ loop: e.target.checked })}
                 className="sr-only peer"
+                aria-label="Wiederholen"
               />
               <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
             </label>

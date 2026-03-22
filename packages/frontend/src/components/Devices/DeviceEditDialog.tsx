@@ -129,10 +129,10 @@ export function DeviceEditDialog({
         />
 
         {/* Mode Selection */}
-        <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+        <fieldset>
+          <legend className="block text-sm font-medium text-spa-text-primary mb-1">
             Betriebsmodus
-          </label>
+          </legend>
           <div className="space-y-2">
             <label className="flex items-start gap-3 p-3 border border-spa-bg-secondary rounded-lg cursor-pointer hover:bg-spa-bg-primary transition-colors">
               <input
@@ -170,7 +170,7 @@ export function DeviceEditDialog({
               </div>
             </label>
           </div>
-        </div>
+        </fieldset>
 
         <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4">
           <ToggleField

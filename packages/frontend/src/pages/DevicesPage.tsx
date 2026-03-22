@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Monitor,
@@ -73,12 +73,27 @@ export function DevicesPage() {
   const [activeGroupFilter, setActiveGroupFilter] = useState<DeviceGroupFilter>('all');
   const [pendingBulkAction, setPendingBulkAction] = useState<PendingBulkAction | null>(null);
 
-  const pairedDevices = devices.filter((device) => device.pairedAt !== null);
+  const pairedDevices = useMemo(
+    () => devices.filter((device) => device.pairedAt !== null),
+    [devices],
+  );
+
+  const deviceStats = useMemo(() => {
+    let online = 0;
+    let offline = 0;
+    let override = 0;
+    let maintenance = 0;
+    for (const device of pairedDevices) {
+      const status = getDeviceStatus(device.lastSeen);
+      if (status === 'online') online++;
+      if (status === 'offline') offline++;
+      if (device.mode === 'override') override++;
+      if (device.maintenanceMode) maintenance++;
+    }
+    return { online, offline, override, maintenance };
+  }, [pairedDevices]);
+
   const pendingPairings = Math.max(devices.length - pairedDevices.length, 0);
-  const onlineDevices = pairedDevices.filter((device) => getDeviceStatus(device.lastSeen) === 'online').length;
-  const offlineDevices = pairedDevices.filter((device) => getDeviceStatus(device.lastSeen) === 'offline').length;
-  const overrideDevices = pairedDevices.filter((device) => device.mode === 'override').length;
-  const maintenanceDevices = pairedDevices.filter((device) => Boolean(device.maintenanceMode)).length;
 
   useEffect(() => {
     const validIds = new Set(pairedDevices.map((device) => device.id));
@@ -152,55 +167,41 @@ export function DevicesPage() {
     });
   };
 
-  const groupEntries = new Map<string, { label: string; count: number }>();
+  const groupFilters = useMemo(() => {
+    const entries = new Map<string, { label: string; count: number }>();
 
-  pairedDevices.forEach((device) => {
-    const groupKey = normalizeGroupKey(device.groupName);
-    const existingEntry = groupEntries.get(groupKey);
-
-    if (existingEntry) {
-      existingEntry.count += 1;
-      return;
+    for (const device of pairedDevices) {
+      const groupKey = normalizeGroupKey(device.groupName);
+      const existing = entries.get(groupKey);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        entries.set(groupKey, { label: getDeviceGroupLabel(device.groupName), count: 1 });
+      }
     }
 
-    groupEntries.set(groupKey, {
-      label: getDeviceGroupLabel(device.groupName),
-      count: 1,
+    return [
+      { key: 'all' as const, label: 'Alle Geräte', count: pairedDevices.length },
+      ...Array.from(entries.entries())
+        .sort((left, right) => left[1].label.localeCompare(right[1].label, 'de'))
+        .map(([key, value]) => ({ key, label: value.label, count: value.count })),
+    ];
+  }, [pairedDevices]);
+
+  const visibleDevices = useMemo(() => {
+    const filtered = activeGroupFilter === 'all'
+      ? pairedDevices
+      : pairedDevices.filter((device) => normalizeGroupKey(device.groupName) === activeGroupFilter);
+
+    return filtered.slice().sort((left, right) => {
+      const groupCompare = getDeviceGroupLabel(left.groupName).localeCompare(getDeviceGroupLabel(right.groupName), 'de');
+      if (groupCompare !== 0) return groupCompare;
+      if (Boolean(left.maintenanceMode) !== Boolean(right.maintenanceMode)) {
+        return Number(Boolean(right.maintenanceMode)) - Number(Boolean(left.maintenanceMode));
+      }
+      return left.name.localeCompare(right.name, 'de');
     });
-  });
-
-  const groupFilters = [
-    { key: 'all' as const, label: 'Alle Geräte', count: pairedDevices.length },
-    ...Array.from(groupEntries.entries())
-      .sort((left, right) => left[1].label.localeCompare(right[1].label, 'de'))
-      .map(([key, value]) => ({
-        key,
-        label: value.label,
-        count: value.count,
-      })),
-  ];
-
-  const filteredDevices = pairedDevices.filter((device) => (
-    activeGroupFilter === 'all'
-      ? true
-      : normalizeGroupKey(device.groupName) === activeGroupFilter
-  ));
-
-  const visibleDevices = filteredDevices.slice().sort((left, right) => {
-    const leftGroup = getDeviceGroupLabel(left.groupName);
-    const rightGroup = getDeviceGroupLabel(right.groupName);
-    const groupCompare = leftGroup.localeCompare(rightGroup, 'de');
-
-    if (groupCompare !== 0) {
-      return groupCompare;
-    }
-
-    if (Boolean(left.maintenanceMode) !== Boolean(right.maintenanceMode)) {
-      return Number(Boolean(right.maintenanceMode)) - Number(Boolean(left.maintenanceMode));
-    }
-
-    return left.name.localeCompare(right.name, 'de');
-  });
+  }, [activeGroupFilter, pairedDevices]);
 
   const visibleDeviceIds = visibleDevices.map((device) => device.id);
   const selectedVisibleCount = visibleDeviceIds.filter((id) => selectedDeviceIds.includes(id)).length;
@@ -329,9 +330,9 @@ export function DevicesPage() {
           )}
           badges={[
             { label: `${pairedDevices.length} gekoppelt`, tone: 'info' },
-            { label: `${onlineDevices} online`, tone: onlineDevices > 0 ? 'success' : 'neutral' },
-            { label: `${offlineDevices} offline`, tone: offlineDevices > 0 ? 'warning' : 'neutral' },
-            { label: `${maintenanceDevices} Wartung`, tone: maintenanceDevices > 0 ? 'warning' : 'neutral' },
+            { label: `${deviceStats.online} online`, tone: deviceStats.online > 0 ? 'success' : 'neutral' },
+            { label: `${deviceStats.offline} offline`, tone: deviceStats.offline > 0 ? 'warning' : 'neutral' },
+            { label: `${deviceStats.maintenance} Wartung`, tone: deviceStats.maintenance > 0 ? 'warning' : 'neutral' },
             { label: `${pendingPairings} pending`, tone: pendingPairings > 0 ? 'warning' : 'neutral' },
           ]}
         />
@@ -346,10 +347,10 @@ export function DevicesPage() {
               { label: 'Filter', value: activeFilterLabel, tone: 'neutral' },
             ]}
           />
-          <StatCard title="Online" value={onlineDevices} icon={Wifi} color="success" />
-          <StatCard title="Offline" value={offlineDevices} icon={WifiOff} color={offlineDevices > 0 ? 'warning' : 'neutral'} />
-          <StatCard title="Override-Modus" value={overrideDevices} icon={ToggleRight} color="info" />
-          <StatCard title="Wartung" value={maintenanceDevices} icon={Wrench} color={maintenanceDevices > 0 ? 'warning' : 'neutral'} />
+          <StatCard title="Online" value={deviceStats.online} icon={Wifi} color="success" />
+          <StatCard title="Offline" value={deviceStats.offline} icon={WifiOff} color={deviceStats.offline > 0 ? 'warning' : 'neutral'} />
+          <StatCard title="Override-Modus" value={deviceStats.override} icon={ToggleRight} color="info" />
+          <StatCard title="Wartung" value={deviceStats.maintenance} icon={Wrench} color={deviceStats.maintenance > 0 ? 'warning' : 'neutral'} />
         </div>
 
         <PendingPairings />

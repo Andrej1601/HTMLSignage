@@ -82,6 +82,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
   const displayConfigRefreshInFlightRef = useRef(false);
   const displayConfigRefreshQueueRef = useRef<{ deviceId: string; silent: boolean } | null>(null);
   const displayConfigRefreshVersionRef = useRef(0);
+  const heartbeatInFlightRef = useRef(false);
 
   const cachedMedia = useMemo(
     () => readDisplayCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
@@ -494,6 +495,8 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     if (isPreviewMode || !pairingInfo?.paired || !pairingInfo?.id || !deviceToken) return;
 
     const sendHeartbeat = async () => {
+      if (heartbeatInFlightRef.current) return;
+      heartbeatInFlightRef.current = true;
       try {
         const response = await displayDevicesApi.sendHeartbeat(pairingInfo.id, deviceToken);
         if (response.ok && ENV_IS_DEV) {
@@ -503,6 +506,8 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         if (ENV_IS_DEV) {
           console.error('[Display] Heartbeat failed:', error);
         }
+      } finally {
+        heartbeatInFlightRef.current = false;
       }
     };
 

@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, comparePassword, generateToken, authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { sendPasswordResetEmail } from '../lib/mailer.js';
+import { assertUsernameAvailable, UserConflictError } from '../lib/userValidation.js';
 
 const router = Router();
 
@@ -105,14 +106,7 @@ router.post('/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Check if username already exists
-    const existing = await prisma.user.findUnique({
-      where: { username: validated.username },
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-    }
+    await assertUsernameAvailable(validated.username);
 
     // First user gets all roles
     const roles = ['admin', 'editor', 'viewer'];
@@ -154,6 +148,9 @@ router.post('/register', authLimiter, async (req, res) => {
       token,
     });
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }

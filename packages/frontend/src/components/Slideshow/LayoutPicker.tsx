@@ -118,6 +118,7 @@ export function LayoutPicker({
             disabled={disabled}
             className={clsx(
               'group flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all disabled:opacity-50',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2',
               layout === option.type
                 ? 'border-spa-primary bg-spa-primary/5 shadow-md ring-2 ring-spa-primary/20'
                 : 'border-spa-bg-secondary hover:border-spa-primary/50 hover:shadow-sm'

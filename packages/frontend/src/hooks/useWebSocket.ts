@@ -86,7 +86,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         timeout: 10000,
       });
 
-      socket.on('connect', () => {
+      socket.off('connect').on('connect', () => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Connected:', socket.id);
         }
@@ -94,14 +94,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         setError(null);
       });
 
-      socket.on('disconnect', (reason) => {
+      socket.off('disconnect').on('disconnect', (reason) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Disconnected:', reason);
         }
         setIsConnected(false);
       });
 
-      socket.on('connect_error', (err) => {
+      socket.off('connect_error').on('connect_error', (err) => {
         if (ENV_IS_DEV) {
           console.error('[WebSocket] Connection error:', err);
         }
@@ -110,21 +110,21 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       });
 
       // Keep listeners stable via refs without reconnecting on each render.
-      socket.on('schedule:updated', (data: Schedule) => {
+      socket.off('schedule:updated').on('schedule:updated', (data: Schedule) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Schedule updated:', data);
         }
         onScheduleUpdateRef.current?.(data);
       });
 
-      socket.on('settings:updated', (data: Settings) => {
+      socket.off('settings:updated').on('settings:updated', (data: Settings) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Settings updated:', data);
         }
         onSettingsUpdateRef.current?.(data);
       });
 
-      socket.on('device:command', (data: { command?: string }) => {
+      socket.off('device:command').on('device:command', (data: { command?: string }) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Device command:', data);
         }
@@ -133,7 +133,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
       });
 
-      socket.on('device:updated', (data: Record<string, unknown>) => {
+      socket.off('device:updated').on('device:updated', (data: Record<string, unknown>) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Device updated:', data);
         }

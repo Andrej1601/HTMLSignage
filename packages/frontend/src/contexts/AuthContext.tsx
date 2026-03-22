@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
 import { ENV_IS_DEV } from '@/config/env';
 import { fetchApi } from '@/services/api';
@@ -21,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
   const [isLoading, setIsLoading] = useState(true);
+  const loggedOutRef = useRef(false);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -62,12 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token || user || isLoading) return;
 
     const retry = async () => {
+      if (loggedOutRef.current) return;
       try {
         const userData = await fetchApi<User>('/auth/me', {
           token,
         });
+        if (loggedOutRef.current) return;
         setUser(userData);
       } catch (error) {
+        if (loggedOutRef.current) return;
         const message = error instanceof Error ? error.message : '';
         if (AUTH_FAILURE_PATTERN.test(message)) {
           localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
@@ -89,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token, user, isLoading]);
 
   const login = async (credentials: LoginRequest) => {
+    loggedOutRef.current = false;
     const data = await fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
       data: credentials,
@@ -99,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (data: RegisterRequest) => {
+    loggedOutRef.current = false;
     const authData = await fetchApi<AuthResponse>('/auth/register', {
       method: 'POST',
       data,
@@ -109,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    loggedOutRef.current = true;
     if (token) {
       try {
         await fetchApi('/auth/logout', {

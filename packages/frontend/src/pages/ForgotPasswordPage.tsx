@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchApi } from '@/services/api';
+import { Button } from '@/components/Button';
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -72,13 +73,14 @@ export function ForgotPasswordPage() {
               />
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              fullWidth
+              loading={isLoading}
+              loadingText="Sende..."
             >
-              {isLoading ? 'Sende...' : 'Reset-Link senden'}
-            </button>
+              Reset-Link senden
+            </Button>
 
             <Link to="/login" className="block text-center text-sm text-spa-primary hover:underline">
               Zurück zur Anmeldung

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { listAuditLogs, logAuditEvent } from '../lib/audit.js';
@@ -64,34 +65,17 @@ async function findHistoryLog(historyId: string) {
 }
 
 async function publishGlobal(req: AuthRequest, snapshot: WorkflowSnapshot, action: 'slideshow.publish' | 'slideshow.rollback', sourceHistoryId?: string) {
-  const [currentActive, latest] = await Promise.all([
-    prisma.settings.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
-    prisma.settings.findFirst({ orderBy: { version: 'desc' }, select: { version: true } }),
-  ]);
-  const nextVersion = (latest?.version ?? 0) + 1;
+  const currentActive = await prisma.settings.findFirst({
+    where: { isActive: true },
+    orderBy: { version: 'desc' },
+  });
   const payload = buildGlobalSettingsWorkflowPayload(currentActive?.data, snapshot);
-  payload.version = nextVersion;
-
-  const created = await prisma.settings.create({
-    data: {
-      version: nextVersion,
-      data: payload as Prisma.InputJsonValue,
-      isActive: true,
-    },
-  });
-
-  await prisma.settings.updateMany({
-    where: {
-      id: { not: created.id },
-      isActive: true,
-    },
-    data: { isActive: false },
-  });
+  const { id: createdId, version: nextVersion } = await createVersionedRecord('settings', payload);
 
   broadcastSettingsUpdate(payload);
   await logAuditEvent(req, {
     action,
-    resource: created.id,
+    resource: createdId,
     details: buildWorkflowActionAuditDetails({
       targetType: 'global',
       targetName: 'Globale Slideshow',

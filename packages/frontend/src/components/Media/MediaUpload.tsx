@@ -290,7 +290,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
+        <div role="alert" className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-spa-error-dark">Fehler</p>

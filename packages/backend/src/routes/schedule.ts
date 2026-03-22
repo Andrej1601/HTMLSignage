@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
@@ -37,7 +37,8 @@ router.get('/', async (req, res) => {
 // GET /api/schedule/history - Get schedule history
 router.get('/history', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 10;
     const details = req.query.details === 'true';
 
     const selectFields: Record<string, boolean> = {
@@ -89,50 +90,25 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
   try {
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);
-    const latest = await prisma.schedule.findFirst({
-      orderBy: { version: 'desc' },
-      select: { version: true },
-    });
-    const nextVersion = (latest?.version ?? 0) + 1;
-    const scheduleToStore = {
-      ...validated,
-      version: nextVersion,
-    };
-
-    // Create new schedule
-    const newSchedule = await prisma.schedule.create({
-      data: {
-        version: nextVersion,
-        data: scheduleToStore as unknown as Prisma.InputJsonValue,
-        isActive: true,
-      },
-    });
-
-    // Deactivate old versions
-    await prisma.schedule.updateMany({
-      where: {
-        id: { not: newSchedule.id },
-        isActive: true,
-      },
-      data: { isActive: false },
-    });
+    const scheduleToStore = { ...validated };
+    const { id, version } = await createVersionedRecord('schedule', scheduleToStore);
 
     // Broadcast update via WebSocket
     broadcastScheduleUpdate(scheduleToStore);
 
     await logAuditEvent(req, {
       action: 'schedule.update',
-      resource: newSchedule.id,
+      resource: id,
       details: {
-        version: nextVersion,
+        version,
         presets: Object.keys(validated.presets || {}),
       },
     });
 
-    res.json({ 
-      ok: true, 
-      version: nextVersion,
-      id: newSchedule.id 
+    res.json({
+      ok: true,
+      version,
+      id,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

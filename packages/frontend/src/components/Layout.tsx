@@ -270,7 +270,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-30 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}>
+        <div className="lg:hidden fixed inset-0 z-30 bg-black/50" role="presentation" onClick={() => setIsMobileMenuOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setIsMobileMenuOpen(false); }}>
           <div
             className="fixed inset-y-0 left-0 w-64 bg-spa-primary text-white shadow-xl"
             onClick={(e) => e.stopPropagation()}

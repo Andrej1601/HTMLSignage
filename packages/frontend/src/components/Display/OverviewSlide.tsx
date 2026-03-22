@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { PRESET_LABELS, resolveLivePresetKey } from '@/types/schedule.types';
@@ -12,7 +12,7 @@ interface OverviewSlideProps {
   deviceId?: string;
 }
 
-export function OverviewSlide({ schedule, settings, now: nowProp, deviceId }: OverviewSlideProps) {
+export const OverviewSlide = memo(function OverviewSlide({ schedule, settings, now: nowProp, deviceId }: OverviewSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const fonts = settings.fonts || defaults.fonts!;
@@ -230,4 +230,4 @@ export function OverviewSlide({ schedule, settings, now: nowProp, deviceId }: Ov
       </div>
     </div>
   );
-}
+});

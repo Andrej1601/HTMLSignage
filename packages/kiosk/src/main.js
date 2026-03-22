@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, session } = require('electron');
+const { app, BrowserWindow, globalShortcut, session, powerSaveBlocker } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -28,6 +28,9 @@ const OFFLINE_PATH = path.join(__dirname, 'offline.html');
 
 const INITIAL_RETRY_MS = 3000;
 const MAX_RETRY_MS = 30000;
+const WATCHDOG_INTERVAL_MS = 15000;
+const PERIODIC_RELOAD_MS = 12 * 60 * 60 * 1000; // 12 hours – prevents slow memory leaks
+
 let retryMs = INITIAL_RETRY_MS;
 let retryTimer = null;
 
@@ -59,7 +62,9 @@ function scheduleReload(delayMs) {
 
 let mainWindow = null;
 let watchdogInterval = null;
+let periodicReloadTimer = null;
 let isOffline = false;
+let powerSaveId = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -132,6 +137,7 @@ function createWindow() {
 
   loadDisplay();
   startWatchdog();
+  startPeriodicReload();
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +165,7 @@ function showOffline() {
 }
 
 // ---------------------------------------------------------------------------
-// Network Watchdog
+// Network Watchdog (checks every 15s)
 // ---------------------------------------------------------------------------
 
 function startWatchdog() {
@@ -176,7 +182,21 @@ function startWatchdog() {
       retryMs = INITIAL_RETRY_MS;
       loadDisplay();
     }
-  }, 30000);
+  }, WATCHDOG_INTERVAL_MS);
+}
+
+// ---------------------------------------------------------------------------
+// Periodic Reload (every 12h – prevents memory leaks in 24/7 operation)
+// ---------------------------------------------------------------------------
+
+function startPeriodicReload() {
+  if (periodicReloadTimer) clearInterval(periodicReloadTimer);
+
+  periodicReloadTimer = setInterval(() => {
+    if (isOffline) return; // Don't reload if already offline
+    console.log('[Kiosk] Periodischer Reload (alle 12h) – lade Display neu');
+    loadDisplay();
+  }, PERIODIC_RELOAD_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +218,10 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  // Prevent display from going to sleep
+  powerSaveId = powerSaveBlocker.start('prevent-display-sleep');
+  console.log(`[Kiosk] PowerSaveBlocker aktiv (ID: ${powerSaveId})`);
+
   // Benachrichtigungen unterdrücken
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     if (permission === 'notifications') {
@@ -221,8 +245,22 @@ app.whenReady().then(() => {
   }
 });
 
+// ---- GPU Process Crash Recovery ----
+app.on('gpu-process-crashed', (_event, killed) => {
+  console.error(`[Kiosk] GPU-Prozess ${killed ? 'killed' : 'crashed'} – lade Display neu in 3s`);
+  scheduleReload(3000);
+});
+
+app.on('child-process-gone', (_event, details) => {
+  if (details.type === 'GPU') {
+    console.error(`[Kiosk] GPU child process gone (reason: ${details.reason}) – lade Display neu in 3s`);
+    scheduleReload(3000);
+  }
+});
+
 app.on('window-all-closed', () => {
   if (watchdogInterval) clearInterval(watchdogInterval);
+  if (periodicReloadTimer) clearInterval(periodicReloadTimer);
   if (retryTimer) clearTimeout(retryTimer);
   app.quit();
 });
@@ -230,7 +268,11 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (watchdogInterval) clearInterval(watchdogInterval);
+  if (periodicReloadTimer) clearInterval(periodicReloadTimer);
   if (retryTimer) clearTimeout(retryTimer);
+  if (powerSaveId !== null && powerSaveBlocker.isStarted(powerSaveId)) {
+    powerSaveBlocker.stop(powerSaveId);
+  }
 });
 
 // Unhandled Errors abfangen – nicht abstürzen

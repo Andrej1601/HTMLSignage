@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi } from '@/services/api';
+import { Button } from '@/components/Button';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -64,7 +65,7 @@ export function ResetPasswordPage() {
 
         {!token && (
           <div className="space-y-4">
-            <div className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
+            <div role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
               Der Reset-Link ist ungültig. Bitte fordere einen neuen Link an.
             </div>
             <Link to="/forgot-password" className="block text-center text-sm text-spa-primary hover:underline">
@@ -119,13 +120,15 @@ export function ResetPasswordPage() {
               />
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isLoading || isSuccess}
-              className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              fullWidth
+              disabled={isSuccess}
+              loading={isLoading}
+              loadingText="Speichere..."
             >
-              {isLoading ? 'Speichere...' : 'Passwort zurücksetzen'}
-            </button>
+              Passwort zurücksetzen
+            </Button>
 
             <Link to="/login" className="block text-center text-sm text-spa-primary hover:underline">
               Zurück zur Anmeldung

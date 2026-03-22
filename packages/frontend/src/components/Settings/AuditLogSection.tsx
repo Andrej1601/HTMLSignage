@@ -81,7 +81,7 @@ export function AuditLogSection() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-spa-error/30 bg-spa-error-light px-3 py-2 text-sm text-spa-error-dark mb-4">
+        <div role="alert" className="rounded-lg border border-spa-error/30 bg-spa-error-light px-3 py-2 text-sm text-spa-error-dark mb-4">
           {error}
         </div>
       )}

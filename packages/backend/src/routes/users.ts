@@ -5,6 +5,7 @@ import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
+import { assertUsernameAvailable, assertEmailAvailable, UserConflictError } from '../lib/userValidation.js';
 
 const router = Router();
 
@@ -52,25 +53,8 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
   try {
     const validated = CreateUserSchema.parse(req.body);
 
-    // Check if username already exists
-    const existing = await prisma.user.findUnique({
-      where: { username: validated.username },
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-    }
-
-    // Check if email already exists (if provided)
-    if (validated.email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email: validated.email },
-      });
-
-      if (existingEmail) {
-        return res.status(400).json({ error: 'email-taken', message: 'Email already exists' });
-      }
-    }
+    await assertUsernameAvailable(validated.username);
+    if (validated.email) await assertEmailAvailable(validated.email);
 
     const hashedPassword = await hashPassword(validated.password);
 
@@ -101,6 +85,9 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
 
     res.json(user);
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }
@@ -123,26 +110,11 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
       return res.status(404).json({ error: 'not-found', message: 'User not found' });
     }
 
-    // Check if username is taken (if changing)
     if (validated.username && validated.username !== user.username) {
-      const existing = await prisma.user.findUnique({
-        where: { username: validated.username },
-      });
-
-      if (existing) {
-        return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-      }
+      await assertUsernameAvailable(validated.username, user.id);
     }
-
-    // Check if email is taken (if changing)
     if (validated.email && validated.email !== user.email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email: validated.email },
-      });
-
-      if (existingEmail) {
-        return res.status(400).json({ error: 'email-taken', message: 'Email already exists' });
-      }
+      await assertEmailAvailable(validated.email, user.id);
     }
 
     // Prepare update data
@@ -179,6 +151,9 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
 
     res.json(updatedUser);
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.errors });
     }

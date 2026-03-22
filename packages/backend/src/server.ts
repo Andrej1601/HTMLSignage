@@ -14,7 +14,7 @@ import { setupWebSocket } from './websocket/index.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 import scheduleRouter from './routes/schedule.js';
 import settingsRouter from './routes/settings.js';
-import devicesRouter from './routes/devices.js';
+import devicesRouter from './routes/devices/index.js';
 import authRouter from './routes/auth.js';
 import usersRouter from './routes/users.js';
 import mediaRouter from './routes/media.js';
