@@ -3,7 +3,6 @@
 .DS_Store
 node_modules/
 coverage/
-pnpm-lock.yaml
 yarn.lock
 
 # Database files
