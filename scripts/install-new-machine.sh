@@ -386,24 +386,6 @@ fi
 step "Installing Node dependencies"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
 
-# ── Native module verification ───────────────────────────────────────────────
-step "Verifying native backend dependencies"
-
-# Rebuild bcrypt native bindings
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend rebuild bcrypt" || {
-  warn "bcrypt rebuild failed, attempting fresh install..."
-  sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend install --force"
-}
-
-# Verify bcrypt loads (ESM-safe: use dynamic import, not require)
-if ! sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend exec node --input-type=module -e 'import bcrypt from \"bcrypt\"; console.log(\"bcrypt-ok\")'"; then
-  warn "bcrypt ESM import failed, trying CommonJS fallback..."
-  if ! sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend exec node -e \"require('bcrypt'); console.log('bcrypt-ok')\""; then
-    die "bcrypt konnte weder als ESM noch als CommonJS geladen werden. Native Bindings fehlen."
-  fi
-fi
-log "bcrypt verified successfully."
-
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
 step "Configuring PostgreSQL"
 systemctl enable --now postgresql

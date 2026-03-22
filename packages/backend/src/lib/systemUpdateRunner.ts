@@ -95,20 +95,6 @@ function createSystemUpdateSteps(tagName: string): SystemUpdateStep[] {
       percent: 45,
     },
     {
-      label: 'Rebuilding native backend dependencies',
-      command: 'pnpm',
-      args: ['--filter', 'backend', 'rebuild', 'bcrypt'],
-      timeoutMs: 10 * 60 * 1000,
-      percent: 52,
-    },
-    {
-      label: 'Validating bcrypt native binding',
-      command: 'pnpm',
-      args: ['--filter', 'backend', 'exec', 'node', '-e', "require('bcrypt'); console.log('bcrypt-ok')"],
-      timeoutMs: 60 * 1000,
-      percent: 56,
-    },
-    {
       label: 'Applying Prisma migrations',
       command: 'pnpm',
       args: ['--filter', 'backend', 'prisma', 'migrate', 'deploy'],
