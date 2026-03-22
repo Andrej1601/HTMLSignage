@@ -384,7 +384,7 @@ fi
 
 # ── Node dependencies ────────────────────────────────────────────────────────
 step "Installing Node dependencies"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
+sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
 step "Configuring PostgreSQL"
@@ -456,11 +456,11 @@ fi
 
 # ── Prisma migrations ────────────────────────────────────────────────────────
 step "Running Prisma migrations"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
+sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 step "Building frontend and backend"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm build"
+sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm build"
 
 # ── Systemd services ─────────────────────────────────────────────────────────
 step "Creating systemd service files"
