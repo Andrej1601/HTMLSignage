@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
-import { DisplayScenarioPreview } from '@/components/Display/DisplayScenarioPreview';
-import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
+import clsx from 'clsx';
 import { Button } from '@/components/Button';
+import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
 import { SlideshowConfigPanel } from '@/components/Slideshow/SlideshowConfigPanel';
 import { PRESET_LABELS, type Schedule } from '@/types/schedule.types';
 import { createDefaultSlideshowConfig } from '@/types/slideshow.types';
@@ -12,212 +11,23 @@ import {
   type DesignStyle,
   type DisplayAppearance,
   type Event,
-  type EventSettingsOverrides,
   type Settings,
 } from '@/types/settings.types';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
-import { useMedia } from '@/hooks/useMedia';
 import {
   DISPLAY_APPEARANCE_OPTIONS,
   SCHEDULE_DESIGN_STYLE_OPTIONS,
   getDisplayAppearanceLabel,
   getScheduleDesignStyleLabel,
 } from '@/config/displayDesignStyles';
-import {
-  Calendar,
-  CheckCircle2,
-  Clock3,
-  ImagePlus,
-  XCircle,
-} from 'lucide-react';
-import clsx from 'clsx';
-import {
-  formatEventWindow,
-  toggleTargetDeviceId,
-  type EventDraft,
-} from './eventManager.utils';
+import { toggleTargetDeviceId } from '../eventManager.utils';
 import type { Device } from '@/types/device.types';
-
-interface StepProps {
-  formData: EventDraft;
-  normalizedFormData: EventDraft;
-  setFormData: React.Dispatch<React.SetStateAction<EventDraft>>;
-  updateOverrides: (patch: Partial<EventSettingsOverrides>) => void;
-}
+import type { StepProps } from './types';
 
 const DEFAULT_EVENT_AUDIO: AudioSettings = {
   enabled: false,
   volume: 0.5,
   loop: true,
 };
-
-export function BasicsStep({ formData, setFormData }: StepProps) {
-  const { data: media } = useMedia();
-  const imageList = useMemo(
-    () => (media || []).filter((item) => item.type === 'image'),
-    [media],
-  );
-  const getImageUrl = (imageId?: string) => getMediaUploadUrl(media, imageId);
-
-  return (
-    <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-      <div className="space-y-4">
-        <div>
-          <label className="mb-2 block text-sm font-medium text-spa-text-primary">Event-Name *</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-            placeholder="z. B. Saunanacht, Frauentag, Sommer-Event"
-            autoFocus
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-sm font-medium text-spa-text-primary">Beschreibung</label>
-          <textarea
-            value={formData.description || ''}
-            onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-            className="min-h-[140px] w-full rounded-lg border border-spa-bg-secondary px-4 py-3 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-            placeholder="Interner Hinweis oder kurzer Kundentext für dieses Event"
-          />
-        </div>
-
-        <div>
-          <span className="mb-2 block text-sm font-medium text-spa-text-primary">Status</span>
-          <button
-            type="button"
-            onClick={() => setFormData((prev) => ({ ...prev, isActive: !prev.isActive }))}
-            className={clsx(
-              'flex w-full items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-medium transition-colors',
-              formData.isActive
-                ? 'border-spa-success bg-spa-success-light text-spa-success-dark'
-                : 'border-spa-bg-secondary bg-spa-bg-primary text-spa-text-secondary',
-            )}
-          >
-            {formData.isActive ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-            {formData.isActive ? 'Event ist aktivierbar' : 'Event bleibt deaktiviert'}
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-spa-text-primary">
-          <ImagePlus className="h-4 w-4" />
-          Event-Bild
-        </div>
-        {imageList.length > 0 ? (
-          <>
-            <select
-              value={formData.imageId || ''}
-              onChange={(event) => setFormData({ ...formData, imageId: event.target.value || undefined })}
-              className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-            >
-              <option value="">Kein Bild</option>
-              {imageList.map((image) => (
-                <option key={image.id} value={image.id}>
-                  {image.originalName}
-                </option>
-              ))}
-            </select>
-
-            <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white">
-              {formData.imageId ? (
-                <img
-                  src={getImageUrl(formData.imageId) || ''}
-                  alt="Event-Vorschau"
-                  className="h-64 w-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-64 items-center justify-center text-sm text-spa-text-secondary">
-                  Kein Bild ausgewählt
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="rounded-xl border border-dashed border-spa-bg-secondary bg-white px-4 py-6 text-sm text-spa-text-secondary">
-            Keine Bilder verfügbar. Laden Sie zuerst Medien hoch, wenn das Event eine Bildfläche bekommen soll.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function TimingStep({ formData, normalizedFormData, setFormData }: StepProps) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <div>
-        <label className="mb-2 block text-sm font-medium text-spa-text-primary">Startdatum *</label>
-        <div className="relative">
-          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-spa-text-secondary" />
-          <input
-            type="date"
-            value={formData.startDate}
-            onChange={(event) => setFormData({ ...formData, startDate: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-spa-text-primary">Startzeit *</label>
-        <div className="relative">
-          <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-spa-text-secondary" />
-          <input
-            type="time"
-            value={formData.startTime}
-            onChange={(event) => setFormData({ ...formData, startTime: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-spa-text-primary">Enddatum</label>
-        <div className="relative">
-          <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-spa-text-secondary" />
-          <input
-            type="date"
-            value={formData.endDate || ''}
-            onChange={(event) => setFormData({ ...formData, endDate: event.target.value || undefined })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-spa-text-primary">Endzeit</label>
-        <div className="relative">
-          <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-spa-text-secondary" />
-          <input
-            type="time"
-            value={formData.endTime || ''}
-            onChange={(event) => setFormData({ ...formData, endTime: event.target.value || undefined })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
-          />
-        </div>
-      </div>
-
-      <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-4 text-sm text-spa-text-secondary">
-        <div className="font-medium text-spa-text-primary">Geplantes Zeitfenster</div>
-        <div className="mt-1">
-          {normalizedFormData.startDate && normalizedFormData.startTime
-            ? formatEventWindow({
-                startDate: normalizedFormData.startDate,
-                startTime: normalizedFormData.startTime,
-                endDate: normalizedFormData.endDate,
-                endTime: normalizedFormData.endTime,
-              } as Event)
-            : 'Noch nicht vollständig definiert'}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 interface DeliveryStepProps extends StepProps {
   pairedDevices: Device[];
@@ -496,84 +306,6 @@ export function AudioStep({ formData, updateOverrides }: StepProps) {
           Keine Event-Musik konfiguriert. Das Event nutzt dann die globale Audio-Einstellung.
         </div>
       )}
-    </div>
-  );
-}
-
-interface PreviewStepProps extends StepProps {
-  previewEvent: Event;
-  previewSchedule: Schedule;
-  previewSettings: Settings;
-  pairedDevices: Device[];
-  selectedTargetDevices: Device[];
-  selectedTargetDeviceIds: string[];
-  previewTargetLabel: string;
-  startDateTime: Date | null;
-}
-
-export function PreviewStep({
-  normalizedFormData,
-  previewEvent,
-  previewSchedule,
-  previewSettings,
-  pairedDevices,
-  selectedTargetDeviceIds,
-  previewTargetLabel,
-  startDateTime,
-}: PreviewStepProps) {
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
-        <div className="space-y-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-5 text-sm text-spa-text-secondary">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-spa-text-secondary">Zusammenfassung</div>
-            <div className="mt-2 text-base font-semibold text-spa-text-primary">{normalizedFormData.name.trim() || 'Event ohne Namen'}</div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Aufgussplan</div>
-            <div>{PRESET_LABELS[normalizedFormData.assignedPreset]}</div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Ziel</div>
-            <div>{previewTargetLabel}</div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Event-Zeitraum</div>
-            <div>{formatEventWindow(previewEvent)}</div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Design</div>
-            <div>
-              {previewEvent.settingsOverrides?.displayAppearance
-                ? getDisplayAppearanceLabel(previewEvent.settingsOverrides.displayAppearance)
-                : 'Global'}
-              {' · '}
-              {previewEvent.settingsOverrides?.designStyle
-                ? getScheduleDesignStyleLabel(previewEvent.settingsOverrides.designStyle)
-                : 'Global'}
-              {previewEvent.settingsOverrides?.colorPalette ? ` · ${previewEvent.settingsOverrides.colorPalette}` : ''}
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Slideshow</div>
-            <div>{previewEvent.settingsOverrides?.slideshow ? 'Event-Slideshow aktiv' : 'Global / Geräte-Override'}</div>
-          </div>
-          <div>
-            <div className="font-medium text-spa-text-primary">Audio</div>
-            <div>{previewEvent.settingsOverrides?.audio ? 'Event-Audio aktiv' : 'Global / aus'}</div>
-          </div>
-        </div>
-
-        <DisplayScenarioPreview
-          schedule={previewSchedule}
-          settings={previewSettings}
-          devices={pairedDevices}
-          allowedDeviceIds={selectedTargetDeviceIds.length > 0 ? selectedTargetDeviceIds : undefined}
-          defaultDeviceId={selectedTargetDeviceIds[0] || pairedDevices[0]?.id || null}
-          defaultPreviewAt={startDateTime || undefined}
-          previewClassName="shadow-sm"
-        />
-      </div>
     </div>
   );
 }

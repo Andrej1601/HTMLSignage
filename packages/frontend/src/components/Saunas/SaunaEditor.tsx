@@ -173,6 +173,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
               type="color"
               value={formData.color}
               onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              aria-label="Sauna-Farbe"
               className="h-10 w-20 rounded border border-spa-bg-secondary cursor-pointer"
             />
             <input

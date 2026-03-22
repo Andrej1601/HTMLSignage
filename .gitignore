@@ -34,6 +34,7 @@ nginx-*.conf
 .env.*.local
 
 # Local agent/assistant config
+.claude/
 .claude/skills/
 .claude/settings.local.json
 

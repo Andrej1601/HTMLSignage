@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchApi } from '@/services/api';
 import { Button } from '@/components/Button';
@@ -8,6 +8,7 @@ export function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export function ForgotPasswordPage() {
       setIsSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+      requestAnimationFrame(() => errorRef.current?.focus());
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +47,7 @@ export function ForgotPasswordPage() {
             </div>
             <Link
               to="/login"
-              className="block text-center w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+              className="flex items-center justify-center w-full rounded-lg bg-spa-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-spa-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
             >
               Zurück zur Anmeldung
             </Link>
@@ -53,7 +55,7 @@ export function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
+              <div ref={errorRef} tabIndex={-1} role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-none">
                 {error}
               </div>
             )}

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Skeleton, SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { TabGroup, TabPanel, type Tab } from '@/components/TabGroup';
 import { useSettings } from '@/hooks/useSettings';
@@ -27,6 +28,7 @@ import type {
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Monitor, Wrench } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 
 type TabId = 'theme' | 'audio' | 'maintenance' | 'aromas' | 'infos' | 'events' | 'system';
@@ -50,16 +52,15 @@ export function SettingsPage() {
     enabled: Boolean(localSettings),
   });
 
-  useUnsavedChangesGuard({
+  const unsavedGuard = useUnsavedChangesGuard({
     when: isDirty,
-    message: 'Es gibt ungespeicherte Änderungen in den Einstellungen. Wirklich verlassen?',
   });
 
   useEffect(() => {
-    if (!settings || isDirty || draftState.hasRecoveredDraft) return;
+    if (!settings || isDirty || draftState.hasStoredDraft) return;
     setLocalSettings(settings);
     setIsDirty(false);
-  }, [draftState.hasRecoveredDraft, isDirty, settings]);
+  }, [draftState.hasStoredDraft, isDirty, settings]);
 
   const updateField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setLocalSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -147,10 +148,26 @@ export function SettingsPage() {
     return items;
   }, [canSystem]);
 
+  const tabGroups = useMemo(() => {
+    const groups: Array<{ label: string; tabs: Tab<TabId>[] }> = [
+      { label: 'Darstellung', tabs: tabs.filter(t => t.id === 'theme' || t.id === 'maintenance') },
+      { label: 'Inhalte', tabs: tabs.filter(t => t.id === 'aromas' || t.id === 'infos' || t.id === 'events') },
+      { label: 'System', tabs: tabs.filter(t => t.id === 'audio' || t.id === 'system') },
+    ];
+    return groups.filter(g => g.tabs.length > 0);
+  }, [tabs]);
+
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Einstellungen..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="flex gap-2 overflow-hidden">
+            {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} variant="rect" className="h-10 w-28 rounded-lg" />)}
+          </div>
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </Layout>
     );
   }
@@ -187,19 +204,15 @@ export function SettingsPage() {
           )}
           badges={[
             { label: `Live v${settings?.version || localSettings.version}`, tone: 'info' },
-            draftState.hasStoredDraft
-              ? {
-                  label: draftState.hasRecoveredDraft ? 'Entwurf wiederhergestellt' : 'Lokaler Entwurf vorhanden',
-                  tone: draftState.hasRecoveredDraft ? 'info' as const : 'warning' as const,
-                }
+            draftState.hasStoredDraft && !isDirty
+              ? { label: 'Lokaler Entwurf vorhanden', tone: 'warning' as const }
               : { label: 'Live-Stand', tone: 'neutral' as const },
             { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' : 'success' },
           ]}
         />
 
-        {draftState.hasStoredDraft && !draftState.hasRecoveredDraft && !isDirty && (
+        {draftState.hasStoredDraft && !isDirty && (
           <DraftRecoveryBanner
-            mode="available"
             entityLabel="Einstellungen"
             updatedAt={draftState.draftUpdatedAt}
             onRestore={handleRestoreDraft}
@@ -207,84 +220,114 @@ export function SettingsPage() {
           />
         )}
 
-        {draftState.hasRecoveredDraft && (
-          <DraftRecoveryBanner
-            mode="restored"
-            entityLabel="Einstellungen"
-            updatedAt={draftState.draftUpdatedAt}
-            onDiscard={handleDiscardDraft}
-          />
-        )}
+        {/* Mobile: horizontal tabs */}
+        <div className="xl:hidden">
+          <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        </div>
 
-        <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        <div className="flex gap-6">
+          {/* Desktop: vertical grouped sidebar */}
+          <nav className="hidden xl:block w-56 flex-shrink-0" aria-label="Einstellungen-Navigation">
+            <div className="sticky top-4 space-y-4">
+              {tabGroups.map((group) => (
+                <div key={group.label}>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-spa-text-secondary/70 px-3 mb-1">
+                    {group.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {group.tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-spa-primary text-white shadow-sm'
+                              : 'text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary'
+                          }`}
+                        >
+                          {Icon && <Icon className="w-4 h-4 flex-shrink-0" />}
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </nav>
 
-        <SectionCard noPadding>
-          <div className="p-6">
-            <TabPanel id="theme" activeTab={activeTab}>
-              {localSettings.theme && (
-                <ThemeEditor
-                  theme={localSettings.theme}
-                  displayAppearance={localSettings.displayAppearance}
-                  designStyle={localSettings.designStyle}
-                  colorPalette={localSettings.colorPalette}
-                  onChange={(theme) => updateField('theme', theme)}
-                  onDisplayAppearanceChange={(v) => updateField('displayAppearance', v)}
-                  onDesignStyleChange={(v) => updateField('designStyle', v)}
-                  onColorPaletteChange={handleColorPaletteChange}
+          {/* Content */}
+          <SectionCard noPadding className="flex-1 min-w-0">
+            <div className="p-6">
+              <TabPanel id="theme" activeTab={activeTab}>
+                {localSettings.theme && (
+                  <ThemeEditor
+                    theme={localSettings.theme}
+                    displayAppearance={localSettings.displayAppearance}
+                    designStyle={localSettings.designStyle}
+                    colorPalette={localSettings.colorPalette}
+                    onChange={(theme) => updateField('theme', theme)}
+                    onDisplayAppearanceChange={(v) => updateField('displayAppearance', v)}
+                    onDesignStyleChange={(v) => updateField('designStyle', v)}
+                    onColorPaletteChange={handleColorPaletteChange}
+                  />
+                )}
+              </TabPanel>
+
+              <TabPanel id="audio" activeTab={activeTab}>
+                {localSettings.audio && (
+                  <AudioSettings
+                    audio={localSettings.audio}
+                    onChange={(audio) => updateField('audio', audio)}
+                  />
+                )}
+              </TabPanel>
+
+              <TabPanel id="maintenance" activeTab={activeTab}>
+                <MaintenanceScreenEditor
+                  value={localSettings.maintenanceScreen}
+                  onChange={(v) => updateField('maintenanceScreen', v)}
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel id="audio" activeTab={activeTab}>
-              {localSettings.audio && (
-                <AudioSettings
-                  audio={localSettings.audio}
-                  onChange={(audio) => updateField('audio', audio)}
+              <TabPanel id="aromas" activeTab={activeTab}>
+                <AromaLibraryManager
+                  aromas={localSettings.aromas || []}
+                  onChange={(aromas) => updateField('aromas', aromas)}
                 />
-              )}
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel id="maintenance" activeTab={activeTab}>
-              <MaintenanceScreenEditor
-                value={localSettings.maintenanceScreen}
-                onChange={(v) => updateField('maintenanceScreen', v)}
-              />
-            </TabPanel>
-
-            <TabPanel id="aromas" activeTab={activeTab}>
-              <AromaLibraryManager
-                aromas={localSettings.aromas || []}
-                onChange={(aromas) => updateField('aromas', aromas)}
-              />
-            </TabPanel>
-
-            <TabPanel id="infos" activeTab={activeTab}>
-              <InfoManager
-                infos={localSettings.infos || []}
-                onChange={(infos) => updateField('infos', infos)}
-              />
-            </TabPanel>
-
-            <TabPanel id="events" activeTab={activeTab}>
-              <Suspense fallback={<LoadingSpinner label="Lade Event-Manager..." />}>
-                <EventManager
-                  events={localSettings.events || []}
-                  settings={localSettings}
-                  schedule={schedule}
-                  onChange={(events) => updateField('events', events)}
+              <TabPanel id="infos" activeTab={activeTab}>
+                <InfoManager
+                  infos={localSettings.infos || []}
+                  onChange={(infos) => updateField('infos', infos)}
                 />
-              </Suspense>
-            </TabPanel>
+              </TabPanel>
 
-            <TabPanel id="system" activeTab={activeTab}>
-              {canSystem && (
-                <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
-                  <SystemMaintenance />
+              <TabPanel id="events" activeTab={activeTab}>
+                <Suspense fallback={<LoadingSpinner label="Lade Event-Manager..." />}>
+                  <EventManager
+                    events={localSettings.events || []}
+                    settings={localSettings}
+                    schedule={schedule}
+                    onChange={(events) => updateField('events', events)}
+                  />
                 </Suspense>
-              )}
-            </TabPanel>
-          </div>
-        </SectionCard>
+              </TabPanel>
+
+              <TabPanel id="system" activeTab={activeTab}>
+                {canSystem && (
+                  <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
+                    <SystemMaintenance />
+                  </Suspense>
+                )}
+              </TabPanel>
+            </div>
+          </SectionCard>
+        </div>
 
         <SectionCard
           title="Szenario-Vorschau"
@@ -299,6 +342,17 @@ export function SettingsPage() {
           </Suspense>
         </SectionCard>
       </div>
+
+      <ConfirmDialog
+        isOpen={unsavedGuard.isBlocked}
+        title="Ungespeicherte Änderungen"
+        message="Es gibt ungespeicherte Änderungen in den Einstellungen. Wirklich verlassen?"
+        confirmLabel="Verlassen"
+        cancelLabel="Bleiben"
+        variant="warning"
+        onConfirm={unsavedGuard.proceed}
+        onCancel={unsavedGuard.reset}
+      />
     </Layout>
   );
 }

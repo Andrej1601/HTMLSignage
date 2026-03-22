@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Monitor } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
 import { InputField, ToggleField } from '@/components/FormField';
+import { ComboboxField } from '@/components/ComboboxField';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
 
 interface DeviceEditDialogProps {
@@ -11,6 +12,8 @@ interface DeviceEditDialogProps {
   onClose: () => void;
   onSave: (id: string, updates: UpdateDeviceRequest) => void;
   isSaving: boolean;
+  /** Existing group names for autocomplete suggestions */
+  existingGroups?: string[];
 }
 
 export function DeviceEditDialog({
@@ -18,23 +21,32 @@ export function DeviceEditDialog({
   isOpen,
   onClose,
   onSave,
-  isSaving
+  isSaving,
+  existingGroups = [],
 }: DeviceEditDialogProps) {
   const [name, setName] = useState('');
   const [groupName, setGroupName] = useState('');
   const [mode, setMode] = useState<'auto' | 'override'>('auto');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [error, setError] = useState('');
+  const initializedDeviceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (device) {
-      setName(device.name);
-      setGroupName(device.groupName || '');
-      setMode(device.mode);
-      setMaintenanceMode(Boolean(device.maintenanceMode));
-      setError('');
-    }
-  }, [device]);
+    if (!isOpen || !device) return;
+    if (initializedDeviceIdRef.current === device.id) return;
+
+    initializedDeviceIdRef.current = device.id;
+    setName(device.name);
+    setGroupName(device.groupName || '');
+    setMode(device.mode);
+    setMaintenanceMode(Boolean(device.maintenanceMode));
+    setError('');
+  }, [device, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    initializedDeviceIdRef.current = null;
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +68,7 @@ export function DeviceEditDialog({
 
   const handleClose = () => {
     if (!isSaving) {
+      initializedDeviceIdRef.current = null;
       setName('');
       setGroupName('');
       setMode('auto');
@@ -119,14 +132,19 @@ export function DeviceEditDialog({
           autoFocus
         />
 
-        <InputField
-          label="Gerätegruppe"
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          placeholder="z.B. Saunawelt West"
-          disabled={isSaving}
-          hint="Hilft beim Filtern, Gruppieren und bei Bulk-Aktionen."
-        />
+        <div>
+          <ComboboxField
+            label="Gerätegruppe"
+            value={groupName}
+            onChange={setGroupName}
+            options={existingGroups}
+            placeholder="z.B. Saunawelt West"
+            createLabel="Neue Gruppe"
+          />
+          <p className="mt-1 text-xs text-spa-text-secondary">
+            Hilft beim Filtern, Gruppieren und bei Bulk-Aktionen.
+          </p>
+        </div>
 
         {/* Mode Selection */}
         <fieldset>

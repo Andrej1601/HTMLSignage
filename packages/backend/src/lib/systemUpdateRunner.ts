@@ -95,6 +95,20 @@ function createSystemUpdateSteps(tagName: string): SystemUpdateStep[] {
       percent: 45,
     },
     {
+      label: 'Rebuilding native backend dependencies',
+      command: 'pnpm',
+      args: ['--filter', 'backend', 'rebuild', 'bcrypt'],
+      timeoutMs: 10 * 60 * 1000,
+      percent: 52,
+    },
+    {
+      label: 'Validating bcrypt native binding',
+      command: 'pnpm',
+      args: ['--filter', 'backend', 'exec', 'node', '-e', "require('bcrypt'); console.log('bcrypt-ok')"],
+      timeoutMs: 60 * 1000,
+      percent: 56,
+    },
+    {
       label: 'Applying Prisma migrations',
       command: 'pnpm',
       args: ['--filter', 'backend', 'prisma', 'migrate', 'deploy'],
@@ -129,6 +143,7 @@ async function attemptRollback(previousTag: string, context: RunSystemJobContext
   }
 
   await runCommand('pnpm', ['install', '--force', '--no-frozen-lockfile', '--ignore-scripts=false'], { timeoutMs: 20 * 60 * 1000 });
+  await runCommand('pnpm', ['--filter', 'backend', 'rebuild', 'bcrypt'], { timeoutMs: 10 * 60 * 1000 });
   await runCommand('pnpm', ['--filter', 'backend', 'build'], { timeoutMs: 10 * 60 * 1000 });
   await runCommand('pnpm', ['--filter', 'frontend', 'build'], { timeoutMs: 15 * 60 * 1000 });
   context.appendLog(`Rollback auf ${previousTag} erfolgreich.`);

@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SectionCard } from '@/components/SectionCard';
 import { Monitor, SlidersHorizontal } from 'lucide-react';
@@ -7,7 +6,6 @@ import type { Device } from '@/types/device.types';
 import type { SlideshowWorkflowEntry } from '@/services/api';
 import {
   getDeviceSlideshowSource,
-  summarizeDeviceSlideshowSources,
   toDeviceTarget,
   type EditorTarget,
 } from '@/pages/slideshowPage.utils';
@@ -29,33 +27,10 @@ export function SlideshowTargetSelector({
   onSelectTarget,
   onDeviceModeChange,
 }: SlideshowTargetSelectorProps) {
-  const deviceSourceSummary = useMemo(() => {
-    return summarizeDeviceSlideshowSources(pairedDevices);
-  }, [pairedDevices]);
-
   return (
     <SectionCard
       title="Geräte-Ausspielung"
-      description="Wähle ein Ziel, um globale Slideshow oder Geräte-Override zu bearbeiten."
       icon={Monitor}
-      actions={
-        <div className="flex flex-wrap gap-2 text-xs font-medium">
-          <span className="rounded-full bg-spa-success-light px-3 py-1 text-spa-success-dark">
-            Global: {deviceSourceSummary.global}
-          </span>
-          <span className="rounded-full bg-spa-info-light px-3 py-1 text-spa-info-dark">
-            Override aktiv: {deviceSourceSummary.overrideActive}
-          </span>
-          <span className="rounded-full bg-spa-warning-light px-3 py-1 text-spa-warning-dark">
-            Override hinterlegt: {deviceSourceSummary.overrideStoredInactive}
-          </span>
-          {deviceSourceSummary.overrideModeWithoutData > 0 && (
-            <span className="rounded-full bg-spa-error-light px-3 py-1 text-spa-error-dark">
-              Modus Override ohne Daten: {deviceSourceSummary.overrideModeWithoutData}
-            </span>
-          )}
-        </div>
-      }
     >
       <div className="space-y-1.5">
         <div
@@ -76,11 +51,6 @@ export function SlideshowTargetSelector({
               <StatusBadge label="Im Editor" tone="success" showDot={false} />
             )}
           </div>
-          {target === 'global' && (
-            <p className="text-xs text-spa-text-secondary mt-1 ml-7">
-              Standard-Konfiguration für alle Geräte im Auto-Modus
-            </p>
-          )}
         </div>
 
         {pairedDevices.length === 0 ? (
@@ -132,9 +102,6 @@ export function SlideshowTargetSelector({
                     <StatusBadge label="Im Editor" tone="success" showDot={false} />
                   )}
                 </div>
-                {isSelected && (
-                  <p className="text-xs text-spa-text-secondary mt-1 ml-[72px]">{source.detail}</p>
-                )}
               </div>
             );
           })

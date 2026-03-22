@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Skeleton } from '@/components/Skeleton';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
 import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
@@ -23,6 +23,7 @@ import {
   syncScheduleWithSaunas,
 } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
 import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
@@ -57,6 +58,7 @@ export function SchedulePage() {
   const [editingPreset, setEditingPreset] = useState<PresetKey>('Mon');
   const [isDirty, setIsDirty] = useState(false);
   const [showCopyMenu, setShowCopyMenu] = useState(false);
+  const [pendingCopySource, setPendingCopySource] = useState<PresetKey | null>(null);
   const [eventClock, setEventClock] = useState(() => Date.now());
   const [simulationDateTime, setSimulationDateTime] = useState(() => formatDateTimeLocalInput(new Date()));
   const [simulationDeviceId, setSimulationDeviceId] = useState<string>('');
@@ -84,18 +86,17 @@ export function SchedulePage() {
     enabled: Boolean(localSchedule),
   });
 
-  useUnsavedChangesGuard({
+  const unsavedGuard = useUnsavedChangesGuard({
     when: isDirty,
-    message: 'Es gibt ungespeicherte Änderungen im Aufgussplan. Wirklich verlassen?',
   });
 
   // Initialize local schedule from server data
   useEffect(() => {
-    if (schedule && !localSchedule && !draftState.hasRecoveredDraft) {
+    if (schedule && !localSchedule && !draftState.hasStoredDraft) {
       setLocalSchedule(schedule);
       setEditingPreset(resolveInitialEditingPreset(schedule, settings));
     }
-  }, [draftState.hasRecoveredDraft, schedule, localSchedule, settings]);
+  }, [draftState.hasStoredDraft, schedule, localSchedule, settings]);
 
   useEffect(() => {
     const interval = setInterval(() => setEventClock(Date.now()), 30000);
@@ -190,10 +191,15 @@ export function SchedulePage() {
   // Handle copy from another day
   const handleCopyFrom = (sourcePreset: PresetKey) => {
     if (!localSchedule) return;
-
-    setLocalSchedule(withCopiedPreset(localSchedule, sourcePreset, editingPreset));
-    setIsDirty(true);
+    setPendingCopySource(sourcePreset);
     setShowCopyMenu(false);
+  };
+
+  const confirmCopyFrom = () => {
+    if (!localSchedule || !pendingCopySource) return;
+    setLocalSchedule(withCopiedPreset(localSchedule, pendingCopySource, editingPreset));
+    setIsDirty(true);
+    setPendingCopySource(null);
   };
 
   // Handle edit cell
@@ -302,7 +308,15 @@ export function SchedulePage() {
   if (isLoading || !localSchedule) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Aufgussplan..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="rounded-xl border border-spa-bg-secondary bg-white p-6 space-y-4">
+            <div className="flex gap-2">
+              {Array.from({ length: 7 }, (_, i) => <Skeleton key={i} variant="rect" className="h-10 w-16 rounded-lg" />)}
+            </div>
+            <Skeleton variant="rect" className="h-64 w-full" />
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -356,32 +370,19 @@ export function SchedulePage() {
           )}
           badges={[
             { label: `Live v${schedule?.version || localSchedule.version}`, tone: 'info' },
-            draftState.hasStoredDraft
-              ? {
-                  label: draftState.hasRecoveredDraft ? 'Entwurf wiederhergestellt' : 'Lokaler Entwurf vorhanden',
-                  tone: draftState.hasRecoveredDraft ? 'info' as const : 'warning' as const,
-                }
+            draftState.hasStoredDraft && !isDirty
+              ? { label: 'Lokaler Entwurf vorhanden', tone: 'warning' as const }
               : { label: 'Live-Stand', tone: 'neutral' as const },
             { label: localSchedule.autoPlay ? 'Auto-Play' : 'Manuell', tone: localSchedule.autoPlay ? 'success' as const : 'warning' as const },
             { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' as const : 'success' as const },
           ]}
         />
 
-        {draftState.hasStoredDraft && !draftState.hasRecoveredDraft && !isDirty && (
+        {draftState.hasStoredDraft && !isDirty && (
           <DraftRecoveryBanner
-            mode="available"
             entityLabel="Aufgussplan"
             updatedAt={draftState.draftUpdatedAt}
             onRestore={handleRestoreDraft}
-            onDiscard={handleDiscardDraft}
-          />
-        )}
-
-        {draftState.hasRecoveredDraft && (
-          <DraftRecoveryBanner
-            mode="restored"
-            entityLabel="Aufgussplan"
-            updatedAt={draftState.draftUpdatedAt}
             onDiscard={handleDiscardDraft}
           />
         )}
@@ -675,6 +676,32 @@ export function SchedulePage() {
           isOpen={editingTime !== null}
           onClose={() => setEditingTime(null)}
           onSave={handleSaveTime}
+        />
+        <ConfirmDialog
+          isOpen={unsavedGuard.isBlocked}
+          title="Ungespeicherte Änderungen"
+          message="Es gibt ungespeicherte Änderungen im Aufgussplan. Wirklich verlassen?"
+          confirmLabel="Verlassen"
+          cancelLabel="Bleiben"
+          variant="warning"
+          onConfirm={unsavedGuard.proceed}
+          onCancel={unsavedGuard.reset}
+        />
+        <ConfirmDialog
+          isOpen={Boolean(pendingCopySource)}
+          title="Tagesplan überschreiben?"
+          message={(() => {
+            if (!pendingCopySource || !localSchedule) return '';
+            const source = localSchedule.presets[pendingCopySource];
+            const target = currentDaySchedule;
+            const sourceRows = source?.rows?.length || 0;
+            const targetRows = target?.rows?.length || 0;
+            return `${PRESET_LABELS[pendingCopySource]} (${sourceRows} Zeitslots) → ${PRESET_LABELS[editingPreset]} (${targetRows} Zeitslots)\n\nDer aktuelle Plan für ${PRESET_LABELS[editingPreset]} wird vollständig durch den Plan von ${PRESET_LABELS[pendingCopySource]} ersetzt.`;
+          })()}
+          confirmLabel="Überschreiben"
+          variant="warning"
+          onConfirm={confirmCopyFrom}
+          onCancel={() => setPendingCopySource(null)}
         />
       </div>
     </Layout>

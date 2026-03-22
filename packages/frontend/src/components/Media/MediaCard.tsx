@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy, Tags } from 'lucide-react';
+import { MoreVertical, Trash2, Download, Image as ImageIcon, Music, Film, Copy, Tags, Link2 } from 'lucide-react';
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
@@ -10,9 +10,10 @@ interface MediaCardProps {
   media: Media;
   onDelete: (media: Media) => void;
   onEditTags?: (media: Media) => void;
+  usageSummary?: string[];
 }
 
-export function MediaCard({ media, onDelete, onEditTags }: MediaCardProps) {
+export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCardProps) {
   const [copied, setCopied] = useState(false);
 
   // Construct full URL for media
@@ -139,6 +140,14 @@ export function MediaCard({ media, onDelete, onEditTags }: MediaCardProps) {
         {mediaSummary && (
           <div className="mt-1 text-xs text-spa-text-secondary">
             {mediaSummary}
+          </div>
+        )}
+        {usageSummary && usageSummary.length > 0 && (
+          <div className="mt-1.5 flex items-center gap-1 text-[11px] text-spa-info-dark">
+            <Link2 className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate" title={usageSummary.join(', ')}>
+              {usageSummary.join(', ')}
+            </span>
           </div>
         )}
       </div>

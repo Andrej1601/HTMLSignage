@@ -49,6 +49,7 @@ export function useUploadMedia() {
     mutationFn: (file: File) => mediaApi.uploadMedia(file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['media'] });
+      queryClient.invalidateQueries({ queryKey: ['media-tags'] });
       toast.success('Datei hochgeladen.');
     },
     onError: () => {

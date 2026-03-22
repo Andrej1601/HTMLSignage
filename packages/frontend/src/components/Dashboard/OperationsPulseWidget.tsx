@@ -1,18 +1,26 @@
 import { Link } from 'react-router-dom';
 import {
   CalendarClock,
+  Image as ImageIcon,
   Layers,
   Monitor,
   Radio,
   Settings2,
   Sparkles,
 } from 'lucide-react';
+import { formatFileSize } from '@/types/media.types';
 import { StatusBadge } from '@/components/StatusBadge';
 import type { DashboardLiveState } from '@/hooks/useDashboardData';
 import type { SystemJob } from '@/services/api';
 import type { RunningSlideshowGroup } from '@/components/Dashboard/LiveOperationsWidget';
 import type { PresetKey } from '@/types/schedule.types';
 import { PRESET_LABELS } from '@/types/schedule.types';
+
+interface MediaStatsProps {
+  total: number;
+  totalSize: number;
+  latestName: string | null;
+}
 
 interface OperationsPulseWidgetProps {
   liveState: DashboardLiveState;
@@ -21,6 +29,7 @@ interface OperationsPulseWidgetProps {
   nextEventLabel: string;
   activePreset: PresetKey | null;
   autoPlay: boolean;
+  mediaStats?: MediaStatsProps;
 }
 
 function PulseMetric({
@@ -39,7 +48,7 @@ function PulseMetric({
   return (
     <Link
       to={href}
-      className="rounded-2xl border border-white/70 bg-white/85 p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+      className="rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
     >
       <div className="flex items-center gap-2 text-spa-text-secondary">
         <Icon className="h-4 w-4" />
@@ -58,6 +67,7 @@ export function OperationsPulseWidget({
   nextEventLabel,
   activePreset,
   autoPlay,
+  mediaStats,
 }: OperationsPulseWidgetProps) {
   const presetLabel = activePreset ? PRESET_LABELS[activePreset] : 'Kein Live-Preset';
   const activeEventLabel = liveState.activeEvent
@@ -68,7 +78,7 @@ export function OperationsPulseWidget({
     : 'Keine laufenden Jobs';
 
   return (
-    <section className="rounded-2xl border border-spa-secondary/20 bg-gradient-to-br from-spa-secondary/10 via-white to-spa-primary/10 p-6 shadow-sm">
+    <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-spa-text-primary">
@@ -126,9 +136,18 @@ export function OperationsPulseWidget({
           detail={`${liveState.pendingPairings} offen · ${liveState.offlineDevices} offline`}
           href="/devices"
         />
+        {mediaStats && (
+          <PulseMetric
+            icon={ImageIcon}
+            label="Medien"
+            value={`${mediaStats.total} Dateien`}
+            detail={`${formatFileSize(mediaStats.totalSize)} · ${mediaStats.latestName || 'Keine Uploads'}`}
+            href="/media"
+          />
+        )}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
+      <div className="mt-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary px-4 py-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-spa-text-primary">

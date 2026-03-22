@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { SortableSaunaCard } from '@/components/Saunas/SaunaCard';
 import { SaunaEditor } from '@/components/Saunas/SaunaEditor';
@@ -29,11 +29,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-
-// Simple UUID generator
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '@/utils/id';
 
 export function SaunasPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
@@ -184,7 +180,12 @@ export function SaunasPage() {
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Saunas..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }, (_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
       </Layout>
     );
   }

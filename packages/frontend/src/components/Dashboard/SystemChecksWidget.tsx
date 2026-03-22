@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, HardDrive, Wrench } from 'lucide-react';
+import { Activity, AlertTriangle, ChevronDown, HardDrive, Wrench } from 'lucide-react';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
 import type { SystemRuntimeHistoryResponse, SystemRuntimeStatusResponse } from '@/services/api';
 import { formatFileSize } from '@/types/media.types';
@@ -88,6 +88,9 @@ export function SystemChecksWidget({
   const maintenanceBadge = maintenance ? getMaintenanceBadge(maintenance.state) : null;
   const historySummary = runtimeHistory?.summary || null;
 
+  const hasWarnings = warnings.length > 0;
+  const [detailOpen, setDetailOpen] = useState(hasWarnings);
+
   return (
     <DashboardWidgetFrame
       title="System-Checks"
@@ -133,7 +136,19 @@ export function SystemChecksWidget({
         )}
       </div>
 
-      <div className="mt-5 pt-4 border-t border-spa-bg-secondary space-y-3">
+      <div className="mt-4 border-t border-spa-bg-secondary pt-3">
+        <button
+          type="button"
+          onClick={() => setDetailOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-sm font-semibold text-spa-text-secondary transition-colors hover:text-spa-text-primary"
+        >
+          <span>Details {hasWarnings ? `(${warnings.length} Warnungen)` : ''}</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${detailOpen ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {detailOpen && (
+      <div className="space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="rounded-lg bg-spa-bg-primary p-4">
             <div className="flex items-center justify-between gap-3 mb-2">
@@ -331,6 +346,7 @@ export function SystemChecksWidget({
           )}
         </div>
       </div>
+      )}
 
       <RuntimeHistoryDetailDialog
         metric={selectedHistoryMetric}

@@ -1,6 +1,7 @@
 import { DeviceCard } from './DeviceCard';
 import { getDeviceGroupLabel, type Device } from '@/types/device.types';
 import { Monitor } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 
 interface DeviceListProps {
   devices: Device[];
@@ -27,15 +28,11 @@ export function DeviceList({
 }: DeviceListProps) {
   if (devices.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-        <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-          Keine Geräte gefunden
-        </h3>
-        <p className="text-spa-text-secondary">
-          Füge dein erstes Display hinzu, um loszulegen
-        </p>
-      </div>
+      <EmptyState
+        icon={Monitor}
+        title="Keine Geräte gefunden"
+        description="Füge dein erstes Display hinzu, um loszulegen"
+      />
     );
   }
 

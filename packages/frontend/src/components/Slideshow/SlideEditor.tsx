@@ -11,6 +11,7 @@ import { InfoPickerField } from './slide-forms/InfoPickerField';
 import { Save } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
+import { TransitionPreview } from '@/components/Slideshow/TransitionPreview';
 import clsx from 'clsx';
 
 interface SlideEditorProps {
@@ -303,6 +304,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             <option value="zoom">Zoom</option>
             <option value="none">Keine</option>
           </select>
+          <TransitionPreview transition={formData.transition || 'fade'} />
         </div>
 
         {/* Enabled Toggle */}

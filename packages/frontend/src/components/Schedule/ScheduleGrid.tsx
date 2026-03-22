@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DaySchedule, Entry } from '@/types/schedule.types';
 import type { Aroma } from '@/types/settings.types';
 import { resolveAromaForBadge, getAromaDisplayColor } from '@/types/settings.types';
-import { Plus, Trash2, Flame, Clock } from 'lucide-react';
+import { detectConflicts, getConflictsForCell } from '@/utils/scheduleConflicts';
+import { Plus, Trash2, Flame, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/Button';
 import clsx from 'clsx';
 
@@ -111,6 +112,7 @@ export function ScheduleGrid({
   onDeleteTimeRow,
 }: ScheduleGridProps) {
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const conflicts = useMemo(() => detectConflicts(daySchedule), [daySchedule]);
 
   if (daySchedule.rows.length === 0) {
     return (
@@ -190,18 +192,29 @@ export function ScheduleGrid({
                 {timeRow.entries.map((entry, saunaIndex) => {
                   const cellKey = `${timeRowIndex}-${saunaIndex}`;
                   const isHovered = hoveredCell === cellKey;
+                  const cellConflicts = getConflictsForCell(conflicts, timeRowIndex, saunaIndex);
 
                   return (
                     <td key={saunaIndex} className="px-3 py-2.5">
                       {entry ? (
-                        <EntryCard
-                          entry={entry}
-                          aromas={aromas}
-                          isHovered={isHovered}
-                          onClick={() => onEditCell(timeRowIndex, saunaIndex)}
-                          onMouseEnter={() => setHoveredCell(cellKey)}
-                          onMouseLeave={() => setHoveredCell(null)}
-                        />
+                        <div className="relative">
+                          {cellConflicts.length > 0 && (
+                            <div
+                              className="absolute -top-1 -right-1 z-10 p-0.5 rounded-full bg-spa-warning-light border border-spa-warning"
+                              title={cellConflicts.map(c => c.message).join('\n')}
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5 text-spa-warning-dark" />
+                            </div>
+                          )}
+                          <EntryCard
+                            entry={entry}
+                            aromas={aromas}
+                            isHovered={isHovered}
+                            onClick={() => onEditCell(timeRowIndex, saunaIndex)}
+                            onMouseEnter={() => setHoveredCell(cellKey)}
+                            onMouseLeave={() => setHoveredCell(null)}
+                          />
+                        </div>
                       ) : (
                         <button
                           onClick={() => onEditCell(timeRowIndex, saunaIndex)}

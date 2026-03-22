@@ -42,7 +42,7 @@ export function ToastContainer() {
             key={t.id}
             role="alert"
             className={clsx(
-              'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-in slide-in-from-right-5',
+              'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-slide-in-right',
               styleMap[t.type]
             )}
           >

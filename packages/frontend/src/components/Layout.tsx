@@ -1,5 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X } from 'lucide-react';
+import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search } from 'lucide-react';
+import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { CommandPalette } from '@/components/CommandPalette';
+import { useCommandPalette } from '@/hooks/useCommandPalette';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,6 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const commandPalette = useCommandPalette();
 
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
@@ -233,8 +237,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </nav>
 
-          {/* Logout Button */}
-          <div className="flex-shrink-0 border-t border-white/10 px-2 py-4">
+          {/* Search + Logout */}
+          <div className="flex-shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
+            <button
+              onClick={commandPalette.open}
+              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <span className="flex items-center">
+                <Search className="mr-3 flex-shrink-0 h-5 w-5" />
+                Suche
+              </span>
+              <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
+            </button>
             <button
               onClick={handleLogout}
               className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
@@ -356,9 +370,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="lg:hidden h-16" />
 
         {/* Content */}
-        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main key={location.pathname} id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 animate-fade-in">
+          <Breadcrumbs />
           {children}
         </main>
+        <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
       </div>
     </div>
   );

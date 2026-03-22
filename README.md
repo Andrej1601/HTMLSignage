@@ -100,7 +100,7 @@ Auf Zielmaschine:
 sudo apt update
 sudo apt install -y git curl ca-certificates openssl
 
-git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
+git clone --branch DEV https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
 
 sudo APP_USER="$USER" bash scripts/install-new-machine.sh
@@ -110,7 +110,7 @@ sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 1. Systempakete installieren/aktualisieren
 2. Node.js `NODE_MAJOR` von NodeSource installieren (falls lokal zu alt)
 3. pnpm robust installieren (corepack bevorzugt, npm fallback)
-4. Repository auf `main` klonen/aktualisieren
+4. Repository auf dem gewählten Branch klonen/aktualisieren (standardmäßig aktueller Checkout-Branch, typischerweise `DEV`)
 5. Dependencies installieren (`pnpm install --force --no-frozen-lockfile`)
 6. PostgreSQL einrichten (DB + User)
 7. `.env`-Dateien fuer Backend/Frontend erzeugen
@@ -142,7 +142,7 @@ Folgende Variablen koennen beim Aufruf gesetzt werden:
 sudo \
   APP_USER="$USER" \
   APP_DIR="/opt/HTMLSignage" \
-  BRANCH="main" \
+  BRANCH="DEV" \
   CLEAN_INSTALL="false" \
   APT_UPGRADE="false" \
   DB_NAME="htmlsignage" \
@@ -247,7 +247,7 @@ sudo systemctl restart htmlsignage-frontend.service
 ### Update auf neue Version
 ```bash
 cd /opt/HTMLSignage
-git pull --ff-only origin main
+git pull --ff-only origin DEV
 sudo APP_USER="$USER" bash scripts/install-new-machine.sh
 ```
 

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Monitor,
   Circle,
@@ -8,7 +9,9 @@ import {
   Edit2,
   CheckCircle,
   AlertCircle,
+  ChevronDown,
 } from 'lucide-react';
+import clsx from 'clsx';
 import type { Device } from '@/types/device.types';
 import {
   getDeviceStatus,
@@ -44,6 +47,7 @@ export function DeviceCard({
   onClearCache,
   onToggleMaintenance,
 }: DeviceCardProps) {
+  const [expanded, setExpanded] = useState(false);
   const status = getDeviceStatus(device.lastSeen);
   const statusColor = getStatusColor(status);
   const hasOverrides = hasDeviceOverrides(device);
@@ -118,75 +122,89 @@ export function DeviceCard({
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        <DeviceSnapshotPreview
-          snapshotUrl={device.snapshotUrl}
-          capturedAt={device.snapshotCapturedAt}
-          alt={`Live-Snapshot von ${device.name}`}
-        />
+      {/* Expandable details toggle */}
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-spa-text-secondary hover:text-spa-text-primary hover:bg-spa-bg-primary/60 transition-colors"
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Details ausblenden' : 'Details anzeigen'}
+      >
+        <ChevronDown className={clsx('w-3.5 h-3.5 transition-transform', expanded && 'rotate-180')} />
+        {expanded ? 'Weniger' : 'Details'}
+      </button>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-spa-text-secondary">ID</p>
-            <p className="text-spa-text-primary font-mono text-xs mt-1 truncate">
-              {device.id}
-            </p>
+      {expanded && (
+        <div className="p-4 pt-0 space-y-3">
+          <DeviceSnapshotPreview
+            snapshotUrl={device.snapshotUrl}
+            capturedAt={device.snapshotCapturedAt}
+            alt={`Live-Snapshot von ${device.name}`}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-spa-text-secondary">ID</p>
+              <p className="text-spa-text-primary font-mono text-xs mt-1 truncate">
+                {device.id}
+              </p>
+            </div>
+            <div>
+              <p className="text-spa-text-secondary">Letzte Aktivität</p>
+              <p className="text-spa-text-primary font-medium mt-1">
+                {formatLastSeen(device.lastSeen)}
+              </p>
+            </div>
+            <div>
+              <p className="text-spa-text-secondary">Gruppe</p>
+              <p className="text-spa-text-primary font-medium mt-1">
+                {hasGroup ? device.groupName : 'Ohne Gruppe'}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-spa-text-secondary">Letzte Aktivität</p>
-            <p className="text-spa-text-primary font-medium mt-1">
-              {formatLastSeen(device.lastSeen)}
-            </p>
-          </div>
-          <div>
-            <p className="text-spa-text-secondary">Gruppe</p>
-            <p className="text-spa-text-primary font-medium mt-1">
-              {hasGroup ? device.groupName : 'Ohne Gruppe'}
-            </p>
-          </div>
+
+          {device.pairedAt && (
+            <div className="flex items-start gap-2 text-sm">
+              <CheckCircle className="w-4 h-4 text-spa-success mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-spa-text-secondary">
+                  Gekoppelt am {new Date(device.pairedAt).toLocaleDateString('de-DE')}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {device.maintenanceMode && (
+            <div className="flex items-start gap-2 text-sm rounded-lg p-3 bg-spa-warning-light">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-spa-warning-dark" />
+              <div className="flex-1">
+                <p className="font-medium text-spa-warning-dark">
+                  Wartungsmodus aktiv
+                </p>
+                <p className="text-xs mt-1 text-spa-warning-dark/80">
+                  Dieses Display ist für Wartung oder Rollout-Arbeiten markiert und kann gesammelt angesteuert werden.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {hasOverrides && (
+            <div className={`flex items-start gap-2 text-sm rounded-lg p-3 ${isOverrideActive ? 'bg-spa-info-light' : 'bg-spa-warning-light'}`}>
+              <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOverrideActive ? 'text-spa-info' : 'text-spa-warning'}`} />
+              <div className="flex-1">
+                <p className={`font-medium ${isOverrideActive ? 'text-spa-info-dark' : 'text-spa-warning-dark'}`}>
+                  {isOverrideActive ? 'Device Overrides aktiv' : 'Device Overrides hinterlegt'}
+                </p>
+                <p className={`text-xs mt-1 ${isOverrideActive ? 'text-spa-info-dark/80' : 'text-spa-warning-dark/80'}`}>
+                  {isOverrideActive
+                    ? 'Dieses Gerät verwendet angepasste Einstellungen'
+                    : 'Overrides sind gespeichert, aber Modus steht auf Automatisch'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-
-        {device.pairedAt && (
-          <div className="flex items-start gap-2 text-sm">
-            <CheckCircle className="w-4 h-4 text-spa-success mt-0.5 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-spa-text-secondary">
-                Gekoppelt am {new Date(device.pairedAt).toLocaleDateString('de-DE')}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {device.maintenanceMode && (
-          <div className="flex items-start gap-2 text-sm rounded-lg p-3 bg-spa-warning-light">
-            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-spa-warning-dark" />
-            <div className="flex-1">
-              <p className="font-medium text-spa-warning-dark">
-                Wartungsmodus aktiv
-              </p>
-              <p className="text-xs mt-1 text-spa-warning-dark/80">
-                Dieses Display ist für Wartung oder Rollout-Arbeiten markiert und kann gesammelt angesteuert werden.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {hasOverrides && (
-          <div className={`flex items-start gap-2 text-sm rounded-lg p-3 ${isOverrideActive ? 'bg-spa-info-light' : 'bg-spa-warning-light'}`}>
-            <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${isOverrideActive ? 'text-spa-info' : 'text-spa-warning'}`} />
-            <div className="flex-1">
-              <p className={`font-medium ${isOverrideActive ? 'text-spa-info-dark' : 'text-spa-warning-dark'}`}>
-                {isOverrideActive ? 'Device Overrides aktiv' : 'Device Overrides hinterlegt'}
-              </p>
-              <p className={`text-xs mt-1 ${isOverrideActive ? 'text-spa-info-dark/80' : 'text-spa-warning-dark/80'}`}>
-                {isOverrideActive
-                  ? 'Dieses Gerät verwendet angepasste Einstellungen'
-                  : 'Overrides sind gespeichert, aber Modus steht auf Automatisch'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

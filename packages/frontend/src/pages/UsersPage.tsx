@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Skeleton, SkeletonTableRow } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
@@ -45,6 +45,7 @@ export function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch users
   const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
@@ -207,10 +208,28 @@ export function UsersPage() {
     },
   ];
 
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+    const q = searchQuery.toLowerCase();
+    return users.filter((u) =>
+      u.username.toLowerCase().includes(q)
+      || (u.email && u.email.toLowerCase().includes(q))
+      || u.roles.some((r) => r.toLowerCase().includes(q)),
+    );
+  }, [users, searchQuery]);
+
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Benutzer..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="rounded-xl border border-spa-bg-secondary bg-white overflow-hidden">
+            <div className="flex items-center gap-4 px-4 py-3 border-b border-spa-bg-secondary bg-spa-bg-primary">
+              {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} variant="text" className="h-4 w-20" />)}
+            </div>
+            {Array.from({ length: 5 }, (_, i) => <SkeletonTableRow key={i} columns={4} />)}
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -248,6 +267,19 @@ export function UsersPage() {
         </div>
 
         <SectionCard title="Benutzer" icon={UsersIcon}>
+          {users.length > 0 && (
+            <div className="relative max-w-xs mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary" aria-hidden="true" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Benutzer suchen..."
+                aria-label="Benutzer durchsuchen"
+                className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+              />
+            </div>
+          )}
           {users.length === 0 ? (
             <div className="py-8 text-center">
               <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
@@ -263,7 +295,7 @@ export function UsersPage() {
             </div>
           ) : (
             <DataTable<User>
-              data={users}
+              data={filteredUsers}
               keyFn={(u) => u.id}
               mobileTitle={(u) => (
                 <div className="flex items-center gap-3">
@@ -424,10 +456,10 @@ function UserDialog({
           minLength={8}
         />
 
-        <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+        <fieldset>
+          <legend className="block text-sm font-medium text-spa-text-primary mb-1">
             Rollen
-          </label>
+          </legend>
           <div className="space-y-2">
             {AVAILABLE_ROLES.map((role) => (
               <label key={role.value} className="flex items-start gap-2 cursor-pointer">
@@ -444,7 +476,7 @@ function UserDialog({
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       </form>
     </Dialog>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,16 +46,27 @@ export function Dialog({
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const closeOnEscRef = useRef(closeOnEsc);
+  const closeDisabledRef = useRef(closeDisabled);
 
-  // Trap focus and manage ESC
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && closeOnEsc && !closeDisabled) {
-        onClose();
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    closeOnEscRef.current = closeOnEsc;
+    closeDisabledRef.current = closeDisabled;
+  }, [onClose, closeOnEsc, closeDisabled]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && closeOnEscRef.current && !closeDisabledRef.current) {
+        onCloseRef.current();
         return;
       }
 
-      // Focus trap
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])',
@@ -73,14 +84,7 @@ export function Dialog({
           first.focus();
         }
       }
-    },
-    [closeOnEsc, closeDisabled, onClose],
-  );
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    previousFocusRef.current = document.activeElement as HTMLElement;
+    }
 
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
@@ -100,7 +104,7 @@ export function Dialog({
       document.body.style.overflow = '';
       previousFocusRef.current?.focus();
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -119,7 +123,7 @@ export function Dialog({
         <div
           ref={dialogRef}
           className={clsx(
-            'w-full rounded-lg bg-white shadow-xl',
+            'w-full rounded-lg bg-white shadow-xl animate-scale-in',
             sizeClasses[size],
             isScrollable && 'flex max-h-[calc(100vh-2rem)] flex-col',
           )}

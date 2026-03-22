@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchApi } from '@/services/api';
@@ -16,6 +16,7 @@ export function LoginPage() {
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const errorRef = useRef<HTMLDivElement>(null);
 
   // Check if this is the first user (no users exist yet)
   useEffect(() => {
@@ -47,6 +48,7 @@ export function LoginPage() {
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+      requestAnimationFrame(() => errorRef.current?.focus());
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +77,7 @@ export function LoginPage() {
 
         {/* Error Message */}
         {error && (
-          <div role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
+          <div ref={errorRef} tabIndex={-1} role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-none">
             {error}
           </div>
         )}

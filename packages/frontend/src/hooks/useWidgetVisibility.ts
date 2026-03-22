@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 export type DashboardWidgetKey =
   | 'operationsContent'
   | 'activityFeed'
-  | 'systemChecks'
-  | 'mediaInsights';
+  | 'systemChecks';
 
 export type WidgetVisibilityState = Record<DashboardWidgetKey, boolean>;
 
@@ -18,14 +17,12 @@ export const DEFAULT_WIDGET_VISIBILITY: WidgetVisibilityState = {
   operationsContent: true,
   activityFeed: true,
   systemChecks: true,
-  mediaInsights: true,
 };
 
 export const WIDGET_PREFERENCES: WidgetPreferenceItem[] = [
   { key: 'operationsContent', title: 'Betrieb & Inhalte', description: 'Gerätezustand, Ausspielungsmodi, Live-Preset und Plan-Checks' },
   { key: 'activityFeed', title: 'Letzte Aktivitäten', description: 'Chronologischer Verlauf von Uploads und Änderungen' },
   { key: 'systemChecks', title: 'System-Checks', description: 'Backend, Datenbasis, WebSocket und Update-Status' },
-  { key: 'mediaInsights', title: 'Medien-Insights', description: 'Dateitypen, Gesamtgröße und letzter Upload' },
 ];
 
 function parseWidgetVisibility(raw: string | null): WidgetVisibilityState {
@@ -47,7 +44,6 @@ function parseWidgetVisibility(raw: string | null): WidgetVisibilityState {
       operationsContent,
       activityFeed: parsed.activityFeed !== false,
       systemChecks: parsed.systemChecks !== false,
-      mediaInsights: parsed.mediaInsights !== false,
     };
   } catch {
     return DEFAULT_WIDGET_VISIBILITY;
@@ -88,9 +84,8 @@ export function useWidgetVisibility(storageKey: string) {
   const setOpsFocus = () =>
     setWidgetVisibility({
       operationsContent: true,
-      activityFeed: true,
+      activityFeed: false,
       systemChecks: true,
-      mediaInsights: false,
     });
 
   return {

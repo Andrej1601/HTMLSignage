@@ -47,17 +47,14 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
   debounceMs = 500,
 }: UsePersistentEditorDraftOptions<TValue, TMeta>) {
   const [availableDraft, setAvailableDraft] = useState<EditorDraftRecord<TValue, TMeta> | null>(null);
-  const [hasRecoveredDraft, setHasRecoveredDraft] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setAvailableDraft(null);
-      setHasRecoveredDraft(false);
       return;
     }
 
     setAvailableDraft(readDraft<TValue, TMeta>(storageKey));
-    setHasRecoveredDraft(false);
   }, [enabled, storageKey]);
 
   useEffect(() => {
@@ -89,19 +86,16 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
       window.localStorage.removeItem(storageKey);
     }
     setAvailableDraft(null);
-    setHasRecoveredDraft(false);
   }, [storageKey]);
 
   const restoreDraft = useCallback(() => {
     if (!availableDraft) return null;
-    setHasRecoveredDraft(true);
     return availableDraft;
   }, [availableDraft]);
 
   return {
     availableDraft,
     hasStoredDraft: Boolean(availableDraft),
-    hasRecoveredDraft,
     draftUpdatedAt: availableDraft?.updatedAt || null,
     restoreDraft,
     clearDraft,

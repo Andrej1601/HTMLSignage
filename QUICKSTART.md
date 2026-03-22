@@ -8,7 +8,7 @@ Run these commands on a clean Ubuntu/Debian host:
 sudo apt update
 sudo apt install -y git curl ca-certificates openssl
 
-git clone https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
+git clone --branch DEV https://github.com/Andrej1601/HTMLSignage.git /opt/HTMLSignage
 cd /opt/HTMLSignage
 
 sudo APP_USER="$USER" bash scripts/install-new-machine.sh
@@ -38,7 +38,7 @@ You can override defaults when needed:
 sudo \
   APP_USER="$USER" \
   APP_DIR="/opt/HTMLSignage" \
-  BRANCH="main" \
+  BRANCH="DEV" \
   CLEAN_INSTALL="false" \
   APT_UPGRADE="false" \
   DB_NAME="htmlsignage" \
@@ -57,7 +57,7 @@ sudo \
 
 ```bash
 cd /opt/HTMLSignage
-git pull --ff-only origin main
+git pull --ff-only origin DEV
 sudo systemctl restart htmlsignage-backend.service
 sudo systemctl restart htmlsignage-frontend.service
 ```

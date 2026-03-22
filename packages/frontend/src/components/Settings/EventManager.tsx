@@ -46,7 +46,7 @@ import {
   DesignStep,
   AudioStep,
   PreviewStep,
-} from './EventWizardSteps';
+} from './EventWizard';
 import { EventListCard } from './EventListCard';
 
 interface EventManagerProps {

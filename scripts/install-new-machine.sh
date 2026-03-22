@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# HTMLSignage v2 bootstrap for a fresh Ubuntu/Debian machine.
-# Installs runtime dependencies, deploys repo, provisions Postgres,
-# builds the app and configures systemd services for backend/frontend.
+# HTMLSignage v2 — Production Installer
+# Supports both fresh installs and updates after git pull.
+# Uses whiptail dialogs for interactive configuration on fresh installs.
+# On updates, preserves existing .env and only rebuilds/restarts.
+#
+# Usage:
+#   sudo bash scripts/install-new-machine.sh            # interactive
+#   sudo bash scripts/install-new-machine.sh --update    # skip dialogs, update only
+#   sudo BACKEND_PORT=3000 bash scripts/install-new-machine.sh  # env overrides still work
 
+# ── Guard ────────────────────────────────────────────────────────────────────
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Please run as root: sudo bash scripts/install-new-machine.sh"
   exit 1
 fi
 
-log() { echo "[install] $*"; }
+# ── Logging helpers ──────────────────────────────────────────────────────────
+log()  { echo "[install] $*"; }
 warn() { echo "[install][warn] $*" >&2; }
-die() { echo "[install][error] $*" >&2; exit 1; }
+die()  { echo "[install][error] $*" >&2; exit 1; }
 INSTALL_LOG="${INSTALL_LOG:-/var/log/htmlsignage-installer.log}"
 
 is_true() {
@@ -40,11 +48,7 @@ step() {
 }
 
 wait_for_url() {
-  local label="$1"
-  local url="$2"
-  local retries="$3"
-  local delay="$4"
-  local i
+  local label="$1" url="$2" retries="$3" delay="$4" i
   for ((i = 1; i <= retries; i++)); do
     if curl -fsS "${url}" >/dev/null 2>&1; then
       log "${label} is reachable (${url})"
@@ -56,8 +60,7 @@ wait_for_url() {
 }
 
 cleanup_pnpm_bins() {
-  local remove_all="${1:-false}"
-  local bin
+  local remove_all="${1:-false}" bin
   for bin in /usr/bin/pnpm /usr/bin/pnpx /usr/local/bin/pnpm /usr/local/bin/pnpx; do
     if [[ "${remove_all}" == "true" ]]; then
       [[ -e "${bin}" || -L "${bin}" ]] && rm -f "${bin}"
@@ -73,16 +76,113 @@ cleanup_pnpm_bins() {
   done
 }
 
-REPO_URL="${REPO_URL:-https://github.com/Andrej1601/HTMLSignage.git}"
-BRANCH="${BRANCH:-main}"
+# ── Whiptail dialog helpers ──────────────────────────────────────────────────
+HAS_WHIPTAIL="false"
+if command -v whiptail >/dev/null 2>&1; then
+  HAS_WHIPTAIL="true"
+fi
+
+# Ask user for input via whiptail, fall back to read if unavailable.
+# Usage: ask_input "title" "prompt" "default"
+ask_input() {
+  local title="$1" prompt="$2" default="$3" result
+  if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+    result="$(whiptail --title "${title}" --inputbox "${prompt}" 10 70 "${default}" 3>&1 1>&2 2>&3)" || result="${default}"
+  else
+    echo -n "[input] ${prompt} [${default}]: " >&2
+    read -r result
+    [[ -z "${result}" ]] && result="${default}"
+  fi
+  echo "${result}"
+}
+
+# Ask user for password via whiptail (hidden input).
+# Usage: ask_password "title" "prompt" "default"
+ask_password() {
+  local title="$1" prompt="$2" default="$3" result
+  if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+    result="$(whiptail --title "${title}" --passwordbox "${prompt}" 10 70 "${default}" 3>&1 1>&2 2>&3)" || result="${default}"
+  else
+    echo -n "[input] ${prompt} [****]: " >&2
+    read -rs result
+    echo >&2
+    [[ -z "${result}" ]] && result="${default}"
+  fi
+  echo "${result}"
+}
+
+# Yes/No dialog. Returns 0 for yes, 1 for no.
+# Usage: ask_yesno "title" "prompt" && echo "yes"
+ask_yesno() {
+  local title="$1" prompt="$2"
+  if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+    whiptail --title "${title}" --yesno "${prompt}" 10 70 3>&1 1>&2 2>&3
+  else
+    echo -n "[input] ${prompt} [Y/n]: " >&2
+    local answer
+    read -r answer
+    [[ -z "${answer}" || "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
+  fi
+}
+
+# Show info message
+show_info() {
+  local title="$1" message="$2"
+  if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+    whiptail --title "${title}" --msgbox "${message}" 12 70
+  else
+    echo "[info] ${message}" >&2
+  fi
+}
+
+# ── Detect install mode ─────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${APP_DIR:-/opt/HTMLSignage}"
 APP_USER="${APP_USER:-${SUDO_USER:-andrej}}"
+
+# Detect current branch from the repo we're in
+DEFAULT_BRANCH="main"
+if git -C "${SCRIPT_DIR}/.." rev-parse --git-dir >/dev/null 2>&1; then
+  DETECTED_BRANCH="$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  if [[ -n "${DETECTED_BRANCH}" && "${DETECTED_BRANCH}" != "HEAD" ]]; then
+    DEFAULT_BRANCH="${DETECTED_BRANCH}"
+  fi
+fi
+BRANCH="${BRANCH:-${DEFAULT_BRANCH}}"
+
+# Determine if this is an update or fresh install
+IS_UPDATE="false"
+FORCE_UPDATE="false"
+BACKEND_ENV="${APP_DIR}/packages/backend/.env"
+FRONTEND_ENV="${APP_DIR}/packages/frontend/.env.production"
+
+for arg in "$@"; do
+  case "${arg}" in
+    --update) FORCE_UPDATE="true" ;;
+  esac
+done
+
+if [[ -f "${BACKEND_ENV}" && -d "${APP_DIR}/.git" ]]; then
+  IS_UPDATE="true"
+fi
+if [[ "${FORCE_UPDATE}" == "true" ]]; then
+  IS_UPDATE="true"
+fi
+
+# ── Setup logging ────────────────────────────────────────────────────────────
+mkdir -p "$(dirname "${INSTALL_LOG}")"
+touch "${INSTALL_LOG}"
+chmod 600 "${INSTALL_LOG}" || true
+exec > >(tee -a "${INSTALL_LOG}") 2>&1
+
+# ── Defaults ─────────────────────────────────────────────────────────────────
+REPO_URL="${REPO_URL:-https://github.com/Andrej1601/HTMLSignage.git}"
 DB_NAME="${DB_NAME:-htmlsignage}"
 DB_USER="${DB_USER:-signage}"
 DB_PASS="${DB_PASS:-}"
 BACKEND_PORT="${BACKEND_PORT:-3000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-FRONTEND_URL="${FRONTEND_URL:-*}"
+FRONTEND_URL="${FRONTEND_URL:-}"
 VITE_API_URL="${VITE_API_URL:-}"
 RESET_PASSWORD_URL_BASE="${RESET_PASSWORD_URL_BASE:-}"
 SMTP_HOST="${SMTP_HOST:-}"
@@ -100,11 +200,69 @@ SKIP_HEALTHCHECKS="${SKIP_HEALTHCHECKS:-false}"
 HEALTHCHECK_RETRIES="${HEALTHCHECK_RETRIES:-45}"
 HEALTHCHECK_DELAY="${HEALTHCHECK_DELAY:-2}"
 
-mkdir -p "$(dirname "${INSTALL_LOG}")"
-touch "${INSTALL_LOG}"
-chmod 600 "${INSTALL_LOG}" || true
-exec > >(tee -a "${INSTALL_LOG}") 2>&1
+# ── Interactive configuration (fresh install only) ───────────────────────────
+if [[ "${IS_UPDATE}" == "true" ]]; then
+  log "Update-Modus: Bestehende Konfiguration wird beibehalten."
 
+  # Parse existing .env to get ports for service files and health checks
+  if [[ -f "${BACKEND_ENV}" ]]; then
+    BACKEND_PORT="$(grep -oP '^PORT=\K.*' "${BACKEND_ENV}" 2>/dev/null || echo "${BACKEND_PORT}")"
+    # Read existing DB credentials for Prisma migrations
+    EXISTING_DB_URL="$(grep -oP '^DATABASE_URL="\K[^"]+' "${BACKEND_ENV}" 2>/dev/null || true)"
+    EXISTING_JWT="$(grep -oP '^JWT_SECRET=\K.*' "${BACKEND_ENV}" 2>/dev/null || true)"
+    [[ -n "${EXISTING_JWT}" ]] && JWT_SECRET="${EXISTING_JWT}"
+  fi
+  if [[ -f "${FRONTEND_ENV}" ]]; then
+    VITE_API_URL="$(grep -oP '^VITE_API_URL=\K.*' "${FRONTEND_ENV}" 2>/dev/null || echo "${VITE_API_URL}")"
+  fi
+  FRONTEND_PORT="$(grep -oP -- '--port \K[0-9]+' /etc/systemd/system/htmlsignage-frontend.service 2>/dev/null || echo "${FRONTEND_PORT}")"
+
+else
+  # Fresh install — ask user for configuration via dialogs
+  ACCESS_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [[ -z "${ACCESS_HOST}" ]] && ACCESS_HOST="$(hostname)"
+
+  if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+    show_info "HTMLSignage Installer" "Willkommen zum HTMLSignage Installer!\n\nEs werden nun einige Konfigurationswerte abgefragt.\nBei jedem Feld wird ein sinnvoller Standardwert vorgeschlagen.\n\nDruecke Enter um den Standardwert zu uebernehmen."
+  fi
+
+  APP_USER="$(ask_input "Betriebssystem-User" "Unter welchem System-Benutzer soll HTMLSignage laufen?" "${APP_USER}")"
+  BACKEND_PORT="$(ask_input "Backend-Port" "Port fuer die Backend-API:" "${BACKEND_PORT}")"
+  FRONTEND_PORT="$(ask_input "Frontend-Port" "Port fuer die Admin-Oberflaeche:" "${FRONTEND_PORT}")"
+
+  DEFAULT_FRONTEND_URL="http://${ACCESS_HOST}:${FRONTEND_PORT}"
+  FRONTEND_URL="$(ask_input "Frontend-URL" "Oeffentliche URL des Frontends (fuer CORS):" "${DEFAULT_FRONTEND_URL}")"
+
+  if [[ -z "${VITE_API_URL}" ]]; then
+    VITE_API_URL="http://${ACCESS_HOST}:${BACKEND_PORT}"
+  fi
+  VITE_API_URL="$(ask_input "API-URL" "URL der Backend-API (vom Browser aus erreichbar):" "${VITE_API_URL}")"
+
+  DB_NAME="$(ask_input "Datenbank" "Name der PostgreSQL-Datenbank:" "${DB_NAME}")"
+  DB_USER="$(ask_input "Datenbank-User" "PostgreSQL-Benutzername:" "${DB_USER}")"
+  if [[ -z "${DB_PASS}" ]]; then
+    DB_PASS="$(openssl rand -hex 18)"
+  fi
+
+  if [[ -z "${JWT_SECRET}" ]]; then
+    JWT_SECRET="$(openssl rand -hex 32)"
+  fi
+
+  if ask_yesno "E-Mail / SMTP" "Moechtest du SMTP fuer Passwort-Reset konfigurieren?\n(Kann spaeter in der .env nachgetragen werden)"; then
+    SMTP_HOST="$(ask_input "SMTP Host" "SMTP-Server Adresse:" "${SMTP_HOST}")"
+    SMTP_PORT="$(ask_input "SMTP Port" "SMTP Port:" "${SMTP_PORT}")"
+    SMTP_USER="$(ask_input "SMTP User" "SMTP Benutzername:" "${SMTP_USER}")"
+    SMTP_PASS="$(ask_password "SMTP Passwort" "SMTP Passwort:" "${SMTP_PASS}")"
+    MAIL_FROM="$(ask_input "Absender" "Absender-E-Mail (z.B. noreply@example.com):" "${MAIL_FROM}")"
+    RESET_PASSWORD_URL_BASE="${FRONTEND_URL}"
+  fi
+
+  if [[ -z "${RESET_PASSWORD_URL_BASE}" && "${FRONTEND_URL}" != "*" ]]; then
+    RESET_PASSWORD_URL_BASE="${FRONTEND_URL}"
+  fi
+fi
+
+# ── Validation ───────────────────────────────────────────────────────────────
 [[ -n "${APP_DIR}" && "${APP_DIR}" != "/" ]] || die "APP_DIR must not be empty or '/'."
 [[ "${APP_DIR}" == /* ]] || die "APP_DIR must be an absolute path."
 [[ "${NODE_MAJOR}" =~ ^[0-9]+$ ]] || die "NODE_MAJOR must be numeric."
@@ -119,41 +277,29 @@ if ! id -u "${APP_USER}" >/dev/null 2>&1; then
   die "User '${APP_USER}' does not exist. Create the user first or pass APP_USER=<existing-user>."
 fi
 
-if [[ -z "${RESET_PASSWORD_URL_BASE}" && "${FRONTEND_URL}" != "*" ]]; then
-  RESET_PASSWORD_URL_BASE="${FRONTEND_URL}"
-fi
-
 step "Configuration"
+log "MODE=$(if [[ "${IS_UPDATE}" == "true" ]]; then echo "UPDATE"; else echo "FRESH INSTALL"; fi)"
 log "APP_DIR=${APP_DIR}"
 log "APP_USER=${APP_USER}"
 log "REPO=${REPO_URL} (${BRANCH})"
 log "PORTS frontend=${FRONTEND_PORT} backend=${BACKEND_PORT}"
 log "DATABASE ${DB_USER}@${DB_NAME}"
-log "FRONTEND_URL=${FRONTEND_URL}"
 log "NODE_MAJOR=${NODE_MAJOR}"
 log "PNPM_VERSION=${PNPM_VERSION}"
-log "CLEAN_INSTALL=${CLEAN_INSTALL}"
-log "APT_UPGRADE=${APT_UPGRADE}"
-log "SKIP_HEALTHCHECKS=${SKIP_HEALTHCHECKS}"
 log "INSTALL_LOG=${INSTALL_LOG}"
 
+# ── System packages ──────────────────────────────────────────────────────────
 step "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl git ca-certificates gnupg build-essential openssl postgresql postgresql-contrib
+apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail
 if is_true "${APT_UPGRADE}"; then
   apt-get upgrade -y
 else
   log "Skipping apt-get upgrade (APT_UPGRADE=${APT_UPGRADE})"
 fi
 
-if [[ -z "${DB_PASS}" ]]; then
-  DB_PASS="$(openssl rand -hex 18)"
-fi
-if [[ -z "${JWT_SECRET}" ]]; then
-  JWT_SECRET="$(openssl rand -hex 32)"
-fi
-
+# ── Node.js ──────────────────────────────────────────────────────────────────
 step "Ensuring Node.js"
 NEED_NODE_INSTALL="false"
 if ! command -v node >/dev/null 2>&1; then
@@ -174,6 +320,7 @@ command -v node >/dev/null 2>&1 || die "Node.js installation failed."
 command -v npm >/dev/null 2>&1 || die "npm installation failed."
 log "Using Node.js $(node -v), npm $(npm -v)"
 
+# ── pnpm ─────────────────────────────────────────────────────────────────────
 step "Preparing pnpm (${PNPM_VERSION})"
 cleanup_pnpm_bins
 CURRENT_PNPM="$(pnpm --version 2>/dev/null || true)"
@@ -198,6 +345,7 @@ command -v pnpm >/dev/null 2>&1 || die "pnpm installation failed."
 PNPM_BIN="$(command -v pnpm)"
 log "Using pnpm version: $(pnpm --version) (${PNPM_BIN})"
 
+# ── Application source ───────────────────────────────────────────────────────
 step "Preparing application source"
 cd /
 mkdir -p "$(dirname "${APP_DIR}")"
@@ -208,16 +356,22 @@ if [[ -d "${APP_DIR}/.git" ]]; then
     log "CLEAN_INSTALL=true -> removing existing directory ${APP_DIR}"
     rm -rf "${APP_DIR}"
   else
-    if ! sudo -u "${APP_USER}" git -C "${APP_DIR}" diff --quiet --ignore-submodules --; then
-      die "Local changes detected in ${APP_DIR}. Commit/stash them or run with CLEAN_INSTALL=true."
-    fi
-    if ! sudo -u "${APP_USER}" git -C "${APP_DIR}" diff --cached --quiet --ignore-submodules --; then
-      die "Staged local changes detected in ${APP_DIR}. Commit/stash them or run with CLEAN_INSTALL=true."
+    # On updates: allow local changes (user may have made config edits)
+    if [[ "${IS_UPDATE}" == "false" ]]; then
+      if ! sudo -u "${APP_USER}" git -C "${APP_DIR}" diff --quiet --ignore-submodules --; then
+        die "Local changes detected in ${APP_DIR}. Commit/stash them or run with CLEAN_INSTALL=true."
+      fi
+      if ! sudo -u "${APP_USER}" git -C "${APP_DIR}" diff --cached --quiet --ignore-submodules --; then
+        die "Staged local changes detected in ${APP_DIR}. Commit/stash them or run with CLEAN_INSTALL=true."
+      fi
     fi
     log "Repository exists, updating to ${BRANCH}..."
     sudo -u "${APP_USER}" git -C "${APP_DIR}" fetch --all --prune
-    sudo -u "${APP_USER}" git -C "${APP_DIR}" checkout "${BRANCH}"
-    sudo -u "${APP_USER}" git -C "${APP_DIR}" pull --ff-only origin "${BRANCH}"
+    sudo -u "${APP_USER}" git -C "${APP_DIR}" checkout "${BRANCH}" || true
+    sudo -u "${APP_USER}" git -C "${APP_DIR}" pull --ff-only origin "${BRANCH}" || {
+      warn "Fast-forward pull failed. Attempting merge..."
+      sudo -u "${APP_USER}" git -C "${APP_DIR}" pull origin "${BRANCH}"
+    }
   fi
 fi
 
@@ -228,13 +382,40 @@ if [[ ! -d "${APP_DIR}/.git" ]]; then
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
 
+# ── Node dependencies ────────────────────────────────────────────────────────
 step "Installing Node dependencies"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
 
+# ── Native module verification ───────────────────────────────────────────────
+step "Verifying native backend dependencies"
+
+# Rebuild bcrypt native bindings
+sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend rebuild bcrypt" || {
+  warn "bcrypt rebuild failed, attempting fresh install..."
+  sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend install --force"
+}
+
+# Verify bcrypt loads (ESM-safe: use dynamic import, not require)
+if ! sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend exec node --input-type=module -e 'import bcrypt from \"bcrypt\"; console.log(\"bcrypt-ok\")'"; then
+  warn "bcrypt ESM import failed, trying CommonJS fallback..."
+  if ! sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm --filter backend exec node -e \"require('bcrypt'); console.log('bcrypt-ok')\""; then
+    die "bcrypt konnte weder als ESM noch als CommonJS geladen werden. Native Bindings fehlen."
+  fi
+fi
+log "bcrypt verified successfully."
+
+# ── PostgreSQL ───────────────────────────────────────────────────────────────
 step "Configuring PostgreSQL"
 systemctl enable --now postgresql
-DB_PASS_SQL="${DB_PASS//\'/\'\'}"
-sudo -u postgres psql <<SQL
+
+if [[ "${IS_UPDATE}" == "false" ]]; then
+  # Fresh install: provision database
+  if [[ -z "${DB_PASS}" ]]; then
+    DB_PASS="$(openssl rand -hex 18)"
+  fi
+
+  DB_PASS_SQL="${DB_PASS//\'/\'\'}"
+  sudo -u postgres psql <<SQL
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${DB_USER}') THEN
@@ -246,14 +427,21 @@ END
 \$\$;
 SQL
 
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
-  sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+  if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" | grep -q 1; then
+    sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+  fi
+  sudo -u postgres psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
+else
+  log "Update-Modus: PostgreSQL-Konfiguration wird beibehalten."
 fi
-sudo -u postgres psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};"
 
+# ── Environment files ────────────────────────────────────────────────────────
 step "Writing environment files"
-DB_PASS_URL_ENCODED="$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "${DB_PASS}")"
-cat > "${APP_DIR}/packages/backend/.env" <<EOF
+
+if [[ "${IS_UPDATE}" == "false" ]]; then
+  # Fresh install: write new .env files
+  DB_PASS_URL_ENCODED="$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "${DB_PASS}")"
+  cat > "${BACKEND_ENV}" <<EOF
 DATABASE_URL="postgresql://${DB_USER}:${DB_PASS_URL_ENCODED}@localhost:5432/${DB_NAME}?schema=public"
 PORT=${BACKEND_PORT}
 NODE_ENV=production
@@ -271,21 +459,30 @@ UPLOAD_DIR=uploads
 MAX_FILE_SIZE=10485760
 SESSION_DURATION=604800
 EOF
-chown "${APP_USER}:${APP_USER}" "${APP_DIR}/packages/backend/.env"
-chmod 600 "${APP_DIR}/packages/backend/.env"
+  chown "${APP_USER}:${APP_USER}" "${BACKEND_ENV}"
+  chmod 600 "${BACKEND_ENV}"
 
-cat > "${APP_DIR}/packages/frontend/.env.production" <<EOF
+  cat > "${FRONTEND_ENV}" <<EOF
 VITE_API_URL=${VITE_API_URL}
 EOF
-chown "${APP_USER}:${APP_USER}" "${APP_DIR}/packages/frontend/.env.production"
+  chown "${APP_USER}:${APP_USER}" "${FRONTEND_ENV}"
+else
+  log "Update-Modus: .env-Dateien bleiben unveraendert."
+  [[ -f "${BACKEND_ENV}" ]] || die "Backend .env nicht gefunden: ${BACKEND_ENV}"
+  [[ -f "${FRONTEND_ENV}" ]] || die "Frontend .env nicht gefunden: ${FRONTEND_ENV}"
+fi
 
-step "Running Prisma migrations (Prisma 7)"
+# ── Prisma migrations ────────────────────────────────────────────────────────
+step "Running Prisma migrations"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
 
+# ── Build ────────────────────────────────────────────────────────────────────
 step "Building frontend and backend"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}'; pnpm build"
 
+# ── Systemd services ─────────────────────────────────────────────────────────
 step "Creating systemd service files"
+
 cat > /etc/systemd/system/htmlsignage-backend.service <<EOF
 [Unit]
 Description=HTMLSignage Backend API
@@ -300,7 +497,7 @@ Environment=NODE_ENV=production
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter backend start
 Restart=always
-RestartSec=3
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -319,7 +516,7 @@ WorkingDirectory=${APP_DIR}
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND_PORT}
 Restart=always
-RestartSec=3
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -328,53 +525,63 @@ EOF
 step "Reloading and starting services"
 systemctl daemon-reload
 systemctl enable --now htmlsignage-backend.service
+systemctl restart htmlsignage-backend.service
 systemctl enable --now htmlsignage-frontend.service
+systemctl restart htmlsignage-frontend.service
 
+# ── Firewall ─────────────────────────────────────────────────────────────────
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   log "Opening firewall ports ${FRONTEND_PORT} and ${BACKEND_PORT}..."
   ufw allow "${FRONTEND_PORT}/tcp" || true
   ufw allow "${BACKEND_PORT}/tcp" || true
 fi
 
-if ! is_true "${SKIP_HEALTHCHECKS}"; then
+# ── Health checks ────────────────────────────────────────────────────────────
+if ! is_true "${SKIP_HEALTHCHECKS:-false}"; then
   step "Health checks"
   if ! wait_for_url "Backend health" "http://127.0.0.1:${BACKEND_PORT}/health" "${HEALTHCHECK_RETRIES}" "${HEALTHCHECK_DELAY}"; then
+    warn "Backend health check failed. Diagnostics:"
     systemctl --no-pager --full status htmlsignage-backend.service || true
     journalctl -u htmlsignage-backend.service -n 80 --no-pager || true
-    die "Backend health check failed."
+    die "Backend health check failed after ${HEALTHCHECK_RETRIES} retries."
   fi
   if ! wait_for_url "Frontend health" "http://127.0.0.1:${FRONTEND_PORT}/" "${HEALTHCHECK_RETRIES}" "${HEALTHCHECK_DELAY}"; then
+    warn "Frontend health check failed. Diagnostics:"
     systemctl --no-pager --full status htmlsignage-frontend.service || true
     journalctl -u htmlsignage-frontend.service -n 80 --no-pager || true
-    die "Frontend health check failed."
+    die "Frontend health check failed after ${HEALTHCHECK_RETRIES} retries."
   fi
 else
   log "Skipping health checks (SKIP_HEALTHCHECKS=${SKIP_HEALTHCHECKS})"
 fi
 
-ACCESS_HOST="$(hostname -I | awk '{print $1}')"
-if [[ -z "${ACCESS_HOST}" ]]; then
-  ACCESS_HOST="$(hostname)"
-fi
+# ── Done ─────────────────────────────────────────────────────────────────────
+ACCESS_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[[ -z "${ACCESS_HOST}" ]] && ACCESS_HOST="$(hostname)"
 
-cat <<EOF
-
-Install complete.
+SUMMARY="Installation abgeschlossen!
 
 Frontend: http://${ACCESS_HOST}:${FRONTEND_PORT}
 Display:  http://${ACCESS_HOST}:${FRONTEND_PORT}/display
 Backend:  http://${ACCESS_HOST}:${BACKEND_PORT}/health
 
-Systemd status:
-  systemctl status htmlsignage-backend.service
-  systemctl status htmlsignage-frontend.service
+Systemd:
+  systemctl status htmlsignage-backend
+  systemctl status htmlsignage-frontend
 
-Installer log:
-  ${INSTALL_LOG}
+Log: ${INSTALL_LOG}
+Konfiguration: ${BACKEND_ENV}"
 
-DB credentials were written to:
-  ${APP_DIR}/packages/backend/.env
+if [[ "${IS_UPDATE}" == "false" ]]; then
+  SUMMARY="${SUMMARY}
 
-First admin user:
-  Open frontend and register first account (first user becomes admin).
-EOF
+Erster Admin-User:
+  Frontend oeffnen und ersten Account registrieren (wird automatisch Admin)."
+fi
+
+if [[ "${HAS_WHIPTAIL}" == "true" ]]; then
+  show_info "Installation abgeschlossen" "${SUMMARY}"
+fi
+
+echo
+echo "${SUMMARY}"

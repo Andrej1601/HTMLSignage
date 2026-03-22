@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Monitor, Music4, Radio } from 'lucide-react';
+import { ChevronDown, Monitor, Music4, Radio } from 'lucide-react';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
 import type { DashboardDeviceMonitorItem } from '@/hooks/useDashboardData';
 import { DeviceSnapshotPreview } from '@/components/Devices/DeviceSnapshotPreview';
@@ -69,16 +70,30 @@ export function OperationsContentWidget({
         <span className="font-medium text-spa-text-primary">{liveState.devicesWithOverrides}</span> Gerät(e) haben gespeicherte Overrides.
       </div>
 
-      <div className="mt-5 pt-4 border-t border-spa-bg-secondary">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <p className="text-sm font-semibold text-spa-text-primary flex items-center gap-2">
-            <Radio className="w-4 h-4" />
-            Geräteüberwachung
-          </p>
-          <span className="text-xs text-spa-text-secondary">{deviceMonitoring.length} gekoppelte Geräte</span>
-        </div>
+      <DeviceMonitoringSection deviceMonitoring={deviceMonitoring} />
+    </DashboardWidgetFrame>
+  );
+}
 
-        <div className="max-h-[360px] overflow-y-auto pr-1 overscroll-contain space-y-3">
+function DeviceMonitoringSection({ deviceMonitoring }: { deviceMonitoring: DashboardDeviceMonitorItem[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+      <div className="mt-5 pt-4 border-t border-spa-bg-secondary">
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-sm font-semibold text-spa-text-primary transition-colors hover:text-spa-primary"
+        >
+          <span className="flex items-center gap-2">
+            <Radio className="w-4 h-4" />
+            {deviceMonitoring.length} Geräte anzeigen
+          </span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+
+        {expanded && (
+        <div className="mt-3 max-h-[360px] overflow-y-auto pr-1 overscroll-contain space-y-3">
           {deviceMonitoring.map((device) => (
             <div key={device.id} className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/60 p-3">
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
@@ -124,8 +139,8 @@ export function OperationsContentWidget({
             </div>
           ))}
         </div>
+        )}
       </div>
-    </DashboardWidgetFrame>
   );
 }
 

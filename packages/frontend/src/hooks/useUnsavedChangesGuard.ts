@@ -1,12 +1,24 @@
-import { useEffect } from 'react';
+import { useCallback } from 'react';
 import { useBeforeUnload, useBlocker } from 'react-router-dom';
 
 interface UseUnsavedChangesGuardOptions {
   when: boolean;
-  message: string;
+  message?: string;
 }
 
-export function useUnsavedChangesGuard({ when, message }: UseUnsavedChangesGuardOptions) {
+interface UnsavedChangesGuard {
+  /** Whether the styled confirm dialog is currently open */
+  isBlocked: boolean;
+  /** Call to proceed with navigation (leave page) */
+  proceed: () => void;
+  /** Call to cancel navigation (stay on page) */
+  reset: () => void;
+}
+
+export function useUnsavedChangesGuard({
+  when,
+  message: _message,
+}: UseUnsavedChangesGuardOptions): UnsavedChangesGuard {
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       when
@@ -17,22 +29,25 @@ export function useUnsavedChangesGuard({ when, message }: UseUnsavedChangesGuard
       ),
   );
 
-  useEffect(() => {
-    if (blocker.state !== 'blocked') {
-      return;
-    }
+  const isBlocked = blocker.state === 'blocked';
 
-    if (window.confirm(message)) {
+  const proceed = useCallback(() => {
+    if (blocker.state === 'blocked') {
       blocker.proceed();
-      return;
     }
+  }, [blocker]);
 
-    blocker.reset();
-  }, [blocker, message]);
+  const reset = useCallback(() => {
+    if (blocker.state === 'blocked') {
+      blocker.reset();
+    }
+  }, [blocker]);
 
   useBeforeUnload((event) => {
     if (!when) return;
     event.preventDefault();
     event.returnValue = '';
   });
+
+  return { isBlocked, proceed, reset };
 }
