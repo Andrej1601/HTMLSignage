@@ -23,3 +23,11 @@ export const heartbeatLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'too-many-requests', message: 'Zu viele Heartbeats. Bitte kurz warten.' },
 });
+
+export const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 Minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too-many-requests', message: 'Zu viele Uploads. Bitte kurz warten.' },
+});

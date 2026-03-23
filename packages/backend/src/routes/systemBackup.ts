@@ -6,7 +6,7 @@ import os from 'os';
 import multer from 'multer';
 import archiver from 'archiver';
 import type { AuthRequest } from '../lib/auth.js';
-import { logAuditEvent } from '../lib/audit.js';
+import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
 import {
   buildBackupExportManifest,
   buildImportPreview,
@@ -73,18 +73,6 @@ function resolveBackupFile(req: AuthRequest): Express.Multer.File | undefined {
   if (!files) return undefined;
   if (Array.isArray(files)) return files[0];
   return files.backup?.[0] || files.backupFile?.[0] || files.file?.[0];
-}
-
-function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
-  return {
-    userId: req.userId,
-    user: req.user,
-    ip: req.ip,
-    headers: {
-      'user-agent': req.headers['user-agent'] || '',
-    },
-    requestId: req.requestId,
-  } as AuthRequest;
 }
 
 function buildBackupFailureBody(

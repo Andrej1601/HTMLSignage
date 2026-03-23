@@ -32,9 +32,9 @@ const LoginSchema = z.object({
 });
 
 const RegisterSchema = z.object({
-  username: z.string().min(3).max(50),
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Nur Buchstaben, Zahlen, Unterstrich und Bindestrich erlaubt'),
   email: z.string().email().optional(),
-  password: z.string().min(8),
+  password: z.string().min(8).max(128),
 });
 
 const ForgotPasswordSchema = z.object({

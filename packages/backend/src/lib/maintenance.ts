@@ -124,8 +124,17 @@ async function cleanupOrphanUploads(now: Date): Promise<number> {
 
   let removed = 0;
   for (const file of removableFiles) {
-    await fs.unlink(file.absolutePath).catch(() => {});
-    removed += 1;
+    try {
+      await fs.unlink(file.absolutePath);
+      removed += 1;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        removed += 1; // Already gone — count as removed
+      } else {
+        console.error(`[maintenance] Failed to delete orphan upload ${file.name}:`, error);
+      }
+    }
   }
 
   return removed;
@@ -149,8 +158,17 @@ async function cleanupDeviceSnapshots(now: Date): Promise<number> {
 
   let removed = 0;
   for (const file of removableFiles) {
-    await fs.unlink(file.absolutePath).catch(() => {});
-    removed += 1;
+    try {
+      await fs.unlink(file.absolutePath);
+      removed += 1;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        removed += 1;
+      } else {
+        console.error(`[maintenance] Failed to delete stale snapshot ${file.name}:`, error);
+      }
+    }
   }
 
   return removed;
@@ -176,8 +194,17 @@ async function cleanupBackupFiles(now: Date): Promise<number> {
   let removed = 0;
 
   for (const file of removableFiles) {
-    await fs.unlink(file.absolutePath).catch(() => {});
-    removed += 1;
+    try {
+      await fs.unlink(file.absolutePath);
+      removed += 1;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        removed += 1;
+      } else {
+        console.error(`[maintenance] Failed to delete backup ${file.name}:`, error);
+      }
+    }
   }
 
   return removed;
@@ -190,8 +217,17 @@ async function cleanupLogFiles(now: Date): Promise<{ removed: number; trimmed: n
   let trimmed = 0;
 
   for (const file of removable) {
-    await fs.unlink(file.absolutePath).catch(() => {});
-    removed += 1;
+    try {
+      await fs.unlink(file.absolutePath);
+      removed += 1;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        removed += 1;
+      } else {
+        console.error(`[maintenance] Failed to delete log ${file.name}:`, error);
+      }
+    }
   }
 
   for (const file of trimmable) {
@@ -222,8 +258,17 @@ async function cleanupOldFrontendAssets(now: Date): Promise<number> {
   let removed = 0;
 
   for (const file of removableFiles) {
-    await fs.unlink(file.absolutePath).catch(() => {});
-    removed += 1;
+    try {
+      await fs.unlink(file.absolutePath);
+      removed += 1;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        removed += 1;
+      } else {
+        console.error(`[maintenance] Failed to delete old frontend asset ${file.name}:`, error);
+      }
+    }
   }
 
   return removed;

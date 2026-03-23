@@ -269,3 +269,11 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   void shutdown('SIGINT');
 });
+
+process.on('unhandledRejection', (reason) => {
+  console.error(JSON.stringify({
+    type: 'unhandled_rejection',
+    message: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  }));
+});

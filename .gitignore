@@ -31,6 +31,7 @@ nginx-*.conf
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Local agent/assistant config
 .claude/

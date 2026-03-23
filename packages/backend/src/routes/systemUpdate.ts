@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AuthRequest } from '../lib/auth.js';
-import { logAuditEvent } from '../lib/audit.js';
+import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
 import {
   readLocalVersion,
   fetchGitHubReleases,
@@ -9,7 +9,6 @@ import {
 } from '../lib/systemHelpers.js';
 import {
   buildSystemUpdateStatusPayload,
-  createAuditRequestSnapshot,
   normalizeSystemUpdateTag,
   runSystemUpdateJob,
 } from '../lib/systemUpdateRunner.js';

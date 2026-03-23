@@ -54,17 +54,7 @@ done 2>/dev/null || true
 # 5. Clean systemd journal (if we have permission)
 journalctl --vacuum-size=100M 2>/dev/null && log "Journal vacuumed to 100M" || true
 
-# 6. Clean old SQLite WAL/SHM files if they're large
-for wal in /opt/HTMLSignage/packages/backend/data/*.db-wal; do
-  if [ -f "$wal" ]; then
-    SIZE=$(stat -c%s "$wal" 2>/dev/null || echo 0)
-    if [ "$SIZE" -gt 52428800 ]; then  # > 50MB
-      log "WARNING: Large WAL file: $wal ($(numfmt --to=iec $SIZE))"
-    fi
-  fi
-done 2>/dev/null || true
-
-# 7. Remove old tmp files (older than 7 days)
+# 6. Remove old tmp files (older than 7 days)
 find /tmp -maxdepth 1 -user "$(whoami)" -mtime +7 -not -name "." -exec rm -rf {} \; 2>/dev/null || true
 log "Cleaned old tmp files"
 

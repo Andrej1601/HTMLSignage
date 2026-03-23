@@ -217,6 +217,17 @@ if [[ "${IS_UPDATE}" == "true" ]]; then
   fi
   FRONTEND_PORT="$(grep -oP -- '--port \K[0-9]+' /etc/systemd/system/htmlsignage-frontend.service 2>/dev/null || echo "${FRONTEND_PORT}")"
 
+  # Validate critical secrets exist in update mode
+  if [[ -z "${EXISTING_JWT}" ]]; then
+    warn "JWT_SECRET fehlt in ${BACKEND_ENV} — generiere neuen Wert."
+    warn "ACHTUNG: Alle bestehenden Sessions werden ungueltig!"
+    JWT_SECRET="$(openssl rand -hex 32)"
+  fi
+  if [[ ! -f "${BACKEND_ENV}" ]]; then
+    warn "Backend .env fehlt (${BACKEND_ENV}). Wechsle zu Neuinstallations-Modus fuer Konfiguration."
+    IS_UPDATE="false"
+  fi
+
 else
   # Fresh install — ask user for configuration via dialogs
   ACCESS_HOST="$(hostname -I 2>/dev/null | awk '{print $1}')"
@@ -469,13 +480,14 @@ cat > /etc/systemd/system/htmlsignage-backend.service <<EOF
 [Unit]
 Description=HTMLSignage Backend API
 After=network.target postgresql.service
-Wants=postgresql.service
+Requires=postgresql.service
 
 [Service]
 Type=simple
 User=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
+Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter backend start
 Restart=always
@@ -495,6 +507,7 @@ Wants=htmlsignage-backend.service
 Type=simple
 User=${APP_USER}
 WorkingDirectory=${APP_DIR}
+Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND_PORT}
 Restart=always

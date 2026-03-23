@@ -27,18 +27,6 @@ interface SystemUpdateStep {
   percent: number;
 }
 
-export function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
-  return {
-    userId: req.userId,
-    user: req.user,
-    ip: req.ip,
-    headers: {
-      'user-agent': req.headers['user-agent'] || '',
-    },
-    requestId: req.requestId,
-  } as AuthRequest;
-}
-
 export function normalizeSystemUpdateTag(targetVersion: string): string {
   return targetVersion.startsWith('v') ? targetVersion : `v${targetVersion}`;
 }

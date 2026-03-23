@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
-import { mutationLimiter } from '../lib/rateLimiter.js';
+import { mutationLimiter, uploadLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
 import fsPromises from 'fs/promises';
 import path from 'path';
@@ -203,7 +203,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/media/upload - Upload file (auth required)
-router.post('/upload', authMiddleware, requirePermission('media:manage'), mutationLimiter, upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/upload', authMiddleware, requirePermission('media:manage'), uploadLimiter, upload.single('file'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'no-file-uploaded', message: 'Keine Datei hochgeladen' });
@@ -313,19 +313,8 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
       return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
 
-    // Delete file from filesystem
-    const filePath = path.join(UPLOAD_DIR, media.filename);
-    try {
-      await fsPromises.unlink(filePath);
-    } catch (fsError) {
-      const code = (fsError as NodeJS.ErrnoException).code;
-      if (code !== 'ENOENT') {
-        console.error('[media] Error deleting file from disk:', fsError);
-      }
-      // Continue with database deletion even if file deletion fails
-    }
-
-    // Delete from database
+    // Delete from database first — orphan files on disk are cleaned up by
+    // the maintenance cycle, but a DB record pointing to a missing file is worse.
     await prisma.media.delete({
       where: { id: req.params.id },
     });
@@ -337,6 +326,17 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
         type: media.type,
       },
     });
+
+    // Best-effort file removal — maintenance handles leftovers
+    const filePath = path.join(UPLOAD_DIR, media.filename);
+    try {
+      await fsPromises.unlink(filePath);
+    } catch (fsError) {
+      const code = (fsError as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        console.error('[media] Error deleting file from disk:', fsError);
+      }
+    }
 
     res.json({ ok: true });
   } catch (error) {

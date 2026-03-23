@@ -264,7 +264,7 @@ export async function getCurrentGitRef(): Promise<string | null> {
 }
 
 async function hasCommand(command: string): Promise<boolean> {
-  const result = await runCommand('sh', ['-lc', `command -v ${command}`], { timeoutMs: 15_000 });
+  const result = await runCommand('which', [command], { timeoutMs: 15_000 });
   return result.code === 0;
 }
 

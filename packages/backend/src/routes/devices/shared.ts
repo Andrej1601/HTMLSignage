@@ -31,14 +31,14 @@ export const DeviceIdListSchema = z.array(z.string().min(1)).min(1).max(100).tra
 ));
 
 export const CreateDeviceSchema = z.object({
-  name: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(100),
   groupName: z.string().trim().max(80).nullable().optional(),
   mode: z.enum(['auto', 'override']).optional().default('auto'),
   maintenanceMode: z.boolean().optional().default(false),
 });
 
 export const UpdateDeviceSchema = z.object({
-  name: z.string().trim().min(1).optional(),
+  name: z.string().trim().min(1).max(100).optional(),
   groupName: z.string().trim().max(80).nullable().optional(),
   mode: z.enum(['auto', 'override']).optional(),
   maintenanceMode: z.boolean().optional(),

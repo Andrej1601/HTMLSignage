@@ -142,3 +142,19 @@ export async function listAuditLogs(options: AuditLogListOptions = {}) {
     unavailable: false,
   };
 }
+
+/**
+ * Creates a lightweight snapshot of the request context for use in
+ * background tasks (jobs, updates) that outlive the HTTP request.
+ */
+export function createAuditRequestSnapshot(req: AuthRequest): AuthRequest {
+  return {
+    userId: req.userId,
+    user: req.user,
+    ip: req.ip,
+    headers: {
+      'user-agent': req.headers['user-agent'] || '',
+    },
+    requestId: req.requestId,
+  } as AuthRequest;
+}
