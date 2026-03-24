@@ -120,6 +120,32 @@ export const COLOR_PALETTES: Array<{ id: ColorPaletteName; name: string; colors:
       statusLive: '#4A9B6E', statusNext: '#8B5E3C', statusPrestart: '#D4903A',
     },
   },
+  {
+    // Dramatisches Dunkel-Theme — schwarze Saunasteine, glühende Aufguss-Glut,
+    // warmes Birkenholz. Maximaler Sauna-Charakter für Premium-Displays.
+    id: 'aufguss-ritual',
+    name: 'Aufguss Ritual',
+    colors: {
+      // Basis: Vulkan-Schwarz mit warmem Rotunterton
+      bg: '#0E0A08', fg: '#F0E4CC', accent: '#D4561A',
+      // Gitter: dunkle Holzmaserung, tiefer Glutstreifen
+      gridTable: '#321A0E', cellBg: '#1C1109', boxFg: '#F0E4CC', timeColBg: '#8A3018',
+      // Flamme: reinste Feuerfarbe
+      flame: '#FF3A18',
+      // Zebra: kaum wahrnehmbar — Fokus auf Inhalte statt Zeilen
+      zebra1: '#0E0A08', zebra2: '#160C08',
+      timeZebra1: '#7A2C14', timeZebra2: '#5E2010',
+      // Header (klassisch): dunkles Holz mit Crème-Text
+      headRowBg: '#321A0E', headRowFg: '#F0E4CC',
+      cornerBg: '#D4561A', cornerFg: '#FFF8F0',
+      // Display (modern): tiefschwarz mit Holzpaneel-Karten
+      dashboardBg: '#0B0807', cardBg: '#1C1109', cardBorder: '#321A0E',
+      textMain: '#F0E4CC', textMuted: '#9A7258',
+      accentGold: '#D4561A', accentGreen: '#8A6E58',
+      // Status: lebendige Feuerfarben — LÄUFT brennt, GLEICH glüht, NÄCHSTER leuchtet
+      statusLive: '#FF4422', statusNext: '#D4561A', statusPrestart: '#F0960A',
+    },
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

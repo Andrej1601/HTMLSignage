@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
 import { DataTable, type Column } from '@/components/DataTable';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { EmptyState } from '@/components/EmptyState';
 import { StatCard } from '@/components/Dashboard/StatCard';
 import { SectionCard } from '@/components/SectionCard';
 import { AVAILABLE_ROLES } from '@/utils/permissions';
@@ -281,18 +282,12 @@ export function UsersPage() {
             </div>
           )}
           {users.length === 0 ? (
-            <div className="py-8 text-center">
-              <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-                Keine Benutzer
-              </h3>
-              <p className="text-spa-text-secondary mb-4">
-                Erstelle den ersten Benutzer, um loszulegen.
-              </p>
-              <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
-                Ersten Benutzer anlegen
-              </Button>
-            </div>
+            <EmptyState
+              icon={UsersIcon}
+              title="Keine Benutzer"
+              description="Erstelle den ersten Benutzer, um loszulegen."
+              action={<Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>Ersten Benutzer anlegen</Button>}
+            />
           ) : (
             <DataTable<User>
               data={filteredUsers}

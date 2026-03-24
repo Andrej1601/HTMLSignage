@@ -26,6 +26,8 @@ import type {
   ColorPaletteName,
 } from '@/types/settings.types';
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Monitor, Wrench } from 'lucide-react';
+import { AutosaveIndicator } from '@/components/AutosaveIndicator';
+import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -132,6 +134,11 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
+  const paletteActions = useMemo(() => isDirty ? [
+    { id: 'settings-save', label: 'Einstellungen speichern', description: 'Ungespeicherte Änderungen sichern', icon: Save, group: 'Aktionen', action: handleSave },
+  ] : [], [isDirty, handleSave]);
+  useCommandPaletteActions(paletteActions);
+
   // useMemo MUST be called before any early returns to satisfy Rules of Hooks
   const tabs = useMemo<Tab<TabId>[]>(() => {
     const items: Tab<TabId>[] = [
@@ -191,6 +198,7 @@ export function SettingsPage() {
           icon={Wrench}
           actions={(
             <>
+              <AutosaveIndicator isDirty={isDirty} lastAutoSavedAt={draftState.lastAutoSavedAt} />
               <Button variant="ghost" icon={RotateCcw} onClick={handleReload} disabled={isSaving}>
                 Neu laden
               </Button>

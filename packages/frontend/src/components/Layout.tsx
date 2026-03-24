@@ -2,12 +2,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search } from 'lucide-react';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CommandPalette } from '@/components/CommandPalette';
-import { useCommandPalette } from '@/hooks/useCommandPalette';
+import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission, type Permission } from '@/utils/permissions';
 import { useEffect, useMemo, useState } from 'react';
+import { WifiOff } from 'lucide-react';
+import { useWebSocketStatus } from '@/contexts/WebSocketContext';
 
 interface NavItem {
   name: string;
@@ -30,12 +32,37 @@ function isRouteActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function NavSections({
+  sections,
+  renderItem,
+}: {
+  sections: NavSection[];
+  renderItem: (item: NavItem) => React.ReactNode;
+}) {
+  return (
+    <div className="space-y-5">
+      {sections.map((section) => (
+        <div key={section.key} className="space-y-1.5">
+          <div className="px-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+              {section.title}
+            </p>
+            <p className="mt-1 text-xs text-white/55">{section.description}</p>
+          </div>
+          {section.items.map(renderItem)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isConnected: wsConnected } = useWebSocketStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const commandPalette = useCommandPalette();
+  const commandPalette = useCommandPaletteContext();
 
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
@@ -187,54 +214,54 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
+          {/* Offline indicator */}
+          {!wsConnected && (
+            <div className="border-b border-white/10 px-4 py-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-spa-warning-light px-2.5 py-1 text-xs font-semibold text-spa-warning-dark">
+                <WifiOff className="h-3 w-3" aria-hidden="true" />
+                Keine Echtzeit-Verbindung
+              </span>
+            </div>
+          )}
+
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Hauptnavigation">
-            <div className="space-y-5">
-              {navigationSections.map((section) => (
-                <div key={section.key} className="space-y-1.5">
-                  <div className="px-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
-                      {section.title}
-                    </p>
-                    <p className="mt-1 text-xs text-white/55">{section.description}</p>
-                  </div>
-
-                  {section.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = isRouteActive(location.pathname, item.href);
-                    return (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        aria-current={isActive ? 'page' : undefined}
+            <NavSections
+              sections={navigationSections}
+              renderItem={(item) => {
+                const Icon = item.icon;
+                const isActive = isRouteActive(location.pathname, item.href);
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={clsx(
+                      'group flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
+                      isActive
+                        ? 'border-white bg-white text-spa-primary shadow-sm'
+                        : 'border-transparent text-white/90 hover:border-white/20 hover:bg-white/10 hover:text-white',
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Icon
                         className={clsx(
-                          'group flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
-                          isActive
-                            ? 'border-white bg-white text-spa-primary shadow-sm'
-                            : 'border-transparent text-white/90 hover:border-white/20 hover:bg-white/10 hover:text-white',
+                          'h-5 w-5',
+                          isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white',
                         )}
-                      >
-                        <span className="flex items-center gap-3">
-                          <Icon
-                            className={clsx(
-                              'h-5 w-5',
-                              isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white',
-                            )}
-                          />
-                          {item.name}
-                        </span>
-                        <span
-                          className={clsx(
-                            'h-2 w-2 rounded-full transition-colors',
-                            isActive ? 'bg-spa-primary' : 'bg-transparent group-hover:bg-white/50',
-                          )}
-                        />
-                      </Link>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+                      />
+                      {item.name}
+                    </span>
+                    <span
+                      className={clsx(
+                        'h-2 w-2 rounded-full transition-colors',
+                        isActive ? 'bg-spa-primary' : 'bg-transparent group-hover:bg-white/50',
+                      )}
+                    />
+                  </Link>
+                );
+              }}
+            />
           </nav>
 
           {/* Search + Logout */}
@@ -274,12 +301,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-6 w-6" aria-hidden="true" />
           )}
         </button>
-        <div className="ml-4">
+        <div className="ml-4 flex-1">
           <h1 className="text-xl font-bold">HTMLSignage</h1>
           {activeNavigation && (
             <p className="mt-0.5 text-[11px] text-white/80">{activeNavigation.name}</p>
           )}
         </div>
+        {!wsConnected && (
+          <span className="mr-4 inline-flex items-center gap-1 rounded-full bg-spa-warning-light px-2.5 py-1 text-xs font-semibold text-spa-warning-dark">
+            <WifiOff className="h-3 w-3" aria-hidden="true" />
+            Offline
+          </span>
+        )}
       </div>
 
       {/* Mobile menu */}
@@ -307,43 +340,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
               {/* Navigation */}
               <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Hauptnavigation">
-                <div className="space-y-5">
-                  {navigationSections.map((section) => (
-                    <div key={section.key} className="space-y-1.5">
-                      <div className="px-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
-                          {section.title}
-                        </p>
-                        <p className="mt-1 text-xs text-white/60">{section.description}</p>
-                      </div>
-
-                      {section.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = isRouteActive(location.pathname, item.href);
-                        return (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            aria-current={isActive ? 'page' : undefined}
-                            className={clsx(
-                              'group flex items-center rounded-xl px-3 py-3 text-base font-medium transition-colors',
-                              isActive
-                                ? 'bg-spa-primary-dark text-white'
-                                : 'text-white/90 hover:bg-spa-primary-light hover:text-white',
-                            )}
-                          >
-                            <Icon className="mr-3 h-6 w-6 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <p>{item.name}</p>
-                              <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
+                <NavSections
+                  sections={navigationSections}
+                  renderItem={(item) => {
+                    const Icon = item.icon;
+                    const isActive = isRouteActive(location.pathname, item.href);
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={clsx(
+                          'group flex items-center rounded-xl px-3 py-3 text-base font-medium transition-colors',
+                          isActive
+                            ? 'bg-spa-primary-dark text-white'
+                            : 'text-white/90 hover:bg-spa-primary-light hover:text-white',
+                        )}
+                      >
+                        <Icon className="mr-3 h-6 w-6 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p>{item.name}</p>
+                          <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
+                        </div>
+                      </Link>
+                    );
+                  }}
+                />
               </nav>
 
               {/* Logout Button */}

@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import { WebSocketProvider } from '@/contexts/WebSocketContext';
+import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,7 +15,11 @@ const queryClient = new QueryClient({
 export default function AdminApp() {
   return (
     <QueryClientProvider client={queryClient}>
-      <App />
+      <WebSocketProvider>
+        <CommandPaletteProvider>
+          <App />
+        </CommandPaletteProvider>
+      </WebSocketProvider>
     </QueryClientProvider>
   );
 }

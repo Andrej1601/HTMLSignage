@@ -29,6 +29,8 @@ import { SectionCard } from '@/components/SectionCard';
 import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar, MonitorSmartphone } from 'lucide-react';
+import { AutosaveIndicator } from '@/components/AutosaveIndicator';
+import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { Button } from '@/components/Button';
 import clsx from 'clsx';
 import { getModeLabel } from '@/types/device.types';
@@ -305,6 +307,11 @@ export function SchedulePage() {
     resetToLiveSchedule();
   };
 
+  const paletteActions = useMemo(() => isDirty ? [
+    { id: 'schedule-save', label: 'Aufgussplan speichern', description: 'Ungespeicherte Änderungen sichern', icon: Save, group: 'Aktionen', action: handleSave },
+  ] : [], [isDirty, handleSave]);
+  useCommandPaletteActions(paletteActions);
+
   if (isLoading || !localSchedule) {
     return (
       <Layout>
@@ -338,7 +345,8 @@ export function SchedulePage() {
           description={`Version ${localSchedule?.version || 1} · Live: ${PRESET_LABELS[livePreset]} · Bearbeitung: ${PRESET_LABELS[editingPreset]}`}
           icon={Calendar}
           actions={(
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <AutosaveIndicator isDirty={isDirty} lastAutoSavedAt={draftState.lastAutoSavedAt} />
               <Button
                 variant={localSchedule?.autoPlay ? 'secondary' : 'ghost'}
                 icon={Play}

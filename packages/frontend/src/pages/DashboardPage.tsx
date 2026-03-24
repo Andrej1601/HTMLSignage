@@ -128,8 +128,24 @@ export function DashboardPage() {
           )}
         />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr,0.85fr]">
-          <AttentionBoardWidget items={attentionItems} />
+        {attentionItems.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr,0.85fr]">
+            <AttentionBoardWidget items={attentionItems} />
+            <OperationsPulseWidget
+              liveState={liveState}
+              activeSystemJobs={activeSystemJobs}
+              runningSlideshows={runningSlideshows}
+              nextEventLabel={nextEventDesc.value}
+              activePreset={liveState.activePreset}
+              autoPlay={Boolean(schedule?.autoPlay)}
+              mediaStats={{
+                total: mediaStats.images + mediaStats.audio + mediaStats.videos,
+                totalSize: mediaStats.totalSize,
+                latestName: mediaStats.latestMedia?.originalName || null,
+              }}
+            />
+          </div>
+        ) : (
           <OperationsPulseWidget
             liveState={liveState}
             activeSystemJobs={activeSystemJobs}
@@ -143,7 +159,7 @@ export function DashboardPage() {
               latestName: mediaStats.latestMedia?.originalName || null,
             }}
           />
-        </div>
+        )}
 
         {activeWidgetCount === 0 && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-spa-warning/30 bg-spa-warning-light px-4 py-3 text-sm text-spa-warning-dark">

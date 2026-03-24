@@ -17,8 +17,9 @@ import {
 import type { Device } from '@/types/device.types';
 import type { AudioSettings, Event, Settings } from '@/types/settings.types';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
+import type { StatusTone } from '@/components/StatusBadge';
 
-export type EditorQualityTone = 'success' | 'warning' | 'danger' | 'info';
+export type EditorQualityTone = Exclude<StatusTone, 'neutral'>;
 
 export interface EditorQualityIssue {
   id: string;

@@ -5,17 +5,8 @@ import {
   Home, Calendar, Monitor, Presentation, Image, Flame, Settings, Users,
   Search, CornerDownLeft, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
-
-interface CommandItem {
-  id: string;
-  label: string;
-  description?: string;
-  icon: LucideIcon;
-  group: string;
-  action: () => void;
-}
+import { useCommandPaletteContext, type CommandItem } from '@/contexts/CommandPaletteContext';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -46,20 +37,22 @@ const ROUTE_MAP: Record<string, string> = {
 
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
+  const { extraItems } = useCommandPaletteContext();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const items = useMemo<CommandItem[]>(() =>
-    NAV_ITEMS.map((item) => ({
+  const items = useMemo<CommandItem[]>(() => [
+    ...NAV_ITEMS.map((item) => ({
       ...item,
       action: () => {
         const route = ROUTE_MAP[item.id];
         if (route) navigate(route);
       },
     })),
-  [navigate]);
+    ...extraItems,
+  ], [navigate, extraItems]);
 
   const fuse = useMemo(
     () => new Fuse(items, { keys: ['label', 'description', 'group'], threshold: 0.4 }),
@@ -140,7 +133,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Seite suchen..."
+            placeholder="Seite oder Aktion suchen..."
             className="flex-1 bg-transparent text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none text-sm"
             aria-label="Suche"
             aria-activedescendant={results[selectedIndex] ? `cmd-${results[selectedIndex].id}` : undefined}

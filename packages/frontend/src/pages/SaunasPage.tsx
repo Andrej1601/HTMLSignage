@@ -9,6 +9,7 @@ import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
@@ -247,14 +248,16 @@ export function SaunasPage() {
           icon={Flame}
         >
           {localSaunas.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
-              {canManage && (
+            <EmptyState
+              icon={Flame}
+              title="Noch keine Saunas"
+              description="Lege deine erste Sauna an, um sie im Aufgussplan zu verwenden."
+              action={canManage ? (
                 <Button icon={Plus} onClick={handleAddSauna}>
                   Erste Sauna hinzufügen
                 </Button>
-              )}
-            </div>
+              ) : undefined}
+            />
           ) : canManage ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={sortedIds} strategy={rectSortingStrategy}>

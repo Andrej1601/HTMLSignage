@@ -116,7 +116,8 @@ export type BuiltinPaletteName =
   | 'wellness-dark'
   | 'wellness-warm'
   | 'ocean-breeze'
-  | 'alpine-wood';
+  | 'alpine-wood'
+  | 'aufguss-ritual';
 
 // Includes built-in palette IDs and custom palette IDs (cuid strings)
 export type ColorPaletteName = BuiltinPaletteName | (string & {});

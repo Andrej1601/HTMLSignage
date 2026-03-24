@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import clsx from 'clsx';
+import { FieldWrapper } from '@/components/FormField';
 
 interface ComboboxFieldProps {
   value: string;
@@ -11,6 +12,9 @@ interface ComboboxFieldProps {
   allowCreate?: boolean;
   createLabel?: string;
   className?: string;
+  error?: string;
+  hint?: string;
+  required?: boolean;
 }
 
 export function ComboboxField({
@@ -22,6 +26,9 @@ export function ComboboxField({
   allowCreate = true,
   createLabel = 'Neu erstellen',
   className,
+  error,
+  hint,
+  required,
 }: ComboboxFieldProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -95,12 +102,8 @@ export function ComboboxField({
   };
 
   return (
-    <div ref={containerRef} className={clsx('relative', className)}>
-      {label && (
-        <label className="block text-sm font-medium text-spa-text-primary mb-1.5">
-          {label}
-        </label>
-      )}
+    <FieldWrapper label={label} error={error} hint={hint} required={required} className={className}>
+    <div ref={containerRef} className="relative">
       <div className="relative">
         <input
           ref={inputRef}
@@ -170,5 +173,6 @@ export function ComboboxField({
         </ul>
       )}
     </div>
+    </FieldWrapper>
   );
 }

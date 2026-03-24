@@ -47,6 +47,7 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
   debounceMs = 500,
 }: UsePersistentEditorDraftOptions<TValue, TMeta>) {
   const [availableDraft, setAvailableDraft] = useState<EditorDraftRecord<TValue, TMeta> | null>(null);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!enabled) {
@@ -73,6 +74,7 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
       try {
         window.localStorage.setItem(storageKey, JSON.stringify(record));
         setAvailableDraft(record);
+        setLastAutoSavedAt(new Date());
       } catch {
         // Ignore storage failures; editing should keep working even without persistence.
       }
@@ -97,6 +99,7 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
     availableDraft,
     hasStoredDraft: Boolean(availableDraft),
     draftUpdatedAt: availableDraft?.updatedAt || null,
+    lastAutoSavedAt,
     restoreDraft,
     clearDraft,
   };
