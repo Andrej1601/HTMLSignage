@@ -12,7 +12,7 @@ import { InputField } from '@/components/FormField';
 import { DataTable, type Column } from '@/components/DataTable';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { EmptyState } from '@/components/EmptyState';
-import { StatCard } from '@/components/Dashboard/StatCard';
+import { StatCard } from '@/components/StatCard';
 import { SectionCard } from '@/components/SectionCard';
 import { AVAILABLE_ROLES } from '@/utils/permissions';
 import { fetchApi } from '@/services/api';

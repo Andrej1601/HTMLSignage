@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { DeviceList } from '@/components/Devices/DeviceList';
 import { DeviceEditDialog } from '@/components/Devices/DeviceEditDialog';
 import { PendingPairings } from '@/components/Devices/PendingPairings';
-import { StatCard } from '@/components/Dashboard/StatCard';
+import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
@@ -60,11 +60,9 @@ export function DevicesPage() {
             </Button>
           )}
           badges={[
-            { label: `${state.pairedDevices.length} gekoppelt`, tone: 'info' },
+            { label: `${state.pairedDevices.length} Geräte`, tone: 'info' },
             { label: `${state.deviceStats.online} online`, tone: state.deviceStats.online > 0 ? 'success' : 'neutral' },
-            { label: `${state.deviceStats.offline} offline`, tone: state.deviceStats.offline > 0 ? 'warning' : 'neutral' },
-            { label: `${state.deviceStats.maintenance} Wartung`, tone: state.deviceStats.maintenance > 0 ? 'warning' : 'neutral' },
-            { label: `${state.pendingPairings} pending`, tone: state.pendingPairings > 0 ? 'warning' : 'neutral' },
+            ...(state.pendingPairings > 0 ? [{ label: `${state.pendingPairings} ausstehend`, tone: 'warning' as const }] : []),
           ]}
         />
 

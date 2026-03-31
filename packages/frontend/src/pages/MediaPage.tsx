@@ -6,7 +6,7 @@ import { MediaGrid } from '@/components/Media/MediaGrid';
 import type { Media, MediaType } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
-import { StatCard } from '@/components/Dashboard/StatCard';
+import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
 import { ImageIcon, RefreshCw, Upload, Filter, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
@@ -65,9 +65,9 @@ export function MediaPage() {
           )}
           badges={[
             { label: `${stats.total} Dateien`, tone: 'info' },
-            { label: `Filter: ${activeTypeFilter}`, tone: typeFilter === 'all' ? 'neutral' : 'info' },
-            { label: trimmedSearch ? `Suche: ${trimmedSearch}` : 'Keine Suche', tone: trimmedSearch ? 'warning' : 'neutral' },
-            { label: hasActiveTagFilter ? `Tag: ${tagFilter}` : 'Alle Tags', tone: hasActiveTagFilter ? 'info' : 'neutral' },
+            ...(typeFilter !== 'all' ? [{ label: `Filter: ${activeTypeFilter}`, tone: 'info' as const }] : []),
+            ...(trimmedSearch ? [{ label: `Suche: ${trimmedSearch}`, tone: 'warning' as const }] : []),
+            ...(hasActiveTagFilter ? [{ label: `Tag: ${tagFilter}`, tone: 'info' as const }] : []),
           ]}
         />
 
