@@ -187,14 +187,16 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`block cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
+        className={`block cursor-pointer rounded-2xl border-2 border-dashed px-10 py-12 text-center transition-colors ${
           isDragging
             ? 'border-spa-primary bg-spa-primary/5'
-            : 'border-spa-bg-secondary bg-spa-bg-primary/30 hover:border-spa-primary/50'
+            : 'border-spa-bg-secondary bg-spa-bg-primary/20 hover:border-spa-primary/50'
         }`}
       >
-        <div className="flex flex-col items-center gap-3">
-          <Upload className="h-8 w-8 text-spa-text-secondary/50" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-spa-bg-secondary/80">
+            <Upload className="h-6 w-6 text-spa-primary" />
+          </div>
           <div>
             <p className="text-sm font-semibold text-spa-text-primary">
               Dateien hierher ziehen oder klicken

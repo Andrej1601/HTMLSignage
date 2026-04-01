@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronUp, Link as LinkIcon, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog } from '@/components/Dialog';
@@ -82,14 +82,14 @@ export function PendingPairings() {
 
   return (
     <>
-      <div className="rounded-2xl border border-spa-bg-secondary bg-white">
-        {/* Collapsible Header */}
+      <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white">
+        {/* Gold accent bar + collapsible header */}
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
+          className="flex w-full items-center justify-between border-l-4 border-l-spa-primary px-6 py-4 text-left"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="text-lg">📡</span>
             <span className="text-sm font-semibold text-spa-text-primary">
               Ausstehende Pairings ({pendingDevices.length})
@@ -109,14 +109,14 @@ export function PendingPairings() {
             {pendingDevices.map((device) => (
               <div
                 key={device.id}
-                className="flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4"
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-xl border border-dashed border-spa-bg-secondary bg-white p-5"
               >
                 {/* Pairing Code */}
-                <div className="flex-shrink-0 rounded-lg border border-spa-bg-secondary bg-white px-5 py-3 text-center">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-spa-text-secondary">
+                <div className="flex-shrink-0 rounded-lg border border-dashed border-spa-text-secondary/30 px-6 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-spa-text-secondary">
                     Code
                   </div>
-                  <div className="mt-1 text-2xl font-bold tracking-widest font-mono text-spa-text-primary">
+                  <div className="mt-1 text-2xl font-bold tracking-[0.2em] font-mono text-spa-text-primary">
                     {device.pairingCode}
                   </div>
                 </div>
@@ -127,16 +127,20 @@ export function PendingPairings() {
                     {device.name}
                   </p>
                   <p className="text-xs text-spa-text-secondary mt-0.5">
-                    Anfrage vor {timeSince(device.createdAt)} · IP: {device.id.slice(0, 12)}…
+                    Anfrage vor {timeSince(device.createdAt)} (IP: {device.id.slice(0, 15)})
                   </p>
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button variant="ghost" size="sm" icon={X} onClick={() => refetch()}>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="rounded-lg border border-spa-bg-secondary bg-white px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
+                  >
                     Ablehnen
-                  </Button>
-                  <Button size="sm" icon={LinkIcon} onClick={() => handlePairClick(device)}>
+                  </button>
+                  <Button size="sm" onClick={() => handlePairClick(device)}>
                     Koppeln
                   </Button>
                 </div>
