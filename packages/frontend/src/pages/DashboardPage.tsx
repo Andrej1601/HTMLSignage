@@ -18,7 +18,7 @@ export function DashboardPage() {
     schedule, wsConnected,
     isAdmin,
     liveState, mediaStats, eventStats,
-    runningSlideshows, systemChecks, updateLabel,
+    runningSlideshows, deviceSlideshowRows, systemChecks, updateLabel,
     runtimeStatus, runtimeHistory,
     activeSystemJobs, attentionItems,
     activityItems,
@@ -131,7 +131,7 @@ export function DashboardPage() {
         </div>
 
         {/* Row 3: Laufende Slideshows */}
-        <RunningSlideshowsWidget runningSlideshows={runningSlideshows} />
+        <RunningSlideshowsWidget rows={deviceSlideshowRows} />
 
         {/* Error Banner */}
         {hasErrors && (

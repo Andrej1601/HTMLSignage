@@ -14,6 +14,19 @@ export interface RunningSlideshowGroup {
   deviceNames: string[];
 }
 
+export interface DeviceSlideshowRow {
+  deviceId: string;
+  deviceName: string;
+  snapshotUrl: string | null;
+  snapshotCapturedAt: string | null;
+  slideshowTitle: string;
+  slideCount: number;
+  lastSeen: string | null;
+  isOnline: boolean;
+  /** 'global' or 'device:<id>' — used for deep-linking to the slideshow editor */
+  editorTarget: string;
+}
+
 export interface DashboardSystemChecks {
   backendTone: StatusTone;
   dataTone: StatusTone;

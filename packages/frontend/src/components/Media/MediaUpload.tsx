@@ -183,49 +183,36 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
   return (
     <div className="space-y-4">
       {/* Upload Area */}
-      <div
+      <label
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`block cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
           isDragging
             ? 'border-spa-primary bg-spa-primary/5'
-            : 'border-spa-bg-secondary hover:border-spa-primary/50'
+            : 'border-spa-bg-secondary bg-spa-bg-primary/30 hover:border-spa-primary/50'
         }`}
       >
-        <div className="flex flex-col items-center gap-4">
-          <div className="p-4 bg-spa-bg-primary rounded-full">
-            <Upload className="w-8 h-8 text-spa-primary" />
-          </div>
-
+        <div className="flex flex-col items-center gap-3">
+          <Upload className="h-8 w-8 text-spa-text-secondary/50" />
           <div>
-            <p className="text-lg font-medium text-spa-text-primary mb-2">
-              Datei(en) hochladen
+            <p className="text-sm font-semibold text-spa-text-primary">
+              Dateien hierher ziehen oder klicken
             </p>
-            <p className="text-sm text-spa-text-secondary mb-4">
-              Ziehe eine oder mehrere Dateien hierher oder klicke zum Auswählen
+            <p className="mt-1 text-xs text-spa-text-secondary">
+              JPG, PNG, WebP, MP3, MP4 — max. {formatFileSize(MAX_FILE_SIZE)}
             </p>
-
-            <label className="inline-block px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors cursor-pointer">
-              Dateien auswählen
-              <input
-                type="file"
-                className="hidden"
-                accept={acceptedTypes.join(',')}
-                multiple
-                onChange={handleFileInput}
-                disabled={isUploading}
-              />
-            </label>
           </div>
-
-          <p className="text-xs text-spa-text-secondary">
-            Unterstützt: Bilder (JPG, PNG, GIF, WebP), Audio (MP3, WAV, OGG, WebM), Video (MP4, WebM, OGG)
-            <br />
-            Max. Dateigröße: 50MB
-          </p>
+          <input
+            type="file"
+            className="hidden"
+            accept={acceptedTypes.join(',')}
+            multiple
+            onChange={handleFileInput}
+            disabled={isUploading}
+          />
         </div>
-      </div>
+      </label>
 
       {/* Selected Files */}
       {selectedFiles.length > 0 && (

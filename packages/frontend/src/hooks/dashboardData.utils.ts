@@ -1,5 +1,5 @@
 import type { ActivityItem } from '@/components/Dashboard/ActivityFeedWidget';
-import type { RunningSlideshowGroup } from '@/hooks/dashboardData.types';
+import type { DeviceSlideshowRow, RunningSlideshowGroup } from '@/hooks/dashboardData.types';
 import type { StatusTone } from '@/components/StatusBadge';
 import type {
   AuditLogItem,
@@ -301,6 +301,35 @@ export function buildRunningSlideshows(
   }
 
   return [...groups, ...Array.from(overrideGroups.values())];
+}
+
+export function buildDeviceSlideshowRows(
+  pairedDevices: Device[],
+  settings: Settings | null | undefined,
+): DeviceSlideshowRow[] {
+  const globalConfig = settings?.slideshow || createDefaultSlideshowConfig();
+  const globalSlideCount = getEnabledSlides(globalConfig).length;
+
+  return pairedDevices.map((device) => {
+    const overrideConfig = getDeviceSlideshowOverride(device);
+    const hasOverride = device.mode === 'override' && overrideConfig !== null;
+    const activeConfig = hasOverride ? overrideConfig! : globalConfig;
+    const slideCount = hasOverride ? getEnabledSlides(activeConfig).length : globalSlideCount;
+    const minutes = getMinutesSince(device.lastSeen);
+    const isOnline = minutes !== null && minutes < ONLINE_THRESHOLD_MINUTES;
+
+    return {
+      deviceId: device.id,
+      deviceName: device.name,
+      snapshotUrl: device.snapshotUrl || null,
+      snapshotCapturedAt: device.snapshotCapturedAt || null,
+      slideshowTitle: hasOverride ? 'Override Slideshow' : 'Globale Slideshow',
+      slideCount,
+      lastSeen: device.lastSeen || null,
+      isOnline,
+      editorTarget: hasOverride ? `device:${device.id}` : 'global',
+    };
+  });
 }
 
 export function buildDeviceMonitoring(

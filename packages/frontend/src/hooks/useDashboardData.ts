@@ -23,6 +23,7 @@ import {
   buildEventStats,
   buildMediaStats,
   buildPlanQuality,
+  buildDeviceSlideshowRows,
   buildRunningSlideshows,
   buildSystemChecks,
   buildUpdateLabel,
@@ -130,6 +131,11 @@ export function useDashboardData() {
     [liveState.onlinePairedDevices, settings],
   );
 
+  const deviceSlideshowRows = useMemo(
+    () => buildDeviceSlideshowRows(liveState.pairedDevices, settings),
+    [liveState.pairedDevices, settings],
+  );
+
   const deviceMonitoring = useMemo(
     () => buildDeviceMonitoring(liveState.pairedDevices, media, settings),
     [liveState.pairedDevices, media, settings],
@@ -223,6 +229,7 @@ export function useDashboardData() {
     mediaStats,
     eventStats,
     runningSlideshows,
+    deviceSlideshowRows,
     deviceMonitoring,
     runtimeStatus,
     runtimeHistory,

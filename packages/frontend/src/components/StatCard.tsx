@@ -53,25 +53,28 @@ export function StatCard({
 }: StatCardProps) {
   const selectedColor = colorClasses[color];
   const cardClasses = clsx(
-    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-6 shadow-sm backdrop-blur-sm transition-all',
+    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-5 shadow-sm backdrop-blur-sm transition-all',
     href ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'hover:shadow-md'
   );
   const cardContent = (
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm font-medium text-spa-text-secondary mb-1">
+    <div className="flex items-center gap-4">
+      <div className={clsx('flex-shrink-0 rounded-xl p-3', selectedColor.iconBg)}>
+        <Icon className={clsx('h-6 w-6', selectedColor.iconFg)} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-spa-text-secondary">
           {title}
         </p>
-        <p className="text-3xl font-bold text-spa-text-primary mb-2">
+        <p className="text-2xl font-bold text-spa-text-primary">
           {value}
         </p>
         {description && (
-          <p className="text-sm text-spa-text-secondary">
+          <p className="text-xs text-spa-text-secondary mt-0.5">
             {description}
           </p>
         )}
         {details && details.length > 0 && (
-          <div className="space-y-1 mt-1">
+          <div className="space-y-0.5 mt-1">
             {details.map((d) => (
               <div key={d.label} className="flex items-center justify-between text-xs">
                 <span className="text-spa-text-secondary">{d.label}</span>
@@ -83,19 +86,16 @@ export function StatCard({
           </div>
         )}
         {trend && (
-          <div className={clsx('text-sm font-medium mt-2', trend.isPositive ? 'text-spa-success-dark' : 'text-spa-error-dark')}>
+          <div className={clsx('text-sm font-medium mt-1', trend.isPositive ? 'text-spa-success-dark' : 'text-spa-error-dark')}>
             {trend.isPositive ? '↑' : '↓'} {Math.abs(trend.value)}%
           </div>
         )}
         {href && (
-          <div className="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-spa-primary">
+          <div className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-spa-primary">
             {ctaLabel || 'Details'}
             <ArrowRight className="w-3.5 h-3.5" />
           </div>
         )}
-      </div>
-      <div className={clsx('rounded-xl p-3', selectedColor.iconBg)}>
-        <Icon className={clsx('w-6 h-6', selectedColor.iconFg)} />
       </div>
     </div>
   );

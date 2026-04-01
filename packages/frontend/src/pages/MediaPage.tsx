@@ -9,11 +9,10 @@ import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
-import { ImageIcon, RefreshCw, Upload, Filter, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
+import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { SectionCard } from '@/components/SectionCard';
 import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 import { ComboboxField } from '@/components/ComboboxField';
 import { useMediaPageState, normalizeTagsInput, hasTagCaseInsensitive } from '@/hooks/useMediaPageState';
@@ -29,9 +28,6 @@ export function MediaPage() {
     availableTags,
     mediaUsageSummaries,
     stats,
-    activeTypeFilter,
-    trimmedSearch,
-    hasActiveTagFilter,
     uploadOpen, setUploadOpen,
     deletingMedia, setDeletingMedia,
     handleDeleteMedia,
@@ -49,6 +45,7 @@ export function MediaPage() {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <PageHeader
           title="Medien-Bibliothek"
           description="Verwalte Bilder, Audio und Video für die Ausspielung."
@@ -59,19 +56,17 @@ export function MediaPage() {
                 Aktualisieren
               </Button>
               <Button icon={Upload} onClick={() => setUploadOpen(!uploadOpen)}>
-                {uploadOpen ? 'Upload schließen' : 'Hochladen'}
+                Medien hochladen
               </Button>
             </>
           )}
           badges={[
             { label: `${stats.total} Dateien`, tone: 'info' },
-            ...(typeFilter !== 'all' ? [{ label: `Filter: ${activeTypeFilter}`, tone: 'info' as const }] : []),
-            ...(trimmedSearch ? [{ label: `Suche: ${trimmedSearch}`, tone: 'warning' as const }] : []),
-            ...(hasActiveTagFilter ? [{ label: `Tag: ${tagFilter}`, tone: 'info' as const }] : []),
+            { label: formatFileSize(stats.totalSize), tone: 'info' },
           ]}
         />
 
-        {/* Stats */}
+        {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard title="Gesamt" value={stats.total} icon={ImageIcon} color="primary" />
           <StatCard title="Bilder" value={stats.images} icon={ImageIcon} color="info" />
@@ -79,102 +74,88 @@ export function MediaPage() {
           <StatCard title="Video" value={stats.video} icon={Film} color="success" />
         </div>
 
-        {/* Upload Section */}
-        {uploadOpen && (
-          <MediaUpload onUploadComplete={() => refetch()} />
-        )}
-
-        {/* Filters + View Toggle */}
-        <SectionCard title="Filter & Ansicht" icon={Filter}>
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Type Filter */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
-                className="px-4 py-2 border border-spa-bg-secondary rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              >
-                <option value="all">Alle Typen</option>
-                <option value="image">Bilder</option>
-                <option value="audio">Audio</option>
-                <option value="video">Video</option>
-              </select>
-            </div>
-
-            {/* Tag Filter */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Tags className="w-5 h-5 text-spa-text-secondary" />
-              <select
-                value={tagFilter}
-                onChange={(e) => setTagFilter(e.target.value)}
-                className="px-4 py-2 border border-spa-bg-secondary rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-              >
-                <option value="all">Alle Tags</option>
-                {availableTags.map((tag) => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Search */}
+        {/* Filter Bar */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Dateinamen suchen..."
-              className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-lg focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              placeholder="Medien durchsuchen..."
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-4 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
             />
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 border border-spa-bg-secondary rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-                aria-label="Rasteransicht"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-                aria-label="Listenansicht"
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
           </div>
-          {isFetching && (
-            <p className="mt-2 text-xs text-spa-text-secondary">Filter wird aktualisiert...</p>
-          )}
-        </SectionCard>
 
-        {/* Media Grid or List */}
-        <SectionCard title="Dateien" icon={ImageIcon} noPadding>
-          {isLoading && media.length === 0 ? (
-            <div className="p-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 8 }, (_, i) => <SkeletonMediaCard key={i} />)}
-            </div>
-          ) : error ? (
-            <div className="p-6">
-              <ErrorAlert error={error} onRetry={() => refetch()} />
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className="p-6">
-              <MediaGrid
-                media={media}
-                onDelete={setDeletingMedia}
-                onEditTags={openTagEditor}
-                mediaUsage={mediaUsageSummaries}
-              />
-            </div>
-          ) : (
-            <MediaListView
-              media={media}
-              onDelete={setDeletingMedia}
-              onEditTags={openTagEditor}
-            />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
+            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+          >
+            <option value="all">Alle Typen</option>
+            <option value="image">Bilder</option>
+            <option value="audio">Audio</option>
+            <option value="video">Video</option>
+          </select>
+
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+          >
+            <option value="all">Alle Tags</option>
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-1 rounded-lg border border-spa-bg-secondary bg-white p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`rounded-md p-2 transition-colors ${viewMode === 'grid' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
+              aria-label="Rasteransicht"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`rounded-md p-2 transition-colors ${viewMode === 'list' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
+              aria-label="Listenansicht"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+
+          {isFetching && (
+            <span className="text-xs text-spa-text-secondary">Aktualisiert...</span>
           )}
-        </SectionCard>
+        </div>
+
+        {/* Upload Drop Zone */}
+        {uploadOpen && (
+          <MediaUpload onUploadComplete={() => refetch()} />
+        )}
+
+        {/* Media Grid / List */}
+        {isLoading && media.length === 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }, (_, i) => <SkeletonMediaCard key={i} />)}
+          </div>
+        ) : error ? (
+          <ErrorAlert error={error} onRetry={() => refetch()} />
+        ) : viewMode === 'grid' ? (
+          <MediaGrid
+            media={media}
+            onDelete={setDeletingMedia}
+            onEditTags={openTagEditor}
+            mediaUsage={mediaUsageSummaries}
+          />
+        ) : (
+          <MediaListView
+            media={media}
+            onDelete={setDeletingMedia}
+            onEditTags={openTagEditor}
+          />
+        )}
 
         {/* Single Delete Confirm */}
         <ConfirmDialog
@@ -288,7 +269,7 @@ function MediaListView({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden divide-y divide-spa-bg-secondary">
+    <div className="rounded-2xl border border-spa-bg-secondary bg-white overflow-hidden divide-y divide-spa-bg-secondary">
       {media.map((item) => (
         <MediaListRow
           key={item.id}
@@ -337,7 +318,7 @@ function MediaListRow({
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-spa-text-primary truncate">{item.originalName}</p>
         <p className="text-xs text-spa-text-secondary">
-          {item.type} &middot; {formatFileSize(item.size)}
+          {formatFileSize(item.size)}
           {summary ? ` · ${summary}` : ''}
         </p>
         {item.tags && item.tags.length > 0 && (

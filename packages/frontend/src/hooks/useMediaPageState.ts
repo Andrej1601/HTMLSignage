@@ -104,6 +104,7 @@ export function useMediaPageState() {
     images: media.filter((m) => m.type === 'image').length,
     audio: media.filter((m) => m.type === 'audio').length,
     video: media.filter((m) => m.type === 'video').length,
+    totalSize: media.reduce((sum, m) => sum + (m.size || 0), 0),
   };
 
   const activeTypeFilter =

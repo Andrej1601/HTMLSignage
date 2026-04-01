@@ -16,6 +16,7 @@ import {
 } from '@/types/device.types';
 
 type DeviceGroupFilter = 'all' | '__ungrouped__' | string;
+export type DeviceStatusFilter = 'all' | 'online' | 'offline' | 'maintenance';
 
 export interface PendingBulkAction {
   kind: 'command' | 'update';
@@ -50,6 +51,7 @@ export function useDevicesPageState() {
   const [deletingDevice, setDeletingDevice] = useState<Device | null>(null);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [activeGroupFilter, setActiveGroupFilter] = useState<DeviceGroupFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<DeviceStatusFilter>('all');
   const [pendingBulkAction, setPendingBulkAction] = useState<PendingBulkAction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -170,6 +172,14 @@ export function useDevicesPageState() {
       ? pairedDevices
       : pairedDevices.filter((device) => normalizeGroupKey(device.groupName) === activeGroupFilter);
 
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((device) => {
+        if (statusFilter === 'maintenance') return device.maintenanceMode;
+        const status = getDeviceStatus(device.lastSeen);
+        return status === statusFilter;
+      });
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter((device) =>
@@ -187,7 +197,7 @@ export function useDevicesPageState() {
       }
       return left.name.localeCompare(right.name, 'de');
     });
-  }, [activeGroupFilter, pairedDevices, searchQuery]);
+  }, [activeGroupFilter, statusFilter, pairedDevices, searchQuery]);
 
   const visibleDeviceIds = visibleDevices.map((device) => device.id);
   const selectedVisibleCount = visibleDeviceIds.filter((id) => selectedDeviceIds.includes(id)).length;
@@ -294,6 +304,8 @@ export function useDevicesPageState() {
     activeGroupFilter,
     setActiveGroupFilter,
     activeFilterLabel,
+    statusFilter,
+    setStatusFilter,
 
     // Device actions
     editingDevice,

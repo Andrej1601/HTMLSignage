@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   useClearOverrides,
   useDevices,
@@ -61,7 +62,14 @@ export function useSlideshowEditor() {
     [devices],
   );
 
-  const [target, setTarget] = useState<EditorTarget>('global');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [target, setTarget] = useState<EditorTarget>(() => {
+    const urlTarget = searchParams.get('target');
+    if (urlTarget === 'global' || (urlTarget && urlTarget.startsWith('device:'))) {
+      return urlTarget as EditorTarget;
+    }
+    return 'global';
+  });
   const [editorConfig, setEditorConfig] = useState<SlideshowConfig | null>(null);
   const [editorAudioOverride, setEditorAudioOverride] = useState<AudioSettings | null>(null);
   const [editorPrestartMinutes, setEditorPrestartMinutes] = useState(10);
@@ -78,6 +86,13 @@ export function useSlideshowEditor() {
 
   const previewSchedule = schedule || createDefaultSchedule();
   const activeEvent = useMemo(() => (settings ? getActiveEvent(settings, new Date()) : null), [settings]);
+
+  // Clear ?target= from URL after consuming it
+  useEffect(() => {
+    if (searchParams.has('target')) {
+      setSearchParams((prev) => { prev.delete('target'); return prev; }, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!selectedDeviceId) return;
