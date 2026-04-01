@@ -74,12 +74,12 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
         )}
 
         {/* Type Badge */}
-        <span className={`absolute top-2.5 right-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide ${typeBadgeStyles[media.type] || typeBadgeStyles.image}`}>
+        <span className={`absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide ${typeBadgeStyles[media.type] || typeBadgeStyles.image}`}>
           {typeLabels[media.type] || 'FILE'}
         </span>
 
         {/* Menu (visible on hover) */}
-        <div className="absolute top-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <DropdownMenu
             ariaLabel="Medien-Aktionen"
             width="w-48"
