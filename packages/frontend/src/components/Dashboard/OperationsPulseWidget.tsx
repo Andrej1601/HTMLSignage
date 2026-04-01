@@ -12,7 +12,7 @@ import { formatFileSize } from '@/types/media.types';
 import { StatusBadge } from '@/components/StatusBadge';
 import type { DashboardLiveState } from '@/hooks/useDashboardData';
 import type { SystemJob } from '@/services/api';
-import type { RunningSlideshowGroup } from '@/components/Dashboard/LiveOperationsWidget';
+import type { RunningSlideshowGroup } from '@/hooks/dashboardData.types';
 import type { PresetKey } from '@/types/schedule.types';
 import { PRESET_LABELS } from '@/types/schedule.types';
 

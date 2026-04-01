@@ -1,35 +1,17 @@
 import { Layout } from '@/components/Layout';
-import { OperationsContentWidget } from '@/components/Dashboard/OperationsContentWidget';
-import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
-import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
-import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
 import { OperationsPulseWidget } from '@/components/Dashboard/OperationsPulseWidget';
+import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
+import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
+import { MediaStatsWidget } from '@/components/Dashboard/MediaStatsWidget';
+import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
+import { RunningSlideshowsWidget } from '@/components/Dashboard/RunningSlideshowsWidget';
 import { PageHeader } from '@/components/PageHeader';
-import { DropdownMenu } from '@/components/ui/DropdownMenu';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { SkeletonCard } from '@/components/Skeleton';
 import { Button } from '@/components/Button';
-import {
-  AlertCircle,
-  SlidersHorizontal,
-  LayoutDashboard,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
+import { AlertCircle, LayoutDashboard, RefreshCw } from 'lucide-react';
 
 export function DashboardPage() {
-  const { user } = useAuth();
-  const widgetStorageKey = `htmlsignage_dashboard_widgets_${user?.id || 'anonymous'}`;
-  const {
-    widgetVisibility,
-    activeWidgetCount,
-    toggleWidget,
-    showAllWidgets,
-    setOpsFocus,
-  } = useWidgetVisibility(widgetStorageKey);
-
   const {
     isLoading,
     scheduleQuery, settingsQuery, devicesQuery, mediaQuery, backendHealthQuery,
@@ -37,7 +19,7 @@ export function DashboardPage() {
     isAdmin,
     liveState, mediaStats, eventStats,
     runningSlideshows, systemChecks, updateLabel,
-    runtimeStatus, runtimeHistory, deviceMonitoring,
+    runtimeStatus, runtimeHistory,
     activeSystemJobs, attentionItems,
     activityItems,
   } = useDashboardData();
@@ -52,18 +34,16 @@ export function DashboardPage() {
             <SkeletonCard />
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2 space-y-6">
-              <SkeletonCard />
-              <SkeletonCard />
-            </div>
+            <SkeletonCard />
+            <SkeletonCard />
             <SkeletonCard />
           </div>
+          <SkeletonCard />
         </div>
       </Layout>
     );
   }
 
-  // Next event description
   const nextEventDesc = (() => {
     if (liveState.activeEvent) {
       const endTime = liveState.activeEvent.endTime || '23:59';
@@ -76,76 +56,37 @@ export function DashboardPage() {
     return { value: 'Kein aktives Event', tone: 'neutral' as const };
   })();
 
-  const hasLeftWidgets =
-    widgetVisibility.operationsContent || widgetVisibility.activityFeed;
-  const hasRightWidgets = widgetVisibility.systemChecks;
+  const hasErrors = scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error;
+
+  const handleRefresh = () => {
+    scheduleQuery.refetch();
+    settingsQuery.refetch();
+    devicesQuery.refetch();
+    mediaQuery.refetch();
+    backendHealthQuery.refetch();
+  };
 
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <PageHeader
-          title="Dashboard"
+          title="Dashboard Übersicht"
           description="Betriebszentrale für Displays, Inhalte und Systemzustand"
           icon={LayoutDashboard}
-          actions={(
-            <DropdownMenu
-              sections={[
-                [
-                  {
-                    label: 'Alle anzeigen',
-                    icon: Eye,
-                    onClick: showAllWidgets,
-                  },
-                  {
-                    label: 'Nur Warnungen',
-                    icon: EyeOff,
-                    onClick: setOpsFocus,
-                  },
-                ],
-                WIDGET_PREFERENCES.map((widget) => ({
-                  label: `${widgetVisibility[widget.key] ? '\u2713' : '\u2717'} ${widget.title}`,
-                  icon: SlidersHorizontal,
-                  onClick: () => toggleWidget(widget.key),
-                  keepOpen: true,
-                })),
-              ]}
-              width="w-64"
-              trigger={(open) => (
-                <button
-                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    open
-                      ? 'border-spa-primary/30 bg-spa-primary/10 text-spa-primary'
-                      : 'border-spa-bg-secondary bg-white text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary'
-                  }`}
-                  aria-label="Widgets anpassen"
-                  type="button"
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                  Widgets ({activeWidgetCount}/{WIDGET_PREFERENCES.length})
-                </button>
-              )}
-            />
-          )}
+          actions={
+            <Button variant="secondary" icon={RefreshCw} onClick={handleRefresh}>
+              Aktualisieren
+            </Button>
+          }
+          badges={[
+            { label: attentionItems.length === 0 ? 'Normalbetrieb' : `${attentionItems.length} Meldungen`, tone: attentionItems.length === 0 ? 'success' : 'warning' },
+            { label: `${liveState.onlinePairedDevices.length} Geräte online`, tone: liveState.onlinePairedDevices.length > 0 ? 'success' : 'neutral' },
+          ]}
         />
 
-        {attentionItems.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr,0.85fr]">
-            <AttentionBoardWidget items={attentionItems} />
-            <OperationsPulseWidget
-              liveState={liveState}
-              activeSystemJobs={activeSystemJobs}
-              runningSlideshows={runningSlideshows}
-              nextEventLabel={nextEventDesc.value}
-              activePreset={liveState.activePreset}
-              autoPlay={Boolean(schedule?.autoPlay)}
-              mediaStats={{
-                total: mediaStats.images + mediaStats.audio + mediaStats.videos,
-                totalSize: mediaStats.totalSize,
-                latestName: mediaStats.latestMedia?.originalName || null,
-              }}
-            />
-          </div>
-        ) : (
+        {/* Row 1: Betriebsstatus + Meldungen */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <OperationsPulseWidget
             liveState={liveState}
             activeSystemJobs={activeSystemJobs}
@@ -159,64 +100,43 @@ export function DashboardPage() {
               latestName: mediaStats.latestMedia?.originalName || null,
             }}
           />
-        )}
+          <AttentionBoardWidget items={attentionItems} />
+        </div>
 
-        {activeWidgetCount === 0 && (
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-spa-warning/30 bg-spa-warning-light px-4 py-3 text-sm text-spa-warning-dark">
-            <span>Alle Widgets sind ausgeblendet. Aktiviere mindestens ein Widget für das Dashboard.</span>
-            <Button
-              onClick={showAllWidgets}
-              variant="warning"
-              size="sm"
-            >
-              Widgets zurücksetzen
-            </Button>
-          </div>
-        )}
+        {/* Row 2: System-Checks + Medien-Statistiken + Aktivitäts-Feed */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <SystemChecksWidget
+            backendStatus={
+              backendHealthQuery.data?.status === 'ok' ? 'ok'
+              : backendHealthQuery.isError ? 'error'
+              : 'unknown'
+            }
+            backendTone={systemChecks.backendTone}
+            dataTone={systemChecks.dataTone}
+            websocketTone={systemChecks.websocketTone}
+            wsConnected={wsConnected}
+            updateTone={systemChecks.updateTone}
+            isAdmin={isAdmin}
+            updateLabel={updateLabel}
+            runtimeStatus={runtimeStatus}
+            runtimeHistory={runtimeHistory}
+          />
+          <MediaStatsWidget
+            images={mediaStats.images}
+            audio={mediaStats.audio}
+            videos={mediaStats.videos}
+            totalSize={mediaStats.totalSize}
+          />
+          <ActivityFeedWidget items={activityItems} />
+        </div>
 
-        {/* Widget Grid */}
-        {(hasLeftWidgets || hasRightWidgets) && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {hasLeftWidgets && (
-              <div className="xl:col-span-2 space-y-6">
-                {widgetVisibility.operationsContent && (
-                  <OperationsContentWidget
-                    liveState={liveState}
-                    deviceMonitoring={deviceMonitoring}
-                  />
-                )}
-                {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
-              </div>
-            )}
+        {/* Row 3: Laufende Slideshows */}
+        <RunningSlideshowsWidget runningSlideshows={runningSlideshows} />
 
-            {hasRightWidgets && (
-              <div className={hasLeftWidgets ? 'space-y-6' : 'xl:col-span-3 space-y-6'}>
-                {widgetVisibility.systemChecks && (
-                  <SystemChecksWidget
-                    backendStatus={
-                      backendHealthQuery.data?.status === 'ok' ? 'ok'
-                      : backendHealthQuery.isError ? 'error'
-                      : 'unknown'
-                    }
-                    backendTone={systemChecks.backendTone}
-                    dataTone={systemChecks.dataTone}
-                    websocketTone={systemChecks.websocketTone}
-                    wsConnected={wsConnected}
-                    updateTone={systemChecks.updateTone}
-                    isAdmin={isAdmin}
-                    updateLabel={updateLabel}
-                    runtimeStatus={runtimeStatus}
-                    runtimeHistory={runtimeHistory}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {(scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error) && (
-          <div className="rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark flex items-center gap-2" role="alert">
-            <AlertCircle className="w-4 h-4" />
+        {/* Error Banner */}
+        {hasErrors && (
+          <div className="flex items-center gap-2 rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark" role="alert">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
             Ein oder mehrere Datenquellen konnten nicht geladen werden. Bitte API- und Netzwerkstatus prüfen.
           </div>
         )}

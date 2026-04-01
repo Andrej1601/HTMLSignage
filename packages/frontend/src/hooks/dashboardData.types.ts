@@ -3,6 +3,16 @@ import type { StatusTone } from '@/components/StatusBadge';
 import type { Media } from '@/types/media.types';
 import type { PresetKey } from '@/types/schedule.types';
 import type { Event } from '@/types/settings.types';
+import type { SlideshowConfig, SlideConfig } from '@/types/slideshow.types';
+
+export interface RunningSlideshowGroup {
+  id: string;
+  source: 'global' | 'override';
+  title: string;
+  config: SlideshowConfig;
+  slides: SlideConfig[];
+  deviceNames: string[];
+}
 
 export interface DashboardSystemChecks {
   backendTone: StatusTone;

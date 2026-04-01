@@ -1,5 +1,5 @@
 import type { ActivityItem } from '@/components/Dashboard/ActivityFeedWidget';
-import type { RunningSlideshowGroup } from '@/components/Dashboard/LiveOperationsWidget';
+import type { RunningSlideshowGroup } from '@/hooks/dashboardData.types';
 import type { StatusTone } from '@/components/StatusBadge';
 import type {
   AuditLogItem,
