@@ -1,31 +1,13 @@
 import axios from 'axios';
 import { API_URL } from '@/config/env';
+import { API_REQUEST_TIMEOUT_MS } from '@/utils/constants';
 import type { FetchApiOptions, FetchApiResponseType } from './types';
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 8000;
-const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
-
 export const api = axios.create({
-  baseURL: '/api',
-  timeout: DEFAULT_REQUEST_TIMEOUT_MS,
+  baseURL: `${API_URL}/api`,
+  timeout: API_REQUEST_TIMEOUT_MS,
+  withCredentials: true,
 });
-
-// Attach JWT from localStorage to every request unless already set.
-api.interceptors.request.use((config) => {
-  if (!config.headers.Authorization) {
-    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
-export function getAuthHeaders(token: string) {
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
 
 export function getDeviceHeaders(deviceToken?: string) {
   if (!deviceToken) return undefined;
@@ -85,25 +67,21 @@ export async function fetchApi<T = unknown>(url: string, options: FetchApiOption
     data,
     body,
     headers,
-    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    timeoutMs = API_REQUEST_TIMEOUT_MS,
     responseType = 'json',
-    token,
+    deviceToken,
     ...init
   } = options;
 
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const requestHeaders = new Headers(headers);
-  const storedToken = token || (
-    typeof window !== 'undefined'
-      ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
-      : null
-  );
 
-  if (storedToken && !requestHeaders.has('Authorization')) {
-    requestHeaders.set('Authorization', `Bearer ${storedToken}`);
+  if (deviceToken && !requestHeaders.has('X-Device-Token')) {
+    requestHeaders.set('X-Device-Token', deviceToken);
   }
 
+  const useCookies = !deviceToken;
   const requestBody = body ?? buildFetchBody(data, requestHeaders);
 
   try {
@@ -112,6 +90,7 @@ export async function fetchApi<T = unknown>(url: string, options: FetchApiOption
       headers: requestHeaders,
       body: requestBody,
       signal: controller.signal,
+      credentials: useCookies ? 'include' : 'same-origin',
     });
 
     if (!response.ok) {

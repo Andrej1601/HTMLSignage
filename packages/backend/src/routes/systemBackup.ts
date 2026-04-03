@@ -179,7 +179,7 @@ router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, r
     });
   }
 
-  const runningJob = findRunningSystemJob('backup-import');
+  const runningJob = await findRunningSystemJob('backup-import');
   if (runningJob) {
     return res.status(409).json({
       error: 'backup-import-in-progress',
@@ -190,7 +190,7 @@ router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, r
   }
 
   const auditRequest = createAuditRequestSnapshot(req);
-  const job = createSystemJob({
+  const job = await createSystemJob({
     type: 'backup-import',
     title: `Backup importieren: ${backupFile.originalname}`,
     requestId: req.requestId ?? null,

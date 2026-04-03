@@ -1,6 +1,3 @@
-// Prisma Schema für HTMLSignage v2.0
-// PostgreSQL Database
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,24 +6,19 @@ datasource db {
   provider = "postgresql"
 }
 
-// ============================================================================
-// User & Authentication
-// ============================================================================
-
 model User {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  email     String?  @unique
-  password  String   // bcrypt hash
-  roles     String[] @default(["viewer"]) // ["admin", "editor", "viewer"]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sessions     Session[]
+  id                  String               @id @default(cuid())
+  username            String               @unique
+  email               String?              @unique
+  password            String
+  roles               String[]             @default(["viewer"])
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  auditLogs           AuditLog[]
+  devices             Device[]
+  mediaUploads        Media[]
   passwordResetTokens PasswordResetToken[]
-  devices      Device[]
-  mediaUploads Media[]
-  auditLogs    AuditLog[]
+  sessions            Session[]
 
   @@map("users")
 }
@@ -39,8 +31,7 @@ model Session {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -48,14 +39,13 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -63,54 +53,46 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-// ============================================================================
-// Devices (Slideshow Displays)
-// ============================================================================
-
 model Device {
-  id          String    @id @default(cuid())
-  name        String
-  pairingCode String?   @unique // 6-digit code for pairing
-  groupName   String?
-  mode        String    @default("auto") // "auto" | "override"
-  maintenanceMode Boolean @default(false)
-  pairedBy    String?
-  pairedAt    DateTime?
-  lastSeen    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user      User?           @relation(fields: [pairedBy], references: [id], onDelete: SetNull)
-  overrides DeviceOverride?
+  id              String          @id @default(cuid())
+  name            String
+  pairingCode     String?         @unique
+  mode            String          @default("auto")
+  pairedBy        String?
+  pairedAt        DateTime?
+  lastSeen        DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  groupName       String?
+  maintenanceMode Boolean         @default(false)
+  tokenRevokedAt  DateTime?
+  overrides       DeviceOverride?
+  user            User?           @relation(fields: [pairedBy], references: [id])
 
   @@index([pairedBy])
   @@index([groupName])
   @@index([lastSeen])
   @@index([maintenanceMode])
   @@index([pairingCode])
+  @@index([tokenRevokedAt])
   @@map("devices")
 }
 
 model DeviceOverride {
   id       String @id @default(cuid())
   deviceId String @unique
-  schedule Json   // Aufgussplan Override
-  settings Json   // Design/Theme Settings Override
-
-  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  schedule Json
+  settings Json
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@map("device_overrides")
 }
-
-// ============================================================================
-// Schedule (Aufgussplan)
-// ============================================================================
 
 model Schedule {
   id        String   @id @default(cuid())
   version   Int      @default(1)
   isActive  Boolean  @default(true)
-  data      Json     // Aufgussplan: { rows: [...] }
+  data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -118,15 +100,11 @@ model Schedule {
   @@map("schedules")
 }
 
-// ============================================================================
-// Settings (Design/Theme)
-// ============================================================================
-
 model Settings {
   id        String   @id @default(cuid())
   version   Int      @default(1)
   isActive  Boolean  @default(true)
-  data      Json     // Design Settings: { theme: {...}, fonts: {...}, ... }
+  data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -134,61 +112,88 @@ model Settings {
   @@map("settings")
 }
 
-// ============================================================================
-// Media Library
-// ============================================================================
-
 model Media {
   id           String   @id @default(cuid())
-  type         String   // "image" | "audio" | "video"
-  filename     String   // Stored filename on disk
-  originalName String   // Original filename from upload
+  type         String
+  filename     String
+  originalName String
   mimeType     String
-  size         Int      // File size in bytes
+  size         Int
   tags         String[] @default([])
   uploadedBy   String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  user User? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  user         User?    @relation(fields: [uploadedBy], references: [id])
 
   @@index([type])
   @@index([createdAt(sort: Desc)])
   @@map("media")
 }
 
-// ============================================================================
-// Custom Color Palettes
-// ============================================================================
-
 model CustomPalette {
   id        String   @id @default(cuid())
   name      String
-  colors    Json     // ThemeColors object
+  colors    Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("custom_palettes")
 }
 
-// ============================================================================
-// Audit Log
-// ============================================================================
-
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
-  action    String   // "schedule.update", "device.pair", "settings.update", etc.
-  resource  String?  // Resource ID
-  details   Json?    // Additional metadata
+  action    String
+  resource  String?
+  details   Json?
   ipAddress String?
   userAgent String?
   timestamp DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?    @relation(fields: [userId], references: [id])
 
   @@index([userId, timestamp(sort: Desc)])
   @@index([action, timestamp(sort: Desc)])
   @@index([timestamp(sort: Desc)])
   @@map("audit_logs")
+}
+
+model SystemJob {
+  id         String    @id @default(cuid())
+  type       String
+  title      String
+  status     String
+  requestId  String?
+  createdBy  Json?
+  progress   Json?
+  log        String    @default("")
+  result     Json?
+  error      Json?
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([type, status])
+  @@index([createdAt(sort: Desc)])
+  @@map("system_jobs")
+}
+
+model RuntimeHistory {
+  id                 String   @id @default(cuid())
+  timestamp          DateTime @default(now())
+  diskUsagePercent   Float
+  pairedDevices      Int
+  onlineDevices      Int
+  offlineDevices     Int
+  staleDevices       Int
+  neverSeenDevices   Int
+  missingMediaFiles  Int
+  orphanMediaFiles   Int
+  warningCount       Int
+  deviceWarningCount Int
+  systemWarningCount Int
+  maintenanceState   String
+
+  @@index([timestamp(sort: Desc)])
+  @@map("runtime_history")
 }

@@ -1,4 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ReactNode } from 'react';
+import React from 'react';
 import clsx from 'clsx';
 
 /* ------------------------------------------------------------------ */
@@ -34,6 +35,8 @@ export function FieldWrapper({
   children,
   className,
 }: FieldWrapperProps) {
+  const errorId = error ? `${htmlFor || 'field'}-error` : undefined;
+
   return (
     <div className={className}>
       {label && (
@@ -45,12 +48,21 @@ export function FieldWrapper({
           {required && <span className="text-spa-error ml-0.5">*</span>}
         </label>
       )}
-      {children}
-      {hint && !error && (
-        <p className="text-xs text-spa-text-secondary mt-1">{hint}</p>
-      )}
-      {error && (
-        <p className="text-sm text-spa-error mt-1" role="alert">{error}</p>
+      {errorId ? (
+        <>
+          {React.cloneElement(children as React.ReactElement, {
+            'aria-invalid': true,
+            'aria-describedby': errorId,
+          })}
+          <p id={errorId} className="text-sm text-spa-error mt-1" role="alert">{error}</p>
+        </>
+      ) : (
+        <>
+          {children}
+          {hint && !error && (
+            <p className="text-xs text-spa-text-secondary mt-1">{hint}</p>
+          )}
+        </>
       )}
     </div>
   );

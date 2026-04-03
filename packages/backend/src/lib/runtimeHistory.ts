@@ -1,14 +1,10 @@
-import fs from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-import { REPO_ROOT } from './systemHelpers.js';
-
-const RUNTIME_HISTORY_FILE = path.join(REPO_ROOT, 'logs', 'runtime-history.json');
-const MAX_HISTORY_POINTS = 7 * 24 * 12;
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+import { prisma } from './prisma.js';
 
 export type RuntimeHistoryMaintenanceState = 'idle' | 'running' | 'ok' | 'error';
 export type RuntimeHistoryWarningCategory = 'disk' | 'devices' | 'media' | 'maintenance';
+
+const MAX_HISTORY_POINTS = 7 * 24 * 12;
+const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface RuntimeHistoryStatusSource {
   checkedAt: string;
@@ -76,12 +72,6 @@ export interface RuntimeHistoryResponse {
   summary: RuntimeHistorySummary;
 }
 
-interface PersistedRuntimeHistoryState {
-  version: 1;
-  updatedAt: string;
-  items: RuntimeHistoryPoint[];
-}
-
 let runtimeHistoryWriteChain: Promise<void> = Promise.resolve();
 
 function clampPercent(value: unknown): number {
@@ -92,28 +82,6 @@ function clampPercent(value: unknown): number {
 function clampCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
   return Math.max(0, Math.round(value));
-}
-
-function isMaintenanceState(value: unknown): value is RuntimeHistoryMaintenanceState {
-  return value === 'idle' || value === 'running' || value === 'ok' || value === 'error';
-}
-
-function isRuntimeHistoryPoint(value: unknown): value is RuntimeHistoryPoint {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<RuntimeHistoryPoint>;
-  return (
-    typeof candidate.timestamp === 'string' &&
-    typeof candidate.diskUsagePercent === 'number' &&
-    typeof candidate.pairedDevices === 'number' &&
-    typeof candidate.onlineDevices === 'number' &&
-    typeof candidate.offlineDevices === 'number' &&
-    typeof candidate.staleDevices === 'number' &&
-    typeof candidate.neverSeenDevices === 'number' &&
-    typeof candidate.missingMediaFiles === 'number' &&
-    typeof candidate.orphanMediaFiles === 'number' &&
-    typeof candidate.warningCount === 'number' &&
-    isMaintenanceState(candidate.maintenanceState)
-  );
 }
 
 function normalizeRuntimeHistoryPoint(point: RuntimeHistoryPoint): RuntimeHistoryPoint {
@@ -158,47 +126,37 @@ function parseIso(value: string): number | null {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-async function readRuntimeHistoryState(): Promise<PersistedRuntimeHistoryState> {
-  if (!existsSync(RUNTIME_HISTORY_FILE)) {
-    return {
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      items: [],
-    };
-  }
-
-  try {
-    const raw = await fs.readFile(RUNTIME_HISTORY_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<PersistedRuntimeHistoryState>;
-    const items = Array.isArray(parsed.items)
-      ? parsed.items.filter(isRuntimeHistoryPoint).map(normalizeRuntimeHistoryPoint)
-      : [];
-
-    return {
-      version: 1,
-      updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString(),
-      items,
-    };
-  } catch (error) {
-    console.error('[runtimeHistory] Failed to read history:', error);
-    return {
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      items: [],
-    };
-  }
-}
-
-async function writeRuntimeHistoryState(items: RuntimeHistoryPoint[]): Promise<void> {
-  await fs.mkdir(path.dirname(RUNTIME_HISTORY_FILE), { recursive: true });
-  const payload: PersistedRuntimeHistoryState = {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    items: items.slice(-MAX_HISTORY_POINTS),
-  };
-  const tmpFile = `${RUNTIME_HISTORY_FILE}.tmp`;
-  await fs.writeFile(tmpFile, JSON.stringify(payload, null, 2), 'utf-8');
-  await fs.rename(tmpFile, RUNTIME_HISTORY_FILE);
+function mapPrismaHistory(raw: {
+  id: string;
+  timestamp: Date;
+  diskUsagePercent: number;
+  pairedDevices: number;
+  onlineDevices: number;
+  offlineDevices: number;
+  staleDevices: number;
+  neverSeenDevices: number;
+  missingMediaFiles: number;
+  orphanMediaFiles: number;
+  warningCount: number;
+  deviceWarningCount: number;
+  systemWarningCount: number;
+  maintenanceState: string;
+}): RuntimeHistoryPoint {
+  return normalizeRuntimeHistoryPoint({
+    timestamp: raw.timestamp.toISOString(),
+    diskUsagePercent: raw.diskUsagePercent,
+    pairedDevices: raw.pairedDevices,
+    onlineDevices: raw.onlineDevices,
+    offlineDevices: raw.offlineDevices,
+    staleDevices: raw.staleDevices,
+    neverSeenDevices: raw.neverSeenDevices,
+    missingMediaFiles: raw.missingMediaFiles,
+    orphanMediaFiles: raw.orphanMediaFiles,
+    warningCount: raw.warningCount,
+    deviceWarningCount: raw.deviceWarningCount,
+    systemWarningCount: raw.systemWarningCount,
+    maintenanceState: raw.maintenanceState as RuntimeHistoryMaintenanceState,
+  });
 }
 
 export function buildRuntimeHistoryPoint(status: RuntimeHistoryStatusSource): RuntimeHistoryPoint {
@@ -302,9 +260,13 @@ export function summarizeRuntimeHistoryPoints(points: RuntimeHistoryPoint[]): Ru
 
 export async function recordRuntimeStatusSnapshot(status: RuntimeHistoryStatusSource): Promise<void> {
   runtimeHistoryWriteChain = runtimeHistoryWriteChain.then(async () => {
-    const state = await readRuntimeHistoryState();
     const nextPoint = buildRuntimeHistoryPoint(status);
-    const lastPoint = state.items[state.items.length - 1] || null;
+
+    const last = await prisma.runtimeHistory.findFirst({
+      orderBy: { timestamp: 'desc' },
+    });
+
+    const lastPoint = last ? mapPrismaHistory(last) : null;
     const lastTimestamp = lastPoint ? parseIso(lastPoint.timestamp) : null;
     const nextTimestamp = parseIso(nextPoint.timestamp);
     const changed = hasRuntimeHistorySignificantChange(lastPoint, nextPoint);
@@ -319,13 +281,35 @@ export async function recordRuntimeStatusSnapshot(status: RuntimeHistoryStatusSo
       return;
     }
 
-    const nextItems = [...state.items, nextPoint].sort((left, right) => {
-      const leftTs = parseIso(left.timestamp) || 0;
-      const rightTs = parseIso(right.timestamp) || 0;
-      return leftTs - rightTs;
+    await prisma.runtimeHistory.create({
+      data: {
+        diskUsagePercent: nextPoint.diskUsagePercent,
+        pairedDevices: nextPoint.pairedDevices,
+        onlineDevices: nextPoint.onlineDevices,
+        offlineDevices: nextPoint.offlineDevices,
+        staleDevices: nextPoint.staleDevices,
+        neverSeenDevices: nextPoint.neverSeenDevices,
+        missingMediaFiles: nextPoint.missingMediaFiles,
+        orphanMediaFiles: nextPoint.orphanMediaFiles,
+        warningCount: nextPoint.warningCount,
+        deviceWarningCount: nextPoint.deviceWarningCount,
+        systemWarningCount: nextPoint.systemWarningCount,
+        maintenanceState: nextPoint.maintenanceState,
+      },
     });
 
-    await writeRuntimeHistoryState(nextItems);
+    // Trim old entries
+    const count = await prisma.runtimeHistory.count();
+    if (count > MAX_HISTORY_POINTS) {
+      const oldest = await prisma.runtimeHistory.findMany({
+        orderBy: { timestamp: 'asc' },
+        take: count - MAX_HISTORY_POINTS,
+        select: { id: true },
+      });
+      await prisma.runtimeHistory.deleteMany({
+        where: { id: { in: oldest.map((o) => o.id) } },
+      });
+    }
   }).catch((error) => {
     console.error('[runtimeHistory] Failed to record snapshot:', error);
   });
@@ -334,11 +318,21 @@ export async function recordRuntimeStatusSnapshot(status: RuntimeHistoryStatusSo
 }
 
 export async function getRuntimeHistory(periodHours = 24): Promise<RuntimeHistoryResponse> {
-  const state = await readRuntimeHistoryState();
-  const points = filterRuntimeHistoryPoints(state.items, periodHours);
+  const hours = Math.max(1, Math.min(24 * 7, Math.round(periodHours)));
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const raw = await prisma.runtimeHistory.findMany({
+    where: {
+      timestamp: { gte: cutoff },
+    },
+    orderBy: { timestamp: 'asc' },
+  });
+
+  const points = raw.map(mapPrismaHistory);
+
   return {
     ok: true,
-    periodHours: Math.max(1, Math.min(24 * 7, Math.round(periodHours))),
+    periodHours: hours,
     points,
     summary: summarizeRuntimeHistoryPoints(points),
   };

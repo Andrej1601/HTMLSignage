@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { randomInt } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
@@ -14,7 +14,7 @@ if (!process.env.JWT_SECRET) {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '7d';
-const DEVICE_TOKEN_EXPIRES_IN = '365d';
+const DEVICE_TOKEN_EXPIRES_IN = '90d';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -75,14 +75,25 @@ export function verifyDeviceToken(token: string): { deviceId: string } | null {
 }
 
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  const authHeader = req.headers.authorization;
+  let token: string | null = null;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+
+  if (!token) {
+    const cookieToken = req.cookies?.auth_token;
+    if (typeof cookieToken === 'string') {
+      token = cookieToken;
+    }
+  }
+
+  if (!token) {
     res.status(401).json({ error: 'unauthorized', message: 'No token provided' });
     return;
   }
 
-  const token = authHeader.substring(7);
   const payload = verifyUserToken(token);
 
   if (!payload) {
@@ -157,10 +168,15 @@ export async function deviceAuthMiddleware(req: AuthRequest, res: Response, next
 
   const device = await prisma.device.findUnique({
     where: { id: payload.deviceId },
-    select: { id: true },
+    select: { id: true, tokenRevokedAt: true },
   });
   if (!device) {
     res.status(401).json({ error: 'unauthorized', message: 'Device not found' });
+    return;
+  }
+
+  if (device.tokenRevokedAt) {
+    res.status(401).json({ error: 'unauthorized', message: 'Device token has been revoked' });
     return;
   }
 

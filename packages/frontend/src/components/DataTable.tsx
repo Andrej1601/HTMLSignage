@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -74,7 +74,7 @@ export function DataTable<T>({
   }, [sortedData, pageSize, safePageIndex]);
 
   // Reset page when data changes
-  useMemo(() => { setPage(0); }, [data.length]);
+  useEffect(() => { setPage(0); }, [data.length]);
 
   if (data.length === 0 && emptyState) {
     return <>{emptyState}</>;

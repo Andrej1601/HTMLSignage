@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
 import {
   buildSystemUpdatePreflight,
   buildSystemUpdatePreflightChecks,
@@ -29,8 +28,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const REPO_ROOT = path.resolve(__dirname, '../../../../');
 
-export const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
-export const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
 export const MAX_UPDATE_LOG_CHARS = 200_000;
 export const MAX_UPDATE_LOG_LINES = 400;
 export const BACKUP_DIR = path.join(REPO_ROOT, 'backups');
@@ -62,34 +59,6 @@ export interface GitHubApiRelease {
   published_at: string | null;
   prerelease: boolean;
   draft: boolean;
-}
-
-export function createEmptyDaySchedule(saunas: string[] = DEFAULT_SAUNAS): DaySchedule {
-  return {
-    saunas: [...saunas],
-    rows: [],
-  };
-}
-
-export function createDefaultSchedule(version = 1): Schedule {
-  const presets = Object.fromEntries(
-    PRESET_KEYS.map((key) => [key, createEmptyDaySchedule()])
-  ) as Record<PresetKey, DaySchedule>;
-
-  return {
-    version: Math.max(1, Math.floor(version)),
-    presets,
-    autoPlay: false,
-  };
-}
-
-export function normalizeScheduleData(raw: unknown): Schedule {
-  const parsed = ScheduleSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-
-  const maybeVersion = (raw as { version?: unknown } | null)?.version;
-  const version = typeof maybeVersion === 'number' && Number.isFinite(maybeVersion) ? maybeVersion : 1;
-  return createDefaultSchedule(version);
 }
 
 export function trimLog(value: string): string {

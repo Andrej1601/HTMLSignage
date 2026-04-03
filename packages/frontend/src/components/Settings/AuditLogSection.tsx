@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, User, Shield } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { systemApi, type AuditLogItem } from '@/services/api';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatAuditActionLabel, getAuditActionMeta, summarizeAuditDetails } from '@/utils/auditLog';
@@ -18,7 +17,6 @@ function formatDateTime(iso: string): string {
 }
 
 export function AuditLogSection() {
-  const { token } = useAuth();
   const [items, setItems] = useState<AuditLogItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,11 +24,7 @@ export function AuditLogSection() {
   const [error, setError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
-  const canLoad = useMemo(() => Boolean(token), [token]);
-
   const loadAuditLog = useCallback(async (cursor?: string | null) => {
-    if (!token) return;
-
     const isLoadMore = Boolean(cursor);
     if (isLoadMore) {
       setIsLoadingMore(true);
@@ -40,7 +34,7 @@ export function AuditLogSection() {
     }
 
     try {
-      const response = await systemApi.getAuditLog(token, 50, cursor);
+      const response = await systemApi.getAuditLog(50, cursor);
       setUnavailable(response.unavailable);
       setNextCursor(response.nextCursor);
       setItems((prev) => (isLoadMore ? [...prev, ...response.items] : response.items));
@@ -51,12 +45,11 @@ export function AuditLogSection() {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
-    if (!canLoad) return;
     void loadAuditLog(null);
-  }, [canLoad, loadAuditLog]);
+  }, [loadAuditLog]);
 
   return (
     <div className="rounded-lg border border-spa-bg-secondary p-5">
@@ -72,7 +65,7 @@ export function AuditLogSection() {
         </div>
         <button
           onClick={() => void loadAuditLog(null)}
-          disabled={!canLoad || isLoading || isLoadingMore}
+          disabled={isLoading || isLoadingMore}
           className="px-3 py-2 rounded-lg border border-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-primary disabled:opacity-50 flex items-center gap-2"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />

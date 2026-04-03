@@ -59,7 +59,13 @@ function createFinalizerAuditRequest(meta: FinalizerAuditMeta): AuthRequest {
 async function runShellStep(jobId: string, label: string, command: string, timeoutMs = 2 * 60 * 1000): Promise<void> {
   appendSystemJobLog(jobId, `== ${label} ==`);
   appendSystemJobLog(jobId, `$ ${command}`);
-  const result = await runCommand('sh', ['-lc', command], { timeoutMs });
+
+  const parts = parseShellCommand(command);
+  if (!parts) {
+    throw new Error(`${label}: Konnte Befehl nicht parsen.`);
+  }
+
+  const result = await runCommand(parts.cmd, parts.args, { timeoutMs });
   const combinedOutput = [result.stdout, result.stderr].filter(Boolean).join('\n');
   if (combinedOutput) {
     appendSystemJobLog(jobId, combinedOutput);
@@ -67,6 +73,63 @@ async function runShellStep(jobId: string, label: string, command: string, timeo
   if (result.code !== 0) {
     throw new Error(`${label} fehlgeschlagen.`);
   }
+}
+
+function parseShellCommand(command: string): { cmd: string; args: string[] } | null {
+  const trimmed = command.trim();
+  if (!trimmed) return null;
+
+  const tokens: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escaped = false;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i];
+
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (ch === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (ch === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (ch === ' ' && !inSingleQuote && !inDoubleQuote) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+
+    if (ch === '|' || ch === '&' || ch === ';' || ch === '>' || ch === '<' || ch === '`' || ch === '$') {
+      return null;
+    }
+
+    current += ch;
+  }
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+
+  if (tokens.length === 0) return null;
+  return { cmd: tokens[0], args: tokens.slice(1) };
 }
 
 async function failFinalizeJob(

@@ -4,6 +4,7 @@ import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { API_URL } from '@/config/env';
 import { ENV_IS_DEV } from '@/config/env';
+import { WS_RECONNECT } from '@/utils/constants';
 
 interface UseWebSocketOptions {
   url?: string;
@@ -79,11 +80,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       const socket = io(url, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 30000,
-        reconnectionAttempts: Infinity,
-        randomizationFactor: 0.5,
-        timeout: 10000,
+        reconnectionDelay: WS_RECONNECT.delayMs,
+        reconnectionDelayMax: WS_RECONNECT.delayMaxMs,
+        reconnectionAttempts: WS_RECONNECT.attempts,
+        randomizationFactor: WS_RECONNECT.randomizationFactor,
+        timeout: WS_RECONNECT.timeoutMs,
       });
 
       socket.off('connect').on('connect', () => {

@@ -1,5 +1,7 @@
-import express from 'express';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import path from 'path';
+import express from 'express';
 import { createServer } from 'http';
 import os from 'os';
 import crypto from 'crypto';
@@ -7,7 +9,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { prisma } from './lib/prisma.js';
 import { startMaintenanceScheduler, stopMaintenanceScheduler } from './lib/maintenance.js';
 import { setupWebSocket } from './websocket/index.js';
@@ -23,13 +25,14 @@ import saunasRouter from './routes/saunas.js';
 import palettesRouter from './routes/palettes.js';
 import slideshowWorkflowRouter from './routes/slideshowWorkflow.js';
 
-
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
 const httpServer = createServer(app);
 const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim();
-const allowAllOrigins = configuredFrontendUrl === '' || configuredFrontendUrl === '*';
+const allowAllOrigins = configuredFrontendUrl === '*';
 const LOG_HTTP_REQUESTS = process.env.LOG_HTTP_REQUESTS === '1' || process.env.NODE_ENV === 'development';
 const parsedSlowThreshold = Number.parseInt(process.env.LOG_HTTP_SLOW_THRESHOLD_MS || '1500', 10);
 const LOG_HTTP_SLOW_THRESHOLD_MS = Number.isFinite(parsedSlowThreshold) ? parsedSlowThreshold : 1500;
@@ -67,8 +70,13 @@ const corsOptions = {
       }
     }
 
-    // In production, allow all origins when FRONTEND_URL is "*" (or empty)
-    if (allowAllOrigins || origin === configuredFrontendUrl) {
+    // In production, only allow explicitly configured FRONTEND_URL
+    // Empty FRONTEND_URL = no CORS allowed (secure default)
+    if (allowAllOrigins) {
+      return callback(null, true);
+    }
+
+    if (configuredFrontendUrl && origin === configuredFrontendUrl) {
       return callback(null, true);
     }
 
@@ -89,6 +97,7 @@ app.use(helmet({
 }));
 app.use(compression());
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 

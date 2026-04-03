@@ -383,7 +383,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="lg:hidden h-16" />
 
         {/* Content */}
-        <main key={location.pathname} id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 animate-fade-in">
+        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
         <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />

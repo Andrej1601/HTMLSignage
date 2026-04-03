@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import clsx from 'clsx';
 import type { LucideIcon } from 'lucide-react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'warning';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'warning' | 'active';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -27,6 +27,8 @@ const variantClasses: Record<ButtonVariant, string> = {
     'bg-spa-warning text-white hover:bg-spa-warning-dark focus-visible:ring-spa-warning',
   ghost:
     'bg-transparent text-spa-text-secondary hover:bg-spa-bg-secondary hover:text-spa-text-primary focus-visible:ring-spa-primary',
+  active:
+    'bg-spa-secondary text-white hover:bg-spa-secondary-dark focus-visible:ring-spa-secondary',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

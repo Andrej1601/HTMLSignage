@@ -1,35 +1,29 @@
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarClock,
-  Image as ImageIcon,
-  Layers,
-  Monitor,
   Radio,
-  Settings2,
   Sparkles,
+  MonitorSmartphone,
 } from 'lucide-react';
-import { formatFileSize } from '@/types/media.types';
 import { StatusBadge } from '@/components/StatusBadge';
 import type { DashboardLiveState } from '@/hooks/useDashboardData';
-import type { SystemJob } from '@/services/api';
 import type { RunningSlideshowGroup } from '@/hooks/dashboardData.types';
-import type { PresetKey } from '@/types/schedule.types';
-import { PRESET_LABELS } from '@/types/schedule.types';
-
-interface MediaStatsProps {
-  total: number;
-  totalSize: number;
-  latestName: string | null;
-}
+import type { PresetKey, Schedule } from '@/types/schedule.types';
+import { PRESET_LABELS, getTodayPresetKey, resolveLivePresetKey } from '@/types/schedule.types';
+import type { Settings } from '@/types/settings.types';
+import { getActiveEvent } from '@/types/settings.types';
+import type { Device } from '@/types/device.types';
 
 interface OperationsPulseWidgetProps {
   liveState: DashboardLiveState;
-  activeSystemJobs: SystemJob[];
   runningSlideshows: RunningSlideshowGroup[];
   nextEventLabel: string;
   activePreset: PresetKey | null;
   autoPlay: boolean;
-  mediaStats?: MediaStatsProps;
+  schedule: Schedule | null;
+  settings: Settings | null;
+  pairedDevices: Device[];
 }
 
 function PulseMetric({
@@ -39,7 +33,7 @@ function PulseMetric({
   detail,
   href,
 }: {
-  icon: typeof Monitor;
+  icon: typeof Radio;
   label: string;
   value: string;
   detail: string;
@@ -60,37 +54,54 @@ function PulseMetric({
   );
 }
 
+function formatDateTimeLocalInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function OperationsPulseWidget({
   liveState,
-  activeSystemJobs,
-  runningSlideshows,
   nextEventLabel,
   activePreset,
   autoPlay,
-  mediaStats,
+  schedule,
+  settings,
+  pairedDevices,
 }: OperationsPulseWidgetProps) {
   const presetLabel = activePreset ? PRESET_LABELS[activePreset] : 'Kein Live-Preset';
   const activeEventLabel = liveState.activeEvent
     ? `${liveState.activeEvent.name} bis ${liveState.activeEvent.endTime || '23:59'}`
     : 'Kein Event aktiv';
-  const jobLabel = activeSystemJobs.length > 0
-    ? activeSystemJobs[0]?.progress?.message || activeSystemJobs[0]?.title
-    : 'Keine laufenden Jobs';
+  // Simulation state
+  const [simDateTime, setSimDateTime] = useState(() => formatDateTimeLocalInput(new Date()));
+  const [simDeviceId, setSimDeviceId] = useState<string>('');
+
+  const simNow = useMemo(() => {
+    const parsed = simDateTime ? new Date(simDateTime) : new Date();
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  }, [simDateTime]);
+
+  const simulatedEvent = settings
+    ? getActiveEvent(settings, simNow, simDeviceId || undefined)
+    : null;
+
+  const simulatedPreset: PresetKey = schedule
+    ? resolveLivePresetKey(schedule, settings, simNow, simDeviceId || undefined)
+    : getTodayPresetKey(simNow);
 
   return (
     <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-sm">
+      {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-spa-text-primary">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-spa-primary/10 text-spa-primary">
-              <Sparkles className="h-5 w-5" />
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold">Live-Puls</h3>
-              <p className="mt-1 text-sm text-spa-text-secondary">
-                Was gerade ausgespielt wird und was als Nächstes ansteht.
-              </p>
-            </div>
+        <div className="flex items-center gap-2 text-spa-text-primary">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-spa-primary/10 text-spa-primary">
+            <Sparkles className="h-5 w-5" />
+          </span>
+          <div>
+            <h3 className="text-lg font-semibold">Live-Puls</h3>
+            <p className="mt-1 text-sm text-spa-text-secondary">
+              Was gerade ausgespielt wird und was als Nächstes ansteht.
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -107,6 +118,7 @@ export function OperationsPulseWidget({
         </div>
       </div>
 
+      {/* Live Metrics */}
       <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         <PulseMetric
           icon={Radio}
@@ -122,48 +134,58 @@ export function OperationsPulseWidget({
           detail={liveState.activeEvent ? 'Event-Override ist bereits aktiv.' : 'Event-Planung und Zeitraum im Blick behalten.'}
           href="/settings"
         />
-        <PulseMetric
-          icon={Layers}
-          label="Ausspielung"
-          value={`${runningSlideshows.length} Slideshow${runningSlideshows.length === 1 ? '' : 's'} live`}
-          detail={`${liveState.activeOverrideDevices} Override${liveState.activeOverrideDevices === 1 ? '' : 's'} aktiv · ${liveState.devicesWithOverrides} gespeichert`}
-          href="/slideshow"
-        />
-        <PulseMetric
-          icon={Monitor}
-          label="Displays"
-          value={`${liveState.onlineDevices}/${liveState.pairedDevices.length} online`}
-          detail={`${liveState.pendingPairings} offen · ${liveState.offlineDevices} offline`}
-          href="/devices"
-        />
-        {mediaStats && (
-          <PulseMetric
-            icon={ImageIcon}
-            label="Medien"
-            value={`${mediaStats.total} Dateien`}
-            detail={`${formatFileSize(mediaStats.totalSize)} · ${mediaStats.latestName || 'Keine Uploads'}`}
-            href="/media"
-          />
-        )}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary px-4 py-3">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      {/* Compact Simulation */}
+      <div className="mt-4 rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-4">
+        <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-spa-text-primary">
+          <MonitorSmartphone className="h-4 w-4" />
+          Simulation
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 mb-3">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-spa-text-primary">
-              <Settings2 className="h-4 w-4" />
-              Hintergrundjobs
-            </div>
-            <p className="mt-1 text-sm text-spa-text-secondary">{jobLabel}</p>
+            <label className="mb-1 block text-xs font-medium text-spa-text-secondary">Zeitpunkt</label>
+            <input
+              type="datetime-local"
+              value={simDateTime}
+              onChange={(e) => setSimDateTime(e.target.value)}
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            />
           </div>
-          <Link
-            to="/settings"
-            className="inline-flex items-center justify-center rounded-xl bg-spa-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-spa-primary-dark"
-          >
-            System öffnen
-          </Link>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-spa-text-secondary">Gerät (optional)</label>
+            <select
+              value={simDeviceId}
+              onChange={(e) => setSimDeviceId(e.target.value)}
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            >
+              <option value="">Global (kein Filter)</option>
+              {pairedDevices.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-white border border-spa-bg-secondary px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-spa-text-secondary">Live-Preset</div>
+            <div className="mt-1 text-sm font-semibold text-spa-text-primary truncate">{PRESET_LABELS[simulatedPreset]}</div>
+            <div className="mt-0.5 text-[10px] text-spa-text-secondary">{simulatedPreset}</div>
+          </div>
+          <div className="rounded-xl bg-white border border-spa-bg-secondary px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-spa-text-secondary">Aktives Event</div>
+            <div className="mt-1 text-sm font-semibold text-spa-text-primary truncate">
+              {simulatedEvent ? simulatedEvent.name : 'Keins'}
+            </div>
+            <div className="mt-0.5 text-[10px] text-spa-text-secondary">
+              {simulatedEvent
+                ? `${PRESET_LABELS[simulatedEvent.assignedPreset]} · bis ${simulatedEvent.endTime || '23:59'}`
+                : 'Auto-Play / Tagesplan'}
+            </div>
+          </div>
         </div>
       </div>
+
     </section>
   );
 }

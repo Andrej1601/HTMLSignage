@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { systemApi, type SystemJob } from '@/services/api';
 import { Activity, Clock3, RefreshCw } from 'lucide-react';
 
@@ -29,7 +28,6 @@ function getJobLabel(job: SystemJob): string {
 }
 
 export function SystemJobsSection() {
-  const { token } = useAuth();
   const [jobs, setJobs] = useState<SystemJob[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,13 +37,12 @@ export function SystemJobsSection() {
   );
 
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
 
     const load = async () => {
       setIsLoading(true);
       try {
-        const response = await systemApi.listJobs(token, 8);
+        const response = await systemApi.listJobs(8);
         if (!cancelled) {
           setJobs(response.items);
         }
@@ -67,7 +64,7 @@ export function SystemJobsSection() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [hasRunningJobs, token]);
+  }, [hasRunningJobs]);
 
   return (
     <div className="rounded-lg border border-spa-bg-secondary p-5">

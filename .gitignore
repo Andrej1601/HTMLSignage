@@ -37,6 +37,7 @@ nginx-*.conf
 .claude/
 .claude/skills/
 .claude/settings.local.json
+.stitch/
 
 # Build outputs
 dist/

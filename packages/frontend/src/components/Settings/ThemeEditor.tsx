@@ -36,56 +36,44 @@ export function ThemeEditor({
   };
 
   return (
-    <div className="space-y-6">
-      <AppearanceSelector
-        displayAppearance={displayAppearance}
-        designStyle={designStyle}
-        onDisplayAppearanceChange={onDisplayAppearanceChange}
-        onDesignStyleChange={onDesignStyleChange}
-      />
+    <div className="space-y-8">
+      {/* 2-column grid: Palette left, Settings right */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left: Color scheme cards */}
+        <section className="lg:col-span-7">
+          <PaletteSelector
+            theme={theme}
+            colorPalette={colorPalette}
+            onApplyPalette={applyPalette}
+          />
+        </section>
 
-      <PaletteSelector
-        theme={theme}
-        colorPalette={colorPalette}
-        onApplyPalette={applyPalette}
-      />
-
-      <ColorTokenEditor
-        theme={theme}
-        onChange={onChange}
-      />
-
-      {/* Preview */}
-      <div>
-        <h3 className="text-lg font-semibold text-spa-text-primary mb-3">Vorschau</h3>
-        <div
-          className="p-6 rounded-lg border-2 transition-all"
-          style={{
-            backgroundColor: theme.bg,
-            color: theme.fg,
-            borderColor: theme.accent,
-          }}
-        >
-          <div className="mb-4">
-            <h4 className="text-xl font-bold mb-2" style={{ color: theme.fg }}>
-              Beispiel-Überschrift
-            </h4>
-            <p style={{ color: theme.fg }}>
-              Dies ist ein Beispieltext in der ausgewählten Farbpalette.
-            </p>
+        {/* Right: Darstellung + Token editor */}
+        <section className="lg:col-span-5 space-y-5">
+          <div>
+            <h2 className="text-base font-bold text-stone-800 mb-1">Darstellung</h2>
+            <p className="text-xs text-stone-500 uppercase tracking-widest mb-4">Display Configuration</p>
+            <AppearanceSelector
+              displayAppearance={displayAppearance}
+              designStyle={designStyle}
+              onDisplayAppearanceChange={onDisplayAppearanceChange}
+              onDesignStyleChange={onDesignStyleChange}
+            />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-3 rounded" style={{ backgroundColor: theme.cellBg }}>
-              <div className="text-sm font-medium" style={{ color: theme.boxFg }}>
-                Zellen-Hintergrund
-              </div>
-            </div>
-            <div className="p-3 rounded" style={{ backgroundColor: theme.accent, color: '#fff' }}>
-              <div className="text-sm font-medium">Akzent-Farbe</div>
-            </div>
+
+          {/* Color token editor (collapsible) */}
+          <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">
+              Einzelne Farbtokens
+            </label>
+            <ColorTokenEditor
+              theme={theme}
+              onChange={onChange}
+            />
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+
+</div>
   );
 }

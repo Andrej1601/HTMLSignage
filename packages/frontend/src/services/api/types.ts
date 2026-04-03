@@ -349,6 +349,7 @@ export interface FetchApiOptions extends Omit<RequestInit, 'body'> {
   responseType?: FetchApiResponseType;
   timeoutMs?: number;
   token?: string;
+  deviceToken?: string;
 }
 
 export interface CustomPalette {

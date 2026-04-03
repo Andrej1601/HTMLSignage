@@ -23,8 +23,8 @@ export function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein.');
+    if (password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein.');
       return;
     }
 
@@ -98,9 +98,9 @@ export function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
                 className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-                placeholder="Mindestens 6 Zeichen"
+                placeholder="Mindestens 8 Zeichen"
               />
             </div>
 

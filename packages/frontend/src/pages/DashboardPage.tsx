@@ -5,6 +5,7 @@ import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaStatsWidget } from '@/components/Dashboard/MediaStatsWidget';
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
 import { RunningSlideshowsWidget } from '@/components/Dashboard/RunningSlideshowsWidget';
+import { InlineErrorBoundary } from '@/components/InlineErrorBoundary';
 import { PageHeader } from '@/components/PageHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { SkeletonCard } from '@/components/Skeleton';
@@ -15,12 +16,12 @@ export function DashboardPage() {
   const {
     isLoading,
     scheduleQuery, settingsQuery, devicesQuery, mediaQuery, backendHealthQuery,
-    schedule, wsConnected,
+    schedule, settings, wsConnected,
     isAdmin,
     liveState, mediaStats, eventStats,
     runningSlideshows, deviceSlideshowRows, systemChecks, updateLabel,
     runtimeStatus, runtimeHistory,
-    activeSystemJobs, attentionItems,
+    attentionItems,
     activityItems,
   } = useDashboardData();
 
@@ -87,51 +88,62 @@ export function DashboardPage() {
 
         {/* Row 1: Betriebsstatus + Meldungen */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <OperationsPulseWidget
-            liveState={liveState}
-            activeSystemJobs={activeSystemJobs}
-            runningSlideshows={runningSlideshows}
-            nextEventLabel={nextEventDesc.value}
-            activePreset={liveState.activePreset}
-            autoPlay={Boolean(schedule?.autoPlay)}
-            mediaStats={{
-              total: mediaStats.images + mediaStats.audio + mediaStats.videos,
-              totalSize: mediaStats.totalSize,
-              latestName: mediaStats.latestMedia?.originalName || null,
-            }}
-          />
-          <AttentionBoardWidget items={attentionItems} />
+          <InlineErrorBoundary fallbackLabel="Betriebsstatus konnte nicht geladen werden.">
+            <OperationsPulseWidget
+              liveState={liveState}
+              runningSlideshows={runningSlideshows}
+              nextEventLabel={nextEventDesc.value}
+              activePreset={liveState.activePreset}
+              autoPlay={Boolean(schedule?.autoPlay)}
+              schedule={schedule ?? null}
+              settings={settings ?? null}
+              pairedDevices={liveState.pairedDevices}
+            />
+          </InlineErrorBoundary>
+          <InlineErrorBoundary fallbackLabel="Meldungen konnten nicht geladen werden.">
+            <AttentionBoardWidget items={attentionItems} />
+          </InlineErrorBoundary>
         </div>
 
-        {/* Row 2: System-Checks + Medien-Statistiken + Aktivitäts-Feed */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <SystemChecksWidget
-            backendStatus={
-              backendHealthQuery.data?.status === 'ok' ? 'ok'
-              : backendHealthQuery.isError ? 'error'
-              : 'unknown'
-            }
-            backendTone={systemChecks.backendTone}
-            dataTone={systemChecks.dataTone}
-            websocketTone={systemChecks.websocketTone}
-            wsConnected={wsConnected}
-            updateTone={systemChecks.updateTone}
-            isAdmin={isAdmin}
-            updateLabel={updateLabel}
-            runtimeStatus={runtimeStatus}
-            runtimeHistory={runtimeHistory}
-          />
-          <MediaStatsWidget
-            images={mediaStats.images}
-            audio={mediaStats.audio}
-            videos={mediaStats.videos}
-            totalSize={mediaStats.totalSize}
-          />
+        {/* Row 2: Laufende Slideshows */}
+        <InlineErrorBoundary fallbackLabel="Laufende Slideshows konnten nicht geladen werden.">
+          <RunningSlideshowsWidget rows={deviceSlideshowRows} />
+        </InlineErrorBoundary>
+
+        {/* Row 3: System-Checks + Medien-Statistiken */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <InlineErrorBoundary fallbackLabel="System-Checks konnten nicht geladen werden.">
+            <SystemChecksWidget
+              backendStatus={
+                backendHealthQuery.data?.status === 'ok' ? 'ok'
+                : backendHealthQuery.isError ? 'error'
+                : 'unknown'
+              }
+              backendTone={systemChecks.backendTone}
+              dataTone={systemChecks.dataTone}
+              websocketTone={systemChecks.websocketTone}
+              wsConnected={wsConnected}
+              updateTone={systemChecks.updateTone}
+              isAdmin={isAdmin}
+              updateLabel={updateLabel}
+              runtimeStatus={runtimeStatus}
+              runtimeHistory={runtimeHistory}
+            />
+          </InlineErrorBoundary>
+          <InlineErrorBoundary fallbackLabel="Medien-Statistiken konnten nicht geladen werden.">
+            <MediaStatsWidget
+              images={mediaStats.images}
+              audio={mediaStats.audio}
+              videos={mediaStats.videos}
+              totalSize={mediaStats.totalSize}
+            />
+          </InlineErrorBoundary>
+        </div>
+
+        {/* Row 4: Audit-Log (full width) */}
+        <InlineErrorBoundary fallbackLabel="Aktivitäts-Feed konnte nicht geladen werden.">
           <ActivityFeedWidget items={activityItems} />
-        </div>
-
-        {/* Row 3: Laufende Slideshows */}
-        <RunningSlideshowsWidget rows={deviceSlideshowRows} />
+        </InlineErrorBoundary>
 
         {/* Error Banner */}
         {hasErrors && (

@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { UpdateSection } from './UpdateSection';
 import { BackupSection } from './BackupSection';
-import { AuditLogSection } from './AuditLogSection';
 import { SystemJobsSection } from './SystemJobsSection';
 import {
   AlertTriangle,
@@ -26,7 +25,6 @@ export function SystemMaintenance() {
       <UpdateSection onFeedback={handleFeedback} />
       <BackupSection onFeedback={handleFeedback} onImportWarnings={handleImportWarnings} />
       <SystemJobsSection />
-      <AuditLogSection />
 
       {/* Feedback */}
       {feedback && (

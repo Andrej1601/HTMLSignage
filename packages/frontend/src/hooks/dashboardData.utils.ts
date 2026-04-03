@@ -627,7 +627,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       tone: entry.isActive ? 'success' : 'neutral',
       timestamp: date,
       actor: 'Unbekannt',
-      category: 'plan',
+      category: 'einstellungen',
       details: entry.changeSummary ?? undefined,
     });
   }
@@ -669,7 +669,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       tone: 'info',
       timestamp: new Date(`${liveState.activeEvent.startDate}T${liveState.activeEvent.startTime}`),
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 
@@ -680,7 +680,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       description: 'Bitte Verbindungsstatus und Display-Clients prüfen',
       tone: 'warning',
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 
@@ -691,7 +691,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       description: 'Neue Bildschirme warten auf Freigabe',
       tone: 'warning',
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 
@@ -703,7 +703,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       tone: getWarningTone(warning.level),
       timestamp: toValidDate(runtimeStatus?.checkedAt),
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 
@@ -714,7 +714,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       description: `${systemStatus.latestRelease.tag} — ${systemStatus.latestRelease.name}`,
       tone: 'warning',
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 
@@ -725,7 +725,7 @@ function buildFallbackActivities(input: Omit<DashboardActivityBuildInput, 'audit
       description: `Design: ${getDisplayAppearanceLabel(settings.displayAppearance)} · ${getScheduleDesignStyleLabel(settings.designStyle || 'modern-wellness')}`,
       tone: 'success',
       actor: 'System',
-      category: 'system',
+      category: 'systemjobs',
     });
   }
 

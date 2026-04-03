@@ -121,7 +121,7 @@ interface UpdateSectionProps {
 }
 
 export function UpdateSection({ onFeedback }: UpdateSectionProps) {
-  const { token } = useAuth();
+  const { user } = useAuth();
 
   const [releases, setReleases] = useState<SystemReleasesResponse | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
@@ -132,7 +132,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
   const [isDowngrade, setIsDowngrade] = useState(false);
   const notifiedTerminalJobRef = useRef<string | null>(null);
 
-  const canRunActions = useMemo(() => Boolean(token), [token]);
+  const canRunActions = Boolean(user);
   const preflight = releases?.preflight || null;
   const isRunningUpdate = latestJob?.status === 'queued' || latestJob?.status === 'running';
   const isUpdateBlocked = !preflight?.ready;
@@ -151,10 +151,9 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
   );
 
   const loadReleases = useCallback(async () => {
-    if (!token) return;
     setIsCheckingStatus(true);
     try {
-      const result = await systemApi.getReleases(token);
+      const result = await systemApi.getReleases();
       setReleases(result);
       if (result.activeJob && result.activeJob.type === 'system-update') {
         setLatestJob(result.activeJob);
@@ -164,18 +163,17 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
     } finally {
       setIsCheckingStatus(false);
     }
-  }, [token, onFeedback]);
+  }, [onFeedback]);
 
   const loadLatestUpdateJob = useCallback(async () => {
-    if (!token) return;
     try {
-      const response = await systemApi.listJobs(token, 10);
+      const response = await systemApi.listJobs(10);
       const updateJob = response.items.find((job) => job.type === 'system-update') || null;
       setLatestJob(updateJob);
     } catch {
       // Secondary status polling should not spam the UI.
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     void loadReleases();
@@ -183,11 +181,11 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
   }, [loadLatestUpdateJob, loadReleases]);
 
   useEffect(() => {
-    if (!token || !latestJob || (latestJob.status !== 'queued' && latestJob.status !== 'running')) return;
+    if (!latestJob || (latestJob.status !== 'queued' && latestJob.status !== 'running')) return;
 
     const interval = window.setInterval(async () => {
       try {
-        const response = await systemApi.getJob(token, latestJob.id);
+        const response = await systemApi.getJob(latestJob.id);
         setLatestJob(response.job);
         if (response.job.status === 'succeeded' || response.job.status === 'failed') {
           void loadReleases();
@@ -200,7 +198,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
     return () => {
       window.clearInterval(interval);
     };
-  }, [latestJob, loadReleases, token]);
+  }, [latestJob, loadReleases]);
 
   useEffect(() => {
     if (!latestJob) return;
@@ -232,12 +230,12 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
   };
 
   const handleConfirmUpdate = async () => {
-    if (!token || !confirmTarget) return;
+    if (!confirmTarget) return;
     setConfirmTarget(null);
     setIsStartingUpdate(true);
     onFeedback(null);
     try {
-      const response = await systemApi.runUpdate(token, confirmTarget.tag);
+      const response = await systemApi.runUpdate(confirmTarget.tag);
       setLatestJob(response.job);
       notifiedTerminalJobRef.current = null;
       onFeedback({ type: 'success', message: response.message });

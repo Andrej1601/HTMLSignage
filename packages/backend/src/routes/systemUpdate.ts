@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AuthRequest } from '../lib/auth.js';
+import { authMiddleware, requireRole } from '../lib/auth.js';
 import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
+import { requirePermission } from '../lib/permissions.js';
 import {
   readLocalVersion,
   fetchGitHubReleases,
@@ -17,10 +19,10 @@ import { createSystemJob, findRunningSystemJob, runSystemJob } from '../lib/syst
 const router = Router();
 
 // GET /update/status
-router.get('/update/status', async (req: AuthRequest, res) => {
+router.get('/update/status', authMiddleware, requireRole('admin'), async (req: AuthRequest, res) => {
   try {
-    const activeJob = findRunningSystemJob('system-update');
-    const [currentVersion, releases, preflight] = await Promise.all([
+    const [activeJob, currentVersion, releases, preflight] = await Promise.all([
+      findRunningSystemJob('system-update'),
       readLocalVersion(),
       fetchGitHubReleases(),
       collectSystemUpdatePreflight(),
@@ -44,11 +46,11 @@ router.get('/update/status', async (req: AuthRequest, res) => {
 
 // POST /update/run
 const UpdateRunSchema = z.object({
-  targetVersion: z.string().min(1),
+  targetVersion: z.string().min(1).regex(/^\d+\.\d+\.\d+$/, 'Muss ein Semver-Format sein (z.B. 1.2.3)'),
 });
 
-router.post('/update/run', async (req: AuthRequest, res) => {
-  const runningJob = findRunningSystemJob('system-update');
+router.post('/update/run', authMiddleware, requireRole('admin'), requirePermission('system:manage'), async (req: AuthRequest, res) => {
+  const runningJob = await findRunningSystemJob('system-update');
   if (runningJob) {
     return res.status(409).json({
       error: 'update-in-progress',
@@ -90,7 +92,7 @@ router.post('/update/run', async (req: AuthRequest, res) => {
     });
   }
 
-  const job = createSystemJob({
+  const job = await createSystemJob({
     type: 'system-update',
     title: `Update auf ${tagName}`,
     requestId: req.requestId ?? null,

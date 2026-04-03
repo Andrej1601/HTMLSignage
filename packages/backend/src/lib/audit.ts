@@ -16,44 +16,18 @@ export interface AuditLogListOptions {
 
 const DEFAULT_AUDIT_LIMIT = 50;
 const MAX_AUDIT_LIMIT = 200;
-let auditInfrastructureEnsured = false;
-let auditInfrastructureFailed = false;
+let auditTableAvailable: boolean | null = null;
 
-async function ensureAuditInfrastructure(): Promise<boolean> {
-  if (auditInfrastructureEnsured) return true;
-  if (auditInfrastructureFailed) return false;
+async function isAuditTableAvailable(): Promise<boolean> {
+  if (auditTableAvailable !== null) return auditTableAvailable;
 
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "audit_logs" (
-        "id" text PRIMARY KEY,
-        "userId" text,
-        "action" text NOT NULL,
-        "resource" text,
-        "details" jsonb,
-        "ipAddress" text,
-        "userAgent" text,
-        "timestamp" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "audit_logs_userId_fkey"
-          FOREIGN KEY ("userId") REFERENCES "users"("id")
-          ON DELETE SET NULL ON UPDATE CASCADE
-      )
-    `);
-    await prisma.$executeRawUnsafe(
-      'CREATE INDEX IF NOT EXISTS "audit_logs_userId_timestamp_idx" ON "audit_logs"("userId", "timestamp" DESC)',
-    );
-    await prisma.$executeRawUnsafe(
-      'CREATE INDEX IF NOT EXISTS "audit_logs_action_timestamp_idx" ON "audit_logs"("action", "timestamp" DESC)',
-    );
-    await prisma.$executeRawUnsafe(
-      'CREATE INDEX IF NOT EXISTS "audit_logs_timestamp_idx" ON "audit_logs"("timestamp" DESC)',
-    );
-
-    auditInfrastructureEnsured = true;
+    await prisma.auditLog.count();
+    auditTableAvailable = true;
     return true;
-  } catch (error) {
-    auditInfrastructureFailed = true;
-    console.error('[audit] Failed to ensure audit log infrastructure:', error);
+  } catch {
+    auditTableAvailable = false;
+    console.error('[audit] Audit log table not available. Run `pnpm db:migrate` to create it.');
     return false;
   }
 }
@@ -73,8 +47,8 @@ function serializeDetails(details: unknown): Prisma.InputJsonValue | undefined {
 }
 
 export async function logAuditEvent(req: AuthRequest, payload: AuditLogPayload): Promise<void> {
-  const ready = await ensureAuditInfrastructure();
-  if (!ready) return;
+  const available = await isAuditTableAvailable();
+  if (!available) return;
 
   try {
     await prisma.auditLog.create({
@@ -93,8 +67,8 @@ export async function logAuditEvent(req: AuthRequest, payload: AuditLogPayload):
 }
 
 export async function listAuditLogs(options: AuditLogListOptions = {}) {
-  const ready = await ensureAuditInfrastructure();
-  if (!ready) {
+  const available = await isAuditTableAvailable();
+  if (!available) {
     return {
       items: [],
       nextCursor: null,

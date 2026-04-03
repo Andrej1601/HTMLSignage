@@ -9,7 +9,7 @@ import { InputField } from '@/components/FormField';
 import { fetchApi } from '@/services/api';
 
 export function PendingPairings() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [pairingDevice, setPairingDevice] = useState<Device | null>(null);
   const [deviceName, setDeviceName] = useState('');
@@ -17,13 +17,11 @@ export function PendingPairings() {
   const [expanded, setExpanded] = useState(true);
 
   const { data: pendingDevices = [], refetch, isLoading } = useQuery<Device[]>({
-    queryKey: ['devices', 'pending', token],
-    enabled: !!token,
+    queryKey: ['devices', 'pending'],
     retry: false,
     queryFn: async () => {
-      if (!token) throw new Error('unauthorized');
       try {
-        return await fetchApi<Device[]>('/devices/pending', { token });
+        return await fetchApi<Device[]>('/devices/pending');
       } catch (error) {
         if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
           await logout();
@@ -32,15 +30,13 @@ export function PendingPairings() {
         throw error;
       }
     },
-    refetchInterval: token ? 5000 : false,
+    refetchInterval: 5000,
   });
 
   const pairDevice = useMutation({
     mutationFn: async (data: { pairingCode: string; name: string; groupName?: string | null }) => {
-      if (!token) throw new Error('unauthorized');
       return fetchApi('/devices/pair', {
         method: 'POST',
-        token,
         data,
       });
     },

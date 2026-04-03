@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
-import { CalendarDays, Image, Monitor, Settings, ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
-import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
-import { formatRelativeTime } from '@/utils/dateUtils';
+import { Fragment, useState, useMemo } from 'react';
+import { Shield, Settings2, Server, Monitor, Users, Image, ChevronDown, ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { StatusTone } from '@/components/StatusBadge';
 import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
 
-export type ActivityCategory = 'plan' | 'media' | 'device' | 'system';
+export type ActivityCategory = 'einstellungen' | 'systemjobs' | 'device' | 'benutzer' | 'media';
 
 export interface ActivityItem {
   id: string;
@@ -23,130 +23,254 @@ interface ActivityFeedWidgetProps {
 
 type FilterKey = 'all' | ActivityCategory;
 
-const CATEGORY_PILLS: { key: FilterKey; label: string; icon?: LucideIcon }[] = [
-  { key: 'all', label: 'Alles' },
-  { key: 'plan', label: 'Pläne', icon: CalendarDays },
-  { key: 'media', label: 'Medien', icon: Image },
-  { key: 'device', label: 'Geräte', icon: Monitor },
-  { key: 'system', label: 'System', icon: Settings },
+const PAGE_SIZE = 10;
+
+const CATEGORY_CONFIG: Record<ActivityCategory, { label: string; colorClass: string; icon: LucideIcon }> = {
+  einstellungen: { label: 'Einstellungen', colorClass: 'text-blue-600',   icon: Settings2 },
+  systemjobs:    { label: 'Systemjobs',    colorClass: 'text-purple-600', icon: Server },
+  device:        { label: 'Geräte',        colorClass: 'text-amber-600',  icon: Monitor },
+  benutzer:      { label: 'Benutzer',      colorClass: 'text-rose-600',   icon: Users },
+  media:         { label: 'Inhalte',       colorClass: 'text-teal-600',   icon: Image },
+};
+
+const STATUS_CONFIG: Record<StatusTone, { label: string; colorClass: string }> = {
+  success: { label: 'Erfolg',   colorClass: 'text-emerald-600 font-semibold' },
+  info:    { label: 'Info',     colorClass: 'text-blue-600 font-semibold' },
+  warning: { label: 'Warnung',  colorClass: 'text-amber-600 font-semibold' },
+  danger:  { label: 'Fehler',   colorClass: 'text-red-600 font-semibold' },
+  neutral: { label: 'OK',       colorClass: 'text-stone-500 font-semibold' },
+};
+
+const CATEGORY_PILLS: { key: FilterKey; label: string }[] = [
+  { key: 'all',          label: 'Alle' },
+  { key: 'einstellungen', label: 'Einstellungen' },
+  { key: 'systemjobs',   label: 'Systemjobs' },
+  { key: 'device',       label: 'Geräte' },
+  { key: 'benutzer',     label: 'Benutzer' },
+  { key: 'media',        label: 'Inhalte' },
 ];
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleString('de-DE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
 
 export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
-  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
-
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: items.length };
-    for (const item of items) {
-      counts[item.category] = (counts[item.category] || 0) + 1;
-    }
-    return counts;
-  }, [items]);
+  const [expandedRow, setExpandedRow]   = useState<string | null>(null);
+  const [page, setPage]                 = useState(0);
 
   const filteredItems = useMemo(
-    () => activeFilter === 'all' ? items : items.filter((item) => item.category === activeFilter),
+    () => activeFilter === 'all' ? items : items.filter((i) => i.category === activeFilter),
     [items, activeFilter],
   );
 
-  const toggleDetails = (id: string) => {
-    setExpandedDetails((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const totalItems = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const pageItems  = filteredItems.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const startIdx   = totalItems === 0 ? 0 : page * PAGE_SIZE + 1;
+  const endIdx     = Math.min((page + 1) * PAGE_SIZE, totalItems);
+
+  const handleFilter = (key: FilterKey) => {
+    setActiveFilter(key);
+    setPage(0);
+    setExpandedRow(null);
+  };
+
+  const toggleRow = (id: string) => setExpandedRow((prev) => (prev === id ? null : id));
+
+  const handleExport = () => {
+    const header = 'Zeitstempel\tKategorie\tAktion\tBenutzer/System\tStatus\tDetails';
+    const rows = items.map((item) => [
+      item.timestamp ? formatDateTime(item.timestamp) : '-',
+      CATEGORY_CONFIG[item.category]?.label ?? item.category,
+      item.title,
+      item.actor ?? 'System',
+      STATUS_CONFIG[item.tone]?.label ?? item.tone,
+      (item.details ?? []).join(' | '),
+    ].join('\t'));
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'audit-log.tsv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <DashboardWidgetFrame
-      title="Letzte Aktivitäten"
-      description="Änderungen an Plänen, Medien, Geräten und Systemzustand mit schnellem Kontext."
-      icon={CalendarDays}
+      title="Audit-Log"
+      icon={Shield}
+      actions={
+        <button
+          onClick={handleExport}
+          className="text-sm font-medium text-spa-accent hover:underline whitespace-nowrap"
+        >
+          Alle exportieren
+        </button>
+      }
+      contentClassName="p-0"
     >
       {/* Filter Pills */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        {CATEGORY_PILLS.map(({ key, label, icon: Icon }) => {
-          const count = categoryCounts[key] || 0;
-          if (key !== 'all' && count === 0) return null;
+      <div className="flex flex-wrap gap-1.5 px-6 pt-5 pb-4">
+        {CATEGORY_PILLS.map(({ key, label }) => {
           const isActive = activeFilter === key;
           return (
             <button
               key={key}
-              onClick={() => setActiveFilter(key)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              onClick={() => handleFilter(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 isActive
                   ? 'bg-spa-accent text-white'
                   : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/80'
               }`}
             >
-              {Icon && <Icon className="w-3.5 h-3.5" />}
               {label}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                isActive ? 'bg-white/20' : 'bg-white/60'
-              }`}>
-                {count}
-              </span>
             </button>
           );
         })}
       </div>
 
-      {/* Activity List */}
-      <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
-        {filteredItems.length === 0 && (
-          <p className="text-sm text-spa-text-secondary">Keine Aktivität verfügbar.</p>
-        )}
-        {filteredItems.map((item) => {
-          const isExpanded = expandedDetails.has(item.id);
-          const hasDetails = item.details && item.details.length > 0;
-          return (
-            <div key={item.id} className="rounded-lg border border-spa-bg-secondary p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-spa-text-primary">{item.title}</p>
-                  <p className="text-sm text-spa-text-secondary mt-0.5">{item.description}</p>
-                  {item.actor && item.actor !== 'System' && item.actor !== 'Unbekannt' && (
-                    <p className="text-xs text-spa-text-secondary mt-1">
-                      von <span className="font-medium text-spa-text-primary">{item.actor}</span>
-                    </p>
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-y border-spa-bg-secondary bg-spa-bg-primary/50">
+              <th className="py-2.5 pl-6 pr-4 text-left text-xs font-semibold uppercase tracking-wider text-spa-text-secondary whitespace-nowrap w-40">
+                Zeitstempel
+              </th>
+              <th className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-spa-text-secondary w-36">
+                Kategorie
+              </th>
+              <th className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-spa-text-secondary">
+                Aktion
+              </th>
+              <th className="py-2.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-spa-text-secondary whitespace-nowrap w-36">
+                Benutzer/System
+              </th>
+              <th className="py-2.5 pl-4 pr-6 text-left text-xs font-semibold uppercase tracking-wider text-spa-text-secondary w-24">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-6 py-10 text-center text-sm text-spa-text-secondary">
+                  Keine Einträge für diesen Filter.
+                </td>
+              </tr>
+            )}
+            {pageItems.map((item) => {
+              const cat    = CATEGORY_CONFIG[item.category];
+              const status = STATUS_CONFIG[item.tone];
+              const isExpanded = expandedRow === item.id;
+              const hasDetails = Boolean(item.description || (item.details && item.details.length > 0));
+
+              return (
+                <Fragment key={item.id}>
+                  <tr
+                    onClick={() => hasDetails && toggleRow(item.id)}
+                    className={`border-b border-spa-bg-secondary/60 transition-colors ${
+                      hasDetails ? 'cursor-pointer hover:bg-spa-bg-primary/50' : ''
+                    } ${isExpanded ? 'bg-spa-bg-primary/40' : ''}`}
+                  >
+                    {/* Zeitstempel */}
+                    <td className="py-3.5 pl-6 pr-4 font-mono text-xs text-spa-text-secondary whitespace-nowrap align-top">
+                      {item.timestamp ? formatDateTime(item.timestamp) : '—'}
+                    </td>
+
+                    {/* Kategorie */}
+                    <td className="py-3.5 px-4 align-top">
+                      <span className={`text-xs font-bold tracking-wide uppercase ${cat?.colorClass ?? 'text-spa-text-secondary'}`}>
+                        {cat?.label ?? item.category}
+                      </span>
+                    </td>
+
+                    {/* Aktion */}
+                    <td className="py-3.5 px-4 text-spa-text-primary align-top">
+                      <div className="flex items-center gap-1.5">
+                        {hasDetails && (
+                          isExpanded
+                            ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-spa-text-secondary" />
+                            : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-spa-text-secondary" />
+                        )}
+                        {item.title}
+                      </div>
+                    </td>
+
+                    {/* Benutzer/System */}
+                    <td className="py-3.5 px-4 font-semibold text-spa-text-primary whitespace-nowrap align-top">
+                      {item.actor ?? 'System'}
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3.5 pl-4 pr-6 align-top">
+                      <span className={`text-xs ${status?.colorClass ?? 'text-spa-text-secondary'}`}>
+                        {status?.label ?? item.tone}
+                      </span>
+                    </td>
+                  </tr>
+
+                  {/* Detail-Zeile */}
+                  {isExpanded && (
+                    <tr className="border-b border-spa-bg-secondary/60 bg-spa-bg-primary/30">
+                      <td colSpan={5} className="pl-14 pr-6 py-3">
+                        <div className="flex flex-col gap-2">
+                          {item.description && (
+                            <p className="text-xs text-spa-text-secondary">{item.description}</p>
+                          )}
+                          {item.details && item.details.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {item.details.map((d, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex rounded-full bg-white border border-spa-bg-secondary px-2.5 py-1 text-xs text-spa-text-secondary"
+                                >
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                  {hasDetails && (
-                    <button
-                      onClick={() => toggleDetails(item.id)}
-                      className="text-xs text-spa-accent hover:underline mt-1.5 flex items-center gap-1"
-                    >
-                      {isExpanded ? (
-                        <>
-                          <ChevronDown className="w-3 h-3" />
-                          Details ausblenden
-                        </>
-                      ) : (
-                        <>
-                          <ChevronRight className="w-3 h-3" />
-                          {item.details!.length} {item.details!.length === 1 ? 'Änderung' : 'Änderungen'}
-                        </>
-                      )}
-                    </button>
-                  )}
-                  {isExpanded && item.details && (
-                    <ul className="mt-2 text-xs space-y-1 text-spa-text-secondary border-l-2 border-spa-bg-secondary pl-3">
-                      {item.details.map((detail, i) => (
-                        <li key={i}>{detail}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                {item.timestamp && (
-                  <StatusBadge
-                    label={formatRelativeTime(item.timestamp)}
-                    tone={item.tone}
-                    showDot={false}
-                  />
-                )}
-              </div>
-            </div>
-          );
-        })}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer: Pagination */}
+      <div className="flex items-center justify-between px-6 py-4 border-t border-spa-bg-secondary/60">
+        <span className="text-xs text-spa-text-secondary">
+          {totalItems === 0
+            ? 'Keine Einträge'
+            : `Zeige ${startIdx}–${endIdx} von ${totalItems} Einträgen`}
+        </span>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-xs font-medium border border-spa-bg-secondary rounded-lg text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Zurück
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-spa-accent text-white hover:bg-spa-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Weiter
+            </button>
+          </div>
+        </div>
       </div>
     </DashboardWidgetFrame>
   );

@@ -12,6 +12,8 @@ import { broadcastScheduleUpdate, broadcastSettingsUpdate } from '../websocket/i
 import { ScheduleSchema } from '../types/schedule.types.js';
 import {
   normalizeScheduleData,
+} from './schedule.js';
+import {
   readLocalVersion,
   compareVersions,
   parseDateOrFallback,

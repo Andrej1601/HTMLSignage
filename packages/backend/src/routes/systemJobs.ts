@@ -9,13 +9,13 @@ const ListJobsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
-router.get('/jobs', (req: AuthRequest, res) => {
+router.get('/jobs', async (req: AuthRequest, res) => {
   const parsed = ListJobsQuerySchema.safeParse(req.query);
   const limit = parsed.success ? parsed.data.limit ?? 20 : 20;
 
   res.json({
     ok: true,
-    items: listSystemJobs(limit),
+    items: await listSystemJobs(limit),
   });
 });
 

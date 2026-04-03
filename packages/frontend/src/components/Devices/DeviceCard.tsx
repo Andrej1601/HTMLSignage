@@ -71,7 +71,7 @@ export function DeviceCard({
             </div>
             <div className="mt-1.5 flex items-center gap-2">
               <span className={`flex items-center gap-1.5 text-xs font-semibold ${
-                isOnline ? 'text-emerald-600' : status === 'offline' ? 'text-red-500' : 'text-spa-text-secondary'
+                isOnline ? 'text-emerald-600' : 'text-red-500'
               }`}>
                 <Circle className={`h-2 w-2 fill-current`} />
                 {getStatusLabel(status).toUpperCase()}

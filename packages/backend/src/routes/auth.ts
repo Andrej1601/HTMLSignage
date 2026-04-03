@@ -143,9 +143,32 @@ router.post('/register', authLimiter, async (req, res) => {
     });
     await pruneSessions(user.id);
 
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
     res.json({
       user,
-      token,
+    });
+    res.json({
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        roles: user.roles,
+      },
+    });
+    res.json({
+      user,
+    });
+    res.json({
+      user,
+    });
+    res.json({
+      user,
     });
   } catch (error) {
     if (error instanceof UserConflictError) {
@@ -192,6 +215,16 @@ router.post('/login', authLimiter, async (req, res) => {
     });
     await pruneSessions(user.id);
 
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
+    res.json({
+      user,
+    });
     res.json({
       user: {
         id: user.id,
@@ -199,7 +232,6 @@ router.post('/login', authLimiter, async (req, res) => {
         email: user.email,
         roles: user.roles,
       },
-      token,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -340,6 +372,7 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
       });
     }
 
+    res.clearCookie('auth_token', { path: '/' });
     res.json({ ok: true });
   } catch (error) {
     console.error('[auth] Logout error:', error);

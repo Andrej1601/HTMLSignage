@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -16,6 +16,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { usePermission } from '@/hooks/usePermission';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import api from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import {
   DndContext,
   closestCenter,
@@ -41,7 +42,7 @@ export function SaunasPage() {
   const [editingSauna, setEditingSauna] = useState<Sauna | null>(null);
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const isInitializedRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -60,7 +61,8 @@ export function SaunasPage() {
 
   // Initialize local saunas from settings only once
   useEffect(() => {
-    if (!isInitialized && settings) {
+    if (!isInitializedRef.current && settings) {
+      isInitializedRef.current = true;
       if (settings.saunas && settings.saunas.length > 0) {
         setLocalSaunas(settings.saunas);
       } else {
@@ -88,9 +90,8 @@ export function SaunasPage() {
         setLocalSaunas(defaultSaunas);
         setIsDirty(true); // Mark as dirty so user can save
       }
-      setIsInitialized(true);
     }
-  }, [settings, isInitialized]);
+  }, [settings]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -162,19 +163,21 @@ export function SaunasPage() {
   };
 
   const handleReload = () => {
-    setIsInitialized(false);
+    isInitializedRef.current = false;
     setIsDirty(false);
     refetch();
   };
 
   // Saunameister: change status via dedicated endpoint (no settings:manage needed)
   const handleStatusChange = async (saunaId: string, status: Sauna['status']) => {
+    const previousSaunas = localSaunas;
+    setLocalSaunas((prev) => prev.map((s) => s.id === saunaId ? { ...s, status } : s));
     try {
       await api.patch(`/saunas/${saunaId}/status`, { status });
-      // Update local state optimistically
-      setLocalSaunas((prev) => prev.map((s) => s.id === saunaId ? { ...s, status } : s));
     } catch (err) {
-      console.error('[saunas] Status update failed:', err);
+      setLocalSaunas(previousSaunas);
+      const message = err instanceof Error ? err.message : 'Status konnte nicht geändert werden';
+      toast.error(`Fehler: ${message}`);
     }
   };
 

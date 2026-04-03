@@ -41,7 +41,7 @@ interface UpdateUserData {
 }
 
 export function UsersPage() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -50,13 +50,11 @@ export function UsersPage() {
 
   // Fetch users
   const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
-    queryKey: ['users', token],
-    enabled: !!token,
+    queryKey: ['users'],
     retry: false,
     queryFn: async () => {
-      if (!token) throw new Error('unauthorized');
       try {
-        return await fetchApi<User[]>('/users', { token });
+        return await fetchApi<User[]>('/users');
       } catch (error) {
         if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
           await logout();
@@ -70,10 +68,8 @@ export function UsersPage() {
   // Create user mutation
   const createUser = useMutation({
     mutationFn: async (data: CreateUserData) => {
-      if (!token) throw new Error('unauthorized');
       return fetchApi('/users', {
         method: 'POST',
-        token,
         data,
       });
     },
@@ -86,10 +82,8 @@ export function UsersPage() {
   // Update user mutation
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
-      if (!token) throw new Error('unauthorized');
       return fetchApi(`/users/${id}`, {
         method: 'PATCH',
-        token,
         data,
       });
     },
@@ -102,10 +96,8 @@ export function UsersPage() {
   // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
-      if (!token) throw new Error('unauthorized');
       return fetchApi(`/users/${id}`, {
         method: 'DELETE',
-        token,
       });
     },
     onSuccess: () => {
@@ -114,7 +106,7 @@ export function UsersPage() {
     },
   });
 
-  const userColumns: Column<User>[] = [
+  const userColumns: Column<User>[] = useMemo(() => [
     {
       key: 'username',
       header: 'Benutzer',
@@ -207,7 +199,7 @@ export function UsersPage() {
         </div>
       ),
     },
-  ];
+  ], []);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;

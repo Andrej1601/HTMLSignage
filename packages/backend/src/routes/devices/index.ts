@@ -250,6 +250,38 @@ router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutat
   }
 });
 
+// POST /api/devices/:id/revoke-token - Revoke device token without deleting device
+router.post('/:id/revoke-token', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+  try {
+    const device = await prisma.device.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, name: true, tokenRevokedAt: true },
+    });
+
+    if (!device) {
+      return res.status(404).json({ error: 'not-found', message: 'Gerät nicht gefunden' });
+    }
+
+    await prisma.device.update({
+      where: { id: req.params.id },
+      data: { tokenRevokedAt: new Date() },
+    });
+
+    broadcastDeviceCommand(req.params.id, { command: 'reconnect' });
+
+    await logAuditEvent(req, {
+      action: 'device.token-revoked',
+      resource: req.params.id,
+      details: { deviceId: device.id, deviceName: device.name },
+    });
+
+    res.json({ ok: true, message: 'Device-Token wurde widerrufen' });
+  } catch (error) {
+    console.error('[devices] Error revoking device token:', error);
+    res.status(500).json({ error: 'revoke-failed', message: 'Token konnte nicht widerrufen werden' });
+  }
+});
+
 // POST /api/devices/:id/heartbeat - Device heartbeat
 router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req: AuthRequest, res) => {
   try {

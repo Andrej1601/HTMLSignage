@@ -5,15 +5,13 @@ import { useDevices } from '@/hooks/useDevices';
 import { useMedia } from '@/hooks/useMedia';
 import { useSettings } from '@/hooks/useSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useWebSocketStatus } from '@/contexts/WebSocketContext';
 import {
   fetchApi,
   systemApi,
   type SystemJob,
 } from '@/services/api';
 import type { Media } from '@/types/media.types';
-import {
-} from '@/types/schedule.types';
 import type { Device } from '@/types/device.types';
 import {
   buildActivityItems,
@@ -50,9 +48,9 @@ export function useDashboardData() {
   const settingsQuery = useSettings();
   const devicesQuery = useDevices();
   const mediaQuery = useMedia();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const isAdmin = Boolean(user?.roles.includes('admin'));
-  const { isConnected: wsConnected, error: wsError } = useWebSocket({ autoConnect: true });
+  const { isConnected: wsConnected, error: wsError } = useWebSocketStatus();
 
   const schedule = scheduleQuery.schedule;
   const settings = settingsQuery.settings;
@@ -67,36 +65,34 @@ export function useDashboardData() {
 
   const runtimeStatusQuery = useQuery({
     queryKey: ['dashboard-runtime-status'],
-    queryFn: () => systemApi.getRuntimeStatus(token!),
-    enabled: Boolean(token),
+    queryFn: () => systemApi.getRuntimeStatus(),
     refetchInterval: 30000,
   });
 
   const runtimeHistoryQuery = useQuery({
     queryKey: ['dashboard-runtime-history'],
-    queryFn: () => systemApi.getRuntimeHistory(token!, 24),
-    enabled: Boolean(token),
+    queryFn: () => systemApi.getRuntimeHistory(24),
     refetchInterval: 5 * 60 * 1000,
   });
 
   const systemStatusQuery = useQuery({
     queryKey: ['dashboard-system-update-status'],
-    queryFn: () => systemApi.getReleases(token!),
-    enabled: isAdmin && Boolean(token),
+    queryFn: () => systemApi.getReleases(),
+    enabled: isAdmin,
     refetchInterval: 60000,
   });
 
   const auditLogQuery = useQuery({
     queryKey: ['dashboard-audit-log'],
-    queryFn: () => systemApi.getAuditLog(token!, 16),
-    enabled: isAdmin && Boolean(token),
+    queryFn: () => systemApi.getAuditLog(16),
+    enabled: isAdmin,
     refetchInterval: 15000,
   });
 
   const systemJobsQuery = useQuery({
     queryKey: ['dashboard-system-jobs'],
-    queryFn: () => systemApi.listJobs(token!, 6),
-    enabled: isAdmin && Boolean(token),
+    queryFn: () => systemApi.listJobs(6),
+    enabled: isAdmin,
     refetchInterval: 5000,
   });
 
@@ -221,7 +217,6 @@ export function useDashboardData() {
     devices,
     media,
     isAdmin,
-    token,
     wsConnected,
     wsError,
     liveState,

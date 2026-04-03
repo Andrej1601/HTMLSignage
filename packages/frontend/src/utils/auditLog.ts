@@ -4,7 +4,6 @@ import {
   Image as ImageIcon,
   Monitor,
   Settings2,
-  Upload,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -49,28 +48,22 @@ export function getAuditActionMeta(action: string): {
   group: string;
   category: ActivityCategory;
 } {
-  if (action.startsWith('schedule.')) {
-    return { tone: 'success', icon: Settings2, group: 'Plan', category: 'plan' };
-  }
-  if (action.startsWith('settings.') || action.startsWith('slideshow.')) {
-    return { tone: 'success', icon: Settings2, group: 'Einstellungen', category: 'plan' };
+  if (action.startsWith('schedule.') || action.startsWith('settings.') || action.startsWith('slideshow.')) {
+    return { tone: 'success', icon: Settings2, group: 'Einstellungen', category: 'einstellungen' };
   }
   if (action.startsWith('device.')) {
     return { tone: 'info', icon: Monitor, group: 'Geräte', category: 'device' };
   }
   if (action.startsWith('media.')) {
-    return { tone: 'info', icon: ImageIcon, group: 'Medien', category: 'media' };
+    return { tone: 'info', icon: ImageIcon, group: 'Inhalte', category: 'media' };
   }
   if (action.startsWith('user.')) {
-    return { tone: 'warning', icon: Users, group: 'Benutzer', category: 'system' };
+    return { tone: 'warning', icon: Users, group: 'Benutzer', category: 'benutzer' };
   }
-  if (action.startsWith('system.backup.')) {
-    return { tone: 'warning', icon: Upload, group: 'Backup', category: 'system' };
+  if (action.startsWith('system.')) {
+    return { tone: 'warning', icon: Download, group: 'Systemjobs', category: 'systemjobs' };
   }
-  if (action.startsWith('system.update.')) {
-    return { tone: 'warning', icon: Download, group: 'System', category: 'system' };
-  }
-  return { tone: 'neutral', icon: Activity, group: 'Sonstiges', category: 'system' };
+  return { tone: 'neutral', icon: Activity, group: 'Systemjobs', category: 'systemjobs' };
 }
 
 export function summarizeAuditDetails(details: AuditLogItem['details']): string[] {

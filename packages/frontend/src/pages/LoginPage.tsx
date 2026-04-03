@@ -126,13 +126,13 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={mode === 'register' ? 6 : 1}
+              minLength={mode === 'register' ? 8 : 1}
               className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
               placeholder="••••••••"
             />
             {mode === 'register' && (
               <p className="mt-1 text-xs text-spa-text-secondary">
-                Mindestens 6 Zeichen
+                Mindestens 8 Zeichen
               </p>
             )}
           </div>

@@ -3,7 +3,7 @@ import type { Settings } from './settings.types';
 
 export type DeviceMode = 'auto' | 'override';
 
-export type DeviceStatus = 'online' | 'offline' | 'unknown';
+export type DeviceStatus = 'online' | 'offline';
 
 export interface Device {
   id: string;
@@ -73,15 +73,14 @@ export function getDeviceGroupLabel(groupName?: string | null): string {
 
 // Helper functions
 export function getDeviceStatus(lastSeen?: string): DeviceStatus {
-  if (!lastSeen) return 'unknown';
+  if (!lastSeen) return 'offline';
 
   const lastSeenDate = new Date(lastSeen);
   const now = new Date();
   const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / 1000 / 60;
 
   if (diffMinutes < 5) return 'online';
-  if (diffMinutes < 30) return 'offline';
-  return 'unknown';
+  return 'offline';
 }
 
 export function formatLastSeen(lastSeen?: string): string {
@@ -109,8 +108,6 @@ export function getStatusColor(status: DeviceStatus): string {
       return 'text-spa-success-dark bg-spa-success-light';
     case 'offline':
       return 'text-spa-warning-dark bg-spa-warning-light';
-    case 'unknown':
-      return 'bg-spa-bg-secondary text-spa-text-secondary';
   }
 }
 
@@ -120,8 +117,6 @@ export function getStatusLabel(status: DeviceStatus): string {
       return 'Online';
     case 'offline':
       return 'Offline';
-    case 'unknown':
-      return 'Unbekannt';
   }
 }
 

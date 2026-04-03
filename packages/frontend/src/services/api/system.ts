@@ -1,4 +1,4 @@
-import { api, getAuthHeaders } from './core';
+import { api } from './core';
 import type {
   SystemAuditLogResponse,
   SystemBackupPreviewResponse,
@@ -11,56 +11,45 @@ import type {
 } from './types';
 
 export const systemApi = {
-  getRuntimeStatus: async (token: string): Promise<SystemRuntimeStatusResponse> => {
-    const { data } = await api.get<SystemRuntimeStatusResponse>('/system/runtime-status', {
-      headers: getAuthHeaders(token),
-    });
+  getRuntimeStatus: async (): Promise<SystemRuntimeStatusResponse> => {
+    const { data } = await api.get<SystemRuntimeStatusResponse>('/system/runtime-status');
     return data;
   },
 
-  getRuntimeHistory: async (token: string, hours = 24): Promise<SystemRuntimeHistoryResponse> => {
+  getRuntimeHistory: async (hours = 24): Promise<SystemRuntimeHistoryResponse> => {
     const { data } = await api.get<SystemRuntimeHistoryResponse>('/system/runtime-history', {
-      headers: getAuthHeaders(token),
       params: { hours },
     });
     return data;
   },
 
-  getReleases: async (token: string): Promise<SystemReleasesResponse> => {
-    const { data } = await api.get<SystemReleasesResponse>('/system/update/status', {
-      headers: getAuthHeaders(token),
-    });
+  getReleases: async (): Promise<SystemReleasesResponse> => {
+    const { data } = await api.get<SystemReleasesResponse>('/system/update/status');
     return data;
   },
 
-  runUpdate: async (token: string, targetVersion: string): Promise<SystemJobStartResponse> => {
-    const { data } = await api.post<SystemJobStartResponse>('/system/update/run', { targetVersion }, {
-      headers: getAuthHeaders(token),
-    });
+  runUpdate: async (targetVersion: string): Promise<SystemJobStartResponse> => {
+    const { data } = await api.post<SystemJobStartResponse>('/system/update/run', { targetVersion });
     return data;
   },
 
-  exportBackup: async (token: string): Promise<Blob> => {
+  exportBackup: async (): Promise<Blob> => {
     const { data } = await api.get('/system/backup/export', {
-      headers: getAuthHeaders(token),
       responseType: 'blob',
     });
     return data as Blob;
   },
 
-  importBackup: async (token: string, backupFile: File, replaceMedia = true): Promise<SystemJobStartResponse> => {
+  importBackup: async (backupFile: File, replaceMedia = true): Promise<SystemJobStartResponse> => {
     const formData = new FormData();
     formData.append('backup', backupFile);
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
-    const { data } = await api.post<SystemJobStartResponse>('/system/backup/import', formData, {
-      headers: getAuthHeaders(token),
-    });
+    const { data } = await api.post<SystemJobStartResponse>('/system/backup/import', formData);
     return data;
   },
 
   previewBackupImport: async (
-    token: string,
     backupFile: File,
     replaceMedia = true,
   ): Promise<SystemBackupPreviewResponse> => {
@@ -68,15 +57,12 @@ export const systemApi = {
     formData.append('backup', backupFile);
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
-    const { data } = await api.post<SystemBackupPreviewResponse>('/system/backup/import/preview', formData, {
-      headers: getAuthHeaders(token),
-    });
+    const { data } = await api.post<SystemBackupPreviewResponse>('/system/backup/import/preview', formData);
     return data;
   },
 
-  getAuditLog: async (token: string, limit = 50, cursor?: string | null): Promise<SystemAuditLogResponse> => {
+  getAuditLog: async (limit = 50, cursor?: string | null): Promise<SystemAuditLogResponse> => {
     const { data } = await api.get<SystemAuditLogResponse>('/system/audit', {
-      headers: getAuthHeaders(token),
       params: {
         limit,
         ...(cursor ? { cursor } : {}),
@@ -85,18 +71,15 @@ export const systemApi = {
     return data;
   },
 
-  listJobs: async (token: string, limit = 20): Promise<SystemJobListResponse> => {
+  listJobs: async (limit = 20): Promise<SystemJobListResponse> => {
     const { data } = await api.get<SystemJobListResponse>('/system/jobs', {
-      headers: getAuthHeaders(token),
       params: { limit },
     });
     return data;
   },
 
-  getJob: async (token: string, jobId: string): Promise<SystemJobDetailResponse> => {
-    const { data } = await api.get<SystemJobDetailResponse>(`/system/jobs/${jobId}`, {
-      headers: getAuthHeaders(token),
-    });
+  getJob: async (jobId: string): Promise<SystemJobDetailResponse> => {
+    const { data } = await api.get<SystemJobDetailResponse>(`/system/jobs/${jobId}`);
     return data;
   },
 };

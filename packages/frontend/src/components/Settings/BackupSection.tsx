@@ -83,7 +83,7 @@ function PreviewMetric({ label, value }: { label: string; value: string }) {
 }
 
 export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionProps) {
-  const { token } = useAuth();
+  const { user } = useAuth();
 
   const [isExporting, setIsExporting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -97,7 +97,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   const fileInputRef = useRef<HTMLInputElement>(null);
   const notifiedTerminalJobRef = useRef<string | null>(null);
 
-  const canRunActions = useMemo(() => Boolean(token), [token]);
+  const canRunActions = Boolean(user);
   const lastExportDate = localStorage.getItem('lastBackupExport');
   const isImportRunning = latestImportJob?.status === 'queued' || latestImportJob?.status === 'running';
   const importResult = latestImportJob?.result && typeof latestImportJob.result === 'object' ? latestImportJob.result : null;
@@ -111,9 +111,8 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   };
 
   const loadLatestImportJob = useCallback(async () => {
-    if (!token) return;
     try {
-      const response = await systemApi.listJobs(token, 10);
+      const response = await systemApi.listJobs(10);
       const job = response.items.find((item) => item.type === 'backup-import') || null;
       if (job) {
         setLatestImportJob(job);
@@ -121,18 +120,18 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
     } catch {
       // Silent background refresh.
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     void loadLatestImportJob();
   }, [loadLatestImportJob]);
 
   useEffect(() => {
-    if (!token || !latestImportJob || (latestImportJob.status !== 'queued' && latestImportJob.status !== 'running')) return;
+    if (!latestImportJob || (latestImportJob.status !== 'queued' && latestImportJob.status !== 'running')) return;
 
     const interval = window.setInterval(async () => {
       try {
-        const response = await systemApi.getJob(token, latestImportJob.id);
+        const response = await systemApi.getJob(latestImportJob.id);
         setLatestImportJob(response.job);
       } catch {
         // Retry on next interval.
@@ -142,7 +141,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
     return () => {
       window.clearInterval(interval);
     };
-  }, [latestImportJob, token]);
+  }, [latestImportJob]);
 
   useEffect(() => {
     if (!latestImportJob) return;
@@ -173,11 +172,10 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   }, [importResult?.warnings, latestImportJob, onFeedback, onImportWarnings]);
 
   const handleExportBackup = async () => {
-    if (!token) return;
     setIsExporting(true);
     onFeedback(null);
     try {
-      const blob = await systemApi.exportBackup(token);
+      const blob = await systemApi.exportBackup();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -203,12 +201,12 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   };
 
   const handlePreviewImport = async () => {
-    if (!token || !backupFile) return;
+    if (!backupFile) return;
     setIsPreviewing(true);
     onFeedback(null);
     onImportWarnings([]);
     try {
-      const result = await systemApi.previewBackupImport(token, backupFile, replaceMedia);
+      const result = await systemApi.previewBackupImport(backupFile, replaceMedia);
       setPreview(result);
       onFeedback({
         type: result.warnings.length > 0 ? 'warning' : 'success',
@@ -234,13 +232,13 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   };
 
   const handleConfirmImport = async () => {
-    if (!token || !backupFile) return;
+    if (!backupFile) return;
     setShowImportConfirm(false);
     setIsStartingImport(true);
     onFeedback(null);
     onImportWarnings([]);
     try {
-      const response = await systemApi.importBackup(token, backupFile, replaceMedia);
+      const response = await systemApi.importBackup(backupFile, replaceMedia);
       setLatestImportJob(response.job);
       notifiedTerminalJobRef.current = null;
       onFeedback({ type: 'success', message: response.message });

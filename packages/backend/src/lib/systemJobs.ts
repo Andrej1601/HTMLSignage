@@ -1,7 +1,6 @@
-import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { REPO_ROOT, trimLog } from './systemHelpers.js';
+import type { Prisma } from '@prisma/client';
+import { prisma } from './prisma.js';
+import { trimLog } from './systemHelpers.js';
 
 export type SystemJobType = 'system-update' | 'backup-import';
 export type SystemJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -57,237 +56,191 @@ export interface RunSystemJobContext {
   fail: (code: string, message: string, result?: Record<string, unknown> | null) => void;
 }
 
-interface PersistedSystemJobsState {
-  version: 1;
-  updatedAt: string;
-  items: SystemJobRecord[];
-}
-
 const MAX_JOBS = 50;
-const JOBS_STORE_FILE = path.join(REPO_ROOT, 'logs', 'system-jobs.json');
-const jobs = new Map<string, SystemJobRecord>();
-const orderedJobIds: string[] = [];
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function cloneJob<Result = Record<string, unknown> | null>(job: SystemJobRecord<Result>): PublicSystemJob<Result> {
-  return JSON.parse(JSON.stringify(job)) as PublicSystemJob<Result>;
-}
-
-function trimJobs(): void {
-  while (orderedJobIds.length > MAX_JOBS) {
-    const staleId = orderedJobIds.pop();
-    if (!staleId) break;
-    jobs.delete(staleId);
-  }
-}
-
-function getMutableJob(jobId: string): SystemJobRecord | null {
-  return jobs.get(jobId) || null;
-}
-
-function persistJobsToDisk(): void {
-  try {
-    fs.mkdirSync(path.dirname(JOBS_STORE_FILE), { recursive: true });
-    const payload: PersistedSystemJobsState = {
-      version: 1,
-      updatedAt: nowIso(),
-      items: orderedJobIds
-        .map((jobId) => jobs.get(jobId))
-        .filter((job): job is SystemJobRecord => Boolean(job))
-        .map((job) => cloneJob(job)),
-    };
-    const tmpFile = `${JOBS_STORE_FILE}.tmp`;
-    fs.writeFileSync(tmpFile, JSON.stringify(payload, null, 2), 'utf-8');
-    fs.renameSync(tmpFile, JOBS_STORE_FILE);
-  } catch (error) {
-    console.error('[systemJobs] Failed to persist jobs:', error);
-  }
-}
-
-function isValidJobStatus(value: unknown): value is SystemJobStatus {
-  return value === 'queued' || value === 'running' || value === 'succeeded' || value === 'failed';
-}
-
-function isValidJobType(value: unknown): value is SystemJobType {
-  return value === 'system-update' || value === 'backup-import';
-}
-
-function isSystemJobRecord(value: unknown): value is SystemJobRecord {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<SystemJobRecord>;
-  return (
-    typeof candidate.id === 'string' &&
-    isValidJobType(candidate.type) &&
-    typeof candidate.title === 'string' &&
-    isValidJobStatus(candidate.status) &&
-    typeof candidate.createdAt === 'string' &&
-    typeof candidate.log === 'string'
-  );
-}
-
-function loadJobsFromDisk(): void {
-  if (!fs.existsSync(JOBS_STORE_FILE)) return;
-
-  try {
-    const raw = fs.readFileSync(JOBS_STORE_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<PersistedSystemJobsState>;
-    const items = Array.isArray(parsed.items) ? parsed.items.filter(isSystemJobRecord) : [];
-
-    jobs.clear();
-    orderedJobIds.length = 0;
-
-    items.slice(0, MAX_JOBS).forEach((item) => {
-      jobs.set(item.id, cloneJob(item));
-      orderedJobIds.push(item.id);
-    });
-  } catch (error) {
-    console.error('[systemJobs] Failed to load persisted jobs:', error);
-  }
-}
-
-function setJobRunning(jobId: string): void {
-  const target = getMutableJob(jobId);
-  if (!target) return;
-  target.status = 'running';
-  target.startedAt = target.startedAt || nowIso();
-  persistJobsToDisk();
-}
-
-export function setSystemJobProgress(jobId: string, stage: string, message: string, percent?: number): void {
-  const target = getMutableJob(jobId);
-  if (!target) return;
-  target.progress = { stage, message, ...(typeof percent === 'number' ? { percent } : {}) };
-  persistJobsToDisk();
-}
-
-export function appendSystemJobLog(jobId: string, chunk: string): void {
-  if (!chunk.trim()) return;
-  const target = getMutableJob(jobId);
-  if (!target) return;
-  target.log = trimLog(target.log ? `${target.log}\n\n${chunk.trimEnd()}` : chunk.trimEnd());
-  persistJobsToDisk();
-}
-
-export function succeedSystemJob(jobId: string, result: Record<string, unknown> | null = null): void {
-  const target = getMutableJob(jobId);
-  if (!target) return;
-  target.status = 'succeeded';
-  target.finishedAt = nowIso();
-  target.result = result;
-  target.error = null;
-  target.progress = {
-    stage: 'done',
-    message: 'Abgeschlossen',
-    percent: 100,
+function mapPrismaJob(raw: {
+  id: string;
+  type: string;
+  title: string;
+  status: string;
+  requestId: string | null;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+  createdBy: unknown;
+  progress: unknown;
+  log: string;
+  result: unknown;
+  error: unknown;
+}): SystemJobRecord {
+  return {
+    id: raw.id,
+    type: raw.type as SystemJobType,
+    title: raw.title,
+    status: raw.status as SystemJobStatus,
+    requestId: raw.requestId,
+    createdAt: raw.createdAt.toISOString(),
+    startedAt: raw.startedAt?.toISOString() ?? null,
+    finishedAt: raw.finishedAt?.toISOString() ?? null,
+    createdBy: (raw.createdBy as SystemJobUser | null) ?? null,
+    progress: (raw.progress as SystemJobProgress | null) ?? null,
+    log: raw.log,
+    result: (raw.result as Record<string, unknown> | null) ?? null,
+    error: (raw.error as SystemJobErrorInfo | null) ?? null,
   };
-  persistJobsToDisk();
 }
 
-export function failSystemJob(
+function toPrismaJson(value: unknown): Prisma.InputJsonValue | undefined {
+  if (value === null) return undefined;
+  return value as Prisma.InputJsonValue;
+}
+
+export async function setSystemJobProgress(jobId: string, stage: string, message: string, percent?: number): Promise<void> {
+  await prisma.systemJob.update({
+    where: { id: jobId },
+    data: {
+      progress: { stage, message, ...(typeof percent === 'number' ? { percent } : {}) },
+    },
+  });
+}
+
+export async function appendSystemJobLog(jobId: string, chunk: string): Promise<void> {
+  if (!chunk.trim()) return;
+  const job = await prisma.systemJob.findUnique({ where: { id: jobId }, select: { log: true } });
+  if (!job) return;
+  const newLog = trimLog(job.log ? `${job.log}\n\n${chunk.trimEnd()}` : chunk.trimEnd());
+  await prisma.systemJob.update({
+    where: { id: jobId },
+    data: { log: newLog },
+  });
+}
+
+export async function succeedSystemJob(jobId: string, result: Record<string, unknown> | null = null): Promise<void> {
+  await prisma.systemJob.update({
+    where: { id: jobId },
+    data: {
+      status: 'succeeded',
+      finishedAt: new Date(),
+      result: toPrismaJson(result),
+      error: undefined,
+      progress: { stage: 'done', message: 'Abgeschlossen', percent: 100 },
+    },
+  });
+}
+
+export async function failSystemJob(
   jobId: string,
   code: string,
   message: string,
   result: Record<string, unknown> | null = null,
-): void {
-  const target = getMutableJob(jobId);
-  if (!target) return;
-  target.status = 'failed';
-  target.finishedAt = nowIso();
-  target.result = result;
-  target.error = {
-    code,
-    message,
-    requestId: target.requestId,
-  };
-  target.progress = {
-    stage: 'failed',
-    message,
-  };
-  persistJobsToDisk();
+): Promise<void> {
+  const job = await prisma.systemJob.findUnique({ where: { id: jobId }, select: { requestId: true } });
+  await prisma.systemJob.update({
+    where: { id: jobId },
+    data: {
+      status: 'failed',
+      finishedAt: new Date(),
+      result: toPrismaJson(result),
+      error: { code, message, requestId: job?.requestId ?? null },
+      progress: { stage: 'failed', message },
+    },
+  });
 }
 
-export function createSystemJob(input: CreateSystemJobInput): SystemJobRecord {
-  const job: SystemJobRecord = {
-    id: crypto.randomUUID(),
-    type: input.type,
-    title: input.title,
-    status: 'queued',
-    requestId: input.requestId || null,
-    createdAt: nowIso(),
-    startedAt: null,
-    finishedAt: null,
-    createdBy: input.createdBy || null,
-    progress: null,
-    log: '',
-    result: null,
-    error: null,
-  };
+export async function createSystemJob(input: CreateSystemJobInput): Promise<SystemJobRecord> {
+  const raw = await prisma.systemJob.create({
+    data: {
+      type: input.type,
+      title: input.title,
+      status: 'queued',
+      requestId: input.requestId || undefined,
+      createdBy: input.createdBy ? toPrismaJson(input.createdBy) : undefined,
+      log: '',
+    },
+  });
 
-  jobs.set(job.id, job);
-  orderedJobIds.unshift(job.id);
-  trimJobs();
-  persistJobsToDisk();
+  const job = mapPrismaJob(raw);
+
+  const count = await prisma.systemJob.count();
+  if (count > MAX_JOBS) {
+    const oldest = await prisma.systemJob.findMany({
+      orderBy: { createdAt: 'asc' },
+      take: count - MAX_JOBS,
+      select: { id: true },
+    });
+    await prisma.systemJob.deleteMany({
+      where: { id: { in: oldest.map((o) => o.id) } },
+    });
+  }
+
   return job;
 }
 
-export function getSystemJob(jobId: string): PublicSystemJob | null {
-  const job = jobs.get(jobId);
-  return job ? cloneJob(job) : null;
+export async function getSystemJob(jobId: string): Promise<PublicSystemJob | null> {
+  const raw = await prisma.systemJob.findUnique({ where: { id: jobId } });
+  return raw ? mapPrismaJob(raw) : null;
 }
 
-export function listSystemJobs(limit = 20): PublicSystemJob[] {
+export async function listSystemJobs(limit = 20): Promise<PublicSystemJob[]> {
   const safeLimit = Math.max(1, Math.min(limit, MAX_JOBS));
-  return orderedJobIds
-    .slice(0, safeLimit)
-    .map((jobId) => jobs.get(jobId))
-    .filter((job): job is SystemJobRecord => Boolean(job))
-    .map((job) => cloneJob(job));
+  const raw = await prisma.systemJob.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: safeLimit,
+  });
+  return raw.map(mapPrismaJob);
 }
 
-export function findRunningSystemJob(type: SystemJobType): PublicSystemJob | null {
-  for (const jobId of orderedJobIds) {
-    const job = jobs.get(jobId);
-    if (!job) continue;
-    if (job.type === type && (job.status === 'queued' || job.status === 'running')) {
-      return cloneJob(job);
-    }
-  }
-  return null;
+export async function findRunningSystemJob(type: SystemJobType): Promise<PublicSystemJob | null> {
+  const raw = await prisma.systemJob.findFirst({
+    where: {
+      type,
+      status: { in: ['queued', 'running'] },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return raw ? mapPrismaJob(raw) : null;
 }
 
 export function runSystemJob(
   jobId: string,
   runner: (context: RunSystemJobContext) => Promise<void>,
 ): void {
-  const job = getMutableJob(jobId);
-  if (!job) return;
-
-  setJobRunning(jobId);
+  let jobRecord: SystemJobRecord | null = null;
 
   const context: RunSystemJobContext = {
-    job,
-    setProgress(stage, message, percent) {
-      setSystemJobProgress(jobId, stage, message, percent);
+    get job() {
+      return jobRecord!;
     },
-    appendLog(chunk) {
-      appendSystemJobLog(jobId, chunk);
+    async setProgress(stage, message, percent) {
+      await setSystemJobProgress(jobId, stage, message, percent);
     },
-    succeed(result = null) {
-      succeedSystemJob(jobId, result);
+    async appendLog(chunk) {
+      await appendSystemJobLog(jobId, chunk);
     },
-    fail(code, message, result = null) {
-      failSystemJob(jobId, code, message, result);
+    async succeed(result = null) {
+      await succeedSystemJob(jobId, result);
+    },
+    async fail(code, message, result = null) {
+      await failSystemJob(jobId, code, message, result);
     },
   };
 
-  void runner(context).catch((error) => {
+  void (async () => {
+    jobRecord = await getSystemJob(jobId);
+    if (!jobRecord) return;
+
+    await prisma.systemJob.update({
+      where: { id: jobId },
+      data: {
+        status: 'running',
+        startedAt: new Date(),
+      },
+    });
+
+    await runner(context);
+  })().catch(async (error) => {
     const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
-    context.appendLog(`Unexpected error: ${message}`);
-    context.fail('job-runner-failed', message);
+    await appendSystemJobLog(jobId, `Unexpected error: ${message}`);
+    await failSystemJob(jobId, 'job-runner-failed', message);
   });
 }
-
-loadJobsFromDisk();

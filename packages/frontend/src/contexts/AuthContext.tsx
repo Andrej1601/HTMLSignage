@@ -1,11 +1,10 @@
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
 import { ENV_IS_DEV } from '@/config/env';
 import { fetchApi } from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
@@ -14,38 +13,23 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
 const AUTH_FAILURE_PATTERN = /nicht authentifiziert|unauthorized|invalid token|session expired|user not found|no token provided/i;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
   const [isLoading, setIsLoading] = useState(true);
   const loggedOutRef = useRef(false);
 
-  // Check authentication status on mount
+  // Check authentication status on mount via httpOnly cookie
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-      if (!storedToken) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const userData = await fetchApi<User>('/auth/me', {
-          token: storedToken,
-        });
+        const userData = await fetchApi<User>('/auth/me');
         setUser(userData);
-        setToken(storedToken);
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
         if (AUTH_FAILURE_PATTERN.test(message)) {
-          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-          setToken(null);
           setUser(null);
-        } else {
-          setToken(storedToken);
         }
         if (ENV_IS_DEV) {
           console.error('Auth check failed:', error);
@@ -58,24 +42,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
-  // Retry user profile fetch while token exists (e.g. after temporary offline/server outage).
+  // Retry user profile fetch while logged out is not requested (e.g. after temporary offline/server outage).
   useEffect(() => {
-    if (!token || user || isLoading) return;
+    if (user || isLoading || loggedOutRef.current) return;
 
     const retry = async () => {
       if (loggedOutRef.current) return;
       try {
-        const userData = await fetchApi<User>('/auth/me', {
-          token,
-        });
+        const userData = await fetchApi<User>('/auth/me');
         if (loggedOutRef.current) return;
         setUser(userData);
       } catch (error) {
         if (loggedOutRef.current) return;
         const message = error instanceof Error ? error.message : '';
         if (AUTH_FAILURE_PATTERN.test(message)) {
-          localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-          setToken(null);
           setUser(null);
         }
         if (ENV_IS_DEV) {
@@ -90,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 30_000);
 
     return () => window.clearInterval(interval);
-  }, [token, user, isLoading]);
+  }, [user, isLoading]);
 
   const login = async (credentials: LoginRequest) => {
     loggedOutRef.current = false;
@@ -99,8 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: credentials,
     });
     setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, data.token);
   };
 
   const register = async (data: RegisterRequest) => {
@@ -110,40 +88,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data,
     });
     setUser(authData.user);
-    setToken(authData.token);
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, authData.token);
   };
 
   const logout = async () => {
     loggedOutRef.current = true;
-    if (token) {
-      try {
-        await fetchApi('/auth/logout', {
-          method: 'POST',
-          token,
-          responseType: 'void',
-        });
-      } catch (error) {
-        if (ENV_IS_DEV) {
-          console.error('Logout error:', error);
-        }
+    try {
+      await fetchApi('/auth/logout', {
+        method: 'POST',
+        responseType: 'void',
+      });
+    } catch (error) {
+      if (ENV_IS_DEV) {
+        console.error('Logout error:', error);
       }
     }
 
     setUser(null);
-    setToken(null);
-    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   };
 
-  const value = {
+  const value = useMemo(() => ({
     user,
-    token,
     isLoading,
     login,
     register,
     logout,
     isAuthenticated: !!user,
-  };
+  }), [user, isLoading, login, register, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
