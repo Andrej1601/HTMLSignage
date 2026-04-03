@@ -395,11 +395,34 @@ fi
 
 # ── Node dependencies ────────────────────────────────────────────────────────
 step "Installing Node dependencies"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --force --no-frozen-lockfile --ignore-scripts=false"
+if [[ "${IS_UPDATE}" == "true" ]]; then
+  sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
+else
+  sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
+fi
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
 step "Configuring PostgreSQL"
 systemctl enable --now postgresql
+
+# Harden PostgreSQL: restrict to localhost only
+PG_VERSION="$(sudo -u postgres psql -tAc "SHOW server_version;" | cut -d. -f1)"
+PG_CONF="/etc/postgresql/${PG_VERSION}/main/postgresql.conf"
+PG_HBA="/etc/postgresql/${PG_VERSION}/main/pg_hba.conf"
+
+if [[ -f "${PG_CONF}" ]]; then
+  sed -i "s/^#*listen_addresses.*/listen_addresses = 'localhost'/" "${PG_CONF}"
+  log "PostgreSQL restricted to localhost connections only"
+fi
+
+if [[ -f "${PG_HBA}" ]]; then
+  # Ensure local connections use md5 (password) authentication
+  if grep -q "^local.*all.*all.*peer" "${PG_HBA}" 2>/dev/null; then
+    sed -i "s/^local.*all.*all.*peer/local   all             all                                     md5/" "${PG_HBA}"
+    log "PostgreSQL authentication set to md5 for local connections"
+  fi
+  systemctl reload postgresql
+fi
 
 if [[ "${IS_UPDATE}" == "false" ]]; then
   # Fresh install: provision database
@@ -463,13 +486,58 @@ else
   log "Update-Modus: .env-Dateien bleiben unveraendert."
   [[ -f "${BACKEND_ENV}" ]] || die "Backend .env nicht gefunden: ${BACKEND_ENV}"
   [[ -f "${FRONTEND_ENV}" ]] || die "Frontend .env nicht gefunden: ${FRONTEND_ENV}"
+
+  # Extract DB_PASS from existing DATABASE_URL for potential future use
+  EXISTING_DB_URL="$(grep -oP '^DATABASE_URL="\K[^"]+' "${BACKEND_ENV}" 2>/dev/null || true)"
+  if [[ -n "${EXISTING_DB_URL}" ]]; then
+    DB_PASS="$(echo "${EXISTING_DB_URL}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p' | node -e "console.log(decodeURIComponent(require('fs').readFileSync('/dev/stdin','utf8').trim()))" 2>/dev/null || true)"
+  fi
 fi
+
+# ── Directory setup ──────────────────────────────────────────────────────────
+step "Creating application directories"
+
+# Upload directory
+UPLOAD_DIR="${APP_DIR}/packages/backend/uploads"
+mkdir -p "${UPLOAD_DIR}"
+chown "${APP_USER}:${APP_USER}" "${UPLOAD_DIR}"
+chmod 750 "${UPLOAD_DIR}"
+log "Upload directory created: ${UPLOAD_DIR}"
+
+# Logs directory
+LOGS_DIR="${APP_DIR}/logs"
+mkdir -p "${LOGS_DIR}"
+chown "${APP_USER}:${APP_USER}" "${LOGS_DIR}"
+chmod 750 "${LOGS_DIR}"
+log "Logs directory created: ${LOGS_DIR}"
+
+# Backup directory
+BACKUP_DIR="${APP_DIR}/backups"
+mkdir -p "${BACKUP_DIR}"
+chown "${APP_USER}:${APP_USER}" "${BACKUP_DIR}"
+chmod 750 "${BACKUP_DIR}"
+log "Backup directory created: ${BACKUP_DIR}"
 
 # ── Prisma migrations ────────────────────────────────────────────────────────
 step "Running Prisma migrations"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
 
 # ── Build ────────────────────────────────────────────────────────────────────
+step "Checking system resources"
+TOTAL_MEM_KB="$(grep MemTotal /proc/meminfo | awk '{print $2}')"
+TOTAL_MEM_MB="$((TOTAL_MEM_KB / 1024))"
+if [[ "${TOTAL_MEM_MB}" -lt 2048 ]]; then
+  warn "Low memory detected (${TOTAL_MEM_MB}MB). Build may fail."
+  if ! swapon --show 2>/dev/null | grep -q .; then
+    warn "No swap found. Creating 2GB swap file..."
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    log "Swap file created and activated"
+  fi
+fi
+
 step "Building frontend and backend"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm build"
 
@@ -493,6 +561,14 @@ ExecStart=${PNPM_BIN} --filter backend start
 Restart=always
 RestartSec=5
 
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ReadWritePaths=${APP_DIR}/packages/backend/uploads ${APP_DIR}/logs ${APP_DIR}/backups
+ReadOnlyPaths=${APP_DIR}
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -513,6 +589,13 @@ ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND
 Restart=always
 RestartSec=5
 
+# Security hardening
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+ReadOnlyPaths=${APP_DIR}
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -531,9 +614,121 @@ if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   ufw allow "${BACKEND_PORT}/tcp" || true
 fi
 
+# ── Log rotation ─────────────────────────────────────────────────────────────
+step "Configuring log rotation"
+cat > /etc/logrotate.d/htmlsignage <<'LOGROTATE'
+/opt/HTMLSignage/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 ${APP_USER} ${APP_USER}
+    sharedscripts
+    postrotate
+        systemctl reload htmlsignage-backend 2>/dev/null || true
+    endscript
+}
+LOGROTATE
+# Replace placeholder with actual user
+sed -i "s/\${APP_USER}/${APP_USER}/g" /etc/logrotate.d/htmlsignage
+log "Log rotation configured for ${APP_USER}"
+
+# ── Disk cleanup cron ────────────────────────────────────────────────────────
+step "Installing disk cleanup cron job"
+CLEANUP_SRC="${APP_DIR}/scripts/disk-cleanup.sh"
+CLEANUP_DST="/usr/local/bin/htmlsignage-disk-cleanup.sh"
+if [[ -f "${CLEANUP_SRC}" ]]; then
+  cp "${CLEANUP_SRC}" "${CLEANUP_DST}"
+  chmod +x "${CLEANUP_DST}"
+  if ! crontab -u "${APP_USER}" -l 2>/dev/null | grep -q "htmlsignage-disk-cleanup"; then
+    (crontab -u "${APP_USER}" -l 2>/dev/null; echo "0 */6 * * * ${CLEANUP_DST} >/dev/null 2>&1") | crontab -u "${APP_USER}" -
+    log "Disk cleanup cron installed (runs every 6 hours as ${APP_USER})"
+  else
+    log "Disk cleanup cron already installed"
+  fi
+else
+  warn "disk-cleanup.sh not found at ${CLEANUP_SRC}, skipping cron setup"
+fi
+
+# ── Backup script ────────────────────────────────────────────────────────────
+step "Installing backup script"
+BACKUP_SCRIPT="/usr/local/bin/htmlsignage-backup.sh"
+cat > "${BACKUP_SCRIPT}" <<'BACKUP_SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${APP_DIR:-/opt/HTMLSignage}"
+BACKUP_DIR="${APP_DIR}/backups"
+TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+RETENTION_DAYS=30
+
+mkdir -p "${BACKUP_DIR}"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+# Extract DB credentials from .env
+BACKEND_ENV="${APP_DIR}/packages/backend/.env"
+if [[ ! -f "${BACKEND_ENV}" ]]; then
+  echo "Error: ${BACKEND_ENV} not found" >&2
+  exit 1
+fi
+
+DB_URL="$(grep -oP '^DATABASE_URL="\K[^"]+' "${BACKEND_ENV}")"
+DB_NAME="$(echo "${DB_URL}" | sed -n 's|.*/\([^?]*\).*|\1|p')"
+DB_USER="$(echo "${DB_URL}" | sed -n 's|.*://\([^:]*\):.*|\1|p')"
+DB_PASS="$(echo "${DB_URL}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')"
+DB_HOST="$(echo "${DB_URL}" | sed -n 's|.*@\([^:]*\):.*|\1|p')"
+DB_PORT="$(echo "${DB_URL}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')"
+
+log "Starting backup of database '${DB_NAME}'"
+
+# Database backup
+PGPASSWORD="${DB_PASS}" pg_dump -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -Fc "${DB_NAME}" > "${BACKUP_DIR}/db_${TIMESTAMP}.dump"
+log "Database backup: db_${TIMESTAMP}.dump ($(du -h "${BACKUP_DIR}/db_${TIMESTAMP}.dump" | cut -f1))"
+
+# Uploads backup
+if [[ -d "${APP_DIR}/packages/backend/uploads" ]]; then
+  tar -czf "${BACKUP_DIR}/uploads_${TIMESTAMP}.tar.gz" -C "${APP_DIR}/packages/backend" uploads/
+  log "Uploads backup: uploads_${TIMESTAMP}.tar.gz ($(du -h "${BACKUP_DIR}/uploads_${TIMESTAMP}.tar.gz" | cut -f1))"
+fi
+
+# .env backup (secrets)
+cp "${BACKEND_ENV}" "${BACKUP_DIR}/env_${TIMESTAMP}.bak"
+chmod 600 "${BACKUP_DIR}/env_${TIMESTAMP}.bak"
+log "Environment backup saved"
+
+# Clean old backups
+find "${BACKUP_DIR}" -mtime +${RETENTION_DAYS} -delete
+log "Cleaned backups older than ${RETENTION_DAYS} days"
+
+log "Backup completed successfully"
+BACKUP_SCRIPT
+
+chmod +x "${BACKUP_SCRIPT}"
+chown "${APP_USER}:${APP_USER}" "${BACKUP_SCRIPT}"
+
+# Install backup cron (daily at 3am)
+if ! crontab -u "${APP_USER}" -l 2>/dev/null | grep -q "htmlsignage-backup"; then
+  (crontab -u "${APP_USER}" -l 2>/dev/null; echo "0 3 * * * ${BACKUP_SCRIPT} >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -u "${APP_USER}" -
+  log "Backup cron installed (daily at 3am)"
+else
+  log "Backup cron already installed"
+fi
+
 # ── Health checks ────────────────────────────────────────────────────────────
 if ! is_true "${SKIP_HEALTHCHECKS:-false}"; then
   step "Health checks"
+
+  # Database connectivity check
+  log "Checking database connectivity..."
+  if sudo -u postgres psql -d "${DB_NAME}" -c "SELECT 1" >/dev/null 2>&1; then
+    log "Database '${DB_NAME}' is reachable"
+  else
+    warn "Database connectivity check failed"
+  fi
+
   if ! wait_for_url "Backend health" "http://127.0.0.1:${BACKEND_PORT}/health" "${HEALTHCHECK_RETRIES}" "${HEALTHCHECK_DELAY}"; then
     warn "Backend health check failed. Diagnostics:"
     systemctl --no-pager --full status htmlsignage-backend.service || true
