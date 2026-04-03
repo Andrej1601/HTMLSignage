@@ -7,6 +7,9 @@ export const api = axios.create({
   baseURL: `${API_URL}/api`,
   timeout: API_REQUEST_TIMEOUT_MS,
   withCredentials: true,
+  headers: {
+    'X-CSRF-Token': '1',
+  },
 });
 
 export function getDeviceHeaders(deviceToken?: string) {
@@ -73,6 +76,7 @@ export async function fetchApi<T = unknown>(url: string, options: FetchApiOption
     ...init
   } = options;
 
+  const useCookies = !deviceToken;
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   const requestHeaders = new Headers(headers);
@@ -81,7 +85,10 @@ export async function fetchApi<T = unknown>(url: string, options: FetchApiOption
     requestHeaders.set('X-Device-Token', deviceToken);
   }
 
-  const useCookies = !deviceToken;
+  if (useCookies && !requestHeaders.has('X-CSRF-Token')) {
+    requestHeaders.set('X-CSRF-Token', '1');
+  }
+
   const requestBody = body ?? buildFetchBody(data, requestHeaders);
 
   try {

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { randomInt } from 'crypto';
+import { createHash, randomInt } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prisma.js';
 
@@ -15,6 +15,14 @@ if (!process.env.JWT_SECRET) {
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '7d';
 const DEVICE_TOKEN_EXPIRES_IN = '90d';
+
+function hashSessionToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function hashSessionTokenForExport(token: string): string {
+  return hashSessionToken(token);
+}
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -103,10 +111,11 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
   try {
     const now = new Date();
+    const tokenHash = hashSessionToken(token);
     const [session, user] = await Promise.all([
       prisma.session.findFirst({
         where: {
-          token,
+          tokenHash,
           userId: payload.userId,
           expiresAt: { gt: now },
         },

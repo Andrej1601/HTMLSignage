@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
-import { trimLog } from './systemHelpers.js';
+import { MAX_UPDATE_LOG_CHARS } from './systemHelpers.js';
 
 export type SystemJobType = 'system-update' | 'backup-import';
 export type SystemJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -106,9 +106,10 @@ export async function setSystemJobProgress(jobId: string, stage: string, message
 
 export async function appendSystemJobLog(jobId: string, chunk: string): Promise<void> {
   if (!chunk.trim()) return;
+  const trimmed = chunk.trimEnd();
   const job = await prisma.systemJob.findUnique({ where: { id: jobId }, select: { log: true } });
   if (!job) return;
-  const newLog = trimLog(job.log ? `${job.log}\n\n${chunk.trimEnd()}` : chunk.trimEnd());
+  const newLog = (job.log + `\n\n${trimmed}`).slice(-MAX_UPDATE_LOG_CHARS);
   await prisma.systemJob.update({
     where: { id: jobId },
     data: { log: newLog },

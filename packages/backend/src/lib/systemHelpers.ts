@@ -210,10 +210,17 @@ export async function createDatabaseBackup(): Promise<string | null> {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFile = path.join(BACKUP_DIR, `db-backup-${stamp}.sql`);
 
+  const url = new URL(dbUrl);
+  const pgEnv = {
+    ...process.env,
+    PGPASSWORD: url.password,
+  };
+  const cleanUrl = `${url.protocol}//${url.username}@${url.host}${url.pathname}${url.search}`;
+
   const result = await runCommand(
     'pg_dump',
-    ['--clean', '--if-exists', '--format=plain', '--file', backupFile, dbUrl],
-    { cwd: REPO_ROOT, timeoutMs: 15 * 60 * 1000 },
+    ['--clean', '--if-exists', '--format=plain', '--file', backupFile, cleanUrl],
+    { cwd: REPO_ROOT, timeoutMs: 15 * 60 * 1000, env: pgEnv },
   );
   if (result.code !== 0) {
     console.error('[system] pg_dump failed:', result.stderr);

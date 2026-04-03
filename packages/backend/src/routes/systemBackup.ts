@@ -3,9 +3,11 @@ import { createReadStream } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { randomBytes } from 'crypto';
 import multer from 'multer';
 import archiver from 'archiver';
 import type { AuthRequest } from '../lib/auth.js';
+import { authMiddleware, requireRole } from '../lib/auth.js';
 import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
 import {
   buildBackupExportManifest,
@@ -24,7 +26,7 @@ const backupUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, os.tmpdir()),
     filename: (_req, file, cb) => {
-      const suffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const suffix = `${Date.now()}-${randomBytes(8).toString('hex')}`;
       const ext = path.extname(file.originalname || '') || '.zip';
       cb(null, `htmlsignage-backup-${suffix}${ext}`);
     },
@@ -87,7 +89,7 @@ function buildBackupFailureBody(
   };
 }
 
-router.get('/backup/export', async (req: AuthRequest, res) => {
+router.get('/backup/export', authMiddleware, requireRole('admin'), async (req: AuthRequest, res) => {
   try {
     const manifest = await buildBackupExportManifest();
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -129,7 +131,7 @@ router.get('/backup/export', async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/backup/import/preview', backupUploadMiddleware, async (req: AuthRequest, res) => {
+router.post('/backup/import/preview', authMiddleware, requireRole('admin'), backupUploadMiddleware, async (req: AuthRequest, res) => {
   const backupFile = resolveBackupFile(req);
   const filePath = backupFile?.path;
   const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);
@@ -166,7 +168,7 @@ router.post('/backup/import/preview', backupUploadMiddleware, async (req: AuthRe
   }
 });
 
-router.post('/backup/import', backupUploadMiddleware, async (req: AuthRequest, res) => {
+router.post('/backup/import', authMiddleware, requireRole('admin'), backupUploadMiddleware, async (req: AuthRequest, res) => {
   const backupFile = resolveBackupFile(req);
   const filePath = backupFile?.path;
   const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);

@@ -101,6 +101,21 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// CSRF protection via custom header check for cookie-based auth
+app.use((req, res, next) => {
+  const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  if (isMutation && req.cookies?.auth_token) {
+    const csrfToken = req.headers['x-csrf-token'];
+    if (!csrfToken || csrfToken !== '1') {
+      return res.status(403).json({
+        error: 'csrf-token-missing',
+        message: 'CSRF token required for mutation requests.',
+      });
+    }
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
   (req as typeof req & { requestId?: string }).requestId = requestId;
@@ -285,4 +300,5 @@ process.on('unhandledRejection', (reason) => {
     message: reason instanceof Error ? reason.message : String(reason),
     stack: reason instanceof Error ? reason.stack : undefined,
   }));
+  process.exit(1);
 });

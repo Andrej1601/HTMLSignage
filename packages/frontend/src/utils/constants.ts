@@ -37,7 +37,7 @@ export const EVENT_CLOCK_INTERVAL_MS = 30000;
 export const DEVICE_HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 
 /** Media refresh interval in milliseconds. */
-export const MEDIA_REFRESH_INTERVAL_MS = 5 * 60_000;
+export const MEDIA_REFRESH_INTERVAL_MS = 300_000;
 
 /** Device pairing check interval in milliseconds. */
 export const PAIRING_CHECK_INTERVAL_MS = 30_000;

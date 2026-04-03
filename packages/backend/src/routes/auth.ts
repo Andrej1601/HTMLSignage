@@ -3,27 +3,33 @@ import { z } from 'zod';
 import { createHash, randomBytes } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword, comparePassword, generateToken, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { PrismaStore } from '../lib/rateLimiter.js';
+import { hashPassword, comparePassword, generateToken, authMiddleware, hashSessionTokenForExport, type AuthRequest } from '../lib/auth.js';
 import { sendPasswordResetEmail } from '../lib/mailer.js';
 import { assertUsernameAvailable, UserConflictError } from '../lib/userValidation.js';
 
 const router = Router();
 
-// Rate-Limiting für Auth-Endpunkte
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const FORGOT_PASSWORD_WINDOW_MS = 60 * 60 * 1000;
+
+// Rate-Limiting für Auth-Endpunkte (persistent via Prisma)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 Minuten
-  max: 20, // max 20 Versuche pro Fenster
+  windowMs: AUTH_WINDOW_MS,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+  store: new PrismaStore({ prefix: 'auth_' }),
 });
 
 const forgotPasswordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 Stunde
-  max: 5, // max 5 Versuche pro Stunde
+  windowMs: FORGOT_PASSWORD_WINDOW_MS,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+  store: new PrismaStore({ prefix: 'forgot_pw_' }),
 });
 
 const LoginSchema = z.object({
@@ -135,7 +141,7 @@ router.post('/register', authLimiter, async (req, res) => {
     await prisma.session.create({
       data: {
         userId: user.id,
-        token,
+        tokenHash: hashSessionTokenForExport(token),
         expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
@@ -151,24 +157,12 @@ router.post('/register', authLimiter, async (req, res) => {
       path: '/',
     });
     res.json({
-      user,
-    });
-    res.json({
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
         roles: user.roles,
       },
-    });
-    res.json({
-      user,
-    });
-    res.json({
-      user,
-    });
-    res.json({
-      user,
     });
   } catch (error) {
     if (error instanceof UserConflictError) {
@@ -207,7 +201,7 @@ router.post('/login', authLimiter, async (req, res) => {
     await prisma.session.create({
       data: {
         userId: user.id,
-        token,
+        tokenHash: hashSessionTokenForExport(token),
         expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
@@ -217,13 +211,10 @@ router.post('/login', authLimiter, async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: true,
-      secure: false,
+      secure: process.env.COOKIE_SECURE === 'true',
       sameSite: 'lax',
       maxAge: SESSION_TTL_MS,
       path: '/',
-    });
-    res.json({
-      user,
     });
     res.json({
       user: {
@@ -368,7 +359,7 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
 
     if (token) {
       await prisma.session.deleteMany({
-        where: { token },
+        where: { tokenHash: hashSessionTokenForExport(token) },
       });
     }
 
