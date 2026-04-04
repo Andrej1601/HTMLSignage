@@ -76,7 +76,7 @@ export function EditorQualityAssistant({
     >
       {issues.length === 0 ? (
         <div className="flex items-start gap-3 rounded-2xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-4 text-sm text-spa-success-dark">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <p className="font-semibold">Editor-Check sauber</p>
             <p className="mt-1 leading-relaxed">{okMessage}</p>

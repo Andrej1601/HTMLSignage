@@ -111,7 +111,7 @@ export function DropdownMenu({
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-haspopup="menu"
-          className="appearance-none bg-transparent border-none p-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2 rounded"
+          className="appearance-none bg-transparent border-none p-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2 rounded"
         >
           {trigger(open)}
         </button>
@@ -119,7 +119,7 @@ export function DropdownMenu({
         <button
           ref={triggerRef}
           onClick={() => { setOpen((prev) => !prev); if (!open) setFocusedIndex(0); }}
-          className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
+          className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-haspopup="menu"
@@ -155,7 +155,7 @@ export function DropdownMenu({
                         type="button"
                         tabIndex={-1}
                         onClick={() => handleItemClick(item)}
-                        className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-spa-primary ${
+                        className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-spa-primary ${
                           isDanger
                             ? 'text-spa-error hover:bg-spa-error-light'
                             : 'text-spa-text-primary hover:bg-spa-bg-primary'

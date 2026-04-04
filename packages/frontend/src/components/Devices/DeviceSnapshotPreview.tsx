@@ -40,7 +40,7 @@ export function DeviceSnapshotPreview({
             crossOrigin="anonymous"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-white">
             <div className="text-center">
               <Monitor className="mx-auto h-8 w-8 text-spa-primary/35" />
               <div className="mt-2 text-xs text-spa-text-secondary">

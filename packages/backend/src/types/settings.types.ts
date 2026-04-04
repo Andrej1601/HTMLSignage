@@ -18,14 +18,14 @@ export const FontsSchema = z.object({
   metaHeadScale: z.number().optional(),
   badgeTextScale: z.number().optional(),
   flameScale: z.number().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const SlideSettingsSchema = z.object({
   defaultDuration: z.number().optional(),
   transitionDuration: z.number().optional(),
   showClock: z.boolean().optional(),
   clockPosition: z.string().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const DisplaySettingsSchema = z.object({
   gridColumns: z.number().optional(),
@@ -34,7 +34,7 @@ export const DisplaySettingsSchema = z.object({
   showSubtitles: z.boolean().optional(),
   compactMode: z.boolean().optional(),
   prestartMinutes: z.number().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const AudioSettingsSchema = z.object({
   enabled: z.boolean(),
@@ -42,7 +42,7 @@ export const AudioSettingsSchema = z.object({
   mediaId: z.string().optional(),
   volume: z.number(),
   loop: z.boolean(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const HeaderSettingsSchema = z.object({
   enabled: z.boolean(),
@@ -52,7 +52,7 @@ export const HeaderSettingsSchema = z.object({
   showDate: z.boolean(),
   subtitle: z.string().optional(),
   height: z.number().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const MaintenanceScreenSchema = z.object({
   label: z.string().optional(),
@@ -60,14 +60,14 @@ export const MaintenanceScreenSchema = z.object({
   message: z.string().optional(),
   showDeviceName: z.boolean().optional(),
   backgroundImageId: z.string().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const SaunaInfoSchema = z.object({
   temperature: z.number().optional(),
   humidity: z.number().optional(),
   capacity: z.number().optional(),
   features: z.array(z.string()).optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const SaunaSchema = z.object({
   id: z.string(),
@@ -78,7 +78,7 @@ export const SaunaSchema = z.object({
   color: z.string().optional(),
   info: SaunaInfoSchema,
   description: z.string().optional(),
-}).passthrough();
+}).catchall(z.unknown());
 
 export const InfoItemSchema = z.object({
   id: z.string(),
@@ -86,7 +86,7 @@ export const InfoItemSchema = z.object({
   text: z.string(),
   imageId: z.string().optional(),
   imageMode: z.enum(['thumbnail', 'background']).optional(),
-}).passthrough();
+}).catchall(z.unknown());
 
 export const SlideshowConfigSchema = z.object({
   version: z.number().optional(),
@@ -97,11 +97,11 @@ export const SlideshowConfigSchema = z.object({
     enabled: z.boolean(),
     duration: z.number(),
     order: z.number(),
-  }).passthrough()).optional(),
+  }).catchall(z.unknown())).optional(),
   defaultDuration: z.number().optional(),
   defaultTransition: z.string().optional(),
   enableTransitions: z.boolean().optional(),
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 export const EventSettingsOverridesSchema = z.object({
   displayAppearance: z.enum(['wellness-stage', 'editorial-resort']).optional(),
@@ -114,7 +114,7 @@ export const EventSettingsOverridesSchema = z.object({
   header: HeaderSettingsSchema,
   slideshow: SlideshowConfigSchema,
   audio: AudioSettingsSchema,
-}).passthrough().optional();
+}).catchall(z.unknown()).optional();
 
 // ─── Main Settings Schema ────────────────────────────────────────────────────
 
@@ -150,5 +150,5 @@ export const SettingsSchema = z.object({
     assignedPreset: z.enum(['Evt1', 'Evt2']),
     isActive: z.boolean(),
     settingsOverrides: EventSettingsOverridesSchema,
-  }).passthrough()).optional(),
-}).passthrough();
+  }).catchall(z.unknown())).optional(),
+}).catchall(z.unknown());

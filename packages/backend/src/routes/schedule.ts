@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -114,7 +114,7 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: 'validation-failed',
-        details: error.errors,
+        details: error.issues,
       });
     }
     console.error('[schedule] Error saving schedule:', error);
@@ -126,7 +126,7 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
 router.get('/:id', async (req, res) => {
   try {
     const schedule = await prisma.schedule.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!schedule) {

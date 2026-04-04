@@ -222,7 +222,7 @@ export function DisplayScenarioPreview({
             <select
               value={previewDeviceId || ''}
               onChange={(event) => setPreviewDeviceId(event.target.value || null)}
-              className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             >
               <option value="">Globaler Kontext</option>
               {pairedDevices.map((device) => (
@@ -248,7 +248,7 @@ export function DisplayScenarioPreview({
               type="datetime-local"
               value={previewAtInput}
               onChange={(event) => setPreviewAtInput(event.target.value)}
-              className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             />
           </div>
         </div>

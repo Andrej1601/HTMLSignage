@@ -108,7 +108,7 @@ export function PendingPairings() {
                 className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-xl border border-dashed border-spa-bg-secondary bg-white p-5"
               >
                 {/* Pairing Code */}
-                <div className="flex-shrink-0 rounded-lg border border-dashed border-spa-text-secondary/30 px-6 py-3 text-center">
+                <div className="shrink-0 rounded-lg border border-dashed border-spa-text-secondary/30 px-6 py-3 text-center">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-spa-text-secondary">
                     Code
                   </div>
@@ -128,7 +128,7 @@ export function PendingPairings() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 shrink-0">
                   <button
                     type="button"
                     onClick={() => refetch()}

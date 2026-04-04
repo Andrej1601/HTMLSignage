@@ -155,7 +155,7 @@ function InfusionItemDetail({
   return (
     <div
       className={classNames(
-        'rounded-[2rem] border transition-all flex flex-col justify-center shadow-sm relative overflow-hidden',
+        'rounded-[2rem] border transition-all flex flex-col justify-center shadow-xs relative overflow-hidden',
         ultraCompact ? 'rounded-[1.45rem]' : compact ? 'rounded-[1.7rem]' : 'rounded-[2rem]',
         cardClassName,
         isFinished && 'opacity-60',
@@ -191,7 +191,7 @@ function InfusionItemDetail({
         {infusion.scents.map((scent, i) => (
           <div
             key={`${infusion.id}-${i}`}
-            className={classNames('flex items-center rounded-full font-bold uppercase tracking-wider border shadow-sm', badgeClassName)}
+            className={classNames('flex items-center rounded-full font-bold uppercase tracking-wider border shadow-xs', badgeClassName)}
             style={{
               backgroundColor: scentBg,
               borderColor: scentBorder,
@@ -219,7 +219,7 @@ function InfusionItemDetail({
             <motion.span
               animate={{ opacity: [1, 0.4, 1] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
-              className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
+              className={classNames('font-black tracking-[0.15em] rounded-full shadow-xs border', stateClassName)}
               style={{
                 color: statusLive,
                 backgroundColor: withAlpha(statusLive, 0.18),
@@ -230,7 +230,7 @@ function InfusionItemDetail({
             </motion.span>
           ) : (
             <span
-              className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
+              className={classNames('font-black tracking-[0.15em] rounded-full shadow-xs border', stateClassName)}
               style={{
                 color: statusPrestart,
                 backgroundColor: withAlpha(statusPrestart, 0.18),
@@ -246,7 +246,7 @@ function InfusionItemDetail({
       {isFinished && (
         <div className={`absolute flex items-center ${compact ? 'bottom-3 right-4' : 'bottom-4 right-5'}`}>
           <span
-            className={classNames('font-black tracking-[0.15em] rounded-full shadow-sm border', stateClassName)}
+            className={classNames('font-black tracking-[0.15em] rounded-full shadow-xs border', stateClassName)}
             style={{
               color: withAlpha(textMain, 0.55),
               backgroundColor: withAlpha(borderColor, 0.18),
@@ -556,7 +556,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
       <div className={classNames('flex items-center px-1', isCompactLayout ? 'mb-1.5 gap-2' : 'mb-2 gap-3')}>
         <span
           className={classNames(
-            'text-white font-black rounded-full uppercase shadow-sm shrink-0',
+            'text-white font-black rounded-full uppercase shadow-xs shrink-0',
             isUltraCompactLayout ? 'px-2.5 py-1 text-[8px] tracking-[0.16em]' : isCompactLayout ? 'px-3 py-1 text-[9px] tracking-[0.18em]' : 'px-3.5 py-1.5 text-[10px] tracking-widest',
           )}
           style={{ backgroundColor: accentGreen }}
@@ -606,7 +606,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                 <div
                   key={`${sauna.id}-info-${idx}`}
                   className={classNames(
-                    'text-white rounded-3xl flex items-center shadow-sm border border-white/20',
+                    'text-white rounded-3xl flex items-center shadow-xs border border-white/20',
                     isUltraCompactLayout ? 'gap-2 p-2.5 px-3.5' : isCompactLayout ? 'gap-2.5 p-3 px-4' : 'gap-3 p-3 px-5',
                   )}
                   style={{ backgroundColor: accentGreen }}
@@ -636,7 +636,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
 
       <div
         className={classNames(
-          'flex-1 border-2 backdrop-blur-md flex flex-col min-h-0 shadow-sm overflow-hidden',
+          'flex-1 border-2 backdrop-blur-md flex flex-col min-h-0 shadow-xs overflow-hidden',
           isUltraCompactLayout ? 'rounded-[1.5rem] p-4' : isCompactLayout ? 'rounded-[2rem] p-5' : 'rounded-[2.5rem] p-8',
         )}
         style={{

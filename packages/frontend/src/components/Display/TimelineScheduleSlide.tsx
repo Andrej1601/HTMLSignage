@@ -132,7 +132,7 @@ function TimelineInfusionCard({
 
   return (
     <div
-      className={`h-full w-full rounded-xl border shadow-sm flex flex-col overflow-hidden ${
+      className={`h-full w-full rounded-xl border shadow-xs flex flex-col overflow-hidden ${
         isFinished ? 'opacity-75' : ''
       }`}
       style={{
@@ -456,7 +456,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
 
         <div
           className={classNames(
-            'text-right shrink-0 border backdrop-blur-sm',
+            'text-right shrink-0 border backdrop-blur-xs',
             compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'rounded-2xl px-4 py-3' : 'rounded-3xl px-6 py-4',
           )}
           style={{
@@ -487,7 +487,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
       )}
 
       <div
-        className="flex-1 min-h-0 rounded-[2rem] border shadow-sm overflow-hidden relative flex flex-col"
+        className="flex-1 min-h-0 rounded-[2rem] border shadow-xs overflow-hidden relative flex flex-col"
         style={{
           borderColor: withAlpha(border, 0.9),
           backgroundColor: withAlpha(cardBg, 0.35),
@@ -667,7 +667,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
 
                       {outOfOrder && (
                         <div
-                          className="absolute inset-2 rounded-xl border backdrop-blur-sm flex flex-col items-center justify-center text-center px-2"
+                          className="absolute inset-2 rounded-xl border backdrop-blur-xs flex flex-col items-center justify-center text-center px-2"
                           style={{
                             backgroundColor: withAlpha(cardBg, 0.75),
                             borderColor: withAlpha('#DC2626', 0.28),

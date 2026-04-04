@@ -91,7 +91,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
         {!showForm && (
           <button
             onClick={handleStartAdd}
-            className="flex items-center gap-2 bg-stone-800 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-stone-900 transition-all shadow-sm"
+            className="flex items-center gap-2 bg-stone-800 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-stone-900 transition-all shadow-xs"
           >
             <Plus className="w-4 h-4" />
             Info hinzufügen
@@ -102,7 +102,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Form */}
         {showForm && (
-          <div className="lg:col-span-5 bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden sticky top-40">
+          <div className="lg:col-span-5 bg-white rounded-xl border border-stone-200 shadow-xs overflow-hidden sticky top-40">
             <div className="bg-[#8B6F47]/5 px-5 py-4 border-b border-stone-100 flex items-center justify-between">
               <span className="text-[#8B6F47] font-bold text-xs uppercase tracking-wider">
                 {isAdding ? 'Neuer Eintrag' : 'Eintrag bearbeiten'}
@@ -119,7 +119,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full border border-stone-200 rounded-lg focus:ring-2 focus:ring-[#8B6F47]/20 focus:border-[#8B6F47] text-sm px-3 py-2.5 outline-none"
+                  className="w-full border border-stone-200 rounded-lg focus:ring-2 focus:ring-[#8B6F47]/20 focus:border-[#8B6F47] text-sm px-3 py-2.5 outline-hidden"
                   placeholder="z.B. Saunagänge richtig nutzen…"
                   autoFocus
                 />
@@ -130,7 +130,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                 <textarea
                   value={formData.text}
                   onChange={(e) => setFormData({ ...formData, text: e.target.value })}
-                  className="w-full border border-stone-200 rounded-lg focus:ring-2 focus:ring-[#8B6F47]/20 focus:border-[#8B6F47] text-sm px-3 py-2.5 resize-none outline-none"
+                  className="w-full border border-stone-200 rounded-lg focus:ring-2 focus:ring-[#8B6F47]/20 focus:border-[#8B6F47] text-sm px-3 py-2.5 resize-none outline-hidden"
                   rows={4}
                   placeholder="Tipps für Ihre Gäste beschreiben..."
                 />
@@ -176,7 +176,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                           onClick={() => setFormData({ ...formData, imageMode: 'thumbnail' })}
                           className={`py-2 text-xs font-bold rounded-lg transition-colors ${
                             formData.imageMode !== 'background'
-                              ? 'bg-white text-[#8B6F47] shadow-sm border border-stone-200'
+                              ? 'bg-white text-[#8B6F47] shadow-xs border border-stone-200'
                               : 'text-stone-500 hover:text-stone-700'
                           }`}
                         >
@@ -187,7 +187,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                           onClick={() => setFormData({ ...formData, imageMode: 'background' })}
                           className={`py-2 text-xs font-bold rounded-lg transition-colors ${
                             formData.imageMode === 'background'
-                              ? 'bg-white text-[#8B6F47] shadow-sm border border-stone-200'
+                              ? 'bg-white text-[#8B6F47] shadow-xs border border-stone-200'
                               : 'text-stone-500 hover:text-stone-700'
                           }`}
                         >
@@ -238,14 +238,14 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                 <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <button
                     onClick={() => handleStartEdit(item)}
-                    className="w-6 h-6 rounded bg-white/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-primary hover:border-spa-primary transition-colors shadow-sm"
+                    className="w-6 h-6 rounded bg-white/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-primary hover:border-spa-primary transition-colors shadow-xs"
                     aria-label="Bearbeiten"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="w-6 h-6 rounded bg-white/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-error hover:border-spa-error/40 transition-colors shadow-sm"
+                    className="w-6 h-6 rounded bg-white/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-error hover:border-spa-error/40 transition-colors shadow-xs"
                     aria-label="Löschen"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -263,7 +263,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                     }`}
                   >
                     <img src={imgUrl!} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
                     <div className="absolute bottom-0 inset-x-0 p-2">
                       <p className="text-[11px] font-semibold text-white leading-snug line-clamp-1">{item.title}</p>
                       <p className="text-[9px] text-white/70 mt-0.5 line-clamp-2 leading-snug">{item.text}</p>
@@ -278,7 +278,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                 return (
                   <div
                     key={item.id}
-                    className={`group relative rounded-lg border overflow-hidden bg-white hover:shadow-sm transition-all flex gap-0 ${
+                    className={`group relative rounded-lg border overflow-hidden bg-white hover:shadow-xs transition-all flex gap-0 ${
                       isEditing ? 'border-spa-primary ring-1 ring-spa-primary/20' : 'border-spa-bg-secondary'
                     }`}
                   >
@@ -296,7 +296,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
               return (
                 <div
                   key={item.id}
-                  className={`group relative rounded-lg border bg-white overflow-hidden hover:shadow-sm transition-all ${
+                  className={`group relative rounded-lg border bg-white overflow-hidden hover:shadow-xs transition-all ${
                     isEditing ? 'border-spa-primary ring-1 ring-spa-primary/20' : 'border-spa-bg-secondary'
                   }`}
                 >

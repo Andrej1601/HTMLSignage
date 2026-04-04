@@ -64,7 +64,7 @@ router.post('/update/run', authMiddleware, requireRole('admin'), requirePermissi
   if (!parsed.success) {
     return res.status(400).json({
       error: 'invalid-request',
-      details: parsed.error.errors,
+      details: parsed.error.issues,
       requestId: req.requestId ?? null,
     });
   }

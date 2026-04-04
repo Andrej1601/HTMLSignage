@@ -24,15 +24,15 @@ export function DashboardWidgetFrame({
   return (
     <section
       className={clsx(
-        'overflow-hidden rounded-2xl border border-spa-bg-secondary/80 bg-white/95 shadow-sm backdrop-blur-sm',
+        'overflow-hidden rounded-2xl border border-spa-bg-secondary/80 bg-white/95 shadow-xs backdrop-blur-xs',
         className,
       )}
     >
-      <div className="flex flex-col gap-4 border-b border-spa-bg-secondary/80 bg-gradient-to-r from-white via-white to-spa-bg-primary/70 px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-4 border-b border-spa-bg-secondary/80 bg-linear-to-r from-white via-white to-spa-bg-primary/70 px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex items-start gap-3">
             {Icon && (
-              <span className="mt-0.5 inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-spa-primary/10 text-spa-primary">
+              <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-spa-primary/10 text-spa-primary">
                 <Icon className="h-5 w-5" />
               </span>
             )}

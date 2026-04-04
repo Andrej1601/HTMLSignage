@@ -42,7 +42,7 @@ function PulseMetric({
   return (
     <Link
       to={href}
-      className="rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-4 transition-all hover:-translate-y-0.5 hover:shadow-sm"
+      className="rounded-2xl border border-spa-bg-secondary bg-spa-bg-primary p-4 transition-all hover:-translate-y-0.5 hover:shadow-xs"
     >
       <div className="flex items-center gap-2 text-spa-text-secondary">
         <Icon className="h-4 w-4" />
@@ -90,7 +90,7 @@ export function OperationsPulseWidget({
     : getTodayPresetKey(simNow);
 
   return (
-    <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-sm">
+    <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-xs">
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-center gap-2 text-spa-text-primary">
@@ -149,7 +149,7 @@ export function OperationsPulseWidget({
               type="datetime-local"
               value={simDateTime}
               onChange={(e) => setSimDateTime(e.target.value)}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             />
           </div>
           <div>
@@ -157,7 +157,7 @@ export function OperationsPulseWidget({
             <select
               value={simDeviceId}
               onChange={(e) => setSimDeviceId(e.target.value)}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             >
               <option value="">Global (kein Filter)</option>
               {pairedDevices.map((d) => (

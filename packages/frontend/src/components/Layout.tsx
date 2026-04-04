@@ -178,16 +178,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Skip-to-Content for keyboard users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-spa-primary focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-spa-primary focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-hidden"
       >
         Zum Hauptinhalt springen
       </a>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col bg-gradient-to-b from-spa-primary to-spa-primary-dark text-white shadow-2xl">
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col bg-linear-to-b from-spa-primary to-spa-primary-dark text-white shadow-2xl">
         <div className="flex-1 flex flex-col min-h-0">
           {/* Logo/Brand */}
-          <div className="flex h-24 flex-shrink-0 flex-col justify-center border-b border-white/10 px-5">
+          <div className="flex h-24 shrink-0 flex-col justify-center border-b border-white/10 px-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
               Control Center
             </p>
@@ -201,7 +201,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {user && (
             <div className="border-b border-white/10 px-4 py-4">
               <div className="flex items-center">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white/20 font-bold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 font-bold">
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <div className="ml-3">
@@ -237,7 +237,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={clsx(
                       'group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       isActive
-                        ? 'border-white bg-white text-spa-primary shadow-sm'
+                        ? 'border-white bg-white text-spa-primary shadow-xs'
                         : 'border-transparent text-white/90 hover:border-white/20 hover:bg-white/10 hover:text-white',
                     )}
                   >
@@ -255,13 +255,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* Search + Logout */}
-          <div className="flex-shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
+          <div className="shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
             <button
               onClick={commandPalette.open}
               className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
             >
               <span className="flex items-center">
-                <Search className="mr-3 flex-shrink-0 h-5 w-5" />
+                <Search className="mr-3 shrink-0 h-5 w-5" />
                 Suche
               </span>
               <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
@@ -270,7 +270,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               onClick={handleLogout}
               className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
             >
-              <LogOut className="mr-3 flex-shrink-0 h-5 w-5" />
+              <LogOut className="mr-3 shrink-0 h-5 w-5" />
               Abmelden
             </button>
           </div>
@@ -317,7 +317,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {user && (
                 <div className="px-4 py-6 bg-spa-primary-dark border-b border-spa-primary-light">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-12 w-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
+                    <div className="shrink-0 h-12 w-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
                       {user.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="ml-3">
@@ -348,7 +348,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             : 'text-white/90 hover:bg-spa-primary-light hover:text-white',
                         )}
                       >
-                        <Icon className="mr-3 h-6 w-6 flex-shrink-0" />
+                        <Icon className="mr-3 h-6 w-6 shrink-0" />
                         <div className="min-w-0">
                           <p>{item.name}</p>
                           <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
@@ -360,7 +360,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </nav>
 
               {/* Logout Button */}
-              <div className="flex-shrink-0 px-2 py-4 border-t border-spa-primary-light">
+              <div className="shrink-0 px-2 py-4 border-t border-spa-primary-light">
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
@@ -368,7 +368,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }}
                   className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors"
                 >
-                  <LogOut className="mr-3 flex-shrink-0 h-6 w-6" />
+                  <LogOut className="mr-3 shrink-0 h-6 w-6" />
                   Abmelden
                 </button>
               </div>

@@ -45,13 +45,13 @@ function PaletteCard({
       className={`bg-white rounded-xl overflow-hidden transition-all cursor-pointer ${
         isActive
           ? 'border-2 border-spa-primary shadow-lg ring-2 ring-spa-primary/10'
-          : 'border border-stone-200 shadow-sm hover:shadow-md hover:border-spa-primary/40'
+          : 'border border-stone-200 shadow-xs hover:shadow-md hover:border-spa-primary/40'
       }`}
     >
       <button
         type="button"
         onClick={onSelect}
-        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
+        className="w-full text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
       >
         {/* Color strip preview */}
         <div className="h-8 relative overflow-hidden">
@@ -214,7 +214,7 @@ export function PaletteSelector({
               onKeyDown={(e) => e.key === 'Enter' && handleCreatePalette()}
               placeholder="Name der Palette..."
               autoFocus
-              className="flex-1 px-3 py-2 text-sm border rounded-lg border-stone-200 bg-white text-stone-800 focus:outline-none focus:ring-2 focus:ring-spa-primary/40"
+              className="flex-1 px-3 py-2 text-sm border rounded-lg border-stone-200 bg-white text-stone-800 focus:outline-hidden focus:ring-2 focus:ring-spa-primary/40"
             />
             <button
               type="button"

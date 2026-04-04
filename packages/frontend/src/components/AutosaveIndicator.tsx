@@ -26,7 +26,7 @@ export function AutosaveIndicator({ isDirty, lastAutoSavedAt, className }: Autos
     >
       <span
         className={clsx(
-          'h-1.5 w-1.5 flex-shrink-0 rounded-full',
+          'h-1.5 w-1.5 shrink-0 rounded-full',
           isDirty ? 'bg-spa-warning animate-pulse' : 'bg-spa-success',
         )}
       />

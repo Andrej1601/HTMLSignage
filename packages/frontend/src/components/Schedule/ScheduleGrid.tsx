@@ -39,7 +39,7 @@ function EntryCard({
         'border transition-all',
         isHovered
           ? 'border-spa-accent bg-spa-accent-warm/15 shadow-md ring-1 ring-spa-accent/30'
-          : 'border-spa-bg-secondary bg-white hover:border-spa-accent/40 hover:shadow-sm'
+          : 'border-spa-bg-secondary bg-white hover:border-spa-accent/40 hover:shadow-xs'
       )}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
@@ -51,7 +51,7 @@ function EntryCard({
           {entry.title || 'Kein Titel'}
         </h4>
         {entry.duration && (
-          <span className="flex-shrink-0 inline-flex items-center gap-1 text-[11px] text-spa-text-secondary bg-spa-bg-primary rounded-md px-1.5 py-0.5">
+          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] text-spa-text-secondary bg-spa-bg-primary rounded-md px-1.5 py-0.5">
             <Clock className="w-3 h-3" />
             {entry.duration}'
           </span>
@@ -149,7 +149,7 @@ export function ScheduleGrid({
                     <div className="flex items-center gap-2">
                       {color && (
                         <span
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: color }}
                         />
                       )}

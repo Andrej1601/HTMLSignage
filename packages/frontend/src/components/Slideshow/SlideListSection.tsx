@@ -115,7 +115,7 @@ function SortableSlideItem({
 
       <SlidePreview slide={slide} />
 
-      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-spa-primary text-white flex items-center justify-center font-bold text-xs">
+      <div className="shrink-0 w-6 h-6 rounded-full bg-spa-primary text-white flex items-center justify-center font-bold text-xs">
         {index + 1}
       </div>
 

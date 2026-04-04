@@ -68,9 +68,9 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 }`}
               >
                 {/* Glass mini-preview */}
-                <div className="relative h-14 w-full overflow-hidden rounded-lg bg-gradient-to-br from-stone-700 to-stone-900">
+                <div className="relative h-14 w-full overflow-hidden rounded-lg bg-linear-to-br from-stone-700 to-stone-900">
                   <div className="absolute inset-0 flex items-center justify-center p-2">
-                    <div className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center backdrop-blur-sm">
+                    <div className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center backdrop-blur-xs">
                       <div className="text-[7px] font-semibold uppercase tracking-wider text-white/60">Wartung</div>
                       <div className="text-[8px] font-bold text-white leading-tight mt-0.5">Gleich zurück</div>
                     </div>
@@ -88,7 +88,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 }`}
               >
                 {/* Overlay mini-preview */}
-                <div className="relative h-14 w-full overflow-hidden rounded-lg bg-gradient-to-br from-stone-700 to-stone-900">
+                <div className="relative h-14 w-full overflow-hidden rounded-lg bg-linear-to-br from-stone-700 to-stone-900">
                   <div
                     className="absolute inset-0 flex flex-col items-center justify-center"
                     style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
@@ -112,7 +112,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 type="text"
                 value={normalized.label}
                 onChange={(e) => update({ label: e.target.value })}
-                className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20"
+                className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
                 placeholder="Wartungsmodus"
               />
             </div>
@@ -140,7 +140,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               type="text"
               value={normalized.headline}
               onChange={(e) => update({ headline: e.target.value })}
-              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="Display vorübergehend pausiert"
             />
           </div>
@@ -153,7 +153,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               value={normalized.message}
               onChange={(e) => update({ message: e.target.value })}
               rows={4}
-              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-3 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-3 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="Dieses Gerät ist aktuell für Wartung reserviert."
             />
           </div>
@@ -201,7 +201,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       loading="lazy"
                     />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2 py-1.5 text-left text-[10px] text-white">
+                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent px-2 py-1.5 text-left text-[10px] text-white">
                       <div className="line-clamp-1">{image.originalName}</div>
                     </div>
                   </button>
@@ -219,7 +219,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
           </div>
 
           <div
-            className="relative flex min-h-[24rem] overflow-hidden rounded-[2rem] border border-spa-bg-secondary/80 shadow-sm"
+            className="relative flex min-h-[24rem] overflow-hidden rounded-[2rem] border border-spa-bg-secondary/80 shadow-xs"
             style={
               backgroundPreviewUrl
                 ? {

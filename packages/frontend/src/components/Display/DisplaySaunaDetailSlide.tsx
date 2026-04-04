@@ -109,7 +109,7 @@ export function DisplaySaunaDetailSlide({
       ) : null}
       <div className="max-w-6xl w-full relative">
         <div
-          className="rounded-3xl p-12 shadow-2xl backdrop-blur-sm"
+          className="rounded-3xl p-12 shadow-2xl backdrop-blur-xs"
           style={{
             backgroundColor: imageUrl ? 'rgba(255, 255, 255, 0.95)' : theme.cellBg,
             borderLeft: `12px solid ${resolvedSauna.color || theme.accent}`,

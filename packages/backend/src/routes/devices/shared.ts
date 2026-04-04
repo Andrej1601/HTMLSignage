@@ -9,6 +9,18 @@ import {
   findMissingEntityIds,
 } from '../../lib/deviceManagement.js';
 
+/** Express 5: req.params/query values can be string | string[]. Extracts a single string. */
+export function str(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Like str() but throws if missing. */
+export function strReq(value: string | string[] | undefined, name: string): string {
+  const v = Array.isArray(value) ? value[0] : value;
+  if (v === undefined) throw new Error(`Missing required parameter: ${name}`);
+  return v;
+}
+
 export const DEFAULT_DEVICE_LIMIT = 250;
 export const MAX_DEVICE_LIMIT = 1000;
 

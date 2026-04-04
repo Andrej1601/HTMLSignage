@@ -89,7 +89,7 @@ function ColorSwatch({
         style={{ backgroundColor: value || '#000000' }}
       >
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-t-lg bg-black/15">
-          <Pencil className="w-3 h-3 text-white drop-shadow-sm" />
+          <Pencil className="w-3 h-3 text-white drop-shadow-xs" />
         </div>
       </div>
       {/* Label bar */}

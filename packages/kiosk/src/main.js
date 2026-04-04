@@ -65,6 +65,7 @@ let watchdogInterval = null;
 let periodicReloadTimer = null;
 let isOffline = false;
 let powerSaveId = null;
+let injectedCssId = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -82,8 +83,8 @@ function createWindow() {
   });
 
   // ---- Crash Recovery ----
-  mainWindow.webContents.on('crashed', (_event, killed) => {
-    console.error(`[Kiosk] Renderer ${killed ? 'killed' : 'crashed'} – Neustart in 3s`);
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`[Kiosk] Renderer ${details.killed ? 'killed' : 'crashed'} (reason: ${details.reason}) – Neustart in 3s`);
     scheduleReload(3000);
   });
 
@@ -108,9 +109,12 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
   // ---- Cursor & CSS-Injection ----
-  mainWindow.webContents.on('did-finish-load', () => {
+  mainWindow.webContents.on('did-finish-load', async () => {
+    if (injectedCssId !== null) {
+      await mainWindow.webContents.removeInsertedCSS(injectedCssId).catch(() => {});
+    }
     if (config.hideCursor) {
-      mainWindow.webContents.insertCSS('* { cursor: none !important; }');
+      injectedCssId = await mainWindow.webContents.insertCSS('* { cursor: none !important; }');
     }
     if (!isOffline) {
       retryMs = INITIAL_RETRY_MS; // Reset backoff bei erfolgreichem Laden
@@ -246,11 +250,6 @@ app.whenReady().then(() => {
 });
 
 // ---- GPU Process Crash Recovery ----
-app.on('gpu-process-crashed', (_event, killed) => {
-  console.error(`[Kiosk] GPU-Prozess ${killed ? 'killed' : 'crashed'} – lade Display neu in 3s`);
-  scheduleReload(3000);
-});
-
 app.on('child-process-gone', (_event, details) => {
   if (details.type === 'GPU') {
     console.error(`[Kiosk] GPU child process gone (reason: ${details.reason}) – lade Display neu in 3s`);

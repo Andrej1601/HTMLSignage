@@ -298,7 +298,7 @@ export function SaunasPage() {
                   <select
                     value={sauna.status}
                     onChange={(e) => handleStatusChange(sauna.id, e.target.value as Sauna['status'])}
-                    className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                    className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                   >
                     <option value="active">Aufgüsse</option>
                     <option value="no-aufguss">Keine Aufgüsse</option>

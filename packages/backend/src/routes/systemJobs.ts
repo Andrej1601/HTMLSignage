@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getSystemJob, listSystemJobs } from '../lib/systemJobs.js';
 import type { AuthRequest } from '../lib/auth.js';
+import { str } from '../lib/auth.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get('/jobs', async (req: AuthRequest, res) => {
 });
 
 router.get('/jobs/:jobId', (req: AuthRequest, res) => {
-  const job = getSystemJob(req.params.jobId);
+  const job = getSystemJob(str(req.params.jobId)!);
   if (!job) {
     return res.status(404).json({
       error: 'job-not-found',

@@ -100,7 +100,7 @@ export function DevicesPage() {
                 onClick={() => state.setStatusFilter(tab.key)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   state.statusFilter === tab.key
-                    ? 'bg-spa-primary text-white shadow-sm'
+                    ? 'bg-spa-primary text-white shadow-xs'
                     : 'text-spa-text-secondary hover:bg-spa-bg-primary'
                 }`}
               >
@@ -116,7 +116,7 @@ export function DevicesPage() {
               onChange={(e) => state.setSearchQuery(e.target.value)}
               placeholder="Gerät suchen..."
               aria-label="Geräte durchsuchen"
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
             />
           </div>
         </div>

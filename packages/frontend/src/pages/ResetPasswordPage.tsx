@@ -56,7 +56,7 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">Neues Passwort</h1>
@@ -99,7 +99,7 @@ export function ResetPasswordPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="Mindestens 8 Zeichen"
               />
             </div>
@@ -115,7 +115,7 @@ export function ResetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="Passwort wiederholen"
               />
             </div>

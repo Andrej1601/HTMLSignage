@@ -10,7 +10,7 @@ interface SkeletonProps {
 }
 
 const shimmerClass =
-  'animate-pulse bg-gradient-to-r from-spa-bg-secondary via-spa-bg-primary to-spa-bg-secondary bg-[length:200%_100%]';
+  'animate-pulse bg-linear-to-r from-spa-bg-secondary via-spa-bg-primary to-spa-bg-secondary bg-[length:200%_100%]';
 
 const variantDefaults: Record<SkeletonVariant, string> = {
   text: 'h-4 w-full rounded',

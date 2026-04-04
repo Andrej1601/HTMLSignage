@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -18,7 +18,7 @@ const CreateSlideshowSchema = z.object({
 
 const UpdateSlideshowSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ─── GET /api/slideshows - List all slideshows ──────────────────────────────
@@ -32,6 +32,7 @@ router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (_r
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
     const result = slideshows.map(({ devices, ...rest }) => ({
@@ -52,7 +53,7 @@ router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (_r
 router.get('/:id', authMiddleware, requirePermission('slideshow:manage'), async (req: AuthRequest, res) => {
   try {
     const slideshow = await prisma.slideshow.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       include: {
         devices: {
           select: { id: true, name: true },
@@ -123,7 +124,7 @@ router.post('/', authMiddleware, requirePermission('slideshow:manage'), mutation
     res.json({ ...createdRest, assignedDevices: createdDevices, deviceCount: createdDevices.length });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshows] Error creating slideshow:', error);
     res.status(500).json({ error: 'create-failed', message: 'Slideshow konnte nicht erstellt werden' });
@@ -137,7 +138,7 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
     const validated = UpdateSlideshowSchema.parse(req.body);
 
     const existing = await prisma.slideshow.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       select: { id: true, name: true },
     });
 
@@ -154,7 +155,7 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
     }
 
     const slideshow = await prisma.slideshow.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       data,
       include: {
         devices: {
@@ -176,7 +177,7 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
     res.json({ ...updatedRest, assignedDevices: updatedDevices, deviceCount: updatedDevices.length });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshows] Error updating slideshow:', error);
     res.status(500).json({ error: 'update-failed', message: 'Slideshow konnte nicht aktualisiert werden' });
@@ -188,7 +189,7 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
 router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.slideshow.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       select: { id: true, name: true, isDefault: true },
     });
 
@@ -202,15 +203,15 @@ router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mut
 
     // Reassign devices that reference this slideshow to null
     await prisma.device.updateMany({
-      where: { slideshowId: req.params.id },
+      where: { slideshowId: str(req.params.id) },
       data: { slideshowId: null },
     });
 
-    await prisma.slideshow.delete({ where: { id: req.params.id } });
+    await prisma.slideshow.delete({ where: { id: str(req.params.id) } });
 
     await logAuditEvent(req, {
       action: 'slideshow.delete',
-      resource: req.params.id,
+      resource: str(req.params.id),
       details: { name: existing.name },
     });
 

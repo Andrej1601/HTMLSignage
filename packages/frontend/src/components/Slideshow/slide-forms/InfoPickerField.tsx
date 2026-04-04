@@ -23,7 +23,7 @@ export function InfoPickerField({ infos, selectedId, onSelect }: InfoPickerField
           <select
             value={selectedId || ''}
             onChange={(e) => onSelect(e.target.value || undefined)}
-            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           >
             <option value="">Bitte wählen...</option>
             {infos.map((info) => (

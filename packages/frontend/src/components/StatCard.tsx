@@ -53,12 +53,12 @@ export function StatCard({
 }: StatCardProps) {
   const selectedColor = colorClasses[color];
   const cardClasses = clsx(
-    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-5 shadow-sm backdrop-blur-sm transition-all',
+    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-5 shadow-xs backdrop-blur-xs transition-all',
     href ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'hover:shadow-md'
   );
   const cardContent = (
     <div className="flex items-center gap-4">
-      <div className={clsx('flex-shrink-0 rounded-xl p-3', selectedColor.iconBg)}>
+      <div className={clsx('shrink-0 rounded-xl p-3', selectedColor.iconBg)}>
         <Icon className={clsx('h-6 w-6', selectedColor.iconFg)} />
       </div>
       <div className="flex-1 min-w-0">

@@ -1,6 +1,49 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-spa-primary: #8B6F47;
+  --color-spa-primary-light: #B8976A;
+  --color-spa-primary-dark: #6B5435;
+  --color-spa-secondary: #7FA99B;
+  --color-spa-secondary-light: #A8C7BC;
+  --color-spa-secondary-dark: #5A7A70;
+  --color-spa-accent: #D4A574;
+  --color-spa-accent-warm: #E8C79B;
+  --color-spa-bg-primary: #F9F7F4;
+  --color-spa-bg-secondary: #EDE9E3;
+  --color-spa-text-primary: #2C2416;
+  --color-spa-text-secondary: #5A4E3F;
+  --color-spa-success: #10B981;
+  --color-spa-success-light: #D1FAE5;
+  --color-spa-success-dark: #047857;
+  --color-spa-warning: #F59E0B;
+  --color-spa-warning-light: #FEF3C7;
+  --color-spa-warning-dark: #B45309;
+  --color-spa-error: #EF4444;
+  --color-spa-error-light: #FEE2E2;
+  --color-spa-error-dark: #B91C1C;
+  --color-spa-info: #3B82F6;
+  --color-spa-info-light: #DBEAFE;
+  --color-spa-info-dark: #1D4ED8;
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-slide-in-right: slide-in-right 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-in-right {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
 
 @layer base {
   body {
@@ -8,12 +51,10 @@
   }
 }
 
-@layer utilities {
-  .scrollbar-hide {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
+@utility scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
     display: none;
   }
 }

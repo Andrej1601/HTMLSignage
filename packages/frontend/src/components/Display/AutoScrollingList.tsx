@@ -128,8 +128,8 @@ export function AutoScrollingList<T extends InfusionListItem>({
       </motion.div>
       {shouldScroll && (
         <>
-          <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-inherit to-transparent z-10 pointer-events-none" />
-          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-inherit to-transparent z-10 pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-8 bg-linear-to-b from-inherit to-transparent z-10 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-linear-to-t from-inherit to-transparent z-10 pointer-events-none" />
         </>
       )}
     </div>

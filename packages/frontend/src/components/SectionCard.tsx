@@ -24,15 +24,15 @@ export function SectionCard({
   return (
     <section
       className={clsx(
-        'overflow-hidden rounded-2xl border border-spa-bg-secondary/80 bg-white/95 shadow-sm backdrop-blur-sm',
+        'overflow-hidden rounded-2xl border border-spa-bg-secondary/80 bg-white/95 shadow-xs backdrop-blur-xs',
         className,
       )}
     >
       {title && (
-        <div className="flex items-center justify-between gap-3 border-b border-spa-bg-secondary/80 bg-gradient-to-r from-white via-white to-spa-bg-primary/5 px-6 py-5">
+        <div className="flex items-center justify-between gap-3 border-b border-spa-bg-secondary/80 bg-linear-to-r from-white via-white to-spa-bg-primary/5 px-6 py-5">
           <div className="flex min-w-0 items-center gap-3">
             {Icon && (
-              <span className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-spa-primary/10 text-spa-primary">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-spa-primary/10 text-spa-primary">
                 <Icon className="h-5 w-5" />
               </span>
             )}
@@ -43,7 +43,7 @@ export function SectionCard({
               )}
             </div>
           </div>
-          {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+          {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
         </div>
       )}
       <div className={clsx(!noPadding && 'p-6')}>{children}</div>

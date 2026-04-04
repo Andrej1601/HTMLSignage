@@ -218,7 +218,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
       {/* Selected Files */}
       {selectedFiles.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary p-4">
+        <div className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-spa-text-primary">
@@ -280,7 +280,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       {/* Error Message */}
       {error && (
         <div role="alert" className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" />
+          <AlertCircle className="w-5 h-5 text-spa-error shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-spa-error-dark">Fehler</p>
             <p className="text-sm text-spa-error-dark/80 mt-1 whitespace-pre-line">{error}</p>
@@ -291,7 +291,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       {/* Success Message */}
       {successMessage && (
         <div className="bg-spa-success-light border border-spa-success/30 rounded-lg p-4 flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-spa-success flex-shrink-0 mt-0.5" />
+          <CheckCircle className="w-5 h-5 text-spa-success shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-spa-success-dark">Erfolg!</p>
             <p className="text-sm text-spa-success-dark/80 mt-1">{successMessage}</p>

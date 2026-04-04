@@ -68,7 +68,7 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
     res.json({ ok: true, version });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[settings] Error saving:', error);
     res.status(500).json({ error: 'save-failed', message: 'Einstellungen konnten nicht gespeichert werden' });

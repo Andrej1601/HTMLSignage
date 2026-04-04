@@ -79,7 +79,7 @@ router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage')
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error bulk updating devices:', error);
     return res.status(500).json({ error: 'bulk-update-failed', message: 'Geräte konnten nicht gesammelt aktualisiert werden' });
@@ -126,7 +126,7 @@ router.post('/bulk/control', authMiddleware, requirePermission('devices:manage')
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error sending bulk control command:', error);
     return res.status(500).json({ error: 'bulk-command-failed', message: 'Befehle konnten nicht an die Geräte gesendet werden' });

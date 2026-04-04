@@ -148,7 +148,7 @@ export function DashboardPage() {
         {/* Error Banner */}
         {hasErrors && (
           <div className="flex items-center gap-2 rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark" role="alert">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0" />
             Ein oder mehrere Datenquellen konnten nicht geladen werden. Bitte API- und Netzwerkstatus prüfen.
           </div>
         )}

@@ -39,12 +39,12 @@ const LoginSchema = z.object({
 
 const RegisterSchema = z.object({
   username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Nur Buchstaben, Zahlen, Unterstrich und Bindestrich erlaubt'),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   password: z.string().min(8).max(128),
 });
 
 const ForgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 const ResetPasswordSchema = z.object({
@@ -169,7 +169,7 @@ router.post('/register', authLimiter, async (req, res) => {
       return res.status(400).json({ error: error.code, message: error.message });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Registration error:', error);
     res.status(500).json({ error: 'registration-failed', message: 'Registrierung fehlgeschlagen' });
@@ -226,7 +226,7 @@ router.post('/login', authLimiter, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Login error:', error);
     res.status(500).json({ error: 'login-failed', message: 'Anmeldung fehlgeschlagen' });
@@ -290,7 +290,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     return res.json(genericResponse);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Forgot password error:', error);
     return res.status(500).json({ error: 'forgot-password-failed', message: 'Passwort-Reset fehlgeschlagen' });
@@ -344,7 +344,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
     return res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Reset password error:', error);
     return res.status(500).json({ error: 'reset-password-failed', message: 'Passwort konnte nicht zurückgesetzt werden' });

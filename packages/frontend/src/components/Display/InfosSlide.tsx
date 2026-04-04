@@ -70,13 +70,13 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
           src={imageUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
-          fallback={<div className="absolute inset-0 bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary" />}
+          fallback={<div className="absolute inset-0 bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary" />}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent" />
         <div className="relative z-10" style={{ padding: 'clamp(12px,3%,32px)' }}>
           <div className="flex items-center" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
             <div
-              className="rounded-lg border shadow-sm shrink-0"
+              className="rounded-lg border shadow-xs shrink-0"
               style={{
                 padding: 'clamp(6px, 1%, 14px)',
                 backgroundColor: `${accentGreen}20`,
@@ -128,7 +128,7 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
         <div className="flex flex-col justify-center min-w-0 flex-1">
           <div className="flex items-center" style={{ gap: 'clamp(8px,1.5%,20px)', marginBottom: 'clamp(6px,1%,16px)' }}>
             <div
-              className="rounded-lg border shadow-sm shrink-0"
+              className="rounded-lg border shadow-xs shrink-0"
               style={{
                 padding: 'clamp(6px, 1%, 14px)',
                 backgroundColor: `${accentGreen}10`,

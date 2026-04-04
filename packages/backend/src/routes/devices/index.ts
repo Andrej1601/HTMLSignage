@@ -4,7 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ScheduleSchema } from '../../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../../websocket/index.js';
-import { authMiddleware, deviceAuthMiddleware, type AuthRequest } from '../../lib/auth.js';
+import { authMiddleware, deviceAuthMiddleware, type AuthRequest, str } from '../../lib/auth.js';
 import { requirePermission } from '../../lib/permissions.js';
 import { mutationLimiter, heartbeatLimiter } from '../../lib/rateLimiter.js';
 import { logAuditEvent } from '../../lib/audit.js';
@@ -83,7 +83,7 @@ router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req
 router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest, res) => {
   try {
     const device = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       include: { overrides: true, slideshow: true },
     });
 
@@ -128,7 +128,7 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
 router.get('/:id', authMiddleware, requirePermission('devices:manage'), async (req: AuthRequest, res) => {
   try {
     const device = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       include: DEVICE_ADMIN_INCLUDE,
     });
 
@@ -157,11 +157,11 @@ router.post('/:id/snapshot', deviceAuthMiddleware, heartbeatLimiter, async (req:
       return res.status(400).json({ error: 'snapshot-too-large', message: 'Snapshot ist zu groß' });
     }
 
-    const meta = await saveDeviceSnapshot(req.params.id, buffer);
+    const meta = await saveDeviceSnapshot(str(req.params.id)!, buffer);
     return res.json({ ok: true, ...meta });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error saving snapshot:', error);
     return res.status(500).json({ error: 'snapshot-save-failed', message: 'Snapshot konnte nicht gespeichert werden' });
@@ -198,7 +198,7 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
     res.json(device);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error creating device:', error);
     res.status(500).json({ error: 'create-failed', message: 'Gerät konnte nicht erstellt werden' });
@@ -210,7 +210,7 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
   try {
     const validated = UpdateDeviceSchema.parse(req.body);
     const device = await prisma.device.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       data: buildDeviceUpdateData(validated),
       include: DEVICE_ADMIN_INCLUDE,
     });
@@ -225,7 +225,7 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
     res.json(device);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error updating device:', error);
     res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
@@ -236,17 +236,17 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
 router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       select: { id: true, name: true, mode: true },
     });
 
-    await prisma.device.delete({ where: { id: req.params.id } });
-    await deleteDeviceSnapshot(req.params.id);
+    await prisma.device.delete({ where: { id: str(req.params.id)! } });
+    await deleteDeviceSnapshot(str(req.params.id)!);
 
-    broadcastDeviceUpdate({ id: req.params.id, deleted: true });
+    broadcastDeviceUpdate({ id: str(req.params.id)!, deleted: true });
     await logAuditEvent(req, {
       action: 'device.delete',
-      resource: req.params.id,
+      resource: str(req.params.id)!,
       details: existing,
     });
 
@@ -261,7 +261,7 @@ router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutat
 router.post('/:id/revoke-token', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const device = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       select: { id: true, name: true, tokenRevokedAt: true },
     });
 
@@ -270,15 +270,15 @@ router.post('/:id/revoke-token', authMiddleware, requirePermission('devices:mana
     }
 
     await prisma.device.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       data: { tokenRevokedAt: new Date() },
     });
 
-    broadcastDeviceCommand(req.params.id, { command: 'reconnect' });
+    broadcastDeviceCommand(str(req.params.id)!, { command: 'reconnect' });
 
     await logAuditEvent(req, {
       action: 'device.token-revoked',
-      resource: req.params.id,
+      resource: str(req.params.id)!,
       details: { deviceId: device.id, deviceName: device.name },
     });
 
@@ -293,7 +293,7 @@ router.post('/:id/revoke-token', authMiddleware, requirePermission('devices:mana
 router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.device.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       data: { lastSeen: new Date() },
     });
 
@@ -309,17 +309,17 @@ router.post('/:id/control', authMiddleware, requirePermission('devices:manage'),
   try {
     const validated = ControlCommandSchema.parse(req.body);
 
-    broadcastDeviceCommand(req.params.id, { command: validated.action });
+    broadcastDeviceCommand(str(req.params.id)!, { command: validated.action });
     await logAuditEvent(req, {
       action: 'device.command',
-      resource: req.params.id,
+      resource: str(req.params.id)!,
       details: { command: validated.action },
     });
 
     res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error sending control command:', error);
     res.status(500).json({ error: 'command-failed', message: 'Befehl konnte nicht ausgeführt werden' });
@@ -332,9 +332,9 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
     const validated = OverridesSchema.parse(req.body);
 
     await prisma.deviceOverride.upsert({
-      where: { deviceId: req.params.id },
+      where: { deviceId: str(req.params.id)!! },
       create: {
-        deviceId: req.params.id,
+        deviceId: str(req.params.id)!!,
         schedule: (validated.schedule || {}) as unknown as Prisma.InputJsonValue,
         settings: (validated.settings || {}) as unknown as Prisma.InputJsonValue,
       },
@@ -345,18 +345,18 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
     });
 
     const device = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       include: DEVICE_ADMIN_INCLUDE,
     });
 
     if (device) {
       broadcastDeviceUpdate(device);
     } else {
-      broadcastDeviceUpdate({ id: req.params.id, overridesUpdated: true });
+      broadcastDeviceUpdate({ id: str(req.params.id)!, overridesUpdated: true });
     }
     await logAuditEvent(req, {
       action: 'device.override.update',
-      resource: req.params.id,
+      resource: str(req.params.id)!,
       details: {
         hasSchedule: Boolean(validated.schedule),
         hasSettings: Boolean(validated.settings),
@@ -366,7 +366,7 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
     res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error setting overrides:', error);
     res.status(500).json({ error: 'overrides-failed', message: 'Überschreibungen konnten nicht gespeichert werden' });
@@ -376,21 +376,21 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
 // DELETE /api/devices/:id/overrides - Clear device overrides (auth required)
 router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
-    await prisma.deviceOverride.deleteMany({ where: { deviceId: req.params.id } });
+    await prisma.deviceOverride.deleteMany({ where: { deviceId: str(req.params.id)!! } });
 
     const device = await prisma.device.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id)! },
       include: DEVICE_ADMIN_INCLUDE,
     });
 
     if (device) {
       broadcastDeviceUpdate(device);
     } else {
-      broadcastDeviceUpdate({ id: req.params.id, overridesCleared: true });
+      broadcastDeviceUpdate({ id: str(req.params.id)!, overridesCleared: true });
     }
     await logAuditEvent(req, {
       action: 'device.override.clear',
-      resource: req.params.id,
+      resource: str(req.params.id)!,
     });
 
     res.json({ ok: true });

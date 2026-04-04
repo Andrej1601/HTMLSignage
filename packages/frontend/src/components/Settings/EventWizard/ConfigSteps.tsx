@@ -54,7 +54,7 @@ export function DeliveryStep({ formData, normalizedFormData, setFormData, paired
               ...formData,
               assignedPreset: event.target.value as Event['assignedPreset'],
             })}
-            className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           >
             <option value="Evt1">{PRESET_LABELS.Evt1}</option>
             <option value="Evt2">{PRESET_LABELS.Evt2}</option>
@@ -199,7 +199,7 @@ export function DesignStep({ formData, updateOverrides }: StepProps) {
             const value = event.target.value as DisplayAppearance | '';
             updateOverrides({ displayAppearance: value || undefined });
           }}
-          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
         >
           <option value="">Globale Aufmachung übernehmen</option>
           {DISPLAY_APPEARANCE_OPTIONS.map((appearance) => (
@@ -218,7 +218,7 @@ export function DesignStep({ formData, updateOverrides }: StepProps) {
             const value = event.target.value as DesignStyle | '';
             updateOverrides({ designStyle: value || undefined });
           }}
-          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
         >
           <option value="">Globale Plan-Darstellung übernehmen</option>
           {SCHEDULE_DESIGN_STYLE_OPTIONS.map((style) => (
@@ -237,7 +237,7 @@ export function DesignStep({ formData, updateOverrides }: StepProps) {
             const value = event.target.value as ColorPaletteName | '';
             updateOverrides({ colorPalette: value || undefined });
           }}
-          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+          className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
         >
           <option value="">Globale Farbpalette übernehmen</option>
           {COLOR_PALETTES.map((palette) => (

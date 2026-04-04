@@ -62,7 +62,7 @@ export function ThemeEditor({
           </div>
 
           {/* Color token editor (collapsible) */}
-          <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-sm">
+          <div className="bg-white rounded-xl border border-stone-200 p-4 shadow-xs">
             <label className="block text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-3">
               Einzelne Farbtokens
             </label>

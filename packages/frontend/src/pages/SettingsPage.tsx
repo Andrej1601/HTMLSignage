@@ -235,7 +235,7 @@ export function SettingsPage() {
 
         <div className="flex gap-6">
           {/* Desktop: vertical grouped sidebar */}
-          <nav className="hidden xl:block w-56 flex-shrink-0" aria-label="Einstellungen-Navigation">
+          <nav className="hidden xl:block w-56 shrink-0" aria-label="Einstellungen-Navigation">
             <div className="sticky top-4 space-y-4">
               {tabGroups.map((group) => (
                 <div key={group.label}>
@@ -252,11 +252,11 @@ export function SettingsPage() {
                           onClick={() => setActiveTab(tab.id)}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                             isActive
-                              ? 'bg-spa-primary text-white shadow-sm'
+                              ? 'bg-spa-primary text-white shadow-xs'
                               : 'text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary'
                           }`}
                         >
-                          {Icon && <Icon className="w-4 h-4 flex-shrink-0" />}
+                          {Icon && <Icon className="w-4 h-4 shrink-0" />}
                           {tab.label}
                         </button>
                       );

@@ -6,7 +6,12 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set');
 }
 
-const adapter = new PrismaPg({ connectionString });
+const adapter = new PrismaPg({
+  connectionString,
+  max: Number.parseInt(process.env.DATABASE_POOL_MAX || '10', 10),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+});
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

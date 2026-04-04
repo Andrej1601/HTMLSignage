@@ -23,11 +23,11 @@ const SlideshowConfigSchema = z.object({
     enabled: z.boolean(),
     duration: z.number(),
     order: z.number(),
-  }).passthrough()).optional(),
+  }).catchall(z.unknown())).optional(),
   defaultDuration: z.number().optional(),
   defaultTransition: z.string().optional(),
   enableTransitions: z.boolean().optional(),
-}).passthrough();
+}).catchall(z.unknown());
 
 const AudioSettingsSchema = z.object({
   enabled: z.boolean(),
@@ -35,7 +35,7 @@ const AudioSettingsSchema = z.object({
   mediaId: z.string().optional(),
   volume: z.number(),
   loop: z.boolean(),
-}).passthrough();
+}).catchall(z.unknown());
 
 export const WorkflowSnapshotSchema = z.object({
   config: SlideshowConfigSchema,
@@ -73,7 +73,7 @@ export interface WorkflowHistoryEntry {
 }
 
 export function cloneWorkflowJson<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value) as T;
 }
 
 export function normalizeWorkflowSnapshot(raw: unknown): WorkflowSnapshot | null {
@@ -125,7 +125,7 @@ export function getWorkflowTargetNameFromDetails(details: unknown): string | nul
 }
 
 export function toWorkflowAuditDetails(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+  return structuredClone(value) as Prisma.InputJsonValue;
 }
 
 export function buildWorkflowActionAuditDetails(input: {

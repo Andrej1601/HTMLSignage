@@ -86,7 +86,7 @@ export function OverrideDiffView({ globalConfig, overrideConfig, className }: Ov
   if (changedCount === 0) {
     return (
       <div className={clsx('flex items-center gap-2 rounded-xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-2.5 text-sm text-spa-success-dark', className)}>
-        <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+        <CheckCircle2 className="h-4 w-4 shrink-0" />
         <span className="font-medium">Override identisch mit Global</span>
       </div>
     );
@@ -130,7 +130,7 @@ export function OverrideDiffView({ globalConfig, overrideConfig, className }: Ov
             >
               <span className="font-medium text-spa-text-primary">{row.label}</span>
               <span className="text-spa-text-secondary">{row.global}</span>
-              <span className="flex-shrink-0">
+              <span className="shrink-0">
                 {row.changed
                   ? <ArrowRight className="w-3.5 h-3.5 text-spa-info" />
                   : <Equal className="w-3.5 h-3.5 text-spa-text-secondary/40" />

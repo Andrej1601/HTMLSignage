@@ -80,7 +80,7 @@ export function PreviewStep({
           allowedDeviceIds={selectedTargetDeviceIds.length > 0 ? selectedTargetDeviceIds : undefined}
           defaultDeviceId={selectedTargetDeviceIds[0] || pairedDevices[0]?.id || null}
           defaultPreviewAt={startDateTime || undefined}
-          previewClassName="shadow-sm"
+          previewClassName="shadow-xs"
         />
       </div>
     </div>

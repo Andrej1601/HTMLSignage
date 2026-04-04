@@ -259,7 +259,7 @@ export const WellnessBottomPanel = memo(function WellnessBottomPanel({ displayAp
         <AnimatedWellnessPanel key="tips">
             <div className="flex items-center gap-4 mb-3">
               <div
-                className="p-3 rounded-xl border shadow-sm"
+                className="p-3 rounded-xl border shadow-xs"
                 style={{
                   backgroundColor: `${accentGreen}10`,
                   borderColor: `${accentGreen}20`,
@@ -285,7 +285,7 @@ export const WellnessBottomPanel = memo(function WellnessBottomPanel({ displayAp
         <AnimatedWellnessPanel key="events">
             <div className="flex items-center gap-4 mb-3">
               <div
-                className="p-3 rounded-xl border shadow-sm"
+                className="p-3 rounded-xl border shadow-xs"
                 style={{
                   backgroundColor: `${accentGold}10`,
                   borderColor: `${accentGold}20`,

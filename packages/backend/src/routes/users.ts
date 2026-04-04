@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { hashPassword, authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -14,7 +14,7 @@ router.use(authMiddleware);
 
 const CreateUserSchema = z.object({
   username: z.string().min(3).max(50),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   password: z.string().min(8),
   roles: z.array(z.string()).default(['viewer']),
 });
@@ -89,7 +89,7 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
       return res.status(400).json({ error: error.code, message: error.message });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[users] Error creating user:', error);
     res.status(500).json({ error: 'create-failed', message: 'Benutzer konnte nicht erstellt werden' });
@@ -103,7 +103,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!user) {
@@ -127,7 +127,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       data: updateData,
       select: {
         id: true,
@@ -155,7 +155,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
       return res.status(400).json({ error: error.code, message: error.message });
     }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[users] Error updating user:', error);
     res.status(500).json({ error: 'update-failed', message: 'Benutzer konnte nicht aktualisiert werden' });
@@ -166,13 +166,13 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
 router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     // Prevent deleting yourself
-    if (req.params.id === req.userId) {
+    if (str(req.params.id) === req.userId) {
       return res.status(400).json({ error: 'cannot-delete-self', message: 'Cannot delete your own account' });
     }
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!user) {
@@ -180,7 +180,7 @@ router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async 
     }
 
     await prisma.user.delete({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
     await logAuditEvent(req, {
       action: 'user.delete',

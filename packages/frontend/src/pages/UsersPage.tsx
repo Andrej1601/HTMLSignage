@@ -113,7 +113,7 @@ export function UsersPage() {
       sortFn: (a, b) => a.username.localeCompare(b.username),
       render: (u) => (
         <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+          <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
             {u.username.charAt(0).toUpperCase()}
           </div>
           <div className="ml-4">
@@ -269,7 +269,7 @@ export function UsersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Benutzer suchen..."
                 aria-label="Benutzer durchsuchen"
-                className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+                className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
               />
             </div>
           )}
@@ -286,7 +286,7 @@ export function UsersPage() {
               keyFn={(u) => u.id}
               mobileTitle={(u) => (
                 <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+                  <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
                     {u.username.charAt(0).toUpperCase()}
                   </div>
                   <span>{u.username}</span>

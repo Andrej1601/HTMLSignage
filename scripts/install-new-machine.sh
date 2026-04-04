@@ -192,8 +192,8 @@ SMTP_USER="${SMTP_USER:-}"
 SMTP_PASS="${SMTP_PASS:-}"
 MAIL_FROM="${MAIL_FROM:-}"
 JWT_SECRET="${JWT_SECRET:-}"
-NODE_MAJOR="${NODE_MAJOR:-20}"
-PNPM_VERSION="${PNPM_VERSION:-9.15.9}"
+NODE_MAJOR="${NODE_MAJOR:-22}"
+PNPM_VERSION="${PNPM_VERSION:-10.31.0}"
 CLEAN_INSTALL="${CLEAN_INSTALL:-false}"
 APT_UPGRADE="${APT_UPGRADE:-false}"
 SKIP_HEALTHCHECKS="${SKIP_HEALTHCHECKS:-false}"
@@ -382,6 +382,12 @@ if [[ "${CURRENT_PNPM}" != "${PNPM_VERSION}" ]]; then
     cleanup_pnpm_bins true
     npm install -g "pnpm@${PNPM_VERSION}" --force
   fi
+fi
+
+# Fix corepack cache ownership (root may have written here during install)
+COREPACK_CACHE_DIR="/home/${APP_USER}/.cache/node/corepack"
+if [[ -d "${COREPACK_CACHE_DIR}" ]]; then
+  chown -R "${APP_USER}:${APP_USER}" "${COREPACK_CACHE_DIR}"
 fi
 
 hash -r
@@ -598,7 +604,7 @@ RestartSec=5
 
 # Security hardening
 ProtectSystem=strict
-ProtectHome=yes
+ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
 ReadWritePaths=${APP_DIR}/packages/backend/uploads ${APP_DIR}/logs ${APP_DIR}/backups

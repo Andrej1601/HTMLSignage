@@ -24,7 +24,7 @@ export function BasicsStep({ formData, setFormData }: StepProps) {
             type="text"
             value={formData.name}
             onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             placeholder="z. B. Saunanacht, Frauentag, Sommer-Event"
             autoFocus
           />
@@ -35,7 +35,7 @@ export function BasicsStep({ formData, setFormData }: StepProps) {
           <textarea
             value={formData.description || ''}
             onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-            className="min-h-[140px] w-full rounded-lg border border-spa-bg-secondary px-4 py-3 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="min-h-[140px] w-full rounded-lg border border-spa-bg-secondary px-4 py-3 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             placeholder="Interner Hinweis oder kurzer Kundentext für dieses Event"
           />
         </div>
@@ -68,7 +68,7 @@ export function BasicsStep({ formData, setFormData }: StepProps) {
             <select
               value={formData.imageId || ''}
               onChange={(event) => setFormData({ ...formData, imageId: event.target.value || undefined })}
-              className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary px-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             >
               <option value="">Kein Bild</option>
               {imageList.map((image) => (
@@ -114,7 +114,7 @@ export function TimingStep({ formData, normalizedFormData, setFormData }: StepPr
             type="date"
             value={formData.startDate}
             onChange={(event) => setFormData({ ...formData, startDate: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
         </div>
       </div>
@@ -127,7 +127,7 @@ export function TimingStep({ formData, normalizedFormData, setFormData }: StepPr
             type="time"
             value={formData.startTime}
             onChange={(event) => setFormData({ ...formData, startTime: event.target.value })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
         </div>
       </div>
@@ -140,7 +140,7 @@ export function TimingStep({ formData, normalizedFormData, setFormData }: StepPr
             type="date"
             value={formData.endDate || ''}
             onChange={(event) => setFormData({ ...formData, endDate: event.target.value || undefined })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
         </div>
       </div>
@@ -153,7 +153,7 @@ export function TimingStep({ formData, normalizedFormData, setFormData }: StepPr
             type="time"
             value={formData.endTime || ''}
             onChange={(event) => setFormData({ ...formData, endTime: event.target.value || undefined })}
-            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full rounded-lg border border-spa-bg-secondary py-2.5 pl-10 pr-4 focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
         </div>
       </div>

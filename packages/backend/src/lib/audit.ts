@@ -43,7 +43,7 @@ function normalizeUserAgent(req: AuthRequest): string | null {
 
 function serializeDetails(details: unknown): Prisma.InputJsonValue | undefined {
   if (details === undefined || details === null) return undefined;
-  return JSON.parse(JSON.stringify(details)) as Prisma.InputJsonValue;
+  return structuredClone(details) as Prisma.InputJsonValue;
 }
 
 export async function logAuditEvent(req: AuthRequest, payload: AuditLogPayload): Promise<void> {

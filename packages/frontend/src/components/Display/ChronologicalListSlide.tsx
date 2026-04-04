@@ -264,7 +264,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
         <div
           className={classNames(
-            'bg-white/80 backdrop-blur-md border text-right shadow-sm shrink-0',
+            'bg-white/80 backdrop-blur-md border text-right shadow-xs shrink-0',
             compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'ml-3 rounded-2xl px-4 py-2.5' : 'ml-4 rounded-2xl px-6 py-3',
           )}
           style={{ borderColor: border }}
@@ -320,7 +320,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
       {/* Scrollable list */}
       <div
         ref={viewportRef}
-        className="flex-1 min-h-0 overflow-hidden relative rounded-2xl border shadow-sm"
+        className="flex-1 min-h-0 overflow-hidden relative rounded-2xl border shadow-xs"
         style={{
           borderColor: withAlpha(border, 0.9),
           backgroundColor: withAlpha(cardBg, 0.4),

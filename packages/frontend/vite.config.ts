@@ -1,12 +1,13 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 const devApiTarget = process.env.VITE_DEV_API_TARGET || 'http://localhost:3000';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -34,47 +35,14 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-
-          if (
-            id.includes('/node_modules/react/') ||
-            id.includes('/node_modules/react-dom/') ||
-            id.includes('/node_modules/scheduler/')
-          ) {
-            return 'react-vendor';
-          }
-
-          if (
-            id.includes('/node_modules/react-router/') ||
-            id.includes('/node_modules/react-router-dom/') ||
-            id.includes('/node_modules/@remix-run/router/')
-          ) {
-            return 'router-vendor';
-          }
-
-          if (
-            id.includes('/node_modules/@tanstack/react-query/') ||
-            id.includes('/node_modules/@tanstack/query-core/')
-          ) {
-            return 'query-vendor';
-          }
-
-          if (
-            id.includes('/node_modules/socket.io-client/') ||
-            id.includes('/node_modules/engine.io-client/') ||
-            id.includes('/node_modules/socket.io-parser/') ||
-            id.includes('/node_modules/engine.io-parser/') ||
-            id.includes('/node_modules/@socket.io/')
-          ) {
-            return 'socket-vendor';
-          }
-
-          if (id.includes('/node_modules/framer-motion/')) {
-            return 'animation-vendor';
-          }
-
-          return undefined;
+        advancedChunks: {
+          groups: [
+            { name: 'react-vendor', test: /\/node_modules\/(?:react|react-dom|scheduler)\// },
+            { name: 'router-vendor', test: /\/node_modules\/(?:react-router(?:-dom)?|@remix-run\/router)\// },
+            { name: 'query-vendor', test: /\/node_modules\/@tanstack\/(?:react-)?query(?:-core)?\// },
+            { name: 'socket-vendor', test: /\/node_modules\/(?:socket\.io(?:-client)?|engine\.io(?:-client|-parser)?|@socket\.io)\// },
+            { name: 'animation-vendor', test: /\/node_modules\/framer-motion\// },
+          ],
         },
       },
     },

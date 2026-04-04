@@ -120,13 +120,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" role="dialog" aria-modal="true" aria-label="Command Palette">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
 
       {/* Palette */}
       <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-spa-bg-secondary overflow-hidden">
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-spa-bg-secondary">
-          <Search className="h-5 w-5 text-spa-text-secondary flex-shrink-0" aria-hidden="true" />
+          <Search className="h-5 w-5 text-spa-text-secondary shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
@@ -134,7 +134,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
             onKeyDown={handleKeyDown}
             placeholder="Seite oder Aktion suchen..."
-            className="flex-1 bg-transparent text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none text-sm"
+            className="flex-1 bg-transparent text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden text-sm"
             aria-label="Suche"
             aria-activedescendant={results[selectedIndex] ? `cmd-${results[selectedIndex].id}` : undefined}
           />
@@ -175,7 +175,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                       onClick={() => { item.action(); onClose(); }}
                       onMouseEnter={() => setSelectedIndex(thisIndex)}
                     >
-                      <Icon className={clsx('h-4 w-4 flex-shrink-0', isSelected ? 'text-spa-primary' : 'text-spa-text-secondary')} />
+                      <Icon className={clsx('h-4 w-4 shrink-0', isSelected ? 'text-spa-primary' : 'text-spa-text-secondary')} />
                       <div className="flex-1 min-w-0">
                         <span className="font-medium">{item.label}</span>
                         {item.description && (

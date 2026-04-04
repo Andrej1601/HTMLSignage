@@ -47,7 +47,7 @@ export function DeviceCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md ${
+      className={`overflow-hidden rounded-2xl border bg-white shadow-xs transition-all hover:shadow-md ${
         selected ? 'border-spa-primary ring-2 ring-spa-primary/20' : 'border-spa-bg-secondary'
       }`}
     >
@@ -56,7 +56,7 @@ export function DeviceCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <label className="flex items-center flex-shrink-0">
+              <label className="flex items-center shrink-0">
                 <input
                   type="checkbox"
                   checked={selected}

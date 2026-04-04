@@ -261,7 +261,7 @@ async function readZipManifestFromDirectory(directory: ZipDirectory): Promise<Zi
         'invalid-backup-format',
         'Backup-Format ist ungültig.',
         400,
-        error.errors,
+        error.issues,
       );
     }
     throw error;

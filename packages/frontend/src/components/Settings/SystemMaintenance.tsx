@@ -71,7 +71,7 @@ export function SystemMaintenance() {
       {/* 2-col section grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Update */}
-        <section className="bg-white rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <section className="bg-white rounded-xl border border-stone-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden">
           <div className="px-5 py-4 border-b border-stone-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center text-[#8B6F47] text-base">
               🔄
@@ -84,7 +84,7 @@ export function SystemMaintenance() {
         </section>
 
         {/* Backup */}
-        <section className="bg-white rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <section className="bg-white rounded-xl border border-stone-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden">
           <div className="px-5 py-4 border-b border-stone-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center text-[#8B6F47] text-base">
               💾
@@ -97,7 +97,7 @@ export function SystemMaintenance() {
         </section>
 
         {/* System Jobs — full width */}
-        <section className="lg:col-span-2 bg-white rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <section className="lg:col-span-2 bg-white rounded-xl border border-stone-200 shadow-xs hover:shadow-md transition-shadow overflow-hidden">
           <div className="px-5 py-4 border-b border-stone-100 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center text-[#8B6F47] text-base">
               ⚙️

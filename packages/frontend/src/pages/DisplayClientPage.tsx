@@ -250,7 +250,7 @@ export function DisplayClientPage() {
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-spa-primary to-spa-primary-dark text-white">
+      <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center">
           <div className="text-3xl font-bold mb-4">HTMLSignage</div>
           <div className="text-lg">Wird geladen...</div>
@@ -261,7 +261,7 @@ export function DisplayClientPage() {
 
   if (!isPreviewMode && !pairingInfo?.paired && pairingInfo?.pairingCode) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-spa-primary to-spa-primary-dark text-white">
+      <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center max-w-2xl px-8">
           <div className="text-4xl font-bold mb-8">HTMLSignage</div>
 

@@ -63,7 +63,7 @@ export function SlideshowSelector({
           const isRenaming = renamingId === slideshow.id;
 
           return (
-            <div key={slideshow.id} className="flex items-center gap-0.5 flex-shrink-0">
+            <div key={slideshow.id} className="flex items-center gap-0.5 shrink-0">
               {isRenaming ? (
                 <form
                   onSubmit={(e) => { e.preventDefault(); handleRename(slideshow.id); }}
@@ -74,7 +74,7 @@ export function SlideshowSelector({
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
                     onBlur={() => handleRename(slideshow.id)}
-                    className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20 w-32"
+                    className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-32"
                     autoFocus
                   />
                 </form>
@@ -85,7 +85,7 @@ export function SlideshowSelector({
                   disabled={disabled}
                   className={`group relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
                     isSelected
-                      ? 'bg-white text-spa-text-primary shadow-sm'
+                      ? 'bg-white text-spa-text-primary shadow-xs'
                       : 'text-spa-text-secondary hover:text-spa-text-primary'
                   } disabled:opacity-60`}
                 >
@@ -139,14 +139,14 @@ export function SlideshowSelector({
         {isCreating ? (
           <form
             onSubmit={(e) => { e.preventDefault(); handleCreate(); }}
-            className="flex items-center gap-1 flex-shrink-0"
+            className="flex items-center gap-1 shrink-0"
           >
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={() => { if (!newName.trim()) setIsCreating(false); }}
-              className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20 w-36"
+              className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-36"
               placeholder="Name..."
               autoFocus
             />
@@ -170,7 +170,7 @@ export function SlideshowSelector({
             type="button"
             onClick={() => setIsCreating(true)}
             disabled={disabled}
-            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-spa-text-secondary hover:text-spa-primary transition-colors disabled:opacity-60"
+            className="shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-spa-text-secondary hover:text-spa-primary transition-colors disabled:opacity-60"
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Neue Slideshow</span>
@@ -187,7 +187,7 @@ export function SlideshowSelector({
 
         return (
           <div className="flex items-center gap-2 text-xs text-spa-text-secondary">
-            <Monitor className="h-3.5 w-3.5 flex-shrink-0" />
+            <Monitor className="h-3.5 w-3.5 shrink-0" />
             {selected.isDefault ? (
               <span>
                 Standard-Slideshow — wird von allen Geräten ohne individuelle Zuweisung verwendet

@@ -28,7 +28,7 @@ import slideshowsRouter from './routes/slideshows.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 const app = express();
 const httpServer = createServer(app);
@@ -153,6 +153,7 @@ app.use('/uploads', (req, res, next) => {
   }
   next();
 }, express.static(UPLOAD_DIR, {
+  dotfiles: 'allow',
   immutable: true,
   maxAge: '30d',
   setHeaders: (res, filePath) => {

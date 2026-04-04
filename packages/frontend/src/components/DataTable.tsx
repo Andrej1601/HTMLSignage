@@ -112,7 +112,7 @@ export function DataTable<T>({
   return (
     <>
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="hidden md:block bg-white rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-spa-bg-secondary">
             <thead className="bg-spa-bg-primary">
@@ -177,7 +177,7 @@ export function DataTable<T>({
         {pagedData.map((item) => (
           <div
             key={keyFn(item)}
-            className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary p-4"
+            className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4"
           >
             {mobileTitle && (
               <div className="font-semibold text-spa-text-primary mb-3">

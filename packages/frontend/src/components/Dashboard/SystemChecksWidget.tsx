@@ -235,7 +235,7 @@ export function SystemChecksWidget({
               <button
                 type="button"
                 onClick={() => setSelectedHistoryMetric('heartbeats')}
-                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
                   Heartbeats
@@ -257,7 +257,7 @@ export function SystemChecksWidget({
               <button
                 type="button"
                 onClick={() => setSelectedHistoryMetric('warnings')}
-                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
                   Warnlagen
@@ -279,7 +279,7 @@ export function SystemChecksWidget({
               <button
                 type="button"
                 onClick={() => setSelectedHistoryMetric('disk')}
-                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-spa-primary/30"
+                className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
               >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
                   Speichertrend

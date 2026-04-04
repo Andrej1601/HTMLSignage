@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter, uploadLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -180,7 +180,7 @@ router.get('/tags', async (_req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const media = await prisma.media.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       include: {
         user: {
           select: { username: true },
@@ -273,7 +273,7 @@ router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mut
   try {
     const tags = normalizeTags(req.body?.tags);
     const media = await prisma.media.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       data: { tags },
       include: {
         user: {
@@ -306,7 +306,7 @@ router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mut
 router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const media = await prisma.media.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!media) {
@@ -316,7 +316,7 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
     // Delete from database first — orphan files on disk are cleaned up by
     // the maintenance cycle, but a DB record pointing to a missing file is worse.
     await prisma.media.delete({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
     await logAuditEvent(req, {
       action: 'media.delete',

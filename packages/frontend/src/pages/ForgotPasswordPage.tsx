@@ -31,7 +31,7 @@ export function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">Passwort vergessen</h1>
@@ -47,7 +47,7 @@ export function ForgotPasswordPage() {
             </div>
             <Link
               to="/login"
-              className="flex items-center justify-center w-full rounded-lg bg-spa-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-spa-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
+              className="flex items-center justify-center w-full rounded-lg bg-spa-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-spa-primary-dark focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
             >
               Zurück zur Anmeldung
             </Link>
@@ -55,7 +55,7 @@ export function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div ref={errorRef} tabIndex={-1} role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-none">
+              <div ref={errorRef} tabIndex={-1} role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-hidden">
                 {error}
               </div>
             )}
@@ -70,7 +70,7 @@ export function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="email@example.com"
               />
             </div>

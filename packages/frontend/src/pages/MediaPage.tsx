@@ -82,14 +82,14 @@ export function MediaPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Medien durchsuchen..."
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-4 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-4 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
             />
           </div>
 
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
-            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
           >
             <option value="all">Alle Typen</option>
             <option value="image">Bilder</option>
@@ -100,7 +100,7 @@ export function MediaPage() {
           <select
             value={tagFilter}
             onChange={(e) => setTagFilter(e.target.value)}
-            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-none focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+            className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
           >
             <option value="all">Alle Tags</option>
             {availableTags.map((tag) => (
@@ -296,7 +296,7 @@ function MediaListRow({
 
   return (
     <div className="flex items-center gap-4 p-3 hover:bg-spa-bg-primary transition-colors">
-      <div className="w-12 h-12 rounded-lg bg-spa-bg-primary overflow-hidden flex-shrink-0">
+      <div className="w-12 h-12 rounded-lg bg-spa-bg-primary overflow-hidden shrink-0">
         {item.type === 'image' ? (
           <img
             src={mediaUrl}

@@ -20,7 +20,7 @@ export function DraftRecoveryBanner({
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-spa-warning/30 bg-spa-warning-light px-5 py-4 text-sm text-spa-warning-dark md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
           <p className="font-semibold">Lokaler Entwurf für {entityLabel} gefunden</p>
           <p className="mt-1 leading-relaxed">

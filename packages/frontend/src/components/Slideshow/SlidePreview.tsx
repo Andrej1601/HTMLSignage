@@ -20,7 +20,7 @@ export const SlidePreview = memo(function SlidePreview({ slide, className = '' }
   const { settings } = useSettings();
   const { data: media } = useMedia();
 
-  const baseClasses = 'w-40 h-[90px] rounded-md overflow-hidden border-2 border-spa-bg-secondary shadow-sm bg-spa-bg-primary flex items-center justify-center relative';
+  const baseClasses = 'w-40 h-[90px] rounded-md overflow-hidden border-2 border-spa-bg-secondary shadow-xs bg-spa-bg-primary flex items-center justify-center relative';
 
   switch (slide.type) {
     case 'content-panel':
@@ -79,12 +79,12 @@ export const SlidePreview = memo(function SlidePreview({ slide, className = '' }
 function ContentPanelPreview({ className }: { className: string }) {
   return (
     <div className={className}>
-      <div className="w-full h-full p-1 bg-gradient-to-br from-spa-primary/10 to-spa-secondary/10">
+      <div className="w-full h-full p-1 bg-linear-to-br from-spa-primary/10 to-spa-secondary/10">
         <div className="grid grid-cols-3 grid-rows-3 gap-0.5 h-full">
           {[...Array(9)].map((_, i) => (
             <div
               key={i}
-              className="bg-white rounded-sm flex items-center justify-center"
+              className="bg-white rounded-xs flex items-center justify-center"
               style={{ opacity: 0.3 + (i % 3) * 0.2 }}
             >
               <Calendar className="w-2 h-2 text-spa-primary" />
@@ -131,7 +131,7 @@ function SaunaDetailPreview({ className, saunaId, settings, media }: SaunaDetail
         />
       )}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-black/40 to-black/60"
+        className="absolute inset-0 bg-linear-to-br from-black/40 to-black/60"
         style={{ backgroundColor: imageUrl ? 'transparent' : sauna.color || '#10b981' }}
       />
       <div className="relative z-10 text-white p-2 text-center">
@@ -224,7 +224,7 @@ function InfosPreview({ className, infoId, settings }: { className: string; info
 
   return (
     <div className={className}>
-      <div className="w-full h-full bg-gradient-to-br from-spa-primary/10 to-spa-secondary/10 flex flex-col items-center justify-center text-spa-text-primary">
+      <div className="w-full h-full bg-linear-to-br from-spa-primary/10 to-spa-secondary/10 flex flex-col items-center justify-center text-spa-text-primary">
         <Info className="w-6 h-6 mb-1 text-spa-primary" />
         <div className="text-[9px] font-semibold uppercase tracking-wide">Infos</div>
         <div className="text-[8px] text-spa-text-secondary mt-0.5 max-w-[90%] truncate">{title}</div>
@@ -239,7 +239,7 @@ function InfosPreview({ className, infoId, settings }: { className: string; info
 function EventsPreview({ className }: { className: string }) {
   return (
     <div className={className}>
-      <div className="w-full h-full bg-gradient-to-br from-spa-secondary/10 to-spa-accent/10 flex flex-col items-center justify-center text-spa-text-primary">
+      <div className="w-full h-full bg-linear-to-br from-spa-secondary/10 to-spa-accent/10 flex flex-col items-center justify-center text-spa-text-primary">
         <Calendar className="w-6 h-6 mb-1 text-spa-secondary" />
         <div className="text-[9px] font-semibold uppercase tracking-wide">Events</div>
       </div>

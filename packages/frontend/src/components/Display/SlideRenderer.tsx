@@ -171,7 +171,7 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
         }
       />
       {slide.showTitle && slide.title && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
           <h2 className="text-5xl font-bold text-white">{slide.title}</h2>
         </div>
       )}
@@ -204,7 +204,7 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
         }
       />
       {slide.showTitle && slide.title && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
           <h2 className="text-5xl font-bold text-white">{slide.title}</h2>
         </div>
       )}

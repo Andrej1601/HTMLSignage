@@ -94,7 +94,7 @@ router.post('/request-pairing', pairingRequestLimiter, async (req, res) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error requesting pairing:', error);
     res.status(500).json({ error: 'pairing-request-failed', message: 'Kopplungsanfrage fehlgeschlagen' });
@@ -144,7 +144,7 @@ router.post('/pair', authMiddleware, requirePermission('devices:manage'), mutati
     res.json(pairedDevice);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error pairing device:', error);
     res.status(500).json({ error: 'pairing-failed', message: 'Kopplung fehlgeschlagen' });

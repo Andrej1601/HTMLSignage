@@ -10,7 +10,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+    <div className="bg-white rounded-lg shadow-xs p-12 text-center">
       <Icon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
       <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
         {title}

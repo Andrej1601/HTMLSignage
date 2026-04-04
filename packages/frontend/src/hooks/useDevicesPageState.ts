@@ -35,7 +35,7 @@ function normalizeGroupKey(groupName?: string | null): string {
 
 export function getFilterButtonClass(active: boolean): string {
   return active
-    ? 'bg-spa-primary text-white shadow-sm'
+    ? 'bg-spa-primary text-white shadow-xs'
     : 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary';
 }
 

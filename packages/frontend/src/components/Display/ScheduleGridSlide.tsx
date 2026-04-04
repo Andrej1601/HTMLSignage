@@ -117,7 +117,7 @@ function InfusionItemGrid({
   return (
     <div
       className={classNames(
-        'relative border transition-all duration-500 shadow-sm',
+        'relative border transition-all duration-500 shadow-xs',
         paddingClassName,
         isFinished && 'opacity-70',
       )}
@@ -340,7 +340,7 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
 
             <div
               className={classNames(
-                'bg-white/80 backdrop-blur-md border text-right shadow-sm shrink-0',
+                'bg-white/80 backdrop-blur-md border text-right shadow-xs shrink-0',
                 compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'ml-3 rounded-2xl px-5 py-3' : 'ml-4 rounded-3xl px-7 py-4',
               )}
               style={{ borderColor: border }}

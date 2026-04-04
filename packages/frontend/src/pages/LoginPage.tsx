@@ -56,14 +56,14 @@ export function LoginPage() {
 
   if (checkingFirstUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
         <div className="text-spa-text-secondary">Lädt...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
         {/* Header */}
         <div className="mb-6 text-center">
@@ -77,7 +77,7 @@ export function LoginPage() {
 
         {/* Error Message */}
         {error && (
-          <div ref={errorRef} tabIndex={-1} role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-none">
+          <div ref={errorRef} tabIndex={-1} role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-hidden">
             {error}
           </div>
         )}
@@ -95,7 +95,7 @@ export function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               minLength={mode === 'register' ? 3 : 1}
-              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
               placeholder="username"
             />
           </div>
@@ -110,7 +110,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="email@example.com"
               />
             </div>
@@ -127,7 +127,7 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={mode === 'register' ? 8 : 1}
-              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
               placeholder="••••••••"
             />
             {mode === 'register' && (

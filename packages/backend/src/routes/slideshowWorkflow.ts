@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { createVersionedRecord } from '../lib/versionedEntity.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { listAuditLogs, logAuditEvent } from '../lib/audit.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
@@ -210,7 +210,7 @@ router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), a
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error fetching state:', error);
     return res.status(500).json({ error: 'fetch-failed', message: 'Workflow-Status konnte nicht geladen werden' });
@@ -252,7 +252,7 @@ router.post('/workflow/draft', authMiddleware, requirePermission('slideshow:mana
     return res.json({ ok: true, savedAt: new Date().toISOString() });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error saving draft:', error);
     return res.status(500).json({ error: 'save-failed', message: 'Entwurf konnte nicht gespeichert werden' });
@@ -288,7 +288,7 @@ router.post('/workflow/discard', authMiddleware, requirePermission('slideshow:ma
     return res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error discarding draft:', error);
     return res.status(500).json({ error: 'discard-failed', message: 'Entwurf konnte nicht verworfen werden' });
@@ -300,7 +300,7 @@ router.delete('/workflow/history/:historyId', authMiddleware, requirePermission(
     const validated = DeleteHistorySchema.parse({
       targetType: req.query.targetType,
       targetId: req.query.targetId,
-      historyId: req.params.historyId,
+      historyId: str(req.params.historyId),
     });
     const targetId = validated.targetType === 'device' ? validated.targetId : null;
     const log = await findHistoryLog(validated.historyId);
@@ -332,7 +332,7 @@ router.delete('/workflow/history/:historyId', authMiddleware, requirePermission(
     return res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error deleting history entry:', error);
     return res.status(500).json({ error: 'delete-failed', message: 'Verlaufseintrag konnte nicht gelöscht werden' });
@@ -359,7 +359,7 @@ router.post('/workflow/publish', authMiddleware, requirePermission('slideshow:ma
     return res.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error publishing:', error);
     return res.status(500).json({ error: 'publish-failed', message: 'Slideshow konnte nicht veröffentlicht werden' });
@@ -386,7 +386,7 @@ router.post('/workflow/rollback', authMiddleware, requirePermission('slideshow:m
     return res.json(result);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshow-workflow] Error rolling back:', error);
     return res.status(500).json({ error: 'rollback-failed', message: 'Slideshow konnte nicht wiederhergestellt werden' });

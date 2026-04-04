@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 
@@ -25,7 +25,7 @@ const PaletteColorsSchema = z.object({
   headRowFg: z.string(),
   cornerBg: z.string(),
   cornerFg: z.string(),
-}).passthrough();
+}).catchall(z.unknown());
 
 const CreatePaletteSchema = z.object({
   name: z.string().min(1).max(100),
@@ -55,7 +55,7 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
     res.status(201).json(palette);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[palettes] Error creating:', error);
     res.status(500).json({ error: 'create-failed' });
@@ -67,13 +67,13 @@ router.put('/:id', authMiddleware, requirePermission('settings:manage'), mutatio
   try {
     const { name, colors } = CreatePaletteSchema.parse(req.body);
     const palette = await prisma.customPalette.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       data: { name, colors: colors as unknown as Prisma.InputJsonValue },
     });
     res.json(palette);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[palettes] Error updating:', error);
     res.status(500).json({ error: 'update-failed' });
@@ -84,7 +84,7 @@ router.put('/:id', authMiddleware, requirePermission('settings:manage'), mutatio
 router.delete('/:id', authMiddleware, requirePermission('settings:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     await prisma.customPalette.delete({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
     res.json({ ok: true });
   } catch (error) {

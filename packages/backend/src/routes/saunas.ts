@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { broadcastSettingsUpdate } from '../websocket/index.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { updateSaunaStatusInSettings, SaunaNotFoundError } from '../lib/saunaManagement.js';
@@ -23,7 +23,7 @@ router.patch(
   async (req: AuthRequest, res) => {
     try {
       const { status } = UpdateStatusSchema.parse(req.body);
-      const saunaId = req.params.id;
+      const saunaId = str(req.params.id)!;
 
       // Load current active settings
       const current = await prisma.settings.findFirst({
@@ -48,7 +48,7 @@ router.patch(
         return res.status(404).json({ error: 'not-found', message: 'Sauna nicht gefunden' });
       }
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: 'validation-failed', details: error.errors });
+        return res.status(400).json({ error: 'validation-failed', details: error.issues });
       }
       console.error('[saunas] Error updating status:', error);
       res.status(500).json({ error: 'update-failed', message: 'Sauna-Status konnte nicht aktualisiert werden' });

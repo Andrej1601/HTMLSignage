@@ -36,6 +36,11 @@ export interface AuthRequest extends Request {
   requestId?: string;
 }
 
+/** Express 5: req.params/query values can be string | string[]. Extracts a single string. */
+export function str(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }

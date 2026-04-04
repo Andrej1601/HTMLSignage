@@ -52,11 +52,11 @@ export function ErrorAlert({
     <div
       ref={alertRef}
       tabIndex={-1}
-      className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3 focus:outline-none"
+      className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3 focus:outline-hidden"
       role="alert"
       aria-live="assertive"
     >
-      <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" aria-hidden="true" />
+      <AlertCircle className="w-5 h-5 text-spa-error shrink-0 mt-0.5" aria-hidden="true" />
       <div className="flex-1">
         <h3 className="font-semibold text-spa-error-dark">{title}</h3>
         <p className="text-spa-error-dark/80 text-sm mt-1">{errorMessage}</p>

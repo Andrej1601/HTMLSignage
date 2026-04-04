@@ -45,7 +45,7 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
 
   return (
     <div
-      className="rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-1 shadow-sm backdrop-blur-sm"
+      className="rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-1 shadow-xs backdrop-blur-xs"
       role="tablist"
       aria-label="Reiter"
       ref={tabListRef}
@@ -66,13 +66,13 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
               onKeyDown={handleKeyDown}
               className={clsx(
                 'flex min-w-0 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-5 py-3 font-medium transition-all',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-inset',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-inset',
                 isActive
-                  ? 'bg-spa-primary text-white shadow-sm'
+                  ? 'bg-spa-primary text-white shadow-xs'
                   : 'text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary',
               )}
             >
-              {Icon && <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />}
+              {Icon && <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />}
               <span className="truncate">{tab.label}</span>
             </button>
           );

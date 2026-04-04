@@ -155,7 +155,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             )}
             {/* Current emoji preview + custom input */}
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-spa-bg-secondary bg-white text-3xl shadow-sm">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-spa-bg-secondary bg-white text-3xl shadow-xs">
                 {formData.emoji || '🌿'}
               </div>
               <div className="flex-1 space-y-1">
@@ -164,7 +164,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   type="text"
                   value={formData.emoji}
                   onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
-                  className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-center text-2xl focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20"
+                  className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-center text-2xl focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
                   placeholder="🌿"
                   maxLength={2}
                 />
@@ -181,7 +181,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="z.B. Eukalyptus, Minze, Lavendel…"
               autoFocus
             />
@@ -202,7 +202,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                     onClick={() => setFormData({ ...formData, color: isSelected ? '' : hex })}
                     className={clsx(
                       'h-7 w-7 rounded-full border-2 transition-all hover:scale-110',
-                      isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-white shadow-sm'
+                      isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-white shadow-xs'
                     )}
                     style={{ backgroundColor: hex }}
                     title={hex}
@@ -273,7 +273,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   'flex items-center justify-between rounded-lg border p-3 transition-all',
                   isEditing
                     ? 'border-spa-primary bg-spa-primary/5'
-                    : 'border-spa-bg-secondary bg-white hover:shadow-sm'
+                    : 'border-spa-bg-secondary bg-white hover:shadow-xs'
                 )}
                 style={{ borderColor: isEditing ? undefined : dc.border }}
               >

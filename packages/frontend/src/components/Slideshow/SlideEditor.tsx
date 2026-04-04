@@ -216,7 +216,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                     className={clsx(
                       'rounded-xl border p-3 text-left transition-all',
                       isActive
-                        ? 'border-spa-primary bg-spa-primary/5 shadow-sm'
+                        ? 'border-spa-primary bg-spa-primary/5 shadow-xs'
                         : 'border-spa-bg-secondary hover:border-spa-primary/50'
                     )}
                   >
@@ -255,7 +255,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             max="300"
             value={formData.duration}
             onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 1 })}
-            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
           {formData.type === 'media-video' && formData.videoPlayback === 'complete' && (
             <p className="text-xs text-spa-text-secondary mt-1">
@@ -273,7 +273,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             type="text"
             value={formData.title || ''}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             placeholder="Überschreibt Standard-Titel"
           />
           <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -297,7 +297,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             onChange={(e) =>
               setFormData({ ...formData, transition: e.target.value as SlideConfig['transition'] })
             }
-            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           >
             <option value="fade">Fade</option>
             <option value="slide">Slide</option>
@@ -328,7 +328,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
           <textarea
             value={formData.notes || ''}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             rows={3}
             placeholder="Interne Notizen zu diesem Slide..."
           />

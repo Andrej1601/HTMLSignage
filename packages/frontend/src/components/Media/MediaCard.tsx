@@ -42,7 +42,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
   };
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white shadow-sm transition-all hover:shadow-md">
+    <div className="group overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white shadow-xs transition-all hover:shadow-md">
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-spa-bg-primary">
         {media.type === 'image' ? (
@@ -85,7 +85,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
             width="w-48"
             trigger={() => (
               <button
-                className="rounded-lg bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-white"
+                className="rounded-lg bg-white/90 p-1.5 shadow-xs transition-colors hover:bg-white"
                 aria-label="Medien-Aktionen"
                 type="button"
               >
@@ -136,7 +136,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
         )}
         {usageSummary && usageSummary.length > 0 && (
           <div className="mt-1.5 flex items-center gap-1 text-[11px] text-spa-info-dark">
-            <Link2 className="h-3 w-3 flex-shrink-0" />
+            <Link2 className="h-3 w-3 shrink-0" />
             <span className="truncate" title={usageSummary.join(', ')}>
               {usageSummary.join(', ')}
             </span>

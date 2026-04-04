@@ -180,7 +180,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
               type="text"
               value={formData.color}
               onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+              className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
               placeholder="#10b981"
             />
           </div>
@@ -264,7 +264,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                     info: { ...formData.info, temperature: parseInt(e.target.value) || undefined },
                   })
                 }
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                 placeholder="90"
               />
             </div>
@@ -284,7 +284,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                     info: { ...formData.info, humidity: parseInt(e.target.value) || undefined },
                   })
                 }
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                 placeholder="10"
               />
             </div>
@@ -304,7 +304,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                     info: { ...formData.info, capacity: parseInt(e.target.value) || undefined },
                   })
                 }
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                 placeholder="12"
               />
             </div>
@@ -321,7 +321,7 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                 value={featureInput}
                 onChange={(e) => setFeatureInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
-                className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                className="flex-1 px-4 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                 placeholder="z.B. Bio, Finnisch, Sanarium..."
               />
               <Button variant="secondary" onClick={handleAddFeature}>

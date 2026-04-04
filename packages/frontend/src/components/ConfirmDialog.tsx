@@ -30,7 +30,7 @@ export function ConfirmDialog({
     variant === 'danger' ? 'danger' : variant === 'warning' ? 'warning' : 'primary';
 
   const icon = variant !== 'default' ? (
-    <div className={`flex-shrink-0 p-2 rounded-full ${
+    <div className={`shrink-0 p-2 rounded-full ${
       variant === 'danger' ? 'bg-spa-error-light' : 'bg-spa-warning-light'
     }`}>
       <AlertTriangle
