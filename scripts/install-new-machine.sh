@@ -303,9 +303,14 @@ log "INSTALL_LOG=${INSTALL_LOG}"
 step "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 
-# Wait for dpkg lock (unattended-upgrades may hold it)
+# Stop unattended-upgrades which may hold the dpkg lock
+log "Stopping unattended-upgrades to release dpkg lock..."
+systemctl stop unattended-upgrades 2>/dev/null || true
+killall -9 unattended-upgrades 2>/dev/null || true
+
+# Wait for dpkg lock to be released
 log "Waiting for dpkg lock to be released..."
-for ((i = 1; i <= 60; i++)); do
+for ((i = 1; i <= 120; i++)); do
   if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
     log "dpkg lock released after ${i}s"
     break
@@ -316,8 +321,22 @@ for ((i = 1; i <= 60; i++)); do
   sleep 1
 done
 
-apt-get update -y
-apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail cron
+# Retry apt-get if it still fails (lock may be re-acquired)
+retry_apt() {
+  local max=3 i=0
+  while (( i < max )); do
+    if "$@"; then
+      return 0
+    fi
+    (( i++ ))
+    log "apt command failed (attempt ${i}/${max}), retrying..."
+    sleep 5
+  done
+  return 1
+}
+
+retry_apt apt-get update -y
+retry_apt apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail cron
 if is_true "${APT_UPGRADE}"; then
   apt-get upgrade -y
 else
