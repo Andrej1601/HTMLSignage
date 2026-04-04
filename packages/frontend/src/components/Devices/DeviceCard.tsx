@@ -12,7 +12,7 @@ import {
   getDeviceStatus,
   formatLastSeen,
   getStatusLabel,
-  getModeLabel,
+  getDeviceSlideshowLabel,
 } from '@/types/device.types';
 import { DeviceSnapshotPreview } from './DeviceSnapshotPreview';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
@@ -43,7 +43,7 @@ export function DeviceCard({
 }: DeviceCardProps) {
   const status = getDeviceStatus(device.lastSeen);
   const isOnline = status === 'online';
-  const slideshowLabel = device.mode === 'override' ? 'Override' : 'Automatisch';
+  const slideshowLabel = getDeviceSlideshowLabel(device);
 
   return (
     <div
@@ -125,13 +125,7 @@ export function DeviceCard({
             {formatLastSeen(device.lastSeen)}
           </p>
         </div>
-        <div>
-          <span className="text-spa-text-secondary">Modus</span>
-          <p className="font-medium text-spa-text-primary mt-0.5">
-            {getModeLabel(device.mode)}
-          </p>
-        </div>
-        <div>
+        <div className="col-span-2">
           <span className="text-spa-text-secondary">Slideshow</span>
           <p className="font-medium text-spa-text-primary mt-0.5 truncate">
             {slideshowLabel}

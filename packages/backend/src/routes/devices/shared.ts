@@ -17,6 +17,7 @@ export const DEVICE_ADMIN_INCLUDE = {
     select: { username: true },
   },
   overrides: true,
+  slideshow: { select: { id: true, name: true } },
 } satisfies Prisma.DeviceInclude;
 
 export async function loadAdminDevicesByIds(deviceIds: string[]) {
@@ -42,6 +43,7 @@ export const UpdateDeviceSchema = z.object({
   groupName: z.string().trim().max(80).nullable().optional(),
   mode: z.enum(['auto', 'override']).optional(),
   maintenanceMode: z.boolean().optional(),
+  slideshowId: z.string().nullable().optional(),
 });
 
 export const ControlCommandSchema = z.object({

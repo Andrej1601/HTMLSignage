@@ -5,6 +5,7 @@ import { Button } from '@/components/Button';
 import { InputField, ToggleField } from '@/components/FormField';
 import { ComboboxField } from '@/components/ComboboxField';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
+import type { SlideshowDefinition } from '@/types/slideshow.types';
 
 interface DeviceEditDialogProps {
   device: Device | null;
@@ -14,6 +15,8 @@ interface DeviceEditDialogProps {
   isSaving: boolean;
   /** Existing group names for autocomplete suggestions */
   existingGroups?: string[];
+  /** Available slideshows for assignment */
+  slideshows?: SlideshowDefinition[];
 }
 
 export function DeviceEditDialog({
@@ -23,10 +26,11 @@ export function DeviceEditDialog({
   onSave,
   isSaving,
   existingGroups = [],
+  slideshows = [],
 }: DeviceEditDialogProps) {
   const [name, setName] = useState('');
   const [groupName, setGroupName] = useState('');
-  const [mode, setMode] = useState<'auto' | 'override'>('auto');
+  const [slideshowId, setSlideshowId] = useState<string | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [error, setError] = useState('');
   const initializedDeviceIdRef = useRef<string | null>(null);
@@ -38,7 +42,7 @@ export function DeviceEditDialog({
     initializedDeviceIdRef.current = device.id;
     setName(device.name);
     setGroupName(device.groupName || '');
-    setMode(device.mode);
+    setSlideshowId(device.slideshowId || null);
     setMaintenanceMode(Boolean(device.maintenanceMode));
     setError('');
   }, [device, isOpen]);
@@ -61,7 +65,7 @@ export function DeviceEditDialog({
     onSave(device.id, {
       name: name.trim(),
       groupName: groupName.trim() || null,
-      mode,
+      slideshowId: slideshowId || null,
       maintenanceMode,
     });
   };
@@ -71,7 +75,7 @@ export function DeviceEditDialog({
       initializedDeviceIdRef.current = null;
       setName('');
       setGroupName('');
-      setMode('auto');
+      setSlideshowId(null);
       setMaintenanceMode(false);
       setError('');
       onClose();
@@ -79,6 +83,8 @@ export function DeviceEditDialog({
   };
 
   if (!device) return null;
+
+  const defaultSlideshow = slideshows.find((s) => s.isDefault);
 
   return (
     <Dialog
@@ -146,49 +152,32 @@ export function DeviceEditDialog({
           </p>
         </div>
 
-        {/* Mode Selection */}
-        <fieldset>
-          <legend className="block text-sm font-medium text-spa-text-primary mb-1">
-            Betriebsmodus
-          </legend>
-          <div className="space-y-2">
-            <label className="flex items-start gap-3 p-3 border border-spa-bg-secondary rounded-lg cursor-pointer hover:bg-spa-bg-primary transition-colors">
-              <input
-                type="radio"
-                name="mode"
-                value="auto"
-                checked={mode === 'auto'}
-                onChange={(e) => setMode(e.target.value as 'auto')}
-                disabled={isSaving}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="font-medium text-spa-text-primary">Automatisch</p>
-                <p className="text-sm text-spa-text-secondary">
-                  Verwendet globale Einstellungen und Schedule
-                </p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 p-3 border border-spa-bg-secondary rounded-lg cursor-pointer hover:bg-spa-bg-primary transition-colors">
-              <input
-                type="radio"
-                name="mode"
-                value="override"
-                checked={mode === 'override'}
-                onChange={(e) => setMode(e.target.value as 'override')}
-                disabled={isSaving}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="font-medium text-spa-text-primary">Überschrieben</p>
-                <p className="text-sm text-spa-text-secondary">
-                  Verwendet individuelle Einstellungen für dieses Gerät
-                </p>
-              </div>
-            </label>
-          </div>
-        </fieldset>
+        {/* Slideshow Assignment */}
+        <div>
+          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+            Slideshow
+          </label>
+          <select
+            value={slideshowId || ''}
+            onChange={(e) => setSlideshowId(e.target.value || null)}
+            disabled={isSaving}
+            className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-none focus:ring-2 focus:ring-spa-primary/20 disabled:opacity-60"
+          >
+            <option value="">
+              Standard{defaultSlideshow ? ` (${defaultSlideshow.name})` : ''}
+            </option>
+            {slideshows
+              .filter((s) => !s.isDefault)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+          <p className="mt-1 text-xs text-spa-text-secondary">
+            Ohne Zuweisung wird die Standard-Slideshow verwendet.
+          </p>
+        </div>
 
         <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4">
           <ToggleField

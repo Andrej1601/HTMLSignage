@@ -291,38 +291,55 @@ export function DisplayClientPage() {
   }
 
   if (!isLoading && maintenanceMode) {
-    return (
-      <div
-        ref={displayRootRef}
-        className="flex h-screen w-full items-center justify-center text-white"
-        style={
-          maintenanceBackgroundUrl
-            ? {
-                backgroundImage: `linear-gradient(135deg, rgba(12, 8, 4, 0.58), rgba(34, 24, 16, 0.82)), url(${maintenanceBackgroundUrl})`,
-                backgroundPosition: 'center',
-                backgroundSize: 'cover',
-              }
-            : {
-                backgroundImage: 'radial-gradient(circle at top, #f2ebdf 0%, #d6b998 45%, #7f674d 100%)',
-              }
+    const bgStyle = maintenanceBackgroundUrl
+      ? {
+          backgroundImage: `linear-gradient(135deg, rgba(12, 8, 4, 0.58), rgba(34, 24, 16, 0.82)), url(${maintenanceBackgroundUrl})`,
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
         }
-      >
-        <div className="max-w-3xl rounded-[2rem] border border-white/20 bg-black/15 px-12 py-14 text-center shadow-2xl backdrop-blur-xl">
-          <div className="text-xs font-semibold uppercase tracking-[0.35em] text-white/75">
-            {maintenanceScreen.label}
-          </div>
-          <h1 className="mt-5 text-5xl font-semibold tracking-tight">
-            {maintenanceScreen.headline}
-          </h1>
-          <p className="mt-6 text-xl leading-relaxed text-white/85">
-            {maintenanceScreen.message}
-          </p>
-          {maintenanceScreen.showDeviceName && displayDeviceName && (
-            <div className="mt-8 inline-flex rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-medium text-white/85">
-              {displayDeviceName}
+      : { backgroundImage: 'radial-gradient(circle at top, #f2ebdf 0%, #d6b998 45%, #7f674d 100%)' };
+
+    const isOverlay = maintenanceScreen.displayStyle === 'overlay';
+
+    return (
+      <div ref={displayRootRef} className="relative flex h-screen w-full items-center justify-center text-white overflow-hidden" style={bgStyle}>
+        {isOverlay ? (
+          /* Overlay-Stil: vollflächiger Blur-Schleier, zentrierter Text */
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-12" style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+            <div className="mb-6 inline-block rounded-full border border-amber-400/60 bg-amber-400/10 px-5 py-1.5 text-xs font-black uppercase tracking-widest text-amber-300">
+              {maintenanceScreen.label}
             </div>
-          )}
-        </div>
+            <h1 className="text-6xl font-bold tracking-tight leading-tight max-w-3xl">
+              {maintenanceScreen.headline}
+            </h1>
+            <p className="mt-6 text-xl leading-relaxed text-white/80 max-w-2xl">
+              {maintenanceScreen.message}
+            </p>
+            {maintenanceScreen.showDeviceName && displayDeviceName && (
+              <div className="absolute bottom-6 right-8 text-white/40 text-sm font-mono">
+                {displayDeviceName}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Glassmorphismus-Stil: zentrierte Karte */
+          <div className="max-w-3xl rounded-[2rem] border border-white/20 bg-black/15 px-12 py-14 text-center shadow-2xl backdrop-blur-xl">
+            <div className="text-xs font-semibold uppercase tracking-[0.35em] text-white/75">
+              {maintenanceScreen.label}
+            </div>
+            <h1 className="mt-5 text-5xl font-semibold tracking-tight">
+              {maintenanceScreen.headline}
+            </h1>
+            <p className="mt-6 text-xl leading-relaxed text-white/85">
+              {maintenanceScreen.message}
+            </p>
+            {maintenanceScreen.showDeviceName && displayDeviceName && (
+              <div className="mt-8 inline-flex rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-medium text-white/85">
+                {displayDeviceName}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

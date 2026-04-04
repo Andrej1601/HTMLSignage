@@ -16,7 +16,7 @@ function normalizeText(value: string | undefined, fallback: string): string {
 
 export function normalizeMaintenanceScreenSettings(
   value?: MaintenanceScreenSettings | null,
-): Required<Omit<MaintenanceScreenSettings, 'backgroundImageId'>> & { backgroundImageId?: string } {
+): Required<Omit<MaintenanceScreenSettings, 'backgroundImageId'>> & { backgroundImageId?: string; displayStyle: 'glass' | 'overlay' } {
   return {
     label: normalizeText(value?.label, DEFAULT_MAINTENANCE_SCREEN_SETTINGS.label || 'Wartungsmodus'),
     headline: normalizeText(
@@ -28,6 +28,7 @@ export function normalizeMaintenanceScreenSettings(
       DEFAULT_MAINTENANCE_SCREEN_SETTINGS.message || 'Dieses Geraet ist aktuell reserviert.',
     ),
     showDeviceName: value?.showDeviceName ?? true,
+    displayStyle: value?.displayStyle ?? 'glass',
     backgroundImageId:
       typeof value?.backgroundImageId === 'string' && value.backgroundImageId.trim().length > 0
         ? value.backgroundImageId

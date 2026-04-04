@@ -303,7 +303,7 @@ log "INSTALL_LOG=${INSTALL_LOG}"
 step "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail
+apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail cron
 if is_true "${APT_UPGRADE}"; then
   apt-get upgrade -y
 else
@@ -642,8 +642,9 @@ CLEANUP_DST="/usr/local/bin/htmlsignage-disk-cleanup.sh"
 if [[ -f "${CLEANUP_SRC}" ]]; then
   cp "${CLEANUP_SRC}" "${CLEANUP_DST}"
   chmod +x "${CLEANUP_DST}"
-  if ! crontab -u "${APP_USER}" -l 2>/dev/null | grep -q "htmlsignage-disk-cleanup"; then
-    (crontab -u "${APP_USER}" -l 2>/dev/null; echo "0 */6 * * * ${CLEANUP_DST} >/dev/null 2>&1") | crontab -u "${APP_USER}" -
+  EXISTING_CRON="$(crontab -u "${APP_USER}" -l 2>/dev/null || true)"
+  if ! echo "${EXISTING_CRON}" | grep -q "htmlsignage-disk-cleanup"; then
+    echo "${EXISTING_CRON}" | { cat; echo "0 */6 * * * ${CLEANUP_DST} >/dev/null 2>&1"; } | crontab -u "${APP_USER}" -
     log "Disk cleanup cron installed (runs every 6 hours as ${APP_USER})"
   else
     log "Disk cleanup cron already installed"
@@ -710,8 +711,9 @@ chmod +x "${BACKUP_SCRIPT}"
 chown "${APP_USER}:${APP_USER}" "${BACKUP_SCRIPT}"
 
 # Install backup cron (daily at 3am)
-if ! crontab -u "${APP_USER}" -l 2>/dev/null | grep -q "htmlsignage-backup"; then
-  (crontab -u "${APP_USER}" -l 2>/dev/null; echo "0 3 * * * ${BACKUP_SCRIPT} >> ${APP_DIR}/logs/backup.log 2>&1") | crontab -u "${APP_USER}" -
+EXISTING_CRON="$(crontab -u "${APP_USER}" -l 2>/dev/null || true)"
+if ! echo "${EXISTING_CRON}" | grep -q "htmlsignage-backup"; then
+  echo "${EXISTING_CRON}" | { cat; echo "0 3 * * * ${BACKUP_SCRIPT} >> ${APP_DIR}/logs/backup.log 2>&1"; } | crontab -u "${APP_USER}" -
   log "Backup cron installed (daily at 3am)"
 else
   log "Backup cron already installed"

@@ -1,163 +1,96 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  useClearOverrides,
-  useDevices,
-  useSetOverrides,
-  useUpdateDevice,
-} from '@/hooks/useDevices';
-import {
-  useDeleteSlideshowHistoryEntry,
-  useDiscardSlideshowDraft,
-  usePublishSlideshow,
-  useRollbackSlideshow,
-  useSaveSlideshowDraft,
-  useSlideshowWorkflow,
-} from '@/hooks/useSlideshowWorkflow';
+import { useDevices } from '@/hooks/useDevices';
+import { useSlideshows, useUpdateSlideshow, useCreateSlideshow, useDeleteSlideshow } from '@/hooks/useSlideshows';
 import { useSchedule } from '@/hooks/useSchedule';
 import { useSettings } from '@/hooks/useSettings';
 import { useMedia } from '@/hooks/useMedia';
 import { createDefaultSchedule } from '@/types/schedule.types';
-import type { Device } from '@/types/device.types';
-import { createDefaultSlideshowConfig, type SlideshowConfig } from '@/types/slideshow.types';
-import { getActiveEvent, type AudioSettings, type Settings } from '@/types/settings.types';
-import type { SlideshowWorkflowEntry, SlideshowWorkflowSnapshot } from '@/services/api';
-import { parseAudioSettings } from '@/utils/audioUtils';
-import { getDeviceOverrideSettings } from '@/utils/deviceUtils';
+import type { SlideshowConfig, SlideshowDefinition } from '@/types/slideshow.types';
+import { createDefaultSlideshowConfig } from '@/types/slideshow.types';
+import { getActiveEvent } from '@/types/settings.types';
 import { getSlideshowQualityIssues } from '@/utils/editorQuality';
 import {
-  buildCurrentSlideshowSnapshot,
   buildSlideshowPreviewPayload,
-  getOverrideSlideshowConfig,
-  hasStoredSlideshowOrAudioOverride,
-  isScheduleOverride,
   normalizeEditorConfig,
   normalizePrestartMinutes,
-  parseDeviceId,
-  type EditorTarget,
 } from '@/pages/slideshowPage.utils';
 
 type ConfirmAction =
-  | { type: 'switch-target'; nextTarget: EditorTarget }
+  | { type: 'switch-slideshow'; nextSlideshowId: string }
   | { type: 'reset' }
-  | { type: 'delete-history'; entry: SlideshowWorkflowEntry }
+  | { type: 'delete-slideshow'; slideshow: SlideshowDefinition }
   | null;
 
 export function useSlideshowEditor() {
-  const { settings, isLoading, error, refetch } = useSettings();
+  const { settings, isLoading: settingsLoading, error: settingsError, refetch } = useSettings();
   const { schedule } = useSchedule();
   const { data: media = [] } = useMedia();
   const { data: devices = [] } = useDevices();
-  const updateDevice = useUpdateDevice();
-  const setOverrides = useSetOverrides();
-  const clearOverrides = useClearOverrides();
-  const saveDraft = useSaveSlideshowDraft();
-  const discardDraft = useDiscardSlideshowDraft();
-  const publishSlideshow = usePublishSlideshow();
-  const rollbackSlideshow = useRollbackSlideshow();
-  const deleteHistoryEntry = useDeleteSlideshowHistoryEntry();
+  const { data: slideshows = [], isLoading: slideshowsLoading } = useSlideshows();
+  const updateSlideshow = useUpdateSlideshow();
+  const createSlideshow = useCreateSlideshow();
+  const deleteSlideshow = useDeleteSlideshow();
 
   const pairedDevices = useMemo(
     () => devices.filter((device) => Boolean(device.pairedAt)),
     [devices],
   );
 
+  // Slideshow selection
   const [searchParams, setSearchParams] = useSearchParams();
-  const [target, setTarget] = useState<EditorTarget>(() => {
-    const urlTarget = searchParams.get('target');
-    if (urlTarget === 'global' || (urlTarget && urlTarget.startsWith('device:'))) {
-      return urlTarget as EditorTarget;
-    }
-    return 'global';
+  const [selectedSlideshowId, setSelectedSlideshowId] = useState<string | null>(() => {
+    return searchParams.get('slideshow') || null;
   });
+
+  // When slideshows load, select default if nothing selected
+  useEffect(() => {
+    if (slideshows.length === 0) return;
+    if (selectedSlideshowId && slideshows.some((s) => s.id === selectedSlideshowId)) return;
+    const defaultShow = slideshows.find((s) => s.isDefault);
+    setSelectedSlideshowId(defaultShow?.id || slideshows[0].id);
+  }, [slideshows, selectedSlideshowId]);
+
+  // Clear ?slideshow= from URL after consuming it
+  useEffect(() => {
+    if (searchParams.has('slideshow')) {
+      setSearchParams((prev) => { prev.delete('slideshow'); return prev; }, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedSlideshow = useMemo(
+    () => slideshows.find((s) => s.id === selectedSlideshowId) || null,
+    [slideshows, selectedSlideshowId],
+  );
+
+  // Editor state
   const [editorConfig, setEditorConfig] = useState<SlideshowConfig | null>(null);
-  const [editorAudioOverride, setEditorAudioOverride] = useState<AudioSettings | null>(null);
   const [editorPrestartMinutes, setEditorPrestartMinutes] = useState(10);
   const [isDirty, setIsDirty] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
-  const selectedDeviceId = parseDeviceId(target);
-  const selectedDevice = useMemo(
-    () => pairedDevices.find((device) => device.id === selectedDeviceId) || null,
-    [pairedDevices, selectedDeviceId],
-  );
-  const workflowTargetType: 'device' | 'global' = selectedDevice ? 'device' : 'global';
-  const workflowState = useSlideshowWorkflow(workflowTargetType, selectedDevice?.id);
-
   const previewSchedule = schedule || createDefaultSchedule();
   const activeEvent = useMemo(() => (settings ? getActiveEvent(settings, new Date()) : null), [settings]);
 
-  // Clear ?target= from URL after consuming it
-  useEffect(() => {
-    if (searchParams.has('target')) {
-      setSearchParams((prev) => { prev.delete('target'); return prev; }, { replace: true });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!selectedDeviceId) return;
-    if (selectedDevice) return;
-    setTarget('global');
-    setIsDirty(false);
-  }, [selectedDevice, selectedDeviceId]);
-
-  const loadEditorFromTarget = useCallback((targetToLoad: EditorTarget, draftSnapshot?: SlideshowWorkflowSnapshot | null) => {
-    if (!settings) return;
-
-    if (targetToLoad === 'global') {
-      const liveConfig = settings.slideshow || createDefaultSlideshowConfig();
-      const config = draftSnapshot?.config
-        ? normalizeEditorConfig(draftSnapshot.config, liveConfig)
-        : liveConfig;
-      setEditorConfig(config);
-      setEditorAudioOverride(null);
-      setEditorPrestartMinutes(normalizePrestartMinutes(
-        draftSnapshot?.prestartMinutes ?? settings.display?.prestartMinutes,
-        10,
-      ));
-      setIsDirty(false);
-      return;
-    }
-
-    const deviceId = parseDeviceId(targetToLoad);
-    const device = pairedDevices.find((entry) => entry.id === deviceId) || null;
-    const fallback = settings.slideshow || createDefaultSlideshowConfig();
-
-    if (draftSnapshot?.config) {
-      setEditorConfig(normalizeEditorConfig(draftSnapshot.config, fallback));
-      setEditorAudioOverride(draftSnapshot.audioOverride ? parseAudioSettings(draftSnapshot.audioOverride) : null);
-      setEditorPrestartMinutes(normalizePrestartMinutes(draftSnapshot.prestartMinutes, settings.display?.prestartMinutes));
-      setIsDirty(false);
-      return;
-    }
-
-    const overrideConfig = getOverrideSlideshowConfig(device, fallback);
-    setEditorConfig(overrideConfig || fallback);
-    setEditorAudioOverride(parseAudioSettings(getDeviceOverrideSettings(device).audio));
-    const overrideSettings = getDeviceOverrideSettings(device);
-    const overridePrestart = (overrideSettings.display as Record<string, unknown> | undefined)?.prestartMinutes;
+  // Load editor config from selected slideshow
+  const loadEditorFromSlideshow = useCallback((slideshow: SlideshowDefinition | null) => {
+    if (!slideshow) return;
+    const config = slideshow.config || createDefaultSlideshowConfig();
+    setEditorConfig(normalizeEditorConfig(config, createDefaultSlideshowConfig()));
     setEditorPrestartMinutes(normalizePrestartMinutes(
-      overridePrestart ?? settings.display?.prestartMinutes,
+      settings?.display?.prestartMinutes,
       10,
     ));
     setIsDirty(false);
-  }, [pairedDevices, settings]);
+  }, [settings]);
 
+  // Auto-load when slideshow selection changes
   useEffect(() => {
-    if (!settings || isDirty) return;
-    const draftSnapshot = workflowState.data?.draft?.snapshot || null;
-    loadEditorFromTarget(target, draftSnapshot);
-  }, [
-    settings,
-    target,
-    selectedDevice?.updatedAt,
-    workflowState.data?.draft?.snapshot,
-    workflowState.data?.draft?.id,
-    workflowState.data?.live.updatedAt,
-    isDirty,
-    loadEditorFromTarget,
-  ]);
+    if (!selectedSlideshow || isDirty) return;
+    loadEditorFromSlideshow(selectedSlideshow);
+  }, [selectedSlideshow, isDirty, loadEditorFromSlideshow]);
 
+  // Preview payload
   const previewPayload = useMemo(() => {
     return buildSlideshowPreviewPayload({
       settings,
@@ -165,45 +98,34 @@ export function useSlideshowEditor() {
       editorConfig,
       editorPrestartMinutes,
       isDirty,
-      selectedDevice,
-      editorAudioOverride,
     });
-  }, [editorAudioOverride, editorConfig, editorPrestartMinutes, isDirty, previewSchedule, selectedDevice, settings]);
+  }, [editorConfig, editorPrestartMinutes, isDirty, previewSchedule, settings]);
 
+  // Quality checks
   const slideshowQualityIssues = useMemo(() => getSlideshowQualityIssues({
     config: editorConfig,
     settings: previewPayload?.settings || settings,
     media,
-    audioOverride: selectedDevice ? editorAudioOverride : null,
-  }), [editorAudioOverride, editorConfig, media, previewPayload?.settings, selectedDevice, settings]);
+    audioOverride: null,
+  }), [editorConfig, media, previewPayload?.settings, settings]);
 
-  const currentSnapshot = useMemo<SlideshowWorkflowSnapshot | null>(() => {
-    return buildCurrentSlideshowSnapshot({
-      editorConfig,
-      editorPrestartMinutes,
-      selectedDevice,
-      editorAudioOverride,
-    });
-  }, [editorAudioOverride, editorConfig, editorPrestartMinutes, selectedDevice]);
+  // currentSnapshot can be used for future workflow integration
+  // const currentSnapshot = useMemo(() => buildCurrentSlideshowSnapshot({ editorConfig, editorPrestartMinutes }), [editorConfig, editorPrestartMinutes]);
 
-  const hasActiveDeviceTarget = Boolean(selectedDevice);
-  const hasRemovableOverride = hasStoredSlideshowOrAudioOverride(selectedDevice);
-  const hasSavedDraft = Boolean(workflowState.data?.draft);
-  const workflowBusy = saveDraft.isPending
-    || discardDraft.isPending
-    || publishSlideshow.isPending
-    || rollbackSlideshow.isPending
-    || deleteHistoryEntry.isPending;
-  const isBusy = workflowBusy || workflowState.isFetching || setOverrides.isPending || clearOverrides.isPending || updateDevice.isPending;
-  const canPublish = Boolean(currentSnapshot) && (isDirty || hasSavedDraft);
+  // Flags
+  const isLoading = settingsLoading || slideshowsLoading;
+  const error = settingsError;
+  const isBusy = updateSlideshow.isPending || createSlideshow.isPending || deleteSlideshow.isPending;
 
-  const handleSelectTarget = (nextTarget: EditorTarget) => {
-    if (nextTarget === target) return;
+  // ── Handlers ──
+
+  const handleSelectSlideshow = (nextId: string) => {
+    if (nextId === selectedSlideshowId) return;
     if (isDirty) {
-      setConfirmAction({ type: 'switch-target', nextTarget });
+      setConfirmAction({ type: 'switch-slideshow', nextSlideshowId: nextId });
       return;
     }
-    setTarget(nextTarget);
+    setSelectedSlideshowId(nextId);
     setIsDirty(false);
   };
 
@@ -212,47 +134,37 @@ export function useSlideshowEditor() {
       setConfirmAction({ type: 'reset' });
       return;
     }
-    loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
+    loadEditorFromSlideshow(selectedSlideshow);
   };
 
   const handleConfirmAction = useCallback(() => {
     if (!confirmAction) return;
 
-    if (confirmAction.type === 'switch-target') {
-      setTarget(confirmAction.nextTarget);
+    if (confirmAction.type === 'switch-slideshow') {
+      setSelectedSlideshowId(confirmAction.nextSlideshowId);
       setIsDirty(false);
     } else if (confirmAction.type === 'reset') {
-      loadEditorFromTarget(target, workflowState.data?.draft?.snapshot || null);
-    } else if (confirmAction.type === 'delete-history') {
-      deleteHistoryEntry.mutate({
-        targetType: workflowTargetType,
-        targetId: selectedDevice?.id,
-        historyId: confirmAction.entry.id,
+      loadEditorFromSlideshow(selectedSlideshow);
+    } else if (confirmAction.type === 'delete-slideshow') {
+      deleteSlideshow.mutate(confirmAction.slideshow.id, {
+        onSuccess: () => {
+          // Select default slideshow after deletion
+          const remaining = slideshows.filter((s) => s.id !== confirmAction.slideshow.id);
+          const next = remaining.find((s) => s.isDefault) || remaining[0];
+          if (next) setSelectedSlideshowId(next.id);
+        },
       });
     }
 
     setConfirmAction(null);
-  }, [confirmAction, deleteHistoryEntry, loadEditorFromTarget, selectedDevice?.id, target, workflowState.data?.draft?.snapshot, workflowTargetType]);
+  }, [confirmAction, deleteSlideshow, loadEditorFromSlideshow, selectedSlideshow, slideshows]);
 
-  const handleSaveDraftCurrent = () => {
-    if (!currentSnapshot) return;
-    saveDraft.mutate(
+  const handleSaveCurrent = () => {
+    if (!editorConfig || !selectedSlideshowId) return;
+    updateSlideshow.mutate(
       {
-        targetType: workflowTargetType,
-        targetId: selectedDevice?.id,
-        snapshot: currentSnapshot,
-      },
-      { onSuccess: () => setIsDirty(false) },
-    );
-  };
-
-  const handlePublishCurrent = () => {
-    if (!currentSnapshot) return;
-    publishSlideshow.mutate(
-      {
-        targetType: workflowTargetType,
-        targetId: selectedDevice?.id,
-        snapshot: currentSnapshot,
+        id: selectedSlideshowId,
+        updates: { config: editorConfig },
       },
       {
         onSuccess: () => {
@@ -263,85 +175,25 @@ export function useSlideshowEditor() {
     );
   };
 
-  const handleDiscardCurrentDraft = () => {
-    discardDraft.mutate(
+  const handleCreateSlideshow = (name: string, copyFromId?: string) => {
+    createSlideshow.mutate(
+      { name, copyFromId },
       {
-        targetType: workflowTargetType,
-        targetId: selectedDevice?.id,
-      },
-      {
-        onSuccess: () => {
+        onSuccess: (created) => {
+          setSelectedSlideshowId(created.id);
           setIsDirty(false);
-          void refetch();
-          loadEditorFromTarget(target, null);
         },
       },
     );
   };
 
-  const handleLoadHistoryEntry = (entry: SlideshowWorkflowEntry) => {
-    loadEditorFromTarget(target, entry.snapshot);
-    setIsDirty(true);
+  const handleDeleteSlideshow = (slideshow: SlideshowDefinition) => {
+    if (slideshow.isDefault) return; // Can't delete default
+    setConfirmAction({ type: 'delete-slideshow', slideshow });
   };
 
-  const handleRollbackEntry = (entry: SlideshowWorkflowEntry) => {
-    rollbackSlideshow.mutate(
-      {
-        targetType: workflowTargetType,
-        targetId: selectedDevice?.id,
-        sourceHistoryId: entry.id,
-        snapshot: entry.snapshot,
-      },
-      {
-        onSuccess: () => {
-          setIsDirty(false);
-          void refetch();
-        },
-      },
-    );
-  };
-
-  const handleDeleteHistoryEntry = (entry: SlideshowWorkflowEntry) => {
-    setConfirmAction({ type: 'delete-history', entry });
-  };
-
-  const handleRemoveCurrentOverride = () => {
-    if (!selectedDevice) return;
-
-    const currentSettingsOverride = getDeviceOverrideSettings(selectedDevice);
-    delete currentSettingsOverride.slideshow;
-    delete currentSettingsOverride.audio;
-
-    const hasRemainingSettingsOverride = Object.keys(currentSettingsOverride).length > 0;
-    const existingSchedule = selectedDevice.overrides?.schedule;
-    const scheduleOverride = isScheduleOverride(existingSchedule) ? existingSchedule : undefined;
-
-    if (hasRemainingSettingsOverride || scheduleOverride) {
-      const nextSettingsOverride = hasRemainingSettingsOverride
-        ? currentSettingsOverride as Partial<Settings>
-        : {};
-
-      setOverrides.mutate(
-        {
-          id: selectedDevice.id,
-          overrides: {
-            settings: nextSettingsOverride,
-            schedule: scheduleOverride,
-          },
-        },
-        { onSuccess: () => loadEditorFromTarget(target, null) },
-      );
-      return;
-    }
-
-    clearOverrides.mutate(selectedDevice.id, {
-      onSuccess: () => loadEditorFromTarget(target, null),
-    });
-  };
-
-  const handleDeviceModeChange = (device: Device, mode: 'auto' | 'override') => {
-    if (device.mode === mode) return;
-    updateDevice.mutate({ id: device.id, updates: { mode } });
+  const handleRenameSlideshow = (id: string, name: string) => {
+    updateSlideshow.mutate({ id, updates: { name } });
   };
 
   const handleConfigChange = (nextConfig: SlideshowConfig) => {
@@ -354,13 +206,6 @@ export function useSlideshowEditor() {
     setIsDirty(true);
   };
 
-  const handleAudioOverrideChange = selectedDevice
-    ? (audio: AudioSettings | null) => {
-        setEditorAudioOverride(audio);
-        setIsDirty(true);
-      }
-    : undefined;
-
   return {
     // Data
     settings,
@@ -368,49 +213,38 @@ export function useSlideshowEditor() {
     isLoading,
     error,
     refetch,
+    slideshows,
+    selectedSlideshow,
+    selectedSlideshowId,
     pairedDevices,
-    selectedDevice,
     activeEvent,
-    workflowState,
     previewPayload,
     slideshowQualityIssues,
 
     // Editor state
-    target,
     editorConfig,
-    editorAudioOverride,
     editorPrestartMinutes,
     isDirty,
     confirmAction,
 
     // Derived flags
-    hasActiveDeviceTarget,
-    hasRemovableOverride,
-    hasSavedDraft,
-    workflowBusy,
     isBusy,
-    canPublish,
-    workflowTargetType,
 
     // Mutation states
-    saveDraft,
-    publishSlideshow,
+    updateSlideshow,
+    createSlideshow,
+    deleteSlideshow,
 
     // Handlers
-    handleSelectTarget,
+    handleSelectSlideshow,
     handleReloadCurrent,
     handleConfirmAction,
-    handleSaveDraftCurrent,
-    handlePublishCurrent,
-    handleDiscardCurrentDraft,
-    handleLoadHistoryEntry,
-    handleRollbackEntry,
-    handleDeleteHistoryEntry,
-    handleRemoveCurrentOverride,
-    handleDeviceModeChange,
+    handleSaveCurrent,
+    handleCreateSlideshow,
+    handleDeleteSlideshow,
+    handleRenameSlideshow,
     handleConfigChange,
     handlePrestartMinutesChange,
-    handleAudioOverrideChange,
     setConfirmAction,
   };
 }

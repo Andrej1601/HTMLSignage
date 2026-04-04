@@ -1,5 +1,16 @@
 // Slideshow Configuration Types
 
+export interface SlideshowDefinition {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  config: SlideshowConfig;
+  createdAt: string;
+  updatedAt: string;
+  deviceCount?: number;
+  assignedDevices?: Array<{ id: string; name: string }>;
+}
+
 // Slide types
 export type SlideType =
   | 'content-panel' // Persistent content panel (e.g. schedule grid)

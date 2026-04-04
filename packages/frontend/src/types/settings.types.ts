@@ -104,6 +104,7 @@ export interface MaintenanceScreenSettings {
   message?: string;
   showDeviceName?: boolean;
   backgroundImageId?: string;
+  displayStyle?: 'glass' | 'overlay';
 }
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';

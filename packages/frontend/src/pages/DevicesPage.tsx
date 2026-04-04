@@ -24,6 +24,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useDevicesPageState, getFilterButtonClass, type DeviceStatusFilter } from '@/hooks/useDevicesPageState';
+import { useSlideshows } from '@/hooks/useSlideshows';
 
 const STATUS_TABS: { key: DeviceStatusFilter; label: string }[] = [
   { key: 'all', label: 'Alle' },
@@ -34,6 +35,7 @@ const STATUS_TABS: { key: DeviceStatusFilter; label: string }[] = [
 
 export function DevicesPage() {
   const state = useDevicesPageState();
+  const { data: slideshows = [] } = useSlideshows();
   const [fleetOpen, setFleetOpen] = useState(false);
 
   if (state.isLoading) {
@@ -193,10 +195,12 @@ export function DevicesPage() {
                     </div>
                   </div>
                   <div className="rounded-xl border border-spa-bg-secondary bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-spa-text-secondary">Modus</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-spa-text-secondary">Slideshow</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="secondary" size="sm" icon={ToggleRight} onClick={() => state.openBulkUpdate({ mode: 'auto' }, 'Automatikmodus setzen?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte wechseln in den Automatikmodus.`, 'Automatik setzen')} disabled={state.selectedDeviceIds.length === 0}>Automatik</Button>
-                      <Button variant="secondary" size="sm" icon={ToggleRight} onClick={() => state.openBulkUpdate({ mode: 'override' }, 'Override-Modus setzen?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte wechseln in den Override-Modus.`, 'Override setzen')} disabled={state.selectedDeviceIds.length === 0}>Override</Button>
+                      <Button variant="secondary" size="sm" icon={ToggleRight} onClick={() => state.openBulkUpdate({ slideshowId: null }, 'Standard-Slideshow zuweisen?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte nutzen die Standard-Slideshow.`, 'Standard setzen')} disabled={state.selectedDeviceIds.length === 0}>Standard</Button>
+                      {slideshows.filter((s) => !s.isDefault).map((s) => (
+                        <Button key={s.id} variant="secondary" size="sm" icon={ToggleRight} onClick={() => state.openBulkUpdate({ slideshowId: s.id }, `"${s.name}" zuweisen?`, `Die ausgewählten ${state.selectedDeviceIds.length} Geräte nutzen „${s.name}".`, 'Zuweisen')} disabled={state.selectedDeviceIds.length === 0}>{s.name}</Button>
+                      ))}
                     </div>
                   </div>
                   <div className="rounded-xl border border-spa-bg-secondary bg-white p-4">
@@ -245,6 +249,7 @@ export function DevicesPage() {
           onSave={state.handleUpdateDevice}
           isSaving={state.updateDeviceIsPending}
           existingGroups={state.existingGroupNames}
+          slideshows={slideshows}
         />
 
         <ConfirmDialog

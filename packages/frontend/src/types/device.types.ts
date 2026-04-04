@@ -11,6 +11,8 @@ export interface Device {
   pairingCode?: string | null;
   groupName?: string | null;
   mode: DeviceMode;
+  slideshowId?: string | null;
+  slideshow?: { id: string; name: string } | null;
   maintenanceMode?: boolean;
   pairedBy?: string;
   pairedAt?: string;
@@ -43,6 +45,7 @@ export interface UpdateDeviceRequest {
   name?: string;
   groupName?: string | null;
   mode?: DeviceMode;
+  slideshowId?: string | null;
   maintenanceMode?: boolean;
 }
 
@@ -127,4 +130,8 @@ export function getModeLabel(mode: DeviceMode): string {
     case 'override':
       return 'Überschrieben';
   }
+}
+
+export function getDeviceSlideshowLabel(device: Device): string {
+  return device.slideshow?.name || 'Standard';
 }

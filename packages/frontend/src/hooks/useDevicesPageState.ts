@@ -25,7 +25,7 @@ export interface PendingBulkAction {
   confirmLabel: string;
   variant?: 'warning' | 'default';
   action?: DeviceControlCommand['action'];
-  updates?: Pick<UpdateDeviceRequest, 'mode' | 'maintenanceMode'>;
+  updates?: Pick<UpdateDeviceRequest, 'mode' | 'maintenanceMode' | 'slideshowId'>;
 }
 
 function normalizeGroupKey(groupName?: string | null): string {
@@ -239,7 +239,7 @@ export function useDevicesPageState() {
   };
 
   const openBulkUpdate = (
-    updates: Pick<UpdateDeviceRequest, 'mode' | 'maintenanceMode'>,
+    updates: Pick<UpdateDeviceRequest, 'mode' | 'maintenanceMode' | 'slideshowId'>,
     title: string,
     message: string,
     confirmLabel: string,

@@ -14,6 +14,7 @@ type DeviceFleetWritableFields = {
   groupName?: string | null;
   mode?: DeviceMode;
   maintenanceMode?: boolean;
+  slideshowId?: string | null;
 };
 
 export function normalizeSettingsData(raw: unknown): Record<string, unknown> {
@@ -81,6 +82,11 @@ export function buildDeviceUpdateData(input: {
   if (input.mode !== undefined) updates.mode = input.mode;
   if (input.groupName !== undefined) updates.groupName = normalizeDeviceGroupName(input.groupName);
   if (input.maintenanceMode !== undefined) updates.maintenanceMode = input.maintenanceMode;
+  if (input.slideshowId !== undefined) {
+    updates.slideshow = input.slideshowId
+      ? { connect: { id: input.slideshowId } }
+      : { disconnect: true };
+  }
 
   return updates as Prisma.DeviceUpdateInput;
 }
@@ -104,6 +110,7 @@ export function buildDeviceUpdateAuditDetails(input: {
   if (input.mode !== undefined) details.mode = input.mode;
   if (input.maintenanceMode !== undefined) details.maintenanceMode = input.maintenanceMode;
   if (input.groupName !== undefined) details.groupName = normalizeDeviceGroupName(input.groupName);
+  if (input.slideshowId !== undefined) details.slideshowId = input.slideshowId;
 
   return details as Prisma.InputJsonObject;
 }

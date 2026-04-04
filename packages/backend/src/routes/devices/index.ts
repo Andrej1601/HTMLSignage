@@ -84,7 +84,7 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
   try {
     const device = await prisma.device.findUnique({
       where: { id: req.params.id },
-      include: { overrides: true },
+      include: { overrides: true, slideshow: true },
     });
 
     if (!device) {
@@ -98,6 +98,13 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
 
     const globalSchedule = normalizeScheduleData(activeSchedule?.data);
     const globalSettings = normalizeSettingsData(activeSettings?.data);
+
+    // Resolve slideshow config: device-specific slideshow takes priority over global settings
+    const effectiveSettings = { ...globalSettings };
+    if (device.slideshowId && device.slideshow) {
+      effectiveSettings.slideshow = (device.slideshow as unknown as { config: unknown }).config;
+    }
+
     const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);
     const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
     const fleetState = readDeviceFleetState(device);
@@ -107,7 +114,7 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
       maintenanceMode: fleetState.maintenanceMode,
       mode: device.mode as 'auto' | 'override',
       globalSchedule,
-      globalSettings,
+      globalSettings: effectiveSettings,
       overrideSchedule,
       overrideSettings: device.overrides?.settings,
     }));

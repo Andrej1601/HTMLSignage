@@ -24,6 +24,7 @@ import systemRouter from './routes/system.js';
 import saunasRouter from './routes/saunas.js';
 import palettesRouter from './routes/palettes.js';
 import slideshowWorkflowRouter from './routes/slideshowWorkflow.js';
+import slideshowsRouter from './routes/slideshows.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -178,6 +179,7 @@ app.use('/api/system', systemRouter);
 app.use('/api/saunas', saunasRouter);
 app.use('/api/palettes', palettesRouter);
 app.use('/api/slideshow', slideshowWorkflowRouter);
+app.use('/api/slideshows', slideshowsRouter);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {

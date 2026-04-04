@@ -53,11 +53,25 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+model Slideshow {
+  id        String   @id @default(cuid())
+  name      String
+  isDefault Boolean  @default(false)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  devices   Device[]
+
+  @@index([isDefault])
+  @@map("slideshows")
+}
+
 model Device {
   id              String          @id @default(cuid())
   name            String
   pairingCode     String?         @unique
   mode            String          @default("auto")
+  slideshowId     String?
   pairedBy        String?
   pairedAt        DateTime?
   lastSeen        DateTime?
@@ -66,6 +80,7 @@ model Device {
   groupName       String?
   maintenanceMode Boolean         @default(false)
   tokenRevokedAt  DateTime?
+  slideshow       Slideshow?      @relation(fields: [slideshowId], references: [id], onDelete: SetNull)
   overrides       DeviceOverride?
   user            User?           @relation(fields: [pairedBy], references: [id])
 
@@ -75,6 +90,7 @@ model Device {
   @@index([maintenanceMode])
   @@index([pairingCode])
   @@index([tokenRevokedAt])
+  @@index([slideshowId])
   @@map("devices")
 }
 
