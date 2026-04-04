@@ -302,6 +302,20 @@ log "INSTALL_LOG=${INSTALL_LOG}"
 # ── System packages ──────────────────────────────────────────────────────────
 step "Installing base packages"
 export DEBIAN_FRONTEND=noninteractive
+
+# Wait for dpkg lock (unattended-upgrades may hold it)
+log "Waiting for dpkg lock to be released..."
+for ((i = 1; i <= 60; i++)); do
+  if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+    log "dpkg lock released after ${i}s"
+    break
+  fi
+  if (( i % 10 == 0 )); then
+    log "Still waiting for dpkg lock (${i}s elapsed)..."
+  fi
+  sleep 1
+done
+
 apt-get update -y
 apt-get install -y curl git ca-certificates gnupg build-essential python3 openssl postgresql postgresql-contrib whiptail cron
 if is_true "${APT_UPGRADE}"; then
