@@ -384,12 +384,6 @@ if [[ "${CURRENT_PNPM}" != "${PNPM_VERSION}" ]]; then
   fi
 fi
 
-# Fix corepack cache ownership (root may have written here during install)
-COREPACK_CACHE_DIR="/home/${APP_USER}/.cache/node/corepack"
-if [[ -d "${COREPACK_CACHE_DIR}" ]]; then
-  chown -R "${APP_USER}:${APP_USER}" "${COREPACK_CACHE_DIR}"
-fi
-
 hash -r
 command -v pnpm >/dev/null 2>&1 || die "pnpm installation failed."
 PNPM_BIN="$(command -v pnpm)"
@@ -440,6 +434,12 @@ if [[ "${IS_UPDATE}" == "true" ]]; then
   sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
 else
   sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
+fi
+
+# Fix corepack cache ownership after pnpm install (root may have written during prepare, pnpm may have written new files)
+COREPACK_CACHE_DIR="/home/${APP_USER}/.cache/node/corepack"
+if [[ -d "${COREPACK_CACHE_DIR}" ]]; then
+  chown -R "${APP_USER}:${APP_USER}" "${COREPACK_CACHE_DIR}"
 fi
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
