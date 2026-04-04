@@ -388,8 +388,10 @@ fi
 
 if [[ ! -d "${APP_DIR}/.git" ]]; then
   log "Cloning repository..."
+  CLONE_TMP="$(mktemp -d /tmp/HTMLSignage-clone-XXXXXX)"
+  git clone --branch "${BRANCH}" "${REPO_URL}" "${CLONE_TMP}"
   rm -rf "${APP_DIR}"
-  git clone --branch "${BRANCH}" "${REPO_URL}" "${APP_DIR}"
+  mv "${CLONE_TMP}" "${APP_DIR}"
   chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 fi
 
