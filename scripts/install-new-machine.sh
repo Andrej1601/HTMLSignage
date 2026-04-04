@@ -642,6 +642,21 @@ WantedBy=multi-user.target
 EOF
 
 step "Reloading and starting services"
+
+# Stop any existing services and free ports before starting fresh
+log "Stopping existing HTMLSignage services..."
+systemctl stop htmlsignage-backend.service 2>/dev/null || true
+systemctl stop htmlsignage-frontend.service 2>/dev/null || true
+
+# Kill any stray processes still holding the ports
+for port in "${BACKEND_PORT}" "${FRONTEND_PORT}"; do
+  pids="$(fuser -k ${port}/tcp 2>/dev/null || true)"
+  if [[ -n "${pids}" ]]; then
+    log "Killed processes holding port ${port}"
+    sleep 1
+  fi
+done
+
 systemctl daemon-reload
 systemctl enable --now htmlsignage-backend.service
 systemctl restart htmlsignage-backend.service
