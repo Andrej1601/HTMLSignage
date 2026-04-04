@@ -597,7 +597,6 @@ User=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
 Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-Environment=COREPACK_ENABLE_AUTO=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter backend start
 Restart=always
@@ -626,7 +625,6 @@ Type=simple
 User=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-Environment=COREPACK_ENABLE_AUTO=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND_PORT}
 Restart=always
