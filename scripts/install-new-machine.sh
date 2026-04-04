@@ -366,24 +366,8 @@ log "Using Node.js $(node -v), npm $(npm -v)"
 
 # ── pnpm ─────────────────────────────────────────────────────────────────────
 step "Preparing pnpm (${PNPM_VERSION})"
-cleanup_pnpm_bins
-CURRENT_PNPM="$(pnpm --version 2>/dev/null || true)"
-if [[ "${CURRENT_PNPM}" != "${PNPM_VERSION}" ]]; then
-  if command -v corepack >/dev/null 2>&1; then
-    export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-    corepack enable
-    if ! corepack prepare "pnpm@${PNPM_VERSION}" --activate; then
-      warn "corepack prepare failed, falling back to npm global install."
-      cleanup_pnpm_bins true
-      npm install -g "pnpm@${PNPM_VERSION}" --force
-    fi
-  else
-    warn "corepack not found, installing pnpm via npm..."
-    cleanup_pnpm_bins true
-    npm install -g "pnpm@${PNPM_VERSION}" --force
-  fi
-fi
-
+cleanup_pnpm_bins true
+npm install -g "pnpm@${PNPM_VERSION}" --force
 hash -r
 command -v pnpm >/dev/null 2>&1 || die "pnpm installation failed."
 PNPM_BIN="$(command -v pnpm)"
@@ -434,12 +418,6 @@ if [[ "${IS_UPDATE}" == "true" ]]; then
   sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
 else
   sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}'; pnpm install --frozen-lockfile --ignore-scripts=false"
-fi
-
-# Fix corepack cache ownership after pnpm install (root may have written during prepare, pnpm may have written new files)
-COREPACK_CACHE_DIR="/home/${APP_USER}/.cache/node/corepack"
-if [[ -d "${COREPACK_CACHE_DIR}" ]]; then
-  chown -R "${APP_USER}:${APP_USER}" "${COREPACK_CACHE_DIR}"
 fi
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
@@ -596,7 +574,6 @@ Type=simple
 User=${APP_USER}
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
-Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter backend start
 Restart=always
@@ -624,7 +601,6 @@ Wants=htmlsignage-backend.service
 Type=simple
 User=${APP_USER}
 WorkingDirectory=${APP_DIR}
-Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND_PORT}
 Restart=always
