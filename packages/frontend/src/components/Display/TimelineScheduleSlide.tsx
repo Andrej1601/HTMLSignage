@@ -5,6 +5,8 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { classNames } from '@/utils/classNames';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import {
@@ -13,9 +15,15 @@ import {
   resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import {
+  buildTimelineBranding,
+  buildTimelineGeometry,
+  buildTimelineInfusionLayout,
+  minutesToTimeLabel,
+  type TimelineInfusion,
+} from './timelineScheduleUtils';
 
-const BASE_ROW_HEIGHT_PX = 72;
-const MIN_ROW_HEIGHT_PX = 56;
 const START_DELAY_MS = 4000;
 const SCROLL_SPEED_PX_PER_SEC = 12;
 const LOOP_PAUSE_MS = 900;
@@ -23,22 +31,9 @@ const LOOP_PAUSE_MS = 900;
 interface TimelineScheduleSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
+  deviceId?: string;
 }
-
-interface TimelineInfusion {
-  id: string;
-  time: string;
-  duration: number;
-  title: string;
-  intensity: number;
-}
-
-function minutesToTimeLabel(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60) % 24;
-  const minutes = totalMinutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
 
 function IntensityFlames({
   level,
@@ -137,7 +132,7 @@ function TimelineInfusionCard({
 
   return (
     <div
-      className={`h-full w-full rounded-xl border shadow-sm flex flex-col overflow-hidden ${
+      className={`h-full w-full rounded-xl border shadow-xs flex flex-col overflow-hidden ${
         isFinished ? 'opacity-75' : ''
       }`}
       style={{
@@ -202,20 +197,24 @@ function TimelineInfusionCard({
   );
 }
 
-export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSlideProps) {
+export function TimelineScheduleSlide({ schedule, settings, now: nowProp, deviceId }: TimelineScheduleSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
-  const [now, setNow] = useState(() => new Date());
+  const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
   const [viewportHeight, setViewportHeight] = useState(0);
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 10_000);
+    if (nowProp) return undefined;
+    const t = setInterval(() => setClockNow(new Date()), 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [nowProp]);
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const now = nowProp ?? clockNow;
+
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets?.[activePresetKey];
 
@@ -264,77 +263,11 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
   );
 
   const timeline = useMemo(() => {
-    const rowMinutes = (daySchedule?.rows || [])
-      .map((row) => timeToMinutes(row.time))
-      .filter((n) => Number.isFinite(n))
-      .sort((a, b) => a - b);
-    const uniqueRowMinutes = Array.from(new Set(rowMinutes));
-
-    const infusionStartMinutes = allInfusions
-      .map((item) => timeToMinutes(item.time))
-      .filter((n) => Number.isFinite(n));
-    const infusionEndMinutes = allInfusions
-      .map((item) => timeToMinutes(item.time) + Math.max(1, item.duration || 15))
-      .filter((n) => Number.isFinite(n));
-
-    const minMinute = Math.min(
-      uniqueRowMinutes[0] ?? Number.POSITIVE_INFINITY,
-      infusionStartMinutes[0] ?? Number.POSITIVE_INFINITY,
+    return buildTimelineGeometry(
+      (daySchedule?.rows || []).map((row) => row.time),
+      allInfusions,
+      viewportHeight,
     );
-    if (!Number.isFinite(minMinute)) return null;
-
-    const positiveDiffs: number[] = [];
-    for (let i = 1; i < uniqueRowMinutes.length; i += 1) {
-      const diff = uniqueRowMinutes[i] - uniqueRowMinutes[i - 1];
-      if (diff > 0) positiveDiffs.push(diff);
-    }
-    const stepMinute = positiveDiffs.length > 0 ? Math.min(...positiveDiffs) : 30;
-
-    const maxFromRows = (uniqueRowMinutes[uniqueRowMinutes.length - 1] ?? minMinute) + stepMinute;
-    const maxFromInfusions = infusionEndMinutes.length > 0
-      ? Math.max(...infusionEndMinutes)
-      : maxFromRows;
-    const endMinute = Math.max(maxFromRows, maxFromInfusions);
-
-    const slotMinutes: number[] = [];
-    for (let cursor = minMinute; cursor <= endMinute; cursor += stepMinute) {
-      slotMinutes.push(cursor);
-    }
-    if (slotMinutes.length < 2) {
-      slotMinutes.push(minMinute + stepMinute);
-    }
-
-    const intervalCount = Math.max(1, slotMinutes.length - 1);
-    const fittingRowHeight = viewportHeight > 0
-      ? ((viewportHeight - 2) / intervalCount)
-      : BASE_ROW_HEIGHT_PX;
-    const rowHeight = Math.max(MIN_ROW_HEIGHT_PX, fittingRowHeight || BASE_ROW_HEIGHT_PX);
-
-    const pixelsPerMinute = rowHeight / stepMinute;
-    const minuteToY = (minute: number) => (minute - minMinute) * pixelsPerMinute;
-    const contentHeight = intervalCount * rowHeight + 4;
-
-    const segments = slotMinutes.slice(0, -1).map((minute, index) => {
-      const nextMinute = slotMinutes[index + 1] ?? (minute + stepMinute);
-      return {
-        minute,
-        top: minuteToY(minute),
-        height: Math.max(1, minuteToY(nextMinute) - minuteToY(minute)),
-        striped: index % 2 === 0,
-      };
-    });
-
-    return {
-      startMinute: minMinute,
-      endMinute,
-      stepMinute,
-      rowHeight,
-      pixelsPerMinute,
-      contentHeight,
-      slotMinutes,
-      segments,
-      minuteToY,
-    };
   }, [allInfusions, daySchedule?.rows, viewportHeight]);
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
@@ -347,14 +280,15 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
   const statusLive = theme.statusLive || '#10B981';
   const statusPrestart = theme.statusPrestart || '#F59E0B';
   const prestartMinutes = resolvePrestartMinutes(settings);
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isCompactLayout = profile.isCompact || profile.isNarrow;
+  const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
+  const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
 
-  const rawLogoText = (header.logoText || '').trim();
-  const logoText = (!rawLogoText || /^html\s*signage$/i.test(rawLogoText))
-    ? 'Westfalenbad Hagen'
-    : rawLogoText;
-  const titleWords = logoText.split(' ');
-  const firstWord = titleWords[0] || 'Westfalenbad';
-  const restWords = titleWords.slice(1).join(' ') || 'Hagen';
+  const { firstWord, restWords } = useMemo(
+    () => buildTimelineBranding(header.logoText || ''),
+    [header.logoText],
+  );
 
   const timeColWidth = 'w-20';
   const gridTemplateColumns = `repeat(${Math.max(1, gridSaunas.length)}, minmax(0, 1fr))`;
@@ -473,23 +407,45 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
   const hasVerticalOverflow = viewportHeight > 0 && (timeline.contentHeight - viewportHeight) > 4;
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden p-6" style={{ backgroundColor: leftBg, color: textMain }}>
-      <header className="mb-4 flex justify-between items-end z-10 w-full px-1 gap-4 shrink-0">
-        <div className="flex items-center gap-5 min-w-0">
+    <div
+      ref={containerRef}
+      className={classNames(
+        'w-full h-full flex flex-col overflow-hidden',
+        isEditorial ? (isCompactLayout ? 'p-3' : 'p-4') : isCompactLayout ? 'p-4' : 'p-6',
+      )}
+      style={{ backgroundColor: leftBg, color: textMain }}
+    >
+      {!isEditorial && (
+        <header className={classNames('z-10 w-full px-1 shrink-0', compactHeader ? 'mb-3 flex flex-col gap-3' : 'mb-4 flex items-end justify-between gap-4')}>
+        <div className={classNames('flex items-center min-w-0', isCompactLayout ? 'gap-3' : 'gap-5')}>
           <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md border"
+            className={classNames(
+              'rounded-2xl flex items-center justify-center shadow-md border',
+              isCompactLayout ? 'h-11 w-11' : 'h-14 w-14',
+            )}
             style={{
               backgroundColor: withAlpha(cardBg, 0.92),
               borderColor: withAlpha(border, 0.9),
             }}
           >
-            <Waves className="w-7 h-7" style={{ color: accentGreen }} />
+            <Waves className={classNames(isCompactLayout ? 'h-5 w-5' : 'h-7 w-7')} style={{ color: accentGreen }} />
           </div>
           <div className="min-w-0">
-            <p className="font-black uppercase tracking-[0.5em] text-[10px] mb-0.5 opacity-90" style={{ color: accentGreen }}>
+            <p
+              className={classNames(
+                'font-black uppercase mb-0.5 opacity-90',
+                isUltraCompactLayout ? 'text-[8px] tracking-[0.22em]' : isCompactLayout ? 'text-[9px] tracking-[0.28em]' : 'text-[10px] tracking-[0.5em]',
+              )}
+              style={{ color: accentGreen }}
+            >
               {header.subtitle && header.subtitle.trim() !== '' ? header.subtitle : 'Aufgussplan'}
             </p>
-            <h1 className="text-[52px] font-black uppercase tracking-tighter leading-none whitespace-nowrap overflow-hidden text-ellipsis">
+            <h1
+              className={classNames(
+                'font-black uppercase tracking-tighter leading-none overflow-hidden text-ellipsis',
+                isUltraCompactLayout ? 'text-[24px] whitespace-normal' : isCompactLayout ? 'text-[34px]' : 'text-[52px] whitespace-nowrap',
+              )}
+            >
               {firstWord}{' '}
               <span style={{ color: accentGold }}>
                 {restWords}
@@ -499,23 +455,39 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
         </div>
 
         <div
-          className="text-right shrink-0 rounded-3xl px-6 py-4 border backdrop-blur-sm"
+          className={classNames(
+            'text-right shrink-0 border backdrop-blur-xs',
+            compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'rounded-2xl px-4 py-3' : 'rounded-3xl px-6 py-4',
+          )}
           style={{
             backgroundColor: withAlpha(cardBg, 0.68),
             borderColor: withAlpha(border, 0.85),
           }}
         >
-          <p className="text-[11px] font-black uppercase tracking-widest mb-0.5" style={{ color: accentGold }}>
+          <p
+            className={classNames(
+              'font-black uppercase mb-0.5',
+              isCompactLayout ? 'text-[9px] tracking-[0.18em]' : 'text-[11px] tracking-widest',
+            )}
+            style={{ color: accentGold }}
+          >
             {formatLongDateDE(now)}
           </p>
-          <p className="text-6xl font-black font-mono leading-none tracking-tight" style={{ color: textMain }}>
+          <p
+            className={classNames(
+              'font-black font-mono leading-none tracking-tight',
+              isUltraCompactLayout ? 'text-[32px]' : isCompactLayout ? 'text-[44px]' : 'text-6xl',
+            )}
+            style={{ color: textMain }}
+          >
             {formatClockDE(now)}
           </p>
         </div>
-      </header>
+        </header>
+      )}
 
       <div
-        className="flex-1 min-h-0 rounded-[2rem] border shadow-sm overflow-hidden relative flex flex-col"
+        className="flex-1 min-h-0 rounded-[2rem] border shadow-xs overflow-hidden relative flex flex-col"
         style={{
           borderColor: withAlpha(border, 0.9),
           backgroundColor: withAlpha(cardBg, 0.35),
@@ -545,18 +517,21 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
               return (
                 <div
                   key={sauna.id}
-                  className="px-2 py-2.5 border-r last:border-r-0 overflow-hidden"
+                  className={classNames('border-r last:border-r-0 overflow-hidden', isCompactLayout ? 'px-1.5 py-2' : 'px-2 py-2.5')}
                   style={{ borderColor: withAlpha(border, 0.65) }}
                 >
                   <div className="flex items-center justify-center gap-2 min-w-0">
                     <div
-                      className="w-2 h-5 rounded-full shrink-0"
+                      className={classNames('rounded-full shrink-0', isCompactLayout ? 'h-4 w-1.5' : 'h-5 w-2')}
                       style={{
                         backgroundColor: outOfOrder ? withAlpha(textMuted, 0.5) : saunaAccent,
                       }}
                     />
                     <span
-                      className="text-[12px] font-black uppercase tracking-[0.14em] truncate"
+                      className={classNames(
+                        'font-black uppercase truncate',
+                        isUltraCompactLayout ? 'text-[9px] tracking-[0.08em]' : isCompactLayout ? 'text-[10px] tracking-[0.1em]' : 'text-[12px] tracking-[0.14em]',
+                      )}
                       style={{
                         color: outOfOrder ? withAlpha(textMain, 0.45) : textMain,
                       }}
@@ -566,14 +541,17 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
                     </span>
                     {!outOfOrder && sauna.info?.temperature != null && (
                       <span
-                        className="text-[10px] font-black rounded-full px-2 py-0.5 border flex items-center gap-1 shrink-0"
+                        className={classNames(
+                          'font-black rounded-full border flex items-center gap-1 shrink-0',
+                          isUltraCompactLayout ? 'text-[8px] px-1.5 py-0.5' : isCompactLayout ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5',
+                        )}
                         style={{
                           color: accentGold,
                           borderColor: withAlpha(border, 0.7),
                           backgroundColor: withAlpha(cardBg, 0.7),
                         }}
                       >
-                        <Thermometer size={12} style={{ color: accentGreen }} />
+                        <Thermometer size={isCompactLayout ? 10 : 12} style={{ color: accentGreen }} />
                         {sauna.info.temperature}°C
                       </span>
                     )}
@@ -652,22 +630,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
                       ))}
 
                       {infusions.map((infusion) => {
-                        const startMinute = timeToMinutes(infusion.time);
-                        const proportionalHeight = Math.max(44, infusion.duration * timeline.pixelsPerMinute - 8);
-                        const singleRowHeight = Math.max(48, timeline.rowHeight - 4);
-                        const minSameRowHeight = Math.max(56, timeline.rowHeight * 0.78);
-                        const minMultiRowHeight = Math.max(68, timeline.rowHeight * 0.9);
-                        const wantsSingleRow = infusion.duration <= timeline.stepMinute;
-                        const desiredHeight = wantsSingleRow
-                          ? Math.min(singleRowHeight, Math.max(minSameRowHeight, proportionalHeight))
-                          : Math.max(minMultiRowHeight, proportionalHeight);
-
-                        const topBase = timeline.minuteToY(startMinute);
-                        const top = wantsSingleRow
-                          ? topBase + Math.max(2, (timeline.rowHeight - desiredHeight) / 2)
-                          : topBase + 4;
-                        const maxHeight = Math.max(44, timeline.contentHeight - top - 2);
-                        const height = Math.min(desiredHeight, maxHeight);
+                        const layout = buildTimelineInfusionLayout(infusion, timeline);
 
                         return (
                           <motion.div
@@ -676,7 +639,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.3 }}
                             className="absolute left-[3%] w-[94%]"
-                            style={{ top: `${top}px`, height: `${height}px` }}
+                            style={{ top: `${layout.top}px`, height: `${layout.height}px` }}
                           >
                             <TimelineInfusionCard
                               infusion={infusion}
@@ -704,7 +667,7 @@ export function TimelineScheduleSlide({ schedule, settings }: TimelineScheduleSl
 
                       {outOfOrder && (
                         <div
-                          className="absolute inset-2 rounded-xl border backdrop-blur-sm flex flex-col items-center justify-center text-center px-2"
+                          className="absolute inset-2 rounded-xl border backdrop-blur-xs flex flex-col items-center justify-center text-center px-2"
                           style={{
                             backgroundColor: withAlpha(cardBg, 0.75),
                             borderColor: withAlpha('#DC2626', 0.28),

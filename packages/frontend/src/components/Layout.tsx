@@ -1,62 +1,161 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X } from 'lucide-react';
+import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search } from 'lucide-react';
+import { CommandPalette } from '@/components/CommandPalette';
+import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission, type Permission } from '@/utils/permissions';
 import { useEffect, useMemo, useState } from 'react';
-
-type NavSectionKey = 'operations' | 'content' | 'admin';
+import { WifiOff } from 'lucide-react';
+import { useWebSocketStatus } from '@/contexts/WebSocketContext';
 
 interface NavItem {
   name: string;
   href: string;
   icon: LucideIcon;
-  section: NavSectionKey;
   permission?: Permission;
+  section: 'operations' | 'content' | 'system';
+  description: string;
 }
 
-const SECTION_ORDER: NavSectionKey[] = ['operations', 'content', 'admin'];
-
-const SECTION_LABELS: Record<NavSectionKey, string> = {
-  operations: 'Betrieb',
-  content: 'Inhalte',
-  admin: 'Administration',
-};
+interface NavSection {
+  key: NavItem['section'];
+  title: string;
+  description: string;
+  items: NavItem[];
+}
 
 function isRouteActive(pathname: string, href: string): boolean {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function NavSections({
+  sections,
+  renderItem,
+}: {
+  sections: NavSection[];
+  renderItem: (item: NavItem) => React.ReactNode;
+}) {
+  return (
+    <div className="space-y-5">
+      {sections.map((section) => (
+        <div key={section.key} className="space-y-1.5">
+          <div className="px-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+              {section.title}
+            </p>
+          </div>
+          {section.items.map(renderItem)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isConnected: wsConnected } = useWebSocketStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const commandPalette = useCommandPaletteContext();
 
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
     const allItems: NavItem[] = [
-      { name: 'Dashboard', href: '/', icon: Home, section: 'operations' },
-      { name: 'Aufgussplan', href: '/schedule', icon: Calendar, section: 'operations', permission: 'schedule:write' },
-      { name: 'Geräte', href: '/devices', icon: Monitor, section: 'operations', permission: 'devices:manage' },
-      { name: 'Slideshow', href: '/slideshow', icon: Presentation, section: 'content', permission: 'slideshow:manage' },
-      { name: 'Medien', href: '/media', icon: Image, section: 'content', permission: 'media:manage' },
-      { name: 'Saunas', href: '/saunas', icon: Flame, section: 'content', permission: 'saunas:read' },
-      { name: 'Einstellungen', href: '/settings', icon: Settings, section: 'admin', permission: 'settings:manage' },
-      { name: 'Benutzer', href: '/users', icon: Users, section: 'admin', permission: 'users:manage' },
+      {
+        name: 'Dashboard',
+        href: '/',
+        icon: Home,
+        section: 'operations',
+        description: 'Live-Lage, Warnungen und Betriebsfokus.',
+      },
+      {
+        name: 'Aufgussplan',
+        href: '/schedule',
+        icon: Calendar,
+        permission: 'schedule:write',
+        section: 'operations',
+        description: 'Presets, Zeiten und Live-Automatik steuern.',
+      },
+      {
+        name: 'Geräte',
+        href: '/devices',
+        icon: Monitor,
+        permission: 'devices:manage',
+        section: 'operations',
+        description: 'Displays, Pairings und Ausspielmodi verwalten.',
+      },
+      {
+        name: 'Slideshow',
+        href: '/slideshow',
+        icon: Presentation,
+        permission: 'slideshow:manage',
+        section: 'content',
+        description: 'Slideshows, Varianten und Veröffentlichungen pflegen.',
+      },
+      {
+        name: 'Medien',
+        href: '/media',
+        icon: Image,
+        permission: 'media:manage',
+        section: 'content',
+        description: 'Bilder, Audio und Video zentral organisieren.',
+      },
+      {
+        name: 'Saunen',
+        href: '/saunas',
+        icon: Flame,
+        permission: 'saunas:read',
+        section: 'content',
+        description: 'Saunadaten und Anzeigeprofile bearbeiten.',
+      },
+      {
+        name: 'Einstellungen',
+        href: '/settings',
+        icon: Settings,
+        permission: 'settings:manage',
+        section: 'system',
+        description: 'Design, Audio, Events und Systempflege bündeln.',
+      },
+      {
+        name: 'Benutzer',
+        href: '/users',
+        icon: Users,
+        permission: 'users:manage',
+        section: 'system',
+        description: 'Rollen, Zugriff und Verantwortlichkeiten steuern.',
+      },
     ];
 
     return allItems.filter((item) => !item.permission || hasPermission(roles, item.permission));
   }, [user?.roles]);
 
-  const navigationSections = useMemo(() => {
-    return SECTION_ORDER
+  const navigationSections = useMemo<NavSection[]>(() => {
+    const sectionMeta: Omit<NavSection, 'items'>[] = [
+      {
+        key: 'operations',
+        title: 'Betrieb',
+        description: 'Live-Steuerung und laufender Betrieb.',
+      },
+      {
+        key: 'content',
+        title: 'Inhalte',
+        description: 'Slides, Medien und Domänendaten.',
+      },
+      {
+        key: 'system',
+        title: 'System',
+        description: 'Konfiguration, Benutzer und Wartung.',
+      },
+    ];
+
+    return sectionMeta
       .map((section) => ({
-        key: section,
-        label: SECTION_LABELS[section],
-        items: navigation.filter((item) => item.section === section),
+        ...section,
+        items: navigation.filter((item) => item.section === section.key),
       }))
       .filter((section) => section.items.length > 0);
   }, [navigation]);
@@ -79,25 +178,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Skip-to-Content for keyboard users */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-spa-primary focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-spa-primary focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-hidden"
       >
         Zum Hauptinhalt springen
       </a>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-72 lg:fixed lg:inset-y-0 bg-gradient-to-b from-spa-primary to-spa-primary-dark text-white shadow-2xl">
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col bg-linear-to-b from-spa-primary to-spa-primary-dark text-white shadow-2xl">
         <div className="flex-1 flex flex-col min-h-0">
           {/* Logo/Brand */}
-          <div className="flex h-20 flex-shrink-0 flex-col justify-center px-5 border-b border-white/10">
-            <h1 className="text-xl font-bold tracking-tight">HTMLSignage</h1>
-            <p className="text-xs text-white/70 mt-1">Control Center</p>
+          <div className="flex h-24 shrink-0 flex-col justify-center border-b border-white/10 px-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
+              Control Center
+            </p>
+            <h1 className="mt-2 text-xl font-bold tracking-tight">HTMLSignage</h1>
+            <p className="mt-1 text-xs text-white/70">
+              Displays, Inhalte und Systembetrieb in einem Blick.
+            </p>
           </div>
 
           {/* User Info */}
           {user && (
-            <div className="px-4 py-3 border-b border-white/10">
+            <div className="border-b border-white/10 px-4 py-4">
               <div className="flex items-center">
-                <div className="flex-shrink-0 h-10 w-10 bg-white/20 rounded-full flex items-center justify-center font-bold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 font-bold">
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <div className="ml-3">
@@ -108,47 +212,65 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
+          {/* Offline indicator */}
+          {!wsConnected && (
+            <div className="border-b border-white/10 px-4 py-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-spa-warning-light px-2.5 py-1 text-xs font-semibold text-spa-warning-dark">
+                <WifiOff className="h-3 w-3" aria-hidden="true" />
+                Keine Echtzeit-Verbindung
+              </span>
+            </div>
+          )}
+
           {/* Navigation */}
-          <nav className="flex-1 px-2 py-4 overflow-y-auto space-y-4" aria-label="Hauptnavigation">
-            {navigationSections.map((section) => (
-              <div key={section.key} className="space-y-1">
-                <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/60">
-                  {section.label}
-                </p>
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = isRouteActive(location.pathname, item.href);
-                  return (
-                    <Link
-                      key={item.name}
-                      to={item.href}
-                      aria-current={isActive ? 'page' : undefined}
+          <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Hauptnavigation">
+            <NavSections
+              sections={navigationSections}
+              renderItem={(item) => {
+                const Icon = item.icon;
+                const isActive = isRouteActive(location.pathname, item.href);
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={clsx(
+                      'group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
+                      isActive
+                        ? 'border-white bg-white text-spa-primary shadow-xs'
+                        : 'border-transparent text-white/90 hover:border-white/20 hover:bg-white/10 hover:text-white',
+                    )}
+                  >
+                    <Icon
                       className={clsx(
-                        'group flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl border transition-all',
-                        isActive
-                          ? 'bg-white text-spa-primary border-white shadow-sm'
-                          : 'border-transparent text-white/90 hover:bg-white/10 hover:border-white/20 hover:text-white'
+                        'h-5 w-5',
+                        isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white',
                       )}
-                    >
-                      <span className="flex items-center gap-3">
-                        <Icon className={clsx('h-5 w-5', isActive ? 'text-spa-primary' : 'text-white/80 group-hover:text-white')} />
-                        {item.name}
-                      </span>
-                      <span className={clsx('h-2 w-2 rounded-full transition-colors', isActive ? 'bg-spa-primary' : 'bg-transparent group-hover:bg-white/50')} />
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+                    />
+                    {item.name}
+                  </Link>
+                );
+              }}
+            />
           </nav>
 
-          {/* Logout Button */}
-          <div className="flex-shrink-0 px-2 py-4 border-t border-white/10">
+          {/* Search + Logout */}
+          <div className="shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
+            <button
+              onClick={commandPalette.open}
+              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <span className="flex items-center">
+                <Search className="mr-3 shrink-0 h-5 w-5" />
+                Suche
+              </span>
+              <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
+            </button>
             <button
               onClick={handleLogout}
               className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
             >
-              <LogOut className="mr-3 flex-shrink-0 h-5 w-5" />
+              <LogOut className="mr-3 shrink-0 h-5 w-5" />
               Abmelden
             </button>
           </div>
@@ -156,7 +278,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-16 px-4 bg-spa-primary text-white shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex h-16 items-center border-b border-white/10 bg-spa-primary text-white shadow-lg">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="p-2 rounded-md hover:bg-spa-primary-light"
@@ -169,17 +291,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-6 w-6" aria-hidden="true" />
           )}
         </button>
-        <div className="ml-4">
+        <div className="ml-4 flex-1">
           <h1 className="text-xl font-bold">HTMLSignage</h1>
           {activeNavigation && (
-            <p className="text-[11px] text-white/80 mt-0.5">{activeNavigation.name}</p>
+            <p className="mt-0.5 text-[11px] text-white/80">{activeNavigation.name}</p>
           )}
         </div>
+        {!wsConnected && (
+          <span className="mr-4 inline-flex items-center gap-1 rounded-full bg-spa-warning-light px-2.5 py-1 text-xs font-semibold text-spa-warning-dark">
+            <WifiOff className="h-3 w-3" aria-hidden="true" />
+            Offline
+          </span>
+        )}
       </div>
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-30 bg-black/50" onClick={() => setIsMobileMenuOpen(false)}>
+        <div className="lg:hidden fixed inset-0 z-30 bg-black/50" role="presentation" onClick={() => setIsMobileMenuOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setIsMobileMenuOpen(false); }}>
           <div
             className="fixed inset-y-0 left-0 w-64 bg-spa-primary text-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
@@ -189,7 +317,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {user && (
                 <div className="px-4 py-6 bg-spa-primary-dark border-b border-spa-primary-light">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-12 w-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
+                    <div className="shrink-0 h-12 w-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
                       {user.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="ml-3">
@@ -201,39 +329,38 @@ export function Layout({ children }: { children: React.ReactNode }) {
               )}
 
               {/* Navigation */}
-              <nav className="flex-1 px-2 py-4 space-y-4 overflow-y-auto" aria-label="Hauptnavigation">
-                {navigationSections.map((section) => (
-                  <div key={section.key} className="space-y-1">
-                    <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/60">
-                      {section.label}
-                    </p>
-                    {section.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = isRouteActive(location.pathname, item.href);
-                      return (
-                        <Link
-                          key={item.name}
-                          to={item.href}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={clsx(
-                            'group flex items-center px-3 py-3 text-base font-medium rounded-md transition-colors',
-                            isActive
-                              ? 'bg-spa-primary-dark text-white'
-                              : 'text-white/90 hover:bg-spa-primary-light hover:text-white'
-                          )}
-                        >
-                          <Icon className="mr-3 flex-shrink-0 h-6 w-6" />
-                          {item.name}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))}
+              <nav className="flex-1 overflow-y-auto px-2 py-4" aria-label="Hauptnavigation">
+                <NavSections
+                  sections={navigationSections}
+                  renderItem={(item) => {
+                    const Icon = item.icon;
+                    const isActive = isRouteActive(location.pathname, item.href);
+                    return (
+                      <Link
+                        key={item.name}
+                        to={item.href}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={clsx(
+                          'group flex items-center rounded-xl px-3 py-3 text-base font-medium transition-colors',
+                          isActive
+                            ? 'bg-spa-primary-dark text-white'
+                            : 'text-white/90 hover:bg-spa-primary-light hover:text-white',
+                        )}
+                      >
+                        <Icon className="mr-3 h-6 w-6 shrink-0" />
+                        <div className="min-w-0">
+                          <p>{item.name}</p>
+                          <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
+                        </div>
+                      </Link>
+                    );
+                  }}
+                />
               </nav>
 
               {/* Logout Button */}
-              <div className="flex-shrink-0 px-2 py-4 border-t border-spa-primary-light">
+              <div className="shrink-0 px-2 py-4 border-t border-spa-primary-light">
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
@@ -241,7 +368,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }}
                   className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors"
                 >
-                  <LogOut className="mr-3 flex-shrink-0 h-6 w-6" />
+                  <LogOut className="mr-3 shrink-0 h-6 w-6" />
                   Abmelden
                 </button>
               </div>
@@ -251,14 +378,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <div className="lg:pl-72 flex flex-col flex-1 w-full">
+      <div className="flex w-full flex-1 flex-col lg:pl-72">
         {/* Mobile top spacing */}
         <div className="lg:hidden h-16" />
 
         {/* Content */}
-        <main id="main-content" className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           {children}
         </main>
+        <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
       </div>
     </div>
   );

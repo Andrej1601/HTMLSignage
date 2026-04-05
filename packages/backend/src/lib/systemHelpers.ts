@@ -3,22 +3,45 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
-import { ScheduleSchema, type DaySchedule, type PresetKey, type Schedule } from '../types/schedule.types.js';
+import {
+  buildSystemUpdatePreflight,
+  buildSystemUpdatePreflightChecks,
+  buildSystemUpdateRestartPlan,
+  buildSystemUpdateVerification,
+  type SystemUpdatePreflight,
+  type SystemUpdateRestartPlan,
+  type SystemUpdateVerification,
+  type SystemUpdateVerificationOptions,
+} from './systemUpdateStatus.js';
 import { UPLOAD_DIR } from './upload.js';
+export type {
+  SystemUpdateCheck,
+  SystemUpdateCheckStatus,
+  SystemUpdatePreflight,
+  SystemUpdateRestartPlan,
+  SystemUpdateRestartStrategy,
+  SystemUpdateVerification,
+  SystemUpdateVerificationOptions,
+} from './systemUpdateStatus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const REPO_ROOT = path.resolve(__dirname, '../../../../');
 
-export const PRESET_KEYS: PresetKey[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Opt', 'Evt1', 'Evt2'];
-export const DEFAULT_SAUNAS = ['Vulkan', 'Nordisch', 'Bio'];
 export const MAX_UPDATE_LOG_CHARS = 200_000;
+export const MAX_UPDATE_LOG_LINES = 400;
 export const BACKUP_DIR = path.join(REPO_ROOT, 'backups');
 
 export interface CommandResult {
   code: number;
   stdout: string;
   stderr: string;
+}
+
+export interface RunCommandOptions {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
 }
 
 export interface ReleaseInfo {
@@ -38,49 +61,57 @@ export interface GitHubApiRelease {
   draft: boolean;
 }
 
-export function createEmptyDaySchedule(saunas: string[] = DEFAULT_SAUNAS): DaySchedule {
-  return {
-    saunas: [...saunas],
-    rows: [],
-  };
-}
-
-export function createDefaultSchedule(version = 1): Schedule {
-  const presets = Object.fromEntries(
-    PRESET_KEYS.map((key) => [key, createEmptyDaySchedule()])
-  ) as Record<PresetKey, DaySchedule>;
-
-  return {
-    version: Math.max(1, Math.floor(version)),
-    presets,
-    autoPlay: false,
-  };
-}
-
-export function normalizeScheduleData(raw: unknown): Schedule {
-  const parsed = ScheduleSchema.safeParse(raw);
-  if (parsed.success) return parsed.data;
-
-  const maybeVersion = (raw as { version?: unknown } | null)?.version;
-  const version = typeof maybeVersion === 'number' && Number.isFinite(maybeVersion) ? maybeVersion : 1;
-  return createDefaultSchedule(version);
-}
-
 export function trimLog(value: string): string {
-  if (value.length <= MAX_UPDATE_LOG_CHARS) return value;
-  return value.slice(value.length - MAX_UPDATE_LOG_CHARS);
+  let next = value;
+  if (next.length > MAX_UPDATE_LOG_CHARS) {
+    next = next.slice(next.length - MAX_UPDATE_LOG_CHARS);
+  }
+
+  const lines = next.split(/\r?\n/);
+  if (lines.length > MAX_UPDATE_LOG_LINES) {
+    next = lines.slice(lines.length - MAX_UPDATE_LOG_LINES).join('\n');
+  }
+
+  return next;
 }
 
-export async function runCommand(command: string, args: string[], cwd = REPO_ROOT): Promise<CommandResult> {
+export async function runCommand(
+  command: string,
+  args: string[],
+  cwdOrOptions: string | RunCommandOptions = REPO_ROOT,
+  maybeOptions?: RunCommandOptions,
+): Promise<CommandResult> {
+  const baseOptions = typeof cwdOrOptions === 'string' ? maybeOptions : cwdOrOptions;
+  const cwd = typeof cwdOrOptions === 'string'
+    ? cwdOrOptions
+    : (cwdOrOptions.cwd || REPO_ROOT);
+  const timeoutMs = Math.max(5000, baseOptions?.timeoutMs ?? 10 * 60 * 1000);
+  const env = {
+    ...process.env,
+    ...(baseOptions?.env || {}),
+  };
+
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd,
-      env: process.env,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let stdout = '';
     let stderr = '';
+    let finished = false;
+
+    const timeout = setTimeout(() => {
+      if (finished) return;
+      stderr = trimLog(`${stderr}\nCommand timed out after ${timeoutMs}ms`);
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!finished) {
+          child.kill('SIGKILL');
+        }
+      }, 2000).unref();
+    }, timeoutMs);
 
     child.stdout.on('data', (chunk: Buffer | string) => {
       stdout = trimLog(stdout + chunk.toString());
@@ -91,11 +122,15 @@ export async function runCommand(command: string, args: string[], cwd = REPO_ROO
     });
 
     child.on('error', (error) => {
+      finished = true;
+      clearTimeout(timeout);
       stderr = trimLog(`${stderr}\n${String(error)}`);
       resolve({ code: 1, stdout, stderr });
     });
 
     child.on('close', (code) => {
+      finished = true;
+      clearTimeout(timeout);
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
@@ -175,7 +210,18 @@ export async function createDatabaseBackup(): Promise<string | null> {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFile = path.join(BACKUP_DIR, `db-backup-${stamp}.sql`);
 
-  const result = await runCommand('pg_dump', ['--clean', '--if-exists', '-f', backupFile], REPO_ROOT);
+  const url = new URL(dbUrl);
+  const pgEnv = {
+    ...process.env,
+    PGPASSWORD: url.password,
+  };
+  const cleanUrl = `${url.protocol}//${url.username}@${url.host}${url.pathname}${url.search}`;
+
+  const result = await runCommand(
+    'pg_dump',
+    ['--clean', '--if-exists', '--format=plain', '--file', backupFile, cleanUrl],
+    { cwd: REPO_ROOT, timeoutMs: 15 * 60 * 1000, env: pgEnv },
+  );
   if (result.code !== 0) {
     console.error('[system] pg_dump failed:', result.stderr);
     return null;
@@ -186,6 +232,141 @@ export async function createDatabaseBackup(): Promise<string | null> {
 export async function getCurrentGitTag(): Promise<string | null> {
   const result = await runCommand('git', ['describe', '--tags', '--exact-match', 'HEAD']);
   return result.code === 0 ? result.stdout.trim() : null;
+}
+
+export async function getCurrentGitRef(): Promise<string | null> {
+  const result = await runCommand('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+  return result.code === 0 ? result.stdout.trim() : null;
+}
+
+async function hasCommand(command: string): Promise<boolean> {
+  const result = await runCommand('which', [command], { timeoutMs: 15_000 });
+  return result.code === 0;
+}
+
+function getEnvValue(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
+export async function getSystemdServiceFromCgroup(pid = process.pid): Promise<string | null> {
+  try {
+    const raw = await fs.readFile(`/proc/${pid}/cgroup`, 'utf-8');
+    const match = raw.match(/\/([^/\n]+\.service)(?:\n|$)/);
+    return match?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveSystemUpdateRestartPlan(pid = process.pid): Promise<SystemUpdateRestartPlan> {
+  const backendService = getEnvValue('SYSTEM_UPDATE_BACKEND_SERVICE') || 'htmlsignage-backend.service';
+  const frontendService = getEnvValue('SYSTEM_UPDATE_FRONTEND_SERVICE') || 'htmlsignage-frontend.service';
+  const backendHealthUrl = getEnvValue('SYSTEM_UPDATE_BACKEND_HEALTH_URL')
+    || `http://127.0.0.1:${process.env.PORT || '3000'}/health`;
+  const frontendHealthUrl = getEnvValue('SYSTEM_UPDATE_FRONTEND_HEALTH_URL')
+    || 'http://127.0.0.1:5173/';
+  const restartCommand = getEnvValue('SYSTEM_UPDATE_RESTART_COMMAND');
+  const frontendRestartCommand = getEnvValue('SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND');
+  const currentService = await getSystemdServiceFromCgroup(pid);
+
+  return buildSystemUpdateRestartPlan({
+    currentService,
+    backendService,
+    frontendService,
+    backendHealthUrl,
+    frontendHealthUrl,
+    restartCommand,
+    frontendRestartCommand,
+  });
+}
+
+export async function waitForHttpOk(
+  url: string,
+  options?: { attempts?: number; delayMs?: number; timeoutMs?: number },
+): Promise<{ ok: boolean; detail: string }> {
+  const attempts = Math.max(1, options?.attempts ?? 15);
+  const delayMs = Math.max(250, options?.delayMs ?? 2000);
+  const timeoutMs = Math.max(1000, options?.timeoutMs ?? 5000);
+  let lastDetail = `Keine Antwort von ${url}.`;
+
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.ok) {
+        return {
+          ok: true,
+          detail: `${url} antwortet mit HTTP ${response.status}.`,
+        };
+      }
+      lastDetail = `${url} antwortet mit HTTP ${response.status}.`;
+    } catch (error) {
+      lastDetail = error instanceof Error ? `${url} ist nicht erreichbar: ${error.message}` : `${url} ist nicht erreichbar.`;
+    }
+
+    if (index < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return {
+    ok: false,
+    detail: lastDetail,
+  };
+}
+
+export async function collectSystemUpdatePreflight(): Promise<SystemUpdatePreflight> {
+  const [gitAvailable, pnpmAvailable, pgDumpAvailable, isDirty, currentTag, currentRef, restartPlan] = await Promise.all([
+    hasCommand('git'),
+    hasCommand('pnpm'),
+    hasCommand('pg_dump'),
+    checkDirtyTree(),
+    getCurrentGitTag(),
+    getCurrentGitRef(),
+    resolveSystemUpdateRestartPlan(),
+  ]);
+
+  return buildSystemUpdatePreflight(buildSystemUpdatePreflightChecks({
+    gitAvailable,
+    pnpmAvailable,
+    pgDumpAvailable,
+    hasGitHubConfig: Boolean(process.env.GITHUB_TOKEN && process.env.GITHUB_REPO),
+    githubRepo: process.env.GITHUB_REPO ?? null,
+    hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+    isDirty,
+    currentTag,
+    currentRef,
+    restartPlan,
+  }));
+}
+
+export async function collectSystemUpdateVerification(
+  targetTag: string,
+  options: SystemUpdateVerificationOptions = {},
+): Promise<SystemUpdateVerification> {
+  const [currentVersion, currentTag, currentRef] = await Promise.all([
+    readLocalVersion(),
+    getCurrentGitTag(),
+    getCurrentGitRef(),
+  ]);
+
+  const backendDistPath = path.join(REPO_ROOT, 'packages/backend/dist/server.js');
+  const frontendDistPath = path.join(REPO_ROOT, 'packages/frontend/dist/index.html');
+  const backendDistReady = existsSync(backendDistPath);
+  const frontendDistReady = existsSync(frontendDistPath);
+
+  return buildSystemUpdateVerification({
+    currentVersion,
+    currentTag,
+    currentRef,
+    targetTag,
+    backendDistReady,
+    frontendDistReady,
+    options,
+    compareVersions,
+  });
 }
 
 export function parseDateOrFallback(raw: string | undefined): Date {
@@ -220,14 +401,19 @@ export async function clearUploadDirectory(): Promise<void> {
   );
 }
 
-export function makeUniqueFilename(baseName: string, used: Set<string>): string {
+export function makeUniqueFilename(
+  baseName: string,
+  used: Set<string>,
+  options?: { checkUploadDir?: boolean },
+): string {
   const parsed = path.parse(baseName);
   const stem = parsed.name || 'media-file';
   const ext = parsed.ext || '';
+  const checkUploadDir = options?.checkUploadDir !== false;
 
   let candidate = `${stem}${ext}`;
   let index = 1;
-  while (used.has(candidate) || existsSync(path.join(UPLOAD_DIR, candidate))) {
+  while (used.has(candidate) || (checkUploadDir && existsSync(path.join(UPLOAD_DIR, candidate)))) {
     candidate = `${stem}-${index}${ext}`;
     index += 1;
   }

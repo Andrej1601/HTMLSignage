@@ -2,7 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { devicesApi } from '@/services/api';
 import { toast } from '@/stores/toastStore';
 import type { DeviceOverridesPayload } from '@/services/api';
-import type { CreateDeviceRequest, UpdateDeviceRequest, DeviceControlCommand } from '@/types/device.types';
+import type {
+  BulkDeviceControlRequest,
+  BulkDeviceUpdateRequest,
+  CreateDeviceRequest,
+  DeviceControlCommand,
+  UpdateDeviceRequest,
+} from '@/types/device.types';
 
 function invalidateDevices(queryClient: ReturnType<typeof useQueryClient>, deviceId?: string): void {
   queryClient.invalidateQueries({ queryKey: ['devices'] });
@@ -88,6 +94,35 @@ export function useSendCommand() {
     },
     onError: () => {
       toast.error('Befehl konnte nicht gesendet werden.');
+    },
+  });
+}
+
+// Bulk update device properties
+export function useBulkUpdateDevices() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: BulkDeviceUpdateRequest) => devicesApi.bulkUpdateDevices(payload),
+    onSuccess: (result) => {
+      invalidateDevices(queryClient);
+      toast.success(`${result.affectedCount} Gerät${result.affectedCount === 1 ? '' : 'e'} aktualisiert.`);
+    },
+    onError: () => {
+      toast.error('Geräte konnten nicht gesammelt aktualisiert werden.');
+    },
+  });
+}
+
+// Bulk send control commands
+export function useBulkSendCommand() {
+  return useMutation({
+    mutationFn: (payload: BulkDeviceControlRequest) => devicesApi.bulkSendCommand(payload),
+    onSuccess: (result) => {
+      toast.success(`Befehl an ${result.affectedCount} Gerät${result.affectedCount === 1 ? '' : 'e'} gesendet.`);
+    },
+    onError: () => {
+      toast.error('Befehle konnten nicht gesammelt gesendet werden.');
     },
   });
 }

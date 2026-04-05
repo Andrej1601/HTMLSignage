@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import type { Schedule, PresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { PRESET_LABELS, resolveLivePresetKey } from '@/types/schedule.types';
@@ -8,22 +8,25 @@ import { Flame } from 'lucide-react';
 interface OverviewSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
+  deviceId?: string;
 }
 
-export function OverviewSlide({ schedule, settings }: OverviewSlideProps) {
+export const OverviewSlide = memo(function OverviewSlide({ schedule, settings, now: nowProp, deviceId }: OverviewSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const fonts = settings.fonts || defaults.fonts!;
-  const [eventClock, setEventClock] = useState(() => Date.now());
+  const [eventClock, setEventClock] = useState(() => nowProp?.getTime() ?? Date.now());
 
   useEffect(() => {
+    if (nowProp) return undefined;
     const interval = setInterval(() => setEventClock(Date.now()), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [nowProp]);
 
-  const now = new Date(eventClock);
+  const now = nowProp ?? new Date(eventClock);
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets[activePresetKey];
 
@@ -227,4 +230,4 @@ export function OverviewSlide({ schedule, settings }: OverviewSlideProps) {
       </div>
     </div>
   );
-}
+});

@@ -1,82 +1,91 @@
-import { useSchedule } from '@/hooks/useSchedule';
-import { useSettings } from '@/hooks/useSettings';
-import { useMedia } from '@/hooks/useMedia';
-import type { SlideConfig } from '@/types/slideshow.types';
+import { memo } from 'react';
+import { getEffectiveMediaFit, type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
 import { normalizeSaunaNameKey } from '@/types/schedule.types';
-import { OverviewSlide } from './OverviewSlide';
-import { ScheduleGridSlide } from './ScheduleGridSlide';
-import { TimelineScheduleSlide } from './TimelineScheduleSlide';
-import { ChronologicalListSlide } from './ChronologicalListSlide';
+import { DisplayContentPanel } from './DisplayContentPanel';
+import { DisplaySaunaDetailSlide } from './DisplaySaunaDetailSlide';
 import { InfosSlide } from './InfosSlide';
 import { EventsSlide } from './EventsSlide';
-
-import { SaunaDetailDashboard } from './SaunaDetailDashboard';
-import { Flame } from 'lucide-react';
-import { getDefaultSettings } from '@/types/settings.types';
-import { buildUploadUrl, getMediaUploadUrl } from '@/utils/mediaUrl';
+import { ResilientImage } from './ResilientImage';
+import { ResilientVideo } from './ResilientVideo';
+import { SlideErrorBoundary } from './SlideErrorBoundary';
+import { buildUploadUrl } from '@/utils/mediaUrl';
 
 interface SlideRendererProps {
   slide: SlideConfig;
   onVideoEnded?: () => void;
-  schedule?: Schedule;
-  settings?: Settings;
+  schedule: Schedule;
+  settings: Settings;
   media?: Media[];
+  now?: Date;
+  deviceId?: string;
 }
 
-export function SlideRenderer({
+function SlideRendererComponent({
   slide,
   onVideoEnded,
-  schedule: scheduleProp,
-  settings: settingsProp,
-  media: mediaProp,
+  schedule,
+  settings,
+  media,
+  now,
+  deviceId,
 }: SlideRendererProps) {
-  const { schedule: scheduleFromQuery } = useSchedule();
-  const { settings: settingsFromQuery } = useSettings();
-  const { data: mediaFromQuery } = useMedia();
+  const content = (() => {
+    switch (slide.type) {
+      case 'content-panel':
+        return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
 
-  const schedule = scheduleProp || scheduleFromQuery;
-  const settings = settingsProp || settingsFromQuery;
-  const media = mediaProp || mediaFromQuery;
+      case 'sauna-detail':
+        return (
+          <SaunaDetailSlide
+            sauna={getSauna(settings, slide.saunaId)}
+            slide={slide}
+            schedule={schedule}
+            settings={settings}
+            media={media}
+            deviceId={deviceId}
+          />
+        );
 
-  if (!schedule || !settings) {
-    return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Lädt...</div>;
-  }
+      case 'media-image':
+        return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
 
-  switch (slide.type) {
-    case 'content-panel':
-      return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} />;
+      case 'media-video':
+        return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
 
-    case 'sauna-detail':
-      return (
-        <SaunaDetailSlide
-          sauna={getSauna(settings, slide.saunaId)}
-          slide={slide}
-          schedule={schedule}
-          settings={settings}
-          media={media}
-        />
-      );
+      case 'infos':
+        return <InfosSlide slide={slide} settings={settings} media={media} />;
 
-    case 'media-image':
-      return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
+      case 'events':
+        return <EventsSlide settings={settings} media={media} />;
 
-    case 'media-video':
-      return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
+      default:
+        return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
+    }
+  })();
 
-    case 'infos':
-      return <InfosSlide slide={slide} settings={settings} media={media} />;
-
-    case 'events':
-      return <EventsSlide settings={settings} media={media} />;
-
-    default:
-      return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
-  }
+  return (
+    <SlideErrorBoundary slideKey={slide.id}>
+      {content}
+    </SlideErrorBoundary>
+  );
 }
+
+function areSlideRendererPropsEqual(prev: SlideRendererProps, next: SlideRendererProps): boolean {
+  return (
+    prev.slide === next.slide &&
+    prev.schedule === next.schedule &&
+    prev.settings === next.settings &&
+    prev.media === next.media &&
+    prev.deviceId === next.deviceId &&
+    (prev.now?.getTime() ?? -1) === (next.now?.getTime() ?? -1)
+  );
+}
+
+export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsEqual);
 
 // Helper functions
 function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
@@ -95,29 +104,20 @@ function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefin
 
 // Individual Slide Components
 
-function ContentPanelSlide({ schedule, settings, slide }: { schedule: Schedule; settings: Settings; slide: SlideConfig }) {
-  const designStyle = settings.designStyle || 'modern-wellness';
-
-  if (designStyle === 'modern-wellness') {
-    return <ScheduleGridSlide schedule={schedule} settings={settings} />;
-  }
-  if (designStyle === 'modern-timeline') {
-    return <TimelineScheduleSlide schedule={schedule} settings={settings} />;
-  }
-  if (designStyle === 'compact-tiles') {
-    return <ChronologicalListSlide schedule={schedule} settings={settings} />;
-  }
-
-  return (
-    <div className="w-full h-full">
-      {slide.showTitle && slide.title && (
-        <div className="absolute top-0 left-0 right-0 bg-spa-primary text-white p-6 z-10">
-          <h2 className="text-4xl font-bold">{slide.title}</h2>
-        </div>
-      )}
-      <OverviewSlide schedule={schedule} settings={settings} />
-    </div>
-  );
+function ContentPanelSlide({
+  schedule,
+  settings,
+  slide,
+  now,
+  deviceId,
+}: {
+  schedule: Schedule;
+  settings: Settings;
+  slide: SlideConfig;
+  now?: Date;
+  deviceId?: string;
+}) {
+  return <DisplayContentPanel schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
 }
 
 function SaunaDetailSlide({
@@ -126,198 +126,28 @@ function SaunaDetailSlide({
   schedule,
   settings,
   media,
+  deviceId,
 }: {
   sauna?: Sauna;
   slide: SlideConfig;
   schedule: Schedule;
   settings: Settings;
   media?: Media[];
+  deviceId?: string;
 }) {
   if (!sauna) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Sauna nicht gefunden</div>;
   }
 
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
-  const fonts = settings.fonts || defaults.fonts!;
-
-  const designStyle = settings.designStyle || 'modern-wellness';
-
-  if ((designStyle === 'modern-wellness' || designStyle === 'modern-timeline' || designStyle === 'compact-tiles') && schedule) {
-    return <SaunaDetailDashboard schedule={schedule} settings={settings} saunaId={sauna.id} />;
-  }
-
-  // Find image filename if imageId is set
-  const imageUrl = getMediaUploadUrl(media, sauna.imageId);
-
   return (
-    <div
-      className="w-full h-screen flex items-center justify-center p-16"
-      style={{
-        backgroundColor: theme.bg,
-        backgroundImage: imageUrl ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), url(${imageUrl})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      <div className="max-w-6xl w-full">
-        {/* Card-Style Container */}
-        <div
-          className="rounded-3xl p-12 shadow-2xl backdrop-blur-sm"
-          style={{
-            backgroundColor: imageUrl ? 'rgba(255, 255, 255, 0.95)' : theme.cellBg,
-            borderLeft: `12px solid ${sauna.color || theme.accent}`,
-          }}
-        >
-          {/* Title */}
-          <h1
-            className="font-bold mb-6"
-            style={{
-              fontSize: `${(fonts.h1Scale || 1.5) * 3}rem`,
-              color: sauna.color || theme.fg,
-            }}
-          >
-            {slide.title || sauna.name}
-          </h1>
-
-          {/* Subtitle / Description */}
-          {sauna.description && (
-            <p
-              className="mb-8"
-              style={{
-                fontSize: `${(fonts.fontScale || 1) * 1.5}rem`,
-                color: theme.fg,
-                opacity: 0.8,
-              }}
-            >
-              {sauna.description}
-            </p>
-          )}
-
-          {/* Info Grid */}
-          <div className="grid grid-cols-3 gap-8 mb-8">
-            {sauna.info?.temperature && (
-              <div
-                className="text-center p-6 rounded-2xl"
-                style={{
-                  backgroundColor: `${sauna.color || theme.accent}20`,
-                }}
-              >
-                <div
-                  className="font-bold"
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: sauna.color || theme.fg,
-                  }}
-                >
-                  {sauna.info.temperature}°C
-                </div>
-                <div
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 1.2}rem`,
-                    opacity: 0.7,
-                    marginTop: '0.5rem',
-                  }}
-                >
-                  Temperatur
-                </div>
-              </div>
-            )}
-
-            {sauna.info?.humidity && (
-              <div
-                className="text-center p-6 rounded-2xl"
-                style={{
-                  backgroundColor: `${sauna.color || theme.accent}20`,
-                }}
-              >
-                <div
-                  className="font-bold"
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: sauna.color || theme.fg,
-                  }}
-                >
-                  {sauna.info.humidity}%
-                </div>
-                <div
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 1.2}rem`,
-                    opacity: 0.7,
-                    marginTop: '0.5rem',
-                  }}
-                >
-                  Luftfeuchtigkeit
-                </div>
-              </div>
-            )}
-
-            {sauna.info?.capacity && (
-              <div
-                className="text-center p-6 rounded-2xl"
-                style={{
-                  backgroundColor: `${sauna.color || theme.accent}20`,
-                }}
-              >
-                <div
-                  className="font-bold"
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: sauna.color || theme.fg,
-                  }}
-                >
-                  {sauna.info.capacity}
-                </div>
-                <div
-                  style={{
-                    fontSize: `${(fonts.fontScale || 1) * 1.2}rem`,
-                    opacity: 0.7,
-                    marginTop: '0.5rem',
-                  }}
-                >
-                  Personen
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Features as Badges */}
-          {sauna.info?.features && sauna.info.features.length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              {sauna.info.features.map((feature, i) => (
-                <span
-                  key={i}
-                  className="px-6 py-3 rounded-full font-semibold"
-                  style={{
-                    backgroundColor: sauna.color || theme.flame,
-                    color: '#FFFFFF',
-                    fontSize: `${(fonts.badgeTextScale || 0.85) * 1.5}rem`,
-                  }}
-                >
-                  {feature}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Temperature indicator with flames */}
-          {sauna.info?.temperature && (
-            <div className="flex items-center justify-center gap-2 mt-8">
-              {Array.from({
-                length: Math.min(4, Math.floor(sauna.info.temperature / 25))
-              }).map((_, i) => (
-                <Flame
-                  key={i}
-                  className="w-12 h-12"
-                  style={{ color: theme.flame }}
-                  fill={theme.flame}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <DisplaySaunaDetailSlide
+      sauna={sauna}
+      slide={slide}
+      schedule={schedule}
+      settings={settings}
+      media={media}
+      deviceId={deviceId}
+    />
   );
 }
 
@@ -326,15 +156,22 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Bild nicht gefunden</div>;
   }
 
+  const fitMode = getEffectiveMediaFit(slide);
+
   return (
-    <div className="w-full h-full relative">
-      <img
+    <div className="w-full h-full relative bg-black">
+      <ResilientImage
         src={buildUploadUrl(media.filename)}
         alt={media.originalName}
-        className="w-full h-full object-cover"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+        fallback={
+          <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
+            Bild konnte nicht geladen werden
+          </div>
+        }
       />
       {slide.showTitle && slide.title && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
           <h2 className="text-5xl font-bold text-white">{slide.title}</h2>
         </div>
       )}
@@ -348,23 +185,29 @@ function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide:
   }
 
   const shouldLoop = slide.videoPlayback === 'loop-duration' || slide.videoPlayback === 'duration';
+  const fitMode = getEffectiveMediaFit(slide);
 
   return (
     <div className="w-full h-full relative bg-black">
-      <video
+      <ResilientVideo
         src={buildUploadUrl(media.filename)}
-        className="w-full h-full object-contain"
+        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
         autoPlay
         loop={shouldLoop}
         muted
+        playsInline
         onEnded={onVideoEnded}
+        fallback={
+          <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
+            Video konnte nicht geladen werden
+          </div>
+        }
       />
       {slide.showTitle && slide.title && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-8">
+        <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-8">
           <h2 className="text-5xl font-bold text-white">{slide.title}</h2>
         </div>
       )}
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { SortableSaunaCard } from '@/components/Saunas/SaunaCard';
 import { SaunaEditor } from '@/components/Saunas/SaunaEditor';
@@ -9,12 +9,14 @@ import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
 import { usePermission } from '@/hooks/usePermission';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import api from '@/services/api';
+import { toast } from '@/stores/toastStore';
 import {
   DndContext,
   closestCenter,
@@ -29,11 +31,7 @@ import {
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
-
-// Simple UUID generator
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+import { generateId } from '@/utils/id';
 
 export function SaunasPage() {
   const { settings, isLoading, error, save, isSaving, refetch } = useSettings();
@@ -44,7 +42,7 @@ export function SaunasPage() {
   const [editingSauna, setEditingSauna] = useState<Sauna | null>(null);
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const isInitializedRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -63,7 +61,8 @@ export function SaunasPage() {
 
   // Initialize local saunas from settings only once
   useEffect(() => {
-    if (!isInitialized && settings) {
+    if (!isInitializedRef.current && settings) {
+      isInitializedRef.current = true;
       if (settings.saunas && settings.saunas.length > 0) {
         setLocalSaunas(settings.saunas);
       } else {
@@ -91,9 +90,8 @@ export function SaunasPage() {
         setLocalSaunas(defaultSaunas);
         setIsDirty(true); // Mark as dirty so user can save
       }
-      setIsInitialized(true);
     }
-  }, [settings, isInitialized]);
+  }, [settings]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -165,26 +163,33 @@ export function SaunasPage() {
   };
 
   const handleReload = () => {
-    setIsInitialized(false);
+    isInitializedRef.current = false;
     setIsDirty(false);
     refetch();
   };
 
   // Saunameister: change status via dedicated endpoint (no settings:manage needed)
   const handleStatusChange = async (saunaId: string, status: Sauna['status']) => {
+    const previousSaunas = localSaunas;
+    setLocalSaunas((prev) => prev.map((s) => s.id === saunaId ? { ...s, status } : s));
     try {
       await api.patch(`/saunas/${saunaId}/status`, { status });
-      // Update local state optimistically
-      setLocalSaunas((prev) => prev.map((s) => s.id === saunaId ? { ...s, status } : s));
     } catch (err) {
-      console.error('[saunas] Status update failed:', err);
+      setLocalSaunas(previousSaunas);
+      const message = err instanceof Error ? err.message : 'Status konnte nicht geändert werden';
+      toast.error(`Fehler: ${message}`);
     }
   };
 
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Saunas..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }, (_, i) => <SkeletonCard key={i} />)}
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -246,14 +251,16 @@ export function SaunasPage() {
           icon={Flame}
         >
           {localSaunas.length === 0 ? (
-            <div className="py-8 text-center">
-              <p className="text-spa-text-secondary mb-4">Noch keine Saunas vorhanden</p>
-              {canManage && (
+            <EmptyState
+              icon={Flame}
+              title="Noch keine Saunas"
+              description="Lege deine erste Sauna an, um sie im Aufgussplan zu verwenden."
+              action={canManage ? (
                 <Button icon={Plus} onClick={handleAddSauna}>
                   Erste Sauna hinzufügen
                 </Button>
-              )}
-            </div>
+              ) : undefined}
+            />
           ) : canManage ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={sortedIds} strategy={rectSortingStrategy}>
@@ -291,7 +298,7 @@ export function SaunasPage() {
                   <select
                     value={sauna.status}
                     onChange={(e) => handleStatusChange(sauna.id, e.target.value as Sauna['status'])}
-                    className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                    className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                   >
                     <option value="active">Aufgüsse</option>
                     <option value="no-aufguss">Keine Aufgüsse</option>

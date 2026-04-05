@@ -8,11 +8,14 @@ import {
   shouldZoneRotate,
 } from '@/types/slideshow.types';
 import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import type { Media } from '@/types/media.types';
+import { buildUploadUrl } from '@/utils/mediaUrl';
 import { ENV_IS_DEV } from '@/config/env';
 
 interface UseSlideshowOptions {
   settings: Settings;
   enabled?: boolean;
+  media?: Media[];
 }
 
 interface ZoneSlidesState {
@@ -44,7 +47,7 @@ function getZoneSlidesState(
   };
 }
 
-export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) {
+export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOptions) {
   const [isPaused, setIsPaused] = useState(false);
 
   // Get slideshow config from settings
@@ -333,7 +336,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
         clearZoneTimer(zoneId);
       }
     });
-  }, [enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide, slideshowConfig.defaultDuration]);
+  }, [clearAllZoneTimers, enabled, isPaused, slides, zones, zoneSlideIndexes, nextSlide, slideshowConfig.defaultDuration]);
 
   // Helper to get current slide for a zone
   const getZoneSlide = useCallback(
@@ -363,6 +366,54 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     [zones, slides, zoneSlideIndexes]
   );
 
+  // --- Preload media for upcoming slides ---
+  const preloadedUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!enabled || !media || media.length === 0) return;
+
+    zones.forEach((zone) => {
+      const zoneSlides = getEnabledSlidesForZone(slides, zone.id);
+      if (zoneSlides.length < 2) return;
+
+      const currentIdx = normalizeSlideIndex(zoneSlideIndexes[zone.id], zoneSlides.length);
+      const nextIdx = (currentIdx + 1) % zoneSlides.length;
+      const nextSlideConfig = zoneSlides[nextIdx];
+      if (!nextSlideConfig) return;
+
+      let mediaId: string | undefined;
+      if (nextSlideConfig.type === 'media-video') mediaId = nextSlideConfig.mediaId;
+      else if (nextSlideConfig.type === 'media-image') mediaId = nextSlideConfig.mediaId;
+
+      if (!mediaId) return;
+
+      const item = media.find((m) => m.id === mediaId);
+      if (!item) return;
+
+      const url = buildUploadUrl(item.filename);
+      if (preloadedUrlsRef.current.has(url)) return;
+
+      preloadedUrlsRef.current.add(url);
+
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.href = url;
+      link.as = nextSlideConfig.type === 'media-video' ? 'video' : 'image';
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+
+      // Clean up old preload links to avoid accumulation (keep max 20)
+      if (preloadedUrlsRef.current.size > 20) {
+        const first = preloadedUrlsRef.current.values().next().value;
+        if (first) {
+          preloadedUrlsRef.current.delete(first);
+          const existing = document.head.querySelector(`link[rel="preload"][href="${CSS.escape(first)}"]`);
+          existing?.remove();
+        }
+      }
+    });
+  }, [enabled, media, slides, zones, zoneSlideIndexes]);
+
   return {
     // Legacy single-zone support (for backward compatibility)
     currentSlide,
@@ -373,6 +424,7 @@ export function useSlideshow({ settings, enabled = true }: UseSlideshowOptions) 
     persistentZonePosition: slideshowConfig.persistentZonePosition,
     persistentZoneSize: slideshowConfig.persistentZoneSize,
     enableTransitions: slideshowConfig.enableTransitions,
+    defaultTransition: slideshowConfig.defaultTransition || 'fade',
     showSlideIndicators: slideshowConfig.showSlideIndicators,
     showZoneBorders: slideshowConfig.showZoneBorders !== false,
     nextSlide,

@@ -1,358 +1,96 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Skeleton } from '@/components/Skeleton';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
 import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
-import { useSchedule } from '@/hooks/useSchedule';
-import { useSettings } from '@/hooks/useSettings';
-import { getActiveEvent } from '@/types/settings.types';
-import type { Schedule, PresetKey, Entry } from '@/types/schedule.types';
-import type { Sauna } from '@/types/sauna.types';
-import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import {
   PRESET_LABELS,
-  WEEKDAY_PRESETS,
-  SPECIAL_PRESETS,
-  getTodayPresetKey,
-  resolveLivePresetKey,
-  sortTimeRows,
-  copyDaySchedule,
-  syncScheduleWithSaunas,
 } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
-import { Save, RefreshCw, Copy, Play, CalendarClock, Calendar } from 'lucide-react';
-import { Button } from '@/components/Button';
-import clsx from 'clsx';
+import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
+import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
+import { Save, Calendar } from 'lucide-react';
+import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
+import { useScheduleEditor } from '@/hooks/useScheduleEditor';
+import { PresetTabs } from '@/components/Schedule/PresetTabs';
+import { SaunaStatusInfo } from '@/components/Schedule/SaunaStatusInfo';
+import { ScheduleActions } from '@/components/Schedule/ScheduleActions';
+
+function SchedulePageSkeleton() {
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+        <div className="rounded-xl border border-spa-bg-secondary bg-white p-6 space-y-4">
+          <div className="flex gap-2">
+            {Array.from({ length: 7 }, (_, i) => <Skeleton key={i} variant="rect" className="h-10 w-16 rounded-lg" />)}
+          </div>
+          <Skeleton variant="rect" className="h-64 w-full" />
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+function SchedulePageError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <Layout>
+      <ErrorAlert error={error} onRetry={onRetry} />
+    </Layout>
+  );
+}
 
 export function SchedulePage() {
-  const { schedule, isLoading, error, save, isSaving, refetch } = useSchedule();
-  const { settings } = useSettings();
+  const editor = useScheduleEditor();
 
-  // Local state
-  const [localSchedule, setLocalSchedule] = useState<Schedule | null>(null);
-  const [editingPreset, setEditingPreset] = useState<PresetKey>('Mon');
-  const [isDirty, setIsDirty] = useState(false);
-  const [showCopyMenu, setShowCopyMenu] = useState(false);
-  const [eventClock, setEventClock] = useState(() => Date.now());
+  const paletteActions = useMemo(() => editor.isDirty ? [
+    { id: 'schedule-save', label: 'Aufgussplan speichern', description: 'Ungespeicherte Änderungen sichern', icon: Save, group: 'Aktionen', action: editor.handleSave },
+  ] : [], [editor.isDirty, editor.handleSave]);
+  useCommandPaletteActions(paletteActions);
 
-  // Cell editor state
-  const [editingCell, setEditingCell] = useState<{
-    timeRowIndex: number;
-    saunaIndex: number;
-    entry: Entry | null;
-  } | null>(null);
-
-  // Time editor state
-  const [editingTime, setEditingTime] = useState<{
-    timeRowIndex: number;
-    currentTime: string;
-  } | null>(null);
-
-  // Initialize local schedule from server data
-  useEffect(() => {
-    if (schedule && !localSchedule) {
-      setLocalSchedule(schedule);
-      // Set active preset based on autoPlay
-      if (schedule.autoPlay) {
-        setEditingPreset(resolveLivePresetKey(schedule, settings));
-      } else if (schedule.activePreset) {
-        setEditingPreset(schedule.activePreset);
-      } else {
-        setEditingPreset(getTodayPresetKey());
-      }
-    }
-  }, [schedule, localSchedule, settings]);
-
-  useEffect(() => {
-    const interval = setInterval(() => setEventClock(Date.now()), 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Sync schedule with settings saunas
-  useEffect(() => {
-    if (localSchedule && settings?.saunas) {
-      const saunaNames = settings.saunas
-        .sort((a: Sauna, b: Sauna) => a.order - b.order)
-        .map((s: Sauna) => s.name);
-
-      // Check if saunas have changed
-      const currentSaunas = localSchedule.presets[editingPreset]?.saunas || [];
-      const saunasChanged =
-        currentSaunas.length !== saunaNames.length ||
-        currentSaunas.some((name, i) => name !== saunaNames[i]);
-
-      if (saunasChanged) {
-        const syncedSchedule = syncScheduleWithSaunas(localSchedule, saunaNames);
-        setLocalSchedule(syncedSchedule);
-        setIsDirty(true);
-      }
-    }
-  }, [settings?.saunas, localSchedule, editingPreset]);
-
-  const saunaColors = useMemo(() => {
-    const map: Record<string, string> = {};
-    if (settings?.saunas) {
-      for (const s of settings.saunas) {
-        if (s.color) map[s.name] = s.color;
-      }
-    }
-    return map;
-  }, [settings?.saunas]);
-
-  const now = new Date(eventClock);
-  const livePreset: PresetKey = localSchedule
-    ? resolveLivePresetKey(localSchedule, settings, now)
-    : getTodayPresetKey(now);
-
-  // Get current day schedule
-  const currentDaySchedule = localSchedule?.presets?.[editingPreset];
-  const activeEvent = settings ? getActiveEvent(settings, now) : null;
-  const activeEventPreset = activeEvent?.assignedPreset;
-
-  // Handle preset tab change
-  const handlePresetChange = (preset: PresetKey) => {
-    setEditingPreset(preset);
-  };
-
-  const handleSetLivePreset = () => {
-    if (!localSchedule || localSchedule.autoPlay) return;
-    if (localSchedule.activePreset === editingPreset) return;
-
-    setLocalSchedule({
-      ...localSchedule,
-      activePreset: editingPreset,
-    });
-    setIsDirty(true);
-  };
-
-  // Handle auto-play toggle
-  const handleAutoPlayToggle = () => {
-    if (!localSchedule) return;
-
-    const newAutoPlay = !localSchedule.autoPlay;
-    const weekdayPreset = getTodayPresetKey(now);
-    const manualPresetFallback: PresetKey = activeEvent
-      ? weekdayPreset
-      : (livePreset === 'Evt1' || livePreset === 'Evt2' ? weekdayPreset : livePreset);
-
-    setLocalSchedule({
-      ...localSchedule,
-      autoPlay: newAutoPlay,
-      activePreset: newAutoPlay ? undefined : manualPresetFallback,
-    });
-    setIsDirty(true);
-  };
-
-  // Handle copy from another day
-  const handleCopyFrom = (sourcePreset: PresetKey) => {
-    if (!localSchedule) return;
-
-    const sourceDaySchedule = localSchedule.presets[sourcePreset];
-    const copiedSchedule = copyDaySchedule(sourceDaySchedule);
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: copiedSchedule,
-      },
-    });
-    setIsDirty(true);
-    setShowCopyMenu(false);
-  };
-
-  // Handle edit cell
-  const handleEditCell = (timeRowIndex: number, saunaIndex: number) => {
-    if (!currentDaySchedule) return;
-
-    const entry = currentDaySchedule.rows[timeRowIndex].entries[saunaIndex];
-    setEditingCell({ timeRowIndex, saunaIndex, entry });
-  };
-
-  // Handle add time row
-  const handleAddTimeRow = () => {
-    if (!localSchedule || !currentDaySchedule) return;
-    // Open time editor for new row
-    setEditingTime({ timeRowIndex: -1, currentTime: '12:00' });
-  };
-
-  // Handle edit time
-  const handleEditTime = (timeRowIndex: number) => {
-    if (!currentDaySchedule) return;
-    const currentTime = currentDaySchedule.rows[timeRowIndex].time;
-    setEditingTime({ timeRowIndex, currentTime });
-  };
-
-  // Handle save time
-  const handleSaveTime = (newTime: string) => {
-    if (!localSchedule || !currentDaySchedule || !editingTime) return;
-
-    if (editingTime.timeRowIndex === -1) {
-      // Adding new time row
-      const newRow = {
-        time: newTime,
-        entries: currentDaySchedule.saunas.map(() => null),
-      };
-      const updatedRows = sortTimeRows([...currentDaySchedule.rows, newRow]);
-
-      setLocalSchedule({
-        ...localSchedule,
-        presets: {
-          ...localSchedule.presets,
-          [editingPreset]: {
-            ...currentDaySchedule,
-            rows: updatedRows,
-          },
-        },
-      });
-    } else {
-      // Editing existing time
-      const updatedRows = [...currentDaySchedule.rows];
-      updatedRows[editingTime.timeRowIndex].time = newTime;
-      const sortedRows = sortTimeRows(updatedRows);
-
-      setLocalSchedule({
-        ...localSchedule,
-        presets: {
-          ...localSchedule.presets,
-          [editingPreset]: {
-            ...currentDaySchedule,
-            rows: sortedRows,
-          },
-        },
-      });
-    }
-
-    setIsDirty(true);
-    setEditingTime(null);
-  };
-
-  // Handle delete time row
-  const handleDeleteTimeRow = (timeRowIndex: number) => {
-    if (!localSchedule || !currentDaySchedule) return;
-
-    const updatedRows = currentDaySchedule.rows.filter((_, i) => i !== timeRowIndex);
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: {
-          ...currentDaySchedule,
-          rows: updatedRows,
-        },
-      },
-    });
-    setIsDirty(true);
-  };
-
-  // Handle save cell
-  const handleSaveCell = (entry: Entry | null) => {
-    if (!localSchedule || !currentDaySchedule || !editingCell) return;
-
-    const updatedRows = [...currentDaySchedule.rows];
-    updatedRows[editingCell.timeRowIndex].entries[editingCell.saunaIndex] = entry;
-
-    setLocalSchedule({
-      ...localSchedule,
-      presets: {
-        ...localSchedule.presets,
-        [editingPreset]: {
-          ...currentDaySchedule,
-          rows: updatedRows,
-        },
-      },
-    });
-    setIsDirty(true);
-    setEditingCell(null);
-  };
-
-  // Handle delete cell
-  const handleDeleteCell = () => {
-    if (!editingCell) return;
-    handleSaveCell(null); // Set to null to clear
-  };
-
-  // Save to server
-  const handleSave = () => {
-    if (!localSchedule) return;
-
-    const scheduleToSave = {
-      ...localSchedule,
-      version: (localSchedule.version || 1) + 1,
-    };
-
-    save(scheduleToSave, {
-      onSuccess: () => {
-        setIsDirty(false);
-        refetch();
-      },
-    });
-  };
-
-  if (isLoading || !localSchedule) {
-    return (
-      <Layout>
-        <LoadingSpinner label="Lade Aufgussplan..." />
-      </Layout>
-    );
+  if (editor.isLoading || !editor.localSchedule) {
+    return <SchedulePageSkeleton />;
   }
 
-  if (error) {
-    return (
-      <Layout>
-        <ErrorAlert error={error} onRetry={() => refetch()} />
-      </Layout>
-    );
+  if (editor.error) {
+    return <SchedulePageError error={editor.error} onRetry={() => editor.refetch()} />;
   }
 
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <PageHeader
           title="Aufgussplan"
-          description={`Version ${localSchedule?.version || 1} · Live: ${PRESET_LABELS[livePreset]} · Bearbeitung: ${PRESET_LABELS[editingPreset]}`}
+          description={`Version ${editor.localSchedule?.version || 1} · Live: ${PRESET_LABELS[editor.livePreset]} · Bearbeitung: ${PRESET_LABELS[editor.editingPreset]}`}
           icon={Calendar}
           actions={(
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={localSchedule?.autoPlay ? 'secondary' : 'ghost'}
-                icon={Play}
-                onClick={handleAutoPlayToggle}
-                className={localSchedule?.autoPlay ? '!bg-spa-secondary !text-white !hover:bg-spa-secondary-dark' : ''}
-              >
-                Auto-Play
-              </Button>
-
-              {!localSchedule.autoPlay && (
-                <Button
-                  variant="ghost"
-                  onClick={handleSetLivePreset}
-                  disabled={editingPreset === livePreset}
-                  className="border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10"
-                >
-                  Auswahl live schalten
-                </Button>
-              )}
-
-              <Button variant="ghost" icon={RefreshCw} onClick={() => { setLocalSchedule(null); setIsDirty(false); refetch(); }} disabled={isLoading}>
-                Neu laden
-              </Button>
-
-              <Button icon={Save} onClick={handleSave} disabled={!isDirty} loading={isSaving} loadingText="Speichert...">
-                Speichern
-              </Button>
-            </div>
+            <ScheduleActions editor={editor} />
           )}
+          badges={[
+            { label: `Live v${editor.schedule?.version || editor.localSchedule.version}`, tone: 'info' },
+            editor.draftState.hasStoredDraft && !editor.isDirty
+              ? { label: 'Lokaler Entwurf vorhanden', tone: 'warning' as const }
+              : { label: 'Live-Stand', tone: 'neutral' as const },
+            { label: editor.localSchedule.autoPlay ? 'Auto-Play' : 'Manuell', tone: editor.localSchedule.autoPlay ? 'success' as const : 'warning' as const },
+            { label: editor.isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: editor.isDirty ? 'warning' as const : 'success' as const },
+          ]}
         />
 
-        {/* Unsaved changes banner */}
-        {isDirty && (
-          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3 shadow-sm">
+        {editor.draftState.hasStoredDraft && !editor.isDirty && (
+          <DraftRecoveryBanner
+            entityLabel="Aufgussplan"
+            updatedAt={editor.draftState.draftUpdatedAt}
+            onRestore={editor.handleRestoreDraft}
+            onDiscard={editor.handleDiscardDraft}
+          />
+        )}
+
+        {editor.isDirty && (
+          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3 shadow-xs">
             <span className="relative flex h-3 w-3">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
               <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
@@ -361,212 +99,74 @@ export function SchedulePage() {
           </div>
         )}
 
-        {/* Preset Tabs */}
-        <SectionCard title="Preset-Auswahl" icon={CalendarClock}>
-          {localSchedule.autoPlay && activeEvent && (
-            <div className="mb-4 flex items-start gap-3 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-4 py-3">
-              <CalendarClock className="mt-0.5 h-5 w-5 text-spa-accent" />
-              <div>
-                <p className="text-sm font-semibold text-spa-text-primary">
-                  Event-Plan aktiv: {activeEvent.name}
-                </p>
-                <p className="text-xs text-spa-text-secondary">
-                  Aktuell wird {PRESET_LABELS[livePreset]} ({livePreset}) abgespielt.
-                </p>
-              </div>
-            </div>
-          )}
+        <EditorQualityAssistant
+          description={`Direkte Plausibilitätschecks für ${PRESET_LABELS[editor.editingPreset]} und den aktuellen Redaktionsstand.`}
+          issues={editor.scheduleQualityIssues}
+          okMessage={`Für ${PRESET_LABELS[editor.editingPreset]} wurden aktuell keine strukturellen Planprobleme erkannt.`}
+        />
 
-          {editingPreset !== livePreset && (
-            <div className="mb-4 rounded-lg border border-spa-secondary/30 bg-spa-secondary/10 px-4 py-3 text-xs text-spa-text-secondary">
-              Du bearbeitest {PRESET_LABELS[editingPreset]} ({editingPreset}), live läuft weiterhin {PRESET_LABELS[livePreset]} ({livePreset}).
-            </div>
-          )}
+        <PresetTabs editor={editor} />
 
-          {/* Weekday Tabs */}
-          <div className="flex gap-2 mb-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {WEEKDAY_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => handlePresetChange(preset)}
-                className={clsx(
-                  'px-4 py-2 rounded-t-lg font-medium transition-colors',
-                  editingPreset === preset
-                    ? 'bg-spa-primary text-white'
-                    : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/70'
-                )}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <span>{PRESET_LABELS[preset]}</span>
-                  {livePreset === preset && (
-                    <span
-                      className={clsx(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        editingPreset === preset
-                          ? 'bg-white/80 text-spa-primary'
-                          : 'bg-spa-primary/15 text-spa-primary'
-                      )}
-                    >
-                      Live
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Special Presets */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {SPECIAL_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => handlePresetChange(preset)}
-                className={clsx(
-                  'px-4 py-2 rounded-t-lg font-medium transition-colors border-2',
-                  editingPreset === preset
-                    ? 'bg-spa-accent text-spa-text-primary border-spa-accent'
-                    : 'bg-white text-spa-text-secondary border-spa-bg-secondary hover:border-spa-accent/50'
-                )}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <span>{PRESET_LABELS[preset]}</span>
-                  {livePreset === preset && (
-                    <span
-                      className={clsx(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        editingPreset === preset
-                          ? 'bg-white/80 text-spa-accent'
-                          : 'bg-spa-accent/15 text-spa-accent'
-                      )}
-                    >
-                      Live
-                    </span>
-                  )}
-                  {localSchedule.autoPlay && activeEventPreset === preset && (
-                    <span
-                      className={clsx(
-                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                        editingPreset === preset
-                          ? 'bg-white/80 text-spa-accent'
-                          : 'bg-spa-accent/15 text-spa-accent'
-                      )}
-                    >
-                      Event aktiv
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
-
-            {/* Copy From Button */}
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setShowCopyMenu(!showCopyMenu)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-spa-bg-secondary rounded-t-lg text-spa-text-secondary hover:border-spa-secondary transition-colors"
-              >
-                <Copy className="w-4 h-4" />
-                Aus Tag X laden
-              </button>
-
-              {/* Copy Menu */}
-              {showCopyMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-spa-bg-secondary rounded-lg shadow-lg z-10 min-w-[200px]">
-                  <div className="p-2">
-                    <div className="text-xs font-semibold text-spa-text-secondary px-2 py-1">Wochentage</div>
-                    {WEEKDAY_PRESETS.map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => handleCopyFrom(preset)}
-                        disabled={preset === editingPreset}
-                        className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {PRESET_LABELS[preset]}
-                      </button>
-                    ))}
-
-                    <div className="text-xs font-semibold text-spa-text-secondary px-2 py-1 mt-2">Spezial</div>
-                    {SPECIAL_PRESETS.map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => handleCopyFrom(preset)}
-                        disabled={preset === editingPreset}
-                        className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {PRESET_LABELS[preset]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </SectionCard>
-
-        {/* Sauna Status Info */}
-        {settings?.saunas && settings.saunas.length > 0 && (
-          <SectionCard title="Sauna-Status">
-            <div className="flex flex-wrap gap-3">
-              {settings.saunas
-                .sort((a: Sauna, b: Sauna) => a.order - b.order)
-                .map((sauna: Sauna) => (
-                  <div
-                    key={sauna.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md border"
-                    style={{
-                      borderColor: sauna.color || '#10b981',
-                      backgroundColor: `${sauna.color || '#10b981'}10`,
-                    }}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: SAUNA_STATUS_COLORS[sauna.status] }}
-                    />
-                    <span className="font-medium text-sm">{sauna.name}</span>
-                    <span className="text-xs text-spa-text-secondary">
-                      ({SAUNA_STATUS_LABELS[sauna.status]})
-                    </span>
-                    {sauna.info?.temperature && (
-                      <span className="text-xs text-spa-text-secondary ml-2">
-                        {sauna.info.temperature}°C
-                      </span>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </SectionCard>
+        {editor.settings?.saunas && editor.settings.saunas.length > 0 && (
+          <SaunaStatusInfo saunas={editor.settings.saunas} />
         )}
 
-        {/* Grid */}
-        {currentDaySchedule && (
-          <SectionCard title={`Tagesplan: ${PRESET_LABELS[editingPreset]}`} noPadding>
+        {editor.currentDaySchedule && (
+          <SectionCard title={`Tagesplan: ${PRESET_LABELS[editor.editingPreset]}`} noPadding>
             <ScheduleGrid
-              daySchedule={currentDaySchedule}
-              aromas={settings?.aromas || []}
-              saunaColors={saunaColors}
-              onEditCell={handleEditCell}
-              onEditTime={handleEditTime}
-              onAddTimeRow={handleAddTimeRow}
-              onDeleteTimeRow={handleDeleteTimeRow}
+              daySchedule={editor.currentDaySchedule}
+              aromas={editor.settings?.aromas || []}
+              saunaColors={editor.saunaColors}
+              onEditCell={editor.handleEditCell}
+              onEditTime={editor.handleEditTime}
+              onAddTimeRow={editor.handleAddTimeRow}
+              onDeleteTimeRow={editor.handleDeleteTimeRow}
             />
           </SectionCard>
         )}
 
-        {/* Cell Editor Dialog */}
         <CellEditor
-          entry={editingCell?.entry || null}
-          isOpen={editingCell !== null}
-          onClose={() => setEditingCell(null)}
-          onSave={handleSaveCell}
-          onDelete={editingCell?.entry ? handleDeleteCell : undefined}
-          aromas={settings?.aromas || []}
+          entry={editor.editingCell?.entry || null}
+          isOpen={editor.editingCell !== null}
+          onClose={() => editor.setEditingCell(null)}
+          onSave={editor.handleSaveCell}
+          onDelete={editor.editingCell?.entry ? editor.handleDeleteCell : undefined}
+          aromas={editor.settings?.aromas || []}
         />
 
-        {/* Time Editor Dialog */}
         <TimeEditor
-          time={editingTime?.currentTime || null}
-          isOpen={editingTime !== null}
-          onClose={() => setEditingTime(null)}
-          onSave={handleSaveTime}
+          time={editor.editingTime?.currentTime || null}
+          isOpen={editor.editingTime !== null}
+          onClose={() => editor.setEditingTime(null)}
+          onSave={editor.handleSaveTime}
+        />
+
+        <ConfirmDialog
+          isOpen={editor.unsavedGuard.isBlocked}
+          title="Ungespeicherte Änderungen"
+          message="Es gibt ungespeicherte Änderungen im Aufgussplan. Wirklich verlassen?"
+          confirmLabel="Verlassen"
+          cancelLabel="Bleiben"
+          variant="warning"
+          onConfirm={editor.unsavedGuard.proceed}
+          onCancel={editor.unsavedGuard.reset}
+        />
+
+        <ConfirmDialog
+          isOpen={Boolean(editor.pendingCopySource)}
+          title="Tagesplan überschreiben?"
+          message={(() => {
+            if (!editor.pendingCopySource || !editor.localSchedule) return '';
+            const source = editor.localSchedule.presets[editor.pendingCopySource];
+            const target = editor.currentDaySchedule;
+            const sourceRows = source?.rows?.length || 0;
+            const targetRows = target?.rows?.length || 0;
+            return `${PRESET_LABELS[editor.pendingCopySource]} (${sourceRows} Zeitslots) → ${PRESET_LABELS[editor.editingPreset]} (${targetRows} Zeitslots)\n\nDer aktuelle Plan für ${PRESET_LABELS[editor.editingPreset]} wird vollständig durch den Plan von ${PRESET_LABELS[editor.pendingCopySource]} ersetzt.`;
+          })()}
+          confirmLabel="Überschreiben"
+          variant="warning"
+          onConfirm={editor.confirmCopyFrom}
+          onCancel={() => editor.setPendingCopySource(null)}
         />
       </div>
     </Layout>

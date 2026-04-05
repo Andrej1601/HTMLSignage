@@ -1,74 +1,58 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Monitor, Check, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
 import { InputField } from '@/components/FormField';
+import { fetchApi } from '@/services/api';
 
 export function PendingPairings() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [pairingDevice, setPairingDevice] = useState<Device | null>(null);
   const [deviceName, setDeviceName] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [expanded, setExpanded] = useState(true);
 
-  // Fetch pending devices (unpaired with pairing codes)
   const { data: pendingDevices = [], refetch, isLoading } = useQuery<Device[]>({
-    queryKey: ['devices', 'pending', token],
-    enabled: !!token,
+    queryKey: ['devices', 'pending'],
     retry: false,
     queryFn: async () => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/devices/pending`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        await logout();
-        throw new Error('unauthorized');
+      try {
+        return await fetchApi<Device[]>('/devices/pending');
+      } catch (error) {
+        if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
+          await logout();
+          throw new Error('unauthorized');
+        }
+        throw error;
       }
-
-      if (!response.ok) throw new Error('Failed to fetch pending devices');
-      return response.json();
     },
-    refetchInterval: token ? 5000 : false, // Refresh every 5 seconds when authenticated
+    refetchInterval: 5000,
   });
 
-  // Pair device mutation
   const pairDevice = useMutation({
-    mutationFn: async (data: { pairingCode: string; name: string }) => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/devices/pair`, {
+    mutationFn: async (data: { pairingCode: string; name: string; groupName?: string | null }) => {
+      return fetchApi('/devices/pair', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Pairing failed');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
       queryClient.invalidateQueries({ queryKey: ['devices', 'pending'] });
       setPairingDevice(null);
       setDeviceName('');
+      setGroupName('');
     },
   });
 
   const handlePairClick = (device: Device) => {
     setPairingDevice(device);
     setDeviceName(device.name);
+    setGroupName(device.groupName || '');
   };
 
   const handlePairSubmit = (e: React.FormEvent) => {
@@ -78,6 +62,7 @@ export function PendingPairings() {
     pairDevice.mutate({
       pairingCode: pairingDevice.pairingCode,
       name: deviceName.trim(),
+      groupName: groupName.trim() || null,
     });
   };
 
@@ -85,83 +70,80 @@ export function PendingPairings() {
     if (!pairDevice.isPending) {
       setPairingDevice(null);
       setDeviceName('');
+      setGroupName('');
     }
   };
 
-  if (pendingDevices.length === 0) {
-    return null;
-  }
+  if (pendingDevices.length === 0) return null;
 
   return (
     <>
-      <div className="mb-6">
-        <div className="bg-spa-warning-light border border-spa-warning/30 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Monitor className="w-5 h-5 text-spa-warning-dark" />
-              <h3 className="text-lg font-semibold text-spa-warning-dark">
-                Nicht verbundene Geräte
-              </h3>
-              {isLoading && (
-                <RefreshCw className="w-4 h-4 text-spa-warning-dark animate-spin" />
-              )}
-            </div>
-            <button
-              onClick={() => refetch()}
-              className="text-sm text-spa-warning-dark hover:underline"
-            >
-              Aktualisieren
-            </button>
+      <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white">
+        {/* Gold accent bar + collapsible header */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex w-full items-center justify-between border-l-4 border-l-spa-primary px-6 py-4 text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">📡</span>
+            <span className="text-sm font-semibold text-spa-text-primary">
+              Ausstehende Pairings ({pendingDevices.length})
+            </span>
+            {isLoading && (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-spa-primary border-t-transparent" />
+            )}
           </div>
+          {expanded
+            ? <ChevronUp className="h-4 w-4 text-spa-text-secondary" />
+            : <ChevronDown className="h-4 w-4 text-spa-text-secondary" />
+          }
+        </button>
 
-          <p className="text-sm text-spa-warning-dark/80 mb-4">
-            Diese Geräte warten darauf, verbunden zu werden. Der Pairing-Code wird auf dem Gerät angezeigt.
-          </p>
-
-          {/* Pending Devices Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {expanded && (
+          <div className="border-t border-spa-bg-secondary px-6 pb-6 pt-4 space-y-4">
             {pendingDevices.map((device) => (
               <div
                 key={device.id}
-                className="bg-white rounded-lg p-4 border border-spa-warning/30 hover:border-spa-warning transition-colors"
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-xl border border-dashed border-spa-bg-secondary bg-white p-5"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Monitor className="w-5 h-5 text-spa-warning-dark" />
-                    <span className="text-sm font-medium text-spa-text-primary">
-                      {device.name}
-                    </span>
+                {/* Pairing Code */}
+                <div className="shrink-0 rounded-lg border border-dashed border-spa-text-secondary/30 px-6 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-spa-text-secondary">
+                    Code
                   </div>
-                </div>
-
-                {/* Pairing Code Display */}
-                <div className="bg-gradient-to-br from-spa-primary to-spa-primary-dark text-white rounded-lg p-4 mb-3">
-                  <div className="text-xs opacity-75 mb-1">Pairing-Code</div>
-                  <div className="text-3xl font-bold tracking-wider font-mono">
+                  <div className="mt-1 text-2xl font-bold tracking-[0.2em] font-mono text-spa-text-primary">
                     {device.pairingCode}
                   </div>
                 </div>
 
                 {/* Device Info */}
-                <div className="text-xs text-spa-text-secondary mb-3 space-y-1">
-                  <div>ID: {device.id.slice(0, 12)}...</div>
-                  <div>Erstellt: {new Date(device.createdAt).toLocaleString('de-DE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-spa-text-primary">
+                    {device.name}
+                  </p>
+                  <p className="text-xs text-spa-text-secondary mt-0.5">
+                    Anfrage vor {timeSince(device.createdAt)} (IP: {device.id.slice(0, 15)})
+                  </p>
                 </div>
 
-                {/* Connect Button */}
-                <Button icon={LinkIcon} fullWidth onClick={() => handlePairClick(device)}>
-                  Verbinden
-                </Button>
+                {/* Actions */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="rounded-lg border border-spa-bg-secondary bg-white px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
+                  >
+                    Ablehnen
+                  </button>
+                  <Button size="sm" onClick={() => handlePairClick(device)}>
+                    Koppeln
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Pairing Dialog */}
@@ -189,9 +171,9 @@ export function PendingPairings() {
         }
       >
         <form id="pair-form" onSubmit={handlePairSubmit} className="space-y-4">
-          <div className="bg-spa-bg-primary rounded-lg p-4">
-            <div className="text-sm text-spa-text-secondary mb-2">Pairing-Code</div>
-            <div className="text-3xl font-bold font-mono text-spa-primary">
+          <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary p-4 text-center">
+            <div className="text-xs text-spa-text-secondary mb-1">Pairing-Code</div>
+            <div className="text-3xl font-bold font-mono text-spa-primary tracking-widest">
               {pairingDevice?.pairingCode}
             </div>
           </div>
@@ -206,8 +188,27 @@ export function PendingPairings() {
             hint="Gib dem Gerät einen aussagekräftigen Namen zur Identifikation"
             autoFocus
           />
+
+          <InputField
+            label="Gerätegruppe"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="z.B. Saunawelt West"
+            disabled={pairDevice.isPending}
+            hint="Optional: Das Gerät wird direkt in eine Gruppe einsortiert."
+          />
         </form>
       </Dialog>
     </>
   );
+}
+
+function timeSince(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'gerade eben';
+  if (minutes < 60) return `${minutes} Min.`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} Std.`;
+  return `${Math.floor(hours / 24)} Tagen`;
 }

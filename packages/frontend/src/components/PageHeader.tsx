@@ -29,7 +29,7 @@ export function PageHeader({
   return (
     <section
       className={clsx(
-        'mb-6 rounded-2xl border border-spa-bg-secondary bg-gradient-to-r from-white via-spa-bg-primary to-spa-secondary/10 p-5 shadow-sm',
+        'mb-6 rounded-2xl border border-spa-bg-secondary bg-linear-to-r from-white via-spa-bg-primary to-spa-secondary/10 p-5 shadow-xs',
         className
       )}
     >

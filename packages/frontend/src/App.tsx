@@ -1,7 +1,15 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+} from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteErrorPage } from './components/RouteErrorPage';
 import { ToastContainer } from './components/Toast';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 
@@ -30,30 +38,40 @@ function PageFallback() {
   );
 }
 
+function AppRouteShell() {
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <Outlet />
+    </Suspense>
+  );
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<AppRouteShell />} errorElement={<RouteErrorPage />}>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/display" element={<DisplayClientPage />} />
+      <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+      <Route path="/schedule" element={<ProtectedRoute permission="schedule:write"><SchedulePage /></ProtectedRoute>} />
+      <Route path="/saunas" element={<ProtectedRoute permission="saunas:read"><SaunasPage /></ProtectedRoute>} />
+      <Route path="/slideshow" element={<ProtectedRoute permission="slideshow:manage"><SlideshowPage /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute permission="settings:manage"><SettingsPage /></ProtectedRoute>} />
+      <Route path="/devices" element={<ProtectedRoute permission="devices:manage"><DevicesPage /></ProtectedRoute>} />
+      <Route path="/users" element={<ProtectedRoute permission="users:manage"><UsersPage /></ProtectedRoute>} />
+      <Route path="/media" element={<ProtectedRoute permission="media:manage"><MediaPage /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>,
+  ),
+);
+
 function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <BrowserRouter>
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/display" element={<DisplayClientPage />} />
-              <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-              <Route path="/schedule" element={<ProtectedRoute permission="schedule:write"><SchedulePage /></ProtectedRoute>} />
-              <Route path="/saunas" element={<ProtectedRoute permission="saunas:read"><SaunasPage /></ProtectedRoute>} />
-              <Route path="/slideshow" element={<ProtectedRoute permission="slideshow:manage"><SlideshowPage /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute permission="settings:manage"><SettingsPage /></ProtectedRoute>} />
-              <Route path="/devices" element={<ProtectedRoute permission="devices:manage"><DevicesPage /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute permission="users:manage"><UsersPage /></ProtectedRoute>} />
-              <Route path="/media" element={<ProtectedRoute permission="media:manage"><MediaPage /></ProtectedRoute>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-          <ToastContainer />
-        </BrowserRouter>
+        <RouterProvider router={router} />
+        <ToastContainer />
       </AuthProvider>
     </ErrorBoundary>
   );

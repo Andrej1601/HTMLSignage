@@ -1,20 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Skeleton, SkeletonTableRow } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
 import { Button } from '@/components/Button';
 import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
 import { DataTable, type Column } from '@/components/DataTable';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { StatCard } from '@/components/Dashboard/StatCard';
+import { EmptyState } from '@/components/EmptyState';
+import { StatCard } from '@/components/StatCard';
 import { SectionCard } from '@/components/SectionCard';
 import { AVAILABLE_ROLES } from '@/utils/permissions';
+import { fetchApi } from '@/services/api';
 
 interface User {
   id: string;
@@ -40,54 +41,37 @@ interface UpdateUserData {
 }
 
 export function UsersPage() {
-  const { token, logout } = useAuth();
+  const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch users
   const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
-    queryKey: ['users', token],
-    enabled: !!token,
+    queryKey: ['users'],
     retry: false,
     queryFn: async () => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        await logout();
-        throw new Error('unauthorized');
+      try {
+        return await fetchApi<User[]>('/users');
+      } catch (error) {
+        if (error instanceof Error && /nicht authentifiziert|invalid token|session expired|user not found|no token provided/i.test(error.message)) {
+          await logout();
+          throw new Error('unauthorized');
+        }
+        throw error;
       }
-
-      if (!response.ok) throw new Error('Failed to fetch users');
-      return response.json();
     },
   });
 
   // Create user mutation
   const createUser = useMutation({
     mutationFn: async (data: CreateUserData) => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users`, {
+      return fetchApi('/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -98,21 +82,10 @@ export function UsersPage() {
   // Update user mutation
   const updateUser = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateUserData }) => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users/${id}`, {
+      return fetchApi(`/users/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
+        data,
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -123,19 +96,9 @@ export function UsersPage() {
   // Delete user mutation
   const deleteUser = useMutation({
     mutationFn: async (id: string) => {
-      if (!token) throw new Error('unauthorized');
-
-      const response = await fetch(`${API_URL}/api/users/${id}`, {
+      return fetchApi(`/users/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete user');
-      }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -143,14 +106,14 @@ export function UsersPage() {
     },
   });
 
-  const userColumns: Column<User>[] = [
+  const userColumns: Column<User>[] = useMemo(() => [
     {
       key: 'username',
       header: 'Benutzer',
       sortFn: (a, b) => a.username.localeCompare(b.username),
       render: (u) => (
         <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+          <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
             {u.username.charAt(0).toUpperCase()}
           </div>
           <div className="ml-4">
@@ -236,12 +199,30 @@ export function UsersPage() {
         </div>
       ),
     },
-  ];
+  ], []);
+
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+    const q = searchQuery.toLowerCase();
+    return users.filter((u) =>
+      u.username.toLowerCase().includes(q)
+      || (u.email && u.email.toLowerCase().includes(q))
+      || u.roles.some((r) => r.toLowerCase().includes(q)),
+    );
+  }, [users, searchQuery]);
 
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Benutzer..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="rounded-xl border border-spa-bg-secondary bg-white overflow-hidden">
+            <div className="flex items-center gap-4 px-4 py-3 border-b border-spa-bg-secondary bg-spa-bg-primary">
+              {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} variant="text" className="h-4 w-20" />)}
+            </div>
+            {Array.from({ length: 5 }, (_, i) => <SkeletonTableRow key={i} columns={4} />)}
+          </div>
+        </div>
       </Layout>
     );
   }
@@ -279,26 +260,33 @@ export function UsersPage() {
         </div>
 
         <SectionCard title="Benutzer" icon={UsersIcon}>
-          {users.length === 0 ? (
-            <div className="py-8 text-center">
-              <UsersIcon className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-                Keine Benutzer
-              </h3>
-              <p className="text-spa-text-secondary mb-4">
-                Erstelle den ersten Benutzer, um loszulegen.
-              </p>
-              <Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>
-                Ersten Benutzer anlegen
-              </Button>
+          {users.length > 0 && (
+            <div className="relative max-w-xs mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary" aria-hidden="true" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Benutzer suchen..."
+                aria-label="Benutzer durchsuchen"
+                className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+              />
             </div>
+          )}
+          {users.length === 0 ? (
+            <EmptyState
+              icon={UsersIcon}
+              title="Keine Benutzer"
+              description="Erstelle den ersten Benutzer, um loszulegen."
+              action={<Button icon={Plus} onClick={() => setIsCreateDialogOpen(true)}>Ersten Benutzer anlegen</Button>}
+            />
           ) : (
             <DataTable<User>
-              data={users}
+              data={filteredUsers}
               keyFn={(u) => u.id}
               mobileTitle={(u) => (
                 <div className="flex items-center gap-3">
-                  <div className="flex-shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
+                  <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
                     {u.username.charAt(0).toUpperCase()}
                   </div>
                   <span>{u.username}</span>
@@ -455,10 +443,10 @@ function UserDialog({
           minLength={8}
         />
 
-        <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+        <fieldset>
+          <legend className="block text-sm font-medium text-spa-text-primary mb-1">
             Rollen
-          </label>
+          </legend>
           <div className="space-y-2">
             {AVAILABLE_ROLES.map((role) => (
               <label key={role.value} className="flex items-start gap-2 cursor-pointer">
@@ -475,7 +463,7 @@ function UserDialog({
               </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       </form>
     </Dialog>
   );

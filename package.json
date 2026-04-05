@@ -11,10 +11,18 @@
     "db:migrate": "pnpm --filter backend db:migrate",
     "db:studio": "pnpm --filter backend db:studio",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "test": "pnpm --filter backend test && pnpm --filter frontend test",
+    "test:backend": "pnpm --filter backend test",
+    "test:frontend": "pnpm --filter frontend test",
+    "typecheck": "pnpm -r typecheck",
+    "smoke": "node ./scripts/smoke-check.mjs",
+    "kiosk": "pnpm --filter @htmlsignage/kiosk start",
+    "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
+    "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
+    "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   },
   "engines": {
     "node": ">=20.0.0",

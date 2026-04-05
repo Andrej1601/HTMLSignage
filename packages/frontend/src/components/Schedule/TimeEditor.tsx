@@ -66,7 +66,7 @@ export function TimeEditor({ time, isOpen, onClose, onSave }: TimeEditorProps) {
             onChange={(e) => setHours(e.target.value)}
             min="0"
             max="23"
-            className="w-24 px-4 py-3 text-center text-2xl font-bold border-2 border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-24 px-4 py-3 text-center text-2xl font-bold border-2 border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             autoFocus
           />
         </div>
@@ -84,7 +84,7 @@ export function TimeEditor({ time, isOpen, onClose, onSave }: TimeEditorProps) {
             onChange={(e) => setMinutes(e.target.value)}
             min="0"
             max="59"
-            className="w-24 px-4 py-3 text-center text-2xl font-bold border-2 border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary"
+            className="w-24 px-4 py-3 text-center text-2xl font-bold border-2 border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
           />
         </div>
       </div>

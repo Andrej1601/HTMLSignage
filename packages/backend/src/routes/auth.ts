@@ -3,26 +3,33 @@ import { z } from 'zod';
 import { createHash, randomBytes } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword, comparePassword, generateToken, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { PrismaStore } from '../lib/rateLimiter.js';
+import { hashPassword, comparePassword, generateToken, authMiddleware, hashSessionTokenForExport, type AuthRequest } from '../lib/auth.js';
 import { sendPasswordResetEmail } from '../lib/mailer.js';
+import { assertUsernameAvailable, UserConflictError } from '../lib/userValidation.js';
 
 const router = Router();
 
-// Rate-Limiting für Auth-Endpunkte
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const FORGOT_PASSWORD_WINDOW_MS = 60 * 60 * 1000;
+
+// Rate-Limiting für Auth-Endpunkte (persistent via Prisma)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 Minuten
-  max: 20, // max 20 Versuche pro Fenster
+  windowMs: AUTH_WINDOW_MS,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+  store: new PrismaStore({ prefix: 'auth_' }),
 });
 
 const forgotPasswordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 Stunde
-  max: 5, // max 5 Versuche pro Stunde
+  windowMs: FORGOT_PASSWORD_WINDOW_MS,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' },
+  store: new PrismaStore({ prefix: 'forgot_pw_' }),
 });
 
 const LoginSchema = z.object({
@@ -31,13 +38,13 @@ const LoginSchema = z.object({
 });
 
 const RegisterSchema = z.object({
-  username: z.string().min(3).max(50),
-  email: z.string().email().optional(),
-  password: z.string().min(8),
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9_-]+$/, 'Nur Buchstaben, Zahlen, Unterstrich und Bindestrich erlaubt'),
+  email: z.email().optional(),
+  password: z.string().min(8).max(128),
 });
 
 const ForgotPasswordSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
 });
 
 const ResetPasswordSchema = z.object({
@@ -46,6 +53,8 @@ const ResetPasswordSchema = z.object({
 });
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_SESSIONS_PER_USER = 10;
 
 function hashResetToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -56,6 +65,35 @@ function createResetToken(): { rawToken: string; tokenHash: string; expiresAt: D
   const tokenHash = hashResetToken(rawToken);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
   return { rawToken, tokenHash, expiresAt };
+}
+
+async function pruneSessions(userId: string): Promise<void> {
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: {
+      OR: [
+        { expiresAt: { lte: now } },
+        {
+          userId,
+          createdAt: {
+            lt: new Date(now.getTime() - SESSION_TTL_MS),
+          },
+        },
+      ],
+    },
+  });
+
+  const sessions = await prisma.session.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  });
+  if (sessions.length > MAX_SESSIONS_PER_USER) {
+    const staleSessionIds = sessions.slice(MAX_SESSIONS_PER_USER).map((s) => s.id);
+    await prisma.session.deleteMany({
+      where: { id: { in: staleSessionIds } },
+    });
+  }
 }
 
 // POST /api/auth/register - Register new user (ONLY first user - becomes admin)
@@ -74,14 +112,7 @@ router.post('/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Check if username already exists
-    const existing = await prisma.user.findUnique({
-      where: { username: validated.username },
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-    }
+    await assertUsernameAvailable(validated.username);
 
     // First user gets all roles
     const roles = ['admin', 'editor', 'viewer'];
@@ -110,20 +141,35 @@ router.post('/register', authLimiter, async (req, res) => {
     await prisma.session.create({
       data: {
         userId: user.id,
-        token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        tokenHash: hashSessionTokenForExport(token),
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       },
     });
+    await pruneSessions(user.id);
 
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
     res.json({
-      user,
-      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        roles: user.roles,
+      },
     });
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Registration error:', error);
     res.status(500).json({ error: 'registration-failed', message: 'Registrierung fehlgeschlagen' });
@@ -155,13 +201,21 @@ router.post('/login', authLimiter, async (req, res) => {
     await prisma.session.create({
       data: {
         userId: user.id,
-        token,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        tokenHash: hashSessionTokenForExport(token),
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS), // 7 days
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       },
     });
+    await pruneSessions(user.id);
 
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === 'true',
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
     res.json({
       user: {
         id: user.id,
@@ -169,11 +223,10 @@ router.post('/login', authLimiter, async (req, res) => {
         email: user.email,
         roles: user.roles,
       },
-      token,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Login error:', error);
     res.status(500).json({ error: 'login-failed', message: 'Anmeldung fehlgeschlagen' });
@@ -237,7 +290,7 @@ router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
     return res.json(genericResponse);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Forgot password error:', error);
     return res.status(500).json({ error: 'forgot-password-failed', message: 'Passwort-Reset fehlgeschlagen' });
@@ -291,7 +344,7 @@ router.post('/reset-password', authLimiter, async (req, res) => {
     return res.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Reset password error:', error);
     return res.status(500).json({ error: 'reset-password-failed', message: 'Passwort konnte nicht zurückgesetzt werden' });
@@ -306,10 +359,11 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
 
     if (token) {
       await prisma.session.deleteMany({
-        where: { token },
+        where: { tokenHash: hashSessionTokenForExport(token) },
       });
     }
 
+    res.clearCookie('auth_token', { path: '/' });
     res.json({ ok: true });
   } catch (error) {
     console.error('[auth] Logout error:', error);

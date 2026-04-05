@@ -3,12 +3,23 @@ import { scheduleApi } from '@/services/api';
 import { toast } from '@/stores/toastStore';
 import type { Schedule } from '@/types/schedule.types';
 
-export function useSchedule() {
+interface ScheduleQueryOptions {
+  enabled?: boolean;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  staleTime?: number;
+}
+
+export function useSchedule(options?: ScheduleQueryOptions) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['schedule'],
     queryFn: scheduleApi.getSchedule,
+    enabled: options?.enabled,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
+    refetchOnReconnect: options?.refetchOnReconnect,
+    staleTime: options?.staleTime,
   });
 
   const saveMutation = useMutation({

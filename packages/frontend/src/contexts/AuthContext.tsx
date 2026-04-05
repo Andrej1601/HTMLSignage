@@ -1,10 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
-import { API_URL } from '@/config/env';
+import { ENV_IS_DEV } from '@/config/env';
+import { fetchApi } from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
@@ -13,43 +13,27 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AUTH_FAILURE_PATTERN = /nicht authentifiziert|unauthorized|invalid token|session expired|user not found|no token provided/i;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [isLoading, setIsLoading] = useState(true);
+  const loggedOutRef = useRef(false);
 
-  // Check authentication status on mount
+  // Check authentication status on mount via httpOnly cookie
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('auth_token');
-      if (!storedToken) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${storedToken}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-          setToken(storedToken);
-        } else {
-          // Token is invalid
-          localStorage.removeItem('auth_token');
-          setToken(null);
+        const userData = await fetchApi<User>('/auth/me');
+        setUser(userData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (AUTH_FAILURE_PATTERN.test(message)) {
           setUser(null);
         }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('auth_token');
-        setToken(null);
-        setUser(null);
+        if (ENV_IS_DEV) {
+          console.error('Auth check failed:', error);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -58,74 +42,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  // Retry user profile fetch while logged out is not requested (e.g. after temporary offline/server outage).
+  useEffect(() => {
+    if (user || isLoading || loggedOutRef.current) return;
+
+    const retry = async () => {
+      if (loggedOutRef.current) return;
+      try {
+        const userData = await fetchApi<User>('/auth/me');
+        if (loggedOutRef.current) return;
+        setUser(userData);
+      } catch (error) {
+        if (loggedOutRef.current) return;
+        const message = error instanceof Error ? error.message : '';
+        if (AUTH_FAILURE_PATTERN.test(message)) {
+          setUser(null);
+        }
+        if (ENV_IS_DEV) {
+          console.error('Auth retry failed:', error);
+        }
+      }
+    };
+
+    void retry();
+    const interval = window.setInterval(() => {
+      void retry();
+    }, 30_000);
+
+    return () => window.clearInterval(interval);
+  }, [user, isLoading]);
+
   const login = async (credentials: LoginRequest) => {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    loggedOutRef.current = false;
+    const data = await fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
+      data: credentials,
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
-    }
-
-    const data: AuthResponse = await response.json();
     setUser(data.user);
-    setToken(data.token);
-    localStorage.setItem('auth_token', data.token);
   };
 
   const register = async (data: RegisterRequest) => {
-    const response = await fetch(`${API_URL}/api/auth/register`, {
+    loggedOutRef.current = false;
+    const authData = await fetchApi<AuthResponse>('/auth/register', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+      data,
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
-    }
-
-    const authData: AuthResponse = await response.json();
     setUser(authData.user);
-    setToken(authData.token);
-    localStorage.setItem('auth_token', authData.token);
   };
 
   const logout = async () => {
-    if (token) {
-      try {
-        await fetch(`${API_URL}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-      } catch (error) {
+    loggedOutRef.current = true;
+    try {
+      await fetchApi('/auth/logout', {
+        method: 'POST',
+        responseType: 'void',
+      });
+    } catch (error) {
+      if (ENV_IS_DEV) {
         console.error('Logout error:', error);
       }
     }
 
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('auth_token');
   };
 
-  const value = {
+  const value = useMemo(() => ({
     user,
-    token,
     isLoading,
     login,
     register,
     logout,
     isAuthenticated: !!user,
-  };
+  }), [user, isLoading, login, register, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

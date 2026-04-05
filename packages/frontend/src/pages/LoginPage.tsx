@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { API_URL } from '@/config/env';
+import { fetchApi } from '@/services/api';
+import { Button } from '@/components/Button';
 
 export function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -15,15 +16,15 @@ export function LoginPage() {
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const errorRef = useRef<HTMLDivElement>(null);
 
   // Check if this is the first user (no users exist yet)
   useEffect(() => {
     const checkFirstUser = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/me`);
-        // If 401, no users exist, allow registration
-        setIsFirstUser(response.status === 401);
-      } catch (error) {
+        await fetchApi('/auth/me');
+        setIsFirstUser(false);
+      } catch {
         setIsFirstUser(true);
       } finally {
         setCheckingFirstUser(false);
@@ -47,6 +48,7 @@ export function LoginPage() {
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+      requestAnimationFrame(() => errorRef.current?.focus());
     } finally {
       setIsLoading(false);
     }
@@ -54,14 +56,14 @@ export function LoginPage() {
 
   if (checkingFirstUser) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
         <div className="text-spa-text-secondary">Lädt...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
         {/* Header */}
         <div className="mb-6 text-center">
@@ -75,7 +77,7 @@ export function LoginPage() {
 
         {/* Error Message */}
         {error && (
-          <div role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
+          <div ref={errorRef} tabIndex={-1} role="alert" className="mb-4 p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm focus:outline-hidden">
             {error}
           </div>
         )}
@@ -93,7 +95,7 @@ export function LoginPage() {
               onChange={(e) => setUsername(e.target.value)}
               required
               minLength={mode === 'register' ? 3 : 1}
-              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
               placeholder="username"
             />
           </div>
@@ -108,7 +110,7 @@ export function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="email@example.com"
               />
             </div>
@@ -124,24 +126,25 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={mode === 'register' ? 6 : 1}
-              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+              minLength={mode === 'register' ? 8 : 1}
+              className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
               placeholder="••••••••"
             />
             {mode === 'register' && (
               <p className="mt-1 text-xs text-spa-text-secondary">
-                Mindestens 6 Zeichen
+                Mindestens 8 Zeichen
               </p>
             )}
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={isLoading}
-            className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            fullWidth
+            loading={isLoading}
+            loadingText="Lädt..."
           >
-            {isLoading ? 'Lädt...' : mode === 'login' ? 'Anmelden' : 'Administrator erstellen'}
-          </button>
+            {mode === 'login' ? 'Anmelden' : 'Administrator erstellen'}
+          </Button>
 
           {mode === 'login' && (
             <div className="text-right">

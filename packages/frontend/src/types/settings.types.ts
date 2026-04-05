@@ -98,8 +98,18 @@ export interface HeaderSettings {
   height?: number; // percentage of screen height (default: 8)
 }
 
+export interface MaintenanceScreenSettings {
+  label?: string;
+  headline?: string;
+  message?: string;
+  showDeviceName?: boolean;
+  backgroundImageId?: string;
+  displayStyle?: 'glass' | 'overlay';
+}
+
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type ColorPaletteName =
+export type DisplayAppearance = 'wellness-stage' | 'editorial-resort';
+export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
   | 'dark'
@@ -108,7 +118,10 @@ export type ColorPaletteName =
   | 'wellness-warm'
   | 'ocean-breeze'
   | 'alpine-wood'
-  | 'custom';
+  | 'aufguss-ritual';
+
+// Includes built-in palette IDs and custom palette IDs (cuid strings)
+export type ColorPaletteName = BuiltinPaletteName | (string & {});
 
 // Aroma/Scent for aufguss badges
 export interface Aroma {
@@ -189,10 +202,12 @@ export interface Event {
   endTime?: string;
   assignedPreset: 'Evt1' | 'Evt2';
   isActive: boolean;
+  targetDeviceIds?: string[];
   settingsOverrides?: EventSettingsOverrides;
 }
 
 export interface EventSettingsOverrides {
+  displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
   colorPalette?: ColorPaletteName;
   theme?: Partial<ThemeColors>;
@@ -206,6 +221,7 @@ export interface EventSettingsOverrides {
 
 export interface Settings {
   version: number;
+  displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
   colorPalette?: ColorPaletteName;
   theme?: ThemeColors;
@@ -214,6 +230,7 @@ export interface Settings {
   display?: DisplaySettings;
   audio?: AudioSettings;
   header?: HeaderSettings;
+  maintenanceScreen?: MaintenanceScreenSettings;
   saunas?: Sauna[];
   slideshow?: SlideshowConfig;
   aromas?: Aroma[];
@@ -232,10 +249,24 @@ export function isEventActive(event: Event, now: Date = new Date()): boolean {
   return now >= startDateTime && now <= endDateTime;
 }
 
-export function getActiveEvent(settings: Settings, now: Date = new Date()): Event | null {
+export function eventTargetsDevice(event: Event, deviceId?: string | null): boolean {
+  const targets = Array.isArray(event.targetDeviceIds)
+    ? event.targetDeviceIds.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+
+  if (targets.length === 0) return true;
+  if (!deviceId) return true;
+  return targets.includes(deviceId);
+}
+
+export function getActiveEvent(
+  settings: Settings,
+  now: Date = new Date(),
+  deviceId?: string | null,
+): Event | null {
   if (!settings.events) return null;
   const activeEvents = settings.events
-    .filter((event) => isEventActive(event, now))
+    .filter((event) => isEventActive(event, now) && eventTargetsDevice(event, deviceId))
     .sort((a, b) => {
       const aStart = new Date(`${a.startDate}T${a.startTime}`);
       const bStart = new Date(`${b.startDate}T${b.startTime}`);

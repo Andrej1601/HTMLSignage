@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { API_URL } from '@/config/env';
+import { fetchApi } from '@/services/api';
+import { Button } from '@/components/Button';
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -22,8 +23,8 @@ export function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein.');
+    if (password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen lang sein.');
       return;
     }
 
@@ -35,21 +36,13 @@ export function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+      await fetchApi('/auth/reset-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+        data: {
           token,
           password,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.message || 'Passwort konnte nicht zurückgesetzt werden.');
-      }
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -63,7 +56,7 @@ export function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spa-bg-primary to-spa-bg-secondary">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
       <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">Neues Passwort</h1>
@@ -72,7 +65,7 @@ export function ResetPasswordPage() {
 
         {!token && (
           <div className="space-y-4">
-            <div className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
+            <div role="alert" className="p-3 bg-spa-error-light border border-spa-error/30 rounded-lg text-spa-error-dark text-sm">
               Der Reset-Link ist ungültig. Bitte fordere einen neuen Link an.
             </div>
             <Link to="/forgot-password" className="block text-center text-sm text-spa-primary hover:underline">
@@ -105,9 +98,9 @@ export function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
-                placeholder="Mindestens 6 Zeichen"
+                minLength={8}
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                placeholder="Mindestens 8 Zeichen"
               />
             </div>
 
@@ -122,18 +115,20 @@ export function ResetPasswordPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent"
                 placeholder="Passwort wiederholen"
               />
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={isLoading || isSuccess}
-              className="w-full bg-spa-primary hover:bg-spa-primary-dark text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              fullWidth
+              disabled={isSuccess}
+              loading={isLoading}
+              loadingText="Speichere..."
             >
-              {isLoading ? 'Speichere...' : 'Passwort zurücksetzen'}
-            </button>
+              Passwort zurücksetzen
+            </Button>
 
             <Link to="/login" className="block text-center text-sm text-spa-primary hover:underline">
               Zurück zur Anmeldung

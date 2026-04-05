@@ -1,338 +1,270 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import crypto from 'crypto';
+import { Router, type NextFunction, type Response } from 'express';
+import { createReadStream } from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import fs from 'fs/promises';
-import { existsSync } from 'fs';
+import { randomBytes } from 'crypto';
 import multer from 'multer';
-import { prisma } from '../lib/prisma.js';
+import archiver from 'archiver';
 import type { AuthRequest } from '../lib/auth.js';
-import { ScheduleSchema } from '../types/schedule.types.js';
-import { UPLOAD_DIR } from '../lib/upload.js';
-import { broadcastScheduleUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
+import { authMiddleware, requireRole } from '../lib/auth.js';
+import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
 import {
-  normalizeScheduleData,
-  readLocalVersion,
-  compareVersions,
-  parseDateOrFallback,
-  sanitizeFilename,
-  listUploadFiles,
-  clearUploadDirectory,
-  makeUniqueFilename,
-} from '../lib/systemHelpers.js';
+  buildBackupExportManifest,
+  buildImportPreview,
+  getBackupOperationFailure,
+  importBackupArchive,
+  parseReplaceMedia,
+  type BackupOperationFailure,
+} from '../lib/systemBackup.js';
+import { createSystemJob, findRunningSystemJob, runSystemJob } from '../lib/systemJobs.js';
+import { UPLOAD_DIR } from '../lib/upload.js';
 
 const router = Router();
-
-interface BackupMediaItem {
-  id?: string;
-  filename: string;
-  originalName: string;
-  mimeType: string;
-  size?: number;
-  type: string;
-  tags?: string[];
-  uploadedBy?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  dataBase64: string;
-}
-
-interface PreparedImportMedia {
-  id: string;
-  filename: string;
-  originalName: string;
-  mimeType: string;
-  type: string;
-  tags: string[];
-  uploadedBy: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  buffer: Buffer;
-}
-
-const BackupMediaSchema = z.object({
-  id: z.string().min(1).optional(),
-  filename: z.string().min(1),
-  originalName: z.string().min(1),
-  mimeType: z.string().min(1),
-  size: z.number().int().nonnegative().optional(),
-  type: z.string().min(1),
-  tags: z.array(z.string()).default([]),
-  uploadedBy: z.string().nullable().optional(),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
-  dataBase64: z.string().min(1),
-});
-
-const BackupPayloadSchema = z.object({
-  formatVersion: z.union([z.literal(1), z.literal(2)]),
-  exportedAt: z.string(),
-  appVersion: z.string().optional(),
-  checksum: z.string().optional(),
-  mediaCount: z.number().optional(),
-  schedule: ScheduleSchema,
-  settings: z.record(z.string(), z.unknown()),
-  media: z.array(BackupMediaSchema).default([]),
-});
 
 const backupUpload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, os.tmpdir()),
     filename: (_req, file, cb) => {
-      const suffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      const ext = path.extname(file.originalname || '') || '.json';
+      const suffix = `${Date.now()}-${randomBytes(8).toString('hex')}`;
+      const ext = path.extname(file.originalname || '') || '.zip';
       cb(null, `htmlsignage-backup-${suffix}${ext}`);
     },
   }),
   limits: {
-    fileSize: 1024 * 1024 * 1024, // 1GB
+    fileSize: 1024 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const lowerName = (file.originalname || '').toLowerCase();
+    const isZip = lowerName.endsWith('.zip')
+      || file.mimetype === 'application/zip'
+      || file.mimetype === 'application/x-zip-compressed'
+      || (file.mimetype === 'application/octet-stream' && lowerName.endsWith('.zip'));
+
+    if (isZip) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error('Nur ZIP-Backups sind erlaubt.'));
   },
 });
 
-// GET /backup/export
-router.get('/backup/export', async (_req: AuthRequest, res) => {
+const backupUploadMiddleware = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  backupUpload.fields([
+    { name: 'backup', maxCount: 1 },
+    { name: 'backupFile', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+  ])(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    const message = error instanceof Error ? error.message : 'Backup-Datei konnte nicht verarbeitet werden.';
+    res.status(400).json({
+      error: 'invalid-backup-upload',
+      message,
+    });
+  });
+};
+
+function resolveBackupFile(req: AuthRequest): Express.Multer.File | undefined {
+  if (req.file) return req.file;
+  const files = req.files as Record<string, Express.Multer.File[]> | Express.Multer.File[] | undefined;
+  if (!files) return undefined;
+  if (Array.isArray(files)) return files[0];
+  return files.backup?.[0] || files.backupFile?.[0] || files.file?.[0];
+}
+
+function buildBackupFailureBody(
+  failure: BackupOperationFailure,
+  requestId?: string | null,
+): Record<string, unknown> {
+  return {
+    error: failure.code,
+    message: failure.message,
+    ...(failure.details !== undefined ? { details: failure.details } : {}),
+    ...(requestId !== undefined ? { requestId } : {}),
+  };
+}
+
+router.get('/backup/export', authMiddleware, requireRole('admin'), async (req: AuthRequest, res) => {
   try {
-    const [scheduleRow, settingsRow, mediaRows] = await Promise.all([
-      prisma.schedule.findFirst({
-        where: { isActive: true },
-        orderBy: { version: 'desc' },
-      }),
-      prisma.settings.findFirst({
-        where: { isActive: true },
-        orderBy: { version: 'desc' },
-      }),
-      prisma.media.findMany({
-        orderBy: { createdAt: 'asc' },
-      }),
-    ]);
-
-    const schedule = normalizeScheduleData(scheduleRow?.data);
-    const settings = (settingsRow?.data && typeof settingsRow.data === 'object')
-      ? (settingsRow.data as Record<string, unknown>)
-      : { version: 1 };
-
-    const mediaResults = await Promise.all(
-      mediaRows.map(async (item) => {
-        const fullPath = path.join(UPLOAD_DIR, item.filename);
-        if (!existsSync(fullPath)) {
-          console.warn(`[system] Skipping missing media file during export: ${item.filename}`);
-          return null;
-        }
-        const fileBuffer = await fs.readFile(fullPath);
-        return {
-          id: item.id,
-          filename: item.filename,
-          originalName: item.originalName,
-          mimeType: item.mimeType,
-          size: item.size,
-          type: item.type,
-          tags: item.tags,
-          uploadedBy: item.uploadedBy,
-          createdAt: item.createdAt.toISOString(),
-          updatedAt: item.updatedAt.toISOString(),
-          dataBase64: fileBuffer.toString('base64'),
-        } satisfies BackupMediaItem;
-      })
-    );
-    const media = mediaResults.filter((m) => m !== null) as BackupMediaItem[];
-
-    const appVersion = await readLocalVersion();
-
-    const payloadBase = {
-      formatVersion: 2 as const,
-      exportedAt: new Date().toISOString(),
-      appVersion,
-      mediaCount: media.length,
-      schedule,
-      settings,
-      media,
-    };
-
-    const payloadJson = JSON.stringify(payloadBase);
-    const checksum = crypto.createHash('sha256').update(payloadJson).digest('hex');
-    const finalPayload = JSON.stringify({ ...payloadBase, checksum });
-
+    const manifest = await buildBackupExportManifest();
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="htmlsignage-backup-${stamp}.json"`);
-    res.status(200).send(finalPayload);
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="htmlsignage-backup-${stamp}.zip"`);
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archiveDone = new Promise<void>((resolve, reject) => {
+      archive.on('end', () => resolve());
+      archive.on('error', (error) => reject(error));
+    });
+
+    archive.pipe(res);
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+
+    for (const item of manifest.media) {
+      archive.append(
+        createReadStream(path.join(UPLOAD_DIR, item.filename)),
+        { name: item.archivePath || `media/${item.filename}` },
+      );
+    }
+
+    await archive.finalize();
+    await archiveDone;
+    await logAuditEvent(req, {
+      action: 'system.backup.export',
+      details: {
+        mediaCount: manifest.media.length,
+        formatVersion: manifest.formatVersion,
+      },
+    });
   } catch (error) {
     console.error('[system] Error exporting backup:', error);
-    res.status(500).json({ error: 'backup-export-failed', message: 'Backup-Export fehlgeschlagen' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'backup-export-failed', message: 'Backup-Export fehlgeschlagen' });
+    } else {
+      res.end();
+    }
   }
 });
 
-// POST /backup/import
-router.post('/backup/import', backupUpload.single('backup'), async (req: AuthRequest, res) => {
-  const filePath = req.file?.path;
-  const replaceMedia = req.body?.replaceMedia !== 'false';
+router.post('/backup/import/preview', authMiddleware, requireRole('admin'), backupUploadMiddleware, async (req: AuthRequest, res) => {
+  const backupFile = resolveBackupFile(req);
+  const filePath = backupFile?.path;
+  const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);
 
-  if (!req.file || !filePath) {
+  if (!backupFile || !filePath) {
     return res.status(400).json({ error: 'backup-file-required', message: 'Backup-Datei erforderlich' });
   }
 
-  const writtenFiles: string[] = [];
-  const warnings: string[] = [];
-
   try {
-    const raw = await fs.readFile(filePath, 'utf-8');
-    const parsedJson = JSON.parse(raw) as unknown;
-    const backup = BackupPayloadSchema.parse(parsedJson);
-
-    if (backup.formatVersion === 2 && backup.checksum) {
-      const { checksum: savedChecksum, ...payloadWithoutChecksum } = backup;
-      const computed = crypto.createHash('sha256').update(JSON.stringify(payloadWithoutChecksum)).digest('hex');
-      if (computed !== savedChecksum) {
-        return res.status(400).json({ error: 'checksum-mismatch', message: 'Backup-Datei ist beschädigt (Checksum stimmt nicht überein).' });
-      }
-    }
-
-    if (backup.appVersion) {
-      const localVersion = await readLocalVersion();
-      if (compareVersions(backup.appVersion, localVersion) > 0) {
-        warnings.push(`Backup wurde mit einer neueren Version erstellt (${backup.appVersion} > ${localVersion}). Kompatibilitätsprobleme möglich.`);
-      }
-    }
-
-    if (backup.mediaCount !== undefined && backup.mediaCount !== backup.media.length) {
-      warnings.push(`Erwartete ${backup.mediaCount} Medien, aber ${backup.media.length} gefunden.`);
-    }
-
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-
-    const existingUsers = await prisma.user.findMany({ select: { id: true } });
-    const validUserIds = new Set(existingUsers.map((user) => user.id));
-
-    const usedFilenames = replaceMedia ? new Set<string>() : await listUploadFiles();
-    const preparedMedia: PreparedImportMedia[] = backup.media.map((item) => {
-      const safeFile = sanitizeFilename(item.filename || item.originalName);
-      const filename = makeUniqueFilename(safeFile, usedFilenames);
-      const buffer = Buffer.from(item.dataBase64, 'base64');
-      const id = item.id && item.id.trim().length > 0
-        ? item.id
-        : `backup-media-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-
-      return {
-        id,
-        filename,
-        originalName: item.originalName,
-        mimeType: item.mimeType,
-        type: item.type,
-        tags: item.tags,
-        uploadedBy: item.uploadedBy && validUserIds.has(item.uploadedBy) ? item.uploadedBy : null,
-        createdAt: parseDateOrFallback(item.createdAt),
-        updatedAt: parseDateOrFallback(item.updatedAt),
-        buffer,
-      };
+    const preview = await buildImportPreview(filePath, replaceMedia);
+    await logAuditEvent(req, {
+      action: 'system.backup.preview',
+      details: {
+        fileName: backupFile.originalname,
+        replaceMedia,
+        importedMedia: preview.importPlan.importedMedia,
+      },
+    });
+    return res.json(preview);
+  } catch (error) {
+    const failure = getBackupOperationFailure(error, {
+      code: 'backup-preview-failed',
+      message: 'Backup-Vorschau fehlgeschlagen',
+      status: 500,
     });
 
-    if (replaceMedia) {
-      await clearUploadDirectory();
+    if (failure.status >= 500) {
+      console.error('[system] Error previewing backup import:', error);
     }
 
-    await Promise.all(
-      preparedMedia.map(async (item) => {
-        const target = path.join(UPLOAD_DIR, item.filename);
-        await fs.writeFile(target, item.buffer);
-        writtenFiles.push(target);
-      })
-    );
+    return res.status(failure.status).json(buildBackupFailureBody(failure));
+  } finally {
+    await fs.unlink(filePath).catch(() => {});
+  }
+});
 
-    const importedSchedule = normalizeScheduleData(backup.schedule);
-    const importedSettings = backup.settings;
+router.post('/backup/import', authMiddleware, requireRole('admin'), backupUploadMiddleware, async (req: AuthRequest, res) => {
+  const backupFile = resolveBackupFile(req);
+  const filePath = backupFile?.path;
+  const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);
 
-    const result = await prisma.$transaction(async (tx) => {
-      const [latestSchedule, latestSettings] = await Promise.all([
-        tx.schedule.findFirst({ orderBy: { version: 'desc' } }),
-        tx.settings.findFirst({ orderBy: { version: 'desc' } }),
-      ]);
+  if (!backupFile || !filePath) {
+    return res.status(400).json({
+      error: 'backup-file-required',
+      message: 'Backup-Datei erforderlich',
+      requestId: req.requestId ?? null,
+    });
+  }
 
-      const nextScheduleVersion = (latestSchedule?.version ?? 0) + 1;
-      const nextSettingsVersion = (latestSettings?.version ?? 0) + 1;
+  const runningJob = await findRunningSystemJob('backup-import');
+  if (runningJob) {
+    return res.status(409).json({
+      error: 'backup-import-in-progress',
+      message: 'Ein Backup-Import läuft bereits',
+      job: runningJob,
+      requestId: req.requestId ?? null,
+    });
+  }
 
-      const scheduleToStore = { ...importedSchedule, version: nextScheduleVersion };
-      const settingsToStore = { ...(importedSettings as Record<string, unknown>), version: nextSettingsVersion };
+  const auditRequest = createAuditRequestSnapshot(req);
+  const job = await createSystemJob({
+    type: 'backup-import',
+    title: `Backup importieren: ${backupFile.originalname}`,
+    requestId: req.requestId ?? null,
+    createdBy: req.user
+      ? {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+        }
+      : null,
+  });
 
-      const [newSchedule, newSettings] = await Promise.all([
-        tx.schedule.create({ data: { version: nextScheduleVersion, isActive: true, data: scheduleToStore } }),
-        tx.settings.create({ data: { version: nextSettingsVersion, isActive: true, data: settingsToStore } }),
-      ]);
+  runSystemJob(job.id, async (context) => {
+    try {
+      const result = await importBackupArchive(filePath, replaceMedia, {
+        setProgress: context.setProgress,
+        appendLog: context.appendLog,
+      });
 
-      await Promise.all([
-        tx.schedule.updateMany({ where: { id: { not: newSchedule.id }, isActive: true }, data: { isActive: false } }),
-        tx.settings.updateMany({ where: { id: { not: newSettings.id }, isActive: true }, data: { isActive: false } }),
-      ]);
+      context.succeed(result);
 
-      if (replaceMedia) {
-        await tx.media.deleteMany({});
+      await logAuditEvent(auditRequest, {
+        action: 'system.backup.import',
+        details: {
+          fileName: backupFile.originalname,
+          replaceMedia,
+          importedMedia: result.importedMedia,
+          importedScheduleVersion: result.importedScheduleVersion,
+          importedSettingsVersion: result.importedSettingsVersion,
+          warnings: result.warnings,
+          requestId: auditRequest.requestId ?? null,
+          jobId: context.job.id,
+        },
+      });
+    } catch (error) {
+      const failure = getBackupOperationFailure(error, {
+        code: 'backup-import-failed',
+        message: error instanceof Error ? error.message : 'Backup-Import fehlgeschlagen',
+        status: 500,
+      });
+
+      if (failure.status >= 500) {
+        console.error('[system] Error importing backup:', error);
       }
 
-      const existingMediaIds = new Set(
-        (await tx.media.findMany({ select: { id: true } })).map((m) => m.id)
+      context.fail(
+        failure.code,
+        failure.message,
+        failure.details === undefined ? null : { details: failure.details },
       );
 
-      for (const mediaItem of preparedMedia) {
-        const mediaId = existingMediaIds.has(mediaItem.id)
-          ? `backup-media-${Date.now()}-${Math.round(Math.random() * 1e9)}`
-          : mediaItem.id;
-
-        await tx.media.create({
-          data: {
-            id: mediaId,
-            filename: mediaItem.filename,
-            originalName: mediaItem.originalName,
-            mimeType: mediaItem.mimeType,
-            size: mediaItem.buffer.length,
-            type: mediaItem.type,
-            tags: mediaItem.tags,
-            uploadedBy: mediaItem.uploadedBy,
-            createdAt: mediaItem.createdAt,
-            updatedAt: mediaItem.updatedAt,
-          },
-        });
-      }
-
-      return {
-        schedule: scheduleToStore,
-        settings: settingsToStore,
-        scheduleVersion: nextScheduleVersion,
-        settingsVersion: nextSettingsVersion,
-      };
-    });
-
-    broadcastScheduleUpdate(result.schedule);
-    broadcastSettingsUpdate(result.settings);
-
-    return res.json({
-      ok: true,
-      importedMedia: preparedMedia.length,
-      replaceMedia,
-      importedAt: new Date().toISOString(),
-      importedScheduleVersion: result.scheduleVersion,
-      importedSettingsVersion: result.settingsVersion,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    });
-  } catch (error) {
-    await Promise.all(
-      writtenFiles.map((f) => fs.unlink(f).catch(() => {}))
-    );
-
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        error: 'invalid-backup-format',
-        details: error.errors,
+      await logAuditEvent(auditRequest, {
+        action: 'system.backup.import.failed',
+        details: {
+          fileName: backupFile.originalname,
+          replaceMedia,
+          errorCode: failure.code,
+          requestId: auditRequest.requestId ?? null,
+          jobId: context.job.id,
+        },
       });
+    } finally {
+      await fs.unlink(filePath).catch(() => {});
     }
-    console.error('[system] Error importing backup:', error);
-    return res.status(500).json({ error: 'backup-import-failed', message: 'Backup-Import fehlgeschlagen' });
-  } finally {
-    try {
-      await fs.unlink(filePath);
-    } catch {
-      // Ignore cleanup errors.
-    }
-  }
+  });
+
+  return res.status(202).json({
+    ok: true,
+    jobId: job.id,
+    job,
+    message: `Backup-Import für ${backupFile.originalname} wurde gestartet.`,
+  });
 });
 
 export default router;

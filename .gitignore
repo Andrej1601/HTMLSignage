@@ -3,7 +3,6 @@
 .DS_Store
 node_modules/
 coverage/
-pnpm-lock.yaml
 yarn.lock
 
 # Database files
@@ -32,7 +31,17 @@ nginx-*.conf
 .env
 .env.local
 .env.*.local
+.env.production
+
+# Local agent/assistant config
+.claude/
+.claude/skills/
+.claude/settings.local.json
+.stitch/
 
 # Build outputs
 dist/
 build/
+logs/
+packages/frontend/dist-rollout-*/
+packages/frontend/dist-rollback/

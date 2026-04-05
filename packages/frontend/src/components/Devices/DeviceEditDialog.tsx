@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Monitor } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
-import { InputField } from '@/components/FormField';
+import { InputField, ToggleField } from '@/components/FormField';
+import { ComboboxField } from '@/components/ComboboxField';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
+import type { SlideshowDefinition } from '@/types/slideshow.types';
 
 interface DeviceEditDialogProps {
   device: Device | null;
@@ -11,6 +13,10 @@ interface DeviceEditDialogProps {
   onClose: () => void;
   onSave: (id: string, updates: UpdateDeviceRequest) => void;
   isSaving: boolean;
+  /** Existing group names for autocomplete suggestions */
+  existingGroups?: string[];
+  /** Available slideshows for assignment */
+  slideshows?: SlideshowDefinition[];
 }
 
 export function DeviceEditDialog({
@@ -18,19 +24,33 @@ export function DeviceEditDialog({
   isOpen,
   onClose,
   onSave,
-  isSaving
+  isSaving,
+  existingGroups = [],
+  slideshows = [],
 }: DeviceEditDialogProps) {
   const [name, setName] = useState('');
-  const [mode, setMode] = useState<'auto' | 'override'>('auto');
+  const [groupName, setGroupName] = useState('');
+  const [slideshowId, setSlideshowId] = useState<string | null>(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [error, setError] = useState('');
+  const initializedDeviceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (device) {
-      setName(device.name);
-      setMode(device.mode);
-      setError('');
-    }
-  }, [device]);
+    if (!isOpen || !device) return;
+    if (initializedDeviceIdRef.current === device.id) return;
+
+    initializedDeviceIdRef.current = device.id;
+    setName(device.name);
+    setGroupName(device.groupName || '');
+    setSlideshowId(device.slideshowId || null);
+    setMaintenanceMode(Boolean(device.maintenanceMode));
+    setError('');
+  }, [device, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) return;
+    initializedDeviceIdRef.current = null;
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,20 +64,27 @@ export function DeviceEditDialog({
 
     onSave(device.id, {
       name: name.trim(),
-      mode
+      groupName: groupName.trim() || null,
+      slideshowId: slideshowId || null,
+      maintenanceMode,
     });
   };
 
   const handleClose = () => {
     if (!isSaving) {
+      initializedDeviceIdRef.current = null;
       setName('');
-      setMode('auto');
+      setGroupName('');
+      setSlideshowId(null);
+      setMaintenanceMode(false);
       setError('');
       onClose();
     }
   };
 
   if (!device) return null;
+
+  const defaultSlideshow = slideshows.find((s) => s.isDefault);
 
   return (
     <Dialog
@@ -111,48 +138,55 @@ export function DeviceEditDialog({
           autoFocus
         />
 
-        {/* Mode Selection */}
+        <div>
+          <ComboboxField
+            label="Gerätegruppe"
+            value={groupName}
+            onChange={setGroupName}
+            options={existingGroups}
+            placeholder="z.B. Saunawelt West"
+            createLabel="Neue Gruppe"
+          />
+          <p className="mt-1 text-xs text-spa-text-secondary">
+            Hilft beim Filtern, Gruppieren und bei Bulk-Aktionen.
+          </p>
+        </div>
+
+        {/* Slideshow Assignment */}
         <div>
           <label className="block text-sm font-medium text-spa-text-primary mb-1">
-            Betriebsmodus
+            Slideshow
           </label>
-          <div className="space-y-2">
-            <label className="flex items-start gap-3 p-3 border border-spa-bg-secondary rounded-lg cursor-pointer hover:bg-spa-bg-primary transition-colors">
-              <input
-                type="radio"
-                name="mode"
-                value="auto"
-                checked={mode === 'auto'}
-                onChange={(e) => setMode(e.target.value as 'auto')}
-                disabled={isSaving}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="font-medium text-spa-text-primary">Automatisch</p>
-                <p className="text-sm text-spa-text-secondary">
-                  Verwendet globale Einstellungen und Schedule
-                </p>
-              </div>
-            </label>
+          <select
+            value={slideshowId || ''}
+            onChange={(e) => setSlideshowId(e.target.value || null)}
+            disabled={isSaving}
+            className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 disabled:opacity-60"
+          >
+            <option value="">
+              Standard{defaultSlideshow ? ` (${defaultSlideshow.name})` : ''}
+            </option>
+            {slideshows
+              .filter((s) => !s.isDefault)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+          </select>
+          <p className="mt-1 text-xs text-spa-text-secondary">
+            Ohne Zuweisung wird die Standard-Slideshow verwendet.
+          </p>
+        </div>
 
-            <label className="flex items-start gap-3 p-3 border border-spa-bg-secondary rounded-lg cursor-pointer hover:bg-spa-bg-primary transition-colors">
-              <input
-                type="radio"
-                name="mode"
-                value="override"
-                checked={mode === 'override'}
-                onChange={(e) => setMode(e.target.value as 'override')}
-                disabled={isSaving}
-                className="mt-0.5"
-              />
-              <div>
-                <p className="font-medium text-spa-text-primary">Überschrieben</p>
-                <p className="text-sm text-spa-text-secondary">
-                  Verwendet individuelle Einstellungen für dieses Gerät
-                </p>
-              </div>
-            </label>
-          </div>
+        <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4">
+          <ToggleField
+            label="Wartungsmodus"
+            description="Markiert das Gerät für Service-, Rollout- oder Diagnosearbeiten."
+            checked={maintenanceMode}
+            onChange={setMaintenanceMode}
+            disabled={isSaving}
+          />
         </div>
       </form>
     </Dialog>

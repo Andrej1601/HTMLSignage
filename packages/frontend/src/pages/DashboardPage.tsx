@@ -1,67 +1,50 @@
 import { Layout } from '@/components/Layout';
-import { StatCard } from '@/components/Dashboard/StatCard';
-import { QuickActionCard } from '@/components/Dashboard/QuickActionCard';
-import { OperationsContentWidget } from '@/components/Dashboard/OperationsContentWidget';
-import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
+import { OperationsPulseWidget } from '@/components/Dashboard/OperationsPulseWidget';
+import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
-import { MediaInsightsWidget } from '@/components/Dashboard/MediaInsightsWidget';
+import { MediaStatsWidget } from '@/components/Dashboard/MediaStatsWidget';
+import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
+import { RunningSlideshowsWidget } from '@/components/Dashboard/RunningSlideshowsWidget';
+import { InlineErrorBoundary } from '@/components/InlineErrorBoundary';
 import { PageHeader } from '@/components/PageHeader';
-import { DropdownMenu } from '@/components/ui/DropdownMenu';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePermissions } from '@/hooks/usePermission';
-import type { Permission } from '@/utils/permissions';
-import { useWidgetVisibility, WIDGET_PREFERENCES } from '@/hooks/useWidgetVisibility';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { PRESET_LABELS } from '@/types/schedule.types';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import {
-  Calendar,
-  Layers,
-  Monitor,
-  Settings,
-  Wifi,
-  WifiOff,
-  Upload,
-  AlertCircle,
-  CheckCircle,
-  Play,
-  SlidersHorizontal,
-  LayoutDashboard,
-} from 'lucide-react';
+import { SkeletonCard } from '@/components/Skeleton';
+import { Button } from '@/components/Button';
+import { AlertCircle, LayoutDashboard, RefreshCw } from 'lucide-react';
 
 export function DashboardPage() {
-  const { user } = useAuth();
-  const perms = usePermissions();
-  const widgetStorageKey = `htmlsignage_dashboard_widgets_${user?.id || 'anonymous'}`;
-  const {
-    widgetVisibility,
-    activeWidgetCount,
-    toggleWidget,
-    showAllWidgets,
-    setOpsFocus,
-  } = useWidgetVisibility(widgetStorageKey);
-
   const {
     isLoading,
     scheduleQuery, settingsQuery, devicesQuery, mediaQuery, backendHealthQuery,
-    schedule, wsConnected,
+    schedule, settings, wsConnected,
     isAdmin,
     liveState, mediaStats, eventStats,
-    runningSlideshows, systemChecks, updateLabel,
+    runningSlideshows, deviceSlideshowRows, systemChecks, updateLabel,
+    runtimeStatus, runtimeHistory,
+    attentionItems,
     activityItems,
   } = useDashboardData();
 
   if (isLoading) {
     return (
       <Layout>
-        <LoadingSpinner label="Lade Dashboard..." />
+        <div className="space-y-6">
+          <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <SkeletonCard />
+        </div>
       </Layout>
     );
   }
 
-  const livePresetLabel = liveState.activePreset ? PRESET_LABELS[liveState.activePreset] : '-';
-
-  // Next event description
   const nextEventDesc = (() => {
     if (liveState.activeEvent) {
       const endTime = liveState.activeEvent.endTime || '23:59';
@@ -74,210 +57,98 @@ export function DashboardPage() {
     return { value: 'Kein aktives Event', tone: 'neutral' as const };
   })();
 
-  // Slideshow stats for the 3rd card
-  const totalActiveSlides = runningSlideshows.reduce((sum, g) => sum + g.slides.length, 0);
-  const globalSlideshow = runningSlideshows.find((g) => g.source === 'global');
-  const overrideCount = runningSlideshows.filter((g) => g.source === 'override').length;
+  const hasErrors = scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error;
 
-  const hasLeftWidgets =
-    widgetVisibility.operationsContent || widgetVisibility.activityFeed;
-  const hasRightWidgets =
-    widgetVisibility.systemChecks || widgetVisibility.mediaInsights || widgetVisibility.quickActions;
-
-  const allQuickActions: { title: string; description: string; icon: typeof Calendar; href: string; color: 'primary' | 'info' | 'violet' | 'success'; permission?: Permission }[] = [
-    { title: 'Aufgussplan bearbeiten', description: 'Wochenplan pflegen und Event-Presets verwalten', icon: Calendar, href: '/schedule', color: 'primary', permission: 'schedule:write' },
-    { title: 'Gerätestatus', description: 'Offline-Displays, Pairings und Modi prüfen', icon: Monitor, href: '/devices', color: 'info', permission: 'devices:manage' },
-    { title: 'Medien aktualisieren', description: 'Bilder, Audio und Video hochladen', icon: Upload, href: '/media', color: 'violet', permission: 'media:manage' },
-    { title: 'Systemwartung', description: 'Update-Status, Backup-Import und Export', icon: Settings, href: '/settings', color: 'success', permission: 'settings:manage' },
-  ];
-  const quickActions = allQuickActions.filter((a) => !a.permission || perms.has(a.permission));
+  const handleRefresh = () => {
+    scheduleQuery.refetch();
+    settingsQuery.refetch();
+    devicesQuery.refetch();
+    mediaQuery.refetch();
+    backendHealthQuery.refetch();
+  };
 
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <PageHeader
-          title="Dashboard"
+          title="Dashboard Übersicht"
           description="Betriebszentrale für Displays, Inhalte und Systemzustand"
           icon={LayoutDashboard}
+          actions={
+            <Button variant="secondary" icon={RefreshCw} onClick={handleRefresh}>
+              Aktualisieren
+            </Button>
+          }
           badges={[
-            { label: liveState.activeEvent ? `Event: ${liveState.activeEvent.name}` : 'Kein Event aktiv', tone: liveState.activeEvent ? 'info' as const : 'neutral' as const },
-            { label: schedule?.autoPlay ? 'Auto-Play' : 'Manuell', tone: schedule?.autoPlay ? 'success' as const : 'warning' as const },
+            { label: attentionItems.length === 0 ? 'Normalbetrieb' : `${attentionItems.length} Meldungen`, tone: attentionItems.length === 0 ? 'success' : 'warning' },
+            { label: `${liveState.onlinePairedDevices.length} Geräte online`, tone: liveState.onlinePairedDevices.length > 0 ? 'success' : 'neutral' },
           ]}
         />
 
-        {/* Compact Widget Toolbar */}
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-spa-text-secondary">
-            {activeWidgetCount} von {WIDGET_PREFERENCES.length} Widgets sichtbar
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={setOpsFocus}
-              className="px-3 py-1.5 text-sm bg-spa-primary/10 text-spa-primary rounded-lg hover:bg-spa-primary/20 transition-colors"
-            >
-              Ops-Fokus
-            </button>
-            <button
-              onClick={showAllWidgets}
-              className="px-3 py-1.5 text-sm bg-spa-secondary/10 text-spa-secondary-dark rounded-lg hover:bg-spa-secondary/20 transition-colors"
-            >
-              Alle
-            </button>
-            <DropdownMenu
-              sections={[
-                WIDGET_PREFERENCES.map((widget) => ({
-                  label: `${widgetVisibility[widget.key] ? '\u2713' : '\u2717'} ${widget.title}`,
-                  icon: SlidersHorizontal,
-                  onClick: () => toggleWidget(widget.key),
-                  keepOpen: true,
-                })),
-              ]}
-              width="w-64"
-              trigger={(open) => (
-                <button
-                  className={`p-2 rounded-lg transition-colors ${
-                    open ? 'bg-spa-primary/10' : 'bg-spa-bg-secondary hover:bg-spa-secondary/20'
-                  }`}
-                  aria-label="Widgets anpassen"
-                >
-                  <SlidersHorizontal className="w-4 h-4 text-spa-text-secondary" />
-                </button>
-              )}
+        {/* Row 1: Betriebsstatus + Meldungen */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <InlineErrorBoundary fallbackLabel="Betriebsstatus konnte nicht geladen werden.">
+            <OperationsPulseWidget
+              liveState={liveState}
+              runningSlideshows={runningSlideshows}
+              nextEventLabel={nextEventDesc.value}
+              activePreset={liveState.activePreset}
+              autoPlay={Boolean(schedule?.autoPlay)}
+              schedule={schedule ?? null}
+              settings={settings ?? null}
+              pairedDevices={liveState.pairedDevices}
             />
-          </div>
+          </InlineErrorBoundary>
+          <InlineErrorBoundary fallbackLabel="Meldungen konnten nicht geladen werden.">
+            <AttentionBoardWidget items={attentionItems} />
+          </InlineErrorBoundary>
         </div>
 
-        {/* KPI Row — 3 Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard
-            title="Geräte"
-            value={`${liveState.onlineDevices}/${liveState.pairedDevices.length}`}
-            icon={liveState.offlineDevices > 0 ? WifiOff : Wifi}
-            description={
-              liveState.offlineDevices > 0
-                ? `${liveState.offlineDevices} offline · ${liveState.pendingPairings} ausstehend`
-                : `Alle online · ${liveState.pendingPairings} ausstehend`
-            }
-            color={liveState.offlineDevices > 0 ? 'warning' : 'success'}
-            href="/devices"
-            ctaLabel="Zu Geräten"
-          />
-          <StatCard
-            title="Tagesplan"
-            value={livePresetLabel}
-            icon={Play}
-            details={[
-              { label: 'Modus', value: schedule?.autoPlay ? 'Auto-Play' : 'Manuell', tone: schedule?.autoPlay ? 'success' : 'warning' },
-              { label: 'Nächster Event', value: nextEventDesc.value, tone: nextEventDesc.tone },
-            ]}
-            color={liveState.activeEvent ? 'info' : 'primary'}
-            href="/schedule"
-            ctaLabel="Zum Aufgussplan"
-          />
-          <StatCard
-            title="Slideshow"
-            value={`${totalActiveSlides} Slides`}
-            icon={Layers}
-            details={[
-              ...(globalSlideshow
-                ? [{ label: 'Layout', value: globalSlideshow.config.layout === 'split-view' ? 'Split View' : globalSlideshow.config.layout === 'full-rotation' ? 'Vollbild' : globalSlideshow.config.layout, tone: 'neutral' as const }]
-                : []),
-              ...(overrideCount > 0
-                ? [{ label: 'Overrides', value: `${overrideCount} Gerät(e)`, tone: 'warning' as const }]
-                : []),
-              { label: 'Geräte', value: `${liveState.onlineDevices} online`, tone: liveState.offlineDevices > 0 ? 'warning' as const : 'success' as const },
-            ]}
-            color="success"
-            href="/slideshow"
-            ctaLabel="Zur Slideshow"
-          />
+        {/* Row 2: Laufende Slideshows */}
+        <InlineErrorBoundary fallbackLabel="Laufende Slideshows konnten nicht geladen werden.">
+          <RunningSlideshowsWidget rows={deviceSlideshowRows} />
+        </InlineErrorBoundary>
+
+        {/* Row 3: System-Checks + Medien-Statistiken */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <InlineErrorBoundary fallbackLabel="System-Checks konnten nicht geladen werden.">
+            <SystemChecksWidget
+              backendStatus={
+                backendHealthQuery.data?.status === 'ok' ? 'ok'
+                : backendHealthQuery.isError ? 'error'
+                : 'unknown'
+              }
+              backendTone={systemChecks.backendTone}
+              dataTone={systemChecks.dataTone}
+              websocketTone={systemChecks.websocketTone}
+              wsConnected={wsConnected}
+              updateTone={systemChecks.updateTone}
+              isAdmin={isAdmin}
+              updateLabel={updateLabel}
+              runtimeStatus={runtimeStatus}
+              runtimeHistory={runtimeHistory}
+            />
+          </InlineErrorBoundary>
+          <InlineErrorBoundary fallbackLabel="Medien-Statistiken konnten nicht geladen werden.">
+            <MediaStatsWidget
+              images={mediaStats.images}
+              audio={mediaStats.audio}
+              videos={mediaStats.videos}
+              totalSize={mediaStats.totalSize}
+            />
+          </InlineErrorBoundary>
         </div>
 
-        {activeWidgetCount === 0 && (
-          <div className="rounded-lg border border-spa-warning/30 bg-spa-warning-light px-4 py-3 text-sm text-spa-warning-dark flex items-center justify-between gap-3">
-            <span>Alle Widgets sind ausgeblendet. Aktiviere mindestens ein Widget für das Dashboard.</span>
-            <button
-              onClick={showAllWidgets}
-              className="px-3 py-1.5 rounded-lg bg-spa-warning/15 hover:bg-spa-warning/25 text-spa-warning-dark font-medium transition-colors"
-            >
-              Widgets zurücksetzen
-            </button>
-          </div>
-        )}
+        {/* Row 4: Audit-Log (full width) */}
+        <InlineErrorBoundary fallbackLabel="Aktivitäts-Feed konnte nicht geladen werden.">
+          <ActivityFeedWidget items={activityItems} />
+        </InlineErrorBoundary>
 
-        {/* Widget Grid */}
-        {(hasLeftWidgets || hasRightWidgets) && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {hasLeftWidgets && (
-              <div className="xl:col-span-2 space-y-6">
-                {widgetVisibility.operationsContent && (
-                  <OperationsContentWidget
-                    liveState={liveState}
-                    runningSlideshows={runningSlideshows}
-                  />
-                )}
-                {widgetVisibility.activityFeed && <ActivityFeedWidget items={activityItems} />}
-              </div>
-            )}
-
-            {hasRightWidgets && (
-              <div className={hasLeftWidgets ? 'space-y-6' : 'xl:col-span-3 space-y-6'}>
-                {widgetVisibility.systemChecks && (
-                  <SystemChecksWidget
-                    backendStatus={
-                      backendHealthQuery.data?.status === 'ok' ? 'ok'
-                      : backendHealthQuery.isError ? 'error'
-                      : 'unknown'
-                    }
-                    backendTone={systemChecks.backendTone}
-                    dataTone={systemChecks.dataTone}
-                    websocketTone={systemChecks.websocketTone}
-                    wsConnected={wsConnected}
-                    updateTone={systemChecks.updateTone}
-                    isAdmin={isAdmin}
-                    updateLabel={updateLabel}
-                  />
-                )}
-                {widgetVisibility.mediaInsights && (
-                  <MediaInsightsWidget
-                    images={mediaStats.images}
-                    audio={mediaStats.audio}
-                    videos={mediaStats.videos}
-                    totalSize={mediaStats.totalSize}
-                    latestMediaName={mediaStats.latestMedia?.originalName || null}
-                    latestMediaDate={
-                      mediaStats.latestMedia ? new Date(mediaStats.latestMedia.createdAt) : null
-                    }
-                  />
-                )}
-                {widgetVisibility.quickActions && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-spa-text-primary mb-4 flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      Schnellzugriff
-                    </h3>
-                    <div className="space-y-3">
-                      {quickActions.map((action) => (
-                        <QuickActionCard
-                          key={action.href}
-                          title={action.title}
-                          description={action.description}
-                          icon={action.icon}
-                          href={action.href}
-                          color={action.color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {(scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error || backendHealthQuery.error) && (
-          <div className="rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark flex items-center gap-2" role="alert">
-            <AlertCircle className="w-4 h-4" />
+        {/* Error Banner */}
+        {hasErrors && (
+          <div className="flex items-center gap-2 rounded-lg border border-spa-error/30 bg-spa-error-light px-4 py-3 text-sm text-spa-error-dark" role="alert">
+            <AlertCircle className="h-4 w-4 shrink-0" />
             Ein oder mehrere Datenquellen konnten nicht geladen werden. Bitte API- und Netzwerkstatus prüfen.
           </div>
         )}

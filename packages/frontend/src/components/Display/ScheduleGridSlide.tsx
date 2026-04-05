@@ -3,21 +3,26 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { motion } from 'framer-motion';
+import { classNames } from '@/utils/classNames';
 import {
   buildScheduleSaunaIndexMap,
   getSaunaAccentColor,
   resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
+import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
 
 interface ScheduleGridSlideProps {
   schedule: Schedule;
   settings: Settings;
+  now?: Date;
+  deviceId?: string;
 }
 
 interface SaunaInfusionItem extends InfusionListItem {
@@ -61,6 +66,8 @@ function InfusionItemGrid({
   accentGold,
   statusLive,
   statusPrestart,
+  compact = false,
+  ultraCompact = false,
 }: {
   infusion: SaunaInfusionItem;
   status: 'ONGOING' | 'PRESTART' | 'UPCOMING' | 'FINISHED';
@@ -69,6 +76,8 @@ function InfusionItemGrid({
   accentGold: string;
   statusLive: string;
   statusPrestart: string;
+  compact?: boolean;
+  ultraCompact?: boolean;
 }) {
   const isOngoing = status === 'ONGOING';
   const isPrestart = status === 'PRESTART';
@@ -100,10 +109,18 @@ function InfusionItemGrid({
   const titleColor = isFinished ? withAlpha(textMain, 0.55) : textMain;
   const durationBg = withAlpha(borderColor, 0.25);
   const durationFg = withAlpha(textMain, 0.35);
+  const timeClassName = ultraCompact ? 'text-[14px]' : compact ? 'text-[16px]' : 'text-[18px]';
+  const titleClassName = ultraCompact ? 'text-[10px]' : compact ? 'text-[11px]' : 'text-[12px]';
+  const badgeClassName = ultraCompact ? 'text-[8px]' : 'text-[9px]';
+  const paddingClassName = ultraCompact ? 'p-2.5 rounded-lg mb-2' : compact ? 'p-3 rounded-xl mb-2.5' : 'p-3.5 rounded-xl mb-3';
 
   return (
     <div
-      className={`relative p-3.5 rounded-xl mb-3 border transition-all duration-500 shadow-sm ${isFinished ? 'opacity-70' : ''}`}
+      className={classNames(
+        'relative border transition-all duration-500 shadow-xs',
+        paddingClassName,
+        isFinished && 'opacity-70',
+      )}
       style={{
         backgroundColor: containerBg,
         borderColor: containerBorder,
@@ -112,7 +129,7 @@ function InfusionItemGrid({
       <div className="flex justify-between items-center mb-0.5">
         <div className="flex items-center gap-2">
           <span
-            className="text-[18px] font-black tracking-tight"
+            className={classNames('font-black tracking-tight', timeClassName)}
             style={{ color: timeColor }}
           >
             {infusion.time}
@@ -121,7 +138,7 @@ function InfusionItemGrid({
             <motion.span
               animate={{ opacity: [1, 0.4, 1] }}
               transition={{ repeat: Infinity, duration: 2 }}
-              className="text-[10px] font-black tracking-wider px-2 py-0.5 rounded border"
+              className={classNames('font-black tracking-wider px-2 py-0.5 rounded border', ultraCompact ? 'text-[8px]' : 'text-[10px]')}
               style={{
                 color: statusLive,
                 backgroundColor: withAlpha(statusLive, 0.18),
@@ -132,12 +149,12 @@ function InfusionItemGrid({
             </motion.span>
           )}
           {isPrestart && (
-            <span className="text-[9px] font-black uppercase tracking-tighter" style={{ color: statusPrestart }}>
+            <span className={classNames('font-black uppercase tracking-tighter', badgeClassName)} style={{ color: statusPrestart }}>
               GLEICH
             </span>
           )}
           {isFinished && (
-            <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: withAlpha(textMain, 0.35) }}>
+            <span className={classNames('font-black uppercase tracking-widest', badgeClassName)} style={{ color: withAlpha(textMain, 0.35) }}>
               VORBEI
             </span>
           )}
@@ -150,13 +167,13 @@ function InfusionItemGrid({
       </div>
       <div className="flex justify-between items-end">
         <h4
-          className="text-[12px] font-bold uppercase tracking-wide truncate pr-2"
+          className={classNames('font-bold uppercase tracking-wide truncate pr-2', titleClassName)}
           style={{ color: titleColor }}
         >
           {infusion.title}
         </h4>
         <span
-          className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+          className={classNames('font-bold px-1.5 py-0.5 rounded', badgeClassName)}
           style={{ color: durationFg, backgroundColor: durationBg }}
         >
           {infusion.duration} MIN
@@ -166,20 +183,24 @@ function InfusionItemGrid({
   );
 }
 
-export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps) {
+export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }: ScheduleGridSlideProps) {
   const defaults = getDefaultSettings();
   const theme = settings.theme || defaults.theme!;
   const header = settings.header || defaults.header!;
 
-  const [now, setNow] = useState(() => new Date());
+  const [clockNow, setClockNow] = useState(() => nowProp ?? new Date());
+  const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   useEffect(() => {
+    if (nowProp) return undefined;
     // Minute-level clock + status changes don't need 1s resolution.
-    const t = setInterval(() => setNow(new Date()), 10_000);
+    const t = setInterval(() => setClockNow(new Date()), 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [nowProp]);
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now);
+  const now = nowProp ?? clockNow;
+
+  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
 
   const daySchedule = schedule.presets?.[activePresetKey];
 
@@ -190,10 +211,23 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
 
   const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
   const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
+  const gridColumns = profile.width > 0
+    ? profile.width < 430
+      ? 1
+      : profile.width < 700
+        ? 2
+        : 3
+    : 3;
+  const isCompactLayout = profile.isCompact || profile.isNarrow;
+  const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
 
   // Compute dynamic row heights based on infusion counts per row
   const gridRowTemplate = useMemo(() => {
-    if (!daySchedule || gridSaunas.length <= 3) return '1fr 1fr';
+    if (!daySchedule) return '1fr';
+    if (gridColumns !== 3 || isCompactLayout) {
+      return `repeat(${Math.max(1, Math.ceil(gridSaunas.length / gridColumns))}, minmax(0, 1fr))`;
+    }
+    if (gridSaunas.length <= 3) return '1fr 1fr';
     const countInfusions = (sauna: typeof gridSaunas[0]) => {
       const sIdx = resolveScheduleSaunaIndex(
         daySchedule.saunas, sauna.name, scheduleSaunaIndexByKey,
@@ -212,7 +246,7 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
     const ratio = total > 0 ? maxRow1 / total : 0.5;
     if (ratio >= 0.4 && ratio <= 0.6) return '1fr 1fr';
     return `${ratio}fr ${1 - ratio}fr`;
-  }, [daySchedule, gridSaunas, scheduleSaunaIndexByKey]);
+  }, [daySchedule, gridColumns, gridSaunas, isCompactLayout, scheduleSaunaIndexByKey]);
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
@@ -223,6 +257,7 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
   const leftBg = theme.zebra1 || '#F7F3E9';
   const border = theme.gridTable || '#EBE5D3';
   const textMain = theme.textMain || theme.fg || '#3E2723';
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
 
   if (!daySchedule || !daySchedule.rows || daySchedule.rows.length === 0) {
     return (
@@ -253,48 +288,97 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
   const titleWords = logoText.split(' ');
   const firstWord = titleWords[0] || 'Westfalenbad';
   const restWords = titleWords.slice(1).join(' ') || 'Hagen';
+  const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
 
   return (
     <div
-      className="w-full h-full flex font-sans select-none overflow-hidden p-8"
+      ref={containerRef}
+      className={classNames(
+        'w-full h-full flex font-sans select-none overflow-hidden',
+        isEditorial
+          ? isCompactLayout ? 'p-3.5' : 'p-5'
+          : isCompactLayout ? 'p-4' : 'p-8',
+      )}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
       <div className="w-full h-full flex flex-col overflow-hidden">
-        <header className="mb-6 flex justify-between items-center z-20 w-full">
-          <div className="flex items-center gap-5 min-w-0 flex-1">
+        {!isEditorial && (
+          <header className={classNames('z-20 w-full', compactHeader ? 'mb-4 flex flex-col gap-3' : 'mb-6 flex items-center justify-between')}>
+            <div className={classNames('flex min-w-0 flex-1 items-center', isCompactLayout ? 'gap-3' : 'gap-5')}>
+              <div
+                className={classNames(
+                  'bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0',
+                  isCompactLayout ? 'h-12 w-12' : 'h-16 w-16',
+                )}
+                style={{ borderColor: border }}
+              >
+                <Waves className={classNames(isCompactLayout ? 'h-6 w-6' : 'h-8 w-8')} style={{ color: accentGreen }} />
+              </div>
+              <div className="min-w-0">
+                <p
+                  className={classNames(
+                    'font-black uppercase opacity-90',
+                    isUltraCompactLayout ? 'mb-0.5 text-[8px] tracking-[0.22em]' : isCompactLayout ? 'mb-0.5 text-[9px] tracking-[0.28em]' : 'mb-1 text-[10px] tracking-[0.4em]',
+                  )}
+                  style={{ color: accentGreen }}
+                >
+                  {header.subtitle && header.subtitle.trim() !== '' ? header.subtitle : 'Saunawelt'}
+                </p>
+                <h1
+                  className={classNames(
+                    'font-black uppercase tracking-tighter leading-none overflow-hidden text-ellipsis',
+                    isUltraCompactLayout ? 'text-[22px] whitespace-normal' : isCompactLayout ? 'text-[28px]' : 'text-3xl whitespace-nowrap',
+                  )}
+                >
+                  {firstWord}{' '}
+                  <span style={{ color: accentGold }}>
+                    {restWords}
+                  </span>
+                </h1>
+              </div>
+            </div>
+
             <div
-              className="w-16 h-16 bg-white border rounded-2xl flex items-center justify-center shadow-md shrink-0"
+              className={classNames(
+                'bg-white/80 backdrop-blur-md border text-right shadow-xs shrink-0',
+                compactHeader ? 'self-stretch rounded-2xl px-4 py-2.5' : isCompactLayout ? 'ml-3 rounded-2xl px-5 py-3' : 'ml-4 rounded-3xl px-7 py-4',
+              )}
               style={{ borderColor: border }}
             >
-              <Waves className="w-8 h-8" style={{ color: accentGreen }} />
-            </div>
-            <div className="min-w-0">
-              <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-1 opacity-90" style={{ color: accentGreen }}>
-                {header.subtitle && header.subtitle.trim() !== '' ? header.subtitle : 'Saunawelt'}
+              <p
+                className={classNames(
+                  'font-black uppercase mb-0.5',
+                  isCompactLayout ? 'text-[9px] tracking-[0.18em]' : 'text-[11px] tracking-widest',
+                )}
+                style={{ color: accentGold }}
+              >
+                {formatLongDateDE(now)}
               </p>
-              <h1 className="text-3xl font-black uppercase tracking-tighter leading-none whitespace-nowrap overflow-hidden text-ellipsis">
-                {firstWord}{' '}
-                <span style={{ color: accentGold }}>
-                  {restWords}
-                </span>
-              </h1>
+              <p
+                className={classNames(
+                  'font-black font-mono leading-none',
+                  isUltraCompactLayout ? 'text-[28px]' : isCompactLayout ? 'text-[34px]' : 'text-4xl',
+                )}
+                style={{ color: textMain }}
+              >
+                {formatClockDE(now)}
+              </p>
             </div>
-          </div>
+          </header>
+        )}
 
-          <div
-            className="bg-white/80 backdrop-blur-md px-7 py-4 rounded-3xl border text-right shadow-sm shrink-0 ml-4"
-            style={{ borderColor: border }}
-          >
-            <p className="text-[11px] font-black uppercase tracking-widest mb-0.5" style={{ color: accentGold }}>
-              {formatLongDateDE(now)}
-            </p>
-            <p className="text-4xl font-black font-mono leading-none" style={{ color: textMain }}>
-              {formatClockDE(now)}
-            </p>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-3 gap-x-8 gap-y-6 flex-1 overflow-hidden px-2" style={{ gridTemplateRows: gridRowTemplate }}>
+        <div
+          className={classNames(
+            'grid flex-1 overflow-hidden',
+            isEditorial
+              ? isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-6 gap-y-4'
+              : isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-8 gap-y-6 px-2',
+          )}
+          style={{
+            gridTemplateRows: gridRowTemplate,
+            gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+          }}
+        >
           {gridSaunas.map((sauna, idx) => {
             const isOutOfOrder = sauna.status === 'out-of-order';
             const saunaIndex = resolveScheduleSaunaIndex(
@@ -323,14 +407,14 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
             return (
               <div key={sauna.id} className="flex flex-col h-full group relative overflow-hidden">
                 <div
-                  className={`mb-4 flex items-center justify-between border-b-2 pb-2 z-20 relative ${
+                  className={`flex items-center justify-between border-b-2 z-20 relative ${
                     isOutOfOrder ? 'border-red-100' : ''
-                  }`}
+                  } ${isCompactLayout ? 'mb-2.5 pb-1.5' : 'mb-4 pb-2'}`}
                   style={{ borderColor: isOutOfOrder ? undefined : border }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className={classNames('flex items-center min-w-0', isCompactLayout ? 'gap-2' : 'gap-3')}>
                     <div
-                      className="w-2 h-7 rounded-full shrink-0"
+                      className={classNames('rounded-full shrink-0', isCompactLayout ? 'h-5 w-1.5' : 'h-7 w-2')}
                       style={{
                         background: isOutOfOrder
                           ? 'linear-gradient(to bottom, #d6d3d1, #a8a29e)'
@@ -338,9 +422,11 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
                       }}
                     />
                     <h2
-                      className={`text-[18px] font-black uppercase tracking-widest leading-none truncate ${
+                      className={classNames(
+                        'font-black uppercase leading-none truncate',
+                        isUltraCompactLayout ? 'text-[12px] tracking-[0.12em]' : isCompactLayout ? 'text-[14px] tracking-[0.18em]' : 'text-[18px] tracking-widest',
                         isOutOfOrder ? 'text-stone-400' : ''
-                      }`}
+                      )}
                       style={{ color: isOutOfOrder ? undefined : textMain }}
                       title={sauna.name}
                     >
@@ -350,10 +436,13 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
 
                   {!isOutOfOrder && sauna.info?.temperature != null && (
                     <div
-                      className="flex items-center gap-1.5 font-bold text-[12px] bg-white/40 px-2.5 py-1 rounded-full border border-white/50 shrink-0"
+                      className={classNames(
+                        'flex items-center font-bold bg-white/40 rounded-full border border-white/50 shrink-0',
+                        isUltraCompactLayout ? 'gap-1 px-1.5 py-0.5 text-[9px]' : isCompactLayout ? 'gap-1 px-2 py-0.5 text-[10px]' : 'gap-1.5 px-2.5 py-1 text-[12px]',
+                      )}
                       style={{ color: accentGold }}
                     >
-                      <Thermometer size={14} style={{ color: accentGreen }} />
+                      <Thermometer size={isCompactLayout ? 12 : 14} style={{ color: accentGreen }} />
                       {sauna.info.temperature}°C
                     </div>
                   )}
@@ -385,6 +474,8 @@ export function ScheduleGridSlide({ schedule, settings }: ScheduleGridSlideProps
                         accentGold={accentGold}
                         statusLive={statusLive}
                         statusPrestart={statusPrestart}
+                        compact={isCompactLayout}
+                        ultraCompact={isUltraCompactLayout}
                       />
                     )}
                   />

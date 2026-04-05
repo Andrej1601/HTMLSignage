@@ -81,10 +81,14 @@ export function getTodayPresetKey(now: Date = new Date()): PresetKey {
 // Helper to get active preset key (considering events)
 // If an event is active, returns the event's assigned preset
 // Otherwise returns the current weekday preset
-export function getActivePresetKey(settings?: Settings | null, now: Date = new Date()): PresetKey {
+export function getActivePresetKey(
+  settings?: Settings | null,
+  now: Date = new Date(),
+  deviceId?: string | null,
+): PresetKey {
   if (!settings) return getTodayPresetKey(now);
 
-  const activeEvent = getActiveEvent(settings, now);
+  const activeEvent = getActiveEvent(settings, now, deviceId);
   if (activeEvent) {
     return activeEvent.assignedPreset;
   }
@@ -102,9 +106,10 @@ export function resolveLivePresetKey(
   schedule: Pick<Schedule, 'autoPlay' | 'activePreset'>,
   settings?: Settings | null,
   now: Date = new Date(),
+  deviceId?: string | null,
 ): PresetKey {
   const todayPreset = getTodayPresetKey(now);
-  const activeEventPreset = settings ? getActiveEvent(settings, now)?.assignedPreset : undefined;
+  const activeEventPreset = settings ? getActiveEvent(settings, now, deviceId)?.assignedPreset : undefined;
 
   if (activeEventPreset) {
     return activeEventPreset;

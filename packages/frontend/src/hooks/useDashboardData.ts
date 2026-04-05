@@ -5,99 +5,42 @@ import { useDevices } from '@/hooks/useDevices';
 import { useMedia } from '@/hooks/useMedia';
 import { useSettings } from '@/hooks/useSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { API_URL } from '@/config/env';
-import { systemApi } from '@/services/api';
-import { formatFileSize, type Media } from '@/types/media.types';
-import { resolveLivePresetKey, type PresetKey } from '@/types/schedule.types';
-import { getActiveEvent } from '@/types/settings.types';
+import { useWebSocketStatus } from '@/contexts/WebSocketContext';
+import {
+  fetchApi,
+  systemApi,
+  type SystemJob,
+} from '@/services/api';
+import type { Media } from '@/types/media.types';
 import type { Device } from '@/types/device.types';
-import { createDefaultSlideshowConfig, getEnabledSlides, type SlideshowConfig } from '@/types/slideshow.types';
-import { ONLINE_THRESHOLD_MINUTES } from '@/utils/constants';
-import { getMinutesSince, toValidDate } from '@/utils/dateUtils';
-import { isPlainRecord } from '@/utils/objectUtils';
-import { hasDeviceOverrides, getDeviceOverrideSettings } from '@/utils/deviceUtils';
-import type { ActivityItem } from '@/components/Dashboard/ActivityFeedWidget';
-import type { RunningSlideshowGroup } from '@/components/Dashboard/LiveOperationsWidget';
-import type { StatusTone } from '@/components/StatusBadge';
+import {
+  buildActivityItems,
+  buildAttentionItems,
+  buildDashboardLiveState,
+  buildDeviceMonitoring,
+  buildEventStats,
+  buildMediaStats,
+  buildPlanQuality,
+  buildDeviceSlideshowRows,
+  buildRunningSlideshows,
+  buildSystemChecks,
+  buildUpdateLabel,
+  getActiveSystemJobs,
+} from './dashboardData.utils';
+export type {
+  DashboardAttentionItem,
+  DashboardDeviceMonitorItem,
+  DashboardDeviceMonitoringWarning,
+  DashboardEventStats,
+  DashboardLiveState,
+  DashboardMediaStats,
+  DashboardPlanQuality,
+  DashboardSystemChecks,
+} from './dashboardData.types';
 
-// ── Private helpers ─────────────────────────────────────────────────────────
-
-function getLatestMediaItem(media: Media[]): Media | null {
-  if (media.length === 0) return null;
-  return media.reduce((latest, current) =>
-    new Date(current.createdAt).getTime() > new Date(latest.createdAt).getTime() ? current : latest
-  );
-}
-
-function isSlideshowConfig(value: unknown): value is SlideshowConfig {
-  if (!isPlainRecord(value)) return false;
-  return typeof value.layout === 'string' && Array.isArray(value.slides);
-}
-
-function getSlideshowFingerprint(config: SlideshowConfig): string {
-  const normalizedSlides = [...(config.slides || [])]
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map((slide) => ({
-      type: slide.type, enabled: slide.enabled, duration: slide.duration,
-      order: slide.order, zoneId: slide.zoneId || 'main', saunaId: slide.saunaId || null,
-      mediaId: slide.mediaId || null, infoId: slide.infoId || null,
-      transition: slide.transition || 'none', videoPlayback: slide.videoPlayback || null,
-    }));
-  return JSON.stringify({
-    layout: config.layout, defaultDuration: config.defaultDuration,
-    defaultTransition: config.defaultTransition, enableTransitions: config.enableTransitions,
-    slides: normalizedSlides,
-  });
-}
-
-function getDeviceSlideshowOverride(device: Device): SlideshowConfig | null {
-  const overrideSettings = getDeviceOverrideSettings(device);
-  const slideshow = overrideSettings.slideshow;
-  if (!isSlideshowConfig(slideshow)) return null;
-  return slideshow;
-}
-
-// ── Hook ────────────────────────────────────────────────────────────────────
-
-export interface DashboardSystemChecks {
-  backendTone: StatusTone;
-  dataTone: StatusTone;
-  websocketTone: StatusTone;
-  updateTone: StatusTone;
-}
-
-export interface DashboardLiveState {
-  pairedDevices: Device[];
-  onlinePairedDevices: Device[];
-  pendingPairings: number;
-  onlineDevices: number;
-  offlineDevices: number;
-  neverSeenDevices: number;
-  overrideModeDevices: number;
-  autoModeDevices: number;
-  devicesWithOverrides: number;
-  activeOverrideDevices: number;
-  activeEvent: ReturnType<typeof getActiveEvent>;
-  activePreset: PresetKey | null;
-}
-
-export interface DashboardPlanQuality {
-  totalRows: number;
-  emptyRows: number;
-  inconsistentRows: number;
-  duplicateTimeRows: number;
-  fillRate: number;
-}
-
-export interface DashboardMediaStats {
-  total: number;
-  images: number;
-  audio: number;
-  videos: number;
-  totalSize: number;
-  latestMedia: Media | null;
-}
+const EMPTY_DEVICES: Device[] = [];
+const EMPTY_MEDIA: Media[] = [];
+const EMPTY_SYSTEM_JOBS: SystemJob[] = [];
 
 export function useDashboardData() {
   const scheduleQuery = useSchedule();
@@ -105,30 +48,52 @@ export function useDashboardData() {
   const settingsQuery = useSettings();
   const devicesQuery = useDevices();
   const mediaQuery = useMedia();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const isAdmin = Boolean(user?.roles.includes('admin'));
-  const { isConnected: wsConnected, error: wsError } = useWebSocket({ autoConnect: true });
+  const { isConnected: wsConnected, error: wsError } = useWebSocketStatus();
 
   const schedule = scheduleQuery.schedule;
   const settings = settingsQuery.settings;
-  const devices = devicesQuery.data || [];
-  const media = mediaQuery.data || [];
+  const devices = devicesQuery.data ?? EMPTY_DEVICES;
+  const media = mediaQuery.data ?? EMPTY_MEDIA;
 
   const backendHealthQuery = useQuery({
     queryKey: ['dashboard-health'],
-    queryFn: async (): Promise<{ status: string; timestamp?: string }> => {
-      const response = await fetch(`${API_URL}/health`);
-      if (!response.ok) throw new Error(`Health check failed (${response.status})`);
-      return response.json();
-    },
+    queryFn: async (): Promise<{ status: string; timestamp?: string }> => fetchApi('/health'),
     refetchInterval: 30000,
+  });
+
+  const runtimeStatusQuery = useQuery({
+    queryKey: ['dashboard-runtime-status'],
+    queryFn: () => systemApi.getRuntimeStatus(),
+    refetchInterval: 30000,
+  });
+
+  const runtimeHistoryQuery = useQuery({
+    queryKey: ['dashboard-runtime-history'],
+    queryFn: () => systemApi.getRuntimeHistory(24),
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const systemStatusQuery = useQuery({
     queryKey: ['dashboard-system-update-status'],
-    queryFn: () => systemApi.getReleases(token!),
-    enabled: isAdmin && Boolean(token),
+    queryFn: () => systemApi.getReleases(),
+    enabled: isAdmin,
     refetchInterval: 60000,
+  });
+
+  const auditLogQuery = useQuery({
+    queryKey: ['dashboard-audit-log'],
+    queryFn: () => systemApi.getAuditLog(16),
+    enabled: isAdmin,
+    refetchInterval: 15000,
+  });
+
+  const systemJobsQuery = useQuery({
+    queryKey: ['dashboard-system-jobs'],
+    queryFn: () => systemApi.listJobs(6),
+    enabled: isAdmin,
+    refetchInterval: 5000,
   });
 
   const isLoading =
@@ -137,288 +102,137 @@ export function useDashboardData() {
     devicesQuery.isLoading ||
     mediaQuery.isLoading;
 
-  // ── Derived state ──────────────────────────────────────────────────────
+  const liveState = useMemo(
+    () => buildDashboardLiveState(devices, schedule, settings),
+    [devices, schedule, settings],
+  );
 
-  const liveState = useMemo<DashboardLiveState>(() => {
-    const now = new Date();
-    const pairedDevices = devices.filter((d) => Boolean(d.pairedAt));
-    const onlinePairedDevices = pairedDevices.filter((d) => {
-      const m = getMinutesSince(d.lastSeen);
-      return m !== null && m < ONLINE_THRESHOLD_MINUTES;
-    });
-    const neverSeenDevices = pairedDevices.filter((d) => getMinutesSince(d.lastSeen) === null).length;
-    const onlineDevices = onlinePairedDevices.length;
-    const offlineDevices = Math.max(pairedDevices.length - onlineDevices - neverSeenDevices, 0);
-    const overrideModeDevices = pairedDevices.filter((d) => d.mode === 'override').length;
-    const autoModeDevices = pairedDevices.length - overrideModeDevices;
-    const devicesWithOverrides = pairedDevices.filter(hasDeviceOverrides).length;
-    const activeOverrideDevices = pairedDevices.filter(
-      (d) => d.mode === 'override' && hasDeviceOverrides(d)
-    ).length;
-    const activeEvent = settings ? getActiveEvent(settings, now) : null;
-    const activePreset = schedule ? resolveLivePresetKey(schedule, settings ?? undefined, now) : null;
-    const pendingPairings = devices.length - pairedDevices.length;
+  const planQuality = useMemo(
+    () => buildPlanQuality(schedule),
+    [schedule],
+  );
 
-    return {
-      pairedDevices, onlinePairedDevices, pendingPairings, onlineDevices, offlineDevices,
-      neverSeenDevices, overrideModeDevices, autoModeDevices, devicesWithOverrides,
-      activeOverrideDevices, activeEvent, activePreset,
-    };
-  }, [devices, schedule, settings]);
+  const mediaStats = useMemo(
+    () => buildMediaStats(media),
+    [media],
+  );
 
-  const planQuality = useMemo<DashboardPlanQuality>(() => {
-    if (!schedule?.presets) {
-      return { totalRows: 0, emptyRows: 0, inconsistentRows: 0, duplicateTimeRows: 0, fillRate: 0 };
-    }
-    let totalRows = 0, emptyRows = 0, inconsistentRows = 0, duplicateTimeRows = 0;
-    for (const preset of Object.values(schedule.presets)) {
-      const seenTimes = new Set<string>();
-      for (const row of preset.rows) {
-        totalRows += 1;
-        if (!(row.entries || []).some((e) => Boolean(e?.title?.trim()))) emptyRows += 1;
-        if ((row.entries?.length || 0) !== preset.saunas.length) inconsistentRows += 1;
-        if (seenTimes.has(row.time)) duplicateTimeRows += 1;
-        else seenTimes.add(row.time);
-      }
-    }
-    const fillRate =
-      totalRows > 0 ? Math.round(((totalRows - emptyRows) / totalRows) * 100) : 0;
-    return { totalRows, emptyRows, inconsistentRows, duplicateTimeRows, fillRate };
-  }, [schedule]);
+  const eventStats = useMemo(
+    () => buildEventStats(settings, liveState.activeEvent),
+    [settings, liveState.activeEvent],
+  );
 
-  const mediaStats = useMemo<DashboardMediaStats>(() => {
-    const images = media.filter((i) => i.type === 'image').length;
-    const audioCount = media.filter((i) => i.type === 'audio').length;
-    const videos = media.filter((i) => i.type === 'video').length;
-    const totalSize = media.reduce((sum, i) => sum + i.size, 0);
-    const latestMedia = getLatestMediaItem(media);
-    return { total: media.length, images, audio: audioCount, videos, totalSize, latestMedia };
-  }, [media]);
+  const runningSlideshows = useMemo(
+    () => buildRunningSlideshows(liveState.onlinePairedDevices, settings),
+    [liveState.onlinePairedDevices, settings],
+  );
 
-  const eventStats = useMemo(() => {
-    const events = settings?.events || [];
-    const now = new Date();
-    // Find the next upcoming active event (not yet started)
-    const nextEvent = events
-      .filter((e) => e.isActive && new Date(`${e.startDate}T${e.startTime}`) > now)
-      .sort((a, b) =>
-        new Date(`${a.startDate}T${a.startTime}`).getTime() -
-        new Date(`${b.startDate}T${b.startTime}`).getTime()
-      )[0] || null;
-    return {
-      total: events.length,
-      enabled: events.filter((e) => e.isActive).length,
-      activeName: liveState.activeEvent?.name || null,
-      nextEvent,
-    };
-  }, [settings, liveState.activeEvent]);
+  const deviceSlideshowRows = useMemo(
+    () => buildDeviceSlideshowRows(liveState.pairedDevices, settings),
+    [liveState.pairedDevices, settings],
+  );
 
-  const runningSlideshows = useMemo<RunningSlideshowGroup[]>(() => {
-    const globalConfig = settings?.slideshow || createDefaultSlideshowConfig();
-    const groups: RunningSlideshowGroup[] = [];
-    const overrideGroups = new Map<string, RunningSlideshowGroup>();
+  const deviceMonitoring = useMemo(
+    () => buildDeviceMonitoring(liveState.pairedDevices, media, settings),
+    [liveState.pairedDevices, media, settings],
+  );
 
-    const globalDeviceNames = liveState.onlinePairedDevices
-      .filter((d) => !(d.mode === 'override' && getDeviceSlideshowOverride(d)))
-      .map((d) => d.name);
+  const runtimeStatus = runtimeStatusQuery.data || null;
+  const runtimeHistory = runtimeHistoryQuery.data || null;
 
-    groups.push({
-      id: 'global', source: 'global', title: 'Globale Slideshow', config: globalConfig,
-      slides: getEnabledSlides(globalConfig), deviceNames: globalDeviceNames,
-    });
-
-    for (const device of liveState.onlinePairedDevices) {
-      if (device.mode !== 'override') continue;
-      const overrideConfig = getDeviceSlideshowOverride(device);
-      if (!overrideConfig) continue;
-      const fingerprint = getSlideshowFingerprint(overrideConfig);
-      const existing = overrideGroups.get(fingerprint);
-      if (existing) { existing.deviceNames.push(device.name); continue; }
-      overrideGroups.set(fingerprint, {
-        id: `override-${overrideGroups.size + 1}`, source: 'override',
-        title: `Override Slideshow ${overrideGroups.size + 1}`, config: overrideConfig,
-        slides: getEnabledSlides(overrideConfig), deviceNames: [device.name],
-      });
-    }
-
-    return [...groups, ...Array.from(overrideGroups.values())];
-  }, [liveState.onlinePairedDevices, settings?.slideshow]);
-
-  const systemChecks = useMemo<DashboardSystemChecks>(() => {
-    const backendTone: StatusTone =
-      backendHealthQuery.isError ? 'danger'
-      : backendHealthQuery.data?.status === 'ok' ? 'success'
-      : 'warning';
-    const dataTone: StatusTone =
-      (scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error)
-        ? 'danger'
-        : (schedule && settings) ? 'success' : 'warning';
-    const websocketTone: StatusTone =
-      wsConnected ? 'success' : wsError ? 'danger' : 'warning';
-    const updateTone: StatusTone =
-      !isAdmin ? 'neutral'
-      : systemStatusQuery.isError ? 'danger'
-      : systemStatusQuery.data?.isRunning ? 'info'
-      : systemStatusQuery.data?.hasUpdate ? 'warning'
-      : systemStatusQuery.data?.isDirty ? 'warning'
-      : 'success';
-    return { backendTone, dataTone, websocketTone, updateTone };
-  }, [
-    backendHealthQuery.isError, backendHealthQuery.data,
-    scheduleQuery.error, settingsQuery.error, devicesQuery.error, mediaQuery.error,
-    schedule, settings, wsConnected, wsError, isAdmin,
-    systemStatusQuery.isError, systemStatusQuery.data,
+  const systemChecks = useMemo(() => buildSystemChecks({
+    backendHealthError: backendHealthQuery.isError,
+    backendHealthStatus: backendHealthQuery.data?.status,
+    dataError: Boolean(scheduleQuery.error || settingsQuery.error || devicesQuery.error || mediaQuery.error),
+    hasCoreData: Boolean(schedule && settings),
+    wsConnected,
+    wsError,
+    isAdmin,
+    systemStatusError: systemStatusQuery.isError,
+    systemStatusData: systemStatusQuery.data,
+  }), [
+    backendHealthQuery.data?.status,
+    backendHealthQuery.isError,
+    devicesQuery.error,
+    isAdmin,
+    mediaQuery.error,
+    schedule,
+    scheduleQuery.error,
+    settings,
+    settingsQuery.error,
+    systemStatusQuery.data,
+    systemStatusQuery.isError,
+    wsConnected,
+    wsError,
   ]);
 
-  const updateLabel = useMemo(() => {
-    if (systemStatusQuery.data?.isRunning) return 'Läuft';
-    if (systemStatusQuery.data?.hasUpdate)
-      return `${systemStatusQuery.data.latestRelease?.tag || 'Update'} verfügbar`;
-    if (systemStatusQuery.data?.isDirty) return 'Lokale Änderungen';
-    return `v${systemStatusQuery.data?.currentVersion || '?'}`;
-  }, [systemStatusQuery.data]);
+  const updateLabel = useMemo(
+    () => buildUpdateLabel(systemStatusQuery.data),
+    [systemStatusQuery.data],
+  );
 
-  const activityItems = useMemo<ActivityItem[]>(() => {
-    const items: ActivityItem[] = [];
+  const systemJobs = systemJobsQuery.data?.items ?? EMPTY_SYSTEM_JOBS;
+  const activeSystemJobs = useMemo(
+    () => getActiveSystemJobs(systemJobs),
+    [systemJobs],
+  );
 
-    for (const entry of (scheduleHistoryQuery.data || []).slice(0, 10)) {
-      const date = toValidDate(entry.createdAt);
-      const dateStr = date
-        ? date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-          + ', ' + date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-        : 'Unbekannt';
-      items.push({
-        id: `schedule-${entry.id}`,
-        title: `Plan vom ${dateStr}`,
-        description: entry.isActive ? 'Aktiver Plan' : 'Historische Version',
-        tone: entry.isActive ? 'success' : 'neutral',
-        timestamp: date,
-        actor: 'Unbekannt',
-        category: 'plan',
-        details: entry.changeSummary ?? undefined,
-      });
-    }
+  const attentionItems = useMemo(
+    () => buildAttentionItems({
+      runtimeStatus,
+      liveState,
+      planQuality,
+      nextEvent: eventStats.nextEvent,
+      activeSystemJobs,
+    }),
+    [activeSystemJobs, eventStats.nextEvent, liveState, planQuality, runtimeStatus],
+  );
 
-    for (const item of [...media]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10)) {
-      items.push({
-        id: `media-${item.id}`,
-        title: `Medium hochgeladen: ${item.originalName}`,
-        description: `${item.type} · ${formatFileSize(item.size)}`,
-        tone: 'info',
-        timestamp: toValidDate(item.createdAt),
-        actor: item.user?.username || 'Unbekannt',
-        category: 'media',
-      });
-    }
-
-    for (const device of [...devices]
-      .filter((d) => Boolean(d.pairedAt))
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-      .slice(0, 8)) {
-      items.push({
-        id: `device-${device.id}`,
-        title: `Gerät aktualisiert: ${device.name}`,
-        description: `Modus: ${device.mode === 'override' ? 'Override' : 'Auto'}`,
-        tone: device.mode === 'override' ? 'warning' : 'neutral',
-        timestamp: toValidDate(device.updatedAt) || toValidDate(device.pairedAt),
-        actor: device.user?.username || 'Unbekannt',
-        category: 'device',
-      });
-    }
-
-    if (liveState.activeEvent) {
-      items.push({
-        id: 'active-event',
-        title: `Event aktiv: ${liveState.activeEvent.name}`,
-        description: `Preset ${liveState.activeEvent.assignedPreset} ist live`,
-        tone: 'info',
-        timestamp: new Date(
-          `${liveState.activeEvent.startDate}T${liveState.activeEvent.startTime}`
-        ),
-        actor: 'System',
-        category: 'system',
-      });
-    }
-    if (liveState.offlineDevices > 0) {
-      items.push({
-        id: 'offline-devices',
-        title: `${liveState.offlineDevices} Gerät(e) offline`,
-        description: 'Bitte Verbindungsstatus und Display-Clients prüfen',
-        tone: 'warning',
-        actor: 'System',
-        category: 'system',
-      });
-    }
-    if (liveState.pendingPairings > 0) {
-      items.push({
-        id: 'pending-pairings',
-        title: `${liveState.pendingPairings} ausstehende Pairings`,
-        description: 'Neue Bildschirme warten auf Freigabe',
-        tone: 'warning',
-        actor: 'System',
-        category: 'system',
-      });
-    }
-    if (systemStatusQuery.data?.hasUpdate && systemStatusQuery.data.latestRelease) {
-      items.push({
-        id: 'system-update',
-        title: 'Systemupdate verfügbar',
-        description: `${systemStatusQuery.data.latestRelease.tag} — ${systemStatusQuery.data.latestRelease.name}`,
-        tone: 'warning',
-        actor: 'System',
-        category: 'system',
-      });
-    }
-    if (settings) {
-      items.push({
-        id: 'settings-version',
-        title: `Einstellungen v${settings.version} geladen`,
-        description: `Design: ${settings.designStyle || 'modern-wellness'}`,
-        tone: 'success',
-        actor: 'System',
-        category: 'system',
-      });
-    }
-
-    return items
-      .sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0))
-      .slice(0, 30);
-  }, [devices, liveState, media, scheduleHistoryQuery.data, settings, systemStatusQuery.data]);
+  const activityItems = useMemo(
+    () => buildActivityItems({
+      auditItems: auditLogQuery.data?.items,
+      scheduleHistory: scheduleHistoryQuery.data,
+      media,
+      devices,
+      liveState,
+      runtimeStatus,
+      systemStatus: systemStatusQuery.data,
+      settings,
+    }),
+    [auditLogQuery.data?.items, devices, liveState, media, runtimeStatus, scheduleHistoryQuery.data, settings, systemStatusQuery.data],
+  );
 
   return {
-    // Loading / error state
     isLoading,
     scheduleQuery,
     settingsQuery,
     devicesQuery,
     mediaQuery,
     backendHealthQuery,
+    runtimeStatusQuery,
+    runtimeHistoryQuery,
     systemStatusQuery,
-
-    // Raw data
     schedule,
     settings,
     devices,
     media,
-
-    // Auth
     isAdmin,
-    token,
-
-    // WebSocket
     wsConnected,
     wsError,
-
-    // Derived
     liveState,
     planQuality,
     mediaStats,
     eventStats,
     runningSlideshows,
+    deviceSlideshowRows,
+    deviceMonitoring,
+    runtimeStatus,
+    runtimeHistory,
     systemChecks,
     updateLabel,
+    systemJobs,
+    activeSystemJobs,
+    attentionItems,
     activityItems,
   };
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Upload, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { useUploadMedia } from '@/hooks/useMedia';
 import {
@@ -7,7 +7,9 @@ import {
   ACCEPTED_AUDIO_TYPES,
   ACCEPTED_VIDEO_TYPES,
   formatFileSize,
+  getMediaType,
 } from '@/types/media.types';
+import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 
 interface MediaUploadProps {
   onUploadComplete?: () => void;
@@ -181,53 +183,42 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
   return (
     <div className="space-y-4">
       {/* Upload Area */}
-      <div
+      <label
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`block cursor-pointer rounded-2xl border-2 border-dashed px-10 py-12 text-center transition-colors ${
           isDragging
             ? 'border-spa-primary bg-spa-primary/5'
-            : 'border-spa-bg-secondary hover:border-spa-primary/50'
+            : 'border-spa-bg-secondary bg-spa-bg-primary/20 hover:border-spa-primary/50'
         }`}
       >
         <div className="flex flex-col items-center gap-4">
-          <div className="p-4 bg-spa-bg-primary rounded-full">
-            <Upload className="w-8 h-8 text-spa-primary" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-spa-bg-secondary/80">
+            <Upload className="h-6 w-6 text-spa-primary" />
           </div>
-
           <div>
-            <p className="text-lg font-medium text-spa-text-primary mb-2">
-              Datei(en) hochladen
+            <p className="text-sm font-semibold text-spa-text-primary">
+              Dateien hierher ziehen oder klicken
             </p>
-            <p className="text-sm text-spa-text-secondary mb-4">
-              Ziehe eine oder mehrere Dateien hierher oder klicke zum Auswählen
+            <p className="mt-1 text-xs text-spa-text-secondary">
+              JPG, PNG, WebP, MP3, MP4 — max. {formatFileSize(MAX_FILE_SIZE)}
             </p>
-
-            <label className="inline-block px-6 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors cursor-pointer">
-              Dateien auswählen
-              <input
-                type="file"
-                className="hidden"
-                accept={acceptedTypes.join(',')}
-                multiple
-                onChange={handleFileInput}
-                disabled={isUploading}
-              />
-            </label>
           </div>
-
-          <p className="text-xs text-spa-text-secondary">
-            Unterstützt: Bilder (JPG, PNG, GIF, WebP, SVG), Audio (MP3, WAV, OGG), Video (MP4, WebM)
-            <br />
-            Max. Dateigröße: 50MB
-          </p>
+          <input
+            type="file"
+            className="hidden"
+            accept={acceptedTypes.join(',')}
+            multiple
+            onChange={handleFileInput}
+            disabled={isUploading}
+          />
         </div>
-      </div>
+      </label>
 
       {/* Selected Files */}
       {selectedFiles.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary p-4">
+        <div className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-spa-text-primary">
@@ -249,23 +240,13 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
           <div className="max-h-56 overflow-y-auto space-y-2 mb-4 pr-1">
             {selectedFiles.map((file, index) => (
-              <div
+              <UploadQueueRow
                 key={getFileKey(file)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-spa-bg-secondary px-3 py-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-spa-text-primary truncate">{file.name}</p>
-                  <p className="text-xs text-spa-text-secondary">{formatFileSize(file.size)}</p>
-                </div>
-                <button
-                  onClick={() => handleRemoveFile(index)}
-                  disabled={isUploading}
-                  className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50"
-                  aria-label={`${file.name} entfernen`}
-                >
-                  <X className="w-4 h-4 text-spa-text-secondary" />
-                </button>
-              </div>
+                file={file}
+                index={index}
+                isUploading={isUploading}
+                onRemove={handleRemoveFile}
+              />
             ))}
           </div>
 
@@ -298,8 +279,8 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-spa-error flex-shrink-0 mt-0.5" />
+        <div role="alert" className="bg-spa-error-light border border-spa-error/30 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-spa-error shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-spa-error-dark">Fehler</p>
             <p className="text-sm text-spa-error-dark/80 mt-1 whitespace-pre-line">{error}</p>
@@ -310,13 +291,55 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       {/* Success Message */}
       {successMessage && (
         <div className="bg-spa-success-light border border-spa-success/30 rounded-lg p-4 flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-spa-success flex-shrink-0 mt-0.5" />
+          <CheckCircle className="w-5 h-5 text-spa-success shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-medium text-spa-success-dark">Erfolg!</p>
             <p className="text-sm text-spa-success-dark/80 mt-1">{successMessage}</p>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function UploadQueueRow({
+  file,
+  index,
+  isUploading,
+  onRemove,
+}: {
+  file: File;
+  index: number;
+  isUploading: boolean;
+  onRemove: (index: number) => void;
+}) {
+  const [previewUrl] = useState(() => URL.createObjectURL(file));
+  const mediaType = getMediaType(file.type);
+  const { summary } = useMediaMetadata(previewUrl, mediaType);
+
+  useEffect(() => {
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-spa-bg-secondary px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-spa-text-primary truncate">{file.name}</p>
+        <p className="text-xs text-spa-text-secondary">
+          {formatFileSize(file.size)}
+          {summary ? ` · ${summary}` : ''}
+        </p>
+      </div>
+      <button
+        onClick={() => onRemove(index)}
+        disabled={isUploading}
+        className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50"
+        aria-label={`${file.name} entfernen`}
+      >
+        <X className="w-4 h-4 text-spa-text-secondary" />
+      </button>
     </div>
   );
 }

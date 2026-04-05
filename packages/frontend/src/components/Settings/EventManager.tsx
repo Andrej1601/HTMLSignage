@@ -1,647 +1,363 @@
-import { useState } from 'react';
-import { AudioConfigEditor } from '@/components/Settings/AudioConfigEditor';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/Button';
+import { SectionCard } from '@/components/SectionCard';
+import { useDevices } from '@/hooks/useDevices';
+import { useMedia } from '@/hooks/useMedia';
+import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import {
-  COLOR_PALETTES,
-  type AudioSettings,
-  type ColorPaletteName,
-  type DesignStyle,
   type Event,
   type EventSettingsOverrides,
+  type Settings,
 } from '@/types/settings.types';
-import type { Media } from '@/types/media.types';
-import { useMedia } from '@/hooks/useMedia';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
-import { Plus, Edit2, Trash2, X, Save, Calendar, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
+import { getEventQualityIssues } from '@/utils/editorQuality';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Layers,
+  MonitorSmartphone,
+  Music2,
+  Palette,
+  Plus,
+  Save,
+  Sparkles,
+  Wand2,
+  X,
+} from 'lucide-react';
 import clsx from 'clsx';
+import {
+  buildPersistedEvent,
+  buildPreviewEvent,
+  createBlankEvent,
+  createEventDraftFromEvent,
+  getEventBounds,
+  getStepValidationMessage,
+  mergeOverridePatch,
+  normalizeOverrides,
+  sanitizeTargetDeviceIds,
+  type EventDraft,
+} from './eventManager.utils';
+import {
+  BasicsStep,
+  TimingStep,
+  DeliveryStep,
+  SlideshowStep,
+  DesignStep,
+  AudioStep,
+  PreviewStep,
+} from './EventWizard';
+import { EventListCard } from './EventListCard';
 
 interface EventManagerProps {
   events: Event[];
+  settings: Settings;
+  schedule?: Schedule | null;
   onChange: (events: Event[]) => void;
 }
 
-export function EventManager({ events, onChange }: EventManagerProps) {
+type AssistantMode = 'idle' | 'create' | 'edit';
+
+const ASSISTANT_STEPS = [
+  { id: 'basics', label: 'Basis', icon: Wand2 },
+  { id: 'timing', label: 'Zeitraum', icon: Calendar },
+  { id: 'delivery', label: 'Ausspielung', icon: MonitorSmartphone },
+  { id: 'slideshow', label: 'Slideshow', icon: Layers },
+  { id: 'design', label: 'Design', icon: Palette },
+  { id: 'audio', label: 'Audio', icon: Music2 },
+  { id: 'preview', label: 'Vorschau', icon: Sparkles },
+] as const;
+
+export function EventManager({ events, settings, schedule, onChange }: EventManagerProps) {
   const { data: media } = useMedia();
-  const [isAdding, setIsAdding] = useState(false);
+  const { data: devices } = useDevices();
+  const [assistantMode, setAssistantMode] = useState<AssistantMode>('idle');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const defaultEventAudio: AudioSettings = {
-    enabled: false,
-    volume: 0.5,
-    loop: true,
+  const [stepIndex, setStepIndex] = useState(0);
+  const [formData, setFormData] = useState<EventDraft>(() => createBlankEvent());
+
+  const pairedDevices = useMemo(
+    () => (devices || []).filter((device) => Boolean(device.pairedAt)),
+    [devices],
+  );
+
+  const normalizedFormData = useMemo<EventDraft>(() => ({
+    ...formData,
+    targetDeviceIds: sanitizeTargetDeviceIds(formData.targetDeviceIds),
+    settingsOverrides: normalizeOverrides(formData.settingsOverrides),
+  }), [formData]);
+
+  const selectedTargetDevices = useMemo(
+    () => pairedDevices.filter((device) => normalizedFormData.targetDeviceIds?.includes(device.id)),
+    [normalizedFormData.targetDeviceIds, pairedDevices],
+  );
+  const selectedTargetDeviceIds = useMemo(
+    () => normalizedFormData.targetDeviceIds ?? [],
+    [normalizedFormData.targetDeviceIds],
+  );
+
+  const { start: startDateTime, end: endDateTime } = useMemo(
+    () => getEventBounds(normalizedFormData),
+    [normalizedFormData],
+  );
+
+  const isTimeRangeValid = Boolean(
+    startDateTime &&
+    endDateTime &&
+    startDateTime.getTime() <= endDateTime.getTime(),
+  );
+
+  const previewEvent = useMemo(
+    () => buildPreviewEvent(normalizedFormData, editingId),
+    [editingId, normalizedFormData],
+  );
+
+  const previewSettings = useMemo<Settings>(() => ({
+    ...settings,
+    events: [previewEvent],
+  }), [previewEvent, settings]);
+
+  const previewSchedule = schedule || createDefaultSchedule();
+  const previewTargetLabel = selectedTargetDevices.length > 0
+    ? selectedTargetDevices.length === 1
+      ? selectedTargetDevices[0].name
+      : `${selectedTargetDevices.length} Geräte`
+    : selectedTargetDeviceIds.length > 0
+      ? `${selectedTargetDeviceIds.length} Geräte`
+      : 'Alle Geräte';
+  const effectivePrestartMinutes = normalizedFormData.settingsOverrides?.display?.prestartMinutes
+    ?? settings.display?.prestartMinutes
+    ?? 10;
+  const eventQualityIssues = useMemo(() => getEventQualityIssues({
+    events,
+    devices: pairedDevices,
+    media: media || [],
+    schedule,
+    draft: assistantMode === 'idle'
+      ? null
+      : {
+          id: editingId || undefined,
+          ...normalizedFormData,
+        },
+  }), [assistantMode, editingId, events, media, normalizedFormData, pairedDevices, schedule]);
+
+  const canSave = Boolean(
+    normalizedFormData.name.trim() &&
+    normalizedFormData.startDate &&
+    normalizedFormData.startTime &&
+    isTimeRangeValid,
+  );
+
+  const stepValidationMessage = useMemo(
+    () => getStepValidationMessage(ASSISTANT_STEPS[stepIndex]?.id, normalizedFormData, isTimeRangeValid, canSave),
+    [canSave, isTimeRangeValid, normalizedFormData, stepIndex],
+  );
+
+  const resetAssistant = () => {
+    setAssistantMode('idle');
+    setEditingId(null);
+    setStepIndex(0);
+    setFormData(createBlankEvent());
   };
-
-  const normalizeOverrides = (raw?: EventSettingsOverrides): EventSettingsOverrides | undefined => {
-    if (!raw) return undefined;
-
-    const next: EventSettingsOverrides = {};
-
-    if (raw.designStyle) next.designStyle = raw.designStyle;
-    if (raw.colorPalette) next.colorPalette = raw.colorPalette;
-    if (raw.theme && Object.keys(raw.theme).length > 0) next.theme = raw.theme;
-    if (raw.fonts && Object.keys(raw.fonts).length > 0) next.fonts = raw.fonts;
-    if (raw.slides && Object.keys(raw.slides).length > 0) next.slides = raw.slides;
-    if (raw.display && Object.keys(raw.display).length > 0) next.display = raw.display;
-    if (raw.header && Object.keys(raw.header).length > 0) next.header = raw.header;
-    if (raw.slideshow) next.slideshow = raw.slideshow;
-    if (raw.audio) next.audio = raw.audio;
-
-    return Object.keys(next).length > 0 ? next : undefined;
-  };
-
-  const updateOverrides = (patch: Partial<EventSettingsOverrides>) => {
-    setFormData((prev) => {
-      const merged: EventSettingsOverrides = {
-        ...(prev.settingsOverrides || {}),
-        ...patch,
-      };
-
-      if ('audio' in patch && !patch.audio) {
-        delete merged.audio;
-      }
-      if ('designStyle' in patch && !patch.designStyle) {
-        delete merged.designStyle;
-      }
-      if ('colorPalette' in patch && !patch.colorPalette) {
-        delete merged.colorPalette;
-      }
-
-      return {
-        ...prev,
-        settingsOverrides: normalizeOverrides(merged),
-      };
-    });
-  };
-
-  const [formData, setFormData] = useState<Omit<Event, 'id'>>({
-    name: '',
-    description: '',
-    imageId: undefined,
-    startDate: '',
-    startTime: '10:00',
-    endDate: '',
-    endTime: '23:59',
-    assignedPreset: 'Evt1',
-    isActive: true,
-    settingsOverrides: undefined,
-  });
 
   const handleStartAdd = () => {
-    const today = new Date().toISOString().split('T')[0];
-    setFormData({
-      name: '',
-      description: '',
-      imageId: undefined,
-      startDate: today,
-      startTime: '10:00',
-      endDate: '',
-      endTime: '23:59',
-      assignedPreset: 'Evt1',
-      isActive: true,
-      settingsOverrides: undefined,
-    });
-    setIsAdding(true);
+    setFormData(createBlankEvent());
+    setAssistantMode('create');
     setEditingId(null);
+    setStepIndex(0);
   };
 
   const handleStartEdit = (event: Event) => {
-    setFormData({
-      name: event.name,
-      description: event.description,
-      imageId: event.imageId,
-      startDate: event.startDate,
-      startTime: event.startTime,
-      endDate: event.endDate,
-      endTime: event.endTime,
-      assignedPreset: event.assignedPreset,
-      isActive: event.isActive,
-      settingsOverrides: normalizeOverrides(event.settingsOverrides),
-    });
+    setFormData(createEventDraftFromEvent(event));
+    setAssistantMode('edit');
     setEditingId(event.id);
-    setIsAdding(false);
+    setStepIndex(0);
   };
 
   const handleSave = () => {
-    if (!formData.name.trim() || !formData.startDate || !formData.startTime) return;
+    if (!canSave) return;
 
-    if (isAdding) {
-      // Add new event
-      const newEvent: Event = {
-        id: Date.now().toString(),
-        ...formData,
-        name: formData.name.trim(),
-        description: formData.description?.trim(),
-      };
-      onChange([...events, newEvent]);
+    const nextEvent = buildPersistedEvent(editingId, normalizedFormData);
+
+    if (assistantMode === 'create') {
+      onChange([...events, nextEvent]);
     } else if (editingId) {
-      // Update existing event
-      onChange(
-        events.map((e) =>
-          e.id === editingId
-            ? {
-                ...e,
-                ...formData,
-                name: formData.name.trim(),
-                description: formData.description?.trim(),
-              }
-            : e
-        )
-      );
+      onChange(events.map((event) => (event.id === editingId ? nextEvent : event)));
     }
 
-    handleCancel();
+    resetAssistant();
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Möchten Sie dieses Event wirklich löschen?')) {
-      onChange(events.filter((e) => e.id !== id));
-    }
+    if (!window.confirm('Möchten Sie dieses Event wirklich löschen?')) return;
+    onChange(events.filter((event) => event.id !== id));
+    if (editingId === id) resetAssistant();
   };
 
   const handleToggleActive = (id: string) => {
-    onChange(
-      events.map((e) =>
-        e.id === id ? { ...e, isActive: !e.isActive } : e
-      )
-    );
+    onChange(events.map((event) => (event.id === id ? { ...event, isActive: !event.isActive } : event)));
   };
 
-  const handleCancel = () => {
-    setIsAdding(false);
-    setEditingId(null);
+  const updateOverrides = (patch: Partial<EventSettingsOverrides>) => {
+    setFormData((prev) => ({
+      ...prev,
+      settingsOverrides: mergeOverridePatch(prev.settingsOverrides, patch),
+    }));
   };
 
-  // Get image for display
-  const getImageUrl = (imageId?: string) => {
-    return getMediaUploadUrl(media, imageId);
-  };
+  const currentStep = ASSISTANT_STEPS[stepIndex];
+  const currentStepId = currentStep.id;
 
-  // Check if event is currently active
-  const isEventCurrentlyActive = (event: Event): boolean => {
-    if (!event.isActive) return false;
-    const now = new Date();
-    const startDateTime = new Date(`${event.startDate}T${event.startTime}`);
-    const endDate = event.endDate || event.startDate;
-    const endTime = event.endTime || '23:59';
-    const endDateTime = new Date(`${endDate}T${endTime}`);
-    return now >= startDateTime && now <= endDateTime;
-  };
-
-  const imageList = media?.filter((m: Media) => m.type === 'image') || [];
+  const stepProps = { formData, normalizedFormData, setFormData, updateOverrides };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-spa-text-primary">Event-Verwaltung</h3>
+          <h3 className="text-lg font-semibold text-spa-text-primary">Event-Assistent</h3>
           <p className="text-sm text-spa-text-secondary">
-            Erstellen Sie Events mit zugewiesenen Aufgussplänen (Event 1 oder Event 2)
+            Zeitraum, Zielgeräte, Plan, Design und Audio in einem durchgehenden Ablauf vorbereiten.
           </p>
         </div>
-        {!isAdding && !editingId && (
-          <button
-            onClick={handleStartAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
-          >
-            <Plus className="w-4 h-4" />
+        {assistantMode === 'idle' && (
+          <Button icon={Plus} onClick={handleStartAdd}>
             Neues Event
-          </button>
+          </Button>
         )}
       </div>
 
-      {/* Add/Edit Form */}
-      {(isAdding || editingId) && (
-        <div className="mb-6 p-6 bg-spa-bg-primary border border-spa-bg-secondary rounded-lg">
-          <h4 className="text-sm font-semibold text-spa-text-primary mb-4">
-            {isAdding ? 'Neues Event erstellen' : 'Event bearbeiten'}
-          </h4>
+      <EditorQualityAssistant
+        description={assistantMode === 'idle'
+          ? 'Prüft die bestehende Event-Bibliothek auf leere Event-Pläne, Konflikte und veraltete Referenzen.'
+          : 'Prüft den aktuellen Event-Entwurf direkt im Bearbeitungskontext auf Konflikte und fehlende Bausteine.'}
+        issues={eventQualityIssues}
+        okMessage={assistantMode === 'idle'
+          ? 'Für die vorhandenen Events wurden aktuell keine auffälligen Konfigurationsprobleme erkannt.'
+          : 'Der aktuelle Event-Entwurf ist aus Sicht der Redaktionslogik aktuell konsistent vorbereitet.'}
+      />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Name */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Event-Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                placeholder="z.B. Weihnachtsfeier, Sommerfest, Jubiläum..."
-                autoFocus
-              />
-            </div>
-
-            {/* Description */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Beschreibung
-              </label>
-              <textarea
-                value={formData.description || ''}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                placeholder="Beschreibung des Events..."
-                rows={3}
-              />
-            </div>
-
-            {/* Image */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Event-Bild
-              </label>
-              {imageList.length > 0 ? (
-                <div className="space-y-2">
-                  <select
-                    value={formData.imageId || ''}
-                    onChange={(e) => setFormData({ ...formData, imageId: e.target.value || undefined })}
-                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+      {assistantMode !== 'idle' && (
+        <SectionCard
+          title={assistantMode === 'create' ? 'Neues Event vorbereiten' : 'Event bearbeiten'}
+          description="Der Assistent führt nacheinander durch Inhalt, Zeitraum, Zielgeräte, Design, Audio und Vorschau."
+          icon={Sparkles}
+          actions={(
+            <span className="rounded-full bg-spa-accent/10 px-3 py-1 text-xs font-semibold text-spa-accent">
+              Schritt {stepIndex + 1} von {ASSISTANT_STEPS.length}: {currentStep.label}
+            </span>
+          )}
+        >
+          <div className="space-y-6">
+            <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+              {ASSISTANT_STEPS.map((step, index) => {
+                const StepIcon = step.icon;
+                const isActive = index === stepIndex;
+                const isCompleted = index < stepIndex;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => setStepIndex(index)}
+                    className={clsx(
+                      'rounded-xl border px-4 py-3 text-left transition-colors',
+                      isActive && 'border-spa-primary bg-spa-primary/10',
+                      !isActive && isCompleted && 'border-spa-success/30 bg-spa-success-light/60',
+                      !isActive && !isCompleted && 'border-spa-bg-secondary bg-spa-bg-primary hover:bg-spa-bg-secondary/60',
+                    )}
                   >
-                    <option value="">Kein Bild</option>
-                    {imageList.map((img: Media) => (
-                      <option key={img.id} value={img.id}>
-                        {img.originalName}
-                      </option>
-                    ))}
-                  </select>
-                  {formData.imageId && (
-                    <div className="mt-2">
-                      <img
-                        src={getImageUrl(formData.imageId) || ''}
-                        alt="Event-Vorschau"
-                        className="w-full h-48 object-cover rounded-md"
-                        loading="lazy"
-                      />
+                    <div className="flex items-center gap-2 text-sm font-semibold text-spa-text-primary">
+                      <StepIcon className="h-4 w-4" />
+                      {step.label}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-spa-text-secondary bg-white p-3 rounded-md border border-spa-bg-secondary">
-                  Keine Bilder verfügbar. Laden Sie zuerst Bilder in der Mediathek hoch.
-                </div>
-              )}
+                    <div className="mt-1 text-xs text-spa-text-secondary">
+                      {isCompleted ? 'Bereit' : isActive ? 'Aktuell' : `Schritt ${index + 1}`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Start Date */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Startdatum *
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-spa-text-secondary pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                />
+            {stepValidationMessage && (
+              <div className="rounded-xl border border-spa-warning/30 bg-spa-warning-light px-4 py-3 text-sm text-spa-warning-dark">
+                {stepValidationMessage}
               </div>
-            </div>
+            )}
 
-            {/* Start Time */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Startzeit *
-              </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-spa-text-secondary pointer-events-none" />
-                <input
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                />
-              </div>
-            </div>
+            {currentStepId === 'basics' && <BasicsStep {...stepProps} />}
+            {currentStepId === 'timing' && <TimingStep {...stepProps} />}
+            {currentStepId === 'delivery' && <DeliveryStep {...stepProps} pairedDevices={pairedDevices} />}
+            {currentStepId === 'slideshow' && (
+              <SlideshowStep
+                {...stepProps}
+                settings={settings}
+                previewSchedule={previewSchedule}
+                previewSettings={previewSettings}
+                effectivePrestartMinutes={effectivePrestartMinutes}
+              />
+            )}
+            {currentStepId === 'design' && <DesignStep {...stepProps} />}
+            {currentStepId === 'audio' && <AudioStep {...stepProps} />}
+            {currentStepId === 'preview' && (
+              <PreviewStep
+                {...stepProps}
+                previewEvent={previewEvent}
+                previewSchedule={previewSchedule}
+                previewSettings={previewSettings}
+                pairedDevices={pairedDevices}
+                selectedTargetDevices={selectedTargetDevices}
+                selectedTargetDeviceIds={selectedTargetDeviceIds}
+                previewTargetLabel={previewTargetLabel}
+                startDateTime={startDateTime}
+              />
+            )}
 
-            {/* End Date */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Enddatum (optional)
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-spa-text-secondary pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.endDate || ''}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value || undefined })}
-                  className="w-full pl-10 pr-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                />
-              </div>
-              <p className="text-xs text-spa-text-secondary mt-1">
-                Leer lassen für eintägiges Event
-              </p>
-            </div>
+            <div className="flex flex-col gap-3 border-t border-spa-bg-secondary pt-4 md:flex-row md:items-center md:justify-between">
+              <Button type="button" variant="ghost" icon={X} onClick={resetAssistant}>
+                Abbrechen
+              </Button>
 
-            {/* End Time */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Endzeit (optional)
-              </label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-spa-text-secondary pointer-events-none" />
-                <input
-                  type="time"
-                  value={formData.endTime || ''}
-                  onChange={(e) => setFormData({ ...formData, endTime: e.target.value || undefined })}
-                  className="w-full pl-10 pr-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                />
-              </div>
-            </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  icon={ArrowLeft}
+                  disabled={stepIndex === 0}
+                  onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
+                >
+                  Zurück
+                </Button>
 
-            {/* Assigned Preset */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Zugewiesener Aufgussplan *
-              </label>
-              <select
-                value={formData.assignedPreset}
-                onChange={(e) => setFormData({ ...formData, assignedPreset: e.target.value as 'Evt1' | 'Evt2' })}
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-              >
-                <option value="Evt1">Event 1</option>
-                <option value="Evt2">Event 2</option>
-              </select>
-              <p className="text-xs text-spa-text-secondary mt-1">
-                Dieser Aufgussplan wird während des Events angezeigt
-              </p>
-            </div>
-
-            {/* Is Active */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Status
-              </label>
-              <button
-                onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                className={clsx(
-                  'flex items-center gap-2 px-4 py-2 rounded-md border-2 transition-colors w-full justify-center',
-                  formData.isActive
-                    ? 'border-spa-success bg-spa-success-light text-spa-success-dark'
-                    : 'border-spa-bg-secondary bg-spa-bg-primary text-spa-text-secondary'
-                )}
-              >
-                {formData.isActive ? (
-                  <>
-                    <CheckCircle className="w-5 h-5" />
-                    Aktiv
-                  </>
+                {stepIndex < ASSISTANT_STEPS.length - 1 ? (
+                  <Button
+                    type="button"
+                    iconRight={ArrowRight}
+                    disabled={Boolean(stepValidationMessage)}
+                    onClick={() => setStepIndex((current) => Math.min(ASSISTANT_STEPS.length - 1, current + 1))}
+                  >
+                    Weiter
+                  </Button>
                 ) : (
-                  <>
-                    <XCircle className="w-5 h-5" />
-                    Inaktiv
-                  </>
+                  <Button
+                    type="button"
+                    icon={Save}
+                    disabled={!canSave}
+                    onClick={handleSave}
+                  >
+                    {assistantMode === 'create' ? 'Event anlegen' : 'Änderungen speichern'}
+                  </Button>
                 )}
-              </button>
-            </div>
-
-            {/* Event Design Override */}
-            <div className="md:col-span-2 border-t border-spa-bg-secondary pt-4 mt-2">
-              <h5 className="text-sm font-semibold text-spa-text-primary mb-3">Event-Design (optional)</h5>
-              <p className="text-xs text-spa-text-secondary mb-4">
-                Wenn gesetzt, wird während des aktiven Events dieses Design verwendet.
-              </p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                    Designstil
-                  </label>
-                  <select
-                    value={formData.settingsOverrides?.designStyle || ''}
-                    onChange={(e) => {
-                      const value = e.target.value as DesignStyle | '';
-                      updateOverrides({ designStyle: value || undefined });
-                    }}
-                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                  >
-                    <option value="">Globaler Stil</option>
-                    <option value="modern-wellness">Modern Wellness</option>
-                    <option value="modern-timeline">Modern Timeline</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                    Farbpalette
-                  </label>
-                  <select
-                    value={formData.settingsOverrides?.colorPalette || ''}
-                    onChange={(e) => {
-                      const value = (e.target.value as ColorPaletteName | '') || undefined;
-                      updateOverrides({ colorPalette: value });
-                    }}
-                    className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                  >
-                    <option value="">Globale Palette</option>
-                    {COLOR_PALETTES.map((palette) => (
-                      <option key={palette.id} value={palette.id}>
-                        {palette.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
-            </div>
-
-            {/* Event Audio Override */}
-            <div className="md:col-span-2 border-t border-spa-bg-secondary pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h5 className="text-sm font-semibold text-spa-text-primary">Event-Musik (optional)</h5>
-                  <p className="text-xs text-spa-text-secondary">
-                    Aktiviert eine eigene Musik nur für dieses Event.
-                  </p>
-                </div>
-
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(formData.settingsOverrides?.audio)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        updateOverrides({ audio: { ...defaultEventAudio } });
-                      } else {
-                        updateOverrides({ audio: undefined });
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-spa-bg-secondary peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-accent/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-spa-accent"></div>
-                </label>
-              </div>
-
-              {formData.settingsOverrides?.audio && (
-                <AudioConfigEditor
-                  audio={formData.settingsOverrides.audio}
-                  onChange={(nextAudio) => updateOverrides({ audio: nextAudio })}
-                  title="Event-Hintergrundmusik"
-                  subtitle="Spielt nur während dieses aktiven Events."
-                  showEnableToggle
-                  enableLabel="Event-Musik aktivieren"
-                  enableDescription="Überschreibt globale Musik für dieses Event."
-                />
-              )}
             </div>
           </div>
-
-          <div className="flex gap-2 mt-6">
-            <button
-              onClick={handleSave}
-              disabled={!formData.name.trim() || !formData.startDate || !formData.startTime}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              Speichern
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Abbrechen
-            </button>
-          </div>
-        </div>
+        </SectionCard>
       )}
 
-      {/* Events List */}
-      <div className="space-y-3">
-        {events
-          .sort((a, b) => {
-            // Sort by start date/time, most recent first
-            const aStart = new Date(`${a.startDate}T${a.startTime}`);
-            const bStart = new Date(`${b.startDate}T${b.startTime}`);
-            return bStart.getTime() - aStart.getTime();
-          })
-          .map((event) => {
-            const imageUrl = getImageUrl(event.imageId);
-            const isCurrentlyActive = isEventCurrentlyActive(event);
-
-            return (
-              <div
-                key={event.id}
-                className={clsx(
-                  'bg-white border-2 rounded-lg p-4 transition-all',
-                  isCurrentlyActive
-                    ? 'border-green-500 shadow-md'
-                    : event.isActive
-                    ? 'border-spa-bg-secondary hover:shadow-sm'
-                    : 'border-gray-200 opacity-60'
-                )}
-              >
-                <div className="flex gap-4">
-                  {/* Image */}
-                  {imageUrl && (
-                    <div className="flex-shrink-0">
-                      <img
-                        src={imageUrl}
-                        alt={event.name}
-                        className="w-32 h-32 object-cover rounded-md"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex-1">
-                        <h4 className="text-lg font-semibold text-spa-text-primary flex items-center gap-2">
-                          {event.name}
-                          {isCurrentlyActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-success-light text-spa-success-dark text-xs rounded-full">
-                              <span className="w-2 h-2 bg-spa-success rounded-full animate-pulse"></span>
-                              Läuft jetzt
-                            </span>
-                          )}
-                          {!event.isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-bg-secondary text-spa-text-secondary text-xs rounded-full">
-                              Inaktiv
-                            </span>
-                          )}
-                        </h4>
-                        {event.description && (
-                          <p className="text-sm text-spa-text-secondary mt-1">{event.description}</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => handleToggleActive(event.id)}
-                          className={clsx(
-                            'p-2 rounded-md transition-colors',
-                            event.isActive
-                              ? 'text-spa-success hover:bg-spa-success-light'
-                              : 'text-spa-text-secondary hover:bg-spa-bg-primary'
-                          )}
-                          title={event.isActive ? 'Deaktivieren' : 'Aktivieren'}
-                        >
-                          {event.isActive ? (
-                            <CheckCircle className="w-5 h-5" />
-                          ) : (
-                            <XCircle className="w-5 h-5" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleStartEdit(event)}
-                          className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
-                          title="Bearbeiten"
-                          aria-label="Event bearbeiten"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(event.id)}
-                          className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors"
-                          title="Löschen"
-                          aria-label="Event löschen"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 text-sm text-spa-text-secondary">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(event.startDate).toLocaleDateString('de-DE')}
-                        {event.endDate && event.endDate !== event.startDate && (
-                          <> - {new Date(event.endDate).toLocaleDateString('de-DE')}</>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        {event.startTime}
-                        {event.endTime && <> - {event.endTime}</>}
-                      </div>
-                      <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-accent/10 text-spa-accent rounded-full text-xs font-medium">
-                        Aufgussplan: {event.assignedPreset}
-                      </div>
-                      {(event.settingsOverrides?.designStyle || event.settingsOverrides?.colorPalette) && (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-spa-info-light text-spa-info-dark rounded-full text-xs font-medium">
-                          Design Override
-                        </div>
-                      )}
-                      {event.settingsOverrides?.audio && (
-                        <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                          Musik Override
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-
-      {events.length === 0 && !isAdding && (
-        <div className="text-center py-12 text-spa-text-secondary bg-white rounded-lg border-2 border-dashed border-spa-bg-secondary">
-          <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p className="font-medium">Keine Events vorhanden</p>
-          <p className="text-sm mt-1">Klicken Sie auf "Neues Event", um ein Event zu erstellen.</p>
-        </div>
-      )}
+      <EventListCard
+        events={events}
+        onEdit={handleStartEdit}
+        onDelete={handleDelete}
+        onToggleActive={handleToggleActive}
+      />
     </div>
   );
 }

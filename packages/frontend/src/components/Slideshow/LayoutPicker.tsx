@@ -13,7 +13,7 @@ function LayoutPreview({ layout }: { layout: LayoutType }) {
     boxShadow: 'inset 0 1px 2px rgba(255,220,180,0.4), 0 2px 6px rgba(0,0,0,0.25)',
   };
   const inner = 'w-full h-full rounded-lg overflow-hidden flex';
-  const label = 'text-[9px] font-black text-white/90 drop-shadow-sm';
+  const label = 'text-[9px] font-black text-white/90 drop-shadow-xs';
 
   switch (layout) {
     case 'split-view':
@@ -118,9 +118,10 @@ export function LayoutPicker({
             disabled={disabled}
             className={clsx(
               'group flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all disabled:opacity-50',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2',
               layout === option.type
                 ? 'border-spa-primary bg-spa-primary/5 shadow-md ring-2 ring-spa-primary/20'
-                : 'border-spa-bg-secondary hover:border-spa-primary/50 hover:shadow-sm'
+                : 'border-spa-bg-secondary hover:border-spa-primary/50 hover:shadow-xs'
             )}
           >
             <div className="w-full max-w-[120px]">

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { hashPassword, authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { hashPassword, authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
+import { assertUsernameAvailable, assertEmailAvailable, UserConflictError } from '../lib/userValidation.js';
 
 const router = Router();
 
@@ -12,7 +14,7 @@ router.use(authMiddleware);
 
 const CreateUserSchema = z.object({
   username: z.string().min(3).max(50),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   password: z.string().min(8),
   roles: z.array(z.string()).default(['viewer']),
 });
@@ -51,25 +53,8 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
   try {
     const validated = CreateUserSchema.parse(req.body);
 
-    // Check if username already exists
-    const existing = await prisma.user.findUnique({
-      where: { username: validated.username },
-    });
-
-    if (existing) {
-      return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-    }
-
-    // Check if email already exists (if provided)
-    if (validated.email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email: validated.email },
-      });
-
-      if (existingEmail) {
-        return res.status(400).json({ error: 'email-taken', message: 'Email already exists' });
-      }
-    }
+    await assertUsernameAvailable(validated.username);
+    if (validated.email) await assertEmailAvailable(validated.email);
 
     const hashedPassword = await hashPassword(validated.password);
 
@@ -89,11 +74,22 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
         updatedAt: true,
       },
     });
+    await logAuditEvent(req, {
+      action: 'user.create',
+      resource: user.id,
+      details: {
+        username: user.username,
+        roles: user.roles,
+      },
+    });
 
     res.json(user);
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[users] Error creating user:', error);
     res.status(500).json({ error: 'create-failed', message: 'Benutzer konnte nicht erstellt werden' });
@@ -107,33 +103,18 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!user) {
       return res.status(404).json({ error: 'not-found', message: 'User not found' });
     }
 
-    // Check if username is taken (if changing)
     if (validated.username && validated.username !== user.username) {
-      const existing = await prisma.user.findUnique({
-        where: { username: validated.username },
-      });
-
-      if (existing) {
-        return res.status(400).json({ error: 'username-taken', message: 'Username already exists' });
-      }
+      await assertUsernameAvailable(validated.username, user.id);
     }
-
-    // Check if email is taken (if changing)
     if (validated.email && validated.email !== user.email) {
-      const existingEmail = await prisma.user.findUnique({
-        where: { email: validated.email },
-      });
-
-      if (existingEmail) {
-        return res.status(400).json({ error: 'email-taken', message: 'Email already exists' });
-      }
+      await assertEmailAvailable(validated.email, user.id);
     }
 
     // Prepare update data
@@ -146,7 +127,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
       data: updateData,
       select: {
         id: true,
@@ -157,11 +138,24 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
         updatedAt: true,
       },
     });
+    await logAuditEvent(req, {
+      action: 'user.update',
+      resource: updatedUser.id,
+      details: {
+        username: updatedUser.username,
+        roles: updatedUser.roles,
+        email: updatedUser.email,
+        passwordChanged: Boolean(validated.password),
+      },
+    });
 
     res.json(updatedUser);
   } catch (error) {
+    if (error instanceof UserConflictError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.errors });
+      return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[users] Error updating user:', error);
     res.status(500).json({ error: 'update-failed', message: 'Benutzer konnte nicht aktualisiert werden' });
@@ -172,13 +166,13 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
 router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     // Prevent deleting yourself
-    if (req.params.id === req.userId) {
+    if (str(req.params.id) === req.userId) {
       return res.status(400).json({ error: 'cannot-delete-self', message: 'Cannot delete your own account' });
     }
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!user) {
@@ -186,7 +180,14 @@ router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async 
     }
 
     await prisma.user.delete({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
+    });
+    await logAuditEvent(req, {
+      action: 'user.delete',
+      resource: user.id,
+      details: {
+        username: user.username,
+      },
     });
 
     res.json({ ok: true });

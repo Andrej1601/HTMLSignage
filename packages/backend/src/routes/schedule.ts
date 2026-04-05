@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
+import { logAuditEvent } from '../lib/audit.js';
 import { normalizeScheduleData, createDefaultSchedule } from '../lib/schedule.js';
 import { computeScheduleChangeSummary } from '../lib/scheduleDiff.js';
 import type { Schedule } from '../types/schedule.types.js';
@@ -36,7 +37,8 @@ router.get('/', async (req, res) => {
 // GET /api/schedule/history - Get schedule history
 router.get('/history', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 50) : 10;
     const details = req.query.details === 'true';
 
     const selectFields: Record<string, boolean> = {
@@ -88,41 +90,31 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
   try {
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);
-
-    // Create new schedule
-    const newSchedule = await prisma.schedule.create({
-      data: {
-        version: validated.version,
-        data: validated as unknown as Prisma.InputJsonValue,
-        isActive: true,
-      },
-    });
-
-    // Deactivate old versions
-    await prisma.schedule.updateMany({
-      where: {
-        id: { not: newSchedule.id },
-        isActive: true,
-      },
-      data: { isActive: false },
-    });
+    const scheduleToStore = { ...validated };
+    const { id, version } = await createVersionedRecord('schedule', scheduleToStore);
 
     // Broadcast update via WebSocket
-    broadcastScheduleUpdate(validated);
+    broadcastScheduleUpdate(scheduleToStore);
 
-    // Log audit event (TODO: implement when auth is ready)
-    // await logAuditEvent(userId, 'schedule.update', newSchedule.id);
+    await logAuditEvent(req, {
+      action: 'schedule.update',
+      resource: id,
+      details: {
+        version,
+        presets: Object.keys(validated.presets || {}),
+      },
+    });
 
-    res.json({ 
-      ok: true, 
-      version: validated.version,
-      id: newSchedule.id 
+    res.json({
+      ok: true,
+      version,
+      id,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: 'validation-failed',
-        details: error.errors,
+        details: error.issues,
       });
     }
     console.error('[schedule] Error saving schedule:', error);
@@ -134,7 +126,7 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
 router.get('/:id', async (req, res) => {
   try {
     const schedule = await prisma.schedule.findUnique({
-      where: { id: req.params.id },
+      where: { id: str(req.params.id) },
     });
 
     if (!schedule) {

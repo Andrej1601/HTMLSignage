@@ -42,15 +42,15 @@ export function ToastContainer() {
             key={t.id}
             role="alert"
             className={clsx(
-              'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-in slide-in-from-right-5',
+              'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-slide-in-right',
               styleMap[t.type]
             )}
           >
-            <Icon className={clsx('w-5 h-5 flex-shrink-0 mt-0.5', iconStyleMap[t.type])} aria-hidden="true" />
+            <Icon className={clsx('w-5 h-5 shrink-0 mt-0.5', iconStyleMap[t.type])} aria-hidden="true" />
             <p className="text-sm font-medium flex-1">{t.message}</p>
             <button
               onClick={() => removeToast(t.id)}
-              className="flex-shrink-0 p-0.5 rounded hover:bg-black/10 transition-colors"
+              className="shrink-0 p-0.5 rounded hover:bg-black/10 transition-colors"
               aria-label="Benachrichtigung schließen"
             >
               <X className="w-4 h-4" aria-hidden="true" />

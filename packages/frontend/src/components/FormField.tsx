@@ -1,4 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes, type ReactNode } from 'react';
+import React from 'react';
 import clsx from 'clsx';
 
 /* ------------------------------------------------------------------ */
@@ -6,7 +7,7 @@ import clsx from 'clsx';
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-  'w-full px-4 py-2 border border-spa-bg-secondary rounded-lg text-spa-text-primary bg-white focus:outline-none focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+  'w-full px-4 py-2 border border-spa-bg-secondary rounded-lg text-spa-text-primary bg-white focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 const inputError =
   'border-spa-error focus:ring-spa-error';
@@ -34,6 +35,8 @@ export function FieldWrapper({
   children,
   className,
 }: FieldWrapperProps) {
+  const errorId = error ? `${htmlFor || 'field'}-error` : undefined;
+
   return (
     <div className={className}>
       {label && (
@@ -45,12 +48,21 @@ export function FieldWrapper({
           {required && <span className="text-spa-error ml-0.5">*</span>}
         </label>
       )}
-      {children}
-      {hint && !error && (
-        <p className="text-xs text-spa-text-secondary mt-1">{hint}</p>
-      )}
-      {error && (
-        <p className="text-sm text-spa-error mt-1" role="alert">{error}</p>
+      {errorId ? (
+        <>
+          {React.cloneElement(children as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
+            'aria-invalid': true,
+            'aria-describedby': errorId,
+          })}
+          <p id={errorId} className="text-sm text-spa-error mt-1" role="alert">{error}</p>
+        </>
+      ) : (
+        <>
+          {children}
+          {hint && !error && (
+            <p className="text-xs text-spa-text-secondary mt-1">{hint}</p>
+          )}
+        </>
       )}
     </div>
   );
@@ -175,7 +187,7 @@ export function ToggleField({
           <p className="text-xs text-spa-text-secondary mt-0.5">{description}</p>
         )}
       </div>
-      <div className="relative inline-flex items-center flex-shrink-0">
+      <div className="relative inline-flex items-center shrink-0">
         <input
           type="checkbox"
           checked={checked}
@@ -186,7 +198,7 @@ export function ToggleField({
         <div
           className={clsx(
             'w-11 h-6 rounded-full transition-colors',
-            'peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-spa-primary/20',
+            'peer-focus:outline-hidden peer-focus:ring-4 peer-focus:ring-spa-primary/20',
             'after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px]',
             'after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all',
             'peer-checked:after:translate-x-full',

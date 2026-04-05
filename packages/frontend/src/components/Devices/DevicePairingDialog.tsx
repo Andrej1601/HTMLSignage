@@ -70,7 +70,7 @@ export function DevicePairingDialog({
       <form id="pairing-form" onSubmit={handleSubmit} className="space-y-4">
         {/* Info Box */}
         <div className="bg-spa-info-light rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-spa-info flex-shrink-0 mt-0.5" />
+          <AlertCircle className="w-5 h-5 text-spa-info shrink-0 mt-0.5" />
           <div className="text-sm text-spa-info-dark">
             <p className="font-medium mb-1">So funktioniert das Pairing:</p>
             <ol className="list-decimal list-inside space-y-1">

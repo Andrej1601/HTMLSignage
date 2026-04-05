@@ -1,5 +1,5 @@
-import { useState, useMemo, type ReactNode } from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
 export interface Column<T> {
@@ -28,6 +28,8 @@ interface DataTableProps<T> {
   mobileTitle?: (item: T) => ReactNode;
   /** Optional empty state */
   emptyState?: ReactNode;
+  /** Items per page. When set, pagination is enabled. */
+  pageSize?: number;
 }
 
 type SortDir = 'asc' | 'desc';
@@ -38,9 +40,11 @@ export function DataTable<T>({
   keyFn,
   mobileTitle,
   emptyState,
+  pageSize,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(0);
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -49,6 +53,7 @@ export function DataTable<T>({
       setSortKey(key);
       setSortDir('asc');
     }
+    setPage(0);
   };
 
   const sortedData = useMemo(() => {
@@ -59,14 +64,55 @@ export function DataTable<T>({
     return sortDir === 'desc' ? sorted.reverse() : sorted;
   }, [data, columns, sortKey, sortDir]);
 
+  const totalPages = pageSize ? Math.max(1, Math.ceil(sortedData.length / pageSize)) : 1;
+  const safePageIndex = Math.min(page, totalPages - 1);
+
+  const pagedData = useMemo(() => {
+    if (!pageSize) return sortedData;
+    const start = safePageIndex * pageSize;
+    return sortedData.slice(start, start + pageSize);
+  }, [sortedData, pageSize, safePageIndex]);
+
+  // Reset page when data changes
+  useEffect(() => { setPage(0); }, [data.length]);
+
   if (data.length === 0 && emptyState) {
     return <>{emptyState}</>;
   }
 
+  const paginationBar = pageSize && totalPages > 1 && (
+    <div className="flex items-center justify-between px-4 py-3 text-sm text-spa-text-secondary">
+      <span>
+        {safePageIndex * pageSize + 1}–{Math.min((safePageIndex + 1) * pageSize, sortedData.length)} von {sortedData.length}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          disabled={safePageIndex === 0}
+          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors"
+          aria-label="Vorherige Seite"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="px-2 font-medium text-spa-text-primary">
+          {safePageIndex + 1} / {totalPages}
+        </span>
+        <button
+          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          disabled={safePageIndex >= totalPages - 1}
+          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors"
+          aria-label="Nächste Seite"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <>
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="hidden md:block bg-white rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-spa-bg-secondary">
             <thead className="bg-spa-bg-primary">
@@ -104,7 +150,7 @@ export function DataTable<T>({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-spa-bg-secondary">
-              {sortedData.map((item) => (
+              {pagedData.map((item) => (
                 <tr key={keyFn(item)} className="hover:bg-spa-bg-primary transition-colors">
                   {columns.map((col) => (
                     <td
@@ -123,14 +169,15 @@ export function DataTable<T>({
             </tbody>
           </table>
         </div>
+        {paginationBar}
       </div>
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {sortedData.map((item) => (
+        {pagedData.map((item) => (
           <div
             key={keyFn(item)}
-            className="bg-white rounded-lg shadow-sm border border-spa-bg-secondary p-4"
+            className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4"
           >
             {mobileTitle && (
               <div className="font-semibold text-spa-text-primary mb-3">
@@ -153,6 +200,7 @@ export function DataTable<T>({
             </div>
           </div>
         ))}
+        {paginationBar}
       </div>
     </>
   );

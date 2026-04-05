@@ -31,6 +31,7 @@ export interface PairingResponse {
   pairingCode?: string;
   paired: boolean;
   name?: string;
+  deviceToken?: string;
 }
 
 export interface PairDeviceRequest {

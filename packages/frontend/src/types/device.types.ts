@@ -3,13 +3,17 @@ import type { Settings } from './settings.types';
 
 export type DeviceMode = 'auto' | 'override';
 
-export type DeviceStatus = 'online' | 'offline' | 'unknown';
+export type DeviceStatus = 'online' | 'offline';
 
 export interface Device {
   id: string;
   name: string;
   pairingCode?: string | null;
+  groupName?: string | null;
   mode: DeviceMode;
+  slideshowId?: string | null;
+  slideshow?: { id: string; name: string } | null;
+  maintenanceMode?: boolean;
   pairedBy?: string;
   pairedAt?: string;
   lastSeen?: string;
@@ -17,6 +21,8 @@ export interface Device {
   updatedAt: string;
   status?: DeviceStatus; // Computed on frontend
   overrides?: DeviceOverride;
+  snapshotUrl?: string | null;
+  snapshotCapturedAt?: string | null;
   user?: {
     username: string;
   };
@@ -31,29 +37,53 @@ export interface DeviceOverride {
 
 export interface CreateDeviceRequest {
   name: string;
+  groupName?: string | null;
   mode?: DeviceMode;
 }
 
 export interface UpdateDeviceRequest {
   name?: string;
+  groupName?: string | null;
   mode?: DeviceMode;
+  slideshowId?: string | null;
+  maintenanceMode?: boolean;
 }
 
 export interface DeviceControlCommand {
   action: 'reload' | 'restart' | 'clear-cache';
 }
 
+export interface BulkDeviceUpdateRequest {
+  deviceIds: string[];
+  updates: UpdateDeviceRequest;
+}
+
+export interface BulkDeviceControlRequest {
+  deviceIds: string[];
+  command: DeviceControlCommand;
+}
+
+export interface BulkDeviceActionResponse {
+  ok: boolean;
+  affectedCount: number;
+  deviceIds: string[];
+}
+
+export function getDeviceGroupLabel(groupName?: string | null): string {
+  const trimmed = typeof groupName === 'string' ? groupName.trim() : '';
+  return trimmed.length > 0 ? trimmed : 'Ohne Gruppe';
+}
+
 // Helper functions
 export function getDeviceStatus(lastSeen?: string): DeviceStatus {
-  if (!lastSeen) return 'unknown';
+  if (!lastSeen) return 'offline';
 
   const lastSeenDate = new Date(lastSeen);
   const now = new Date();
   const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / 1000 / 60;
 
   if (diffMinutes < 5) return 'online';
-  if (diffMinutes < 30) return 'offline';
-  return 'unknown';
+  return 'offline';
 }
 
 export function formatLastSeen(lastSeen?: string): string {
@@ -81,8 +111,6 @@ export function getStatusColor(status: DeviceStatus): string {
       return 'text-spa-success-dark bg-spa-success-light';
     case 'offline':
       return 'text-spa-warning-dark bg-spa-warning-light';
-    case 'unknown':
-      return 'bg-spa-bg-secondary text-spa-text-secondary';
   }
 }
 
@@ -92,8 +120,6 @@ export function getStatusLabel(status: DeviceStatus): string {
       return 'Online';
     case 'offline':
       return 'Offline';
-    case 'unknown':
-      return 'Unbekannt';
   }
 }
 
@@ -104,4 +130,8 @@ export function getModeLabel(mode: DeviceMode): string {
     case 'override':
       return 'Überschrieben';
   }
+}
+
+export function getDeviceSlideshowLabel(device: Device): string {
+  return device.slideshow?.name || 'Standard';
 }

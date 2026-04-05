@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import { MoreVertical } from 'lucide-react';
 
 export interface DropdownMenuItem {
@@ -36,20 +36,90 @@ export function DropdownMenu({
   trigger,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const allItems = sections.flat();
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setFocusedIndex(-1);
+    triggerRef.current?.focus();
+  }, []);
 
   const handleItemClick = (item: DropdownMenuItem) => {
     item.onClick();
-    if (!item.keepOpen) setOpen(false);
+    if (!item.keepOpen) close();
   };
 
+  // Focus menu item when focusedIndex changes
+  useEffect(() => {
+    if (!open || focusedIndex < 0) return;
+    const buttons = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    buttons?.[focusedIndex]?.focus();
+  }, [open, focusedIndex]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setOpen(true);
+        setFocusedIndex(0);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex((prev) => (prev + 1) % allItems.length);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex((prev) => (prev - 1 + allItems.length) % allItems.length);
+        break;
+      case 'Home':
+        e.preventDefault();
+        setFocusedIndex(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setFocusedIndex(allItems.length - 1);
+        break;
+      case 'Escape':
+        e.preventDefault();
+        close();
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < allItems.length) {
+          handleItemClick(allItems[focusedIndex]);
+        }
+        break;
+    }
+  }, [open, focusedIndex, allItems, close]);
+
   return (
-    <div className="relative">
+    <div className="relative" onKeyDown={handleKeyDown}>
       {trigger ? (
-        <div onClick={() => setOpen((prev) => !prev)}>{trigger(open)}</div>
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={() => { setOpen((prev) => !prev); if (!open) setFocusedIndex(0); }}
+          aria-label={ariaLabel}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className="appearance-none bg-transparent border-none p-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2 rounded"
+        >
+          {trigger(open)}
+        </button>
       ) : (
         <button
-          onClick={() => setOpen((prev) => !prev)}
-          className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors"
+          ref={triggerRef}
+          onClick={() => { setOpen((prev) => !prev); if (!open) setFocusedIndex(0); }}
+          className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2"
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-haspopup="menu"
@@ -62,9 +132,10 @@ export function DropdownMenu({
       {open && (
         <>
           {/* Invisible backdrop to close menu on outside click */}
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className="fixed inset-0 z-10" onClick={close} aria-hidden="true" />
 
           <div
+            ref={menuRef}
             role="menu"
             className={`absolute right-0 mt-2 ${width} bg-white rounded-lg shadow-lg border border-spa-bg-secondary z-20`}
           >
@@ -82,8 +153,9 @@ export function DropdownMenu({
                         key={item.label}
                         role="menuitem"
                         type="button"
+                        tabIndex={-1}
                         onClick={() => handleItemClick(item)}
-                        className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors ${
+                        className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-spa-primary ${
                           isDanger
                             ? 'text-spa-error hover:bg-spa-error-light'
                             : 'text-spa-text-primary hover:bg-spa-bg-primary'

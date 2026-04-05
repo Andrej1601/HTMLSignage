@@ -9,53 +9,64 @@ interface AromaLibraryManagerProps {
   onChange: (aromas: Aroma[]) => void;
 }
 
+const EMOJI_CATEGORIES = [
+  { label: '🌿 Pflanzen',  emojis: ['🌿', '🍃', '🌱', '🌾', '🍀', '☘️', '🌵', '🎋', '🎍'] },
+  { label: '🌸 Blumen',    emojis: ['🌸', '🌺', '🌻', '🌼', '🌷', '🏵️', '🥀', '🌹', '🪻'] },
+  { label: '🍋 Früchte',   emojis: ['🍋', '🍊', '🍎', '🍏', '🍑', '🍓', '🍇', '🫐', '🥭', '🍍', '🥥'] },
+  { label: '🌲 Bäume',     emojis: ['🌲', '🌳', '🌴', '🎄', '🪵'] },
+  { label: '❄️ Winter',    emojis: ['❄️', '⛄', '🧊', '💧', '💨', '🌬️'] },
+  { label: '✨ Sonstiges', emojis: ['✨', '⭐', '🌟', '💫', '🔥', '🕯️', '🪔', '🧴', '🫧'] },
+];
+
 export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<{ emoji: string; name: string; color: string }>({
-    emoji: '',
+    emoji: '🌿',
     name: '',
     color: '',
   });
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const showForm = isAdding || !!editingId;
 
   const handleStartAdd = () => {
     setFormData({ emoji: '🌿', name: '', color: '' });
+    setActiveCategory(null);
     setIsAdding(true);
     setEditingId(null);
   };
 
   const handleStartEdit = (aroma: Aroma) => {
     setFormData({ emoji: aroma.emoji, name: aroma.name, color: aroma.color || '' });
+    setActiveCategory(null);
     setEditingId(aroma.id);
     setIsAdding(false);
   };
 
+  const handleCancel = () => {
+    setIsAdding(false);
+    setEditingId(null);
+    setFormData({ emoji: '🌿', name: '', color: '' });
+    setActiveCategory(null);
+  };
+
   const handleSave = () => {
     if (!formData.name.trim()) return;
-
     if (isAdding) {
-      const newAroma: Aroma = {
+      onChange([...aromas, {
         id: Date.now().toString(),
         emoji: formData.emoji || '🌿',
         name: formData.name.trim(),
         ...(formData.color ? { color: formData.color } : {}),
-      };
-      onChange([...aromas, newAroma]);
+      }]);
     } else if (editingId) {
-      onChange(
-        aromas.map((a) =>
-          a.id === editingId
-            ? {
-                ...a,
-                emoji: formData.emoji || '🌿',
-                name: formData.name.trim(),
-                ...(formData.color ? { color: formData.color } : { color: undefined }),
-              }
-            : a
-        )
-      );
+      onChange(aromas.map((a) =>
+        a.id === editingId
+          ? { ...a, emoji: formData.emoji || '🌿', name: formData.name.trim(), ...(formData.color ? { color: formData.color } : { color: undefined }) }
+          : a
+      ));
     }
-
     handleCancel();
   };
 
@@ -65,35 +76,21 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     }
   };
 
-  const handleCancel = () => {
-    setIsAdding(false);
-    setEditingId(null);
-    setFormData({ emoji: '', name: '', color: '' });
-  };
-
-  // Emoji categories for better organization
-  const emojiCategories = {
-    'Pflanzen & Kräuter': ['🌿', '🍃', '🌱', '🌾', '🍀', '☘️', '🌵', '🎋', '🎍'],
-    'Blumen': ['🌸', '🌺', '🌻', '🌼', '🌷', '🏵️', '🥀', '🌹', '🪻'],
-    'Früchte': ['🍋', '🍊', '🍎', '🍏', '🍑', '🍓', '🍇', '🫐', '🥭', '🍍', '🥥'],
-    'Bäume': ['🌲', '🌳', '🌴', '🎄', '🪵'],
-    'Winter & Frische': ['❄️', '⛄', '🧊', '💧', '💨', '🌬️'],
-    'Sonstige': ['✨', '⭐', '🌟', '💫', '🔥', '🕯️', '🪔'],
-  };
+  const activeCategoryEmojis = EMOJI_CATEGORIES.find(c => c.label === activeCategory)?.emojis ?? [];
+  const previewColor = formData.color ? getAromaDisplayColor(formData.color) : null;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="space-y-5">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-spa-text-primary">Aroma-Bibliothek</h3>
-          <p className="text-sm text-spa-text-secondary">
-            Verwalten Sie die verfügbaren Aromen für Aufgüsse
-          </p>
+          <p className="mt-0.5 text-sm text-spa-text-secondary">Verwalten Sie die verfügbaren Aromen für Aufgüsse</p>
         </div>
-        {!isAdding && !editingId && (
+        {!showForm && (
           <button
             onClick={handleStartAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors"
           >
             <Plus className="w-4 h-4" />
             Neues Aroma
@@ -101,125 +98,154 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
         )}
       </div>
 
-      {/* Add/Edit Form */}
-      {(isAdding || editingId) && (
-        <div className="mb-4 p-4 bg-spa-bg-primary border border-spa-bg-secondary rounded-lg">
-          <h4 className="text-sm font-semibold text-spa-text-primary mb-3">
-            {isAdding ? 'Neues Aroma hinzufügen' : 'Aroma bearbeiten'}
-          </h4>
+      {/* Add / Edit form */}
+      {showForm && (
+        <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary p-5 space-y-5">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="text-sm font-semibold text-spa-text-primary">
+              {isAdding ? 'Neues Aroma hinzufügen' : 'Aroma bearbeiten'}
+            </h4>
+            <button onClick={handleCancel} className="text-spa-text-secondary hover:text-spa-text-primary transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
+          {/* ── Emoji-Auswahl (full width, oben) ── */}
           <div className="space-y-3">
-            {/* Emoji Selector */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Emoji
-              </label>
-              <div className="space-y-3 mb-3 max-h-96 overflow-y-auto border border-spa-bg-secondary rounded-md p-3 bg-white">
-                {Object.entries(emojiCategories).map(([category, emojis]) => (
-                  <div key={category}>
-                    <div className="text-xs font-semibold text-spa-text-secondary mb-2">
-                      {category}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {emojis.map((emoji) => (
-                        <button
-                          key={emoji}
-                          onClick={() => setFormData({ ...formData, emoji })}
-                          className={clsx(
-                            'w-10 h-10 text-2xl rounded-md border-2 transition-all hover:scale-110',
-                            formData.emoji === emoji
-                              ? 'border-spa-primary bg-spa-primary/10 shadow-sm'
-                              : 'border-spa-bg-secondary hover:border-spa-primary/50'
-                          )}
-                          title={emoji}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+              Emoji auswählen
+            </label>
+            {/* Category pills */}
+            <div className="flex flex-wrap gap-2">
+              {EMOJI_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.label}
+                  type="button"
+                  onClick={() => setActiveCategory(activeCategory === cat.label ? null : cat.label)}
+                  className={clsx(
+                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    activeCategory === cat.label
+                      ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                      : 'border-spa-bg-secondary bg-white text-spa-text-secondary hover:border-spa-primary/50'
+                  )}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            {/* Emoji grid */}
+            {activeCategory && (
+              <div className="flex flex-wrap gap-1.5 rounded-lg border border-spa-bg-secondary bg-white p-3">
+                {activeCategoryEmojis.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, emoji })}
+                    className={clsx(
+                      'h-9 w-9 rounded-md border-2 text-xl transition-all hover:scale-110',
+                      formData.emoji === emoji
+                        ? 'border-spa-primary bg-spa-primary/10'
+                        : 'border-spa-bg-secondary hover:border-spa-primary/40'
+                    )}
+                  >
+                    {emoji}
+                  </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-spa-text-secondary">Oder eigenes Emoji:</label>
+            )}
+            {/* Current emoji preview + custom input */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-spa-bg-secondary bg-white text-3xl shadow-xs">
+                {formData.emoji || '🌿'}
+              </div>
+              <div className="flex-1 space-y-1">
+                <label className="block text-xs text-spa-text-secondary">Oder eigenes Emoji eingeben</label>
                 <input
                   type="text"
                   value={formData.emoji}
                   onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
-                  className="w-20 px-3 py-2 text-2xl text-center border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
+                  className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-center text-2xl focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
                   placeholder="🌿"
                   maxLength={2}
                 />
               </div>
             </div>
+          </div>
 
-            {/* Name Input */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Name *
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-spa-bg-secondary rounded-md focus:outline-none focus:ring-2 focus:ring-spa-primary"
-                placeholder="z.B. Eukalyptus, Minze, Lavendel..."
-                autoFocus
-              />
-            </div>
+          {/* ── Bezeichnung ── */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+              Bezeichnung *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+              placeholder="z.B. Eukalyptus, Minze, Lavendel…"
+              autoFocus
+            />
+          </div>
 
-            {/* Color Picker */}
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-2">
-                Badge-Farbe
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {AROMA_COLOR_PALETTE.map((hex) => {
-                  const isSelected = formData.color === hex;
-                  return (
-                    <button
-                      key={hex}
-                      onClick={() => setFormData({ ...formData, color: isSelected ? '' : hex })}
-                      className={clsx(
-                        'w-8 h-8 rounded-full border-2 transition-all hover:scale-110',
-                        isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-transparent'
-                      )}
-                      style={{ backgroundColor: hex }}
-                      title={hex}
-                    />
-                  );
-                })}
-              </div>
-              {formData.color && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium border"
-                    style={{
-                      ...(() => {
-                        const c = getAromaDisplayColor(formData.color);
-                        return { backgroundColor: c.bg, color: c.text, borderColor: c.border };
-                      })(),
-                    }}
-                  >
-                    {formData.emoji} {formData.name || 'Vorschau'}
-                  </span>
-                </div>
-              )}
+          {/* ── Themenfarbe ── */}
+          <div className="space-y-2">
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+              Badge-Farbe
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {AROMA_COLOR_PALETTE.map((hex) => {
+                const isSelected = formData.color === hex;
+                return (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, color: isSelected ? '' : hex })}
+                    className={clsx(
+                      'h-7 w-7 rounded-full border-2 transition-all hover:scale-110',
+                      isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-white shadow-xs'
+                    )}
+                    style={{ backgroundColor: hex }}
+                    title={hex}
+                  />
+                );
+              })}
             </div>
           </div>
 
-          <div className="flex gap-2 mt-4">
+          {/* ── Vorschau ── */}
+          {(formData.name || formData.color) && (
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+                Vorschau
+              </label>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium"
+                style={
+                  previewColor
+                    ? { backgroundColor: previewColor.bg, color: previewColor.text, borderColor: previewColor.border }
+                    : {}
+                }
+              >
+                {formData.emoji} {formData.name || 'Vorschau'}
+              </span>
+            </div>
+          )}
+
+          {/* ── Buttons ── */}
+          <div className="flex gap-2 border-t border-spa-bg-secondary pt-4">
             <button
+              type="button"
               onClick={handleSave}
               disabled={!formData.name.trim()}
-              className="flex items-center gap-2 px-4 py-2 bg-spa-primary text-white rounded-md hover:bg-spa-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               Speichern
             </button>
             <button
+              type="button"
               onClick={handleCancel}
-              className="flex items-center gap-2 px-4 py-2 text-spa-text-secondary hover:bg-spa-bg-secondary rounded-md transition-colors"
+              className="flex items-center gap-2 rounded-lg border border-spa-bg-secondary px-4 py-2 text-sm font-medium text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors"
             >
               <X className="w-4 h-4" />
               Abbrechen
@@ -228,52 +254,58 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
         </div>
       )}
 
-      {/* Aroma List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {aromas.map((aroma, aromaIdx) => {
-          const hex = aroma.color || AROMA_COLOR_PALETTE[aromaIdx % AROMA_COLOR_PALETTE.length];
-          const dc = getAromaDisplayColor(hex);
-          return (
-          <div
-            key={aroma.id}
-            className="flex items-center justify-between p-3 bg-white border rounded-md hover:shadow-sm transition-shadow"
-            style={{ borderColor: dc.border }}
-          >
-            <div className="flex items-center gap-3">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium border"
-                style={{ backgroundColor: dc.bg, color: dc.text, borderColor: dc.border }}
-              >
-                {aroma.emoji} {aroma.name}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              <button
-                onClick={() => handleStartEdit(aroma)}
-                className="p-2 text-spa-text-secondary hover:bg-spa-bg-primary rounded-md transition-colors"
-                title="Bearbeiten"
-                aria-label="Aroma bearbeiten"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleDelete(aroma.id)}
-                className="p-2 text-spa-error hover:bg-spa-error-light rounded-md transition-colors"
-                title="Löschen"
-                aria-label="Aroma löschen"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          );
-        })}
-      </div>
-
-      {aromas.length === 0 && !isAdding && (
-        <div className="text-center py-8 text-spa-text-secondary">
+      {/* ── Aromen-Grid (3 Spalten) ── */}
+      {aromas.length === 0 && !showForm ? (
+        <div className="rounded-lg border border-dashed border-spa-bg-secondary py-10 text-center text-sm text-spa-text-secondary">
           <p>Keine Aromen vorhanden.</p>
-          <p className="text-sm mt-1">Klicken Sie auf "Neues Aroma", um eines hinzuzufügen.</p>
+          <p className="mt-1 text-xs">Klicken Sie auf „Neues Aroma", um eines hinzuzufügen.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {aromas.map((aroma, aromaIdx) => {
+            const hex = aroma.color || AROMA_COLOR_PALETTE[aromaIdx % AROMA_COLOR_PALETTE.length];
+            const dc = getAromaDisplayColor(hex);
+            const isEditing = editingId === aroma.id;
+            return (
+              <div
+                key={aroma.id}
+                className={clsx(
+                  'flex items-center justify-between rounded-lg border p-3 transition-all',
+                  isEditing
+                    ? 'border-spa-primary bg-spa-primary/5'
+                    : 'border-spa-bg-secondary bg-white hover:shadow-xs'
+                )}
+                style={{ borderColor: isEditing ? undefined : dc.border }}
+              >
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium"
+                  style={{ backgroundColor: dc.bg, color: dc.text, borderColor: dc.border }}
+                >
+                  {aroma.emoji} {aroma.name}
+                </span>
+                <div className="flex gap-1 shrink-0 ml-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(aroma)}
+                    className="rounded-md p-1.5 text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary transition-colors"
+                    title="Bearbeiten"
+                    aria-label="Aroma bearbeiten"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(aroma.id)}
+                    className="rounded-md p-1.5 text-spa-text-secondary hover:bg-spa-error-light hover:text-spa-error transition-colors"
+                    title="Löschen"
+                    aria-label="Aroma löschen"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

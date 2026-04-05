@@ -43,7 +43,7 @@ export function GlobalSlideshowSettings({
                     onChange({ ...config, defaultDuration: parseInt(event.target.value, 10) || 10 });
                   }}
                   disabled={disabled}
-                  className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
+                  className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
                 />
                 <span className="text-sm text-spa-text-secondary">Sekunden</span>
               </div>
@@ -61,7 +61,7 @@ export function GlobalSlideshowSettings({
                   });
                 }}
                 disabled={disabled}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
+                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
               >
                 <option value="fade">Fade</option>
                 <option value="slide">Slide</option>
@@ -88,7 +88,7 @@ export function GlobalSlideshowSettings({
                       onPrestartMinutesChange(Math.min(120, Math.max(0, nextValue)));
                     }}
                     disabled={disabled}
-                    className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-none focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
+                    className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
                   />
                   <span className="text-sm text-spa-text-secondary">Minuten</span>
                 </div>
