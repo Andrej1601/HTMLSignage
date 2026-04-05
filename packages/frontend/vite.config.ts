@@ -35,7 +35,7 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        advancedChunks: {
+        codeSplitting: {
           groups: [
             { name: 'react-vendor', test: /\/node_modules\/(?:react|react-dom|scheduler)\// },
             { name: 'router-vendor', test: /\/node_modules\/(?:react-router(?:-dom)?|@remix-run\/router)\// },
