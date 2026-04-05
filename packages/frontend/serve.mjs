@@ -1,60 +1,102 @@
-import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { createReadStream, existsSync } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import http from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PORT = Number(process.env.PORT || 5173);
-const HOST = process.env.HOST || '0.0.0.0';
-const DIST = join(import.meta.dirname, 'dist');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const host = process.env.HOST || '0.0.0.0';
+const port = Number.parseInt(process.env.PORT || '5173', 10);
+const distDir = path.join(__dirname, 'dist');
+const indexPath = path.join(distDir, 'index.html');
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.eot': 'application/vnd.ms-fontobject',
-};
-
-function sendFile(res, filePath, fallback) {
-  const ext = extname(filePath);
-  const mime = MIME[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': mime });
-  createReadStream(filePath).pipe(res);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error(`Invalid PORT: ${process.env.PORT ?? '<unset>'}`);
+  process.exit(1);
 }
 
-const server = createServer((req, res) => {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  let filePath = join(DIST, url.pathname === '/' ? 'index.html' : url.pathname);
+if (!existsSync(indexPath)) {
+  console.error(`Frontend build output missing: ${indexPath}`);
+  process.exit(1);
+}
 
-  if (!filePath.startsWith(DIST)) {
-    res.writeHead(403);
-    res.end('Forbidden');
-    return;
-  }
+const contentTypes = new Map([
+  ['.css', 'text/css; charset=utf-8'],
+  ['.gif', 'image/gif'],
+  ['.htm', 'text/html; charset=utf-8'],
+  ['.html', 'text/html; charset=utf-8'],
+  ['.ico', 'image/x-icon'],
+  ['.jpeg', 'image/jpeg'],
+  ['.jpg', 'image/jpeg'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.map', 'application/json; charset=utf-8'],
+  ['.mjs', 'text/javascript; charset=utf-8'],
+  ['.png', 'image/png'],
+  ['.svg', 'image/svg+xml'],
+  ['.txt', 'text/plain; charset=utf-8'],
+  ['.webp', 'image/webp'],
+  ['.woff', 'font/woff'],
+  ['.woff2', 'font/woff2'],
+]);
 
-  if (existsSync(filePath) && statSync(filePath).isFile()) {
-    sendFile(res, filePath, false);
-  } else {
-    const indexHtml = join(DIST, 'index.html');
-    if (existsSync(indexHtml)) {
-      sendFile(res, indexHtml, true);
-    } else {
-      res.writeHead(404);
-      res.end('Not Found');
+const sendFile = async (res, filePath) => {
+  const fileStat = await stat(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  res.writeHead(200, {
+    'Content-Length': fileStat.size,
+    'Content-Type': contentTypes.get(ext) || 'application/octet-stream',
+    'Cache-Control': filePath === indexPath ? 'no-cache' : 'public, max-age=31536000, immutable',
+  });
+
+  await new Promise((resolve, reject) => {
+    const stream = createReadStream(filePath);
+    stream.on('error', reject);
+    stream.on('end', resolve);
+    stream.pipe(res);
+  });
+};
+
+const server = http.createServer(async (req, res) => {
+  try {
+    if (!req.url) {
+      res.writeHead(400);
+      res.end('Bad Request');
+      return;
     }
+
+    const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+    let requestPath = decodeURIComponent(url.pathname);
+
+    if (requestPath === '/health') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('ok');
+      return;
+    }
+
+    if (requestPath.endsWith('/')) {
+      requestPath += 'index.html';
+    }
+
+    const normalizedPath = path.posix.normalize(requestPath).replace(/^(\.\.(\/|\\|$))+/, '');
+    const candidatePath = path.join(distDir, normalizedPath.replace(/^\/+/, ''));
+
+    if (candidatePath.startsWith(distDir) && existsSync(candidatePath)) {
+      await sendFile(res, candidatePath);
+      return;
+    }
+
+    await sendFile(res, indexPath);
+  } catch (error) {
+    console.error('Frontend server error:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    }
+    res.end('Internal Server Error');
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Frontend server running on http://${HOST}:${PORT}`);
-  console.log(`Serving: ${DIST}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'production'}`);
+server.listen(port, host, () => {
+  console.log(`Frontend server listening on http://${host}:${port}`);
 });

@@ -155,6 +155,9 @@ IS_UPDATE="false"
 FORCE_UPDATE="false"
 BACKEND_ENV="${APP_DIR}/packages/backend/.env"
 FRONTEND_ENV="${APP_DIR}/packages/frontend/.env.production"
+EXISTING_DB_URL=""
+EXISTING_JWT=""
+EXISTING_FRONTEND_PORT=""
 
 for arg in "$@"; do
   case "${arg}" in
@@ -215,7 +218,11 @@ if [[ "${IS_UPDATE}" == "true" ]]; then
   if [[ -f "${FRONTEND_ENV}" ]]; then
     VITE_API_URL="$(grep -oP '^VITE_API_URL=\K.*' "${FRONTEND_ENV}" 2>/dev/null || echo "${VITE_API_URL}")"
   fi
-  FRONTEND_PORT="$(grep -oP -- '--port \K[0-9]+' /etc/systemd/system/htmlsignage-frontend.service 2>/dev/null || echo "${FRONTEND_PORT}")"
+  EXISTING_FRONTEND_PORT="$(grep -oP '^Environment=PORT=\K[0-9]+' /etc/systemd/system/htmlsignage-frontend.service 2>/dev/null || true)"
+  if [[ -z "${EXISTING_FRONTEND_PORT}" ]]; then
+    EXISTING_FRONTEND_PORT="$(grep -oP -- '--port \K[0-9]+' /etc/systemd/system/htmlsignage-frontend.service 2>/dev/null || true)"
+  fi
+  [[ -n "${EXISTING_FRONTEND_PORT}" ]] && FRONTEND_PORT="${EXISTING_FRONTEND_PORT}"
 
   # Validate critical secrets exist in update mode
   if [[ -z "${EXISTING_JWT}" ]]; then
@@ -540,6 +547,44 @@ log "Backup directory created: ${BACKUP_DIR}"
 # ── Prisma migrations ────────────────────────────────────────────────────────
 step "Running Prisma migrations"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
+sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}/packages/backend'; node --env-file=./.env <<'NODE'
+const requiredTables = [
+  'users',
+  'sessions',
+  'password_reset_tokens',
+  'devices',
+  'device_overrides',
+  'schedules',
+  'settings',
+  'media',
+  'custom_palettes',
+  'audit_logs',
+  'system_jobs',
+  'runtime_history',
+  'rate_limits',
+];
+
+const { Client } = await import('pg');
+const client = new Client({ connectionString: process.env.DATABASE_URL });
+
+await client.connect();
+const result = await client.query(
+  `SELECT table_name
+     FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = ANY($1::text[])`,
+  [requiredTables],
+);
+await client.end();
+
+const existing = new Set(result.rows.map((row) => row.table_name));
+const missing = requiredTables.filter((table) => !existing.has(table));
+
+if (missing.length > 0) {
+  console.error(`Missing required database tables: ${missing.join(', ')}`);
+  process.exit(1);
+}
+NODE"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 step "Checking system resources"
@@ -639,9 +684,7 @@ done
 
 systemctl daemon-reload
 systemctl enable --now htmlsignage-backend.service
-systemctl restart htmlsignage-backend.service
 systemctl enable --now htmlsignage-frontend.service
-systemctl restart htmlsignage-frontend.service
 
 # ── Firewall ─────────────────────────────────────────────────────────────────
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
@@ -715,9 +758,10 @@ fi
 DB_URL="$(grep -oP '^DATABASE_URL="\K[^"]+' "${BACKEND_ENV}")"
 DB_NAME="$(echo "${DB_URL}" | sed -n 's|.*/\([^?]*\).*|\1|p')"
 DB_USER="$(echo "${DB_URL}" | sed -n 's|.*://\([^:]*\):.*|\1|p')"
-DB_PASS="$(echo "${DB_URL}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')"
+DB_PASS_ENCODED="$(echo "${DB_URL}" | sed -n 's|.*://[^:]*:\([^@]*\)@.*|\1|p')"
 DB_HOST="$(echo "${DB_URL}" | sed -n 's|.*@\([^:]*\):.*|\1|p')"
 DB_PORT="$(echo "${DB_URL}" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')"
+DB_PASS="$(node -e "console.log(decodeURIComponent(process.argv[1] || ''))" "${DB_PASS_ENCODED}")"
 
 log "Starting backup of database '${DB_NAME}'"
 
@@ -773,7 +817,7 @@ if ! is_true "${SKIP_HEALTHCHECKS:-false}"; then
     journalctl -u htmlsignage-backend.service -n 80 --no-pager || true
     die "Backend health check failed after ${HEALTHCHECK_RETRIES} retries."
   fi
-  if ! wait_for_url "Frontend health" "http://127.0.0.1:${FRONTEND_PORT}/" "${HEALTHCHECK_RETRIES}" "${HEALTHCHECK_DELAY}"; then
+  if ! wait_for_url "Frontend health" "http://127.0.0.1:${FRONTEND_PORT}/health" "${HEALTHCHECK_RETRIES}" "${HEALTHCHECK_DELAY}"; then
     warn "Frontend health check failed. Diagnostics:"
     systemctl --no-pager --full status htmlsignage-frontend.service || true
     journalctl -u htmlsignage-frontend.service -n 80 --no-pager || true

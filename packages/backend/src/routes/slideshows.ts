@@ -21,10 +21,41 @@ const UpdateSlideshowSchema = z.object({
   config: z.record(z.string(), z.unknown()).optional(),
 });
 
+async function ensureDefaultSlideshow() {
+  const existing = await prisma.slideshow.findFirst({
+    where: { isDefault: true },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const activeSettings = await prisma.settings.findFirst({
+    where: { isActive: true },
+    orderBy: { version: 'desc' },
+    select: { data: true },
+  });
+
+  const settingsData = (activeSettings?.data ?? {}) as Record<string, unknown>;
+  const slideshowConfig = (settingsData.slideshow ?? {}) as Prisma.InputJsonValue;
+
+  return prisma.slideshow.create({
+    data: {
+      name: 'Standard',
+      isDefault: true,
+      config: slideshowConfig,
+    },
+    select: { id: true },
+  });
+}
+
 // ─── GET /api/slideshows - List all slideshows ──────────────────────────────
 
 router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (_req: AuthRequest, res) => {
   try {
+    await ensureDefaultSlideshow();
+
     const slideshows = await prisma.slideshow.findMany({
       include: {
         devices: {
