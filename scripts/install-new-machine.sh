@@ -593,24 +593,28 @@ EOF
 
 cat > /etc/systemd/system/htmlsignage-frontend.service <<EOF
 [Unit]
-Description=HTMLSignage Frontend (Vite preview)
+Description=HTMLSignage Frontend
 After=network.target htmlsignage-backend.service
 Wants=htmlsignage-backend.service
 
 [Service]
 Type=simple
 User=${APP_USER}
-WorkingDirectory=${APP_DIR}
+WorkingDirectory=${APP_DIR}/packages/frontend
+Environment=NODE_ENV=production
+Environment=PORT=${FRONTEND_PORT}
+Environment=HOST=0.0.0.0
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=${PNPM_BIN} --filter frontend preview --host 0.0.0.0 --port ${FRONTEND_PORT}
+ExecStart=/usr/bin/node serve.mjs
 Restart=always
 RestartSec=5
 
 # Security hardening
 ProtectSystem=strict
-ProtectHome=yes
+ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
+ReadWritePaths=${APP_DIR}/packages/frontend/logs
 ReadOnlyPaths=${APP_DIR}
 
 [Install]
