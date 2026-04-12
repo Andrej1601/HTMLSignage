@@ -537,6 +537,13 @@ chown "${APP_USER}:${APP_USER}" "${LOGS_DIR}"
 chmod 750 "${LOGS_DIR}"
 log "Logs directory created: ${LOGS_DIR}"
 
+# Frontend logs directory
+FRONTEND_LOGS_DIR="${APP_DIR}/packages/frontend/logs"
+mkdir -p "${FRONTEND_LOGS_DIR}"
+chown "${APP_USER}:${APP_USER}" "${FRONTEND_LOGS_DIR}"
+chmod 750 "${FRONTEND_LOGS_DIR}"
+log "Frontend logs directory created: ${FRONTEND_LOGS_DIR}"
+
 # Backup directory
 BACKUP_DIR="${APP_DIR}/backups"
 mkdir -p "${BACKUP_DIR}"
@@ -663,7 +670,7 @@ ProtectSystem=strict
 ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
-ReadWritePaths=${APP_DIR}/packages/frontend/logs
+ReadWritePaths=${APP_DIR}/logs
 ReadOnlyPaths=${APP_DIR}
 
 [Install]
