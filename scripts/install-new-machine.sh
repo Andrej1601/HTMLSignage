@@ -537,6 +537,13 @@ chown "${APP_USER}:${APP_USER}" "${LOGS_DIR}"
 chmod 750 "${LOGS_DIR}"
 log "Logs directory created: ${LOGS_DIR}"
 
+# Frontend logs directory
+FRONTEND_LOGS_DIR="${APP_DIR}/packages/frontend/logs"
+mkdir -p "${FRONTEND_LOGS_DIR}"
+chown "${APP_USER}:${APP_USER}" "${FRONTEND_LOGS_DIR}"
+chmod 750 "${FRONTEND_LOGS_DIR}"
+log "Frontend logs directory created: ${FRONTEND_LOGS_DIR}"
+
 # Backup directory
 BACKUP_DIR="${APP_DIR}/backups"
 mkdir -p "${BACKUP_DIR}"
@@ -547,7 +554,10 @@ log "Backup directory created: ${BACKUP_DIR}"
 # ── Prisma migrations ────────────────────────────────────────────────────────
 step "Running Prisma migrations"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}/packages/backend'; node --env-file=./.env <<'NODE'
+sudo -u "${APP_USER}" env APP_DIR="${APP_DIR}" bash <<'BASH'
+set -Eeuo pipefail
+cd "${APP_DIR}/packages/backend"
+node --env-file=./.env --input-type=module <<'NODE'
 const requiredTables = [
   'users',
   'sessions',
@@ -584,7 +594,8 @@ if (missing.length > 0) {
   console.error(`Missing required database tables: ${missing.join(', ')}`);
   process.exit(1);
 }
-NODE"
+NODE
+BASH
 
 # ── Build ────────────────────────────────────────────────────────────────────
 step "Checking system resources"
@@ -659,6 +670,7 @@ ProtectSystem=strict
 ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
+ReadWritePaths=${APP_DIR}/logs
 ReadOnlyPaths=${APP_DIR}
 
 [Install]
