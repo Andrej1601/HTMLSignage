@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
 import { scheduleApi } from '@/services/api';
 import { toast } from '@/stores/toastStore';
 import type { Schedule } from '@/types/schedule.types';
@@ -28,8 +29,16 @@ export function useSchedule(options?: ScheduleQueryOptions) {
       queryClient.invalidateQueries({ queryKey: ['schedule'] });
       toast.success('Aufgussplan gespeichert.');
     },
-    onError: () => {
-      toast.error('Aufgussplan konnte nicht gespeichert werden.');
+    onError: (error: unknown) => {
+      const axiosError = error as AxiosError<{ error?: string; message?: string }>;
+      if (axiosError.response?.status === 409) {
+        toast.error(
+          axiosError.response.data?.message ??
+          'Konflikt: Bitte Seite neu laden und erneut speichern.',
+        );
+      } else {
+        toast.error('Aufgussplan konnte nicht gespeichert werden.');
+      }
     },
   });
 

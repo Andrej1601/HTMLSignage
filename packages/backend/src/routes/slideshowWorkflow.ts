@@ -28,6 +28,7 @@ import {
 } from '../lib/slideshowWorkflow.js';
 import { isPlainRecord } from '../lib/utils.js';
 import { broadcastDeviceUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
+import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
 
 const router = Router();
 
@@ -72,6 +73,7 @@ async function publishGlobal(req: AuthRequest, snapshot: WorkflowSnapshot, actio
   const payload = buildGlobalSettingsWorkflowPayload(currentActive?.data, snapshot);
   const { id: createdId, version: nextVersion } = await createVersionedRecord('settings', payload);
 
+  invalidateGlobalConfigCache();
   broadcastSettingsUpdate(payload);
   await logAuditEvent(req, {
     action,

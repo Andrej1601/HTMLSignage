@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { createVersionedRecord } from '../lib/versionedEntity.js';
+import { createVersionedRecord, VersionConflictError } from '../lib/versionedEntity.js';
 import { ScheduleSchema } from '../types/schedule.types.js';
 import { broadcastScheduleUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
@@ -10,6 +10,7 @@ import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
 import { normalizeScheduleData, createDefaultSchedule } from '../lib/schedule.js';
 import { computeScheduleChangeSummary } from '../lib/scheduleDiff.js';
+import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
 import type { Schedule } from '../types/schedule.types.js';
 
 const router = Router();
@@ -91,8 +92,13 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
     // Validate request body
     const validated = ScheduleSchema.parse(req.body);
     const scheduleToStore = { ...validated };
-    const { id, version } = await createVersionedRecord('schedule', scheduleToStore);
+    const clientVersion = typeof validated.version === 'number' ? validated.version : null;
+    const expectedPreviousVersion = clientVersion !== null ? clientVersion - 1 : undefined;
+    const { id, version } = await createVersionedRecord('schedule', scheduleToStore, {
+      expectedPreviousVersion,
+    });
 
+    invalidateGlobalConfigCache();
     // Broadcast update via WebSocket
     broadcastScheduleUpdate(scheduleToStore);
 
@@ -111,6 +117,13 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
       id,
     });
   } catch (error) {
+    if (error instanceof VersionConflictError) {
+      return res.status(409).json({
+        error: 'version-conflict',
+        message: 'Konflikt: Ein anderer Admin hat den Aufgussplan zwischenzeitlich gespeichert. Bitte Seite neu laden.',
+        latestVersion: error.latestVersion,
+      });
+    }
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: 'validation-failed',

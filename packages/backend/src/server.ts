@@ -107,7 +107,7 @@ app.use((req, res, next) => {
   const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   if (isMutation && req.cookies?.auth_token) {
     const csrfToken = req.headers['x-csrf-token'];
-    if (!csrfToken || csrfToken !== '1') {
+    if (!csrfToken || typeof csrfToken !== 'string' || !csrfToken.trim()) {
       return res.status(403).json({
         error: 'csrf-token-missing',
         message: 'CSRF token required for mutation requests.',

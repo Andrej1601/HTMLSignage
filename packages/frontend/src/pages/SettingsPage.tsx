@@ -278,7 +278,12 @@ export function SettingsPage() {
                     designStyle={localSettings.designStyle}
                     colorPalette={localSettings.colorPalette}
                     onChange={(theme) => updateField('theme', theme)}
-                    onDisplayAppearanceChange={(v) => updateField('displayAppearance', v)}
+                    onDisplayAppearanceChange={(v) => {
+                      updateField('displayAppearance', v);
+                      // Auto-select the matching palette so the appearance looks correct out of the box
+                      if (v === 'mineral-noir') handleColorPaletteChange('mineral-noir');
+                      else if (v === 'wellness-stage') handleColorPaletteChange('wellness-warm');
+                    }}
                     onDesignStyleChange={(v) => updateField('designStyle', v)}
                     onColorPaletteChange={handleColorPaletteChange}
                   />

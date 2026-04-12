@@ -146,6 +146,33 @@ export const COLOR_PALETTES: Array<{ id: ColorPaletteName; name: string; colors:
       statusLive: '#FF4422', statusNext: '#D4561A', statusPrestart: '#F0960A',
     },
   },
+  {
+    // Mineral Noir — kühles Schiefer-Schwarz, Platin-Akzente, architektonischer Minimalismus.
+    // Kein Gradient, kein Glow — pure Struktur und Typografie.
+    id: 'mineral-noir',
+    name: 'Mineral Noir',
+    colors: {
+      // Basis: tiefes Schiefer mit kühlem Blauunterton
+      bg: '#0D0F14', fg: '#ECEAE6', accent: '#B8B4AB',
+      // Gitter: dunkler Stein, kaum vom Hintergrund unterscheidbar
+      gridTable: '#22262E', cellBg: '#141820', boxFg: '#ECEAE6', timeColBg: '#1A1D24',
+      // Flamme: kühles Smaragd statt Orange — eleganter Kontrast
+      flame: '#3DD9AC',
+      // Zebra: minimal — nur ein Hauch Tiefe
+      zebra1: '#141820', zebra2: '#0D0F14',
+      timeZebra1: '#1E2229', timeZebra2: '#1A1D24',
+      // Header: fast schwarz mit Platin-Text
+      headRowBg: '#0A0C10', headRowFg: '#B8B4AB',
+      cornerBg: '#1A1D24', cornerFg: '#B8B4AB',
+      // Display: dunkle Oberflächen, Steinbordüren
+      dashboardBg: '#0D0F14', cardBg: '#141820', cardBorder: '#22262E',
+      textMain: '#ECEAE6', textMuted: '#6B7280',
+      accentGold: '#A09880',   // warmes Platin
+      accentGreen: '#3DD9AC',  // kühles Smaragd
+      // Status: Smaragd für aktiv, warmes Platin für nächste, kühles Blau für bald
+      statusLive: '#3DD9AC', statusNext: '#A09880', statusPrestart: '#7B9BB8',
+    },
+  },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

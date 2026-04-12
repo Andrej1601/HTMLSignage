@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ScheduleSchema } from '../../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../../websocket/index.js';
+import { getCachedGlobalConfig } from '../../lib/globalConfigCache.js';
 import { authMiddleware, deviceAuthMiddleware, type AuthRequest, str } from '../../lib/auth.js';
 import { requirePermission } from '../../lib/permissions.js';
 import { mutationLimiter, heartbeatLimiter } from '../../lib/rateLimiter.js';
@@ -91,13 +92,9 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
       return res.status(404).json({ error: 'not-found', message: 'Device not found' });
     }
 
-    const [activeSchedule, activeSettings] = await Promise.all([
-      prisma.schedule.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
-      prisma.settings.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
-    ]);
-
-    const globalSchedule = normalizeScheduleData(activeSchedule?.data);
-    const globalSettings = normalizeSettingsData(activeSettings?.data);
+    const { scheduleData, settingsData } = await getCachedGlobalConfig();
+    const globalSchedule = normalizeScheduleData(scheduleData);
+    const globalSettings = normalizeSettingsData(settingsData);
 
     // Resolve slideshow config: device-specific slideshow takes priority over global settings
     const effectiveSettings = { ...globalSettings };

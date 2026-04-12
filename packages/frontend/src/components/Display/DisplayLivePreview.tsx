@@ -66,7 +66,7 @@ export function DisplayLivePreview({
   useEffect(() => {
     if (isReady) return;
     requestReady();
-    const timer = window.setInterval(requestReady, 500);
+    const timer = window.setInterval(requestReady, 1500);
     return () => {
       window.clearInterval(timer);
     };

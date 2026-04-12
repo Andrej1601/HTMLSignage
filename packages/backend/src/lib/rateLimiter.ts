@@ -36,26 +36,25 @@ export class PrismaStore implements Store {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.windowMs);
 
-    const record = await prisma.rateLimit.findUnique({
-      where: { key: prefixedKey },
-    });
+    // Single atomic SQL: insert or conditionally increment/reset on conflict.
+    // Avoids the findUnique → update race condition where two concurrent
+    // requests both see "no record" and both create with count=1.
+    type Row = { count: number; expiresAt: Date };
+    const rows = await prisma.$queryRaw<Row[]>`
+      INSERT INTO rate_limits (id, key, count, "expiresAt", "createdAt")
+      VALUES (gen_random_uuid()::text, ${prefixedKey}, 1, ${expiresAt}, ${now})
+      ON CONFLICT (key) DO UPDATE SET
+        count = CASE WHEN rate_limits."expiresAt" <= ${now} THEN 1
+                     ELSE rate_limits.count + 1
+                END,
+        "expiresAt" = CASE WHEN rate_limits."expiresAt" <= ${now} THEN ${expiresAt}
+                           ELSE rate_limits."expiresAt"
+                      END
+      RETURNING count, "expiresAt"
+    `;
 
-    if (!record || record.expiresAt <= now) {
-      await prisma.rateLimit.upsert({
-        where: { key: prefixedKey },
-        update: { count: 1, expiresAt },
-        create: { key: prefixedKey, count: 1, expiresAt },
-      });
-      return { totalHits: 1, resetTime: expiresAt };
-    }
-
-    const newCount = record.count + 1;
-    await prisma.rateLimit.update({
-      where: { key: prefixedKey },
-      data: { count: newCount },
-    });
-
-    return { totalHits: newCount, resetTime: record.expiresAt };
+    const row = rows[0];
+    return { totalHits: Number(row.count), resetTime: row.expiresAt };
   }
 
   async decrement(key: string): Promise<void> {

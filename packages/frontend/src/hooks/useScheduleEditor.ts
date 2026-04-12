@@ -117,7 +117,14 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
   }, [draftState.hasStoredDraft, schedule, localSchedule, settings]);
 
   useEffect(() => {
-    const interval = setInterval(() => setEventClock(Date.now()), 30000);
+    const interval = setInterval(() => {
+      // Only trigger a re-render when the actual minute changes — the derived
+      // values (livePreset, activeEvent) only care about minutes, not milliseconds.
+      setEventClock((prev) => {
+        const now = Date.now();
+        return Math.floor(now / 60_000) !== Math.floor(prev / 60_000) ? now : prev;
+      });
+    }, 30_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -255,10 +262,10 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
       onSuccess: () => {
         draftState.clearDraft();
         setIsDirty(false);
-        refetch();
+        // invalidateQueries in the mutation's onSuccess already triggers a refetch
       },
     });
-  }, [localSchedule, save, draftState, refetch]);
+  }, [localSchedule, save, draftState]);
 
   const resetToLiveSchedule = useCallback(() => {
     if (!schedule) return;

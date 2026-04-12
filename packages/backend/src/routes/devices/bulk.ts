@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma.js';
-import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../../websocket/index.js';
+import { broadcastBulkDeviceUpdate, broadcastDeviceCommand } from '../../websocket/index.js';
 import { authMiddleware, type AuthRequest } from '../../lib/auth.js';
 import { requirePermission } from '../../lib/permissions.js';
 import { mutationLimiter } from '../../lib/rateLimiter.js';
@@ -61,7 +61,7 @@ router.patch('/bulk/update', authMiddleware, requirePermission('devices:manage')
     });
 
     const updatedDevices = await loadAdminDevicesByIds(validated.deviceIds);
-    updatedDevices.forEach((device) => broadcastDeviceUpdate(device));
+    broadcastBulkDeviceUpdate(updatedDevices);
 
     await logAuditEvent(req, {
       action: 'device.bulk.update',

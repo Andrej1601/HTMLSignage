@@ -525,7 +525,12 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       return;
     }
 
-    const interval = window.setInterval(() => setEventClock(Date.now()), 30_000);
+    const interval = window.setInterval(() => {
+      setEventClock((prev) => {
+        const now = Date.now();
+        return Math.floor(now / 60_000) !== Math.floor(prev / 60_000) ? now : prev;
+      });
+    }, 30_000);
     return () => window.clearInterval(interval);
   }, [previewClockOverride]);
 

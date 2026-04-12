@@ -1,8 +1,6 @@
-import { useState } from 'react';
-import { Copy, CalendarClock } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Copy, ChevronDown, CalendarClock, Radio } from 'lucide-react';
 import clsx from 'clsx';
-import { SectionCard } from '@/components/SectionCard';
-import { Button } from '@/components/Button';
 import {
   PRESET_LABELS,
   WEEKDAY_PRESETS,
@@ -10,6 +8,12 @@ import {
   type PresetKey,
 } from '@/types/schedule.types';
 import type { UseScheduleEditorReturn } from '@/hooks/useScheduleEditor';
+
+// Short labels for chip display
+const PRESET_SHORT: Record<PresetKey, string> = {
+  Mon: 'Mo', Tue: 'Di', Wed: 'Mi', Thu: 'Do', Fri: 'Fr', Sat: 'Sa', Sun: 'So',
+  Opt: 'Opt', Evt1: 'Evt1', Evt2: 'Evt2',
+};
 
 interface PresetTabsProps {
   editor: Pick<
@@ -30,207 +34,205 @@ interface PresetTabsProps {
 
 export function PresetTabs({ editor }: PresetTabsProps) {
   const [showCopyMenu, setShowCopyMenu] = useState(false);
+  const copyMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close copy menu on outside click
+  useEffect(() => {
+    if (!showCopyMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (copyMenuRef.current && !copyMenuRef.current.contains(e.target as Node)) {
+        setShowCopyMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showCopyMenu]);
+
+  const allPresets: PresetKey[] = [...WEEKDAY_PRESETS, ...SPECIAL_PRESETS];
 
   return (
-    <SectionCard title="Preset-Auswahl" icon={CalendarClock}>
-      {editor.localSchedule?.autoPlay && editor.activeEvent && (
-        <div className="mb-4 flex items-start gap-3 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-4 py-3">
-          <CalendarClock className="mt-0.5 h-5 w-5 text-spa-accent" />
-          <div>
-            <p className="text-sm font-semibold text-spa-text-primary">
-              Event-Plan aktiv: {editor.activeEvent.name}
-            </p>
-            <p className="text-xs text-spa-text-secondary">
-              Aktuell wird {PRESET_LABELS[editor.livePreset]} ({editor.livePreset}) abgespielt.
-            </p>
-          </div>
-        </div>
-      )}
-
+    <div className="flex flex-col gap-2">
+      {/* Editing ≠ Live notice */}
       {editor.editingPreset !== editor.livePreset && (
-        <div className="mb-4 rounded-lg border border-spa-secondary/30 bg-spa-secondary/10 px-4 py-3 text-xs text-spa-text-secondary">
-          Du bearbeitest {PRESET_LABELS[editor.editingPreset]} ({editor.editingPreset}), live läuft weiterhin {PRESET_LABELS[editor.livePreset]} ({editor.livePreset}).
+        <div className="flex items-center gap-2 rounded-lg border border-spa-secondary/25 bg-spa-secondary/8 px-3 py-2 text-xs text-spa-text-secondary">
+          <Radio className="h-3.5 w-3.5 text-spa-secondary shrink-0" />
+          Du bearbeitest <span className="font-semibold">{PRESET_LABELS[editor.editingPreset]}</span>
+          &nbsp;— live läuft weiterhin <span className="font-semibold">{PRESET_LABELS[editor.livePreset]}</span>.
         </div>
       )}
 
-      <WeekdayTabs
-        editingPreset={editor.editingPreset}
-        livePreset={editor.livePreset}
-        onPresetChange={editor.handlePresetChange}
-      />
-
-      <SpecialTabs
-        editingPreset={editor.editingPreset}
-        livePreset={editor.livePreset}
-        activeEventPreset={editor.activeEventPreset}
-        autoPlay={editor.localSchedule?.autoPlay}
-        onPresetChange={editor.handlePresetChange}
-      />
-
-      <CopyMenu
-        showCopyMenu={showCopyMenu}
-        setShowCopyMenu={setShowCopyMenu}
-        editingPreset={editor.editingPreset}
-        onCopyFrom={editor.handleCopyFrom}
-      />
-
-      {!editor.localSchedule?.autoPlay && (
-        <Button
-          variant="ghost"
-          onClick={editor.handleSetLivePreset}
-          disabled={editor.editingPreset === editor.livePreset}
-          className="mt-2 border border-spa-secondary text-spa-secondary hover:bg-spa-secondary/10"
-        >
-          Auswahl live schalten
-        </Button>
+      {/* Event-Plan Banner */}
+      {editor.localSchedule?.autoPlay && editor.activeEvent && (
+        <div className="flex items-center gap-2 rounded-lg border border-spa-accent/30 bg-spa-accent/10 px-3 py-2 text-xs text-spa-text-primary">
+          <CalendarClock className="h-3.5 w-3.5 text-spa-accent shrink-0" />
+          <span>
+            <span className="font-semibold">Event aktiv: {editor.activeEvent.name}</span>
+            &nbsp;— spielt {PRESET_LABELS[editor.livePreset]} ({editor.livePreset}).
+          </span>
+        </div>
       )}
-    </SectionCard>
-  );
-}
 
-interface WeekdayTabsProps {
-  editingPreset: PresetKey;
-  livePreset: PresetKey;
-  onPresetChange: (preset: PresetKey) => void;
-}
+      {/* Chip row */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Weekday chips */}
+        <div className="flex gap-1 flex-wrap">
+          {WEEKDAY_PRESETS.map((preset) => (
+            <PresetChip
+              key={preset}
+              preset={preset}
+              editingPreset={editor.editingPreset}
+              livePreset={editor.livePreset}
+              variant="weekday"
+              onPresetChange={editor.handlePresetChange}
+            />
+          ))}
+        </div>
 
-function WeekdayTabs({ editingPreset, livePreset, onPresetChange }: WeekdayTabsProps) {
-  return (
-    <div className="flex gap-2 mb-2 overflow-x-auto pb-1 -mx-1 px-1">
-      {WEEKDAY_PRESETS.map((preset) => (
-        <button
-          key={preset}
-          onClick={() => onPresetChange(preset)}
-          className={clsx(
-            'px-4 py-2 rounded-t-lg font-medium transition-colors',
-            editingPreset === preset
-              ? 'bg-spa-primary text-white'
-              : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/70'
+        {/* Divider */}
+        <div className="h-6 w-px bg-spa-bg-secondary mx-1" />
+
+        {/* Special chips */}
+        <div className="flex gap-1 flex-wrap">
+          {SPECIAL_PRESETS.map((preset) => (
+            <PresetChip
+              key={preset}
+              preset={preset}
+              editingPreset={editor.editingPreset}
+              livePreset={editor.livePreset}
+              activeEventPreset={editor.activeEventPreset}
+              variant="special"
+              onPresetChange={editor.handlePresetChange}
+            />
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* "Auswahl live schalten" */}
+        {!editor.localSchedule?.autoPlay && editor.editingPreset !== editor.livePreset && (
+          <button
+            onClick={editor.handleSetLivePreset}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-secondary/40 bg-spa-secondary/10 px-3 py-1.5 text-xs font-medium text-spa-secondary-dark hover:bg-spa-secondary/20 transition-colors"
+          >
+            <Radio className="h-3.5 w-3.5" />
+            Live schalten
+          </button>
+        )}
+
+        {/* Copy menu */}
+        <div className="relative" ref={copyMenuRef}>
+          <button
+            onClick={() => setShowCopyMenu((v) => !v)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:border-spa-primary/30 hover:text-spa-text-primary transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Kopieren
+            <ChevronDown className={clsx('h-3.5 w-3.5 transition-transform', showCopyMenu && 'rotate-180')} />
+          </button>
+
+          {showCopyMenu && (
+            <div className="absolute right-0 top-full z-30 mt-1.5 min-w-[180px] rounded-xl border border-spa-bg-secondary bg-white shadow-lg">
+              <div className="p-1.5">
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-spa-text-secondary/60">
+                  Wochentage
+                </div>
+                {WEEKDAY_PRESETS.map((preset) => (
+                  <CopyMenuItem
+                    key={preset}
+                    preset={preset}
+                    editingPreset={editor.editingPreset}
+                    allPresets={allPresets}
+                    onCopyFrom={(p) => { editor.handleCopyFrom(p); setShowCopyMenu(false); }}
+                  />
+                ))}
+                <div className="my-1 border-t border-spa-bg-secondary" />
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-spa-text-secondary/60">
+                  Spezial
+                </div>
+                {SPECIAL_PRESETS.map((preset) => (
+                  <CopyMenuItem
+                    key={preset}
+                    preset={preset}
+                    editingPreset={editor.editingPreset}
+                    allPresets={allPresets}
+                    onCopyFrom={(p) => { editor.handleCopyFrom(p); setShowCopyMenu(false); }}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-        >
-          <span className="inline-flex items-center gap-2">
-            <span>{PRESET_LABELS[preset]}</span>
-            {livePreset === preset && (
-              <span
-                className={clsx(
-                  'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                  editingPreset === preset
-                    ? 'bg-white/80 text-spa-primary'
-                    : 'bg-spa-primary/15 text-spa-primary'
-                )}
-              >
-                Live
-              </span>
-            )}
-          </span>
-        </button>
-      ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-interface SpecialTabsProps {
+interface PresetChipProps {
+  preset: PresetKey;
   editingPreset: PresetKey;
   livePreset: PresetKey;
-  activeEventPreset: PresetKey | undefined;
-  autoPlay: boolean | undefined;
+  activeEventPreset?: PresetKey;
+  variant: 'weekday' | 'special';
   onPresetChange: (preset: PresetKey) => void;
 }
 
-function SpecialTabs({ editingPreset, livePreset, activeEventPreset, autoPlay, onPresetChange }: SpecialTabsProps) {
+function PresetChip({ preset, editingPreset, livePreset, activeEventPreset, variant, onPresetChange }: PresetChipProps) {
+  const isActive = editingPreset === preset;
+  const isLive = livePreset === preset;
+  const isEventActive = activeEventPreset === preset;
+
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-      {SPECIAL_PRESETS.map((preset) => (
-        <button
-          key={preset}
-          onClick={() => onPresetChange(preset)}
-          className={clsx(
-            'px-4 py-2 rounded-t-lg font-medium transition-colors border-2',
-            editingPreset === preset
-              ? 'bg-spa-accent text-spa-text-primary border-spa-accent'
-              : 'bg-white text-spa-text-secondary border-spa-bg-secondary hover:border-spa-accent/50'
-          )}
-        >
-          <span className="inline-flex items-center gap-2">
-            <span>{PRESET_LABELS[preset]}</span>
-            {livePreset === preset && (
-              <span
-                className={clsx(
-                  'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                  editingPreset === preset
-                    ? 'bg-white/80 text-spa-accent'
-                    : 'bg-spa-accent/15 text-spa-accent'
-                )}
-              >
-                Live
-              </span>
-            )}
-            {autoPlay && activeEventPreset === preset && (
-              <span
-                className={clsx(
-                  'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                  editingPreset === preset
-                    ? 'bg-white/80 text-spa-accent'
-                    : 'bg-spa-accent/15 text-spa-accent'
-                )}
-              >
-                Event aktiv
-              </span>
-            )}
-          </span>
-        </button>
-      ))}
-    </div>
+    <button
+      onClick={() => onPresetChange(preset)}
+      title={PRESET_LABELS[preset]}
+      className={clsx(
+        'relative inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+        isActive && variant === 'weekday' && 'bg-spa-primary text-white shadow-sm',
+        isActive && variant === 'special' && 'bg-spa-accent text-spa-text-primary shadow-sm',
+        !isActive && 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary hover:text-spa-text-primary',
+      )}
+    >
+      {PRESET_SHORT[preset]}
+      {/* Live dot */}
+      {isLive && (
+        <span className={clsx(
+          'ml-0.5 h-1.5 w-1.5 rounded-full shrink-0',
+          isActive ? 'bg-white/80' : 'bg-spa-primary'
+        )} />
+      )}
+      {/* Event dot */}
+      {isEventActive && !isLive && (
+        <span className={clsx(
+          'ml-0.5 h-1.5 w-1.5 rounded-full shrink-0',
+          isActive ? 'bg-white/80' : 'bg-spa-accent'
+        )} />
+      )}
+    </button>
   );
 }
 
-interface CopyMenuProps {
-  showCopyMenu: boolean;
-  setShowCopyMenu: (show: boolean) => void;
+interface CopyMenuItemProps {
+  preset: PresetKey;
   editingPreset: PresetKey;
+  allPresets: PresetKey[];
   onCopyFrom: (preset: PresetKey) => void;
 }
 
-function CopyMenu({ showCopyMenu, setShowCopyMenu, editingPreset, onCopyFrom }: CopyMenuProps) {
+function CopyMenuItem({ preset, editingPreset, onCopyFrom }: CopyMenuItemProps) {
+  const isSelf = preset === editingPreset;
   return (
-    <div className="relative ml-auto">
-      <button
-        onClick={() => setShowCopyMenu(!showCopyMenu)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-spa-bg-secondary rounded-t-lg text-spa-text-secondary hover:border-spa-secondary transition-colors"
-      >
-        <Copy className="w-4 h-4" />
-        Aus Tag X laden
-      </button>
-
-      {showCopyMenu && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-spa-bg-secondary rounded-lg shadow-lg z-10 min-w-[200px]">
-          <div className="p-2">
-            <div className="text-xs font-semibold text-spa-text-secondary px-2 py-1">Wochentage</div>
-            {WEEKDAY_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => onCopyFrom(preset)}
-                disabled={preset === editingPreset}
-                className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {PRESET_LABELS[preset]}
-              </button>
-            ))}
-
-            <div className="text-xs font-semibold text-spa-text-secondary px-2 py-1 mt-2">Spezial</div>
-            {SPECIAL_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                onClick={() => onCopyFrom(preset)}
-                disabled={preset === editingPreset}
-                className="w-full text-left px-3 py-2 rounded text-sm hover:bg-spa-bg-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {PRESET_LABELS[preset]}
-              </button>
-            ))}
-          </div>
-        </div>
+    <button
+      onClick={() => !isSelf && onCopyFrom(preset)}
+      disabled={isSelf}
+      className={clsx(
+        'w-full rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+        isSelf
+          ? 'cursor-not-allowed text-spa-text-secondary/40'
+          : 'text-spa-text-primary hover:bg-spa-bg-primary'
       )}
-    </div>
+    >
+      {PRESET_LABELS[preset]}
+    </button>
   );
 }

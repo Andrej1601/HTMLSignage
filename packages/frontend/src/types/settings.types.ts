@@ -108,7 +108,7 @@ export interface MaintenanceScreenSettings {
 }
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type DisplayAppearance = 'wellness-stage' | 'editorial-resort';
+export type DisplayAppearance = 'wellness-stage' | 'editorial-resort' | 'mineral-noir';
 export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'

@@ -61,6 +61,58 @@ function normalizeTargetIds(targets?: string[]): string[] {
     : [];
 }
 
+function timeStrToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+/** Findet zeitliche Überschneidungen zwischen Aufgüssen in derselben Sauna-Spalte. */
+function getOverlapIssues(daySchedule: DaySchedule | null | undefined, presetLabel: string): EditorQualityIssue[] {
+  if (!daySchedule?.rows?.length || !daySchedule.saunas.length) return [];
+
+  const issues: EditorQualityIssue[] = [];
+
+  for (let colIdx = 0; colIdx < daySchedule.saunas.length; colIdx++) {
+    const saunaName = daySchedule.saunas[colIdx] || `Sauna ${colIdx + 1}`;
+
+    // Alle befüllten Einträge dieser Spalte, sortiert nach Zeit
+    const entries = daySchedule.rows
+      .map((row) => {
+        const entry = row.entries?.[colIdx];
+        if (!entry?.title?.trim()) return null;
+        return {
+          time: row.time,
+          startMin: timeStrToMinutes(row.time),
+          duration: entry.duration ?? 15,
+          title: entry.title.trim(),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.startMin - b!.startMin) as Array<{
+        time: string; startMin: number; duration: number; title: string;
+      }>;
+
+    for (let i = 0; i < entries.length - 1; i++) {
+      const curr = entries[i];
+      const next = entries[i + 1];
+      const currEnd = curr.startMin + curr.duration;
+
+      if (currEnd > next.startMin) {
+        const overlapMin = currEnd - next.startMin;
+        issues.push({
+          id: `schedule-overlap-col${colIdx}-${curr.time}-${next.time}`,
+          tone: 'danger',
+          title: `Zeitüberschneidung in „${saunaName}": ${curr.title} → ${next.title}`,
+          detail: `„${curr.title}" (${curr.time}, ${curr.duration} Min.) endet um ${Math.floor(currEnd / 60).toString().padStart(2, '0')}:${(currEnd % 60).toString().padStart(2, '0')} Uhr — „${next.title}" beginnt aber bereits um ${next.time} Uhr (${overlapMin} Min. Überschneidung). [${presetLabel}]`,
+          fixLabel: 'Startzeit oder Dauer eines der beiden Aufgüsse anpassen.',
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 function rowHasContent(row: DaySchedule['rows'][number]): boolean {
   return (row.entries || []).some((entry) => {
     if (!entry) return false;
@@ -232,19 +284,25 @@ export function getScheduleQualityIssues({
     });
   }
 
+  // Zeitliche Überschneidungen im aktuellen Preset
+  issues.push(...getOverlapIssues(currentPreset, PRESET_LABELS[presetKey]));
+
   let otherPresetProblems = 0;
+  let otherPresetOverlaps = 0;
   for (const [key, preset] of Object.entries(schedule.presets) as [PresetKey, DaySchedule][]) {
     if (key === presetKey) continue;
     const stats = getDayScheduleStats(preset);
     otherPresetProblems += stats.emptyRows + stats.inconsistentRows + stats.duplicateTimeRows;
+    otherPresetOverlaps += getOverlapIssues(preset, PRESET_LABELS[key as PresetKey]).length;
   }
 
-  if (otherPresetProblems > 0) {
+  const otherTotal = otherPresetProblems + otherPresetOverlaps;
+  if (otherTotal > 0) {
     issues.push({
       id: 'schedule-other-presets',
       tone: 'info',
       title: 'Weitere Planprobleme außerhalb des aktuellen Presets',
-      detail: `In anderen Presets gibt es zusammen ${otherPresetProblems} offene Auffälligkeit${otherPresetProblems === 1 ? '' : 'en'}.`,
+      detail: `In anderen Presets gibt es zusammen ${otherTotal} offene Auffälligkeit${otherTotal === 1 ? '' : 'en'}${otherPresetOverlaps > 0 ? `, davon ${otherPresetOverlaps} Zeitüberschneidung${otherPresetOverlaps === 1 ? '' : 'en'}` : ''}.`,
       fixLabel: 'Nach diesem Preset auch die übrigen Tages- und Eventpläne durchgehen.',
     });
   }

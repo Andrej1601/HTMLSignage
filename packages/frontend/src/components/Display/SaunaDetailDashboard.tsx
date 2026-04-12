@@ -3,7 +3,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { normalizeSaunaNameKey, resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import type { Media } from '@/types/media.types';
 import { Bell, Flame, Thermometer, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -301,6 +301,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
   const cardBorder = theme.cardBorder || theme.gridTable || '#EBE5D3';
   const prestartMinutes = resolvePrestartMinutes(settings);
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
 
   const saunaImageUrl = useMemo(() => {
     if (!sauna?.imageId) return null;
@@ -509,6 +510,113 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                       cardBg={cardBg}
                       accentGold={accentGold}
                       accentGreen={accentGreen}
+                      statusLive={statusLive}
+                      statusPrestart={statusPrestart}
+                      aromas={settings.aromas}
+                      compact
+                      ultraCompact={isCompactLayout}
+                    />
+                  )}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isMineralNoir) {
+    const mnBg = theme.dashboardBg || theme.bg || '#0D0F14';
+    const mnCard = theme.cardBg || theme.cellBg || '#141820';
+    const mnBorder = theme.cardBorder || theme.gridTable || '#22262E';
+    const mnText = theme.textMain || theme.fg || '#ECEAE6';
+    const mnPlatinum = theme.accentGold || theme.accent || '#A09880';
+    const mnEmerald = theme.accentGreen || theme.statusLive || '#3DD9AC';
+
+    return (
+      <div ref={containerRef} className="relative h-full w-full overflow-hidden" style={{ backgroundColor: mnBg, color: mnText }}>
+        {/* Full-bleed Hintergrundbild — kein rundes Vorschaubild */}
+        {saunaImageUrl ? (
+          <>
+            <ResilientImage
+              src={saunaImageUrl}
+              className="absolute inset-0 h-full w-full object-cover"
+              alt={sauna.name}
+              fallback={<div className="absolute inset-0" style={{ backgroundColor: mnCard }} />}
+            />
+            {/* Frosted-Glass-Overlay über gesamte Fläche */}
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundColor: withAlpha(mnBg, 0.72),
+                backdropFilter: 'blur(22px)',
+                WebkitBackdropFilter: 'blur(22px)',
+              }}
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0" style={{ backgroundColor: mnCard }} />
+        )}
+
+        <div className={classNames('relative z-10 flex h-full flex-col justify-end', isUltraCompactLayout ? 'p-3' : isCompactLayout ? 'p-4' : 'p-5')}>
+          {/* Sauna-Name — auf dem Bild, mit subtiler Textschatten-Lesbarkeit */}
+          <div className="shrink-0 mb-3">
+            {/* Eyebrow */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className="shrink-0" style={{ width: isUltraCompactLayout ? '2px' : '3px', height: isUltraCompactLayout ? '14px' : '18px', backgroundColor: mnEmerald, borderRadius: '1px' }} />
+              <span
+                className={classNames('font-bold uppercase tracking-[0.3em]', isUltraCompactLayout ? 'text-[8px]' : 'text-[10px]')}
+                style={{ color: mnEmerald }}
+              >
+                Sauna
+              </span>
+              {sauna.info?.temperature != null && (
+                <span
+                  className={classNames('font-mono tabular-nums border ml-2', isUltraCompactLayout ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5')}
+                  style={{ color: mnPlatinum, borderColor: withAlpha(mnBorder, 0.7), backgroundColor: withAlpha(mnCard, 0.5), borderRadius: 0 }}
+                >
+                  {sauna.info.temperature}°
+                </span>
+              )}
+            </div>
+            <h2
+              className={classNames('font-black uppercase tracking-tight leading-none', isUltraCompactLayout ? 'text-[1.5rem]' : isCompactLayout ? 'text-[2rem]' : 'text-[2.6rem]')}
+              style={{ color: mnText }}
+            >
+              {sauna.name}
+            </h2>
+          </div>
+
+          {/* Programm-Liste */}
+          <div
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
+            style={{ borderTop: `1px solid ${withAlpha(mnEmerald, 0.3)}` }}
+          >
+            <h4
+              className={classNames('flex shrink-0 items-center gap-2 font-bold uppercase tracking-[0.3em]', isCompactLayout ? 'text-[8px] py-2' : 'text-[9px] py-2.5')}
+              style={{ color: mnPlatinum }}
+            >
+              Programm
+            </h4>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {sortedInfusions.length === 0 ? (
+                <p className="py-4 text-center text-sm" style={{ color: withAlpha(mnText, 0.45) }}>Keine Aufgüsse geplant</p>
+              ) : (
+                <AutoScrollingList
+                  items={sortedInfusions}
+                  now={now}
+                  isDetail={true}
+                  prestartMinutes={prestartMinutes}
+                  itemComponent={({ infusion, status }) => (
+                    <InfusionItemDetail
+                      infusion={infusion}
+                      status={status}
+                      textMain={mnText}
+                      borderColor={mnBorder}
+                      cardBg={mnCard}
+                      accentGold={mnPlatinum}
+                      accentGreen={mnEmerald}
                       statusLive={statusLive}
                       statusPrestart={statusPrestart}
                       aromas={settings.aromas}

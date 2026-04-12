@@ -3,11 +3,12 @@ import {
   DISPLAY_APPEARANCE_OPTIONS,
   SCHEDULE_DESIGN_STYLE_OPTIONS,
 } from '@/config/displayDesignStyles';
-import { Layers, LayoutGrid, AlignLeft, BookOpen, Clock, List } from 'lucide-react';
+import { Layers, LayoutGrid, BookOpen, Gem, Clock, List } from 'lucide-react';
 
 const APPEARANCE_ICONS: Record<string, typeof Layers> = {
   'wellness-stage': Layers,
   'editorial-resort': BookOpen,
+  'mineral-noir': Gem,
 };
 
 const STYLE_ICONS: Record<string, typeof LayoutGrid> = {
@@ -38,7 +39,7 @@ export function AppearanceSelector({
         </label>
         <div className="space-y-2" role="radiogroup" aria-label="Visuelle Aufmachung">
           {DISPLAY_APPEARANCE_OPTIONS.map((option) => {
-            const Icon = APPEARANCE_ICONS[option.id] ?? AlignLeft;
+            const Icon = APPEARANCE_ICONS[option.id] ?? Gem;
             const isActive = displayAppearance === option.id;
             return (
               <button

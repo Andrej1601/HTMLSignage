@@ -3,7 +3,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
@@ -66,6 +66,7 @@ function InfusionItemGrid({
   accentGold,
   statusLive,
   statusPrestart,
+  cardBg = '#FFFFFF',
   compact = false,
   ultraCompact = false,
 }: {
@@ -76,6 +77,7 @@ function InfusionItemGrid({
   accentGold: string;
   statusLive: string;
   statusPrestart: string;
+  cardBg?: string;
   compact?: boolean;
   ultraCompact?: boolean;
 }) {
@@ -89,8 +91,8 @@ function InfusionItemGrid({
     : isPrestart
       ? withAlpha(statusPrestart, 0.12)
       : isUpcoming
-        ? withAlpha('#FFFFFF', 0.45)
-        : withAlpha('#FFFFFF', 0.25);
+        ? withAlpha(cardBg, 0.45)
+        : withAlpha(cardBg, 0.25);
 
   const containerBorder = isOngoing
     ? withAlpha(statusLive, 0.45)
@@ -248,6 +250,12 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
     return `${ratio}fr ${1 - ratio}fr`;
   }, [daySchedule, gridColumns, gridSaunas, isCompactLayout, scheduleSaunaIndexByKey]);
 
+  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
+  const designStyle = settings.designStyle || 'modern-wellness';
+  // modern-timeline hat einen eigenen Zeitleisten-Header — interner Header überflüssig
+  const isHeaderless = isEditorial || isMineralNoir || designStyle === 'modern-timeline';
+
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
   const statusLive = theme.statusLive || '#10B981';
@@ -257,7 +265,6 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
   const leftBg = theme.zebra1 || '#F7F3E9';
   const border = theme.gridTable || '#EBE5D3';
   const textMain = theme.textMain || theme.fg || '#3E2723';
-  const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
 
   if (!daySchedule || !daySchedule.rows || daySchedule.rows.length === 0) {
     return (
@@ -295,14 +302,16 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
       ref={containerRef}
       className={classNames(
         'w-full h-full flex font-sans select-none overflow-hidden',
-        isEditorial
-          ? isCompactLayout ? 'p-3.5' : 'p-5'
-          : isCompactLayout ? 'p-4' : 'p-8',
+        isMineralNoir
+          ? isCompactLayout ? 'p-2' : 'p-3'          // Mineral Noir: kein Padding (Stage-Wrapper liefert es)
+          : isEditorial
+            ? isCompactLayout ? 'p-3.5' : 'p-5'
+            : isCompactLayout ? 'p-4' : 'p-8',
       )}
-      style={{ backgroundColor: leftBg, color: textMain }}
+      style={{ backgroundColor: isMineralNoir ? bgBase : leftBg, color: textMain }}
     >
       <div className="w-full h-full flex flex-col overflow-hidden">
-        {!isEditorial && (
+        {!isHeaderless && (
           <header className={classNames('z-20 w-full', compactHeader ? 'mb-4 flex flex-col gap-3' : 'mb-6 flex items-center justify-between')}>
             <div className={classNames('flex min-w-0 flex-1 items-center', isCompactLayout ? 'gap-3' : 'gap-5')}>
               <div
@@ -370,9 +379,11 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
         <div
           className={classNames(
             'grid flex-1 overflow-hidden',
-            isEditorial
-              ? isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-6 gap-y-4'
-              : isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-8 gap-y-6 px-2',
+            isMineralNoir
+              ? isCompactLayout ? 'gap-x-px gap-y-px' : 'gap-x-px gap-y-px' // hairline separators
+              : isEditorial
+                ? isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-6 gap-y-4'
+                : isCompactLayout ? 'gap-x-3 gap-y-3' : 'gap-x-8 gap-y-6 px-2',
           )}
           style={{
             gridTemplateRows: gridRowTemplate,
@@ -405,53 +416,89 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
             const saunaAccent = getSaunaAccentColor(sauna, idx, accentGreen, accentGold);
 
             return (
-              <div key={sauna.id} className="flex flex-col h-full group relative overflow-hidden">
-                <div
-                  className={`flex items-center justify-between border-b-2 z-20 relative ${
-                    isOutOfOrder ? 'border-red-100' : ''
-                  } ${isCompactLayout ? 'mb-2.5 pb-1.5' : 'mb-4 pb-2'}`}
-                  style={{ borderColor: isOutOfOrder ? undefined : border }}
-                >
-                  <div className={classNames('flex items-center min-w-0', isCompactLayout ? 'gap-2' : 'gap-3')}>
-                    <div
-                      className={classNames('rounded-full shrink-0', isCompactLayout ? 'h-5 w-1.5' : 'h-7 w-2')}
-                      style={{
-                        background: isOutOfOrder
-                          ? 'linear-gradient(to bottom, #d6d3d1, #a8a29e)'
-                          : `linear-gradient(to bottom, ${saunaAccent}, ${saunaAccent})`,
-                      }}
-                    />
+              <div
+                key={sauna.id}
+                className="flex flex-col h-full group relative overflow-hidden"
+                style={isMineralNoir ? { backgroundColor: bgBase, borderRight: `1px solid ${withAlpha(border, 0.4)}` } : undefined}
+              >
+                {/* ── Sauna Column Header ── */}
+                {isMineralNoir ? (
+                  /* Mineral Noir: architectural — platinum label, thin hairline, no colored dot */
+                  <div
+                    className={classNames('flex items-center justify-between z-20 relative', isCompactLayout ? 'mb-2 pb-1.5 px-3 pt-2' : 'mb-3 pb-2 px-4 pt-3')}
+                    style={{ borderBottom: `1px solid ${withAlpha(border, 0.55)}` }}
+                  >
                     <h2
                       className={classNames(
-                        'font-black uppercase leading-none truncate',
-                        isUltraCompactLayout ? 'text-[12px] tracking-[0.12em]' : isCompactLayout ? 'text-[14px] tracking-[0.18em]' : 'text-[18px] tracking-widest',
-                        isOutOfOrder ? 'text-stone-400' : ''
+                        'font-semibold uppercase leading-none tracking-[0.22em] truncate',
+                        isUltraCompactLayout ? 'text-[10px]' : isCompactLayout ? 'text-[11px]' : 'text-[13px]',
+                        isOutOfOrder ? 'opacity-30' : '',
                       )}
-                      style={{ color: isOutOfOrder ? undefined : textMain }}
+                      style={{ color: isOutOfOrder ? textMain : accentGold }}
                       title={sauna.name}
                     >
                       {sauna.name}
                     </h2>
+                    {!isOutOfOrder && sauna.info?.temperature != null && (
+                      <span
+                        className={classNames('font-mono font-medium tabular-nums shrink-0', isCompactLayout ? 'text-[10px]' : 'text-[11px]')}
+                        style={{ color: withAlpha(textMain, 0.4) }}
+                      >
+                        {sauna.info.temperature}°
+                      </span>
+                    )}
                   </div>
-
-                  {!isOutOfOrder && sauna.info?.temperature != null && (
-                    <div
-                      className={classNames(
-                        'flex items-center font-bold bg-white/40 rounded-full border border-white/50 shrink-0',
-                        isUltraCompactLayout ? 'gap-1 px-1.5 py-0.5 text-[9px]' : isCompactLayout ? 'gap-1 px-2 py-0.5 text-[10px]' : 'gap-1.5 px-2.5 py-1 text-[12px]',
-                      )}
-                      style={{ color: accentGold }}
-                    >
-                      <Thermometer size={isCompactLayout ? 12 : 14} style={{ color: accentGreen }} />
-                      {sauna.info.temperature}°C
+                ) : (
+                  /* Wellness Stage / Editorial: colored dot + bold name + temperature badge */
+                  <div
+                    className={`flex items-center justify-between border-b-2 z-20 relative ${
+                      isOutOfOrder ? 'border-red-100' : ''
+                    } ${isCompactLayout ? 'mb-2.5 pb-1.5' : 'mb-4 pb-2'}`}
+                    style={{ borderColor: isOutOfOrder ? undefined : border }}
+                  >
+                    <div className={classNames('flex items-center min-w-0', isCompactLayout ? 'gap-2' : 'gap-3')}>
+                      <div
+                        className={classNames('rounded-full shrink-0', isCompactLayout ? 'h-5 w-1.5' : 'h-7 w-2')}
+                        style={{
+                          background: isOutOfOrder
+                            ? 'linear-gradient(to bottom, #d6d3d1, #a8a29e)'
+                            : `linear-gradient(to bottom, ${saunaAccent}, ${saunaAccent})`,
+                        }}
+                      />
+                      <h2
+                        className={classNames(
+                          'font-black uppercase leading-none truncate',
+                          isUltraCompactLayout ? 'text-[12px] tracking-[0.12em]' : isCompactLayout ? 'text-[14px] tracking-[0.18em]' : 'text-[18px] tracking-widest',
+                          isOutOfOrder ? 'text-stone-400' : ''
+                        )}
+                        style={{ color: isOutOfOrder ? undefined : textMain }}
+                        title={sauna.name}
+                      >
+                        {sauna.name}
+                      </h2>
                     </div>
-                  )}
-                </div>
+                    {!isOutOfOrder && sauna.info?.temperature != null && (
+                      <div
+                        className={classNames(
+                          'flex items-center font-bold bg-white/40 rounded-full border border-white/50 shrink-0',
+                          isUltraCompactLayout ? 'gap-1 px-1.5 py-0.5 text-[9px]' : isCompactLayout ? 'gap-1 px-2 py-0.5 text-[10px]' : 'gap-1.5 px-2.5 py-1 text-[12px]',
+                        )}
+                        style={{ color: accentGold }}
+                      >
+                        <Thermometer size={isCompactLayout ? 12 : 14} style={{ color: accentGreen }} />
+                        {sauna.info.temperature}°C
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {isOutOfOrder ? (
-                  <div className="absolute inset-0 top-12 bg-white/70 backdrop-blur-[4px] z-10 rounded-2xl flex flex-col items-center justify-center text-center p-4">
-                    <AlertTriangle className="text-red-500 w-9 h-9 mb-2 opacity-80" />
-                    <span className="text-red-600 font-black uppercase text-[11px] tracking-widest">
+                  <div className={classNames(
+                    'absolute inset-0 top-12 z-10 rounded-2xl flex flex-col items-center justify-center text-center p-4',
+                    isMineralNoir ? 'bg-black/60 backdrop-blur-[4px]' : 'bg-white/70 backdrop-blur-[4px]',
+                  )}>
+                    <AlertTriangle className={classNames('w-9 h-9 mb-2 opacity-80', isMineralNoir ? 'text-red-400' : 'text-red-500')} />
+                    <span className={classNames('font-black uppercase text-[11px] tracking-widest', isMineralNoir ? 'text-red-400' : 'text-red-600')}>
                       Außer Betrieb
                     </span>
                   </div>
@@ -474,6 +521,7 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
                         accentGold={accentGold}
                         statusLive={statusLive}
                         statusPrestart={statusPrestart}
+                        cardBg={isMineralNoir ? (theme.cardBg || theme.cellBg || '#141820') : '#FFFFFF'}
                         compact={isCompactLayout}
                         ultraCompact={isUltraCompactLayout}
                       />

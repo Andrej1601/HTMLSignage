@@ -5,13 +5,18 @@ import {
   DisplayEditorialStage,
   getEditorialStageMeta,
 } from '@/components/Display/displayEditorialChrome';
+import {
+  MineralNoirPanel,
+  MineralNoirStage,
+  getMineralNoirStageMeta,
+} from '@/components/Display/displayMineralNoirChrome';
 import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotationLayout';
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
 import { DisplaySplitLayout } from '@/components/Display/DisplaySplitLayout';
 import { DisplayTripleLayout } from '@/components/Display/DisplayTripleLayout';
 import { OverviewSlide } from '@/components/Display/OverviewSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import {
   isMediaSlide,
   needsModernSlidePadding,
@@ -62,7 +67,10 @@ export function DisplayLayoutRenderer({
     rendered: ReactElement,
     options?: SlidePaddingOptions,
   ): ReactElement => {
-    if (slide && isMediaSlide(slide) && isEditorialDisplayAppearance(displayAppearance)) {
+    if (slide && isMediaSlide(slide) && (
+      isEditorialDisplayAppearance(displayAppearance) ||
+      isMineralNoirDisplayAppearance(displayAppearance)
+    )) {
       return rendered;
     }
 
@@ -155,6 +163,26 @@ export function DisplayLayoutRenderer({
             {renderContentPanel()}
           </DisplayEditorialPanel>
         </DisplayEditorialStage>
+      );
+    }
+
+    if (isMineralNoirDisplayAppearance(displayAppearance)) {
+      const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime);
+
+      return (
+        <MineralNoirStage
+          theme={themeColors}
+          subtitle={stageMeta.subtitle}
+          title={stageMeta.title}
+          meta={stageMeta.meta}
+        >
+          <MineralNoirPanel
+            theme={themeColors}
+            accentTone="emerald"
+          >
+            {renderContentPanel()}
+          </MineralNoirPanel>
+        </MineralNoirStage>
       );
     }
 

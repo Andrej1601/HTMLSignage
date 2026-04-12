@@ -91,10 +91,23 @@ export function broadcastSettingsUpdate(data: unknown) {
 
 export function broadcastDeviceUpdate(data: unknown) {
   if (io) {
-    // Broadcast to all connected clients (for device list updates)
     io.emit('device:updated', data);
     if (LOG_WS) {
       console.log('[ws] Broadcasted device update');
+    }
+  }
+}
+
+/**
+ * Emits a single `devices:bulk-updated` event with all updated devices instead
+ * of N individual `device:updated` events.  Prevents broadcast storms during
+ * bulk operations (e.g. 50 devices × 20 admin sockets = 1 000 events → 1 event).
+ */
+export function broadcastBulkDeviceUpdate(devices: unknown[]) {
+  if (io) {
+    io.emit('devices:bulk-updated', devices);
+    if (LOG_WS) {
+      console.log(`[ws] Broadcasted bulk device update (${devices.length} devices)`);
     }
   }
 }
