@@ -547,7 +547,10 @@ log "Backup directory created: ${BACKUP_DIR}"
 # ── Prisma migrations ────────────────────────────────────────────────────────
 step "Running Prisma migrations"
 sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; export COREPACK_ENABLE_DOWNLOAD_PROMPT=0; cd '${APP_DIR}/packages/backend'; pnpm exec prisma generate; pnpm exec prisma migrate deploy"
-sudo -u "${APP_USER}" bash -lc "set -Eeuo pipefail; cd '${APP_DIR}/packages/backend'; node --env-file=./.env <<'NODE'
+sudo -u "${APP_USER}" env APP_DIR="${APP_DIR}" bash <<'BASH'
+set -Eeuo pipefail
+cd "${APP_DIR}/packages/backend"
+node --env-file=./.env --input-type=module <<'NODE'
 const requiredTables = [
   'users',
   'sessions',
@@ -584,7 +587,8 @@ if (missing.length > 0) {
   console.error(`Missing required database tables: ${missing.join(', ')}`);
   process.exit(1);
 }
-NODE"
+NODE
+BASH
 
 # ── Build ────────────────────────────────────────────────────────────────────
 step "Checking system resources"
