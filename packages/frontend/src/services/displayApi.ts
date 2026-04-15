@@ -10,35 +10,12 @@ import type {
   DeviceSnapshotUploadResponse,
 } from './api/types';
 
+import { deepMerge, isPlainRecord } from '@/utils/objectUtils';
+
 let hasWarnedDisplayConfigFallback = false;
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 function hasObjectKeys(value: unknown): boolean {
-  return isPlainObject(value) && Object.keys(value).length > 0;
-}
-
-function deepMergeRecords<T extends Record<string, unknown>>(
-  base: T,
-  override: Partial<T>,
-): T {
-  const merged: Record<string, unknown> = { ...base };
-
-  for (const [key, value] of Object.entries(override)) {
-    if (isPlainObject(value) && isPlainObject(merged[key])) {
-      merged[key] = deepMergeRecords(
-        merged[key] as Record<string, unknown>,
-        value as Record<string, unknown>,
-      );
-      continue;
-    }
-
-    merged[key] = value;
-  }
-
-  return merged as T;
+  return isPlainRecord(value) && Object.keys(value).length > 0;
 }
 
 async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfigResponse> {
@@ -57,10 +34,7 @@ async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfig
     ? (overrides!.schedule as Schedule)
     : schedule;
   const effectiveSettings = useOverrides && hasSettingsOverride
-    ? deepMergeRecords(
-        settings as unknown as Record<string, unknown>,
-        overrides!.settings as unknown as Record<string, unknown>,
-      ) as unknown as Settings
+    ? deepMerge<Settings>(settings, overrides!.settings as Partial<Settings>)
     : settings;
 
   return {
@@ -97,10 +71,10 @@ export const displaySettingsApi = {
 };
 
 export const displayMediaApi = {
-  getMedia: async (): Promise<Media[]> => {
+  getMedia: async (deviceToken?: string): Promise<Media[]> => {
     const params = new URLSearchParams();
     params.set('limit', '500');
-    return fetchApi<Media[]>(`/media?${params.toString()}`);
+    return fetchApi<Media[]>(`/media?${params.toString()}`, { deviceToken });
   },
 };
 

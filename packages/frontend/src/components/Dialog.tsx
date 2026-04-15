@@ -123,7 +123,7 @@ export function Dialog({
         <div
           ref={dialogRef}
           className={clsx(
-            'w-full rounded-lg bg-white shadow-xl animate-scale-in',
+            'w-full rounded-lg bg-spa-surface shadow-xl animate-scale-in',
             sizeClasses[size],
             isScrollable && 'flex max-h-[calc(100vh-2rem)] flex-col',
           )}
@@ -133,7 +133,7 @@ export function Dialog({
           <div
             className={clsx(
               'flex items-center justify-between border-b border-spa-bg-secondary p-6',
-              isScrollable && 'rounded-t-lg bg-white',
+              isScrollable && 'rounded-t-lg bg-spa-surface',
             )}
           >
             <div className="flex items-center gap-3">
@@ -171,7 +171,7 @@ export function Dialog({
               className={clsx(
                 'flex items-center border-t border-spa-bg-secondary p-6',
                 footerLeft ? 'justify-between' : 'justify-end',
-                isScrollable && 'rounded-b-lg bg-white',
+                isScrollable && 'rounded-b-lg bg-spa-surface',
               )}
             >
               {footerLeft && <div>{footerLeft}</div>}

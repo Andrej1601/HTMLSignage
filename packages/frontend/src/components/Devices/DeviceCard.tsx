@@ -47,7 +47,7 @@ export function DeviceCard({
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl border bg-white shadow-xs transition-all hover:shadow-md ${
+      className={`overflow-hidden rounded-2xl border bg-spa-surface shadow-xs transition-all hover:shadow-md ${
         selected ? 'border-spa-primary ring-2 ring-spa-primary/20' : 'border-spa-bg-secondary'
       }`}
     >
@@ -71,7 +71,7 @@ export function DeviceCard({
             </div>
             <div className="mt-1.5 flex items-center gap-2">
               <span className={`flex items-center gap-1.5 text-xs font-semibold ${
-                isOnline ? 'text-emerald-600' : 'text-red-500'
+                isOnline ? 'text-spa-success' : 'text-spa-error'
               }`}>
                 <Circle className={`h-2 w-2 fill-current`} />
                 {getStatusLabel(status).toUpperCase()}
@@ -121,7 +121,7 @@ export function DeviceCard({
         </div>
         <div>
           <span className="text-spa-text-secondary">Zuletzt gesehen</span>
-          <p className={`font-medium mt-0.5 ${isOnline ? 'text-emerald-600' : 'text-spa-warning-dark'}`}>
+          <p className={`font-medium mt-0.5 ${isOnline ? 'text-spa-success' : 'text-spa-warning-dark'}`}>
             {formatLastSeen(device.lastSeen)}
           </p>
         </div>

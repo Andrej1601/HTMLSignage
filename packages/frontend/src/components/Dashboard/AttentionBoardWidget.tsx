@@ -38,7 +38,7 @@ function getToneHeadline(count: number): string {
 
 export function AttentionBoardWidget({ items }: AttentionBoardWidgetProps) {
   return (
-    <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-xs">
+    <section className="rounded-2xl border border-spa-bg-secondary bg-spa-surface p-6 shadow-xs">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-spa-text-primary">
@@ -79,7 +79,7 @@ export function AttentionBoardWidget({ items }: AttentionBoardWidgetProps) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-spa-text-primary border border-spa-bg-secondary">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-spa-surface text-spa-text-primary border border-spa-bg-secondary">
                         <Icon className="h-4 w-4" />
                       </span>
                       <StatusBadge label={item.actionLabel} tone={item.tone} showDot={false} />

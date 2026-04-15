@@ -22,3 +22,8 @@ export function deepMergeRecords(
   }
   return merged;
 }
+
+/** Type-safe deep merge: merges `override` into `base` and returns the result typed as T. */
+export function deepMerge<T>(base: T, override: Partial<T>): T {
+  return deepMergeRecords(base as unknown as Record<string, unknown>, override as unknown as Record<string, unknown>) as unknown as T;
+}

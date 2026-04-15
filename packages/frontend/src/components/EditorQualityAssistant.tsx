@@ -1,6 +1,6 @@
-import { CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { SectionCard } from '@/components/SectionCard';
-import { StatusBadge } from '@/components/StatusBadge';
+import { CheckCircle2, TriangleAlert, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import clsx from 'clsx';
 import type { EditorQualityIssue, EditorQualityTone } from '@/utils/editorQuality';
 
 interface EditorQualityAssistantProps {
@@ -11,103 +11,94 @@ interface EditorQualityAssistantProps {
   className?: string;
 }
 
-function getToneLabel(tone: EditorQualityTone): string {
+function getToneAccent(tone: EditorQualityTone) {
   switch (tone) {
-    case 'danger':
-      return 'Kritisch';
-    case 'warning':
-      return 'Prüfen';
-    case 'info':
-      return 'Hinweis';
-    default:
-      return 'OK';
+    case 'danger':  return { bar: 'bg-spa-error', text: 'text-spa-error-dark', bg: 'bg-spa-error-light/60 border-spa-error/20' };
+    case 'warning': return { bar: 'bg-spa-warning', text: 'text-spa-warning-dark', bg: 'bg-spa-warning-light/60 border-spa-warning/20' };
+    case 'info':    return { bar: 'bg-spa-info', text: 'text-spa-info-dark', bg: 'bg-spa-info-light/50 border-spa-info/20' };
+    default:        return { bar: 'bg-spa-success', text: 'text-spa-success-dark', bg: 'bg-spa-success-light/60 border-spa-success/20' };
   }
 }
 
-function getIssueAccentClasses(tone: EditorQualityTone): string {
-  switch (tone) {
-    case 'danger':
-      return 'border-spa-error/25 bg-spa-error-light/70';
-    case 'warning':
-      return 'border-spa-warning/25 bg-spa-warning-light/70';
-    case 'info':
-      return 'border-spa-info/25 bg-spa-info-light/60';
-    default:
-      return 'border-spa-success/25 bg-spa-success-light/70';
-  }
-}
+export function EditorQualityAssistant({ issues, okMessage, className }: EditorQualityAssistantProps) {
+  const [expanded, setExpanded] = useState(false);
 
-export function EditorQualityAssistant({
-  title = 'Qualitätsassistent',
-  description,
-  issues,
-  okMessage,
-  className,
-}: EditorQualityAssistantProps) {
-  const dangerCount = issues.filter((issue) => issue.tone === 'danger').length;
-  const warningCount = issues.filter((issue) => issue.tone === 'warning').length;
-  const infoCount = issues.filter((issue) => issue.tone === 'info').length;
+  const dangerCount  = issues.filter((i) => i.tone === 'danger').length;
+  const warningCount = issues.filter((i) => i.tone === 'warning').length;
+  const infoCount    = issues.filter((i) => i.tone === 'info').length;
+  const hasIssues    = issues.length > 0;
+
+  if (!hasIssues) {
+    // Compact OK strip
+    return (
+      <div className={clsx('flex items-center gap-2 rounded-lg border border-spa-success-light bg-spa-success-light px-3 py-2', className)}>
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-spa-success" />
+        <span className="text-xs text-spa-success-dark">{okMessage}</span>
+      </div>
+    );
+  }
 
   return (
-    <SectionCard
-      title={title}
-      description={description}
-      icon={issues.length > 0 ? TriangleAlert : ShieldCheck}
-      className={className}
-      actions={(
-        <div className="flex flex-wrap gap-2">
-          {issues.length === 0 ? (
-            <StatusBadge label="Keine offenen Checks" tone="success" showDot={false} />
-          ) : (
-            <>
-              {dangerCount > 0 && (
-                <StatusBadge label={`${dangerCount} kritisch`} tone="danger" showDot={false} />
-              )}
-              {warningCount > 0 && (
-                <StatusBadge label={`${warningCount} prüfen`} tone="warning" showDot={false} />
-              )}
-              {infoCount > 0 && (
-                <StatusBadge label={`${infoCount} Hinweis${infoCount === 1 ? '' : 'e'}`} tone="info" showDot={false} />
-              )}
-            </>
+    <div className={clsx('rounded-lg border border-spa-warning-light bg-spa-warning-light overflow-hidden', className)}>
+      {/* Compact summary row */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-spa-warning-light/60 transition-colors"
+      >
+        <TriangleAlert className="h-4 w-4 shrink-0 text-spa-warning" />
+        <span className="flex-1 text-xs font-medium text-spa-warning-dark">
+          Qualitätsassistent
+        </span>
+        {/* Issue counts */}
+        <span className="flex items-center gap-1.5">
+          {dangerCount > 0 && (
+            <span className="inline-flex items-center rounded-full bg-spa-error-light px-2 py-0.5 text-[10px] font-bold text-spa-error-dark">
+              {dangerCount} kritisch
+            </span>
           )}
-        </div>
-      )}
-    >
-      {issues.length === 0 ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-4 text-sm text-spa-success-dark">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="font-semibold">Editor-Check sauber</p>
-            <p className="mt-1 leading-relaxed">{okMessage}</p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {issues.map((issue) => (
-            <div
-              key={issue.id}
-              className={`rounded-2xl border px-4 py-4 ${getIssueAccentClasses(issue.tone)}`}
-            >
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          {warningCount > 0 && (
+            <span className="inline-flex items-center rounded-full bg-spa-warning-light px-2 py-0.5 text-[10px] font-bold text-spa-warning-dark">
+              {warningCount} prüfen
+            </span>
+          )}
+          {infoCount > 0 && (
+            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+              {infoCount} Hinweis{infoCount > 1 ? 'e' : ''}
+            </span>
+          )}
+        </span>
+        {expanded
+          ? <ChevronUp className="h-4 w-4 shrink-0 text-spa-warning" />
+          : <ChevronDown className="h-4 w-4 shrink-0 text-spa-warning" />
+        }
+      </button>
+
+      {/* Expanded detail list */}
+      {expanded && (
+        <div className="border-t border-spa-warning-light px-3 py-2 space-y-2">
+          {issues.map((issue) => {
+            const accent = getToneAccent(issue.tone);
+            return (
+              <div
+                key={issue.id}
+                className={clsx('flex gap-2.5 rounded-lg border px-3 py-2', accent.bg)}
+              >
+                <div className={clsx('mt-0.5 h-2 w-2 rounded-full shrink-0', accent.bar)} />
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-spa-text-primary">{issue.title}</p>
-                    <StatusBadge label={getToneLabel(issue.tone)} tone={issue.tone} showDot={false} />
-                  </div>
-                  <p className="mt-1 text-sm leading-relaxed text-spa-text-secondary">{issue.detail}</p>
+                  <p className={clsx('text-xs font-semibold', accent.text)}>{issue.title}</p>
+                  <p className="text-xs text-spa-text-secondary mt-0.5 leading-relaxed">{issue.detail}</p>
+                  {issue.fixLabel && (
+                    <p className="mt-1 text-[10px] font-medium text-spa-text-secondary/70 uppercase tracking-wide">
+                      → {issue.fixLabel}
+                    </p>
+                  )}
                 </div>
               </div>
-
-              {issue.fixLabel && (
-                <p className="mt-3 text-xs font-medium uppercase tracking-wide text-spa-text-secondary">
-                  Nächster Schritt: {issue.fixLabel}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
-    </SectionCard>
+    </div>
   );
 }

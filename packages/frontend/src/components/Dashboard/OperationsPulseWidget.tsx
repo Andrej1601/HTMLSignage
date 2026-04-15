@@ -90,7 +90,7 @@ export function OperationsPulseWidget({
     : getTodayPresetKey(simNow);
 
   return (
-    <section className="rounded-2xl border border-spa-bg-secondary bg-white p-6 shadow-xs">
+    <section className="rounded-2xl border border-spa-bg-secondary bg-spa-surface p-6 shadow-xs">
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-center gap-2 text-spa-text-primary">
@@ -149,7 +149,7 @@ export function OperationsPulseWidget({
               type="datetime-local"
               value={simDateTime}
               onChange={(e) => setSimDateTime(e.target.value)}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             />
           </div>
           <div>
@@ -157,7 +157,7 @@ export function OperationsPulseWidget({
             <select
               value={simDeviceId}
               onChange={(e) => setSimDeviceId(e.target.value)}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
             >
               <option value="">Global (kein Filter)</option>
               {pairedDevices.map((d) => (
@@ -167,12 +167,12 @@ export function OperationsPulseWidget({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-white border border-spa-bg-secondary px-3 py-2.5">
+          <div className="rounded-xl bg-spa-surface border border-spa-bg-secondary px-3 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-spa-text-secondary">Live-Preset</div>
             <div className="mt-1 text-sm font-semibold text-spa-text-primary truncate">{PRESET_LABELS[simulatedPreset]}</div>
             <div className="mt-0.5 text-[10px] text-spa-text-secondary">{simulatedPreset}</div>
           </div>
-          <div className="rounded-xl bg-white border border-spa-bg-secondary px-3 py-2.5">
+          <div className="rounded-xl bg-spa-surface border border-spa-bg-secondary px-3 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-spa-text-secondary">Aktives Event</div>
             <div className="mt-1 text-sm font-semibold text-spa-text-primary truncate">
               {simulatedEvent ? simulatedEvent.name : 'Keins'}

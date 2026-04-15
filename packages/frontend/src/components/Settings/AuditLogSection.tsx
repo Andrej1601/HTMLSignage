@@ -116,7 +116,7 @@ export function AuditLogSection() {
               {detailLines.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {detailLines.map((line) => (
-                    <span key={`${item.id}-${line}`} className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs text-spa-text-secondary border border-spa-bg-secondary">
+                    <span key={`${item.id}-${line}`} className="inline-flex rounded-full bg-spa-surface px-2.5 py-1 text-xs text-spa-text-secondary border border-spa-bg-secondary">
                       {line}
                     </span>
                   ))}

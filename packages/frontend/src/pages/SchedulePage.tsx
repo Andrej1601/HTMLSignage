@@ -4,31 +4,25 @@ import { Skeleton } from '@/components/Skeleton';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
 import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
-import {
-  PRESET_LABELS,
-} from '@/types/schedule.types';
+import { PRESET_LABELS } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { PageHeader } from '@/components/PageHeader';
-import { SectionCard } from '@/components/SectionCard';
 import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
-import { Save, Calendar } from 'lucide-react';
+import { Save, Calendar, RefreshCw } from 'lucide-react';
 import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { useScheduleEditor } from '@/hooks/useScheduleEditor';
 import { PresetTabs } from '@/components/Schedule/PresetTabs';
-import { SaunaStatusInfo } from '@/components/Schedule/SaunaStatusInfo';
-import { ScheduleActions } from '@/components/Schedule/ScheduleActions';
+import { AutosaveIndicator } from '@/components/AutosaveIndicator';
+import clsx from 'clsx';
 
 function SchedulePageSkeleton() {
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
-        <div className="rounded-xl border border-spa-bg-secondary bg-white p-6 space-y-4">
-          <div className="flex gap-2">
-            {Array.from({ length: 7 }, (_, i) => <Skeleton key={i} variant="rect" className="h-10 w-16 rounded-lg" />)}
-          </div>
+      <div className="space-y-4">
+        <div className="h-16 animate-pulse rounded-2xl bg-spa-bg-secondary" />
+        <div className="h-10 animate-pulse rounded-xl bg-spa-bg-secondary" />
+        <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-6 space-y-4">
           <Skeleton variant="rect" className="h-64 w-full" />
         </div>
       </div>
@@ -52,34 +46,90 @@ export function SchedulePage() {
   ] : [], [editor.isDirty, editor.handleSave]);
   useCommandPaletteActions(paletteActions);
 
-  if (editor.isLoading || !editor.localSchedule) {
-    return <SchedulePageSkeleton />;
-  }
-
-  if (editor.error) {
-    return <SchedulePageError error={editor.error} onRetry={() => editor.refetch()} />;
-  }
+  if (editor.isLoading || !editor.localSchedule) return <SchedulePageSkeleton />;
+  if (editor.error) return <SchedulePageError error={editor.error} onRetry={() => editor.refetch()} />;
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <PageHeader
-          title="Aufgussplan"
-          description={`Version ${editor.localSchedule?.version || 1} · Live: ${PRESET_LABELS[editor.livePreset]} · Bearbeitung: ${PRESET_LABELS[editor.editingPreset]}`}
-          icon={Calendar}
-          actions={(
-            <ScheduleActions editor={editor} />
-          )}
-          badges={[
-            { label: `Live v${editor.schedule?.version || editor.localSchedule.version}`, tone: 'info' },
-            editor.draftState.hasStoredDraft && !editor.isDirty
-              ? { label: 'Lokaler Entwurf vorhanden', tone: 'warning' as const }
-              : { label: 'Live-Stand', tone: 'neutral' as const },
-            { label: editor.localSchedule.autoPlay ? 'Auto-Play' : 'Manuell', tone: editor.localSchedule.autoPlay ? 'success' as const : 'warning' as const },
-            { label: editor.isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: editor.isDirty ? 'warning' as const : 'success' as const },
-          ]}
-        />
+      <div className="space-y-4">
 
+        {/* ── Header ── */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-spa-primary/10">
+              <Calendar className="h-5 w-5 text-spa-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-spa-text-primary leading-tight">Aufgussplan</h1>
+              <p className="text-xs text-spa-text-secondary mt-0.5">
+                v{editor.localSchedule.version} · Live: {PRESET_LABELS[editor.livePreset]} · Bearb.: {PRESET_LABELS[editor.editingPreset]}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <AutosaveIndicator isDirty={editor.isDirty} lastAutoSavedAt={editor.draftState.lastAutoSavedAt} />
+
+            {/* Auto-Play Toggle */}
+            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <span className="text-sm text-spa-text-secondary">Auto-Play</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={editor.localSchedule.autoPlay}
+                onClick={editor.handleAutoPlayToggle}
+                className={clsx(
+                  'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200',
+                  editor.localSchedule.autoPlay ? 'bg-spa-success' : 'bg-spa-bg-secondary'
+                )}
+              >
+                <span
+                  className={clsx(
+                    'pointer-events-none inline-block h-4 w-4 rounded-full bg-spa-surface shadow-sm transition-transform duration-200',
+                    editor.localSchedule.autoPlay ? 'translate-x-4' : 'translate-x-0'
+                  )}
+                />
+              </button>
+            </label>
+
+            <button
+              onClick={() => { editor.draftState.clearDraft(); editor.resetToLiveSchedule(); }}
+              disabled={!editor.isDirty}
+              className="inline-flex items-center gap-2 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm font-medium text-spa-text-secondary hover:border-spa-error-light hover:text-spa-error transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Ungespeicherte Änderungen verwerfen"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Reset
+            </button>
+
+            <button
+              onClick={editor.handleSave}
+              disabled={!editor.isDirty || editor.isSaving}
+              className={clsx(
+                'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all',
+                editor.isDirty
+                  ? 'bg-spa-primary text-white shadow-md hover:bg-spa-primary-dark'
+                  : 'bg-spa-bg-secondary text-spa-text-secondary cursor-not-allowed'
+              )}
+            >
+              <Save className="h-4 w-4" />
+              {editor.isSaving ? 'Speichert…' : 'Speichern'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Dirty Banner ── */}
+        {editor.isDirty && (
+          <div className="flex items-center gap-3 rounded-lg border-2 border-spa-warning bg-spa-warning-light px-4 py-2.5">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-spa-warning opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-spa-warning" />
+            </span>
+            <span className="text-sm font-medium text-spa-warning-dark">Ungespeicherte Änderungen</span>
+          </div>
+        )}
+
+        {/* ── Draft Recovery ── */}
         {editor.draftState.hasStoredDraft && !editor.isDirty && (
           <DraftRecoveryBanner
             entityLabel="Aufgussplan"
@@ -89,42 +139,61 @@ export function SchedulePage() {
           />
         )}
 
-        {editor.isDirty && (
-          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3 shadow-xs">
-            <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-amber-500" />
-            </span>
-            <span className="text-sm font-semibold text-amber-800">Ungespeicherte Änderungen — oben auf Speichern klicken, um zu sichern.</span>
-          </div>
-        )}
-
+        {/* ── Quality Assistant (compact) ── */}
         <EditorQualityAssistant
-          description={`Direkte Plausibilitätschecks für ${PRESET_LABELS[editor.editingPreset]} und den aktuellen Redaktionsstand.`}
+          description={`Plausibilitätschecks für ${PRESET_LABELS[editor.editingPreset]}.`}
           issues={editor.scheduleQualityIssues}
-          okMessage={`Für ${PRESET_LABELS[editor.editingPreset]} wurden aktuell keine strukturellen Planprobleme erkannt.`}
+          okMessage={`Keine Probleme für ${PRESET_LABELS[editor.editingPreset]} erkannt.`}
         />
 
+        {/* ── Preset Chip-Tabs ── */}
         <PresetTabs editor={editor} />
 
-        {editor.settings?.saunas && editor.settings.saunas.length > 0 && (
-          <SaunaStatusInfo saunas={editor.settings.saunas} />
-        )}
-
+        {/* ── Grid ── */}
         {editor.currentDaySchedule && (
-          <SectionCard title={`Tagesplan: ${PRESET_LABELS[editor.editingPreset]}`} noPadding>
+          <div className="overflow-hidden rounded-xl border border-spa-bg-secondary bg-spa-surface shadow-xs">
+            {/* Grid title bar */}
+            <div className="flex items-center justify-between border-b border-spa-bg-secondary bg-spa-bg-primary/40 px-4 py-2.5">
+              <span className="text-sm font-semibold text-spa-text-primary">
+                Tagesplan: {PRESET_LABELS[editor.editingPreset]}
+              </span>
+              <span className="text-xs text-spa-text-secondary">
+                {editor.currentDaySchedule.rows.length} Zeitslot{editor.currentDaySchedule.rows.length !== 1 ? 's' : ''}
+                {' · '}
+                {editor.currentDaySchedule.saunas.length} Sauna{editor.currentDaySchedule.saunas.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+
             <ScheduleGrid
               daySchedule={editor.currentDaySchedule}
               aromas={editor.settings?.aromas || []}
               saunaColors={editor.saunaColors}
+              saunaObjects={editor.settings?.saunas || []}
               onEditCell={editor.handleEditCell}
               onEditTime={editor.handleEditTime}
               onAddTimeRow={editor.handleAddTimeRow}
               onDeleteTimeRow={editor.handleDeleteTimeRow}
             />
-          </SectionCard>
+
+            {/* Status bar */}
+            <div className="flex items-center justify-between border-t border-spa-bg-secondary bg-spa-bg-primary/30 px-4 py-2">
+              <span className="text-xs text-spa-text-secondary">
+                Version {editor.localSchedule.version}
+                {editor.schedule?.version !== editor.localSchedule.version && (
+                  <span className="ml-2 text-spa-warning font-medium">· nicht gespeichert</span>
+                )}
+              </span>
+              {editor.scheduleQualityIssues.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-spa-warning-dark">
+                  <span className="h-1.5 w-1.5 rounded-full bg-spa-warning" />
+                  {editor.scheduleQualityIssues.length} Hinweis{editor.scheduleQualityIssues.length !== 1 ? 'e' : ''}
+                </span>
+              )}
+            </div>
+          </div>
         )}
 
+        {/* ── Modals ── */}
         <CellEditor
           entry={editor.editingCell?.entry || null}
           isOpen={editor.editingCell !== null}

@@ -9,6 +9,7 @@ import { generateDashboardColors, getColorPalette } from '@/types/settings.types
 import {
   DEFAULT_DISPLAY_APPEARANCE,
   EDITORIAL_DISPLAY_APPEARANCE,
+  MINERAL_NOIR_DISPLAY_APPEARANCE,
 } from '@/config/displayDesignStyles';
 
 /**
@@ -36,7 +37,9 @@ export function migrateSettings(settings: Settings): Settings {
   const targetDisplayAppearance =
     normalizedAppearance === EDITORIAL_DISPLAY_APPEARANCE || normalizedStyle === EDITORIAL_DISPLAY_APPEARANCE
       ? EDITORIAL_DISPLAY_APPEARANCE
-      : DEFAULT_DISPLAY_APPEARANCE;
+      : normalizedAppearance === MINERAL_NOIR_DISPLAY_APPEARANCE
+        ? MINERAL_NOIR_DISPLAY_APPEARANCE
+        : DEFAULT_DISPLAY_APPEARANCE;
   const targetDesignStyle = legacyStyleMap[normalizedStyle] || 'modern-wellness';
 
   if (next.displayAppearance !== targetDisplayAppearance) {
@@ -59,9 +62,11 @@ export function migrateSettings(settings: Settings): Settings {
       const targetOverrideAppearance =
         overrideAppearance === EDITORIAL_DISPLAY_APPEARANCE || overrideStyle === EDITORIAL_DISPLAY_APPEARANCE
           ? EDITORIAL_DISPLAY_APPEARANCE
-          : overrideAppearance === DEFAULT_DISPLAY_APPEARANCE
-            ? DEFAULT_DISPLAY_APPEARANCE
-            : undefined;
+          : overrideAppearance === MINERAL_NOIR_DISPLAY_APPEARANCE
+            ? MINERAL_NOIR_DISPLAY_APPEARANCE
+            : overrideAppearance === DEFAULT_DISPLAY_APPEARANCE
+              ? DEFAULT_DISPLAY_APPEARANCE
+              : undefined;
 
       const targetOverrideStyle = legacyStyleMap[overrideStyle];
 

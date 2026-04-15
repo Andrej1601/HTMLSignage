@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { ScheduleSchema } from '../../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../../websocket/index.js';
+import { getCachedGlobalConfig } from '../../lib/globalConfigCache.js';
 import { authMiddleware, deviceAuthMiddleware, type AuthRequest, str } from '../../lib/auth.js';
 import { requirePermission } from '../../lib/permissions.js';
 import { mutationLimiter, heartbeatLimiter } from '../../lib/rateLimiter.js';
@@ -91,18 +92,38 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
       return res.status(404).json({ error: 'not-found', message: 'Device not found' });
     }
 
-    const [activeSchedule, activeSettings] = await Promise.all([
-      prisma.schedule.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
-      prisma.settings.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
-    ]);
-
-    const globalSchedule = normalizeScheduleData(activeSchedule?.data);
-    const globalSettings = normalizeSettingsData(activeSettings?.data);
+    const { scheduleData, settingsData } = await getCachedGlobalConfig();
+    const globalSchedule = normalizeScheduleData(scheduleData);
+    const globalSettings = normalizeSettingsData(settingsData);
 
     // Resolve slideshow config: device-specific slideshow takes priority over global settings
     const effectiveSettings = { ...globalSettings };
     if (device.slideshowId && device.slideshow) {
       effectiveSettings.slideshow = (device.slideshow as unknown as { config: unknown }).config;
+    }
+
+    // Resolve event slideshows: if any event references a slideshowId, embed the config
+    if (Array.isArray(effectiveSettings.events)) {
+      const eventSlideshowIds = effectiveSettings.events
+        .map((e: { slideshowId?: string }) => e.slideshowId)
+        .filter((id): id is string => Boolean(id));
+      if (eventSlideshowIds.length > 0) {
+        const eventSlideshows = await prisma.slideshow.findMany({
+          where: { id: { in: eventSlideshowIds } },
+          select: { id: true, config: true },
+        });
+        const slideshowMap = new Map(eventSlideshows.map((s) => [s.id, s.config]));
+        effectiveSettings.events = effectiveSettings.events.map(
+          (event: Record<string, unknown>) => {
+            const sid = event.slideshowId as string | undefined;
+            if (!sid || !slideshowMap.has(sid)) return event;
+            return {
+              ...event,
+              settingsOverrides: { slideshow: slideshowMap.get(sid) },
+            };
+          },
+        );
+      }
     }
 
     const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);

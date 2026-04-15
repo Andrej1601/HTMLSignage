@@ -84,7 +84,7 @@ function ContentPanelPreview({ className }: { className: string }) {
           {[...Array(9)].map((_, i) => (
             <div
               key={i}
-              className="bg-white rounded-xs flex items-center justify-center"
+              className="bg-spa-surface rounded-xs flex items-center justify-center"
               style={{ opacity: 0.3 + (i % 3) * 0.2 }}
             >
               <Calendar className="w-2 h-2 text-spa-primary" />
@@ -206,7 +206,7 @@ function MediaVideoPreview({ className, slide, media }: MediaPreviewProps) {
         preload="metadata"
       />
       <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-spa-surface/90 flex items-center justify-center">
           <Film className="w-4 h-4 text-spa-primary" />
         </div>
       </div>

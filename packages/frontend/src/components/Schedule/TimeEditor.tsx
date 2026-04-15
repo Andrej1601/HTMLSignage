@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Save } from 'lucide-react';
+import { toast } from '@/stores/toastStore';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
 
@@ -13,8 +14,10 @@ interface TimeEditorProps {
 export function TimeEditor({ time, isOpen, onClose, onSave }: TimeEditorProps) {
   const [hours, setHours] = useState('12');
   const [minutes, setMinutes] = useState('00');
-
-  useEffect(() => {
+  const [prevTimeKey, setPrevTimeKey] = useState<string | null>(null);
+  const timeKey = isOpen ? (time ?? '__empty__') : null;
+  if (timeKey !== prevTimeKey) {
+    setPrevTimeKey(timeKey);
     if (time) {
       const [h, m] = time.split(':');
       setHours(h);
@@ -23,14 +26,14 @@ export function TimeEditor({ time, isOpen, onClose, onSave }: TimeEditorProps) {
       setHours('12');
       setMinutes('00');
     }
-  }, [time, isOpen]);
+  }
 
   const handleSave = () => {
     const h = parseInt(hours);
     const m = parseInt(minutes);
 
     if (h < 0 || h > 23 || m < 0 || m > 59) {
-      alert('Ungültige Zeit. Stunden: 0-23, Minuten: 0-59');
+      toast.warning('Ungültige Zeit. Stunden: 0-23, Minuten: 0-59');
       return;
     }
 

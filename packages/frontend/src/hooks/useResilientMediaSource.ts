@@ -22,13 +22,17 @@ export function useResilientMediaSource(src?: string | null): ResilientMediaSour
     }
   }, []);
 
-  useEffect(() => {
-    attemptRef.current += 1;
-    cleanupFallbackUrl();
+  const [prevSrc, setPrevSrc] = useState(src);
+  if (prevSrc !== src) {
+    setPrevSrc(src);
     setResolvedSrc(src || '');
     setHasFailed(false);
     setIsUsingFallback(false);
+  }
 
+  useEffect(() => {
+    attemptRef.current += 1;
+    cleanupFallbackUrl();
     return cleanupFallbackUrl;
   }, [src, cleanupFallbackUrl]);
 

@@ -118,12 +118,12 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   let flatIndex = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" role="dialog" aria-modal="true" aria-label="Befehlspalette">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
 
       {/* Palette */}
-      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-spa-bg-secondary overflow-hidden">
+      <div className="relative w-full max-w-lg rounded-2xl bg-spa-surface shadow-2xl border border-spa-bg-secondary overflow-hidden">
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-spa-bg-secondary">
           <Search className="h-5 w-5 text-spa-text-secondary shrink-0" aria-hidden="true" />

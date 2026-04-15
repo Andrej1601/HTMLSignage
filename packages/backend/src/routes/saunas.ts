@@ -7,6 +7,7 @@ import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { updateSaunaStatusInSettings, SaunaNotFoundError } from '../lib/saunaManagement.js';
+import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.patch(
 
       const { version } = await createVersionedRecord('settings', data);
 
+      invalidateGlobalConfigCache();
       broadcastSettingsUpdate(data);
 
       res.json({ ok: true, saunaId, status, version });

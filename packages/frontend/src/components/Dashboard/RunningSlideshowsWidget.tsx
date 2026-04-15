@@ -94,7 +94,7 @@ export function RunningSlideshowsWidget({ rows }: RunningSlideshowsWidgetProps) 
                   <td className="py-3">
                     <span
                       className={`inline-block h-2.5 w-2.5 rounded-full ${
-                        row.isOnline ? 'bg-emerald-500' : 'bg-amber-500'
+                        row.isOnline ? 'bg-spa-success' : 'bg-spa-warning'
                       }`}
                       title={row.isOnline ? 'Online' : 'Offline'}
                     />

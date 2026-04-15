@@ -69,7 +69,9 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
   });
 
   // Keep zone indexes in sync with current zones (e.g. when layout changes or settings load async).
-  useEffect(() => {
+  const [prevZones, setPrevZones] = useState(zones);
+  if (prevZones !== zones) {
+    setPrevZones(zones);
     setZoneSlideIndexes((prev) => {
       let changed = false;
       const next: Record<string, number> = { ...prev };
@@ -93,7 +95,7 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
 
       return changed ? next : prev;
     });
-  }, [zones]);
+  }
 
   // Track video ended state per zone
   const videoEndedRefs = useRef<Record<string, boolean>>({});

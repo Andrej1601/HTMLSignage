@@ -5,7 +5,12 @@ import {
   DisplayEditorialStage,
   getEditorialStageMeta,
 } from '@/components/Display/displayEditorialChrome';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import {
+  MineralNoirPanel,
+  MineralNoirStage,
+  getMineralNoirStageMeta,
+} from '@/components/Display/displayMineralNoirChrome';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
 
 interface DisplaySplitLayoutProps {
@@ -47,6 +52,81 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
 
   const persistentSize = hasPersistent && hasMain ? gridSizePercent : hasPersistent ? 100 : 0;
   const mainSize = hasPersistent && hasMain ? 100 - gridSizePercent : hasMain ? 100 : 0;
+
+  if (isMineralNoirDisplayAppearance(context.displayAppearance)) {
+    const stageMeta = getMineralNoirStageMeta(context.effectiveSettings, context.currentTime);
+    const renderNoirPanel = (
+      slide: typeof persistentSlide,
+      info: typeof persistentInfo,
+      zone: typeof persistentZone,
+      accentTone: 'emerald' | 'platinum',
+    ) => (
+      <MineralNoirPanel
+        theme={themeColors}
+        accentTone={accentTone}
+        fullBleed={Boolean(slide?.type && (slide.type.startsWith('media-') || slide.type === 'sauna-detail' || slide.type === 'events'))}
+      >
+        <SlideTransition
+          slideKey={slide?.id || `${zone?.id || accentTone}-empty`}
+          enabled={enableTransitions && (info?.shouldRotate || false)}
+          duration={0.5}
+          transition={resolveTransition(slide)}
+        >
+          <div className="relative w-full h-full">
+            {renderZoneSlide(slide, zone || undefined)}
+            {/* Full-bleed gradient overlay für Media-Slides */}
+            {slide?.type.startsWith('media-') && (
+              <div
+                className="absolute inset-x-0 bottom-0 pointer-events-none"
+                style={{
+                  height: '50%',
+                  background: `linear-gradient(to top, ${themeColors.dashboardBg || '#0D0F14'} 0%, transparent 100%)`,
+                }}
+              />
+            )}
+          </div>
+        </SlideTransition>
+      </MineralNoirPanel>
+    );
+
+    if (isVertical) {
+      return (
+        <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta}>
+          <div className="flex h-full gap-px">
+            {scheduleFirst ? (
+              <>
+                {hasPersistent && <div style={{ width: `${persistentSize}%` }} className="h-full">{renderNoirPanel(persistentSlide, persistentInfo, persistentZone, 'emerald')}</div>}
+                {hasMain && <div style={{ width: `${mainSize}%` }} className="h-full">{renderNoirPanel(mainSlide, mainInfo, mainZone, 'platinum')}</div>}
+              </>
+            ) : (
+              <>
+                {hasMain && <div style={{ width: `${mainSize}%` }} className="h-full">{renderNoirPanel(mainSlide, mainInfo, mainZone, 'emerald')}</div>}
+                {hasPersistent && <div style={{ width: `${persistentSize}%` }} className="h-full">{renderNoirPanel(persistentSlide, persistentInfo, persistentZone, 'platinum')}</div>}
+              </>
+            )}
+          </div>
+        </MineralNoirStage>
+      );
+    }
+
+    return (
+      <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta}>
+        <div className="flex h-full flex-col gap-px">
+          {scheduleFirst ? (
+            <>
+              {hasPersistent && <div style={{ height: `${persistentSize}%` }}>{renderNoirPanel(persistentSlide, persistentInfo, persistentZone, 'emerald')}</div>}
+              {hasMain && <div style={{ height: `${mainSize}%` }}>{renderNoirPanel(mainSlide, mainInfo, mainZone, 'platinum')}</div>}
+            </>
+          ) : (
+            <>
+              {hasMain && <div style={{ height: `${mainSize}%` }}>{renderNoirPanel(mainSlide, mainInfo, mainZone, 'emerald')}</div>}
+              {hasPersistent && <div style={{ height: `${persistentSize}%` }}>{renderNoirPanel(persistentSlide, persistentInfo, persistentZone, 'platinum')}</div>}
+            </>
+          )}
+        </div>
+      </MineralNoirStage>
+    );
+  }
 
   if (isEditorialDisplayAppearance(context.displayAppearance)) {
     const stageMeta = getEditorialStageMeta(context.effectiveSettings, context.currentTime);

@@ -53,7 +53,7 @@ export function StatCard({
 }: StatCardProps) {
   const selectedColor = colorClasses[color];
   const cardClasses = clsx(
-    'rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-5 shadow-xs backdrop-blur-xs transition-all',
+    'rounded-2xl border border-spa-bg-secondary/80 bg-spa-surface/95 p-5 shadow-xs backdrop-blur-xs transition-all',
     href ? 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer' : 'hover:shadow-md'
   );
   const cardContent = (

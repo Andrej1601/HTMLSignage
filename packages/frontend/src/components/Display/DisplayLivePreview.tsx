@@ -66,7 +66,7 @@ export function DisplayLivePreview({
   useEffect(() => {
     if (isReady) return;
     requestReady();
-    const timer = window.setInterval(requestReady, 500);
+    const timer = window.setInterval(requestReady, 1500);
     return () => {
       window.clearInterval(timer);
     };
@@ -89,7 +89,6 @@ export function DisplayLivePreview({
         ref={iframeRef}
         title={title}
         src={src}
-        allow="autoplay"
         className="absolute inset-0 h-full w-full border-0"
         onLoad={() => {
           setIsReady(false);

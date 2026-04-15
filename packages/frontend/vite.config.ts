@@ -21,7 +21,7 @@ export default defineConfig({
     css: false,
   },
   server: {
-    host: '0.0.0.0', // Listen on all network interfaces
+    host: process.env.VITE_DEV_HOST || 'localhost',
     port: 5173,
     proxy: {
       '/api': {
@@ -32,7 +32,7 @@ export default defineConfig({
   },
   build: {
     emptyOutDir: true,
-    sourcemap: false,
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         codeSplitting: {

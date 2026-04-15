@@ -13,6 +13,9 @@ interface UseWebSocketOptions {
   onSettingsUpdate?: (data: Settings) => void;
   onDeviceCommand?: (command: string) => void;
   onDeviceUpdate?: (data: Record<string, unknown>) => void;
+  onBulkDeviceUpdate?: (devices: Record<string, unknown>[]) => void;
+  /** Called after a WebSocket reconnect so stale data can be refetched. */
+  onReconnect?: () => void;
 }
 
 let socketIoClientPromise: Promise<typeof import('socket.io-client')> | null = null;
@@ -33,6 +36,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onSettingsUpdate,
     onDeviceCommand,
     onDeviceUpdate,
+    onBulkDeviceUpdate,
+    onReconnect,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -47,11 +52,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onSettingsUpdateRef = useRef(onSettingsUpdate);
   const onDeviceCommandRef = useRef(onDeviceCommand);
   const onDeviceUpdateRef = useRef(onDeviceUpdate);
+  const onBulkDeviceUpdateRef = useRef(onBulkDeviceUpdate);
+  const onReconnectRef = useRef(onReconnect);
 
-  onScheduleUpdateRef.current = onScheduleUpdate;
-  onSettingsUpdateRef.current = onSettingsUpdate;
-  onDeviceCommandRef.current = onDeviceCommand;
-  onDeviceUpdateRef.current = onDeviceUpdate;
+  useEffect(() => {
+    onScheduleUpdateRef.current = onScheduleUpdate;
+    onSettingsUpdateRef.current = onSettingsUpdate;
+    onDeviceCommandRef.current = onDeviceCommand;
+    onDeviceUpdateRef.current = onDeviceUpdate;
+    onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
+    onReconnectRef.current = onReconnect;
+  });
 
   const connect = useCallback(async () => {
     disconnectRequestedRef.current = false;
@@ -87,12 +98,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         timeout: WS_RECONNECT.timeoutMs,
       });
 
+      let firstConnect = true;
       socket.off('connect').on('connect', () => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Connected:', socket.id);
         }
+        const wasReconnect = !firstConnect;
+        firstConnect = false;
         setIsConnected(true);
         setError(null);
+        // On reconnect, notify so callers can refetch stale data
+        if (wasReconnect) {
+          onReconnectRef.current?.();
+        }
       });
 
       socket.off('disconnect').on('disconnect', (reason) => {
@@ -146,6 +164,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
       });
 
+      socket.off('devices:bulk-updated').on('devices:bulk-updated', (devices: Record<string, unknown>[]) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Bulk device update:', devices.length, 'devices');
+        }
+        onBulkDeviceUpdateRef.current?.(devices);
+      });
+
       socketRef.current = socket;
     })().finally(() => {
       connectPromiseRef.current = null;
@@ -176,10 +201,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     switch (channel) {
       case 'schedule':
-        socketRef.current.emit('subscribe:schedule');
+        socketRef.current.emit('subscribe:schedule', { token: deviceToken });
         break;
       case 'settings':
-        socketRef.current.emit('subscribe:settings');
+        socketRef.current.emit('subscribe:settings', { token: deviceToken });
         break;
       case 'device':
         if (deviceId) {

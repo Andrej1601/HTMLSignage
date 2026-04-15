@@ -52,9 +52,9 @@ export function SlideshowPage() {
         />
 
         {editor.isDirty && (
-          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-5 py-3">
-            <span className="inline-flex h-3 w-3 rounded-full bg-amber-500" />
-            <span className="text-sm font-semibold text-amber-800">
+          <div className="flex items-center gap-3 rounded-lg border-2 border-spa-warning bg-spa-warning-light px-5 py-3">
+            <span className="inline-flex h-3 w-3 rounded-full bg-spa-warning" />
+            <span className="text-sm font-semibold text-spa-warning-dark">
               Ungespeicherte Änderungen — speichern nicht vergessen.
             </span>
           </div>

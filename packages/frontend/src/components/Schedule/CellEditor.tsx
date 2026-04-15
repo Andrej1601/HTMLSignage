@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Entry } from '@/types/schedule.types';
 import type { Aroma } from '@/types/settings.types';
-import { Save, Trash2, Flame, X } from 'lucide-react';
+import { Save, Trash2, Flame, X, Check } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
-import { InputField, TextareaField, SelectField } from '@/components/FormField';
+import { InputField, TextareaField } from '@/components/FormField';
 
 function normalizeBadgeLabel(value: string): string {
   const s = String(value ?? '').trim();
@@ -24,7 +24,7 @@ interface CellEditorProps {
   onClose: () => void;
   onSave: (entry: Entry | null) => void;
   onDelete?: () => void;
-  aromas?: Aroma[]; // Available aromas from settings
+  aromas?: Aroma[];
 }
 
 export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = [] }: CellEditorProps) {
@@ -38,32 +38,20 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
     description: '',
   });
 
-  const [selectedAromaId, setSelectedAromaId] = useState<string>('');
-
-  // Initialize local entry when entry changes
-  useEffect(() => {
+  const [prevEntry, setPrevEntry] = useState<Entry | null | undefined>(entry);
+  if (prevEntry !== entry) {
+    setPrevEntry(entry);
     if (entry) {
-      const cleanedBadges = (entry.badges || []).map(normalizeBadgeLabel).filter(Boolean);
       setLocalEntry({
         ...entry,
-        badges: cleanedBadges,
+        badges: (entry.badges || []).map(normalizeBadgeLabel).filter(Boolean),
       });
     } else {
-      setLocalEntry({
-        title: '',
-        subtitle: '',
-        flames: undefined,
-        badges: [],
-        duration: 15,
-        notes: '',
-        description: '',
-      });
+      setLocalEntry({ title: '', subtitle: '', flames: undefined, badges: [], duration: 15, notes: '', description: '' });
     }
-    setSelectedAromaId('');
-  }, [entry]);
+  }
 
   const handleSave = () => {
-    // Only save if title is not empty
     if (localEntry.title.trim()) {
       const cleanedBadges = (localEntry.badges || []).map(normalizeBadgeLabel).filter(Boolean);
       onSave({
@@ -75,39 +63,35 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
         description: localEntry.description?.trim() || undefined,
       });
     } else {
-      // If title is empty, treat as delete
       onSave(null);
     }
   };
 
-  const handleAddAroma = () => {
-    if (!selectedAromaId) return;
-
-    const aroma = aromas.find((a) => a.id === selectedAromaId);
-    if (!aroma) return;
-
-    // Store as plain name, emojis are resolved at render-time from settings.aromas
-    const aromaText = normalizeBadgeLabel(aroma.name);
-    if (!aromaText) return;
-
-    // Don't add if already exists
-    if ((localEntry.badges || []).some((b) => normalizeBadgeLabel(b).toLowerCase() === aromaText.toLowerCase())) {
-      setSelectedAromaId('');
-      return;
-    }
-
+  const toggleAroma = (aroma: Aroma) => {
+    const label = normalizeBadgeLabel(aroma.name);
+    if (!label) return;
+    const current = localEntry.badges || [];
+    const exists = current.some((b) => normalizeBadgeLabel(b).toLowerCase() === label.toLowerCase());
     setLocalEntry({
       ...localEntry,
-      badges: [...(localEntry.badges || []), aromaText],
+      badges: exists
+        ? current.filter((b) => normalizeBadgeLabel(b).toLowerCase() !== label.toLowerCase())
+        : [...current, label],
     });
-    setSelectedAromaId('');
   };
 
-  const handleRemoveAroma = (index: number) => {
+  const removeAroma = (index: number) => {
     setLocalEntry({
       ...localEntry,
-      badges: localEntry.badges?.filter((_, i) => i !== index) || [],
+      badges: (localEntry.badges || []).filter((_, i) => i !== index),
     });
+  };
+
+  const isBadgeSelected = (aroma: Aroma) => {
+    const label = normalizeBadgeLabel(aroma.name);
+    return (localEntry.badges || []).some(
+      (b) => normalizeBadgeLabel(b).toLowerCase() === label.toLowerCase()
+    );
   };
 
   return (
@@ -134,7 +118,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
         </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         <InputField
           label="Titel"
           required
@@ -151,44 +135,57 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
           placeholder="z.B. Mint & Eukalyptus"
         />
 
-        {/* Flames (Intensity) */}
+        {/* Intensity (Flames) */}
         <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
+          <label className="block text-sm font-medium text-spa-text-primary mb-2">
             Intensität
           </label>
           <div className="flex gap-2">
-            {[1, 2, 3, 4].map((flameCount) => (
+            {[1, 2, 3, 4].map((flameCount) => {
+              const isSelected = localEntry.flames === flameCount;
+              return (
+                <button
+                  key={flameCount}
+                  type="button"
+                  onClick={() =>
+                    setLocalEntry({
+                      ...localEntry,
+                      flames: isSelected ? undefined : flameCount,
+                    })
+                  }
+                  className={clsx(
+                    'flex items-center gap-0.5 px-3 py-2 rounded-xl border-2 transition-all',
+                    isSelected
+                      ? 'border-spa-warning bg-spa-warning-light shadow-sm scale-105'
+                      : 'border-spa-bg-secondary bg-spa-surface text-spa-text-secondary hover:border-spa-warning-light hover:bg-spa-warning-light/50'
+                  )}
+                  title={`${flameCount} Flamme${flameCount > 1 ? 'n' : ''}`}
+                >
+                  {Array.from({ length: flameCount }).map((_, i) => (
+                    <Flame
+                      key={i}
+                      className={clsx(
+                        'w-4 h-4',
+                        isSelected ? 'text-spa-warning fill-spa-warning' : 'text-spa-text-secondary/50'
+                      )}
+                    />
+                  ))}
+                </button>
+              );
+            })}
+            {localEntry.flames && (
               <button
-                key={flameCount}
-                onClick={() =>
-                  setLocalEntry({
-                    ...localEntry,
-                    flames: localEntry.flames === flameCount ? undefined : flameCount,
-                  })
-                }
-                className={clsx(
-                  'flex items-center gap-1 px-4 py-2 rounded-lg border-2 transition-colors',
-                  localEntry.flames === flameCount
-                    ? 'border-spa-warning bg-spa-warning-light text-spa-warning-dark'
-                    : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-warning/50'
-                )}
+                type="button"
+                onClick={() => setLocalEntry({ ...localEntry, flames: undefined })}
+                className="ml-auto text-xs text-spa-text-secondary/60 hover:text-spa-text-primary transition-colors px-2"
               >
-                {Array.from({ length: flameCount }).map((_, i) => (
-                  <Flame
-                    key={i}
-                    className={clsx(
-                      'w-4 h-4',
-                      localEntry.flames === flameCount
-                        ? 'text-spa-warning fill-spa-warning'
-                        : 'text-spa-text-secondary'
-                    )}
-                  />
-                ))}
+                Zurücksetzen
               </button>
-            ))}
+            )}
           </div>
         </div>
 
+        {/* Duration */}
         <InputField
           label="Dauer (Minuten)"
           type="number"
@@ -201,78 +198,85 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
           max={180}
         />
 
-        {/* Aromas */}
-        <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
-            Aromas
-          </label>
-          {aromas.length > 0 ? (
-            <>
-              <div className="flex gap-2 mb-2">
-                <SelectField
-                  value={selectedAromaId}
-                  onChange={(e) => setSelectedAromaId(e.target.value)}
-                  className="flex-1"
-                >
-                  <option value="">Aroma auswählen...</option>
-                  {aromas.map((aroma) => (
-                    <option key={aroma.id} value={aroma.id}>
-                      {aroma.emoji} {aroma.name}
-                    </option>
-                  ))}
-                </SelectField>
-                <Button
-                  variant="secondary"
-                  onClick={handleAddAroma}
-                  disabled={!selectedAromaId}
-                  className="self-end"
-                >
-                  Hinzufügen
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {localEntry.badges?.map((badge, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-spa-secondary/20 text-spa-secondary-dark rounded-full text-sm"
-                  >
-                    {(() => {
-                      const cleaned = normalizeBadgeLabel(badge);
-                      const lib = aromas.find((a) => a.name.toLowerCase() === cleaned.toLowerCase());
-                      return lib ? `${lib.emoji} ${cleaned}` : cleaned;
-                    })()}
-                    <button
-                      onClick={() => handleRemoveAroma(index)}
-                      aria-label="Aroma entfernen"
-                      className="p-0.5 hover:bg-spa-secondary/30 rounded-full transition-colors"
+        {/* Aromas — chip grid */}
+        {aromas.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-spa-text-primary mb-2">
+              Aromas
+            </label>
+
+            {/* Selected badges */}
+            {(localEntry.badges || []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {(localEntry.badges || []).map((badge, index) => {
+                  const cleaned = normalizeBadgeLabel(badge);
+                  const lib = aromas.find((a) => a.name.toLowerCase() === cleaned.toLowerCase());
+                  return (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-spa-secondary/15 text-spa-secondary-dark rounded-full text-xs font-medium border border-spa-secondary/20"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+                      {lib ? `${lib.emoji} ${cleaned}` : cleaned}
+                      <button
+                        type="button"
+                        onClick={() => removeAroma(index)}
+                        aria-label="Aroma entfernen"
+                        className="ml-0.5 hover:bg-spa-secondary/20 rounded-full p-0.5 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
-            </>
-          ) : (
-            <div className="text-sm text-spa-text-secondary bg-spa-bg-primary p-3 rounded-lg">
-              Keine Aromas konfiguriert. Bitte erstellen Sie zuerst Aromas in den Einstellungen.
+            )}
+
+            {/* Clickable aroma chips */}
+            <div className="flex flex-wrap gap-1.5 p-3 bg-spa-bg-primary rounded-xl border border-spa-bg-secondary">
+              {aromas.map((aroma) => {
+                const selected = isBadgeSelected(aroma);
+                return (
+                  <button
+                    key={aroma.id}
+                    type="button"
+                    onClick={() => toggleAroma(aroma)}
+                    className={clsx(
+                      'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                      selected
+                        ? 'bg-spa-secondary/20 text-spa-secondary-dark border-spa-secondary/40 shadow-sm'
+                        : 'bg-spa-surface text-spa-text-secondary border-spa-bg-secondary hover:border-spa-secondary/40 hover:bg-spa-secondary/5'
+                    )}
+                  >
+                    {aroma.emoji && <span>{aroma.emoji}</span>}
+                    {aroma.name}
+                    {selected && <Check className="w-3 h-3 ml-0.5 text-spa-secondary" />}
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {aromas.length === 0 && (
+          <div className="text-sm text-spa-text-secondary bg-spa-bg-primary p-3 rounded-lg">
+            Keine Aromas konfiguriert. Bitte Aromas zuerst in den Einstellungen anlegen.
+          </div>
+        )}
 
         <TextareaField
           label="Notizen"
           value={localEntry.notes || ''}
           onChange={(e) => setLocalEntry({ ...localEntry, notes: e.target.value })}
-          placeholder="Interne Notizen..."
-          rows={3}
+          placeholder="Interne Notizen…"
+          rows={2}
         />
 
         <TextareaField
           label="Beschreibung"
           value={localEntry.description || ''}
           onChange={(e) => setLocalEntry({ ...localEntry, description: e.target.value })}
-          placeholder="Öffentliche Beschreibung..."
-          rows={3}
+          placeholder="Öffentliche Beschreibung…"
+          rows={2}
         />
       </div>
     </Dialog>

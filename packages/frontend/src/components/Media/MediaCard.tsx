@@ -15,9 +15,9 @@ interface MediaCardProps {
 }
 
 const typeBadgeStyles: Record<string, string> = {
-  image: 'bg-amber-600 text-white',
-  video: 'bg-red-600 text-white',
-  audio: 'bg-violet-600 text-white',
+  image: 'bg-spa-warning text-white',
+  video: 'bg-spa-error text-white',
+  audio: 'bg-spa-info text-white',
 };
 
 const typeLabels: Record<string, string> = {
@@ -42,7 +42,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
   };
 
   return (
-    <div className="group overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white shadow-xs transition-all hover:shadow-md">
+    <div className="group overflow-hidden rounded-2xl border border-spa-bg-secondary bg-spa-surface shadow-xs transition-all hover:shadow-md">
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-spa-bg-primary">
         {media.type === 'image' ? (
@@ -62,7 +62,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
               preload="metadata"
             />
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-lg">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-spa-surface/90 shadow-lg">
                 <Play className="h-5 w-5 text-spa-text-primary ml-0.5" />
               </div>
             </div>
@@ -85,7 +85,7 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
             width="w-48"
             trigger={() => (
               <button
-                className="rounded-lg bg-white/90 p-1.5 shadow-xs transition-colors hover:bg-white"
+                className="rounded-lg bg-spa-surface/90 p-1.5 shadow-xs transition-colors hover:bg-spa-surface"
                 aria-label="Medien-Aktionen"
                 type="button"
               >

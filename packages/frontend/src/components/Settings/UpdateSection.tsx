@@ -496,7 +496,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
               </div>
 
               {latestJob.progress && (
-                <div className="min-w-[220px] rounded-lg bg-white px-3 py-2 text-xs text-spa-text-secondary border border-spa-bg-secondary">
+                <div className="min-w-[220px] rounded-lg bg-spa-surface px-3 py-2 text-xs text-spa-text-secondary border border-spa-bg-secondary">
                   <div className="font-semibold text-spa-text-primary">{latestJob.progress.message}</div>
                   <div className="mt-1">Schritt: {latestJob.progress.stage}</div>
                   {typeof latestJob.progress.percent === 'number' && (
@@ -512,7 +512,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
             </div>
 
             {updateBackupPath && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg bg-white p-3 text-sm text-spa-text-secondary border border-spa-bg-secondary">
+              <div className="mt-3 flex items-center gap-2 rounded-lg bg-spa-surface p-3 text-sm text-spa-text-secondary border border-spa-bg-secondary">
                 <Database className="h-4 w-4 shrink-0 text-spa-primary" />
                 DB-Backup erstellt: <code className="rounded bg-spa-bg-secondary px-1.5 py-0.5 text-xs">{updateBackupPath}</code>
               </div>
@@ -526,7 +526,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
             )}
 
             {updateVerification && (
-              <div className="mt-3 rounded-lg border border-spa-bg-secondary bg-white p-3">
+              <div className="mt-3 rounded-lg border border-spa-bg-secondary bg-spa-surface p-3">
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h5 className="text-sm font-semibold text-spa-text-primary">

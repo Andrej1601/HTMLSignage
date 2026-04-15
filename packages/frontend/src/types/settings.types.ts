@@ -108,7 +108,7 @@ export interface MaintenanceScreenSettings {
 }
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type DisplayAppearance = 'wellness-stage' | 'editorial-resort';
+export type DisplayAppearance = 'wellness-stage' | 'editorial-resort' | 'mineral-noir';
 export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
@@ -203,9 +203,13 @@ export interface Event {
   assignedPreset: 'Evt1' | 'Evt2';
   isActive: boolean;
   targetDeviceIds?: string[];
+  slideshowId?: string; // Reference to a Slideshow entity (replaces inline overrides)
+
+  /** @deprecated Use slideshowId instead. Kept for backward compat with existing events. */
   settingsOverrides?: EventSettingsOverrides;
 }
 
+/** @deprecated Use SlideshowConfig design fields + slideshowId on Event instead. */
 export interface EventSettingsOverrides {
   displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;

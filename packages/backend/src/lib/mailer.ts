@@ -9,6 +9,14 @@ const MAIL_FROM = (process.env.MAIL_FROM || '').trim();
 
 let transporter: nodemailer.Transporter | null = null;
 
+// Warn at startup if SMTP is partially configured (helps catch misconfigurations early)
+if ((SMTP_HOST || SMTP_USER || SMTP_PASS) && !(SMTP_HOST && SMTP_USER && SMTP_PASS)) {
+  console.warn(
+    '[mailer] SMTP is partially configured — password reset emails will fail.\n' +
+    '  Missing: ' + [!SMTP_HOST && 'SMTP_HOST', !SMTP_USER && 'SMTP_USER', !SMTP_PASS && 'SMTP_PASS'].filter(Boolean).join(', ')
+  );
+}
+
 function getResetPasswordBaseUrl(): string | null {
   const configured = (process.env.RESET_PASSWORD_URL_BASE || process.env.FRONTEND_URL || '').trim();
   if (!configured || configured === '*') return null;

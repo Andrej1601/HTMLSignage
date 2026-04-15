@@ -27,35 +27,51 @@ export function applyActiveEventSettings(
 ): { settings: Settings; activeEvent: Event | null } {
   const normalizedBase = migrateSettings(baseSettings || getDefaultSettings());
   const activeEvent = getActiveEvent(normalizedBase, now, deviceId);
-  const overrides = activeEvent?.settingsOverrides;
 
-  if (!isPlainRecord(overrides)) {
-    return {
-      settings: normalizedBase,
-      activeEvent,
-    };
+  if (!activeEvent) {
+    return { settings: normalizedBase, activeEvent: null };
   }
 
-  const merged = deepMergeRecords(
-    normalizedBase as unknown as Record<string, unknown>,
-    overrides,
-  ) as unknown as Settings;
+  // New model: event references a slideshow by ID (backend resolves to settingsOverrides.slideshow)
+  // Legacy model: event has inline settingsOverrides
+  const overrides = activeEvent.settingsOverrides;
+  const slideshowConfig = overrides?.slideshow;
 
-  const overridePalette =
-    typeof overrides.colorPalette === 'string'
-      ? (overrides.colorPalette as ColorPaletteName)
-      : undefined;
+  // Start with base settings
+  let merged = normalizedBase;
 
-  if (overridePalette) {
-    const paletteTheme = generateDashboardColors(getColorPalette(overridePalette));
-    const overrideTheme = isPlainRecord(overrides.theme)
-      ? (overrides.theme as Partial<ThemeColors>)
-      : undefined;
+  // Apply legacy overrides if present (backward compat)
+  if (isPlainRecord(overrides)) {
+    merged = deepMergeRecords(
+      normalizedBase as unknown as Record<string, unknown>,
+      overrides,
+    ) as unknown as Settings;
+  }
 
+  // Apply design fields from slideshow config (new model: design lives on SlideshowConfig)
+  if (slideshowConfig) {
+    const sc = slideshowConfig as unknown as Record<string, unknown>;
+    if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance as Settings['displayAppearance'];
+    if (sc.designStyle) merged.designStyle = sc.designStyle as Settings['designStyle'];
+    if (sc.colorPalette) {
+      const palette = sc.colorPalette as ColorPaletteName;
+      merged.colorPalette = palette;
+      merged.theme = generateDashboardColors({
+        ...getColorPalette(palette),
+        ...(isPlainRecord(sc.theme) ? (sc.theme as Partial<ThemeColors>) : {}),
+      });
+    }
+  }
+
+  // Apply color palette from legacy overrides
+  const overridePalette = typeof overrides?.colorPalette === 'string'
+    ? (overrides.colorPalette as ColorPaletteName)
+    : undefined;
+  if (overridePalette && !slideshowConfig?.colorPalette) {
     merged.colorPalette = overridePalette;
     merged.theme = generateDashboardColors({
-      ...paletteTheme,
-      ...(overrideTheme || {}),
+      ...getColorPalette(overridePalette),
+      ...(isPlainRecord(overrides?.theme) ? (overrides.theme as Partial<ThemeColors>) : {}),
     });
   }
 
@@ -141,15 +157,12 @@ export function collectDisplayAssetUrls(settings: Settings | undefined, media?: 
   settings.events?.forEach((event) => {
     addMediaIdUrl(urls, mediaItems, event.imageId);
 
-    if (event.settingsOverrides?.slideshow) {
-      event.settingsOverrides.slideshow.slides?.forEach((slide) => {
+    // Resolve event slideshow assets (backend injects config via settingsOverrides.slideshow)
+    const eventSlideshow = event.settingsOverrides?.slideshow;
+    if (eventSlideshow?.slides) {
+      eventSlideshow.slides.forEach((slide) => {
         addMediaIdUrl(urls, mediaItems, slide.mediaId);
       });
-    }
-
-    const eventAudioUrl = resolveAudioSourceUrl(event.settingsOverrides?.audio, mediaItems);
-    if (eventAudioUrl) {
-      urls.add(eventAudioUrl);
     }
   });
 

@@ -92,6 +92,8 @@ export const io = new SocketIOServer(httpServer, {
 });
 
 // Middleware
+// CORP: cross-origin needed for media served from /uploads/ to be loadable by display clients
+// COEP: disabled because display clients embed cross-origin media (images/videos) without CORS headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,
@@ -107,7 +109,7 @@ app.use((req, res, next) => {
   const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   if (isMutation && req.cookies?.auth_token) {
     const csrfToken = req.headers['x-csrf-token'];
-    if (!csrfToken || csrfToken !== '1') {
+    if (!csrfToken || typeof csrfToken !== 'string' || !csrfToken.trim()) {
       return res.status(403).json({
         error: 'csrf-token-missing',
         message: 'CSRF token required for mutation requests.',

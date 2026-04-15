@@ -19,24 +19,9 @@ import type {
   DeviceOverridesPayload,
   DeviceSnapshotUploadResponse,
 } from './types';
+import { deepMerge, isPlainRecord } from '@/utils/objectUtils';
 
 let hasWarnedDisplayConfigFallback = false;
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function deepMergeRecords(base: Record<string, unknown>, override: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    if (isPlainRecord(value) && isPlainRecord(merged[key])) {
-      merged[key] = deepMergeRecords(merged[key] as Record<string, unknown>, value);
-    } else {
-      merged[key] = value;
-    }
-  }
-  return merged;
-}
 
 function hasObjectKeys(value: unknown): value is Record<string, unknown> {
   return isPlainRecord(value) && Object.keys(value).length > 0;
@@ -59,10 +44,7 @@ async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfig
     : schedule;
 
   const effectiveSettings = useOverrides && hasSettingsOverride
-    ? deepMergeRecords(
-        settings as unknown as Record<string, unknown>,
-        overrides!.settings as unknown as Record<string, unknown>
-      ) as unknown as Settings
+    ? deepMerge<Settings>(settings, overrides!.settings as Partial<Settings>)
     : settings;
 
   return {

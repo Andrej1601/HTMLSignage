@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -74,7 +74,11 @@ export function DataTable<T>({
   }, [sortedData, pageSize, safePageIndex]);
 
   // Reset page when data changes
-  useEffect(() => { setPage(0); }, [data.length]);
+  const [prevDataLength, setPrevDataLength] = useState(data.length);
+  if (prevDataLength !== data.length) {
+    setPrevDataLength(data.length);
+    setPage(0);
+  }
 
   if (data.length === 0 && emptyState) {
     return <>{emptyState}</>;
@@ -112,7 +116,7 @@ export function DataTable<T>({
   return (
     <>
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white rounded-lg shadow-xs overflow-hidden">
+      <div className="hidden md:block bg-spa-surface rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-spa-bg-secondary">
             <thead className="bg-spa-bg-primary">
@@ -149,7 +153,7 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-spa-bg-secondary">
+            <tbody className="bg-spa-surface divide-y divide-spa-bg-secondary">
               {pagedData.map((item) => (
                 <tr key={keyFn(item)} className="hover:bg-spa-bg-primary transition-colors">
                   {columns.map((col) => (
@@ -177,7 +181,7 @@ export function DataTable<T>({
         {pagedData.map((item) => (
           <div
             key={keyFn(item)}
-            className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4"
+            className="bg-spa-surface rounded-lg shadow-xs border border-spa-bg-secondary p-4"
           >
             {mobileTitle && (
               <div className="font-semibold text-spa-text-primary mb-3">

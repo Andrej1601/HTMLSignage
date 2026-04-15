@@ -19,6 +19,7 @@ import {
 import {
   createDefaultSlideshowConfig,
   getEnabledSlides,
+  getZonesForLayout,
   type SlideshowConfig,
 } from '@/types/slideshow.types';
 import { ONLINE_THRESHOLD_MINUTES } from '@/utils/constants';
@@ -31,7 +32,7 @@ import {
   getDisplayAppearanceLabel,
   getScheduleDesignStyleLabel,
 } from '@/config/displayDesignStyles';
-import { formatAuditActionLabel, getAuditActionMeta, summarizeAuditDetails } from '@/utils/auditLog';
+import { formatAuditActionLabel, formatAuditDescription, getAuditActionMeta, summarizeAuditDetails } from '@/utils/auditLog';
 import type {
   DashboardActivityBuildInput,
   DashboardAttentionItem,
@@ -154,7 +155,7 @@ function mapAuditItemToActivity(item: AuditLogItem): ActivityItem {
   return {
     id: `audit-${item.id}`,
     title: formatAuditActionLabel(item.action),
-    description: item.resource ? `Ressource: ${item.resource}` : meta.group,
+    description: formatAuditDescription(item.action, item.resource, item.details),
     tone: meta.tone,
     timestamp: toValidDate(item.timestamp),
     actor: item.user?.username || 'System',
@@ -303,31 +304,46 @@ export function buildRunningSlideshows(
   return [...groups, ...Array.from(overrideGroups.values())];
 }
 
+function countActiveSlides(config: SlideshowConfig): number {
+  const enabledSlides = getEnabledSlides(config);
+  const zones = getZonesForLayout(config.layout);
+  const zoneIds = new Set(zones.map((z) => z.id));
+  // Only count slides that belong to a zone of the active layout
+  return enabledSlides.filter((s) => zoneIds.has(s.zoneId || 'main')).length;
+}
+
 export function buildDeviceSlideshowRows(
   pairedDevices: Device[],
   settings: Settings | null | undefined,
 ): DeviceSlideshowRow[] {
   const globalConfig = settings?.slideshow || createDefaultSlideshowConfig();
-  const globalSlideCount = getEnabledSlides(globalConfig).length;
+  const globalSlideCount = countActiveSlides(globalConfig);
 
   return pairedDevices.map((device) => {
     const overrideConfig = getDeviceSlideshowOverride(device);
+    const hasDeviceSlideshow = Boolean(device.slideshowId && device.slideshow);
     const hasOverride = device.mode === 'override' && overrideConfig !== null;
     const activeConfig = hasOverride ? overrideConfig! : globalConfig;
-    const slideCount = hasOverride ? getEnabledSlides(activeConfig).length : globalSlideCount;
+    const slideCount = hasOverride ? countActiveSlides(activeConfig) : globalSlideCount;
     const minutes = getMinutesSince(device.lastSeen);
     const isOnline = minutes !== null && minutes < ONLINE_THRESHOLD_MINUTES;
+
+    const slideshowTitle = hasDeviceSlideshow
+      ? device.slideshow!.name
+      : hasOverride
+        ? 'Override Slideshow'
+        : 'Globale Slideshow';
 
     return {
       deviceId: device.id,
       deviceName: device.name,
       snapshotUrl: device.snapshotUrl || null,
       snapshotCapturedAt: device.snapshotCapturedAt || null,
-      slideshowTitle: hasOverride ? 'Override Slideshow' : 'Globale Slideshow',
+      slideshowTitle,
       slideCount,
       lastSeen: device.lastSeen || null,
       isOnline,
-      editorTarget: hasOverride ? `device:${device.id}` : 'global',
+      editorTarget: hasDeviceSlideshow ? `slideshow:${device.slideshowId}` : hasOverride ? `device:${device.id}` : 'global',
     };
   });
 }

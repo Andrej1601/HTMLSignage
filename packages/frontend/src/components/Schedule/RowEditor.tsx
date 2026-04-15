@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Save } from 'lucide-react';
+import { toast } from '@/stores/toastStore';
 import { getDayLabel } from '@/types/schedule.types';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
@@ -19,7 +20,7 @@ export function RowEditor({ isOpen, onClose, onSave }: RowEditorProps) {
     e.preventDefault();
 
     if (!sauna.trim()) {
-      alert('Sauna-Name ist erforderlich');
+      toast.warning('Sauna-Name ist erforderlich');
       return;
     }
 

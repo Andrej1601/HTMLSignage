@@ -15,7 +15,7 @@ export function InfoPickerField({ infos, selectedId, onSelect }: InfoPickerField
         Info auswählen *
       </label>
       {infos.length === 0 ? (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-spa-error">
           Keine Infos konfiguriert. Bitte lege zuerst Infos unter Einstellungen → Infos an.
         </p>
       ) : (

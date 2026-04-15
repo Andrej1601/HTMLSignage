@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useCallback, useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Skeleton, SkeletonCard } from '@/components/Skeleton';
@@ -8,7 +8,9 @@ import { useSettings } from '@/hooks/useSettings';
 import { useSchedule } from '@/hooks/useSchedule';
 import { usePersistentEditorDraft } from '@/hooks/usePersistentEditorDraft';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ThemeEditor } from '@/components/Settings/ThemeEditor';
+import { useSlideshows } from '@/hooks/useSlideshows';
 import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
@@ -30,7 +32,6 @@ import { AutosaveIndicator } from '@/components/AutosaveIndicator';
 import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 
 type TabId = 'theme' | 'audio' | 'maintenance' | 'aromas' | 'infos' | 'events' | 'system';
@@ -43,6 +44,8 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>('theme');
   const [localSettings, setLocalSettings] = useState<Settings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [previewSlideshowId, setPreviewSlideshowId] = useState<string | null>(null);
+  const { data: allSlideshows = [] } = useSlideshows();
 
   const draftStorageKey = `htmlsignage_editor_draft_settings_${user?.id || 'anonymous'}`;
 
@@ -58,11 +61,23 @@ export function SettingsPage() {
     when: isDirty,
   });
 
-  useEffect(() => {
-    if (!settings || isDirty || draftState.hasStoredDraft) return;
+  // Tab-switch guard: show confirm dialog instead of silently blocking
+  const [pendingTab, setPendingTab] = useState<TabId | null>(null);
+  const handleTabChange = (tab: TabId) => {
+    if (isDirty) {
+      setPendingTab(tab);
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
+  const [prevSettingsVersion, setPrevSettingsVersion] = useState<number | null>(null);
+  const settingsVersion = settings?.version ?? null;
+  if (settingsVersion !== prevSettingsVersion && settings && !isDirty && !draftState.hasStoredDraft) {
+    setPrevSettingsVersion(settingsVersion);
     setLocalSettings(settings);
     setIsDirty(false);
-  }, [draftState.hasStoredDraft, isDirty, settings]);
+  }
 
   const updateField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setLocalSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -75,7 +90,7 @@ export function SettingsPage() {
     setIsDirty(true);
   };
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!localSettings) return;
 
     const settingsToSave = {
@@ -89,7 +104,7 @@ export function SettingsPage() {
         setIsDirty(false);
       },
     });
-  };
+  }, [localSettings, save, draftState]);
 
   const handleReload = () => {
     draftState.clearDraft();
@@ -139,30 +154,21 @@ export function SettingsPage() {
   ] : [], [isDirty, handleSave]);
   useCommandPaletteActions(paletteActions);
 
-  // useMemo MUST be called before any early returns to satisfy Rules of Hooks
-  const tabs = useMemo<Tab<TabId>[]>(() => {
-    const items: Tab<TabId>[] = [
-      { id: 'theme', label: 'Farben & Design', icon: Palette },
-      { id: 'audio', label: 'Audio', icon: Music },
-      { id: 'maintenance', label: 'Wartungsscreen', icon: Monitor },
-      { id: 'aromas', label: 'Aromas', icon: Sparkles },
-      { id: 'infos', label: 'Infos', icon: Info },
-      { id: 'events', label: 'Events', icon: Calendar },
-    ];
-    if (canSystem) {
-      items.push({ id: 'system', label: 'System', icon: Wrench });
-    }
-    return items;
-  }, [canSystem]);
+  const tabs: Tab<TabId>[] = [
+    { id: 'theme', label: 'Farben & Design', icon: Palette },
+    { id: 'audio', label: 'Audio', icon: Music },
+    { id: 'maintenance', label: 'Wartungsscreen', icon: Monitor },
+    { id: 'aromas', label: 'Aromas', icon: Sparkles },
+    { id: 'infos', label: 'Infos', icon: Info },
+    { id: 'events', label: 'Events', icon: Calendar },
+    ...(canSystem ? [{ id: 'system' as const, label: 'System', icon: Wrench }] : []),
+  ];
 
-  const tabGroups = useMemo(() => {
-    const groups: Array<{ label: string; tabs: Tab<TabId>[] }> = [
-      { label: 'Darstellung', tabs: tabs.filter(t => t.id === 'theme' || t.id === 'maintenance') },
-      { label: 'Inhalte', tabs: tabs.filter(t => t.id === 'aromas' || t.id === 'infos' || t.id === 'events') },
-      { label: 'System', tabs: tabs.filter(t => t.id === 'audio' || t.id === 'system') },
-    ];
-    return groups.filter(g => g.tabs.length > 0);
-  }, [tabs]);
+  const tabGroups: Array<{ label: string; tabs: Tab<TabId>[] }> = [
+    { label: 'Darstellung', tabs: tabs.filter(t => t.id === 'theme' || t.id === 'maintenance') },
+    { label: 'Inhalte', tabs: tabs.filter(t => t.id === 'aromas' || t.id === 'infos' || t.id === 'events') },
+    { label: 'System', tabs: tabs.filter(t => t.id === 'audio' || t.id === 'system') },
+  ].filter(g => g.tabs.length > 0);
 
   if (isLoading) {
     return (
@@ -170,7 +176,7 @@ export function SettingsPage() {
         <div className="space-y-6">
           <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
           <div className="flex gap-2 overflow-hidden">
-            {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} variant="rect" className="h-10 w-28 rounded-lg" />)}
+            {Array.from({ length: 6 }, (_, i) => <Skeleton key={`skeleton-${i}`} variant="rect" className="h-10 w-28 rounded-lg" />)}
           </div>
           <SkeletonCard />
           <SkeletonCard />
@@ -230,7 +236,7 @@ export function SettingsPage() {
 
         {/* Mobile: horizontal tabs */}
         <div className="xl:hidden">
-          <TabGroup tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+          <TabGroup tabs={tabs} activeTab={activeTab} onChange={handleTabChange} />
         </div>
 
         <div className="flex gap-6">
@@ -249,7 +255,7 @@ export function SettingsPage() {
                       return (
                         <button
                           key={tab.id}
-                          onClick={() => setActiveTab(tab.id)}
+                          onClick={() => handleTabChange(tab.id)}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                             isActive
                               ? 'bg-spa-primary text-white shadow-xs'
@@ -278,9 +284,15 @@ export function SettingsPage() {
                     designStyle={localSettings.designStyle}
                     colorPalette={localSettings.colorPalette}
                     onChange={(theme) => updateField('theme', theme)}
-                    onDisplayAppearanceChange={(v) => updateField('displayAppearance', v)}
+                    onDisplayAppearanceChange={(v) => {
+                      updateField('displayAppearance', v);
+                      // Auto-select the matching palette so the appearance looks correct out of the box
+                      if (v === 'mineral-noir') handleColorPaletteChange('mineral-noir');
+                      else if (v === 'wellness-stage') handleColorPaletteChange('wellness-warm');
+                    }}
                     onDesignStyleChange={(v) => updateField('designStyle', v)}
                     onColorPaletteChange={handleColorPaletteChange}
+                    onSlideshowContextChange={setPreviewSlideshowId}
                   />
                 )}
               </TabPanel>
@@ -339,18 +351,35 @@ export function SettingsPage() {
 
         <SectionCard
           title="Szenario-Vorschau"
-          description="Ungespeicherte Einstellungen direkt über den echten Display-Pfad für Gerät, Uhrzeit und Event-Kontext prüfen."
+          description="Ungespeicherte Einstellungen direkt für Gerät, Zeitpunkt und Event-Kontext prüfen."
           icon={Monitor}
         >
           <Suspense fallback={<LoadingSpinner label="Lade Vorschau..." />}>
             <DisplayScenarioPreview
               schedule={schedule || createDefaultSchedule()}
-              settings={localSettings}
+              settings={(() => {
+                if (!localSettings) return localSettings;
+                if (!previewSlideshowId) return localSettings;
+                const show = allSlideshows.find((s) => s.id === previewSlideshowId);
+                if (!show?.config) return localSettings;
+                const sc = show.config;
+                return {
+                  ...localSettings,
+                  slideshow: sc,
+                  ...(sc.displayAppearance ? { displayAppearance: sc.displayAppearance } : {}),
+                  ...(sc.designStyle ? { designStyle: sc.designStyle } : {}),
+                  ...(sc.colorPalette ? {
+                    colorPalette: sc.colorPalette,
+                    theme: generateDashboardColors(getColorPalette(sc.colorPalette)),
+                  } : {}),
+                };
+              })()}
             />
           </Suspense>
         </SectionCard>
       </div>
 
+      {/* Route-Navigation guard */}
       <ConfirmDialog
         isOpen={unsavedGuard.isBlocked}
         title="Ungespeicherte Änderungen"
@@ -360,6 +389,25 @@ export function SettingsPage() {
         variant="warning"
         onConfirm={unsavedGuard.proceed}
         onCancel={unsavedGuard.reset}
+      />
+
+      {/* Tab-switch guard */}
+      <ConfirmDialog
+        isOpen={pendingTab !== null}
+        title="Ungespeicherte Änderungen"
+        message="Es gibt ungespeicherte Änderungen. Beim Wechsel gehen diese verloren. Trotzdem wechseln?"
+        confirmLabel="Wechseln"
+        cancelLabel="Bleiben"
+        variant="warning"
+        onConfirm={() => {
+          if (pendingTab) {
+            setActiveTab(pendingTab);
+            setIsDirty(false);
+            if (settings) setLocalSettings(settings);
+          }
+          setPendingTab(null);
+        }}
+        onCancel={() => setPendingTab(null)}
       />
     </Layout>
   );

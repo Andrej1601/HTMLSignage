@@ -45,7 +45,7 @@ export function TabGroup<T extends string>({ tabs, activeTab, onChange }: TabGro
 
   return (
     <div
-      className="rounded-2xl border border-spa-bg-secondary/80 bg-white/95 p-1 shadow-xs backdrop-blur-xs"
+      className="rounded-2xl border border-spa-bg-secondary/80 bg-spa-surface/95 p-1 shadow-xs backdrop-blur-xs"
       role="tablist"
       aria-label="Reiter"
       ref={tabListRef}

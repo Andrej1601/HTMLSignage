@@ -5,7 +5,7 @@ import { useDisplaySnapshotCapture } from '@/hooks/useDisplaySnapshotCapture';
 import { DisplayLayoutRenderer } from '@/components/Display/DisplayLayoutRenderer';
 import { preloadDisplayModules } from '@/components/Display/displayDynamicModules';
 import { normalizeDisplayLayout } from '@/components/Display/displayLayoutUtils';
-import { getDefaultSettings } from '@/types/settings.types';
+import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type { SlideConfig } from '@/types/slideshow.types';
 import { ENV_IS_DEV } from '@/config/env';
 import {
@@ -57,23 +57,41 @@ export function DisplayClientPage() {
     deviceToken,
   } = useDisplayClientRuntime(isPreviewMode);
 
-  const effectiveSettings = useMemo(
-    () => applyActiveEventSettings(
+  const effectiveSettings = useMemo(() => {
+    const { settings: base } = applyActiveEventSettings(
       migrateSettings(localSettings || getDefaultSettings()),
       new Date(eventClock),
       displayDeviceId,
-    ).settings,
-    [displayDeviceId, localSettings, eventClock],
-  );
+    );
+    // Apply design overrides from slideshow config onto top-level settings
+    const sc = base.slideshow;
+    if (!sc) return base;
+    const merged = { ...base };
+    if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance;
+    if (sc.designStyle) merged.designStyle = sc.designStyle;
+    if (sc.colorPalette) {
+      merged.colorPalette = sc.colorPalette;
+      merged.theme = generateDashboardColors(getColorPalette(sc.colorPalette));
+    }
+    return merged;
+  }, [displayDeviceId, localSettings, eventClock]);
+
+  // Audio: disabled in preview mode, slideshow audioOverride takes priority over global
+  const resolvedAudioSettings = useMemo(() => {
+    if (isPreviewMode) return { enabled: false, volume: 0, loop: false };
+    const slideshowAudio = effectiveSettings.slideshow?.audioOverride;
+    if (slideshowAudio?.enabled && slideshowAudio.src) return slideshowAudio;
+    return effectiveSettings.audio;
+  }, [effectiveSettings.slideshow?.audioOverride, effectiveSettings.audio, isPreviewMode]);
 
   const effectiveAudio = useMemo(
-    () => normalizeAudioSettings(effectiveSettings.audio),
-    [effectiveSettings.audio],
+    () => normalizeAudioSettings(resolvedAudioSettings),
+    [resolvedAudioSettings],
   );
 
   const effectiveAudioSourceUrl = useMemo(
-    () => resolveAudioSourceUrl(effectiveSettings.audio, mediaItems),
-    [effectiveSettings.audio, mediaItems],
+    () => resolveAudioSourceUrl(resolvedAudioSettings, mediaItems),
+    [resolvedAudioSettings, mediaItems],
   );
 
   const maintenanceScreen = useMemo(
@@ -167,7 +185,6 @@ export function DisplayClientPage() {
       audio.pause();
       audio.removeAttribute('src');
       audio.load();
-      setIsAudioBlocked(false);
       return;
     }
 
@@ -178,7 +195,9 @@ export function DisplayClientPage() {
 
     audio.loop = effectiveAudio.loop;
     audio.volume = effectiveAudio.volume;
-    void tryPlayAudio();
+    // Schedule play attempt outside effect to avoid cascading setState
+    const timer = setTimeout(() => { void tryPlayAudio(); }, 0);
+    return () => clearTimeout(timer);
   }, [effectiveAudio.enabled, effectiveAudio.loop, effectiveAudio.volume, effectiveAudioSrc, maintenanceMode, tryPlayAudio]);
 
   useEffect(() => {
@@ -265,13 +284,13 @@ export function DisplayClientPage() {
         <div className="text-center max-w-2xl px-8">
           <div className="text-4xl font-bold mb-8">HTMLSignage</div>
 
-          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-12 mb-8">
+          <div className="bg-spa-surface/10 backdrop-blur-lg rounded-3xl p-12 mb-8">
             <h2 className="text-2xl font-semibold mb-6">Gerät nicht gepairt</h2>
             <p className="text-lg mb-8 opacity-90">
               Bitte geben Sie diesen Pairing-Code im Admin-Interface ein:
             </p>
 
-            <div className="bg-white text-spa-primary rounded-2xl p-8 mb-6">
+            <div className="bg-spa-surface text-spa-primary rounded-2xl p-8 mb-6">
               <div className="text-7xl font-bold tracking-wider font-mono">
                 {pairingInfo.pairingCode}
               </div>
@@ -306,7 +325,7 @@ export function DisplayClientPage() {
         {isOverlay ? (
           /* Overlay-Stil: vollflächiger Blur-Schleier, zentrierter Text */
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-12" style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-            <div className="mb-6 inline-block rounded-full border border-amber-400/60 bg-amber-400/10 px-5 py-1.5 text-xs font-black uppercase tracking-widest text-amber-300">
+            <div className="mb-6 inline-block rounded-full border border-spa-warning/60 bg-spa-warning/10 px-5 py-1.5 text-xs font-black uppercase tracking-widest text-spa-warning-light">
               {maintenanceScreen.label}
             </div>
             <h1 className="text-6xl font-bold tracking-tight leading-tight max-w-3xl">
@@ -334,7 +353,7 @@ export function DisplayClientPage() {
               {maintenanceScreen.message}
             </p>
             {maintenanceScreen.showDeviceName && displayDeviceName && (
-              <div className="mt-8 inline-flex rounded-full border border-white/20 bg-white/10 px-5 py-2 text-sm font-medium text-white/85">
+              <div className="mt-8 inline-flex rounded-full border border-white/20 bg-spa-surface/10 px-5 py-2 text-sm font-medium text-white/85">
                 {displayDeviceName}
               </div>
             )}
@@ -346,7 +365,7 @@ export function DisplayClientPage() {
 
   if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-gray-900 text-white">
+      <div className="w-full h-screen flex items-center justify-center bg-spa-text-primary text-white">
         <div className="text-center">
           <div className="text-2xl font-bold mb-4">HTMLSignage</div>
           <div className="text-lg">Wird geladen...</div>
@@ -420,12 +439,12 @@ export function DisplayClientPage() {
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-50">
           {Array.from({ length: totalSlides }).map((_, i) => (
             <div
-              key={i}
+              key={`slide-indicator-${i}`}
               className={classNames(
                 'w-3 h-3 rounded-full transition-all',
                 i === currentSlideIndex
-                  ? 'bg-white w-8'
-                  : 'bg-white/40'
+                  ? 'bg-spa-surface w-8'
+                  : 'bg-spa-surface/40'
               )}
             />
           ))}
@@ -439,7 +458,7 @@ export function DisplayClientPage() {
           style={{ backgroundColor: 'rgba(239, 68, 68, 0.85)', color: 'white' }}
           aria-live="polite"
         >
-          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-spa-surface animate-pulse" />
           Offline
         </div>
       )}

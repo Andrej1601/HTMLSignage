@@ -90,22 +90,28 @@ export function useMediaMetadata(src: string | null | undefined, type: MediaType
   );
   const [isLoading, setIsLoading] = useState(() => Boolean(src && cacheKey && !metadataCache.has(cacheKey)));
 
-  useEffect(() => {
+  const [prevCacheKey, setPrevCacheKey] = useState(cacheKey);
+  if (prevCacheKey !== cacheKey) {
+    setPrevCacheKey(cacheKey);
     if (!src || !cacheKey) {
       setMetadata(null);
       setIsLoading(false);
-      return;
+    } else {
+      const cached = metadataCache.get(cacheKey);
+      if (cached) {
+        setMetadata(cached);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
     }
+  }
 
-    const cached = metadataCache.get(cacheKey);
-    if (cached) {
-      setMetadata(cached);
-      setIsLoading(false);
-      return;
-    }
+  useEffect(() => {
+    if (!src || !cacheKey) return;
+    if (metadataCache.has(cacheKey)) return;
 
     let cancelled = false;
-    setIsLoading(true);
 
     const loader = type === 'image'
       ? loadImageMetadata(src)

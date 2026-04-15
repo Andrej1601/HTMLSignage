@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
-import { Music, Upload, Volume2, VolumeX, RefreshCw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Music, Upload, RefreshCw, Presentation, Play, Square, Volume2 } from 'lucide-react';
 import { useMedia, useUploadMedia } from '@/hooks/useMedia';
+import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { AudioSettings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
+import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 
 interface AudioConfigEditorProps {
@@ -24,260 +26,261 @@ function clampVolume(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function normalizeAudio(value: AudioSettings): AudioSettings {
-  return {
-    enabled: Boolean(value.enabled),
-    src: value.src,
-    mediaId: value.mediaId,
-    volume: clampVolume(value.volume ?? 0.5),
-    loop: value.loop !== false,
-  };
-}
-
 export function AudioConfigEditor({
   audio,
   onChange,
-  title = 'Hintergrundmusik',
-  subtitle = 'Musik während der Slideshow abspielen',
-  showEnableToggle = true,
-  enableLabel = 'Hintergrundmusik aktivieren',
-  enableDescription: _enableDescription = 'Musik während der Slideshow abspielen',
+  title = 'Audio-Verwaltung',
+  subtitle = 'Audio pro Slideshow konfigurieren',
 }: AudioConfigEditorProps) {
-  const normalized = normalizeAudio(audio);
   const { data: media } = useMedia({ type: 'audio' });
   const uploadMedia = useUploadMedia();
+  const { data: slideshows = [] } = useSlideshows();
+  const updateSlideshow = useUpdateSlideshow();
+  const [previewTrackId, setPreviewTrackId] = useState<string | null>(null);
 
   const audioItems = useMemo(
     () => (media || []).filter((item: Media) => item.type === 'audio'),
-    [media]
+    [media],
   );
 
-  const selectedMedia = useMemo(
-    () => audioItems.find((item) => item.id === normalized.mediaId),
-    [audioItems, normalized.mediaId]
-  );
+  const getMediaById = (id?: string) => audioItems.find((a) => a.id === id);
 
-  const updateAudio = (patch: Partial<AudioSettings>) => {
-    onChange(normalizeAudio({ ...normalized, ...patch }));
+  // Keep global settings in sync (for backward compat with displays)
+  const syncGlobalAudio = (patch: Partial<AudioSettings>) => {
+    onChange({ ...audio, ...patch });
   };
 
-  const setAudioFromMedia = (item?: Media) => {
-    if (!item) {
-      updateAudio({ mediaId: undefined, src: undefined });
-      return;
+  const handleSlideshowAudioChange = (show: SlideshowDefinition, mediaId: string | undefined) => {
+    const mediaItem = mediaId ? getMediaById(mediaId) : undefined;
+    const audioOverride: AudioSettings | undefined = mediaItem
+      ? {
+          enabled: true,
+          mediaId: mediaItem.id,
+          src: toRelativeUploadPath(mediaItem.filename),
+          volume: show.config.audioOverride?.volume ?? 0.5,
+          loop: show.config.audioOverride?.loop ?? true,
+        }
+      : undefined;
+
+    const config: SlideshowConfig = { ...show.config, audioOverride };
+    updateSlideshow.mutate({ id: show.id, updates: { config } });
+
+    // Sync first slideshow audio as global fallback
+    if (show.isDefault && mediaItem) {
+      syncGlobalAudio({
+        enabled: true,
+        mediaId: mediaItem.id,
+        src: toRelativeUploadPath(mediaItem.filename),
+      });
     }
-    updateAudio({ enabled: true, mediaId: item.id, src: toRelativeUploadPath(item.filename) });
   };
 
-  const previewSrc = normalized.src ? toAbsoluteMediaUrl(normalized.src) : '';
-  const isEnabled = showEnableToggle ? normalized.enabled : true;
-  const volumePct = Math.round(clampVolume(normalized.volume) * 100);
+  const handleSlideshowVolumeChange = (show: SlideshowDefinition, volume: number) => {
+    if (!show.config.audioOverride) return;
+    const audioOverride: AudioSettings = { ...show.config.audioOverride, volume: clampVolume(volume) };
+    const config: SlideshowConfig = { ...show.config, audioOverride };
+    updateSlideshow.mutate({ id: show.id, updates: { config } });
+  };
+
+  const handleSlideshowLoopChange = (show: SlideshowDefinition, loop: boolean) => {
+    if (!show.config.audioOverride) return;
+    const audioOverride: AudioSettings = { ...show.config.audioOverride, loop };
+    const config: SlideshowConfig = { ...show.config, audioOverride };
+    updateSlideshow.mutate({ id: show.id, updates: { config } });
+  };
+
+  const togglePreview = (trackId: string) => {
+    setPreviewTrackId((prev) => (prev === trackId ? null : trackId));
+  };
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-end">
-        <div>
-          <h2 className="text-2xl font-bold text-stone-900 tracking-tight">{title}</h2>
-          {subtitle && <p className="text-stone-500 mt-1 text-sm">{subtitle}</p>}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-spa-primary/10 flex items-center justify-center text-spa-primary">
+          <Music className="w-5 h-5" />
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-semibold">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          System Online
+        <div>
+          <h3 className="text-lg font-semibold text-spa-text-primary">{title}</h3>
+          {subtitle && <p className="text-sm text-spa-text-secondary">{subtitle}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Card: Hintergrundmusik */}
-        <div className="bg-white rounded-xl shadow-xs border border-stone-200 overflow-hidden">
-          <div className="p-5 border-b border-stone-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center text-[#8B6F47]">
-                <Music className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-stone-800">Hintergrundmusik</h3>
-            </div>
-            {showEnableToggle && (
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input
-                  type="checkbox"
-                  checked={normalized.enabled}
-                  onChange={(e) => updateAudio({ enabled: e.target.checked })}
-                  className="sr-only peer"
-                  aria-label={enableLabel}
-                />
-                <div className="w-11 h-6 bg-stone-200 rounded-full peer peer-checked:bg-[#8B6F47] peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-stone-300 after:rounded-full after:h-5 after:w-5 after:transition-all" />
-              </label>
-            )}
-          </div>
-
-          <div className="p-6 space-y-6">
-            {/* Volume */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-500">
-                  Lautstärke
-                </label>
-                <span className="text-sm font-bold text-[#8B6F47]">{volumePct}%</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <VolumeX className="w-4 h-4 text-stone-400 shrink-0" />
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={clampVolume(normalized.volume)}
-                  onChange={(e) => updateAudio({ volume: parseFloat(e.target.value) })}
-                  aria-label={`Lautstärke: ${volumePct}%`}
-                  className="w-full h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-[#8B6F47]"
-                />
-                <Volume2 className="w-4 h-4 text-stone-400 shrink-0" />
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ── Left: Audio-Bibliothek (2/5) ── */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-spa-surface rounded-xl shadow-xs border border-spa-border overflow-hidden">
+            <div className="p-4 border-b border-spa-border">
+              <h4 className="text-sm font-semibold text-spa-text-primary">Audio-Bibliothek</h4>
+              <p className="text-xs text-spa-text-secondary mt-0.5">Verfügbare Tracks</p>
             </div>
 
-            {/* Audio aus Mediathek */}
-            {isEnabled && (
-              <>
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-stone-500">
-                    Quelle — Mediathek
-                  </label>
-                  {audioItems.length === 0 ? (
-                    <div className="text-sm text-stone-400 bg-stone-50 rounded-lg p-3 border border-stone-100">
-                      Keine Audio-Dateien vorhanden.
+            <div className="divide-y divide-spa-border">
+              {audioItems.length === 0 ? (
+                <p className="text-sm text-spa-text-secondary p-4 text-center">
+                  Keine Audio-Dateien vorhanden.
+                </p>
+              ) : (
+                audioItems.map((item) => {
+                  const isPlaying = previewTrackId === item.id;
+                  const previewUrl = toAbsoluteMediaUrl(toRelativeUploadPath(item.filename));
+                  return (
+                    <div key={item.id} className="p-3 flex items-center gap-3">
+                      <button
+                        onClick={() => togglePreview(item.id)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                          isPlaying
+                            ? 'bg-spa-primary text-white'
+                            : 'bg-spa-bg-secondary text-spa-text-secondary hover:text-spa-primary'
+                        }`}
+                        aria-label={isPlaying ? 'Vorschau stoppen' : 'Vorschau abspielen'}
+                      >
+                        {isPlaying ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-spa-text-primary truncate">{item.originalName}</p>
+                        <p className="text-[10px] text-spa-text-secondary">{(item.size / 1024 / 1024).toFixed(1)} MB</p>
+                      </div>
+                      {isPlaying && (
+                        <audio
+                          autoPlay
+                          src={previewUrl}
+                          onEnded={() => setPreviewTrackId(null)}
+                          className="hidden"
+                        />
+                      )}
                     </div>
-                  ) : (
-                    <select
-                      value={normalized.mediaId || ''}
-                      onChange={(e) => {
-                        const mediaId = e.target.value || undefined;
-                        setAudioFromMedia(audioItems.find((m) => m.id === mediaId));
-                      }}
-                      className="w-full px-3 py-2.5 border border-stone-200 rounded-lg text-sm focus:ring-2 focus:ring-[#8B6F47]/20 focus:border-[#8B6F47] outline-hidden bg-stone-50"
-                    >
-                      <option value="">Keine Musik</option>
-                      {audioItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.originalName}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
+                  );
+                })
+              )}
+            </div>
 
-                {/* Upload */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-stone-500 mb-2">
-                    Datei hochladen
-                  </label>
-                  <label className="flex items-center justify-center gap-2 w-full py-3 bg-stone-100 text-stone-600 text-sm font-semibold rounded-lg hover:bg-stone-200 transition-colors cursor-pointer">
-                    {uploadMedia.isPending ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Upload läuft…
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        Datei auswählen
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="audio/*"
-                      aria-label="Audio-Datei hochladen"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        uploadMedia.mutate(file, { onSuccess: (uploaded) => setAudioFromMedia(uploaded) });
-                      }}
-                    />
-                  </label>
-                  <p className="text-xs text-stone-400 text-center mt-1.5">MP3, WAV, OGG, WebM · max. 50 MB</p>
-                </div>
-
-                {/* Preview */}
-                {previewSrc && (
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-widest text-stone-500">
-                      Vorschau
-                    </label>
-                    <audio controls src={previewSrc} className="w-full" loop={normalized.loop} />
-                    {selectedMedia && (
-                      <p className="text-xs text-stone-400 truncate">{selectedMedia.originalName}</p>
-                    )}
-                  </div>
+            {/* Upload */}
+            <div className="p-4 border-t border-spa-border">
+              <label className="flex items-center justify-center gap-2 w-full py-3 bg-spa-bg-secondary text-spa-text-secondary text-sm font-semibold rounded-lg hover:bg-spa-bg-primary transition-colors cursor-pointer border border-dashed border-spa-border">
+                {uploadMedia.isPending ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" />Upload läuft…</>
+                ) : (
+                  <><Upload className="w-4 h-4" />Neue Datei hochladen</>
                 )}
-              </>
-            )}
+                <input
+                  type="file"
+                  accept="audio/*"
+                  aria-label="Audio-Datei hochladen"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    uploadMedia.mutate(file);
+                  }}
+                />
+              </label>
+              <p className="text-xs text-spa-text-secondary text-center mt-1.5">MP3, WAV, OGG, WebM · max. 50 MB</p>
+            </div>
           </div>
         </div>
 
-        {/* Right Card: Wiedergabe-Einstellungen */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-xs border border-stone-200 overflow-hidden">
-            <div className="p-5 border-b border-stone-100 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-stone-50 flex items-center justify-center text-[#8B6F47]">
-                <RefreshCw className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-stone-800">Wiedergabe-Einstellungen</h3>
+        {/* ── Right: Audio pro Slideshow (3/5) ── */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="bg-spa-surface rounded-xl shadow-xs border border-spa-border overflow-hidden">
+            <div className="p-4 border-b border-spa-border">
+              <h4 className="text-sm font-semibold text-spa-text-primary">Audio pro Slideshow</h4>
+              <p className="text-xs text-spa-text-secondary mt-0.5">Wählen Sie für jede Slideshow einen Track aus</p>
             </div>
 
-            <div className="p-6 space-y-6">
-              {/* Loop toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-stone-700">Wiederholen</p>
-                  <p className="text-xs text-stone-400 mt-0.5">Musik in Endlosschleife abspielen</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={normalized.loop}
-                    onChange={(e) => updateAudio({ loop: e.target.checked })}
-                    className="sr-only peer"
-                    aria-label="Wiederholen"
-                  />
-                  <div className="w-9 h-5 bg-stone-200 rounded-full peer peer-checked:bg-[#7FA99B] peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-stone-300 after:rounded-full after:h-4 after:w-4 after:transition-all" />
-                </label>
-              </div>
-
-              <div className="pt-2 border-t border-stone-100">
-                <p className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-3">
-                  Hinweis
+            <div className="divide-y divide-spa-border">
+              {slideshows.length === 0 ? (
+                <p className="text-sm text-spa-text-secondary p-4 text-center">
+                  Keine Slideshows vorhanden.
                 </p>
-                <div className="flex gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-800">
-                  <span className="text-lg shrink-0">ℹ️</span>
-                  <p className="text-xs leading-relaxed">
-                    Änderungen werden beim nächsten Gerät-Sync wirksam. Die durchschnittliche Synchronisationszeit beträgt ca. 5 Minuten.
-                  </p>
-                </div>
-              </div>
+              ) : (
+                slideshows.map((show: SlideshowDefinition) => {
+                  const override = show.config.audioOverride;
+                  const currentMedia = override?.mediaId ? getMediaById(override.mediaId) : null;
+                  const vol = override ? Math.round(clampVolume(override.volume) * 100) : 50;
+
+                  return (
+                    <div key={show.id} className="p-4 space-y-3">
+                      {/* Slideshow name */}
+                      <div className="flex items-center gap-2">
+                        <Presentation className="w-4 h-4 text-spa-primary shrink-0" />
+                        <span className="text-sm font-semibold text-spa-text-primary truncate">
+                          {show.name}
+                          {show.isDefault && <span className="ml-1.5 text-xs text-spa-primary font-normal">(Standard)</span>}
+                        </span>
+                        {show.assignedDevices && show.assignedDevices.length > 0 && (
+                          <span className="ml-auto text-[10px] text-spa-text-secondary shrink-0">
+                            {show.assignedDevices.length} Gerät{show.assignedDevices.length !== 1 ? 'e' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Track selection */}
+                      <select
+                        value={override?.mediaId || ''}
+                        onChange={(e) => handleSlideshowAudioChange(show, e.target.value || undefined)}
+                        className="w-full px-3 py-2 border border-spa-border rounded-lg text-sm bg-spa-surface text-spa-text-primary focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary outline-hidden"
+                      >
+                        <option value="">Kein Audio</option>
+                        {audioItems.map((item) => (
+                          <option key={item.id} value={item.id}>{item.originalName}</option>
+                        ))}
+                      </select>
+
+                      {/* Volume + Loop (only when audio is assigned) */}
+                      {override?.enabled && currentMedia && (
+                        <div className="flex items-center gap-4 pl-1">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Volume2 className="w-3.5 h-3.5 text-spa-text-secondary shrink-0" />
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.05"
+                              value={clampVolume(override.volume)}
+                              onChange={(e) => handleSlideshowVolumeChange(show, parseFloat(e.target.value))}
+                              className="w-full h-1 bg-spa-bg-secondary rounded-lg appearance-none cursor-pointer accent-spa-primary"
+                              aria-label="Lautstärke"
+                            />
+                            <span className="text-[10px] text-spa-text-secondary w-8 text-right">{vol}%</span>
+                          </div>
+                          <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={override.loop}
+                              onChange={(e) => handleSlideshowLoopChange(show, e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-spa-border text-spa-primary focus:ring-spa-primary/20"
+                            />
+                            <span className="text-xs text-spa-text-secondary">Loop</span>
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Assigned devices */}
+                      {show.assignedDevices && show.assignedDevices.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {show.assignedDevices.slice(0, 5).map((d) => (
+                            <span key={d.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-spa-bg-secondary text-spa-text-secondary">
+                              {d.name}
+                            </span>
+                          ))}
+                          {show.assignedDevices.length > 5 && (
+                            <span className="text-[10px] text-spa-text-secondary px-1">+{show.assignedDevices.length - 5}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          {/* System Status Card */}
-          <div className="bg-stone-900 rounded-xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#8B6F47]/20 blur-3xl -mr-12 -mt-12 rounded-full pointer-events-none" />
-            <div className="relative z-10 flex items-start justify-between">
-              <div className="space-y-3">
-                <div className="w-11 h-11 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-xs text-xl">
-                  🎵
-                </div>
-                <div>
-                  <h4 className="text-white font-bold">System-Status</h4>
-                  <p className="text-stone-400 text-xs mt-1 max-w-[180px] leading-relaxed">
-                    Audio-Ausgabe aktiv auf verbundenen Endgeräten.
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[#8B6F47] font-mono text-2xl font-bold">{volumePct}%</p>
-                <p className="text-[10px] text-stone-500 font-bold uppercase tracking-widest mt-1">Lautstärke</p>
-              </div>
-            </div>
+          {/* Sync-Hinweis */}
+          <div className="p-3 rounded-lg bg-spa-info-light border border-spa-info/20 text-spa-info-dark">
+            <p className="text-xs leading-relaxed">
+              Audio-Änderungen werden beim nächsten Gerät-Sync wirksam (ca. 2–5 Minuten). Audio wird nur auf den Display-Geräten abgespielt, nicht in der Admin-Oberfläche.
+            </p>
           </div>
         </div>
       </div>

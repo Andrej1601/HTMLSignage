@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -42,7 +42,7 @@ export function SaunasPage() {
   const [editingSauna, setEditingSauna] = useState<Sauna | null>(null);
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const isInitializedRef = useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -60,38 +60,36 @@ export function SaunasPage() {
   );
 
   // Initialize local saunas from settings only once
-  useEffect(() => {
-    if (!isInitializedRef.current && settings) {
-      isInitializedRef.current = true;
-      if (settings.saunas && settings.saunas.length > 0) {
-        setLocalSaunas(settings.saunas);
-      } else {
-        // Initialize with default saunas if none exist
-        // IMPORTANT: Only set local state, don't auto-save to prevent overwriting accidentally lost data
-        // User must explicitly click Save to persist defaults
-        const defaultSaunas: Sauna[] = [
-          {
-            id: generateId(),
-            name: 'Finnische Sauna',
-            status: 'active',
-            order: 0,
-            color: '#10b981',
-            info: { temperature: 90, humidity: 10, capacity: 12 },
-          },
-          {
-            id: generateId(),
-            name: 'Bio Sauna',
-            status: 'active',
-            order: 1,
-            color: '#3b82f6',
-            info: { temperature: 60, humidity: 40, capacity: 8 },
-          },
-        ];
-        setLocalSaunas(defaultSaunas);
-        setIsDirty(true); // Mark as dirty so user can save
-      }
+  if (!isInitialized && settings) {
+    setIsInitialized(true);
+    if (settings.saunas && settings.saunas.length > 0) {
+      setLocalSaunas(settings.saunas);
+    } else {
+      // Initialize with default saunas if none exist
+      // IMPORTANT: Only set local state, don't auto-save to prevent overwriting accidentally lost data
+      // User must explicitly click Save to persist defaults
+      const defaultSaunas: Sauna[] = [
+        {
+          id: generateId(),
+          name: 'Finnische Sauna',
+          status: 'active',
+          order: 0,
+          color: '#10b981',
+          info: { temperature: 90, humidity: 10, capacity: 12 },
+        },
+        {
+          id: generateId(),
+          name: 'Bio Sauna',
+          status: 'active',
+          order: 1,
+          color: '#3b82f6',
+          info: { temperature: 60, humidity: 40, capacity: 8 },
+        },
+      ];
+      setLocalSaunas(defaultSaunas);
+      setIsDirty(true); // Mark as dirty so user can save
     }
-  }, [settings]);
+  }
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -163,7 +161,7 @@ export function SaunasPage() {
   };
 
   const handleReload = () => {
-    isInitializedRef.current = false;
+    setIsInitialized(false);
     setIsDirty(false);
     refetch();
   };
@@ -187,7 +185,7 @@ export function SaunasPage() {
         <div className="space-y-6">
           <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Array.from({ length: 4 }, (_, i) => <SkeletonCard key={i} />)}
+            {Array.from({ length: 4 }, (_, i) => <SkeletonCard key={`skeleton-card-${i}`} />)}
           </div>
         </div>
       </Layout>
@@ -282,7 +280,7 @@ export function SaunasPage() {
               {sortedSaunas.map((sauna) => (
                 <div
                   key={sauna.id}
-                  className="rounded-lg border border-spa-bg-secondary bg-white p-4 flex items-center gap-4"
+                  className="rounded-lg border border-spa-bg-secondary bg-spa-surface p-4 flex items-center gap-4"
                   style={{ borderLeftWidth: 4, borderLeftColor: sauna.color || '#10b981' }}
                 >
                   <div className="flex-1 min-w-0">

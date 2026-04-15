@@ -218,7 +218,7 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
       {/* Selected Files */}
       {selectedFiles.length > 0 && (
-        <div className="bg-white rounded-lg shadow-xs border border-spa-bg-secondary p-4">
+        <div className="bg-spa-surface rounded-lg shadow-xs border border-spa-bg-secondary p-4">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-spa-text-primary">

@@ -2,6 +2,7 @@ import type { DesignStyle, DisplayAppearance } from '@/types/settings.types';
 
 export const DEFAULT_DISPLAY_APPEARANCE: DisplayAppearance = 'wellness-stage';
 export const EDITORIAL_DISPLAY_APPEARANCE: DisplayAppearance = 'editorial-resort';
+export const MINERAL_NOIR_DISPLAY_APPEARANCE: DisplayAppearance = 'mineral-noir';
 
 export interface DisplayAppearanceOption {
   id: DisplayAppearance;
@@ -25,6 +26,11 @@ export const DISPLAY_APPEARANCE_OPTIONS: DisplayAppearanceOption[] = [
     id: EDITORIAL_DISPLAY_APPEARANCE,
     title: 'Editorial Resort',
     description: 'Inszenierte Resort-Bühne mit Karten, Lichtflächen und Magazin-Look.',
+  },
+  {
+    id: MINERAL_NOIR_DISPLAY_APPEARANCE,
+    title: 'Mineral Noir',
+    description: 'Architektonischer Dark-Luxus — kühles Schiefer, Platin-Typografie, kein Schnörkel.',
   },
 ];
 
@@ -59,6 +65,12 @@ export function isEditorialDisplayAppearance(
   displayAppearance: string | undefined,
 ): displayAppearance is typeof EDITORIAL_DISPLAY_APPEARANCE {
   return displayAppearance === EDITORIAL_DISPLAY_APPEARANCE;
+}
+
+export function isMineralNoirDisplayAppearance(
+  displayAppearance: string | undefined,
+): displayAppearance is typeof MINERAL_NOIR_DISPLAY_APPEARANCE {
+  return displayAppearance === MINERAL_NOIR_DISPLAY_APPEARANCE;
 }
 
 export function getDisplayAppearanceLabel(displayAppearance: string | undefined): string {

@@ -32,9 +32,9 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-spa-bg-primary p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-8 text-center">
+          <div className="bg-spa-surface rounded-2xl shadow-xl max-w-lg w-full p-8 text-center">
             <div className="mx-auto w-16 h-16 bg-spa-error-light rounded-full flex items-center justify-center mb-6">
-              <AlertTriangle className="w-8 h-8 text-red-600" aria-hidden="true" />
+              <AlertTriangle className="w-8 h-8 text-spa-error" aria-hidden="true" />
             </div>
             <h1 className="text-2xl font-bold text-spa-text-primary mb-2">
               Etwas ist schiefgelaufen

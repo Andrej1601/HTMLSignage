@@ -13,6 +13,5 @@ export function useCommandPaletteActions(items: CommandItem[]) {
     registerItems(items);
     const ids = items.map((item) => item.id);
     return () => unregisterItems(ids);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, registerItems, unregisterItems]);
 }

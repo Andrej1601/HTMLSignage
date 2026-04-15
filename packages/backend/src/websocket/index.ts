@@ -1,5 +1,5 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { verifyDeviceToken } from '../lib/auth.js';
+import { verifyAnyToken, verifyDeviceToken } from '../lib/auth.js';
 
 let io: SocketIOServer | null = null;
 const LOG_WS = process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug';
@@ -12,16 +12,26 @@ export function setupWebSocket(ioInstance: SocketIOServer) {
       console.log(`[ws] Client connected: ${socket.id}`);
     }
 
-    // Subscribe to schedule updates
-    socket.on('subscribe:schedule', () => {
+    // Subscribe to schedule updates (requires valid user or device token)
+    socket.on('subscribe:schedule', (payload?: string | { token?: string }) => {
+      const token = typeof payload === 'string' ? payload : payload?.token;
+      if (!verifyAnyToken(token)) {
+        socket.emit('subscribe:error', { error: 'authentication-required', channel: 'schedule' });
+        return;
+      }
       socket.join('schedule-updates');
       if (LOG_WS) {
         console.log(`[ws] ${socket.id} subscribed to schedule updates`);
       }
     });
 
-    // Subscribe to settings updates
-    socket.on('subscribe:settings', () => {
+    // Subscribe to settings updates (requires valid user or device token)
+    socket.on('subscribe:settings', (payload?: string | { token?: string }) => {
+      const token = typeof payload === 'string' ? payload : payload?.token;
+      if (!verifyAnyToken(token)) {
+        socket.emit('subscribe:error', { error: 'authentication-required', channel: 'settings' });
+        return;
+      }
       socket.join('settings-updates');
       if (LOG_WS) {
         console.log(`[ws] ${socket.id} subscribed to settings updates`);
@@ -91,10 +101,23 @@ export function broadcastSettingsUpdate(data: unknown) {
 
 export function broadcastDeviceUpdate(data: unknown) {
   if (io) {
-    // Broadcast to all connected clients (for device list updates)
     io.emit('device:updated', data);
     if (LOG_WS) {
       console.log('[ws] Broadcasted device update');
+    }
+  }
+}
+
+/**
+ * Emits a single `devices:bulk-updated` event with all updated devices instead
+ * of N individual `device:updated` events.  Prevents broadcast storms during
+ * bulk operations (e.g. 50 devices × 20 admin sockets = 1 000 events → 1 event).
+ */
+export function broadcastBulkDeviceUpdate(devices: unknown[]) {
+  if (io) {
+    io.emit('devices:bulk-updated', devices);
+    if (LOG_WS) {
+      console.log(`[ws] Broadcasted bulk device update (${devices.length} devices)`);
     }
   }
 }

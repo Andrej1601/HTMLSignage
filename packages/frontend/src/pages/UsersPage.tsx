@@ -144,7 +144,7 @@ export function UsersPage() {
                     : role === 'editor'
                     ? 'bg-spa-info-light text-spa-info-dark'
                     : role === 'saunameister'
-                    ? 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-spa-success-light text-spa-success-dark'
                     : 'bg-spa-bg-secondary text-spa-text-secondary'
                 }`}
               >
@@ -216,11 +216,11 @@ export function UsersPage() {
       <Layout>
         <div className="space-y-6">
           <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
-          <div className="rounded-xl border border-spa-bg-secondary bg-white overflow-hidden">
+          <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface overflow-hidden">
             <div className="flex items-center gap-4 px-4 py-3 border-b border-spa-bg-secondary bg-spa-bg-primary">
-              {Array.from({ length: 4 }, (_, i) => <Skeleton key={i} variant="text" className="h-4 w-20" />)}
+              {Array.from({ length: 4 }, (_, i) => <Skeleton key={`skeleton-${i}`} variant="text" className="h-4 w-20" />)}
             </div>
-            {Array.from({ length: 5 }, (_, i) => <SkeletonTableRow key={i} columns={4} />)}
+            {Array.from({ length: 5 }, (_, i) => <SkeletonTableRow key={`skeleton-row-${i}`} columns={4} />)}
           </div>
         </div>
       </Layout>
@@ -269,7 +269,7 @@ export function UsersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Benutzer suchen..."
                 aria-label="Benutzer durchsuchen"
-                className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+                className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
               />
             </div>
           )}

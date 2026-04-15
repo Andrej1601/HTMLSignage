@@ -118,7 +118,7 @@ export function ComboboxField({
           aria-haspopup="listbox"
           role="combobox"
           autoComplete="off"
-          className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-3 pr-8 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+          className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-3 pr-8 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
         />
         <ChevronDown
           className={clsx(
@@ -133,7 +133,7 @@ export function ComboboxField({
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-spa-bg-secondary bg-white shadow-lg"
+          className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-spa-bg-secondary bg-spa-surface shadow-lg"
         >
           {filtered.map((opt, i) => (
             <li
