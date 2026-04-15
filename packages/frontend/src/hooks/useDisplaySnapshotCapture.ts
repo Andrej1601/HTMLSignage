@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { ENV_IS_DEV } from '@/config/env';
 import { displayDevicesApi } from '@/services/displayApi';
 
 const SLIDE_SNAPSHOT_MIN_INTERVAL_MS = 30_000;
@@ -63,7 +64,7 @@ export function useDisplaySnapshotCapture({
       try {
         imageDataUrl = await toJpeg(snapshotTarget, snapshotOptions);
       } catch (error) {
-        console.warn('[Display] Snapshot render failed, retrying with reduced options:', error);
+        if (ENV_IS_DEV) console.warn('[Display] Snapshot render failed, retrying with reduced options:', error);
         imageDataUrl = await toJpeg(snapshotTarget, {
           ...snapshotOptions,
           pixelRatio: 0.35,
@@ -74,7 +75,7 @@ export function useDisplaySnapshotCapture({
       await displayDevicesApi.uploadSnapshot(deviceId, imageDataUrl, deviceToken);
       lastSnapshotAtRef.current = Date.now();
     } catch (error) {
-      console.warn('[Display] Snapshot capture failed:', error);
+      if (ENV_IS_DEV) console.warn('[Display] Snapshot capture failed:', error);
     } finally {
       snapshotUploadInFlightRef.current = false;
     }

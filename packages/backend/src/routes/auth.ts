@@ -56,6 +56,11 @@ const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 60 minutes
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_SESSIONS_PER_USER = 10;
 
+/** Default to secure cookies in production unless explicitly overridden. */
+const COOKIE_SECURE = process.env.COOKIE_SECURE !== undefined
+  ? process.env.COOKIE_SECURE === 'true'
+  : process.env.NODE_ENV === 'production';
+
 function hashResetToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -151,7 +156,7 @@ router.post('/register', authLimiter, async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
+      secure: COOKIE_SECURE,
       sameSite: 'lax',
       maxAge: SESSION_TTL_MS,
       path: '/',
@@ -211,7 +216,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     res.cookie('auth_token', token, {
       httpOnly: true,
-      secure: process.env.COOKIE_SECURE === 'true',
+      secure: COOKIE_SECURE,
       sameSite: 'lax',
       maxAge: SESSION_TTL_MS,
       path: '/',

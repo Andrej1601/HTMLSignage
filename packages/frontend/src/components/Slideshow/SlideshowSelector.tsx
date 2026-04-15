@@ -74,7 +74,7 @@ export function SlideshowSelector({
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
                     onBlur={() => handleRename(slideshow.id)}
-                    className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-32"
+                    className="rounded-lg border border-spa-primary bg-spa-surface px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-32"
                     autoFocus
                   />
                 </form>
@@ -85,7 +85,7 @@ export function SlideshowSelector({
                   disabled={disabled}
                   className={`group relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
                     isSelected
-                      ? 'bg-white text-spa-text-primary shadow-xs'
+                      ? 'bg-spa-surface text-spa-text-primary shadow-xs'
                       : 'text-spa-text-secondary hover:text-spa-text-primary'
                   } disabled:opacity-60`}
                 >
@@ -122,7 +122,7 @@ export function SlideshowSelector({
                       className={`inline-flex items-center justify-center rounded-md p-1 transition-colors ${
                         open
                           ? 'bg-spa-primary/10 text-spa-primary'
-                          : 'text-spa-text-secondary hover:text-spa-text-primary hover:bg-white/60'
+                          : 'text-spa-text-secondary hover:text-spa-text-primary hover:bg-spa-surface/60'
                       }`}
                       aria-label="Slideshow-Aktionen"
                     >
@@ -146,7 +146,7 @@ export function SlideshowSelector({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onBlur={() => { if (!newName.trim()) setIsCreating(false); }}
-              className="rounded-lg border border-spa-primary bg-white px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-36"
+              className="rounded-lg border border-spa-primary bg-spa-surface px-3 py-1.5 text-sm font-medium text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 w-36"
               placeholder="Name..."
               autoFocus
             />

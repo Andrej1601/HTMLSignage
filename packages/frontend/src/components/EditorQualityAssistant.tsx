@@ -31,34 +31,34 @@ export function EditorQualityAssistant({ issues, okMessage, className }: EditorQ
   if (!hasIssues) {
     // Compact OK strip
     return (
-      <div className={clsx('flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2', className)}>
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-        <span className="text-xs text-emerald-700">{okMessage}</span>
+      <div className={clsx('flex items-center gap-2 rounded-lg border border-spa-success-light bg-spa-success-light px-3 py-2', className)}>
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-spa-success" />
+        <span className="text-xs text-spa-success-dark">{okMessage}</span>
       </div>
     );
   }
 
   return (
-    <div className={clsx('rounded-lg border border-amber-200 bg-amber-50 overflow-hidden', className)}>
+    <div className={clsx('rounded-lg border border-spa-warning-light bg-spa-warning-light overflow-hidden', className)}>
       {/* Compact summary row */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-amber-100/60 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-spa-warning-light/60 transition-colors"
       >
-        <TriangleAlert className="h-4 w-4 shrink-0 text-amber-500" />
-        <span className="flex-1 text-xs font-medium text-amber-800">
+        <TriangleAlert className="h-4 w-4 shrink-0 text-spa-warning" />
+        <span className="flex-1 text-xs font-medium text-spa-warning-dark">
           Qualitätsassistent
         </span>
         {/* Issue counts */}
         <span className="flex items-center gap-1.5">
           {dangerCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+            <span className="inline-flex items-center rounded-full bg-spa-error-light px-2 py-0.5 text-[10px] font-bold text-spa-error-dark">
               {dangerCount} kritisch
             </span>
           )}
           {warningCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+            <span className="inline-flex items-center rounded-full bg-spa-warning-light px-2 py-0.5 text-[10px] font-bold text-spa-warning-dark">
               {warningCount} prüfen
             </span>
           )}
@@ -69,14 +69,14 @@ export function EditorQualityAssistant({ issues, okMessage, className }: EditorQ
           )}
         </span>
         {expanded
-          ? <ChevronUp className="h-4 w-4 shrink-0 text-amber-500" />
-          : <ChevronDown className="h-4 w-4 shrink-0 text-amber-500" />
+          ? <ChevronUp className="h-4 w-4 shrink-0 text-spa-warning" />
+          : <ChevronDown className="h-4 w-4 shrink-0 text-spa-warning" />
         }
       </button>
 
       {/* Expanded detail list */}
       {expanded && (
-        <div className="border-t border-amber-200 px-3 py-2 space-y-2">
+        <div className="border-t border-spa-warning-light px-3 py-2 space-y-2">
           {issues.map((issue) => {
             const accent = getToneAccent(issue.tone);
             return (

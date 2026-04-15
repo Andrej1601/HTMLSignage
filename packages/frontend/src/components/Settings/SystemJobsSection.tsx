@@ -98,7 +98,7 @@ export function SystemJobsSection() {
                     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClass(job)}`}>
                       {job.status === 'queued' ? 'Wartet' : job.status === 'running' ? 'Läuft' : job.status === 'succeeded' ? 'Erfolgreich' : 'Fehlgeschlagen'}
                     </span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-spa-text-secondary border border-spa-bg-secondary">
+                    <span className="rounded-full bg-spa-surface px-2.5 py-1 text-xs font-semibold text-spa-text-secondary border border-spa-bg-secondary">
                       {getJobLabel(job)}
                     </span>
                     <span className="text-sm font-semibold text-spa-text-primary">{job.title}</span>
@@ -111,7 +111,7 @@ export function SystemJobsSection() {
                 </div>
 
                 {job.progress && (
-                  <div className="min-w-[220px] rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-xs text-spa-text-secondary">
+                  <div className="min-w-[220px] rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-xs text-spa-text-secondary">
                     <div className="font-semibold text-spa-text-primary">{job.progress.message}</div>
                     <div className="mt-1">Schritt: {job.progress.stage}</div>
                     {typeof job.progress.percent === 'number' && (

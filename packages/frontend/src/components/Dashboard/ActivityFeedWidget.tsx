@@ -28,17 +28,17 @@ const PAGE_SIZE = 10;
 const CATEGORY_CONFIG: Record<ActivityCategory, { label: string; colorClass: string; icon: LucideIcon }> = {
   einstellungen: { label: 'Einstellungen', colorClass: 'text-blue-600',   icon: Settings2 },
   systemjobs:    { label: 'Systemjobs',    colorClass: 'text-purple-600', icon: Server },
-  device:        { label: 'Geräte',        colorClass: 'text-amber-600',  icon: Monitor },
+  device:        { label: 'Geräte',        colorClass: 'text-spa-warning',  icon: Monitor },
   benutzer:      { label: 'Benutzer',      colorClass: 'text-rose-600',   icon: Users },
   media:         { label: 'Inhalte',       colorClass: 'text-teal-600',   icon: Image },
 };
 
 const STATUS_CONFIG: Record<StatusTone, { label: string; colorClass: string }> = {
-  success: { label: 'Erfolg',   colorClass: 'text-emerald-600 font-semibold' },
+  success: { label: 'Erfolg',   colorClass: 'text-spa-success font-semibold' },
   info:    { label: 'Info',     colorClass: 'text-blue-600 font-semibold' },
-  warning: { label: 'Warnung',  colorClass: 'text-amber-600 font-semibold' },
-  danger:  { label: 'Fehler',   colorClass: 'text-red-600 font-semibold' },
-  neutral: { label: 'OK',       colorClass: 'text-stone-500 font-semibold' },
+  warning: { label: 'Warnung',  colorClass: 'text-spa-warning font-semibold' },
+  danger:  { label: 'Fehler',   colorClass: 'text-spa-error font-semibold' },
+  neutral: { label: 'OK',       colorClass: 'text-spa-text-secondary font-semibold' },
 };
 
 const CATEGORY_PILLS: { key: FilterKey; label: string }[] = [
@@ -228,7 +228,7 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
                               {item.details.map((d, i) => (
                                 <span
                                   key={i}
-                                  className="inline-flex rounded-full bg-white border border-spa-bg-secondary px-2.5 py-1 text-xs text-spa-text-secondary"
+                                  className="inline-flex rounded-full bg-spa-surface border border-spa-bg-secondary px-2.5 py-1 text-xs text-spa-text-secondary"
                                 >
                                   {d}
                                 </span>

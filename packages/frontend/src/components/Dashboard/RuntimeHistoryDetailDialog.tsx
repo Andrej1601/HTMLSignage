@@ -95,7 +95,7 @@ function getStatToneClasses(tone: StatusTone = 'neutral'): string {
     case 'info':
       return 'border-spa-primary/20 bg-spa-primary-light/40';
     default:
-      return 'border-spa-bg-secondary bg-white';
+      return 'border-spa-bg-secondary bg-spa-surface';
   }
 }
 
@@ -382,7 +382,7 @@ function HistoryBars({
   const toneClass = getChartToneClass(tone);
 
   return (
-    <div className="flex h-28 items-end gap-1 rounded-lg border border-spa-bg-secondary bg-white px-3 py-3">
+    <div className="flex h-28 items-end gap-1 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-3">
       {values.map((value, index) => {
         const height = Math.max((value / maxValue) * 100, value === 0 ? 6 : 12);
         return (
@@ -488,7 +488,7 @@ export function RuntimeHistoryDetailDialog({
                   {detailView.samples.map((sample) => (
                     <div
                       key={sample.id}
-                      className="rounded-lg border border-spa-bg-secondary bg-white px-4 py-3"
+                      className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
@@ -508,7 +508,7 @@ export function RuntimeHistoryDetailDialog({
                   ))}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-spa-bg-secondary bg-white px-4 py-3 text-sm text-spa-text-secondary">
+                <div className="rounded-lg border border-dashed border-spa-bg-secondary bg-spa-surface px-4 py-3 text-sm text-spa-text-secondary">
                   Noch keine Verlaufspunkte vorhanden.
                 </div>
               )}
@@ -527,7 +527,7 @@ export function RuntimeHistoryDetailDialog({
               </div>
 
               {metric === 'warnings' && detailView.currentWarnings.length > 0 ? (
-                <div className="rounded-lg border border-spa-bg-secondary bg-white px-4 py-4">
+                <div className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-spa-text-primary">Aktive Systemwarnungen jetzt</p>
                     <StatusBadge label={`${detailView.currentWarnings.length} aktiv`} tone="warning" />

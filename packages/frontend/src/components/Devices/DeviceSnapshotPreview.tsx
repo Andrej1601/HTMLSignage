@@ -40,7 +40,7 @@ export function DeviceSnapshotPreview({
             crossOrigin="anonymous"
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-white">
+          <div className="absolute inset-0 flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-surface">
             <div className="text-center">
               <Monitor className="mx-auto h-8 w-8 text-spa-primary/35" />
               <div className="mt-2 text-xs text-spa-text-secondary">
@@ -50,7 +50,7 @@ export function DeviceSnapshotPreview({
           </div>
         )}
       </div>
-      <div className="border-t border-spa-bg-secondary bg-white/80 px-3 py-2 text-[11px] text-spa-text-secondary">
+      <div className="border-t border-spa-bg-secondary bg-spa-surface/80 px-3 py-2 text-[11px] text-spa-text-secondary">
         {formatCapturedAt(capturedAt)}
       </div>
     </div>

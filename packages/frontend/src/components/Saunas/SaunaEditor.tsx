@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { toast } from '@/stores/toastStore';
 import type { Sauna, SaunaStatus } from '@/types/sauna.types';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
@@ -36,7 +37,10 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
   const [featureInput, setFeatureInput] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
 
-  useEffect(() => {
+  const saunaKey = isOpen && sauna ? ('id' in sauna ? sauna.id : `__new_${sauna.name}`) : null;
+  const [prevSaunaKey, setPrevSaunaKey] = useState<string | null>(saunaKey);
+  if (prevSaunaKey !== saunaKey) {
+    setPrevSaunaKey(saunaKey);
     if (sauna) {
       setFormData({
         name: sauna.name,
@@ -60,11 +64,11 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
       });
     }
     setFeatureInput('');
-  }, [sauna, isOpen]);
+  }
 
   const handleSave = () => {
     if (!formData.name.trim()) {
-      alert('Name ist erforderlich');
+      toast.warning('Name ist erforderlich');
       return;
     }
 

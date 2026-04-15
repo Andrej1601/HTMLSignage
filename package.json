@@ -14,15 +14,22 @@
     "test": "pnpm --filter backend test && pnpm --filter frontend test",
     "test:backend": "pnpm --filter backend test",
     "test:frontend": "pnpm --filter frontend test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter backend typecheck && pnpm --filter frontend typecheck",
     "smoke": "node ./scripts/smoke-check.mjs",
     "kiosk": "pnpm --filter @htmlsignage/kiosk start",
     "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
     "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
-    "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows"
+    "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "packages/backend/src/**/*.ts": "eslint",
+    "packages/frontend/src/**/*.{ts,tsx}": "eslint --report-unused-disable-directives --max-warnings 0"
   },
   "engines": {
     "node": ">=20.0.0",

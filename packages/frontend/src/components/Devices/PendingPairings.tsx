@@ -78,7 +78,7 @@ export function PendingPairings() {
 
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white">
+      <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-spa-surface">
         {/* Gold accent bar + collapsible header */}
         <button
           type="button"
@@ -105,7 +105,7 @@ export function PendingPairings() {
             {pendingDevices.map((device) => (
               <div
                 key={device.id}
-                className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-xl border border-dashed border-spa-bg-secondary bg-white p-5"
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-xl border border-dashed border-spa-bg-secondary bg-spa-surface p-5"
               >
                 {/* Pairing Code */}
                 <div className="shrink-0 rounded-lg border border-dashed border-spa-text-secondary/30 px-6 py-3 text-center">
@@ -132,7 +132,7 @@ export function PendingPairings() {
                   <button
                     type="button"
                     onClick={() => refetch()}
-                    className="rounded-lg border border-spa-bg-secondary bg-white px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
+                    className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
                   >
                     Ablehnen
                   </button>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types/auth.types';
 import { ENV_IS_DEV } from '@/config/env';
 import { fetchApi } from '@/services/api';
@@ -46,14 +46,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (user || isLoading || loggedOutRef.current) return;
 
+    let cancelled = false;
+    let inFlight = false;
+
     const retry = async () => {
-      if (loggedOutRef.current) return;
+      if (cancelled || loggedOutRef.current || inFlight) return;
+      inFlight = true;
       try {
         const userData = await fetchApi<User>('/auth/me');
-        if (loggedOutRef.current) return;
+        if (cancelled || loggedOutRef.current) return;
         setUser(userData);
       } catch (error) {
-        if (loggedOutRef.current) return;
+        if (cancelled || loggedOutRef.current) return;
         const message = error instanceof Error ? error.message : '';
         if (AUTH_FAILURE_PATTERN.test(message)) {
           setUser(null);
@@ -61,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (ENV_IS_DEV) {
           console.error('Auth retry failed:', error);
         }
+      } finally {
+        inFlight = false;
       }
     };
 
@@ -69,28 +75,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void retry();
     }, 30_000);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [user, isLoading]);
 
-  const login = async (credentials: LoginRequest) => {
+  const login = useCallback(async (credentials: LoginRequest) => {
     loggedOutRef.current = false;
     const data = await fetchApi<AuthResponse>('/auth/login', {
       method: 'POST',
       data: credentials,
     });
     setUser(data.user);
-  };
+  }, []);
 
-  const register = async (data: RegisterRequest) => {
+  const register = useCallback(async (data: RegisterRequest) => {
     loggedOutRef.current = false;
     const authData = await fetchApi<AuthResponse>('/auth/register', {
       method: 'POST',
       data,
     });
     setUser(authData.user);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     loggedOutRef.current = true;
     try {
       await fetchApi('/auth/logout', {
@@ -104,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(null);
-  };
+  }, []);
 
   const value = useMemo(() => ({
     user,

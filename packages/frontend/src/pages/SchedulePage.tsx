@@ -22,7 +22,7 @@ function SchedulePageSkeleton() {
       <div className="space-y-4">
         <div className="h-16 animate-pulse rounded-2xl bg-spa-bg-secondary" />
         <div className="h-10 animate-pulse rounded-xl bg-spa-bg-secondary" />
-        <div className="rounded-xl border border-spa-bg-secondary bg-white p-6 space-y-4">
+        <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-6 space-y-4">
           <Skeleton variant="rect" className="h-64 w-full" />
         </div>
       </div>
@@ -85,7 +85,7 @@ export function SchedulePage() {
               >
                 <span
                   className={clsx(
-                    'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200',
+                    'pointer-events-none inline-block h-4 w-4 rounded-full bg-spa-surface shadow-sm transition-transform duration-200',
                     editor.localSchedule.autoPlay ? 'translate-x-4' : 'translate-x-0'
                   )}
                 />
@@ -95,7 +95,7 @@ export function SchedulePage() {
             <button
               onClick={() => { editor.draftState.clearDraft(); editor.resetToLiveSchedule(); }}
               disabled={!editor.isDirty}
-              className="inline-flex items-center gap-2 rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-sm font-medium text-spa-text-secondary hover:border-red-300 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm font-medium text-spa-text-secondary hover:border-spa-error-light hover:text-spa-error transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Ungespeicherte Änderungen verwerfen"
             >
               <RefreshCw className="h-4 w-4" />
@@ -120,12 +120,12 @@ export function SchedulePage() {
 
         {/* ── Dirty Banner ── */}
         {editor.isDirty && (
-          <div className="flex items-center gap-3 rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-2.5">
+          <div className="flex items-center gap-3 rounded-lg border-2 border-spa-warning bg-spa-warning-light px-4 py-2.5">
             <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-spa-warning opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-spa-warning" />
             </span>
-            <span className="text-sm font-medium text-amber-800">Ungespeicherte Änderungen</span>
+            <span className="text-sm font-medium text-spa-warning-dark">Ungespeicherte Änderungen</span>
           </div>
         )}
 
@@ -151,7 +151,7 @@ export function SchedulePage() {
 
         {/* ── Grid ── */}
         {editor.currentDaySchedule && (
-          <div className="overflow-hidden rounded-xl border border-spa-bg-secondary bg-white shadow-xs">
+          <div className="overflow-hidden rounded-xl border border-spa-bg-secondary bg-spa-surface shadow-xs">
             {/* Grid title bar */}
             <div className="flex items-center justify-between border-b border-spa-bg-secondary bg-spa-bg-primary/40 px-4 py-2.5">
               <span className="text-sm font-semibold text-spa-text-primary">
@@ -180,12 +180,12 @@ export function SchedulePage() {
               <span className="text-xs text-spa-text-secondary">
                 Version {editor.localSchedule.version}
                 {editor.schedule?.version !== editor.localSchedule.version && (
-                  <span className="ml-2 text-amber-600 font-medium">· nicht gespeichert</span>
+                  <span className="ml-2 text-spa-warning font-medium">· nicht gespeichert</span>
                 )}
               </span>
               {editor.scheduleQualityIssues.length > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-spa-warning-dark">
+                  <span className="h-1.5 w-1.5 rounded-full bg-spa-warning" />
                   {editor.scheduleQualityIssues.length} Hinweis{editor.scheduleQualityIssues.length !== 1 ? 'e' : ''}
                 </span>
               )}

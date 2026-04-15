@@ -78,7 +78,7 @@ export function BasicsStep({ formData, setFormData }: StepProps) {
               ))}
             </select>
 
-            <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-white">
+            <div className="overflow-hidden rounded-2xl border border-spa-bg-secondary bg-spa-surface">
               {formData.imageId ? (
                 <img
                   src={getImageUrl(formData.imageId) || ''}
@@ -94,7 +94,7 @@ export function BasicsStep({ formData, setFormData }: StepProps) {
             </div>
           </>
         ) : (
-          <div className="rounded-xl border border-dashed border-spa-bg-secondary bg-white px-4 py-6 text-sm text-spa-text-secondary">
+          <div className="rounded-xl border border-dashed border-spa-bg-secondary bg-spa-surface px-4 py-6 text-sm text-spa-text-secondary">
             Keine Bilder verfügbar. Laden Sie zuerst Medien hoch, wenn das Event eine Bildfläche bekommen soll.
           </div>
         )}

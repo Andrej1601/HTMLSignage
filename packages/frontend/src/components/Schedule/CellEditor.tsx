@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Entry } from '@/types/schedule.types';
 import type { Aroma } from '@/types/settings.types';
 import { Save, Trash2, Flame, X, Check } from 'lucide-react';
@@ -38,7 +38,9 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
     description: '',
   });
 
-  useEffect(() => {
+  const [prevEntry, setPrevEntry] = useState<Entry | null | undefined>(entry);
+  if (prevEntry !== entry) {
+    setPrevEntry(entry);
     if (entry) {
       setLocalEntry({
         ...entry,
@@ -47,7 +49,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
     } else {
       setLocalEntry({ title: '', subtitle: '', flames: undefined, badges: [], duration: 15, notes: '', description: '' });
     }
-  }, [entry]);
+  }
 
   const handleSave = () => {
     if (localEntry.title.trim()) {
@@ -154,8 +156,8 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                   className={clsx(
                     'flex items-center gap-0.5 px-3 py-2 rounded-xl border-2 transition-all',
                     isSelected
-                      ? 'border-amber-400 bg-amber-50 shadow-sm scale-105'
-                      : 'border-spa-bg-secondary bg-white text-spa-text-secondary hover:border-amber-200 hover:bg-amber-50/50'
+                      ? 'border-spa-warning bg-spa-warning-light shadow-sm scale-105'
+                      : 'border-spa-bg-secondary bg-spa-surface text-spa-text-secondary hover:border-spa-warning-light hover:bg-spa-warning-light/50'
                   )}
                   title={`${flameCount} Flamme${flameCount > 1 ? 'n' : ''}`}
                 >
@@ -164,7 +166,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                       key={i}
                       className={clsx(
                         'w-4 h-4',
-                        isSelected ? 'text-amber-500 fill-amber-500' : 'text-spa-text-secondary/50'
+                        isSelected ? 'text-spa-warning fill-spa-warning' : 'text-spa-text-secondary/50'
                       )}
                     />
                   ))}
@@ -242,7 +244,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                       'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
                       selected
                         ? 'bg-spa-secondary/20 text-spa-secondary-dark border-spa-secondary/40 shadow-sm'
-                        : 'bg-white text-spa-text-secondary border-spa-bg-secondary hover:border-spa-secondary/40 hover:bg-spa-secondary/5'
+                        : 'bg-spa-surface text-spa-text-secondary border-spa-bg-secondary hover:border-spa-secondary/40 hover:bg-spa-secondary/5'
                     )}
                   >
                     {aroma.emoji && <span>{aroma.emoji}</span>}

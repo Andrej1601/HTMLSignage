@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   useBulkSendCommand,
   useBulkUpdateDevices,
@@ -85,7 +85,10 @@ export function useDevicesPageState() {
     return Array.from(groups).sort((a, b) => a.localeCompare(b, 'de'));
   }, [pairedDevices]);
 
-  useEffect(() => {
+  const [prevPairedDeviceIds, setPrevPairedDeviceIds] = useState<string>('');
+  const pairedDeviceIdStr = pairedDevices.map((d) => d.id).join(',');
+  if (prevPairedDeviceIds !== pairedDeviceIdStr) {
+    setPrevPairedDeviceIds(pairedDeviceIdStr);
     const validIds = new Set(pairedDevices.map((device) => device.id));
     setSelectedDeviceIds((current) => {
       const nextSelection = current.filter((id) => validIds.has(id));
@@ -106,7 +109,7 @@ export function useDevicesPageState() {
     if (!hasMatchingFilter && activeGroupFilter !== 'all') {
       setActiveGroupFilter('all');
     }
-  }, [activeGroupFilter, pairedDevices]);
+  }
 
   const handleUpdateDevice = (id: string, updates: UpdateDeviceRequest) => {
     updateDevice.mutate({ id, updates }, {

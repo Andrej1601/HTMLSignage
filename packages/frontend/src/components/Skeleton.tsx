@@ -48,7 +48,7 @@ export function Skeleton({ variant = 'rect', className, lines }: SkeletonProps) 
 /** Pre-composed skeleton for a dashboard widget card */
 export function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={clsx('rounded-xl border border-spa-bg-secondary/50 bg-white p-6 space-y-4', className)}>
+    <div className={clsx('rounded-xl border border-spa-bg-secondary/50 bg-spa-surface p-6 space-y-4', className)}>
       <div className="flex items-center gap-3">
         <Skeleton variant="circle" className="h-8 w-8" />
         <Skeleton variant="text" className="h-5 w-1/3" />
@@ -76,7 +76,7 @@ export function SkeletonTableRow({ columns = 4 }: { columns?: number }) {
 /** Pre-composed skeleton for a media grid item */
 export function SkeletonMediaCard() {
   return (
-    <div className="rounded-xl border border-spa-bg-secondary/50 bg-white overflow-hidden">
+    <div className="rounded-xl border border-spa-bg-secondary/50 bg-spa-surface overflow-hidden">
       <Skeleton variant="rect" className="h-32 w-full rounded-none" />
       <div className="p-3 space-y-2">
         <Skeleton variant="text" className="h-4 w-2/3" />

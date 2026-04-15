@@ -93,6 +93,15 @@ export interface SlideshowConfig {
   persistentZonePosition?: 'left' | 'right' | 'top' | 'bottom';
   persistentZoneSize?: number; // percentage (30-70)
 
+  // Audio override (per-slideshow)
+  audioOverride?: import('@/types/settings.types').AudioSettings;
+
+  // Design override (per-slideshow, used for event slideshows)
+  displayAppearance?: import('@/types/settings.types').DisplayAppearance;
+  designStyle?: import('@/types/settings.types').DesignStyle;
+  colorPalette?: import('@/types/settings.types').ColorPaletteName;
+  theme?: Partial<import('@/types/settings.types').ThemeColors>;
+
   // Advanced
   pauseOnInteraction?: boolean;
   showSlideIndicators?: boolean;
@@ -119,7 +128,7 @@ export interface LayoutOption {
 export const LAYOUT_OPTIONS: LayoutOption[] = [
   {
     type: 'split-view',
-    label: 'Split View',
+    label: 'Geteilte Ansicht',
     description: 'Persistenter Bereich links, rotierender Content rechts',
     icon: '⬌',
     zones: [
@@ -131,7 +140,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
   },
   {
     type: 'full-rotation',
-    label: 'Full Screen Rotation',
+    label: 'Vollbild-Rotation',
     description: 'Jeder Slide nimmt den ganzen Bildschirm ein',
     icon: '🔄',
     zones: [
@@ -149,7 +158,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
   },
   {
     type: 'triple-view',
-    label: 'Triple View Dashboard',
+    label: 'Dreifach-Ansicht',
     description: '1 Bereich links, 2 Bereiche rechts (oben/unten) - Dashboard-Style',
     icon: '📊',
     zones: [
@@ -162,7 +171,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
   },
   {
     type: 'grid-2x2',
-    label: '2x2 Grid',
+    label: '2x2 Raster',
     description: '4 Inhalte gleichzeitig in 2x2 Grid',
     icon: '⬜',
     zones: [
@@ -200,7 +209,7 @@ export interface SlideTypeOption {
 export const SLIDE_TYPE_OPTIONS: SlideTypeOption[] = [
   {
     type: 'content-panel',
-    label: 'Content Panel',
+    label: 'Inhaltsbereich',
     description: 'Persistenter Content-Bereich (z.B. Aufgussplan Grid)',
     icon: '📅',
     requiresSauna: false,
@@ -209,7 +218,7 @@ export const SLIDE_TYPE_OPTIONS: SlideTypeOption[] = [
   },
   {
     type: 'sauna-detail',
-    label: 'Sauna Detail',
+    label: 'Sauna-Details',
     description: 'Zeigt Details einer spezifischen Sauna',
     icon: '🔥',
     requiresSauna: true,

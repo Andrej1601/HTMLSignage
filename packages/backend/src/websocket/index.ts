@@ -1,5 +1,5 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { verifyDeviceToken } from '../lib/auth.js';
+import { verifyAnyToken, verifyDeviceToken } from '../lib/auth.js';
 
 let io: SocketIOServer | null = null;
 const LOG_WS = process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug';
@@ -12,16 +12,26 @@ export function setupWebSocket(ioInstance: SocketIOServer) {
       console.log(`[ws] Client connected: ${socket.id}`);
     }
 
-    // Subscribe to schedule updates
-    socket.on('subscribe:schedule', () => {
+    // Subscribe to schedule updates (requires valid user or device token)
+    socket.on('subscribe:schedule', (payload?: string | { token?: string }) => {
+      const token = typeof payload === 'string' ? payload : payload?.token;
+      if (!verifyAnyToken(token)) {
+        socket.emit('subscribe:error', { error: 'authentication-required', channel: 'schedule' });
+        return;
+      }
       socket.join('schedule-updates');
       if (LOG_WS) {
         console.log(`[ws] ${socket.id} subscribed to schedule updates`);
       }
     });
 
-    // Subscribe to settings updates
-    socket.on('subscribe:settings', () => {
+    // Subscribe to settings updates (requires valid user or device token)
+    socket.on('subscribe:settings', (payload?: string | { token?: string }) => {
+      const token = typeof payload === 'string' ? payload : payload?.token;
+      if (!verifyAnyToken(token)) {
+        socket.emit('subscribe:error', { error: 'authentication-required', channel: 'settings' });
+        return;
+      }
       socket.join('settings-updates');
       if (LOG_WS) {
         console.log(`[ws] ${socket.id} subscribed to settings updates`);

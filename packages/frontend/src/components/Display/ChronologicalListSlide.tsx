@@ -5,7 +5,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import {
@@ -71,9 +71,10 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
   const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
 
-  // Theme colors (computed before useMemo that depends on them)
-  const accentGold = theme.accentGold || theme.accent || '#A68A64';
-  const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
+  // Theme colors — destructured for stable compiler deps
+  const { accentGold: _accentGold, accent: _accent, accentGreen: _accentGreen, timeColBg: _timeColBg } = theme;
+  const accentGold = _accentGold || _accent || '#A68A64';
+  const accentGreen = _accentGreen || _timeColBg || '#8F9779';
   const statusLive = theme.statusLive || '#10B981';
   const statusPrestart = theme.statusPrestart || '#F59E0B';
   const prestartMinutes = resolvePrestartMinutes(settings);
@@ -84,11 +85,14 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
+  const hideBuiltInHeader = isEditorial || isMineralNoir;
   const isCompactLayout = profile.isCompact || profile.isNarrow;
   const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
   const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
 
   // Merge all infusions from all saunas into one sorted list
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- complex display computation, keep manual memo for perf
   const allInfusions = useMemo(() => {
     if (!daySchedule) return [];
 
@@ -122,6 +126,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
     });
 
     return merged.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [daySchedule, visibleSaunas, scheduleSaunaIndexByKey, activePresetKey, accentGreen, accentGold]);
 
   // --- Auto-scroll logic ---
@@ -228,7 +233,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
       )}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
-      {!isEditorial && (
+      {!hideBuiltInHeader && (
         <header className={classNames('z-20 w-full shrink-0', compactHeader ? 'mb-3 flex flex-col gap-3' : 'mb-5 flex items-center justify-between')}>
         <div className={classNames('flex items-center min-w-0 flex-1', isCompactLayout ? 'gap-3' : 'gap-5')}>
           <div

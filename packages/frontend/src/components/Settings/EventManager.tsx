@@ -3,10 +3,9 @@ import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useDevices } from '@/hooks/useDevices';
 import { useMedia } from '@/hooks/useMedia';
-import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
+import type { Schedule } from '@/types/schedule.types';
 import {
   type Event,
-  type EventSettingsOverrides,
   type Settings,
 } from '@/types/settings.types';
 import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
@@ -15,10 +14,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Calendar,
-  Layers,
+  CalendarClock,
   MonitorSmartphone,
-  Music2,
-  Palette,
+  Presentation,
   Plus,
   Save,
   Sparkles,
@@ -28,13 +26,10 @@ import {
 import clsx from 'clsx';
 import {
   buildPersistedEvent,
-  buildPreviewEvent,
   createBlankEvent,
   createEventDraftFromEvent,
   getEventBounds,
   getStepValidationMessage,
-  mergeOverridePatch,
-  normalizeOverrides,
   sanitizeTargetDeviceIds,
   type EventDraft,
 } from './eventManager.utils';
@@ -43,9 +38,6 @@ import {
   TimingStep,
   DeliveryStep,
   SlideshowStep,
-  DesignStep,
-  AudioStep,
-  PreviewStep,
 } from './EventWizard';
 import { EventListCard } from './EventListCard';
 
@@ -62,13 +54,10 @@ const ASSISTANT_STEPS = [
   { id: 'basics', label: 'Basis', icon: Wand2 },
   { id: 'timing', label: 'Zeitraum', icon: Calendar },
   { id: 'delivery', label: 'Ausspielung', icon: MonitorSmartphone },
-  { id: 'slideshow', label: 'Slideshow', icon: Layers },
-  { id: 'design', label: 'Design', icon: Palette },
-  { id: 'audio', label: 'Audio', icon: Music2 },
-  { id: 'preview', label: 'Vorschau', icon: Sparkles },
+  { id: 'slideshow', label: 'Slideshow', icon: Presentation },
 ] as const;
 
-export function EventManager({ events, settings, schedule, onChange }: EventManagerProps) {
+export function EventManager({ events, settings: _settings, schedule, onChange }: EventManagerProps) {
   const { data: media } = useMedia();
   const { data: devices } = useDevices();
   const [assistantMode, setAssistantMode] = useState<AssistantMode>('idle');
@@ -84,17 +73,7 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
   const normalizedFormData = useMemo<EventDraft>(() => ({
     ...formData,
     targetDeviceIds: sanitizeTargetDeviceIds(formData.targetDeviceIds),
-    settingsOverrides: normalizeOverrides(formData.settingsOverrides),
   }), [formData]);
-
-  const selectedTargetDevices = useMemo(
-    () => pairedDevices.filter((device) => normalizedFormData.targetDeviceIds?.includes(device.id)),
-    [normalizedFormData.targetDeviceIds, pairedDevices],
-  );
-  const selectedTargetDeviceIds = useMemo(
-    () => normalizedFormData.targetDeviceIds ?? [],
-    [normalizedFormData.targetDeviceIds],
-  );
 
   const { start: startDateTime, end: endDateTime } = useMemo(
     () => getEventBounds(normalizedFormData),
@@ -107,27 +86,6 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
     startDateTime.getTime() <= endDateTime.getTime(),
   );
 
-  const previewEvent = useMemo(
-    () => buildPreviewEvent(normalizedFormData, editingId),
-    [editingId, normalizedFormData],
-  );
-
-  const previewSettings = useMemo<Settings>(() => ({
-    ...settings,
-    events: [previewEvent],
-  }), [previewEvent, settings]);
-
-  const previewSchedule = schedule || createDefaultSchedule();
-  const previewTargetLabel = selectedTargetDevices.length > 0
-    ? selectedTargetDevices.length === 1
-      ? selectedTargetDevices[0].name
-      : `${selectedTargetDevices.length} Geräte`
-    : selectedTargetDeviceIds.length > 0
-      ? `${selectedTargetDeviceIds.length} Geräte`
-      : 'Alle Geräte';
-  const effectivePrestartMinutes = normalizedFormData.settingsOverrides?.display?.prestartMinutes
-    ?? settings.display?.prestartMinutes
-    ?? 10;
   const eventQualityIssues = useMemo(() => getEventQualityIssues({
     events,
     devices: pairedDevices,
@@ -198,26 +156,24 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
     onChange(events.map((event) => (event.id === id ? { ...event, isActive: !event.isActive } : event)));
   };
 
-  const updateOverrides = (patch: Partial<EventSettingsOverrides>) => {
-    setFormData((prev) => ({
-      ...prev,
-      settingsOverrides: mergeOverridePatch(prev.settingsOverrides, patch),
-    }));
-  };
-
   const currentStep = ASSISTANT_STEPS[stepIndex];
   const currentStepId = currentStep.id;
 
-  const stepProps = { formData, normalizedFormData, setFormData, updateOverrides };
+  const stepProps = { formData, normalizedFormData, setFormData };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-spa-text-primary">Event-Assistent</h3>
-          <p className="text-sm text-spa-text-secondary">
-            Zeitraum, Zielgeräte, Plan, Design und Audio in einem durchgehenden Ablauf vorbereiten.
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-spa-primary/10 flex items-center justify-center text-spa-primary">
+            <CalendarClock className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-spa-text-primary">Event-Assistent</h3>
+            <p className="text-sm text-spa-text-secondary">
+              Zeitraum, Zielgeräte, Aufgussplan und Slideshow für besondere Anlässe konfigurieren.
+            </p>
+          </div>
         </div>
         {assistantMode === 'idle' && (
           <Button icon={Plus} onClick={handleStartAdd}>
@@ -239,7 +195,7 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
       {assistantMode !== 'idle' && (
         <SectionCard
           title={assistantMode === 'create' ? 'Neues Event vorbereiten' : 'Event bearbeiten'}
-          description="Der Assistent führt nacheinander durch Inhalt, Zeitraum, Zielgeräte, Design, Audio und Vorschau."
+          description="Der Assistent führt durch Inhalt, Zeitraum, Zielgeräte und Slideshow-Auswahl."
           icon={Sparkles}
           actions={(
             <span className="rounded-full bg-spa-accent/10 px-3 py-1 text-xs font-semibold text-spa-accent">
@@ -286,30 +242,7 @@ export function EventManager({ events, settings, schedule, onChange }: EventMana
             {currentStepId === 'basics' && <BasicsStep {...stepProps} />}
             {currentStepId === 'timing' && <TimingStep {...stepProps} />}
             {currentStepId === 'delivery' && <DeliveryStep {...stepProps} pairedDevices={pairedDevices} />}
-            {currentStepId === 'slideshow' && (
-              <SlideshowStep
-                {...stepProps}
-                settings={settings}
-                previewSchedule={previewSchedule}
-                previewSettings={previewSettings}
-                effectivePrestartMinutes={effectivePrestartMinutes}
-              />
-            )}
-            {currentStepId === 'design' && <DesignStep {...stepProps} />}
-            {currentStepId === 'audio' && <AudioStep {...stepProps} />}
-            {currentStepId === 'preview' && (
-              <PreviewStep
-                {...stepProps}
-                previewEvent={previewEvent}
-                previewSchedule={previewSchedule}
-                previewSettings={previewSettings}
-                pairedDevices={pairedDevices}
-                selectedTargetDevices={selectedTargetDevices}
-                selectedTargetDeviceIds={selectedTargetDeviceIds}
-                previewTargetLabel={previewTargetLabel}
-                startDateTime={startDateTime}
-              />
-            )}
+            {currentStepId === 'slideshow' && <SlideshowStep {...stepProps} />}
 
             <div className="flex flex-col gap-3 border-t border-spa-bg-secondary pt-4 md:flex-row md:items-center md:justify-between">
               <Button type="button" variant="ghost" icon={X} onClick={resetAssistant}>

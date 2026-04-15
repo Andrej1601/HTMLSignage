@@ -92,6 +92,8 @@ export const io = new SocketIOServer(httpServer, {
 });
 
 // Middleware
+// CORP: cross-origin needed for media served from /uploads/ to be loadable by display clients
+// COEP: disabled because display clients embed cross-origin media (images/videos) without CORS headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginEmbedderPolicy: false,

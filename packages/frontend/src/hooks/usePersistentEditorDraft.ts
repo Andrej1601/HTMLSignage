@@ -49,14 +49,12 @@ export function usePersistentEditorDraft<TValue, TMeta = undefined>({
   const [availableDraft, setAvailableDraft] = useState<EditorDraftRecord<TValue, TMeta> | null>(null);
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
 
-  useEffect(() => {
-    if (!enabled) {
-      setAvailableDraft(null);
-      return;
-    }
-
-    setAvailableDraft(readDraft<TValue, TMeta>(storageKey));
-  }, [enabled, storageKey]);
+  const [prevDraftKey, setPrevDraftKey] = useState<string | null>(enabled ? storageKey : null);
+  const draftKey = enabled ? storageKey : null;
+  if (prevDraftKey !== draftKey) {
+    setPrevDraftKey(draftKey);
+    setAvailableDraft(draftKey ? readDraft<TValue, TMeta>(draftKey) : null);
+  }
 
   useEffect(() => {
     if (!enabled || !isDirty || value == null || typeof window === 'undefined') {

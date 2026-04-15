@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { SlideConfig, SlideType } from '@/types/slideshow.types';
 import { SLIDE_TYPE_OPTIONS, getEffectiveMediaFit, getSlideTypeOption } from '@/types/slideshow.types';
 import type { Media } from '@/types/media.types';
@@ -41,7 +41,10 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
 
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const [prevSlideKey, setPrevSlideKey] = useState<string | null>(null);
+  const slideKey = isOpen ? (slide && 'id' in slide ? slide.id : '__new__') : null;
+  if (slideKey !== prevSlideKey) {
+    setPrevSlideKey(slideKey);
     if (slide) {
       setFormData({
         type: slide.type,
@@ -70,7 +73,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       });
     }
     setError('');
-  }, [slide, isOpen]);
+  }
 
   const handleSave = () => {
     setError('');
@@ -281,7 +284,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
               type="checkbox"
               checked={formData.showTitle ?? true}
               onChange={(e) => setFormData({ ...formData, showTitle: e.target.checked })}
-              className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary"
+              className="w-4 h-4 text-spa-primary border-spa-border rounded focus:ring-spa-primary"
             />
             <span className="text-sm text-spa-text-secondary">Titel anzeigen</span>
           </label>
@@ -314,7 +317,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
               type="checkbox"
               checked={formData.enabled}
               onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-              className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary"
+              className="w-4 h-4 text-spa-primary border-spa-border rounded focus:ring-spa-primary"
             />
             <span className="text-sm font-medium text-spa-text-primary">Slide aktiviert</span>
           </label>

@@ -48,10 +48,10 @@ export function DropdownMenu({
     triggerRef.current?.focus();
   }, []);
 
-  const handleItemClick = (item: DropdownMenuItem) => {
+  const handleItemClick = useCallback((item: DropdownMenuItem) => {
     item.onClick();
     if (!item.keepOpen) close();
-  };
+  }, [close]);
 
   // Focus menu item when focusedIndex changes
   useEffect(() => {
@@ -99,7 +99,7 @@ export function DropdownMenu({
         }
         break;
     }
-  }, [open, focusedIndex, allItems, close]);
+  }, [open, focusedIndex, allItems, close, handleItemClick]);
 
   return (
     <div className="relative" onKeyDown={handleKeyDown}>
@@ -137,7 +137,7 @@ export function DropdownMenu({
           <div
             ref={menuRef}
             role="menu"
-            className={`absolute right-0 mt-2 ${width} bg-white rounded-lg shadow-lg border border-spa-bg-secondary z-20`}
+            className={`absolute right-0 mt-2 ${width} bg-spa-surface rounded-lg shadow-lg border border-spa-bg-secondary z-20`}
           >
             <div className="py-1">
               {sections.map((section, sectionIndex) => (

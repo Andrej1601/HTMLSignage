@@ -214,6 +214,92 @@ export function requireRole(role: string) {
   };
 }
 
+/**
+ * Verifies a JWT token as either a valid user token or device token
+ * (signature + expiry only, no DB session check).
+ * Use for lightweight auth gates like WebSocket subscriptions.
+ */
+export function verifyAnyToken(token: string | undefined | null): boolean {
+  if (!token) return false;
+  return verifyUserToken(token) !== null || verifyDeviceToken(token) !== null;
+}
+
+/**
+ * Middleware that accepts either user auth (Bearer/cookie) or device auth
+ * (X-Device-Token / Authorization: Device …).
+ * Use on routes that need to be accessible to both admin users and display devices.
+ */
+export async function authOrDeviceMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  // 1. Try user auth (Bearer token or cookie)
+  let userToken: string | null = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    userToken = authHeader.substring(7);
+  }
+  if (!userToken) {
+    const cookieToken = req.cookies?.auth_token;
+    if (typeof cookieToken === 'string') {
+      userToken = cookieToken;
+    }
+  }
+
+  if (userToken) {
+    const payload = verifyUserToken(userToken);
+    if (payload) {
+      try {
+        const now = new Date();
+        const tokenHash = hashSessionToken(userToken);
+        const [session, user] = await Promise.all([
+          prisma.session.findFirst({
+            where: { tokenHash, userId: payload.userId, expiresAt: { gt: now } },
+            select: { id: true },
+          }),
+          prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: { id: true, username: true, email: true, roles: true },
+          }),
+        ]);
+
+        if (session && user) {
+          req.userId = user.id;
+          req.user = user;
+          next();
+          return;
+        }
+      } catch (error) {
+        console.error('[auth] authOrDeviceMiddleware user-auth error:', error);
+      }
+    }
+  }
+
+  // 2. Try device auth (X-Device-Token header or Authorization: Device …)
+  const deviceHeaderToken = req.headers['x-device-token'];
+  const deviceTokenValue = typeof deviceHeaderToken === 'string'
+    ? deviceHeaderToken
+    : (authHeader && authHeader.startsWith('Device ') ? authHeader.substring(7) : null);
+
+  if (deviceTokenValue) {
+    const payload = verifyDeviceToken(deviceTokenValue);
+    if (payload) {
+      try {
+        const device = await prisma.device.findUnique({
+          where: { id: payload.deviceId },
+          select: { id: true, tokenRevokedAt: true },
+        });
+        if (device && !device.tokenRevokedAt) {
+          req.deviceId = payload.deviceId;
+          next();
+          return;
+        }
+      } catch (error) {
+        console.error('[auth] authOrDeviceMiddleware device-auth error:', error);
+      }
+    }
+  }
+
+  res.status(401).json({ error: 'unauthorized', message: 'Authentication required' });
+}
+
 export function generatePairingCode(): string {
   return randomInt(100000, 1000000).toString();
 }

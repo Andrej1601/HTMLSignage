@@ -89,7 +89,6 @@ export function DisplayLivePreview({
         ref={iframeRef}
         title={title}
         src={src}
-        allow="autoplay"
         className="absolute inset-0 h-full w-full border-0"
         onLoad={() => {
           setIsReady(false);

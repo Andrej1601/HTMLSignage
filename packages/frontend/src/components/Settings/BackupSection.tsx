@@ -75,7 +75,7 @@ interface BackupSectionProps {
 
 function PreviewMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-spa-bg-secondary bg-white px-3 py-2">
+    <div className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">{label}</div>
       <div className="mt-1 text-sm font-semibold text-spa-text-primary">{value}</div>
     </div>
@@ -442,7 +442,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               </div>
 
               {latestImportJob.progress && (
-                <div className="min-w-[220px] rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-xs text-spa-text-secondary">
+                <div className="min-w-[220px] rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-xs text-spa-text-secondary">
                   <div className="font-semibold text-spa-text-primary">{latestImportJob.progress.message}</div>
                   <div className="mt-1">Schritt: {latestImportJob.progress.stage}</div>
                   {typeof latestImportJob.progress.percent === 'number' && (
@@ -509,13 +509,13 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
                   <PreviewMetric label="App-Version" value={preview.current.appVersion} />
                   <PreviewMetric label="Medien" value={String(preview.current.mediaCount)} />
                   <PreviewMetric label="Plan-Version" value={preview.current.scheduleVersion ? `v${preview.current.scheduleVersion}` : '-'} />
-                  <PreviewMetric label="Settings-Version" value={preview.current.settingsVersion ? `v${preview.current.settingsVersion}` : '-'} />
+                  <PreviewMetric label="Einstellungs-Version" value={preview.current.settingsVersion ? `v${preview.current.settingsVersion}` : '-'} />
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <div className="rounded-lg border border-spa-bg-secondary bg-white p-4">
+              <div className="rounded-lg border border-spa-bg-secondary bg-spa-surface p-4">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Importplan</div>
                 <div className="grid grid-cols-2 gap-2">
                   <PreviewMetric label="Medienimport" value={String(preview.importPlan.importedMedia)} />
@@ -525,7 +525,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
                 </div>
               </div>
 
-              <div className="rounded-lg border border-spa-bg-secondary bg-white p-4">
+              <div className="rounded-lg border border-spa-bg-secondary bg-spa-surface p-4">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Konflikte & Hinweise</div>
                 <div className="flex flex-wrap gap-2">
                   <span className="inline-flex items-center rounded-full border border-spa-bg-secondary bg-spa-bg-primary px-2.5 py-1 text-xs text-spa-text-secondary">
@@ -558,7 +558,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               </div>
             )}
 
-            <div className="rounded-lg border border-spa-bg-secondary bg-white p-4">
+            <div className="rounded-lg border border-spa-bg-secondary bg-spa-surface p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Package className="h-4 w-4 text-spa-text-secondary" />
                 <div className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Medienvorschau</div>
@@ -585,7 +585,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
                     {item.tags.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {item.tags.map((tag) => (
-                          <span key={`${item.filename}-${tag}`} className="inline-flex rounded-full border border-spa-bg-secondary bg-white px-2 py-0.5 text-[11px] text-spa-text-secondary">
+                          <span key={`${item.filename}-${tag}`} className="inline-flex rounded-full border border-spa-bg-secondary bg-spa-surface px-2 py-0.5 text-[11px] text-spa-text-secondary">
                             {tag}
                           </span>
                         ))}

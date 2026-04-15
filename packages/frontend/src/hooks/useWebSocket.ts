@@ -55,12 +55,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onBulkDeviceUpdateRef = useRef(onBulkDeviceUpdate);
   const onReconnectRef = useRef(onReconnect);
 
-  onScheduleUpdateRef.current = onScheduleUpdate;
-  onSettingsUpdateRef.current = onSettingsUpdate;
-  onDeviceCommandRef.current = onDeviceCommand;
-  onDeviceUpdateRef.current = onDeviceUpdate;
-  onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
-  onReconnectRef.current = onReconnect;
+  useEffect(() => {
+    onScheduleUpdateRef.current = onScheduleUpdate;
+    onSettingsUpdateRef.current = onSettingsUpdate;
+    onDeviceCommandRef.current = onDeviceCommand;
+    onDeviceUpdateRef.current = onDeviceUpdate;
+    onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
+    onReconnectRef.current = onReconnect;
+  });
 
   const connect = useCallback(async () => {
     disconnectRequestedRef.current = false;
@@ -199,10 +201,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     switch (channel) {
       case 'schedule':
-        socketRef.current.emit('subscribe:schedule');
+        socketRef.current.emit('subscribe:schedule', { token: deviceToken });
         break;
       case 'settings':
-        socketRef.current.emit('subscribe:settings');
+        socketRef.current.emit('subscribe:settings', { token: deviceToken });
         break;
       case 'device':
         if (deviceId) {

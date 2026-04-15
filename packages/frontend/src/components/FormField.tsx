@@ -7,7 +7,7 @@ import clsx from 'clsx';
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-  'w-full px-4 py-2 border border-spa-bg-secondary rounded-lg text-spa-text-primary bg-white focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+  'w-full px-4 py-2 border border-spa-bg-secondary rounded-lg text-spa-text-primary bg-spa-surface focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 const inputError =
   'border-spa-error focus:ring-spa-error';
@@ -200,7 +200,7 @@ export function ToggleField({
             'w-11 h-6 rounded-full transition-colors',
             'peer-focus:outline-hidden peer-focus:ring-4 peer-focus:ring-spa-primary/20',
             'after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px]',
-            'after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all',
+            'after:bg-spa-surface after:rounded-full after:h-5 after:w-5 after:transition-all',
             'peer-checked:after:translate-x-full',
             checked ? 'bg-spa-primary' : 'bg-spa-bg-secondary',
           )}

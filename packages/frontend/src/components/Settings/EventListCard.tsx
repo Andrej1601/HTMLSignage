@@ -67,7 +67,7 @@ export function EventListCard({ events, onEdit, onDelete, onToggleActive }: Even
                   isCurrentlyActive
                     ? 'border-spa-success bg-spa-success-light/40'
                     : event.isActive
-                      ? 'border-spa-bg-secondary bg-white hover:bg-spa-bg-primary/50'
+                      ? 'border-spa-bg-secondary bg-spa-surface hover:bg-spa-bg-primary/50'
                       : 'border-spa-bg-secondary bg-spa-bg-primary/60 opacity-75',
                 )}
               >

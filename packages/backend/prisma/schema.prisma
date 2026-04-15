@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -221,6 +222,7 @@ model RateLimit {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@index([key, expiresAt])
   @@index([expiresAt])
   @@map("rate_limits")
 }

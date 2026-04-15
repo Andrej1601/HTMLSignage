@@ -33,11 +33,16 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
         {/* Left: Config */}
         <div className="space-y-5 rounded-2xl border border-spa-bg-secondary/80 bg-spa-bg-primary/40 p-5">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-spa-text-primary">Wartungsscreen</h3>
-              <p className="mt-1 text-sm text-spa-text-secondary">
-                Text und Hintergrund für Displays im Wartungsmodus festlegen.
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-spa-primary/10 flex items-center justify-center text-spa-primary">
+                <Monitor className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-spa-text-primary">Wartungsscreen</h3>
+                <p className="text-sm text-spa-text-secondary">
+                  Text und Hintergrund für Displays im Wartungsmodus festlegen.
+                </p>
+              </div>
             </div>
             <button
               type="button"
@@ -50,7 +55,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
           </div>
 
           {/* Display style toggle */}
-          <div className="rounded-xl border border-spa-bg-secondary bg-white p-4 space-y-3">
+          <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-4 space-y-3">
             <div>
               <p className="text-sm font-semibold text-spa-text-primary">Anzeigestil</p>
               <p className="text-xs text-spa-text-secondary mt-0.5">
@@ -70,7 +75,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 {/* Glass mini-preview */}
                 <div className="relative h-14 w-full overflow-hidden rounded-lg bg-linear-to-br from-stone-700 to-stone-900">
                   <div className="absolute inset-0 flex items-center justify-center p-2">
-                    <div className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center backdrop-blur-xs">
+                    <div className="rounded-lg border border-white/20 bg-spa-surface/10 px-3 py-2 text-center backdrop-blur-xs">
                       <div className="text-[7px] font-semibold uppercase tracking-wider text-white/60">Wartung</div>
                       <div className="text-[8px] font-bold text-white leading-tight mt-0.5">Gleich zurück</div>
                     </div>
@@ -93,7 +98,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                     className="absolute inset-0 flex flex-col items-center justify-center"
                     style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
                   >
-                    <div className="mb-1 rounded-full border border-amber-400/60 bg-amber-400/10 px-2 py-0.5 text-[6px] font-bold uppercase tracking-widest text-amber-300">Wartung</div>
+                    <div className="mb-1 rounded-full border border-spa-warning/60 bg-spa-warning/10 px-2 py-0.5 text-[6px] font-bold uppercase tracking-widest text-spa-warning-light">Wartung</div>
                     <div className="text-[8px] font-bold text-white">Gleich zurück</div>
                   </div>
                 </div>
@@ -112,11 +117,11 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 type="text"
                 value={normalized.label}
                 onChange={(e) => update({ label: e.target.value })}
-                className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+                className="w-full rounded-xl border border-spa-bg-secondary bg-spa-surface px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
                 placeholder="Wartungsmodus"
               />
             </div>
-            <label className="flex items-center justify-between gap-4 rounded-xl border border-spa-bg-secondary bg-white px-4 py-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-spa-bg-secondary bg-spa-surface px-4 py-3">
               <div>
                 <div className="text-sm font-medium text-spa-text-primary">Gerätename anzeigen</div>
                 <div className="text-xs text-spa-text-secondary">
@@ -140,7 +145,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               type="text"
               value={normalized.headline}
               onChange={(e) => update({ headline: e.target.value })}
-              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-xl border border-spa-bg-secondary bg-spa-surface px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="Display vorübergehend pausiert"
             />
           </div>
@@ -153,7 +158,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               value={normalized.message}
               onChange={(e) => update({ message: e.target.value })}
               rows={4}
-              className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-3 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-xl border border-spa-bg-secondary bg-spa-surface px-3 py-3 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="Dieses Gerät ist aktuell für Wartung reserviert."
             />
           </div>
@@ -167,11 +172,11 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               </p>
             </div>
             {images.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-spa-bg-secondary bg-white/70 px-4 py-6 text-sm text-spa-text-secondary text-center">
+              <div className="rounded-xl border border-dashed border-spa-bg-secondary bg-spa-surface/70 px-4 py-6 text-sm text-spa-text-secondary text-center">
                 Keine Bilder verfügbar. Lade zuerst in der Mediathek ein Bild hoch.
               </div>
             ) : (
-              <div className="grid max-h-60 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-spa-bg-secondary bg-white p-2 md:grid-cols-4">
+              <div className="grid max-h-60 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-spa-bg-secondary bg-spa-surface p-2 md:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => update({ backgroundImageId: undefined })}
@@ -248,7 +253,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                     {normalized.message}
                   </p>
                   {normalized.showDeviceName && (
-                    <div className="mt-6 inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white/85">
+                    <div className="mt-6 inline-flex rounded-full border border-white/20 bg-spa-surface/10 px-4 py-2 text-sm font-medium text-white/85">
                       Display Sauna-Lounge
                     </div>
                   )}
@@ -260,7 +265,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 className="absolute inset-0 flex flex-col items-center justify-center text-center p-10"
                 style={{ backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.45)' }}
               >
-                <div className="mb-5 rounded-full border border-amber-400/60 bg-amber-400/10 px-4 py-1 text-[10px] font-black uppercase tracking-widest text-amber-300">
+                <div className="mb-5 rounded-full border border-spa-warning/60 bg-spa-warning/10 px-4 py-1 text-[10px] font-black uppercase tracking-widest text-spa-warning-light">
                   {normalized.label}
                 </div>
                 <h4 className="text-4xl font-bold text-white tracking-tight leading-tight mb-4">
@@ -279,7 +284,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
           </div>
 
           {normalized.backgroundImageId && (
-            <div className="flex items-center gap-2 rounded-xl border border-spa-bg-secondary bg-white/80 px-3 py-2 text-xs text-spa-text-secondary">
+            <div className="flex items-center gap-2 rounded-xl border border-spa-bg-secondary bg-spa-surface/80 px-3 py-2 text-xs text-spa-text-secondary">
               <Image className="h-4 w-4 text-spa-primary" />
               Das ausgewählte Bild wird mit einem dunklen Overlay hinterlegt, damit der Text lesbar bleibt.
             </div>

@@ -1,14 +1,15 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search } from 'lucide-react';
+import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search, Sun, Moon } from 'lucide-react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasPermission, type Permission } from '@/utils/permissions';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { useWebSocketStatus } from '@/contexts/WebSocketContext';
+import { useThemeMode } from '@/hooks/useThemeMode';
 
 interface NavItem {
   name: string;
@@ -59,6 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { isConnected: wsConnected } = useWebSocketStatus();
+  const { effectiveTheme, setMode } = useThemeMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const commandPalette = useCommandPaletteContext();
 
@@ -164,9 +166,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return navigation.find((item) => isRouteActive(location.pathname, item.href)) || null;
   }, [navigation, location.pathname]);
 
-  useEffect(() => {
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
+  if (prevPathname !== location.pathname) {
+    setPrevPathname(location.pathname);
     setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+  }
 
   const handleLogout = async () => {
     await logout();
@@ -184,14 +188,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </a>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col bg-linear-to-b from-spa-primary to-spa-primary-dark text-white shadow-2xl">
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-72 lg:flex-col bg-linear-to-b from-spa-nav-bg to-spa-nav-bg-dark text-white shadow-2xl">
         <div className="flex-1 flex flex-col min-h-0">
           {/* Logo/Brand */}
           <div className="flex h-24 shrink-0 flex-col justify-center border-b border-white/10 px-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/55">
-              Control Center
-            </p>
-            <h1 className="mt-2 text-xl font-bold tracking-tight">HTMLSignage</h1>
+            <h1 className="text-lg font-bold tracking-tight">Signage Control Center</h1>
             <p className="mt-1 text-xs text-white/70">
               Displays, Inhalte und Systembetrieb in einem Blick.
             </p>
@@ -201,7 +202,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {user && (
             <div className="border-b border-white/10 px-4 py-4">
               <div className="flex items-center">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 font-bold">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-spa-surface/20 font-bold">
                   {user.username.charAt(0).toUpperCase()}
                 </div>
                 <div className="ml-3">
@@ -237,8 +238,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className={clsx(
                       'group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all',
                       isActive
-                        ? 'border-white bg-white text-spa-primary shadow-xs'
-                        : 'border-transparent text-white/90 hover:border-white/20 hover:bg-white/10 hover:text-white',
+                        ? 'border-white bg-spa-surface text-spa-primary shadow-xs'
+                        : 'border-transparent text-white/90 hover:border-white/20 hover:bg-spa-surface/10 hover:text-white',
                     )}
                   >
                     <Icon
@@ -254,11 +255,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             />
           </nav>
 
-          {/* Search + Logout */}
+          {/* Search + Theme + Logout */}
           <div className="shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
             <button
               onClick={commandPalette.open}
-              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
             >
               <span className="flex items-center">
                 <Search className="mr-3 shrink-0 h-5 w-5" />
@@ -267,8 +268,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
             </button>
             <button
+              onClick={() => setMode(effectiveTheme === 'dark' ? 'light' : 'dark')}
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              aria-label={effectiveTheme === 'dark' ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}
+            >
+              {effectiveTheme === 'dark'
+                ? <Sun className="mr-3 shrink-0 h-5 w-5" />
+                : <Moon className="mr-3 shrink-0 h-5 w-5" />
+              }
+              {effectiveTheme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
+            </button>
+            <button
               onClick={handleLogout}
-              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
             >
               <LogOut className="mr-3 shrink-0 h-5 w-5" />
               Abmelden
@@ -309,15 +321,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-30 bg-black/50" role="presentation" onClick={() => setIsMobileMenuOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setIsMobileMenuOpen(false); }}>
           <div
-            className="fixed inset-y-0 left-0 w-64 bg-spa-primary text-white shadow-xl"
+            className="fixed inset-y-0 left-0 w-64 bg-spa-nav-bg text-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col h-full">
               {/* User Info */}
               {user && (
-                <div className="px-4 py-6 bg-spa-primary-dark border-b border-spa-primary-light">
+                <div className="px-4 py-6 bg-spa-nav-bg-dark border-b border-white/10">
                   <div className="flex items-center">
-                    <div className="shrink-0 h-12 w-12 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">
+                    <div className="shrink-0 h-12 w-12 bg-spa-surface/20 rounded-full flex items-center justify-center font-bold text-lg">
                       {user.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="ml-3">

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── Brand ─────────────────────────────────────────────────── */
   --color-spa-primary: #8B6F47;
   --color-spa-primary-light: #B8976A;
   --color-spa-primary-dark: #6B5435;
@@ -9,10 +10,26 @@
   --color-spa-secondary-dark: #5A7A70;
   --color-spa-accent: #D4A574;
   --color-spa-accent-warm: #E8C79B;
+
+  /* ── Backgrounds ───────────────────────────────────────────── */
   --color-spa-bg-primary: #F9F7F4;
   --color-spa-bg-secondary: #EDE9E3;
+
+  /* ── Surfaces (cards, dialogs, inputs) ─────────────────────── */
+  --color-spa-surface: #FFFFFF;
+  --color-spa-surface-raised: #FFFFFF;
+  --color-spa-border: #E5E0D8;
+
+  /* ── Navigation & Dark Headers (always dark regardless of theme) */
+  --color-spa-nav-bg: #8B6F47;
+  --color-spa-nav-bg-dark: #6B5435;
+  --color-spa-header-bg: #8B6F47;
+
+  /* ── Text ───────────────────────────────────────────────────── */
   --color-spa-text-primary: #2C2416;
   --color-spa-text-secondary: #5A4E3F;
+
+  /* ── Semantic ───────────────────────────────────────────────── */
   --color-spa-success: #10B981;
   --color-spa-success-light: #D1FAE5;
   --color-spa-success-dark: #047857;
@@ -25,9 +42,49 @@
   --color-spa-info: #3B82F6;
   --color-spa-info-light: #DBEAFE;
   --color-spa-info-dark: #1D4ED8;
+
+  /* ── Animations ─────────────────────────────────────────────── */
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-scale-in: scale-in 0.2s ease-out;
   --animate-slide-in-right: slide-in-right 0.3s ease-out;
+}
+
+/* ── Dark Mode Overrides ───────────────────────────────────────── */
+.dark {
+  --color-spa-primary: #C4A57B;
+  --color-spa-primary-light: #8B6F47;
+  --color-spa-primary-dark: #4A3C2A;
+  --color-spa-nav-bg: #2A231A;
+  --color-spa-nav-bg-dark: #1F1A13;
+  --color-spa-header-bg: #3D3425;
+  --color-spa-secondary: #7FA99B;
+  --color-spa-secondary-light: #5A7A70;
+  --color-spa-secondary-dark: #A8C7BC;
+  --color-spa-accent: #D4A574;
+  --color-spa-accent-warm: #A07850;
+
+  --color-spa-bg-primary: #1A1714;
+  --color-spa-bg-secondary: #252220;
+
+  --color-spa-surface: #2A2724;
+  --color-spa-surface-raised: #333028;
+  --color-spa-border: #3D3A35;
+
+  --color-spa-text-primary: #F0EDE8;
+  --color-spa-text-secondary: #A89E91;
+
+  --color-spa-success: #34D399;
+  --color-spa-success-light: #0D3321;
+  --color-spa-success-dark: #6EE7B7;
+  --color-spa-warning: #FBBF24;
+  --color-spa-warning-light: #3D2E0A;
+  --color-spa-warning-dark: #FCD34D;
+  --color-spa-error: #F87171;
+  --color-spa-error-light: #3D1212;
+  --color-spa-error-dark: #FCA5A5;
+  --color-spa-info: #60A5FA;
+  --color-spa-info-light: #1A2744;
+  --color-spa-info-dark: #93C5FD;
 }
 
 @keyframes fade-in {

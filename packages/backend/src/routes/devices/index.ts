@@ -102,6 +102,30 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
       effectiveSettings.slideshow = (device.slideshow as unknown as { config: unknown }).config;
     }
 
+    // Resolve event slideshows: if any event references a slideshowId, embed the config
+    if (Array.isArray(effectiveSettings.events)) {
+      const eventSlideshowIds = effectiveSettings.events
+        .map((e: { slideshowId?: string }) => e.slideshowId)
+        .filter((id): id is string => Boolean(id));
+      if (eventSlideshowIds.length > 0) {
+        const eventSlideshows = await prisma.slideshow.findMany({
+          where: { id: { in: eventSlideshowIds } },
+          select: { id: true, config: true },
+        });
+        const slideshowMap = new Map(eventSlideshows.map((s) => [s.id, s.config]));
+        effectiveSettings.events = effectiveSettings.events.map(
+          (event: Record<string, unknown>) => {
+            const sid = event.slideshowId as string | undefined;
+            if (!sid || !slideshowMap.has(sid)) return event;
+            return {
+              ...event,
+              settingsOverrides: { slideshow: slideshowMap.get(sid) },
+            };
+          },
+        );
+      }
+    }
+
     const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);
     const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
     const fleetState = readDeviceFleetState(device);

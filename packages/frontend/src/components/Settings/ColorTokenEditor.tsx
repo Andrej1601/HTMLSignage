@@ -93,9 +93,9 @@ function ColorSwatch({
         </div>
       </div>
       {/* Label bar */}
-      <div className="bg-white border border-t-0 border-stone-200 rounded-b-lg px-1.5 py-1">
-        <p className="text-[10px] font-semibold text-stone-700 truncate leading-none">{label}</p>
-        <p className="text-[9px] font-mono text-stone-400 mt-0.5 truncate uppercase">
+      <div className="bg-spa-surface border border-t-0 border-spa-border rounded-b-lg px-1.5 py-1">
+        <p className="text-[10px] font-semibold text-spa-text-primary truncate leading-none">{label}</p>
+        <p className="text-[9px] font-mono text-spa-text-secondary mt-0.5 truncate uppercase">
           {(value || '#000000').replace('#', '')}
         </p>
       </div>
@@ -115,7 +115,7 @@ export function ColorTokenEditor({ theme, onChange }: ColorTokenEditorProps) {
       <button
         type="button"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-stone-50 border border-stone-200 hover:bg-white hover:border-spa-primary/40 transition-all text-sm font-semibold text-stone-700 group"
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-spa-bg-secondary border border-spa-border hover:bg-spa-surface hover:border-spa-primary/40 transition-all text-sm font-semibold text-spa-text-primary group"
       >
         <span>Einzelne Farb-Tokens anpassen</span>
         <span className="text-spa-text-secondary group-hover:text-spa-primary transition-colors">
@@ -125,12 +125,12 @@ export function ColorTokenEditor({ theme, onChange }: ColorTokenEditorProps) {
 
       {showAdvanced && (
         <div className="mt-3 space-y-5">
-          <p className="text-xs text-stone-500 px-1">
+          <p className="text-xs text-spa-text-secondary px-1">
             Klicke auf eine Farbfläche, um den Wert direkt im Browser-Picker zu ändern.
           </p>
           {COLOR_GROUPS.map((group) => (
             <div key={group.title}>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2 px-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-spa-text-secondary mb-2 px-0.5">
                 {group.title}
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">

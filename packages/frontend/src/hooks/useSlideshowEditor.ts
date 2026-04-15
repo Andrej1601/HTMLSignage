@@ -44,12 +44,10 @@ export function useSlideshowEditor() {
   });
 
   // When slideshows load, select default if nothing selected
-  useEffect(() => {
-    if (slideshows.length === 0) return;
-    if (selectedSlideshowId && slideshows.some((s) => s.id === selectedSlideshowId)) return;
+  if (slideshows.length > 0 && (!selectedSlideshowId || !slideshows.some((s) => s.id === selectedSlideshowId))) {
     const defaultShow = slideshows.find((s) => s.isDefault);
     setSelectedSlideshowId(defaultShow?.id || slideshows[0].id);
-  }, [slideshows, selectedSlideshowId]);
+  }
 
   // Clear ?slideshow= from URL after consuming it
   useEffect(() => {
@@ -85,10 +83,11 @@ export function useSlideshowEditor() {
   }, [settings]);
 
   // Auto-load when slideshow selection changes
-  useEffect(() => {
-    if (!selectedSlideshow || isDirty) return;
+  const [prevSelectedId, setPrevSelectedId] = useState<string | null>(null);
+  if (selectedSlideshow && !isDirty && selectedSlideshow.id !== prevSelectedId) {
+    setPrevSelectedId(selectedSlideshow.id);
     loadEditorFromSlideshow(selectedSlideshow);
-  }, [selectedSlideshow, isDirty, loadEditorFromSlideshow]);
+  }
 
   // Preview payload
   const previewPayload = useMemo(() => {

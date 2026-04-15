@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Monitor } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
@@ -33,24 +33,18 @@ export function DeviceEditDialog({
   const [slideshowId, setSlideshowId] = useState<string | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [error, setError] = useState('');
-  const initializedDeviceIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || !device) return;
-    if (initializedDeviceIdRef.current === device.id) return;
-
-    initializedDeviceIdRef.current = device.id;
-    setName(device.name);
-    setGroupName(device.groupName || '');
-    setSlideshowId(device.slideshowId || null);
-    setMaintenanceMode(Boolean(device.maintenanceMode));
-    setError('');
-  }, [device, isOpen]);
-
-  useEffect(() => {
-    if (isOpen) return;
-    initializedDeviceIdRef.current = null;
-  }, [isOpen]);
+  const [prevDeviceKey, setPrevDeviceKey] = useState<string | null>(null);
+  const deviceKey = isOpen && device ? device.id : null;
+  if (deviceKey !== prevDeviceKey) {
+    setPrevDeviceKey(deviceKey);
+    if (device && isOpen) {
+      setName(device.name);
+      setGroupName(device.groupName || '');
+      setSlideshowId(device.slideshowId || null);
+      setMaintenanceMode(Boolean(device.maintenanceMode));
+      setError('');
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +66,7 @@ export function DeviceEditDialog({
 
   const handleClose = () => {
     if (!isSaving) {
-      initializedDeviceIdRef.current = null;
+      setPrevDeviceKey(null);
       setName('');
       setGroupName('');
       setSlideshowId(null);
@@ -161,7 +155,7 @@ export function DeviceEditDialog({
             value={slideshowId || ''}
             onChange={(e) => setSlideshowId(e.target.value || null)}
             disabled={isSaving}
-            className="w-full rounded-xl border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 disabled:opacity-60"
+            className="w-full rounded-xl border border-spa-bg-secondary bg-spa-surface px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 disabled:opacity-60"
           >
             <option value="">
               Standard{defaultSlideshow ? ` (${defaultSlideshow.name})` : ''}

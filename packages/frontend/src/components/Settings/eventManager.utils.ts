@@ -1,7 +1,4 @@
-import type {
-  Event,
-  EventSettingsOverrides,
-} from '@/types/settings.types';
+import type { Event } from '@/types/settings.types';
 
 export type EventDraft = Omit<Event, 'id'>;
 
@@ -22,27 +19,8 @@ export function createBlankEvent(): EventDraft {
     assignedPreset: 'Evt1',
     isActive: true,
     targetDeviceIds: undefined,
-    settingsOverrides: undefined,
+    slideshowId: undefined,
   };
-}
-
-export function normalizeOverrides(raw?: EventSettingsOverrides): EventSettingsOverrides | undefined {
-  if (!raw) return undefined;
-
-  const next: EventSettingsOverrides = {};
-
-  if (raw.displayAppearance) next.displayAppearance = raw.displayAppearance;
-  if (raw.designStyle) next.designStyle = raw.designStyle;
-  if (raw.colorPalette) next.colorPalette = raw.colorPalette;
-  if (raw.theme && Object.keys(raw.theme).length > 0) next.theme = raw.theme;
-  if (raw.fonts && Object.keys(raw.fonts).length > 0) next.fonts = raw.fonts;
-  if (raw.slides && Object.keys(raw.slides).length > 0) next.slides = raw.slides;
-  if (raw.display && Object.keys(raw.display).length > 0) next.display = raw.display;
-  if (raw.header && Object.keys(raw.header).length > 0) next.header = raw.header;
-  if (raw.slideshow) next.slideshow = raw.slideshow;
-  if (raw.audio) next.audio = raw.audio;
-
-  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 export function sanitizeTargetDeviceIds(raw?: string[]): string[] | undefined {
@@ -79,7 +57,7 @@ export function buildPreviewEvent(draft: EventDraft, editingId: string | null): 
     endTime: draft.endTime || '23:59',
     isActive: true,
     targetDeviceIds: sanitizeTargetDeviceIds(draft.targetDeviceIds),
-    settingsOverrides: normalizeOverrides(draft.settingsOverrides),
+    slideshowId: draft.slideshowId,
   };
 }
 
@@ -90,7 +68,7 @@ export function buildPersistedEvent(editingId: string | null, draft: EventDraft)
     name: draft.name.trim(),
     description: draft.description?.trim() || undefined,
     targetDeviceIds: sanitizeTargetDeviceIds(draft.targetDeviceIds),
-    settingsOverrides: normalizeOverrides(draft.settingsOverrides),
+    slideshowId: draft.slideshowId,
   };
 }
 
@@ -106,7 +84,7 @@ export function createEventDraftFromEvent(event: Event): EventDraft {
     assignedPreset: event.assignedPreset,
     isActive: event.isActive,
     targetDeviceIds: sanitizeTargetDeviceIds(event.targetDeviceIds),
-    settingsOverrides: normalizeOverrides(event.settingsOverrides),
+    slideshowId: event.slideshowId,
   };
 }
 
@@ -117,18 +95,10 @@ export function formatEventWindow(event: Pick<Event, 'startDate' | 'startTime' |
   const end = new Date(`${endDate}T${endTime}`);
 
   const startLabel = start.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
   const endLabel = end.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
   return `${startLabel} bis ${endLabel}`;
@@ -161,28 +131,11 @@ export function getStepValidationMessage(
     }
   }
 
-  if (currentStepId === 'preview' && !canSave) {
-    return 'Für die Vorschau fehlt noch ein vollständiger und gültiger Event-Zeitraum.';
+  if (currentStepId === 'slideshow' && !canSave) {
+    return 'Für die Slideshow-Auswahl fehlt noch ein vollständiger Event-Zeitraum.';
   }
 
   return null;
-}
-
-export function mergeOverridePatch(
-  current: EventSettingsOverrides | undefined,
-  patch: Partial<EventSettingsOverrides>,
-): EventSettingsOverrides | undefined {
-  const merged: EventSettingsOverrides = {
-    ...(current || {}),
-    ...patch,
-  };
-
-  if ('audio' in patch && !patch.audio) delete merged.audio;
-  if ('displayAppearance' in patch && !patch.displayAppearance) delete merged.displayAppearance;
-  if ('designStyle' in patch && !patch.designStyle) delete merged.designStyle;
-  if ('colorPalette' in patch && !patch.colorPalette) delete merged.colorPalette;
-
-  return normalizeOverrides(merged);
 }
 
 export function toggleTargetDeviceId(current: string[] | undefined, deviceId: string): string[] | undefined {

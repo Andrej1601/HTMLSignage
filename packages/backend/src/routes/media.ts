@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
-import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
+import { authMiddleware, authOrDeviceMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter, uploadLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -85,8 +85,8 @@ function getMediaType(mimeType: string): string {
   return 'other';
 }
 
-// GET /api/media - List all media
-router.get('/', async (req, res) => {
+// GET /api/media - List all media (requires user or device auth)
+router.get('/', authOrDeviceMiddleware, async (req, res) => {
   try {
     const { type, search, tag } = req.query;
     const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
@@ -157,8 +157,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/media/tags - List distinct tags
-router.get('/tags', async (_req, res) => {
+// GET /api/media/tags - List distinct tags (requires user or device auth)
+router.get('/tags', authOrDeviceMiddleware, async (_req, res) => {
   try {
     const rows = await prisma.$queryRaw<Array<{ tag: string | null }>>`
       SELECT DISTINCT unnest("tags") AS tag
@@ -176,8 +176,8 @@ router.get('/tags', async (_req, res) => {
   }
 });
 
-// GET /api/media/:id - Get single media item
-router.get('/:id', async (req, res) => {
+// GET /api/media/:id - Get single media item (requires user or device auth)
+router.get('/:id', authOrDeviceMiddleware, async (req, res) => {
   try {
     const media = await prisma.media.findUnique({
       where: { id: str(req.params.id) },

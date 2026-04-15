@@ -5,7 +5,7 @@ import type { Schedule, PresetKey } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
+import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
@@ -281,6 +281,8 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
   const statusPrestart = theme.statusPrestart || '#F59E0B';
   const prestartMinutes = resolvePrestartMinutes(settings);
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
+  const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
+  const hideBuiltInHeader = isEditorial || isMineralNoir;
   const isCompactLayout = profile.isCompact || profile.isNarrow;
   const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
   const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
@@ -415,7 +417,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
       )}
       style={{ backgroundColor: leftBg, color: textMain }}
     >
-      {!isEditorial && (
+      {!hideBuiltInHeader && (
         <header className={classNames('z-10 w-full px-1 shrink-0', compactHeader ? 'mb-3 flex flex-col gap-3' : 'mb-4 flex items-end justify-between gap-4')}>
         <div className={classNames('flex items-center min-w-0', isCompactLayout ? 'gap-3' : 'gap-5')}>
           <div
@@ -443,7 +445,7 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
             <h1
               className={classNames(
                 'font-black uppercase tracking-tighter leading-none overflow-hidden text-ellipsis',
-                isUltraCompactLayout ? 'text-[24px] whitespace-normal' : isCompactLayout ? 'text-[34px]' : 'text-[52px] whitespace-nowrap',
+                isUltraCompactLayout ? 'text-[22px] whitespace-normal' : isCompactLayout ? 'text-[28px]' : 'text-3xl whitespace-nowrap',
               )}
             >
               {firstWord}{' '}

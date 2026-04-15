@@ -14,7 +14,7 @@ export function SaunaPickerField({ saunas, selectedId, onSelect }: SaunaPickerFi
         Sauna auswählen *
       </label>
       {saunas.length === 0 ? (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-spa-error">
           Keine Saunas konfiguriert. Bitte erstelle zuerst Saunas.
         </p>
       ) : (

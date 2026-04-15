@@ -50,8 +50,8 @@ export function SlideshowConfigPanel({
   prestartMinutes = 10,
   showOpenPreviewButton = true,
   previewButtonLabel = 'Vorschau öffnen',
-  scenarioDefaultDeviceId = null,
-  scenarioAllowedDeviceIds,
+  scenarioDefaultDeviceId: _scenarioDefaultDeviceId = null,
+  scenarioAllowedDeviceIds: _scenarioAllowedDeviceIds,
   onChange,
   onPrestartMinutesChange,
   showAudioOverride = false,
@@ -69,12 +69,9 @@ export function SlideshowConfigPanel({
 
   const zones = useMemo(() => getZonesForLayout(config.layout), [config.layout]);
 
-  useEffect(() => {
-    const firstZone = zones[0]?.id || 'main';
-    if (!zones.some((zone) => zone.id === selectedZone)) {
-      setSelectedZone(firstZone);
-    }
-  }, [zones, selectedZone]);
+  if (!zones.some((zone) => zone.id === selectedZone)) {
+    setSelectedZone(zones[0]?.id || 'main');
+  }
 
   useEffect(() => {
     const slidesNeedingZone = config.slides.filter((slide) => !slide.zoneId);
@@ -189,8 +186,6 @@ export function SlideshowConfigPanel({
         <DisplayScenarioPreview
           schedule={previewSchedule}
           settings={previewSettings}
-          defaultDeviceId={scenarioDefaultDeviceId}
-          allowedDeviceIds={scenarioAllowedDeviceIds}
         />
       </SectionCard>
 

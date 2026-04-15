@@ -306,7 +306,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
   const saunaImageUrl = useMemo(() => {
     if (!sauna?.imageId) return null;
     return getMediaUploadUrl(media, sauna.imageId);
-  }, [media, sauna?.imageId]);
+  }, [media, sauna]);
 
   const infusions: SaunaInfusionDetailItem[] = useMemo(() => {
     if (!sauna || !daySchedule?.rows || !daySchedule.saunas) return [];
@@ -328,7 +328,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
         };
       })
       .filter(Boolean) as SaunaInfusionDetailItem[];
-  }, [activePresetKey, daySchedule?.rows, daySchedule?.saunas, sauna, scheduleSaunaIndexByKey]);
+  }, [activePresetKey, daySchedule, sauna, scheduleSaunaIndexByKey]);
 
   const sortedInfusions = useMemo(() => {
     return infusions.slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));

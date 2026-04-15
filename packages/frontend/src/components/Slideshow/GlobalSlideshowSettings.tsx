@@ -1,4 +1,4 @@
-import { Settings, Clock, Layers } from 'lucide-react';
+import { Settings, Clock, Timer, Sparkles } from 'lucide-react';
 import { SectionCard } from '@/components/SectionCard';
 import type { SlideshowConfig } from '@/types/slideshow.types';
 
@@ -10,6 +10,13 @@ interface GlobalSlideshowSettingsProps {
   onPrestartMinutesChange?: (minutes: number) => void;
 }
 
+const TRANSITION_OPTIONS = [
+  { value: 'fade', label: 'Einblenden', description: 'Sanftes Überblenden' },
+  { value: 'slide', label: 'Schieben', description: 'Horizontaler Übergang' },
+  { value: 'zoom', label: 'Zoom', description: 'Vergrößerungs-Effekt' },
+  { value: 'none', label: 'Direkt', description: 'Kein Übergang' },
+] as const;
+
 export function GlobalSlideshowSettings({
   config,
   prestartMinutes = 10,
@@ -20,133 +27,84 @@ export function GlobalSlideshowSettings({
   const canEditPrestartMinutes = Boolean(onPrestartMinutesChange);
 
   return (
-    <SectionCard title="Globale Einstellungen" icon={Settings}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Timing & Transitions */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-spa-text-primary flex items-center gap-2">
-            <Clock className="w-4 h-4 text-spa-text-secondary" />
-            Timing & Übergang
-          </h4>
-          <div className="rounded-lg border border-spa-bg-secondary p-4 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-1.5">
-                Standard-Dauer
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  max="300"
-                  value={config.defaultDuration}
-                  onChange={(event) => {
-                    onChange({ ...config, defaultDuration: parseInt(event.target.value, 10) || 10 });
-                  }}
-                  disabled={disabled}
-                  className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
-                />
-                <span className="text-sm text-spa-text-secondary">Sekunden</span>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-spa-text-primary mb-1.5">
-                Standard-Übergang
-              </label>
-              <select
-                value={config.defaultTransition}
-                onChange={(event) => {
-                  onChange({
-                    ...config,
-                    defaultTransition: event.target.value as SlideshowConfig['defaultTransition'],
-                  });
-                }}
-                disabled={disabled}
-                className="w-full px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
-              >
-                <option value="fade">Fade</option>
-                <option value="slide">Slide</option>
-                <option value="zoom">Zoom</option>
-                <option value="none">Keine</option>
-              </select>
-            </div>
-            {canEditPrestartMinutes && (
-              <div>
-                <label className="block text-sm font-medium text-spa-text-primary mb-1.5">
-                  „GLEICH" ab (Min vor Start)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="120"
-                    step="1"
-                    value={prestartMinutes}
-                    onChange={(event) => {
-                      if (!onPrestartMinutesChange) return;
-                      const nextValue = parseInt(event.target.value, 10);
-                      if (!Number.isFinite(nextValue)) return;
-                      onPrestartMinutesChange(Math.min(120, Math.max(0, nextValue)));
-                    }}
-                    disabled={disabled}
-                    className="w-24 px-3 py-2 border border-spa-bg-secondary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary disabled:opacity-50 text-sm"
-                  />
-                  <span className="text-sm text-spa-text-secondary">Minuten</span>
-                </div>
-                <p className="mt-1 text-xs text-spa-text-secondary">
-                  Zeitfenster für den Status „GLEICH".
-                </p>
-              </div>
-            )}
+    <SectionCard title="Wiedergabe & Timing" icon={Settings}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+
+        {/* Slide-Dauer */}
+        <div className="rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-spa-primary" />
+            <label className="text-sm font-semibold text-spa-text-primary">Slide-Dauer</label>
           </div>
+          <div className="flex items-baseline gap-2">
+            <input
+              type="number"
+              min="1"
+              max="300"
+              value={config.defaultDuration}
+              onChange={(e) => onChange({ ...config, defaultDuration: parseInt(e.target.value, 10) || 10 })}
+              disabled={disabled}
+              className="w-20 px-3 py-2.5 border border-spa-border bg-spa-surface text-spa-text-primary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary disabled:opacity-50 text-lg font-semibold text-center"
+            />
+            <span className="text-sm text-spa-text-secondary">Sekunden</span>
+          </div>
+          <p className="text-xs text-spa-text-secondary">Dauer pro Slide bevor automatisch weitergeschaltet wird.</p>
         </div>
 
-        {/* Display Options */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-semibold text-spa-text-primary flex items-center gap-2">
-            <Layers className="w-4 h-4 text-spa-text-secondary" />
-            Darstellung
-          </h4>
-          <div className="rounded-lg border border-spa-bg-secondary p-4 space-y-4">
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-spa-bg-primary/50 transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.showSlideIndicators !== false}
-                onChange={(event) => {
-                  onChange({ ...config, showSlideIndicators: event.target.checked });
-                }}
-                disabled={disabled}
-                className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary disabled:opacity-50"
-              />
-              <div>
-                <span className="text-sm font-medium text-spa-text-primary block">
-                  Slide-Indikatoren anzeigen
-                </span>
-                <span className="text-xs text-spa-text-secondary">
-                  Zeigt Punkte zur Navigation zwischen Slides an.
-                </span>
-              </div>
-            </label>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-spa-bg-primary/50 transition-colors cursor-pointer">
-              <input
-                type="checkbox"
-                checked={config.showZoneBorders !== false}
-                onChange={(event) => {
-                  onChange({ ...config, showZoneBorders: event.target.checked });
-                }}
-                disabled={disabled}
-                className="w-4 h-4 text-spa-primary border-gray-300 rounded focus:ring-spa-primary disabled:opacity-50"
-              />
-              <div>
-                <span className="text-sm font-medium text-spa-text-primary block">
-                  Trennlinien anzeigen
-                </span>
-                <span className="text-xs text-spa-text-secondary">
-                  Zeigt visuelle Trennlinien zwischen Layout-Zonen an.
-                </span>
-              </div>
-            </label>
+        {/* Übergang */}
+        <div className="rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-spa-primary" />
+            <label className="text-sm font-semibold text-spa-text-primary">Übergang</label>
           </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {TRANSITION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange({ ...config, defaultTransition: opt.value })}
+                disabled={disabled}
+                className={`py-2 px-2.5 text-xs font-medium rounded-lg border transition-colors ${
+                  config.defaultTransition === opt.value
+                    ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                    : 'border-spa-border bg-spa-surface text-spa-text-secondary hover:border-spa-primary/40'
+                } disabled:opacity-50`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-spa-text-secondary">Effekt beim Wechsel zwischen Slides.</p>
         </div>
+
+        {/* Prestart */}
+        {canEditPrestartMinutes && (
+          <div className="rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-spa-primary" />
+              <label className="text-sm font-semibold text-spa-text-primary">„Gleich"-Vorlauf</label>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <input
+                type="number"
+                min="0"
+                max="120"
+                step="1"
+                value={prestartMinutes}
+                onChange={(e) => {
+                  if (!onPrestartMinutesChange) return;
+                  const v = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(v)) return;
+                  onPrestartMinutesChange(Math.min(120, Math.max(0, v)));
+                }}
+                disabled={disabled}
+                className="w-20 px-3 py-2.5 border border-spa-border bg-spa-surface text-spa-text-primary rounded-lg focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary disabled:opacity-50 text-lg font-semibold text-center"
+              />
+              <span className="text-sm text-spa-text-secondary">Minuten</span>
+            </div>
+            <p className="text-xs text-spa-text-secondary">Ab wann ein Aufguss als „Gleich" angezeigt wird, bevor er beginnt.</p>
+          </div>
+        )}
       </div>
     </SectionCard>
   );

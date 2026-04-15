@@ -109,12 +109,10 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
     when: isDirty,
   });
 
-  useEffect(() => {
-    if (schedule && !localSchedule && !draftState.hasStoredDraft) {
-      setLocalSchedule(schedule);
-      setEditingPreset(resolveInitialEditingPreset(schedule, settings));
-    }
-  }, [draftState.hasStoredDraft, schedule, localSchedule, settings]);
+  if (schedule && !localSchedule && !draftState.hasStoredDraft) {
+    setLocalSchedule(schedule);
+    setEditingPreset(resolveInitialEditingPreset(schedule, settings));
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -128,24 +126,25 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (localSchedule && settings?.saunas) {
-      const saunaNames = settings.saunas
-        .sort((a: Sauna, b: Sauna) => a.order - b.order)
-        .map((s: Sauna) => s.name);
+  const saunaNamesKey = settings?.saunas?.map((s: Sauna) => s.name).join(',') ?? '';
+  const [prevSaunaNamesKey, setPrevSaunaNamesKey] = useState(saunaNamesKey);
+  if (prevSaunaNamesKey !== saunaNamesKey && localSchedule && settings?.saunas) {
+    setPrevSaunaNamesKey(saunaNamesKey);
+    const saunaNames = settings.saunas
+      .sort((a: Sauna, b: Sauna) => a.order - b.order)
+      .map((s: Sauna) => s.name);
 
-      const currentSaunas = localSchedule.presets[editingPreset]?.saunas || [];
-      const saunasChanged =
-        currentSaunas.length !== saunaNames.length ||
-        currentSaunas.some((name, i) => name !== saunaNames[i]);
+    const currentSaunas = localSchedule.presets[editingPreset]?.saunas || [];
+    const saunasChanged =
+      currentSaunas.length !== saunaNames.length ||
+      currentSaunas.some((name, i) => name !== saunaNames[i]);
 
-      if (saunasChanged) {
-        const syncedSchedule = syncScheduleWithSaunas(localSchedule, saunaNames);
-        setLocalSchedule(syncedSchedule);
-        setIsDirty(true);
-      }
+    if (saunasChanged) {
+      const syncedSchedule = syncScheduleWithSaunas(localSchedule, saunaNames);
+      setLocalSchedule(syncedSchedule);
+      setIsDirty(true);
     }
-  }, [settings?.saunas, localSchedule, editingPreset]);
+  }
 
   const saunaColors = useMemo(() => {
     const map: Record<string, string> = {};
@@ -155,9 +154,9 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
       }
     }
     return map;
-  }, [settings?.saunas]);
+  }, [settings]);
 
-  const now = new Date(eventClock);
+  const now = useMemo(() => new Date(eventClock), [eventClock]);
   const livePreset: PresetKey = localSchedule
     ? resolveLivePresetKey(localSchedule, settings, now)
     : getTodayPresetKey(now);
@@ -178,9 +177,17 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
   const handleSetLivePreset = useCallback(() => {
     if (!localSchedule || localSchedule.autoPlay) return;
     if (localSchedule.activePreset === editingPreset) return;
-    setLocalSchedule(withManualActivePreset(localSchedule, editingPreset));
-    setIsDirty(true);
-  }, [localSchedule, editingPreset]);
+    const updated = withManualActivePreset(localSchedule, editingPreset);
+    setLocalSchedule(updated);
+    // Save immediately — user expects "Live schalten" to take effect right away
+    const scheduleToSave = withIncrementedScheduleVersion(updated);
+    save(scheduleToSave, {
+      onSuccess: () => {
+        draftState.clearDraft();
+        setIsDirty(false);
+      },
+    });
+  }, [localSchedule, editingPreset, save, draftState]);
 
   const handleAutoPlayToggle = useCallback(() => {
     if (!localSchedule) return;

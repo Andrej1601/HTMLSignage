@@ -25,7 +25,7 @@ export function MediaPickerField({
       </label>
       {supportsVideo ? (
         videos.length === 0 ? (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-spa-error">
             Keine Videos hochgeladen. Bitte lade zuerst Videos hoch.
           </p>
         ) : (
@@ -41,7 +41,7 @@ export function MediaPickerField({
                     : 'border-spa-bg-secondary hover:border-spa-primary/50'
                 )}
               >
-                <div className="relative w-full h-24 bg-gray-900">
+                <div className="relative w-full h-24 bg-spa-text-primary">
                   <video
                     src={buildUploadUrl(video.filename)}
                     className="w-full h-full object-cover"
@@ -52,7 +52,7 @@ export function MediaPickerField({
                     <Film className="w-8 h-8 text-white" />
                   </div>
                 </div>
-                <div className="px-2 py-1 text-xs text-spa-text-primary truncate bg-white">
+                <div className="px-2 py-1 text-xs text-spa-text-primary truncate bg-spa-surface">
                   {video.originalName}
                 </div>
               </button>
@@ -60,7 +60,7 @@ export function MediaPickerField({
           </div>
         )
       ) : images.length === 0 ? (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-spa-error">
           Keine Bilder hochgeladen. Bitte lade zuerst Bilder hoch.
         </p>
       ) : (

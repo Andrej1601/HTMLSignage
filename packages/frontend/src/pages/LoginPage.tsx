@@ -64,7 +64,7 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-spa-bg-primary to-spa-bg-secondary">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full">
+      <div className="bg-spa-surface p-8 rounded-2xl shadow-2xl max-w-md w-full">
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">

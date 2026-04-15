@@ -66,7 +66,7 @@ const EntryCard = memo(function EntryCard({
         'relative rounded-xl px-3.5 py-3 h-[88px] transition-all border group/card overflow-hidden pointer-events-none',
         hasConflict && 'border-spa-warning/50 bg-spa-warning-light/30',
         !hasConflict && isHovered  && 'border-spa-accent bg-spa-accent-warm/15 shadow-md ring-1 ring-spa-accent/30',
-        !hasConflict && !isHovered && 'border-spa-bg-secondary bg-white',
+        !hasConflict && !isHovered && 'border-spa-bg-secondary bg-spa-surface',
       )}
     >
       {/* Pencil hover overlay */}
@@ -206,8 +206,8 @@ export function ScheduleGrid({
         <table className="w-full border-collapse">
           {/* Sticky header */}
           <thead className="sticky top-0 z-20">
-            <tr className="bg-spa-primary text-white">
-              <th className="px-4 py-3 text-left w-24 sticky left-0 z-30 bg-spa-primary">
+            <tr className="bg-spa-header-bg text-white">
+              <th className="px-4 py-3 text-left w-24 sticky left-0 z-30 bg-spa-header-bg">
                 <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/60">
                   <Clock className="w-3.5 h-3.5" />
                   Zeit
@@ -271,9 +271,9 @@ export function ScheduleGrid({
                   className={clsx(
                     'border-t group',
                     isCurrentRow
-                      ? 'border-t-2 border-t-emerald-400 bg-emerald-50/60'
+                      ? 'border-t-2 border-t-spa-success bg-spa-success-light/60'
                       : 'border-spa-bg-secondary/80',
-                    !isCurrentRow && (timeRowIndex % 2 === 0 ? 'bg-white' : 'bg-spa-bg-primary/20'),
+                    !isCurrentRow && (timeRowIndex % 2 === 0 ? 'bg-spa-surface' : 'bg-spa-bg-primary/20'),
                   )}
                 >
                   {/* Time cell */}
@@ -281,8 +281,8 @@ export function ScheduleGrid({
                     className={clsx(
                       'px-4 py-3 sticky left-0 z-10 transition-colors',
                       isCurrentRow
-                        ? 'bg-emerald-50/60'
-                        : timeRowIndex % 2 === 0 ? 'bg-white' : 'bg-spa-bg-primary/20',
+                        ? 'bg-spa-success-light/60'
+                        : timeRowIndex % 2 === 0 ? 'bg-spa-surface' : 'bg-spa-bg-primary/20',
                       'group-hover:bg-spa-primary/5',
                     )}
                   >
@@ -291,15 +291,15 @@ export function ScheduleGrid({
                       onClick={handleTimeClick}
                       className={clsx(
                         'group/time flex items-center gap-1.5 font-mono text-lg font-bold transition-colors min-h-[44px] min-w-[52px]',
-                        isCurrentRow ? 'text-emerald-600 hover:text-emerald-700' : 'text-spa-primary hover:text-spa-primary-dark',
+                        isCurrentRow ? 'text-spa-success hover:text-spa-success-dark' : 'text-spa-primary hover:text-spa-primary-dark',
                       )}
                       title="Zeit bearbeiten"
                     >
                       {timeRow.time}
                       {isCurrentRow && (
                         <span className="relative flex h-2 w-2 ml-0.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-spa-success opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-spa-success" />
                         </span>
                       )}
                       {!isCurrentRow && (

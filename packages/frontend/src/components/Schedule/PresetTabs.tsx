@@ -124,7 +124,7 @@ export function PresetTabs({ editor }: PresetTabsProps) {
         <div className="relative" ref={copyMenuRef}>
           <button
             onClick={() => setShowCopyMenu((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary bg-white px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:border-spa-primary/30 hover:text-spa-text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:border-spa-primary/30 hover:text-spa-text-primary transition-colors"
           >
             <Copy className="h-3.5 w-3.5" />
             Kopieren
@@ -132,7 +132,7 @@ export function PresetTabs({ editor }: PresetTabsProps) {
           </button>
 
           {showCopyMenu && (
-            <div className="absolute right-0 top-full z-30 mt-1.5 min-w-[180px] rounded-xl border border-spa-bg-secondary bg-white shadow-lg">
+            <div className="absolute right-0 top-full z-30 mt-1.5 min-w-[180px] rounded-xl border border-spa-bg-secondary bg-spa-surface shadow-lg">
               <div className="p-1.5">
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-spa-text-secondary/60">
                   Wochentage
@@ -198,14 +198,14 @@ function PresetChip({ preset, editingPreset, livePreset, activeEventPreset, vari
       {isLive && (
         <span className={clsx(
           'ml-0.5 h-1.5 w-1.5 rounded-full shrink-0',
-          isActive ? 'bg-white/80' : 'bg-spa-primary'
+          isActive ? 'bg-spa-surface/80' : 'bg-spa-primary'
         )} />
       )}
       {/* Event dot */}
       {isEventActive && !isLive && (
         <span className={clsx(
           'ml-0.5 h-1.5 w-1.5 rounded-full shrink-0',
-          isActive ? 'bg-white/80' : 'bg-spa-accent'
+          isActive ? 'bg-spa-surface/80' : 'bg-spa-accent'
         )} />
       )}
     </button>

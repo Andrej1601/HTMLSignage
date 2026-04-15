@@ -53,7 +53,7 @@ function SaunaCardInner({ sauna, onEdit, onDelete, isDragging, dragListeners }: 
   return (
     <div
       className={clsx(
-        'bg-white rounded-lg shadow border-2 transition-all',
+        'bg-spa-surface rounded-lg shadow border-2 transition-all',
         isDragging ? 'opacity-50 border-spa-primary shadow-lg' : 'border-transparent hover:border-spa-bg-secondary'
       )}
     >

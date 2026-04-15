@@ -52,19 +52,28 @@ async function ensureDefaultSlideshow() {
 
 // ─── GET /api/slideshows - List all slideshows ──────────────────────────────
 
-router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (_req: AuthRequest, res) => {
+router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (req: AuthRequest, res) => {
   try {
     await ensureDefaultSlideshow();
 
-    const slideshows = await prisma.slideshow.findMany({
-      include: {
-        devices: {
-          select: { id: true, name: true },
+    const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+    const parsedOffset = Number.parseInt(String(req.query.offset ?? ''), 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 500) : 200;
+    const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+
+    const [slideshows, totalCount] = await Promise.all([
+      prisma.slideshow.findMany({
+        include: {
+          devices: {
+            select: { id: true, name: true },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.slideshow.count(),
+    ]);
 
     const result = slideshows.map(({ devices, ...rest }) => ({
       ...rest,
@@ -72,6 +81,7 @@ router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (_r
       deviceCount: devices.length,
     }));
 
+    res.setHeader('X-Total-Count', String(totalCount));
     res.json(result);
   } catch (error) {
     console.error('[slideshows] Error listing:', error);

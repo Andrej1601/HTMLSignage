@@ -17,6 +17,7 @@ import { Layout } from '@/components/Layout';
 import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { DeviceList } from '@/components/Devices/DeviceList';
+import { EmptyState } from '@/components/EmptyState';
 import { DeviceEditDialog } from '@/components/Devices/DeviceEditDialog';
 import { PendingPairings } from '@/components/Devices/PendingPairings';
 import { StatCard } from '@/components/StatCard';
@@ -44,7 +45,7 @@ export function DevicesPage() {
         <div className="space-y-6">
           <div className="h-20 animate-pulse rounded-2xl bg-spa-bg-secondary" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }, (_, i) => <SkeletonCard key={i} />)}
+            {Array.from({ length: 6 }, (_, i) => <SkeletonCard key={`skeleton-card-${i}`} />)}
           </div>
         </div>
       </Layout>
@@ -92,7 +93,7 @@ export function DevicesPage() {
 
         {/* Status Filter Tabs + Search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="flex gap-1 rounded-lg border border-spa-bg-secondary bg-white p-1">
+          <div className="flex gap-1 rounded-lg border border-spa-bg-secondary bg-spa-surface p-1">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -116,7 +117,7 @@ export function DevicesPage() {
               onChange={(e) => state.setSearchQuery(e.target.value)}
               placeholder="Gerät suchen..."
               aria-label="Geräte durchsuchen"
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
             />
           </div>
         </div>
@@ -125,7 +126,7 @@ export function DevicesPage() {
         <PendingPairings />
 
         {/* Fleet Control (collapsible) */}
-        <div className="rounded-2xl border border-spa-bg-secondary bg-white">
+        <div className="rounded-2xl border border-spa-bg-secondary bg-spa-surface">
           <button
             type="button"
             onClick={() => setFleetOpen(!fleetOpen)}
@@ -155,8 +156,8 @@ export function DevicesPage() {
                     <span>{filter.label}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${
                       state.activeGroupFilter === filter.key
-                        ? 'bg-white/20 text-white'
-                        : 'bg-white text-spa-text-secondary'
+                        ? 'bg-spa-surface/20 text-white'
+                        : 'bg-spa-surface text-spa-text-secondary'
                     }`}>
                       {filter.count}
                     </span>
@@ -186,15 +187,15 @@ export function DevicesPage() {
                 </div>
 
                 <div className="mt-4 grid gap-3 xl:grid-cols-3">
-                  <div className="rounded-xl border border-spa-bg-secondary bg-white p-4">
+                  <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-spa-text-secondary">Kommandos</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => state.openBulkCommand('reload', 'Geräte neu laden?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte laden ihre Anzeigeinhalte neu.`, 'Neu laden')} disabled={state.selectedDeviceIds.length === 0}>Reload</Button>
-                      <Button variant="secondary" size="sm" icon={Power} onClick={() => state.openBulkCommand('restart', 'Geräte neu starten?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte erhalten einen Neustart-Befehl.`, 'Neustart senden')} disabled={state.selectedDeviceIds.length === 0}>Restart</Button>
+                      <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => state.openBulkCommand('reload', 'Geräte neu laden?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte laden ihre Anzeigeinhalte neu.`, 'Neu laden')} disabled={state.selectedDeviceIds.length === 0}>Neu laden</Button>
+                      <Button variant="secondary" size="sm" icon={Power} onClick={() => state.openBulkCommand('restart', 'Geräte neu starten?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte erhalten einen Neustart-Befehl.`, 'Neustart senden')} disabled={state.selectedDeviceIds.length === 0}>Neustart</Button>
                       <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => state.openBulkCommand('clear-cache', 'Cache für Geräte leeren?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte leeren ihren lokalen Cache und laden danach neu.`, 'Cache leeren')} disabled={state.selectedDeviceIds.length === 0}>Cache leeren</Button>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-spa-bg-secondary bg-white p-4">
+                  <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-spa-text-secondary">Slideshow</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button variant="secondary" size="sm" icon={ToggleRight} onClick={() => state.openBulkUpdate({ slideshowId: null }, 'Standard-Slideshow zuweisen?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte nutzen die Standard-Slideshow.`, 'Standard setzen')} disabled={state.selectedDeviceIds.length === 0}>Standard</Button>
@@ -203,7 +204,7 @@ export function DevicesPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-spa-bg-secondary bg-white p-4">
+                  <div className="rounded-xl border border-spa-bg-secondary bg-spa-surface p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-spa-text-secondary">Wartung</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button variant="warning" size="sm" icon={AlertCircle} onClick={() => state.openBulkUpdate({ maintenanceMode: true }, 'Wartungsmodus aktivieren?', `Die ausgewählten ${state.selectedDeviceIds.length} Geräte werden für Wartung markiert.`, 'Wartung aktivieren', 'warning')} disabled={state.selectedDeviceIds.length === 0}>Wartung an</Button>
@@ -218,15 +219,11 @@ export function DevicesPage() {
 
         {/* Device Grid */}
         {state.pairedDevices.length === 0 ? (
-          <div className="py-8 text-center">
-            <Monitor className="w-16 h-16 text-spa-text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-spa-text-primary mb-2">
-              Keine gekoppelten Geräte
-            </h3>
-            <p className="text-spa-text-secondary">
-              Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten.
-            </p>
-          </div>
+          <EmptyState
+            icon={Monitor}
+            title="Keine gekoppelten Geräte"
+            description="Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten."
+          />
         ) : (
           <DeviceList
             devices={state.visibleDevices}

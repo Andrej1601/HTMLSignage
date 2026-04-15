@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Aroma } from '@/types/settings.types';
 import { AROMA_COLOR_PALETTE, getAromaDisplayColor } from '@/types/settings.types';
-import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Droplets, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import clsx from 'clsx';
 
 interface AromaLibraryManagerProps {
@@ -83,9 +83,14 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     <div className="space-y-5">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-spa-text-primary">Aroma-Bibliothek</h3>
-          <p className="mt-0.5 text-sm text-spa-text-secondary">Verwalten Sie die verfügbaren Aromen für Aufgüsse</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-spa-primary/10 flex items-center justify-center text-spa-primary">
+            <Droplets className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-spa-text-primary">Aroma-Bibliothek</h3>
+            <p className="text-sm text-spa-text-secondary">Verwalten Sie die verfügbaren Aromen für Aufgüsse</p>
+          </div>
         </div>
         {!showForm && (
           <button
@@ -105,7 +110,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             <h4 className="text-sm font-semibold text-spa-text-primary">
               {isAdding ? 'Neues Aroma hinzufügen' : 'Aroma bearbeiten'}
             </h4>
-            <button onClick={handleCancel} className="text-spa-text-secondary hover:text-spa-text-primary transition-colors">
+            <button onClick={handleCancel} className="text-spa-text-secondary hover:text-spa-text-primary transition-colors" aria-label="Formular schließen">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -126,7 +131,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                     'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
                     activeCategory === cat.label
                       ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
-                      : 'border-spa-bg-secondary bg-white text-spa-text-secondary hover:border-spa-primary/50'
+                      : 'border-spa-bg-secondary bg-spa-surface text-spa-text-secondary hover:border-spa-primary/50'
                   )}
                 >
                   {cat.label}
@@ -135,7 +140,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             </div>
             {/* Emoji grid */}
             {activeCategory && (
-              <div className="flex flex-wrap gap-1.5 rounded-lg border border-spa-bg-secondary bg-white p-3">
+              <div className="flex flex-wrap gap-1.5 rounded-lg border border-spa-bg-secondary bg-spa-surface p-3">
                 {activeCategoryEmojis.map((emoji) => (
                   <button
                     key={emoji}
@@ -155,7 +160,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             )}
             {/* Current emoji preview + custom input */}
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-spa-bg-secondary bg-white text-3xl shadow-xs">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-spa-bg-secondary bg-spa-surface text-3xl shadow-xs">
                 {formData.emoji || '🌿'}
               </div>
               <div className="flex-1 space-y-1">
@@ -164,7 +169,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   type="text"
                   value={formData.emoji}
                   onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
-                  className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2 text-center text-2xl focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+                  className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-center text-2xl focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
                   placeholder="🌿"
                   maxLength={2}
                 />
@@ -181,7 +186,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full rounded-lg border border-spa-bg-secondary bg-white px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
+              className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20"
               placeholder="z.B. Eukalyptus, Minze, Lavendel…"
               autoFocus
             />
@@ -273,7 +278,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   'flex items-center justify-between rounded-lg border p-3 transition-all',
                   isEditing
                     ? 'border-spa-primary bg-spa-primary/5'
-                    : 'border-spa-bg-secondary bg-white hover:shadow-xs'
+                    : 'border-spa-bg-secondary bg-spa-surface hover:shadow-xs'
                 )}
                 style={{ borderColor: isEditing ? undefined : dc.border }}
               >

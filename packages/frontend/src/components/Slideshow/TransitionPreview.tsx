@@ -26,12 +26,18 @@ const TRANSITION_STYLES: Record<string, { from: string; to: string }> = {
 
 export function TransitionPreview({ transition }: TransitionPreviewProps) {
   const [active, setActive] = useState(false);
+  const [prevTransition, setPrevTransition] = useState(transition);
+  if (prevTransition !== transition) {
+    setPrevTransition(transition);
+    setActive(false);
+  }
 
   useEffect(() => {
-    setActive(false);
-    const timer = setTimeout(() => setActive(true), 50);
-    return () => clearTimeout(timer);
-  }, [transition]);
+    if (!active) {
+      const timer = setTimeout(() => setActive(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [active]);
 
   // Replay on click
   const replay = () => {

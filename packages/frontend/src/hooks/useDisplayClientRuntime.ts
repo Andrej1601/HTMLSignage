@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import type { PairingResponse } from '@/types/auth.types';
 import type { Media } from '@/types/media.types';
 import { ENV_IS_DEV } from '@/config/env';
 import {
   displayDevicesApi,
-  displayMediaApi,
   displayScheduleApi,
   displaySettingsApi,
 } from '@/services/displayApi';
@@ -19,14 +17,9 @@ import { clearDisplayAssetCache } from '@/utils/displayAssetCache';
 import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import { getDefaultSettings, type Settings } from '@/types/settings.types';
 import {
-  areDisplayMediaListsEqual,
-  BROWSER_ID_STORAGE_KEY,
   clearDisplayClientStorage,
-  DEVICE_TOKEN_STORAGE_KEY,
-  DISPLAY_CACHED_MEDIA_KEY,
   DISPLAY_CACHED_SCHEDULE_KEY,
   DISPLAY_CACHED_SETTINGS_KEY,
-  generateDisplayBrowserId,
   parsePreviewConfigPayload,
   readDisplayCachedValue,
   resolveDisplayIdentity,
@@ -34,6 +27,10 @@ import {
   writeDisplayCachedValue,
   type PreviewConfigMessage,
 } from './displayClientRuntime.utils';
+import { useDisplayPairing } from './useDisplayPairing';
+import { useDisplayMediaPolling } from './useDisplayMediaPolling';
+import { useDisplayHeartbeat } from './useDisplayHeartbeat';
+import { useDisplayEventClock } from './useDisplayEventClock';
 
 export interface DisplayClientRuntimeState {
   displayDeviceId: string | null;
@@ -47,26 +44,22 @@ export interface DisplayClientRuntimeState {
   localSchedule: Schedule;
   localSettings: Settings;
   mediaItems: Media[];
-  pairingInfo: PairingResponse | null;
+  pairingInfo: import('@/types/auth.types').PairingResponse | null;
   scheduleLoading: boolean;
+  scheduleError: string | null;
   settingsLoading: boolean;
+  settingsError: string | null;
   deviceToken: string | null;
 }
 
 export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRuntimeState {
-  const [browserId] = useState(() => {
-    let id = localStorage.getItem(BROWSER_ID_STORAGE_KEY);
-    if (!id) {
-      id = generateDisplayBrowserId();
-      localStorage.setItem(BROWSER_ID_STORAGE_KEY, id);
-    }
-    return id;
-  });
-  const [pairingInfo, setPairingInfo] = useState<PairingResponse | null>(null);
-  const [deviceToken, setDeviceToken] = useState<string | null>(
-    () => localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY),
-  );
-  const [isPairingLoading, setIsPairingLoading] = useState(true);
+  // ── Pairing ────────────────────────────────────────────────────────────────
+  const { pairingInfo, deviceToken, isPairingLoading } = useDisplayPairing(isPreviewMode);
+
+  // ── Media polling ──────────────────────────────────────────────────────────
+  const mediaItems = useDisplayMediaPolling(deviceToken);
+
+  // ── Display config state ───────────────────────────────────────────────────
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
   const [hasLoadedDeviceConfig, setHasLoadedDeviceConfig] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -74,22 +67,20 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
   const [previewDeviceId, setPreviewDeviceId] = useState<string | null>(null);
   const [previewDeviceName, setPreviewDeviceName] = useState<string | null>(null);
   const [previewClockOverride, setPreviewClockOverride] = useState<number | null>(null);
-  const [eventClock, setEventClock] = useState(() => Date.now());
   const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const pairedDeviceIdRef = useRef<string | null>(null);
   const displayConfigRefreshInFlightRef = useRef(false);
   const displayConfigRefreshQueueRef = useRef<{ deviceId: string; silent: boolean } | null>(null);
   const displayConfigRefreshVersionRef = useRef(0);
-  const heartbeatInFlightRef = useRef(false);
 
-  const cachedMedia = useMemo(
-    () => readDisplayCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
-    [],
-  );
-  const [mediaItems, setMediaItems] = useState<Media[]>(() => cachedMedia);
+  // ── Event clock ────────────────────────────────────────────────────────────
+  const eventClock = useDisplayEventClock(previewClockOverride);
 
+  // ── Schedule & Settings state ──────────────────────────────────────────────
   const [localSchedule, setLocalSchedule] = useState<Schedule>(() => (
     readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY) || createDefaultSchedule()
   ));
@@ -122,6 +113,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     }
   }, []);
 
+  // ── Preview mode bridge ────────────────────────────────────────────────────
   const applyPreviewPayload = useCallback((payload: PreviewConfigMessage['payload']) => {
     const parsedPayload = parsePreviewConfigPayload(payload);
     if (!parsedPayload) return;
@@ -142,149 +134,8 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     setPreviewDeviceId(parsedPayload.deviceId);
     setPreviewDeviceName(parsedPayload.deviceName);
     setPreviewClockOverride(parsedPayload.previewClock);
-    setEventClock(parsedPayload.previewClock ?? Date.now());
     setMaintenanceMode(parsedPayload.maintenanceMode);
   }, [applySchedule, applySettings]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadMedia = async () => {
-      try {
-        const data = await displayMediaApi.getMedia();
-        if (!isMounted || data.length === 0) return;
-        setMediaItems((prev) => (areDisplayMediaListsEqual(prev, data) ? prev : data));
-        writeDisplayCachedValue(DISPLAY_CACHED_MEDIA_KEY, data);
-      } catch (error) {
-        if (ENV_IS_DEV) {
-          console.warn('[Display] Media preload failed:', error);
-        }
-      }
-    };
-
-    void loadMedia();
-    const interval = window.setInterval(() => {
-      void loadMedia();
-    }, 5 * 60_000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isPreviewMode) {
-      setIsPairingLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    const checkPairing = async (opts?: { silent?: boolean }) => {
-      const silent = Boolean(opts?.silent);
-      if (!silent && isMounted) setIsPairingLoading(true);
-
-      try {
-        const data = await displayDevicesApi.requestPairing(browserId);
-
-        if (typeof data.deviceToken === 'string' && data.deviceToken.trim() !== '') {
-          localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, data.deviceToken);
-          if (isMounted) setDeviceToken(data.deviceToken);
-        }
-
-        if (isMounted) {
-          setPairingInfo((prev) => {
-            if (
-              prev &&
-              prev.id === data.id &&
-              prev.paired === data.paired &&
-              prev.pairingCode === data.pairingCode &&
-              prev.name === data.name
-            ) {
-              return prev;
-            }
-
-            return data;
-          });
-        }
-      } catch (error) {
-        if (!silent && isMounted) {
-          console.warn('[Display] Pairing request failed', error);
-        }
-        if (ENV_IS_DEV) {
-          console.error('[Display] Pairing check failed:', error);
-        }
-      } finally {
-        if (!silent && isMounted) setIsPairingLoading(false);
-      }
-    };
-
-    void checkPairing({ silent: false });
-
-    const interval = pairingInfo?.paired
-      ? null
-      : window.setInterval(() => {
-          void checkPairing({ silent: true });
-        }, 30_000);
-
-    return () => {
-      isMounted = false;
-      if (interval) window.clearInterval(interval);
-    };
-  }, [browserId, isPreviewMode, pairingInfo?.paired]);
-
-  const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
-    const silent = Boolean(options?.silent);
-    const requestVersion = ++displayConfigRefreshVersionRef.current;
-
-    if (displayConfigRefreshInFlightRef.current) {
-      const queued = displayConfigRefreshQueueRef.current;
-      displayConfigRefreshQueueRef.current = {
-        deviceId,
-        silent: queued ? queued.silent && silent : silent,
-      };
-      return;
-    }
-
-    displayConfigRefreshInFlightRef.current = true;
-    if (!silent) setIsDisplayConfigLoading(true);
-
-      try {
-        const displayConfig = await displayDevicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
-        if (requestVersion !== displayConfigRefreshVersionRef.current) {
-          return;
-        }
-
-        applySchedule(displayConfig.schedule);
-        applySettings(
-          migrateSettings(displayConfig.settings),
-          { cacheValue: displayConfig.settings },
-        );
-        setMaintenanceMode(Boolean(displayConfig.maintenanceMode));
-        setHasLoadedDeviceConfig(true);
-      } catch (error) {
-        if (ENV_IS_DEV) {
-          console.error('[Display] Failed to load effective display config:', error);
-        }
-        const cachedSchedule = readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
-        const cachedSettings = readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
-        if (cachedSchedule) applySchedule(cachedSchedule, { persist: false });
-        if (cachedSettings) {
-          applySettings(migrateSettings(cachedSettings), { persist: false });
-        }
-        setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
-      } finally {
-      displayConfigRefreshInFlightRef.current = false;
-      if (!silent) setIsDisplayConfigLoading(false);
-
-      const queued = displayConfigRefreshQueueRef.current;
-      displayConfigRefreshQueueRef.current = null;
-      if (queued && pairedDeviceIdRef.current === queued.deviceId) {
-        void refreshDeviceDisplayConfig(queued.deviceId, { silent: queued.silent });
-      }
-    }
-  }, [applySchedule, applySettings, deviceToken]);
 
   useEffect(() => {
     if (!isPreviewMode) return;
@@ -326,6 +177,64 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     }
   }, [isPreviewMode]);
 
+  // ── Device display config refresh ──────────────────────────────────────────
+  const refreshDeviceDisplayConfig = useCallback(async (deviceId: string, options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    const requestVersion = ++displayConfigRefreshVersionRef.current;
+
+    if (displayConfigRefreshInFlightRef.current) {
+      const queued = displayConfigRefreshQueueRef.current;
+      displayConfigRefreshQueueRef.current = {
+        deviceId,
+        silent: queued ? queued.silent && silent : silent,
+      };
+      return;
+    }
+
+    displayConfigRefreshInFlightRef.current = true;
+    if (!silent) setIsDisplayConfigLoading(true);
+
+      try {
+        const displayConfig = await displayDevicesApi.getDisplayConfig(deviceId, deviceToken || undefined);
+        if (requestVersion !== displayConfigRefreshVersionRef.current) {
+          return;
+        }
+
+        applySchedule(displayConfig.schedule);
+        applySettings(
+          migrateSettings(displayConfig.settings),
+          { cacheValue: displayConfig.settings },
+        );
+        setMaintenanceMode(Boolean(displayConfig.maintenanceMode));
+        setHasLoadedDeviceConfig(true);
+        setScheduleError(null);
+        setSettingsError(null);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Display-Konfiguration konnte nicht geladen werden';
+        setScheduleError(message);
+        setSettingsError(message);
+        if (ENV_IS_DEV) {
+          console.error('[Display] Failed to load effective display config:', error);
+        }
+        const cachedSchedule = readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
+        const cachedSettings = readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
+        if (cachedSchedule) applySchedule(cachedSchedule, { persist: false });
+        if (cachedSettings) {
+          applySettings(migrateSettings(cachedSettings), { persist: false });
+        }
+        setHasLoadedDeviceConfig(Boolean(cachedSchedule || cachedSettings));
+      } finally {
+      displayConfigRefreshInFlightRef.current = false;
+      if (!silent) setIsDisplayConfigLoading(false);
+
+      const queued = displayConfigRefreshQueueRef.current;
+      displayConfigRefreshQueueRef.current = null;
+      if (queued && pairedDeviceIdRef.current === queued.deviceId) {
+        void refreshDeviceDisplayConfig(queued.deviceId, { silent: queued.silent });
+      }
+    }
+  }, [applySchedule, applySettings, deviceToken]);
+
   useEffect(() => {
     if (isPreviewMode) return;
 
@@ -341,6 +250,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     void refreshDeviceDisplayConfig(pairedDeviceId);
   }, [deviceToken, isPreviewMode, pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig]);
 
+  // ── Fallback queries (when no device config) ──────────────────────────────
   useEffect(() => {
     if (!shouldUseFallbackConfigQueries) {
       setScheduleLoading(false);
@@ -425,6 +335,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     shouldUseFallbackConfigQueries,
   ]);
 
+  // ── WebSocket ──────────────────────────────────────────────────────────────
   const { isConnected, subscribe, unsubscribe } = useWebSocket({
     autoConnect: !isPreviewMode && Boolean(pairingInfo?.paired && pairingInfo?.id && deviceToken),
     onScheduleUpdate: (data) => {
@@ -480,8 +391,8 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     }
 
     const deviceId = pairingInfo.id;
-    subscribe('schedule');
-    subscribe('settings');
+    subscribe('schedule', undefined, deviceToken);
+    subscribe('settings', undefined, deviceToken);
     subscribe('device', deviceId, deviceToken);
 
     return () => {
@@ -491,49 +402,15 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     };
   }, [deviceToken, isConnected, isPreviewMode, pairingInfo?.id, pairingInfo?.paired, subscribe, unsubscribe]);
 
-  useEffect(() => {
-    if (isPreviewMode || !pairingInfo?.paired || !pairingInfo?.id || !deviceToken) return;
+  // ── Heartbeat ──────────────────────────────────────────────────────────────
+  useDisplayHeartbeat({
+    isPreviewMode,
+    deviceToken,
+    deviceId: pairingInfo?.id ?? null,
+    paired: Boolean(pairingInfo?.paired),
+  });
 
-    const sendHeartbeat = async () => {
-      if (heartbeatInFlightRef.current) return;
-      heartbeatInFlightRef.current = true;
-      try {
-        const response = await displayDevicesApi.sendHeartbeat(pairingInfo.id, deviceToken);
-        if (response.ok && ENV_IS_DEV) {
-          console.log('[Display] Heartbeat sent');
-        }
-      } catch (error) {
-        if (ENV_IS_DEV) {
-          console.error('[Display] Heartbeat failed:', error);
-        }
-      } finally {
-        heartbeatInFlightRef.current = false;
-      }
-    };
-
-    void sendHeartbeat();
-    const interval = window.setInterval(() => {
-      void sendHeartbeat();
-    }, 2 * 60 * 1000);
-
-    return () => window.clearInterval(interval);
-  }, [deviceToken, isPreviewMode, pairingInfo?.id, pairingInfo?.paired]);
-
-  useEffect(() => {
-    if (previewClockOverride !== null) {
-      setEventClock(previewClockOverride);
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setEventClock((prev) => {
-        const now = Date.now();
-        return Math.floor(now / 60_000) !== Math.floor(prev / 60_000) ? now : prev;
-      });
-    }, 30_000);
-    return () => window.clearInterval(interval);
-  }, [previewClockOverride]);
-
+  // ── Identity resolution ────────────────────────────────────────────────────
   const { displayDeviceId, displayDeviceName } = resolveDisplayIdentity({
     isPreviewMode,
     previewDeviceId,
@@ -555,7 +432,9 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     mediaItems,
     pairingInfo,
     scheduleLoading,
+    scheduleError,
     settingsLoading,
+    settingsError,
     deviceToken,
   };
 }
