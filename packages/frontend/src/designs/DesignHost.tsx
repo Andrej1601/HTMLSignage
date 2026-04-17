@@ -1,4 +1,5 @@
-import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { ErrorInfo } from 'react';
 import type {
   DesignTokens,
   DesignTokenOverrides,
@@ -10,6 +11,7 @@ import type {
 import { DesignErrorBoundary } from './DesignErrorBoundary';
 import { useDesign } from './useDesign';
 import { DEFAULT_DESIGN_ID, type DesignId } from './registry';
+import { recordDesignError } from '@/services/api/telemetry';
 
 interface DesignHostProps<T extends SlideTypeId> {
   /** The slide type being rendered — selects the right renderer in the pack. */
@@ -126,6 +128,20 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const viewport = useMeasuredViewport(wrapperRef);
 
+  const handleRenderError = useCallback(
+    (err: Error, info: ErrorInfo) => {
+      void recordDesignError({
+        designId: design?.manifest.id ?? resolvedId,
+        slideType,
+        message: err.message || 'Unknown design renderer error',
+        stack: err.stack ?? undefined,
+        componentStack: info.componentStack ?? undefined,
+        occurredAt: new Date().toISOString(),
+      });
+    },
+    [design?.manifest.id, resolvedId, slideType],
+  );
+
   // Legacy-path render. Wrapped in the same sizing element so the flag
   // flip doesn't reflow the page.
   const renderedFallback = (
@@ -157,6 +173,7 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
       <DesignErrorBoundary
         fallback={fallback}
         resetKey={`${design.manifest.id}:${slideType}`}
+        onError={handleRenderError}
       >
         {wrapped}
       </DesignErrorBoundary>

@@ -17,6 +17,7 @@ import { InfoManager } from '@/components/Settings/InfoManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
 import { DesignPackFlagCard } from '@/components/Settings/DesignPackFlagCard';
 import { DesignTokenOverrideEditor } from '@/components/Settings/DesignTokenOverrideEditor';
+import { DesignHealthCard } from '@/components/Settings/DesignHealthCard';
 import { usePermission } from '@/hooks/usePermission';
 
 const EventManager = lazy(() => import('@/components/Settings/EventManager').then(m => ({ default: m.EventManager })));
@@ -351,6 +352,7 @@ export function SettingsPage() {
                       display={localSettings.display}
                       onChange={(display) => updateField('display', display)}
                     />
+                    <DesignHealthCard />
                     <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
                       <SystemMaintenance />
                     </Suspense>

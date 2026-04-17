@@ -9,8 +9,17 @@ router.get('/audit', async (req: AuthRequest, res) => {
     const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
     const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : null;
+    const actionsParam = typeof req.query.actions === 'string' ? req.query.actions : '';
+    const actions = actionsParam
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
 
-    const result = await listAuditLogs({ limit, cursor });
+    const result = await listAuditLogs({
+      limit,
+      cursor,
+      actions: actions.length > 0 ? actions : undefined,
+    });
     res.json({
       ok: true,
       items: result.items,

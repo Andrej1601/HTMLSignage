@@ -67,11 +67,18 @@ export const systemApi = {
     return data;
   },
 
-  getAuditLog: async (limit = 50, cursor?: string | null): Promise<SystemAuditLogResponse> => {
+  getAuditLog: async (
+    limit = 50,
+    cursor?: string | null,
+    options: { actions?: string[] } = {},
+  ): Promise<SystemAuditLogResponse> => {
     const { data } = await api.get<SystemAuditLogResponse>('/system/audit', {
       params: {
         limit,
         ...(cursor ? { cursor } : {}),
+        ...(options.actions && options.actions.length > 0
+          ? { actions: options.actions.join(',') }
+          : {}),
       },
     });
     return data;
