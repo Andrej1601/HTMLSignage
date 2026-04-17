@@ -20,6 +20,50 @@ function withAlpha(color: string, alpha: number): string {
   return c;
 }
 
+/** Inline SVG flame — no icon-library dependency. */
+function FlameIcon({ size, color, filled }: { size: number; color: string; filled: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.5 0 2.8-1 3-2.5.2-1.5-1-2.7-1-4.5a4 4 0 0 1 1.9-3.2A8 8 0 0 0 12 2a8 8 0 0 0-8 8c0 3.3 2 6 4.5 6.5" />
+    </svg>
+  );
+}
+
+function IntensityFlames({
+  level,
+  size,
+  activeColor,
+  idleColor,
+}: {
+  level: number;
+  size: number;
+  activeColor: string;
+  idleColor: string;
+}) {
+  return (
+    <div className="inline-flex items-center shrink-0" style={{ gap: Math.max(1, Math.round(size * 0.08)) }}>
+      {[1, 2, 3, 4].map((i) => (
+        <FlameIcon
+          key={i}
+          size={size}
+          color={i <= level ? activeColor : idleColor}
+          filled={i <= level}
+        />
+      ))}
+    </div>
+  );
+}
+
 function InfusionRow({
   entry,
   tokens,
@@ -78,19 +122,26 @@ function InfusionRow({
           {entry.time}
         </span>
         <span
-          className="font-bold uppercase"
+          className="font-bold uppercase flex-1 min-w-0"
           style={{
             color: isFinished ? colors.textSecondary : colors.textPrimary,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
             letterSpacing: '0.04em',
-            minWidth: 0,
           }}
         >
           {entry.title}
         </span>
+        {entry.intensity != null ? (
+          <IntensityFlames
+            level={entry.intensity}
+            size={scaled(16, viewport, 9)}
+            activeColor={isLive ? colors.statusLive : colors.accentPrimary}
+            idleColor={withAlpha(colors.textSecondary, 0.35)}
+          />
+        ) : null}
         {isLive ? (
           <span
-            className="ml-auto font-black uppercase shrink-0"
+            className="font-black uppercase shrink-0"
             style={{
               color: colors.textInverse,
               backgroundColor: colors.statusLive,
@@ -104,7 +155,7 @@ function InfusionRow({
           </span>
         ) : entry.isNext ? (
           <span
-            className="ml-auto font-black uppercase shrink-0"
+            className="font-black uppercase shrink-0"
             style={{
               color: colors.textInverse,
               backgroundColor: colors.statusNext,
