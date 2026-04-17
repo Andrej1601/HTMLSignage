@@ -51,6 +51,10 @@ export interface SchedulePanelCellExtras extends SchedulePanelCell {
 export interface SchedulePanelDataEnriched extends SchedulePanelData {
   cells: Array<Array<SchedulePanelCellExtras | null>>;
   saunasMeta: Sauna[];
+  /** The preset key the hook resolved for the current moment (e.g. 'Mon'). */
+  presetKey: string;
+  /** Whether the active preset has any rows at all. */
+  hasData: boolean;
 }
 
 /**
@@ -170,7 +174,9 @@ export function useSchedulePanelData(input: UseSchedulePanelDataInput): Schedule
       timeSlots,
       cells,
       generatedAt: now.toISOString(),
+      presetKey: String(activePresetKey),
+      hasData: Boolean(daySchedule?.rows && daySchedule.rows.length > 0),
     }),
-    [saunasMeta, timeSlots, cells, now],
+    [saunasMeta, timeSlots, cells, now, activePresetKey, daySchedule],
   );
 }

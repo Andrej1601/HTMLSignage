@@ -1,15 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { Flame, Waves } from 'lucide-react';
-import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { resolveLivePresetKey } from '@/types/schedule.types';
+import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
-import { getVisibleSaunas } from '@/types/sauna.types';
 import {
-  clampFlamesTo4,
   formatClockDE,
   formatLongDateDE,
   getInfusionStatus,
@@ -17,12 +14,11 @@ import {
   withAlpha,
 } from './wellnessDisplayUtils';
 import {
-  buildScheduleSaunaIndexMap,
   getSaunaAccentColor,
-  resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { useSchedulePanelData } from '@/slides/data';
 
 const SCROLL_SPEED = 14;
 const START_DELAY = 4000;
@@ -61,15 +57,8 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
-  const daySchedule = schedule.presets?.[activePresetKey];
-
-  const scheduleSaunaIndexByKey = useMemo(
-    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
-    [daySchedule?.saunas],
-  );
-
-  const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
+  const panelData = useSchedulePanelData({ settings, schedule, deviceId, now });
+  const activePresetKey = panelData.presetKey;
 
   // Theme colors — destructured for stable compiler deps
   const { accentGold: _accentGold, accent: _accent, accentGreen: _accentGreen, timeColBg: _timeColBg } = theme;
@@ -91,43 +80,28 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
   const compactHeader = !isEditorial && (profile.isNarrow || profile.isPortrait);
 
-  // Merge all infusions from all saunas into one sorted list
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- complex display computation, keep manual memo for perf
-  const allInfusions = useMemo(() => {
-    if (!daySchedule) return [];
-
-    const merged: MergedInfusion[] = [];
-
-    visibleSaunas.forEach((sauna, idx) => {
-      if (sauna.status === 'out-of-order') return;
-
-      const saunaIndex = resolveScheduleSaunaIndex(
-        daySchedule.saunas,
-        sauna.name,
-        scheduleSaunaIndexByKey,
-      );
-
-      const accent = getSaunaAccentColor(sauna, idx, accentGreen, accentGold);
-
-      daySchedule.rows.forEach((row) => {
-        const entry = saunaIndex >= 0 ? row.entries?.[saunaIndex] : null;
-        if (!entry?.title) return;
-
-        merged.push({
-          id: `${activePresetKey}-${sauna.id}-${row.time}-${entry.title}`,
-          time: row.time,
-          duration: entry.duration ?? 15,
-          title: entry.title,
-          intensity: clampFlamesTo4(entry.flames ?? 1),
-          saunaName: sauna.name,
-          saunaAccent: accent,
-        });
+  // Merge all infusions from all saunas into one sorted list, using the
+  // already-derived data from the headless panel hook. The React Compiler
+  // memoizes this automatically; no manual useMemo needed.
+  const merged: MergedInfusion[] = [];
+  panelData.saunasMeta.forEach((sauna, idx) => {
+    if (sauna.status === 'out-of-order') return;
+    const accent = getSaunaAccentColor(sauna, idx, accentGreen, accentGold);
+    const row = panelData.cells[idx] ?? [];
+    row.forEach((cell) => {
+      if (!cell) return;
+      merged.push({
+        id: `${panelData.presetKey}-${sauna.id}-${cell.time}-${cell.title}`,
+        time: cell.time,
+        duration: cell.durationMin,
+        title: cell.title,
+        intensity: cell.intensity,
+        saunaName: sauna.name,
+        saunaAccent: accent,
       });
     });
-
-    return merged.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  }, [daySchedule, visibleSaunas, scheduleSaunaIndexByKey, activePresetKey, accentGreen, accentGold]);
+  });
+  const allInfusions = merged.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
   // --- Auto-scroll logic ---
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -148,10 +122,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
     };
   }, []);
 
-  const scrollSignature = useMemo(
-    () => `${activePresetKey}|${allInfusions.length}|${viewportHeight}`,
-    [activePresetKey, allInfusions.length, viewportHeight],
-  );
+  const scrollSignature = `${activePresetKey}|${allInfusions.length}|${viewportHeight}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -203,7 +174,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
   const restWords = titleWords.slice(1).join(' ') || 'Hagen';
 
   // --- Empty state ---
-  if (!daySchedule || allInfusions.length === 0) {
+  if (!panelData.hasData || allInfusions.length === 0) {
     return (
       <div
         className="w-full h-full flex items-center justify-center"
@@ -298,7 +269,7 @@ export function ChronologicalListSlide({ schedule, settings, now: nowProp, devic
 
       {/* Sauna legend */}
       <div className={classNames('flex flex-wrap shrink-0 px-1', isEditorial ? 'mb-3' : 'mb-4', isCompactLayout ? 'gap-2.5' : 'gap-4')}>
-        {visibleSaunas
+        {panelData.saunasMeta
           .filter((s) => s.status !== 'out-of-order')
           .map((sauna, idx) => {
             const accent = getSaunaAccentColor(sauna, idx, accentGreen, accentGold);

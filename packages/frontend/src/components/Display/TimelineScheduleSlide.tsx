@@ -1,21 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { AlertTriangle, Clock3, Flame, Thermometer, Waves } from 'lucide-react';
-import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { resolveLivePresetKey } from '@/types/schedule.types';
+import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
-import { getVisibleSaunas } from '@/types/sauna.types';
-import { clampFlamesTo4, formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
+import { formatClockDE, formatLongDateDE, getInfusionStatus, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import {
-  buildScheduleSaunaIndexMap,
   getSaunaAccentColor,
-  resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { useSchedulePanelData } from '@/slides/data';
 import {
   buildTimelineBranding,
   buildTimelineGeometry,
@@ -214,48 +211,32 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
-
-  const daySchedule = schedule.presets?.[activePresetKey];
-
-  const scheduleSaunaIndexByKey = useMemo(
-    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
-    [daySchedule?.saunas]
-  );
-
-  const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
-  const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
+  const panelData = useSchedulePanelData({ settings, schedule, deviceId, now, limit: 6 });
+  const activePresetKey = panelData.presetKey;
+  const gridSaunas = panelData.saunasMeta;
 
   const infusionsBySauna = useMemo(() => {
     const map = new Map<string, TimelineInfusion[]>();
 
-    gridSaunas.forEach((sauna) => {
-      const saunaIndex = resolveScheduleSaunaIndex(
-        daySchedule?.saunas || [],
-        sauna.name,
-        scheduleSaunaIndexByKey,
-      );
-
-      const items = (daySchedule?.rows || [])
-        .map((row) => {
-          const entry = saunaIndex >= 0 ? row.entries?.[saunaIndex] : null;
-          if (!entry?.title) return null;
+    gridSaunas.forEach((sauna, idx) => {
+      const items: TimelineInfusion[] = (panelData.cells[idx] ?? [])
+        .map((cell) => {
+          if (!cell) return null;
           return {
-            id: `${activePresetKey}-${sauna.id}-${row.time}-${entry.title}`,
-            time: row.time,
-            duration: entry.duration ?? 15,
-            title: entry.title,
-            intensity: clampFlamesTo4(entry.flames ?? 1),
+            id: `${panelData.presetKey}-${sauna.id}-${cell.time}-${cell.title}`,
+            time: cell.time,
+            duration: cell.durationMin,
+            title: cell.title,
+            intensity: cell.intensity,
           } satisfies TimelineInfusion;
         })
-        .filter(Boolean) as TimelineInfusion[];
-
-      items.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+        .filter((item): item is TimelineInfusion => item !== null)
+        .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
       map.set(sauna.id, items);
     });
 
     return map;
-  }, [activePresetKey, daySchedule?.rows, daySchedule?.saunas, gridSaunas, scheduleSaunaIndexByKey]);
+  }, [panelData, gridSaunas]);
 
   const allInfusions = useMemo(
     () => Array.from(infusionsBySauna.values()).flat(),
@@ -264,11 +245,11 @@ export function TimelineScheduleSlide({ schedule, settings, now: nowProp, device
 
   const timeline = useMemo(() => {
     return buildTimelineGeometry(
-      (daySchedule?.rows || []).map((row) => row.time),
+      panelData.timeSlots,
       allInfusions,
       viewportHeight,
     );
-  }, [allInfusions, daySchedule?.rows, viewportHeight]);
+  }, [allInfusions, panelData, viewportHeight]);
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';

@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { resolveLivePresetKey } from '@/types/schedule.types';
+import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
-import { getVisibleSaunas } from '@/types/sauna.types';
 import { AlertTriangle, Thermometer, Waves, Flame } from 'lucide-react';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
-import { clampFlamesTo4, formatClockDE, formatLongDateDE, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
+import { formatClockDE, formatLongDateDE, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { motion } from 'framer-motion';
 import { classNames } from '@/utils/classNames';
 import {
-  buildScheduleSaunaIndexMap,
   getSaunaAccentColor,
-  resolveScheduleSaunaIndex,
   timeToMinutes,
 } from './displayScheduleUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { useSchedulePanelData } from '@/slides/data';
 
 interface ScheduleGridSlideProps {
   schedule: Schedule;
@@ -202,17 +199,10 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
 
   const now = nowProp ?? clockNow;
 
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
+  const panelData = useSchedulePanelData({ settings, schedule, deviceId, now, limit: 6 });
+  const activePresetKey = panelData.presetKey;
+  const gridSaunas = panelData.saunasMeta;
 
-  const daySchedule = schedule.presets?.[activePresetKey];
-
-  const scheduleSaunaIndexByKey = useMemo(
-    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
-    [daySchedule?.saunas]
-  );
-
-  const visibleSaunas = useMemo(() => getVisibleSaunas(settings.saunas || []), [settings.saunas]);
-  const gridSaunas = useMemo(() => visibleSaunas.slice(0, 6), [visibleSaunas]);
   const gridColumns = profile.width > 0
     ? profile.width < 430
       ? 1
@@ -225,30 +215,24 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
 
   // Compute dynamic row heights based on infusion counts per row
   const gridRowTemplate = useMemo(() => {
-    if (!daySchedule) return '1fr';
+    if (!panelData.hasData) return '1fr';
     if (gridColumns !== 3 || isCompactLayout) {
       return `repeat(${Math.max(1, Math.ceil(gridSaunas.length / gridColumns))}, minmax(0, 1fr))`;
     }
     if (gridSaunas.length <= 3) return '1fr 1fr';
-    const countInfusions = (sauna: typeof gridSaunas[0]) => {
-      const sIdx = resolveScheduleSaunaIndex(
-        daySchedule.saunas, sauna.name, scheduleSaunaIndexByKey,
-      );
-      if (sIdx < 0) return 0;
-      return daySchedule.rows.filter((row) => {
-        const entry = row.entries?.[sIdx];
-        return entry?.title;
-      }).length;
+    const countInfusions = (_sauna: typeof gridSaunas[0], saunaIdx: number) => {
+      const row = panelData.cells[saunaIdx] ?? [];
+      return row.filter((cell) => cell !== null).length;
     };
     const row1Saunas = gridSaunas.slice(0, 3);
     const row2Saunas = gridSaunas.slice(3, 6);
-    const maxRow1 = Math.max(...row1Saunas.map(countInfusions), 1);
-    const maxRow2 = row2Saunas.length > 0 ? Math.max(...row2Saunas.map(countInfusions), 1) : 1;
+    const maxRow1 = Math.max(...row1Saunas.map((s, i) => countInfusions(s, i)), 1);
+    const maxRow2 = row2Saunas.length > 0 ? Math.max(...row2Saunas.map((s, i) => countInfusions(s, i + 3)), 1) : 1;
     const total = maxRow1 + maxRow2;
     const ratio = total > 0 ? maxRow1 / total : 0.5;
     if (ratio >= 0.4 && ratio <= 0.6) return '1fr 1fr';
     return `${ratio}fr ${1 - ratio}fr`;
-  }, [daySchedule, gridColumns, gridSaunas, isCompactLayout, scheduleSaunaIndexByKey]);
+  }, [panelData, gridColumns, gridSaunas, isCompactLayout]);
 
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
   const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
@@ -266,7 +250,7 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
   const border = theme.gridTable || '#EBE5D3';
   const textMain = theme.textMain || theme.fg || '#3E2723';
 
-  if (!daySchedule || !daySchedule.rows || daySchedule.rows.length === 0) {
+  if (!panelData.hasData) {
     return (
       <div
         className="w-full h-full flex items-center justify-center"
@@ -392,25 +376,18 @@ export function ScheduleGridSlide({ schedule, settings, now: nowProp, deviceId }
         >
           {gridSaunas.map((sauna, idx) => {
             const isOutOfOrder = sauna.status === 'out-of-order';
-            const saunaIndex = resolveScheduleSaunaIndex(
-              daySchedule.saunas,
-              sauna.name,
-              scheduleSaunaIndexByKey,
-            );
-
-            const infusions: SaunaInfusionItem[] = daySchedule.rows
-              .map((row) => {
-                const entry = saunaIndex >= 0 ? row.entries?.[saunaIndex] : null;
-                if (!entry?.title) return null;
+            const infusions: SaunaInfusionItem[] = (panelData.cells[idx] ?? [])
+              .map((cell) => {
+                if (!cell) return null;
                 return {
-                  id: `${activePresetKey}-${sauna.id}-${row.time}`,
-                  time: row.time,
-                  duration: entry.duration ?? 15,
-                  title: entry.title,
-                  intensity: clampFlamesTo4(entry.flames ?? 1),
+                  id: `${activePresetKey}-${sauna.id}-${cell.time}`,
+                  time: cell.time,
+                  duration: cell.durationMin,
+                  title: cell.title,
+                  intensity: cell.intensity,
                 };
               })
-              .filter(Boolean) as SaunaInfusionItem[];
+              .filter((item): item is SaunaInfusionItem => item !== null);
             const sortedInfusions = infusions.slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
 
             const saunaAccent = getSaunaAccentColor(sauna, idx, accentGreen, accentGold);
