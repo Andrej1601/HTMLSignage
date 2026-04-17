@@ -20,7 +20,10 @@ function withAlpha(color: string, alpha: number): string {
   return c;
 }
 
-/** Inline SVG flame — no icon-library dependency. */
+/**
+ * Inline SVG flame — closed path (Lucide-shape). The previous version
+ * used an open path which the browser rendered as a half-crescent.
+ */
 function FlameIcon({ size, color, filled }: { size: number; color: string; filled: boolean }) {
   return (
     <svg
@@ -34,7 +37,7 @@ function FlameIcon({ size, color, filled }: { size: number; color: string; fille
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.5 0 2.8-1 3-2.5.2-1.5-1-2.7-1-4.5a4 4 0 0 1 1.9-3.2A8 8 0 0 0 12 2a8 8 0 0 0-8 8c0 3.3 2 6 4.5 6.5" />
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
     </svg>
   );
 }
@@ -51,7 +54,10 @@ function IntensityFlames({
   idleColor: string;
 }) {
   return (
-    <div className="inline-flex items-center shrink-0" style={{ gap: Math.max(1, Math.round(size * 0.08)) }}>
+    <div
+      className="inline-flex items-center shrink-0"
+      style={{ gap: Math.max(1, Math.round(size * 0.08)) }}
+    >
       {[1, 2, 3, 4].map((i) => (
         <FlameIcon
           key={i}
@@ -61,6 +67,41 @@ function IntensityFlames({
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * Status-badge variants used across the row. Matches the legacy
+ * look: subtle tinted background + matching border + uppercase label.
+ */
+function StatusBadge({
+  label,
+  color,
+  tokens,
+  viewport,
+}: {
+  label: string;
+  color: string;
+  tokens: SlideRendererProps<'sauna-detail'>['tokens'];
+  viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
+}) {
+  const { typography, radius } = tokens;
+  return (
+    <span
+      className="font-black uppercase shrink-0"
+      style={{
+        color,
+        backgroundColor: withAlpha(color, 0.15),
+        border: `1px solid ${withAlpha(color, 0.3)}`,
+        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
+        padding: `${scaled(2, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+        borderRadius: `${radius.pill}px`,
+        letterSpacing: '0.15em',
+        lineHeight: 1.4,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -78,25 +119,52 @@ function InfusionRow({
   const isPre = entry.isPrestart;
   const isFinished = entry.isFinished;
 
-  const statusColor = isLive
-    ? colors.statusLive
-    : isPre
-      ? colors.statusWarning
-      : isFinished
-        ? colors.textSecondary
-        : colors.textPrimary;
-
   const bg = isLive
     ? withAlpha(colors.statusLive, 0.12)
     : isPre
       ? withAlpha(colors.statusWarning, 0.12)
-      : withAlpha(colors.surfaceElevated, 0.9);
+      : isFinished
+        ? withAlpha(colors.surfaceElevated, 0.45)
+        : withAlpha(colors.surfaceElevated, 0.9);
 
   const borderColor = isLive
     ? withAlpha(colors.statusLive, 0.3)
     : isPre
       ? withAlpha(colors.statusWarning, 0.3)
       : colors.border;
+
+  const timeColor = isLive
+    ? colors.statusLive
+    : isPre
+      ? colors.statusWarning
+      : isFinished
+        ? withAlpha(colors.textPrimary, 0.35)
+        : colors.textPrimary;
+
+  const titleColor = isFinished
+    ? withAlpha(colors.textPrimary, 0.55)
+    : colors.textPrimary;
+
+  // Flames: grey-outlined when finished, coloured-filled otherwise.
+  const flameActiveColor = isFinished
+    ? withAlpha(colors.accentPrimary, 0.35)
+    : isLive
+      ? colors.statusLive
+      : isPre
+        ? colors.statusWarning
+        : colors.accentPrimary;
+  const flameIdleColor = withAlpha(colors.accentPrimary, 0.2);
+
+  // Status badge config.
+  const badge = isLive
+    ? { label: 'LÄUFT', color: colors.statusLive }
+    : isPre
+      ? { label: 'GLEICH', color: colors.statusWarning }
+      : isFinished
+        ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
+        : entry.isNext
+          ? { label: 'GLEICH', color: colors.statusNext }
+          : null;
 
   return (
     <div
@@ -105,71 +173,71 @@ function InfusionRow({
         backgroundColor: bg,
         borderRadius: `${scaled(radius.lg, viewport, 6)}px`,
         border: `1px solid ${borderColor}`,
-        padding: `${scaled(12, viewport, 6)}px`,
-        gap: `${scaled(4, viewport, 2)}px`,
-        opacity: isFinished ? 0.55 : 1,
+        padding: `${scaled(14, viewport, 6)}px ${scaled(16, viewport, 7)}px`,
+        gap: `${scaled(6, viewport, 2)}px`,
       }}
     >
-      <div className="flex items-baseline" style={{ gap: `${scaled(8, viewport, 4)}px` }}>
-        <span
-          className="font-mono font-black"
-          style={{
-            color: statusColor,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 14)}px`,
-            lineHeight: 1,
-          }}
+      {/* Row 1: time + status badge | flames */}
+      <div className="flex items-center justify-between" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+        <div
+          className="flex items-center min-w-0"
+          style={{ gap: `${scaled(10, viewport, 4)}px` }}
         >
-          {entry.time}
-        </span>
+          <span
+            className="font-mono font-black"
+            style={{
+              color: timeColor,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 15)}px`,
+              lineHeight: 1,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {entry.time}
+          </span>
+          {badge ? (
+            <StatusBadge
+              label={badge.label}
+              color={badge.color}
+              tokens={tokens}
+              viewport={viewport}
+            />
+          ) : null}
+        </div>
+        {entry.intensity != null ? (
+          <IntensityFlames
+            level={entry.intensity}
+            size={scaled(16, viewport, 10)}
+            activeColor={flameActiveColor}
+            idleColor={flameIdleColor}
+          />
+        ) : null}
+      </div>
+
+      {/* Row 2: title | duration */}
+      <div className="flex items-baseline justify-between" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
         <span
-          className="font-bold uppercase flex-1 min-w-0"
+          className="font-black uppercase min-w-0"
           style={{
-            color: isFinished ? colors.textSecondary : colors.textPrimary,
+            color: titleColor,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
             letterSpacing: '0.04em',
           }}
         >
           {entry.title}
         </span>
-        {entry.intensity != null ? (
-          <IntensityFlames
-            level={entry.intensity}
-            size={scaled(16, viewport, 9)}
-            activeColor={isLive ? colors.statusLive : colors.accentPrimary}
-            idleColor={withAlpha(colors.textSecondary, 0.35)}
-          />
-        ) : null}
-        {isLive ? (
-          <span
-            className="font-black uppercase shrink-0"
-            style={{
-              color: colors.textInverse,
-              backgroundColor: colors.statusLive,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-              padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
-              borderRadius: `${radius.pill}px`,
-              letterSpacing: '0.12em',
-            }}
-          >
-            LÄUFT
-          </span>
-        ) : entry.isNext ? (
-          <span
-            className="font-black uppercase shrink-0"
-            style={{
-              color: colors.textInverse,
-              backgroundColor: colors.statusNext,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-              padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
-              borderRadius: `${radius.pill}px`,
-              letterSpacing: '0.12em',
-            }}
-          >
-            Gleich
-          </span>
-        ) : null}
+        <span
+          className="font-black shrink-0"
+          style={{
+            color: withAlpha(colors.textSecondary, isFinished ? 0.45 : 0.7),
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
+            letterSpacing: '0.08em',
+          }}
+        >
+          {entry.durationMin} MIN
+        </span>
       </div>
 
+      {/* Row 3: aromas (optional) */}
       {(entry.aromas?.length ?? 0) > 0 ? (
         <div className="flex flex-wrap" style={{ gap: `${scaled(4, viewport, 2)}px` }}>
           {entry.aromas!.slice(0, 3).map((aroma) => (
@@ -184,6 +252,7 @@ function InfusionRow({
                 fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
                 padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
                 gap: `${scaled(4, viewport, 2)}px`,
+                opacity: isFinished ? 0.6 : 1,
               }}
             >
               {aroma.emoji ? <span>{aroma.emoji}</span> : null}
