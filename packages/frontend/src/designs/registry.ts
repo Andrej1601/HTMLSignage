@@ -1,7 +1,7 @@
 import type { Design } from '@htmlsignage/design-sdk';
 import { isApiVersionCompatible, safeParseDesignManifest } from '@htmlsignage/design-sdk';
 
-export type DesignId = 'wellness-classic';
+export type DesignId = 'wellness-classic' | 'modern-oasis';
 
 /**
  * Registry of design packs available to the host.
@@ -16,6 +16,8 @@ export type DesignId = 'wellness-classic';
 export const DESIGN_REGISTRY: Record<DesignId, () => Promise<Design>> = {
   'wellness-classic': () =>
     import('@htmlsignage/design-wellness-classic').then((mod) => mod.wellnessClassicDesign),
+  'modern-oasis': () =>
+    import('@htmlsignage/design-modern-oasis').then((mod) => mod.modernOasisDesign),
 };
 
 export const DESIGN_IDS = Object.keys(DESIGN_REGISTRY) as DesignId[];
