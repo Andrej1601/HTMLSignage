@@ -1,25 +1,26 @@
 import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+import { AutoScroll } from './AutoScroll';
 import { scaled, scaledFont } from './responsive';
 
 /**
  * Wellness Classic — infos slide renderer.
  *
- * Responsive: narrow → hides the side image; ultra-compact → title
- * + shortened body only. Background-image mode always overlays.
+ * Structure is constant regardless of container size: title + body,
+ * with an optional side image or full-bleed background image. Long
+ * bodies auto-scroll instead of showing a scrollbar; everything else
+ * simply scales with the viewport.
  */
 export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps<'infos'>) {
   const { colors, typography } = tokens;
   const { viewport } = context;
 
   const hasBackgroundImage = data.imageMode === 'background' && !!data.imageUrl;
-  const hasSideImage =
-    data.imageMode === 'side' && !!data.imageUrl && !viewport.isNarrow && !viewport.isCompact;
+  const hasSideImage = data.imageMode === 'side' && !!data.imageUrl;
 
   const pad = scaled(32, viewport, 8);
   const gap = scaled(40, viewport, 12);
   const titleSize = scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 14);
   const bodySize = scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 11);
-  const lineClamp = viewport.isUltraCompact ? 3 : viewport.isCompact ? 4 : 6;
 
   return (
     <div
@@ -50,10 +51,13 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
       )}
 
       <div
-        className="relative z-10 flex h-full items-center"
+        className="relative z-10 flex h-full flex-col"
         style={{ padding: `${pad}px` }}
       >
-        <div className="flex w-full items-center" style={{ gap: hasSideImage ? `${gap}px` : 0 }}>
+        <div
+          className="flex min-h-0 flex-1 items-center"
+          style={{ gap: hasSideImage ? `${gap}px` : 0 }}
+        >
           {hasSideImage && (
             <div
               className="shrink-0 overflow-hidden shadow-lg"
@@ -71,9 +75,9 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             </div>
           )}
 
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 min-h-0 flex-1 flex-col">
             <h2
-              className="font-black uppercase"
+              className="font-black uppercase shrink-0"
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing: '0.2em',
@@ -83,28 +87,27 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             >
               {data.title}
             </h2>
-            <p
-              className="font-semibold italic"
-              style={{
-                fontSize: `${bodySize}px`,
-                lineHeight: 1.5,
-                color: hasBackgroundImage
-                  ? 'rgba(255, 255, 255, 0.92)'
-                  : colors.textSecondary,
-                borderLeft: `4px solid ${
-                  hasBackgroundImage
-                    ? 'rgba(255, 255, 255, 0.7)'
-                    : colors.accentSecondary
-                }`,
-                paddingLeft: `${scaled(16, viewport, 6)}px`,
-                display: '-webkit-box',
-                WebkitLineClamp: lineClamp,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {data.text}
-            </p>
+            <AutoScroll className="min-h-0 flex-1">
+              <p
+                className="font-semibold italic"
+                style={{
+                  fontSize: `${bodySize}px`,
+                  lineHeight: 1.5,
+                  color: hasBackgroundImage
+                    ? 'rgba(255, 255, 255, 0.92)'
+                    : colors.textSecondary,
+                  borderLeft: `4px solid ${
+                    hasBackgroundImage
+                      ? 'rgba(255, 255, 255, 0.7)'
+                      : colors.accentSecondary
+                  }`,
+                  paddingLeft: `${scaled(16, viewport, 6)}px`,
+                  margin: 0,
+                }}
+              >
+                {data.text}
+              </p>
+            </AutoScroll>
           </div>
         </div>
       </div>

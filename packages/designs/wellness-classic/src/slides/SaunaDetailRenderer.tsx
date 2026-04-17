@@ -2,6 +2,7 @@ import type {
   SaunaInfusionEntry,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { AutoScroll } from './AutoScroll';
 import { scaled, scaledFont } from './responsive';
 
 function withAlpha(color: string, alpha: number): string {
@@ -53,8 +54,6 @@ function InfusionRow({
       ? withAlpha(colors.statusWarning, 0.3)
       : colors.border;
 
-  const showAromas = !viewport.isUltraCompact && (entry.aromas?.length ?? 0) > 0;
-
   return (
     <div
       className="flex flex-col"
@@ -79,7 +78,7 @@ function InfusionRow({
           {entry.time}
         </span>
         <span
-          className="font-bold uppercase truncate"
+          className="font-bold uppercase"
           style={{
             color: isFinished ? colors.textSecondary : colors.textPrimary,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
@@ -120,9 +119,9 @@ function InfusionRow({
         ) : null}
       </div>
 
-      {showAromas ? (
+      {(entry.aromas?.length ?? 0) > 0 ? (
         <div className="flex flex-wrap" style={{ gap: `${scaled(4, viewport, 2)}px` }}>
-          {entry.aromas!.slice(0, viewport.isCompact ? 1 : 3).map((aroma) => (
+          {entry.aromas!.slice(0, 3).map((aroma) => (
             <span
               key={aroma.id}
               className="inline-flex items-center font-bold uppercase"
@@ -149,8 +148,10 @@ function InfusionRow({
 /**
  * Wellness Classic — sauna-detail slide renderer.
  *
- * Responsive: wide → 2-column (identity | infusions); narrow → stacked;
- * ultra-compact → header + up to 3 upcoming infusions only.
+ * Structure is constant regardless of container size: image left,
+ * infusion list right. Padding, font sizes and gaps scale down with
+ * the viewport; long infusion lists auto-scroll rather than showing
+ * a scrollbar.
  */
 export function SaunaDetailRenderer({
   data,
@@ -161,12 +162,6 @@ export function SaunaDetailRenderer({
   const { viewport } = context;
 
   const accent = data.accentColor ?? colors.accentPrimary;
-  const stacked = viewport.isNarrow;
-  const hideImage = viewport.isUltraCompact || viewport.isShort;
-
-  const upcomingLimit = viewport.isUltraCompact ? 3 : viewport.isCompact ? 5 : data.upcoming.length;
-  const visibleUpcoming = data.upcoming.slice(0, upcomingLimit);
-
   const pad = scaled(32, viewport, 8);
   const gap = scaled(16, viewport, 6);
 
@@ -177,162 +172,139 @@ export function SaunaDetailRenderer({
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
-        gridTemplateColumns: stacked ? '1fr' : 'minmax(0, 1.1fr) minmax(0, 1fr)',
-        gridTemplateRows: stacked ? 'auto 1fr' : undefined,
+        gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1fr)',
       }}
     >
-      {!hideImage && (
-        <section className="relative flex flex-col overflow-hidden">
-          {data.imageUrl ? (
-            <>
-              <img
-                src={data.imageUrl}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(180deg, ${withAlpha(colors.textPrimary, 0.55)} 0%, ${withAlpha(
-                    colors.textPrimary,
-                    0.3,
-                  )} 55%, ${withAlpha(colors.surface, 0.9)} 100%)`,
-                }}
-              />
-            </>
-          ) : (
+      <section className="relative flex flex-col overflow-hidden">
+        {data.imageUrl ? (
+          <>
+            <img
+              src={data.imageUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
             <div
               className="absolute inset-0"
               style={{
-                background: `linear-gradient(180deg, ${withAlpha(accent, 0.18)} 0%, ${withAlpha(
-                  colors.surfaceElevated,
-                  0.35,
-                )} 55%, ${colors.surface} 100%)`,
+                background: `linear-gradient(180deg, ${withAlpha(colors.textPrimary, 0.55)} 0%, ${withAlpha(
+                  colors.textPrimary,
+                  0.3,
+                )} 55%, ${withAlpha(colors.surface, 0.9)} 100%)`,
               }}
             />
-          )}
-
+          </>
+        ) : (
           <div
-            className="relative z-10 flex h-full flex-col justify-end"
-            style={{ padding: `${pad}px`, gap: `${gap}px` }}
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(180deg, ${withAlpha(accent, 0.18)} 0%, ${withAlpha(
+                colors.surfaceElevated,
+                0.35,
+              )} 55%, ${colors.surface} 100%)`,
+            }}
+          />
+        )}
+
+        <div
+          className="relative z-10 flex h-full flex-col justify-end"
+          style={{ padding: `${pad}px`, gap: `${gap}px` }}
+        >
+          <div
+            className="inline-flex items-center font-black uppercase"
+            style={{
+              alignSelf: 'flex-start',
+              color: data.imageUrl ? colors.textInverse : colors.textPrimary,
+              backgroundColor: withAlpha(accent, data.imageUrl ? 0.85 : 0.15),
+              padding: `${scaled(4, viewport, 2)}px ${scaled(12, viewport, 4)}px`,
+              borderRadius: `${radius.pill}px`,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.25em',
+            }}
           >
-            <div
-              className="inline-flex items-center font-black uppercase"
-              style={{
-                alignSelf: 'flex-start',
-                color: data.imageUrl ? colors.textInverse : colors.textPrimary,
-                backgroundColor: withAlpha(accent, data.imageUrl ? 0.85 : 0.15),
-                padding: `${scaled(4, viewport, 2)}px ${scaled(12, viewport, 4)}px`,
-                borderRadius: `${radius.pill}px`,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-                letterSpacing: '0.25em',
-              }}
-            >
-              Sauna
-            </div>
-
-            <h2
-              className="font-black"
-              style={{
-                color: data.imageUrl ? colors.textInverse : colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(
-                  typography.baseSizePx * typography.scale3xl * 1.25,
-                  viewport,
-                  20,
-                )}px`,
-                lineHeight: 1,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {data.name}
-            </h2>
-
-            {data.infoBadges.length > 0 && !viewport.isUltraCompact ? (
-              <div className="flex flex-wrap" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
-                {data.infoBadges.slice(0, viewport.isCompact ? 1 : 2).map((badge, idx) => (
-                  <span
-                    key={idx}
-                    className="font-semibold"
-                    style={{
-                      color: data.imageUrl ? colors.textInverse : colors.textPrimary,
-                      backgroundColor: withAlpha(
-                        data.imageUrl ? colors.surfaceElevated : accent,
-                        data.imageUrl ? 0.2 : 0.15,
-                      ),
-                      border: `1px solid ${withAlpha(
-                        data.imageUrl ? colors.surfaceElevated : accent,
-                        data.imageUrl ? 0.35 : 0.3,
-                      )}`,
-                      borderRadius: `${radius.md}px`,
-                      padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
-                      fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-                    }}
-                  >
-                    {badge}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {!viewport.isUltraCompact ? (
-              <div className="flex flex-wrap" style={{ gap: `${scaled(16, viewport, 6)}px` }}>
-                {data.info.temperatureC != null ? (
-                  <Stat
-                    label="Temperatur"
-                    value={`${data.info.temperatureC}°C`}
-                    color={data.imageUrl ? colors.textInverse : colors.textPrimary}
-                    tokens={tokens}
-                    viewport={viewport}
-                  />
-                ) : null}
-                {data.info.humidityPct != null && !viewport.isCompact ? (
-                  <Stat
-                    label="Feuchte"
-                    value={`${data.info.humidityPct}%`}
-                    color={data.imageUrl ? colors.textInverse : colors.textPrimary}
-                    tokens={tokens}
-                    viewport={viewport}
-                  />
-                ) : null}
-                {data.info.capacity != null && !viewport.isCompact ? (
-                  <Stat
-                    label="Plätze"
-                    value={String(data.info.capacity)}
-                    color={data.imageUrl ? colors.textInverse : colors.textPrimary}
-                    tokens={tokens}
-                    viewport={viewport}
-                  />
-                ) : null}
-              </div>
-            ) : null}
+            Sauna
           </div>
-        </section>
-      )}
 
-      <section
-        className="flex flex-col overflow-hidden"
-        style={{ padding: `${pad}px`, gap: `${gap}px` }}
-      >
-        {hideImage ? (
           <h2
             className="font-black"
             style={{
-              color: colors.textPrimary,
+              color: data.imageUrl ? colors.textInverse : colors.textPrimary,
               fontFamily: typography.fontHeading,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
+              fontSize: `${scaledFont(
+                typography.baseSizePx * typography.scale3xl * 1.25,
+                viewport,
+                16,
+              )}px`,
               lineHeight: 1,
-              letterSpacing: '-0.01em',
+              letterSpacing: '-0.02em',
             }}
           >
             {data.name}
           </h2>
-        ) : null}
 
-        <div
-          className="flex items-baseline justify-between"
-          style={{ marginBottom: `${scaled(4, viewport, 2)}px` }}
-        >
+          {data.infoBadges.length > 0 ? (
+            <div className="flex flex-wrap" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+              {data.infoBadges.slice(0, 2).map((badge, idx) => (
+                <span
+                  key={idx}
+                  className="font-semibold"
+                  style={{
+                    color: data.imageUrl ? colors.textInverse : colors.textPrimary,
+                    backgroundColor: withAlpha(
+                      data.imageUrl ? colors.surfaceElevated : accent,
+                      data.imageUrl ? 0.2 : 0.15,
+                    ),
+                    border: `1px solid ${withAlpha(
+                      data.imageUrl ? colors.surfaceElevated : accent,
+                      data.imageUrl ? 0.35 : 0.3,
+                    )}`,
+                    borderRadius: `${radius.md}px`,
+                    padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
+                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
+                  }}
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap" style={{ gap: `${scaled(16, viewport, 6)}px` }}>
+            {data.info.temperatureC != null ? (
+              <Stat
+                label="Temperatur"
+                value={`${data.info.temperatureC}°C`}
+                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ) : null}
+            {data.info.humidityPct != null ? (
+              <Stat
+                label="Feuchte"
+                value={`${data.info.humidityPct}%`}
+                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ) : null}
+            {data.info.capacity != null ? (
+              <Stat
+                label="Plätze"
+                value={String(data.info.capacity)}
+                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="flex min-h-0 flex-col overflow-hidden"
+        style={{ padding: `${pad}px`, gap: `${gap}px` }}
+      >
+        <div className="flex items-baseline justify-between shrink-0">
           <span
             className="font-black uppercase"
             style={{
@@ -365,14 +337,13 @@ export function SaunaDetailRenderer({
             Heute keine Aufgüsse geplant.
           </div>
         ) : (
-          <div
-            className="flex flex-1 flex-col overflow-y-auto overscroll-contain"
-            style={{ gap: `${scaled(8, viewport, 3)}px` }}
-          >
-            {visibleUpcoming.map((entry) => (
-              <InfusionRow key={entry.id} entry={entry} tokens={tokens} viewport={viewport} />
-            ))}
-          </div>
+          <AutoScroll className="flex-1 min-h-0">
+            <div className="flex flex-col" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+              {data.upcoming.map((entry) => (
+                <InfusionRow key={entry.id} entry={entry} tokens={tokens} viewport={viewport} />
+              ))}
+            </div>
+          </AutoScroll>
         )}
       </section>
     </div>

@@ -3,6 +3,7 @@ import type {
   SchedulePanelData,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { AutoScroll } from './AutoScroll';
 import { scaled, scaledFont } from './responsive';
 
 function withAlpha(color: string, alpha: number): string {
@@ -56,8 +57,6 @@ function Cell({ cell, tokens, viewport }: CellProps) {
       ? withAlpha(colors.statusNext, 0.4)
       : colors.border;
 
-  const showAromas = !viewport.isUltraCompact && !viewport.isCompact && (cell.aromas?.length ?? 0) > 0;
-
   return (
     <div
       className="flex flex-col"
@@ -70,16 +69,16 @@ function Cell({ cell, tokens, viewport }: CellProps) {
       }}
     >
       <span
-        className="font-bold truncate"
+        className="font-bold"
         style={{
           color: colors.textPrimary,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
           lineHeight: 1.15,
         }}
       >
         {cell.title}
       </span>
-      {showAromas ? (
+      {(cell.aromas?.length ?? 0) > 0 ? (
         <div
           className="flex flex-wrap"
           style={{
@@ -135,9 +134,10 @@ function Cell({ cell, tokens, viewport }: CellProps) {
 /**
  * Wellness Classic — content-panel (schedule grid) slide renderer.
  *
- * Responsive: wide → saunas as columns, time slots as rows; narrow →
- * saunas stack below the time column (single-column list); compact →
- * aromas hidden to preserve legibility.
+ * Structure is constant regardless of container size: time-slot rows x
+ * sauna columns. Only padding, font sizes and gaps scale with the
+ * viewport. When rows exceed the available height, the body auto-
+ * scrolls instead of showing a scrollbar.
  */
 export function SchedulePanelRenderer({
   data,
@@ -163,7 +163,6 @@ export function SchedulePanelRenderer({
     );
   }
 
-  const showHeader = !viewport.isUltraCompact;
   const columns = `auto repeat(${data.saunas.length}, minmax(0, 1fr))`;
   const pad = scaled(24, viewport, 8);
 
@@ -178,45 +177,40 @@ export function SchedulePanelRenderer({
         gap: `${scaled(spacing.md, viewport, 4)}px`,
       }}
     >
-      {showHeader ? (
-        <div className="flex items-baseline justify-between">
-          <span
-            className="font-black uppercase"
-            style={{
-              color: colors.accentPrimary,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-              letterSpacing: '0.3em',
-            }}
-          >
-            Aufgussplan
-          </span>
-          {!viewport.isCompact ? (
-            <span
-              className="font-semibold"
-              style={{
-                color: colors.textSecondary,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-              }}
-            >
-              {data.timeSlots.length} Slots · {data.saunas.length} Saunen
-            </span>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex items-baseline justify-between shrink-0">
+        <span
+          className="font-black uppercase"
+          style={{
+            color: colors.accentPrimary,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+            letterSpacing: '0.3em',
+          }}
+        >
+          Aufgussplan
+        </span>
+        <span
+          className="font-semibold"
+          style={{
+            color: colors.textSecondary,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+          }}
+        >
+          {data.timeSlots.length} Slots · {data.saunas.length} Saunen
+        </span>
+      </div>
 
       <div
-        className="grid flex-1 overflow-auto"
+        className="grid shrink-0"
         style={{
           gridTemplateColumns: columns,
           gap: `${scaled(spacing.xs, viewport, 2)}px`,
-          alignContent: 'start',
         }}
       >
         <div />
         {data.saunas.map((sauna) => (
           <div
             key={sauna.id}
-            className="font-black uppercase truncate"
+            className="font-black uppercase"
             style={{
               color: colors.textPrimary,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
@@ -230,18 +224,31 @@ export function SchedulePanelRenderer({
             {sauna.name}
           </div>
         ))}
-
-        {data.timeSlots.map((time, slotIdx) => (
-          <TimeRow
-            key={time}
-            time={time}
-            saunas={data.saunas}
-            cells={data.saunas.map((_, saunaIdx) => data.cells[saunaIdx]?.[slotIdx] ?? null)}
-            tokens={tokens}
-            viewport={viewport}
-          />
-        ))}
       </div>
+
+      <AutoScroll className="flex-1 min-h-0">
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns: columns,
+            gap: `${scaled(spacing.xs, viewport, 2)}px`,
+            alignContent: 'start',
+          }}
+        >
+          {data.timeSlots.map((time, slotIdx) => (
+            <TimeRow
+              key={time}
+              time={time}
+              saunas={data.saunas}
+              cells={data.saunas.map(
+                (_, saunaIdx) => data.cells[saunaIdx]?.[slotIdx] ?? null,
+              )}
+              tokens={tokens}
+              viewport={viewport}
+            />
+          ))}
+        </div>
+      </AutoScroll>
     </div>
   );
 }
