@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Schedule, PresetKey } from '@/types/schedule.types';
-import { normalizeSaunaNameKey, resolveLivePresetKey } from '@/types/schedule.types';
+import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
@@ -8,12 +7,11 @@ import type { Media } from '@/types/media.types';
 import { Bell, Flame, Thermometer, Users } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AutoScrollingList, type InfusionListItem } from './AutoScrollingList';
-import { clampFlamesTo4, getScentEmoji, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
-import { buildScheduleSaunaIndexMap, resolveScheduleSaunaIndex, timeToMinutes } from './displayScheduleUtils';
+import { getScentEmoji, resolvePrestartMinutes, withAlpha } from './wellnessDisplayUtils';
 import { ResilientImage } from './ResilientImage';
 import { classNames } from '@/utils/classNames';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { useSaunaDetailData } from '@/slides/data';
 
 interface SaunaDetailDashboardProps {
   schedule: Schedule;
@@ -28,17 +26,6 @@ interface SaunaInfusionDetailItem extends InfusionListItem {
   intensity: number;
   scents: string[];
   description: string;
-}
-
-function normalizeBadgeLabel(value: string): string {
-  const s = String(value ?? '').trim();
-  if (!s) return s;
-  const parts = s.split(/\s+/);
-  // Migrate legacy format like "🌿 Eukalyptus" to "Eukalyptus".
-  if (parts.length >= 2 && /^[^A-Za-z0-9ÄÖÜäöüß]+$/.test(parts[0] || '')) {
-    return parts.slice(1).join(' ').trim();
-  }
-  return s;
 }
 
 function IntensityFlames({
@@ -273,23 +260,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
     return () => clearInterval(t);
   }, []);
 
-  const sauna = useMemo(() => {
-    if (!saunaId) return undefined;
-    const list = settings.saunas || [];
-    return (
-      list.find((s) => s.id === saunaId) ||
-      list.find((s) => s.name === saunaId) ||
-      list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
-    );
-  }, [settings.saunas, saunaId]);
-
-  const activePresetKey: PresetKey = resolveLivePresetKey(schedule, settings, now, deviceId);
-
-  const daySchedule = schedule.presets?.[activePresetKey];
-  const scheduleSaunaIndexByKey = useMemo(
-    () => buildScheduleSaunaIndexMap(daySchedule?.saunas || []),
-    [daySchedule?.saunas]
-  );
+  const data = useSaunaDetailData({ settings, schedule, saunaId, media, deviceId, now });
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
   const accentGreen = theme.accentGreen || theme.timeColBg || '#8F9779';
@@ -303,51 +274,27 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
   const isEditorial = isEditorialDisplayAppearance(settings.displayAppearance);
   const isMineralNoir = isMineralNoirDisplayAppearance(settings.displayAppearance);
 
-  const saunaImageUrl = useMemo(() => {
-    if (!sauna?.imageId) return null;
-    return getMediaUploadUrl(media, sauna.imageId);
-  }, [media, sauna]);
+  const saunaImageUrl = data?.imageUrl ?? null;
 
-  const infusions: SaunaInfusionDetailItem[] = useMemo(() => {
-    if (!sauna || !daySchedule?.rows || !daySchedule.saunas) return [];
-    const saunaIndex = resolveScheduleSaunaIndex(daySchedule.saunas, sauna.name, scheduleSaunaIndexByKey);
-    if (saunaIndex < 0) return [];
+  const sortedInfusions = useMemo<SaunaInfusionDetailItem[]>(() => {
+    if (!data) return [];
+    return data.upcoming.map((entry) => ({
+      id: entry.id,
+      time: entry.time,
+      duration: entry.durationMin,
+      title: entry.title,
+      intensity: entry.intensity ?? 1,
+      scents: (entry.aromas ?? []).map((a) => a.name),
+      description: entry.description ?? '',
+    }));
+  }, [data]);
 
-    return daySchedule.rows
-      .map((row) => {
-        const entry = row.entries?.[saunaIndex];
-        if (!entry?.title) return null;
-        return {
-          id: `${activePresetKey}-${sauna.id}-${row.time}`,
-          time: row.time,
-          duration: entry.duration ?? 15,
-          title: entry.title,
-          intensity: clampFlamesTo4(entry.flames ?? 1),
-          scents: (entry.badges || []).map(normalizeBadgeLabel).filter(Boolean),
-          description: entry.description || entry.subtitle || '',
-        };
-      })
-      .filter(Boolean) as SaunaInfusionDetailItem[];
-  }, [activePresetKey, daySchedule, sauna, scheduleSaunaIndexByKey]);
-
-  const sortedInfusions = useMemo(() => {
-    return infusions.slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [infusions]);
-
-  const infoBadges = useMemo(() => {
-    if (!sauna) return [];
-    const raw = String(sauna.description || '');
-    return raw
-      .split(/\r?\n/g)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .slice(0, 2);
-  }, [sauna]);
+  const infoBadges = data?.infoBadges ?? [];
   const isCompactLayout = profile.isCompact || profile.isNarrow;
   const isUltraCompactLayout = profile.isUltraCompact || profile.isShort;
   const visibleInfoBadges = isUltraCompactLayout ? infoBadges.slice(0, 1) : infoBadges;
 
-  if (!sauna) {
+  if (!data) {
     return (
       <div ref={containerRef} className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bgRight, color: textMain }}>
         <p className="text-lg opacity-70">Keine Sauna ausgewählt</p>
@@ -366,7 +313,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
             <ResilientImage
               src={saunaImageUrl}
               className="absolute inset-0 h-full w-full object-cover"
-              alt={sauna.name}
+              alt={data.name}
               fallback={<div className="absolute inset-0" style={{ backgroundColor: withAlpha(accentGreen, 0.12) }} />}
             />
             <div
@@ -409,13 +356,13 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                     textShadow: `0 4px 18px ${withAlpha('#000000', 0.26)}`,
                   }}
                 >
-                  {sauna.name}
+                  {data.name}
                 </h2>
                 {visibleInfoBadges.length > 0 && (
                   <div className={classNames(isCompactLayout ? 'mt-2 flex flex-wrap gap-1.5' : 'mt-3 flex flex-wrap gap-2')}>
                     {visibleInfoBadges.map((text, idx) => (
                       <div
-                        key={`${sauna.id}-info-${idx}`}
+                        key={`${data.saunaId}-info-${idx}`}
                         className={classNames(
                           'inline-flex max-w-full items-center rounded-full border font-bold tracking-wide',
                           isUltraCompactLayout ? 'gap-1.5 px-2.5 py-1 text-[9px]' : isCompactLayout ? 'gap-2 px-3 py-1 text-[10px]' : 'gap-2 px-3.5 py-1.5 text-[11px]',
@@ -435,7 +382,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
               </div>
 
               <div className="flex flex-wrap justify-end gap-2 shrink-0">
-                {sauna.info?.temperature != null && (
+                {data.info.temperatureC != null && (
                   <div
                     className={classNames(
                       'inline-flex items-center gap-1.5 rounded-full border font-semibold',
@@ -448,10 +395,10 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                     }}
                   >
                     <Thermometer className="h-3.5 w-3.5" style={{ color: accentGreen }} />
-                    {sauna.info.temperature}°C
+                    {data.info.temperatureC}°C
                   </div>
                 )}
-                {sauna.info?.capacity != null && (
+                {data.info.capacity != null && (
                   <div
                     className={classNames(
                       'inline-flex items-center gap-1.5 rounded-full border font-semibold',
@@ -464,7 +411,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
                     }}
                   >
                     <Users className="h-3.5 w-3.5" style={{ color: accentGreen }} />
-                    {sauna.info.capacity} Pers.
+                    {data.info.capacity} Pers.
                   </div>
                 )}
               </div>
@@ -542,7 +489,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
             <ResilientImage
               src={saunaImageUrl}
               className="absolute inset-0 h-full w-full object-cover"
-              alt={sauna.name}
+              alt={data.name}
               fallback={<div className="absolute inset-0" style={{ backgroundColor: mnCard }} />}
             />
             {/* Frosted-Glass-Overlay über gesamte Fläche */}
@@ -571,12 +518,12 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
               >
                 Sauna
               </span>
-              {sauna.info?.temperature != null && (
+              {data.info.temperatureC != null && (
                 <span
                   className={classNames('font-mono tabular-nums border ml-2', isUltraCompactLayout ? 'text-[9px] px-1.5 py-0.5' : 'text-[10px] px-2 py-0.5')}
                   style={{ color: mnPlatinum, borderColor: withAlpha(mnBorder, 0.7), backgroundColor: withAlpha(mnCard, 0.5), borderRadius: 0 }}
                 >
-                  {sauna.info.temperature}°
+                  {data.info.temperatureC}°
                 </span>
               )}
             </div>
@@ -584,7 +531,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
               className={classNames('font-black uppercase tracking-tight leading-none', isUltraCompactLayout ? 'text-[1.5rem]' : isCompactLayout ? 'text-[2rem]' : 'text-[2.6rem]')}
               style={{ color: mnText }}
             >
-              {sauna.name}
+              {data.name}
             </h2>
           </div>
 
@@ -643,7 +590,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
         <ResilientImage
           src={saunaImageUrl}
           className="w-full h-full object-cover"
-          alt={sauna.name}
+          alt={data.name}
           fallback={
             <div
               className="w-full h-full flex items-center justify-center text-sm font-semibold uppercase tracking-[0.2em]"
@@ -678,14 +625,14 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
           )}
           style={{ color: accentGold }}
         >
-          {sauna.info?.temperature != null && (
+          {data.info.temperatureC != null && (
             <span className="flex items-center gap-1.5 shrink-0">
-              <Thermometer size={16} style={{ color: accentGreen }} /> {sauna.info.temperature}°C
+              <Thermometer size={16} style={{ color: accentGreen }} /> {data.info.temperatureC}°C
             </span>
           )}
-          {sauna.info?.capacity != null && (
+          {data.info.capacity != null && (
             <span className="flex items-center gap-1.5 shrink-0">
-              <Users size={16} style={{ color: accentGreen }} /> {sauna.info.capacity} Pers.
+              <Users size={16} style={{ color: accentGreen }} /> {data.info.capacity} Pers.
             </span>
           )}
         </div>
@@ -698,7 +645,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
         )}
         style={{ color: textMain }}
       >
-        {sauna.name}
+        {data.name}
       </h2>
 
       <AnimatePresence>
@@ -712,7 +659,7 @@ export function SaunaDetailDashboard({ schedule, settings, saunaId, media: media
             <div className={classNames('flex flex-col', isCompactLayout ? 'gap-1.5' : 'gap-2')}>
               {visibleInfoBadges.map((text, idx) => (
                 <div
-                  key={`${sauna.id}-info-${idx}`}
+                  key={`${data.saunaId}-info-${idx}`}
                   className={classNames(
                     'text-white rounded-3xl flex items-center shadow-xs border border-white/20',
                     isUltraCompactLayout ? 'gap-2 p-2.5 px-3.5' : isCompactLayout ? 'gap-2.5 p-3 px-4' : 'gap-3 p-3 px-5',

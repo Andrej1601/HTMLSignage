@@ -1,16 +1,17 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import type { EventSlideEntry, EventStatusRank } from '@htmlsignage/design-sdk';
 import { useDisplayViewportProfile } from './useDisplayViewportProfile';
 import { Calendar, Clock3 } from 'lucide-react';
 import { withAlpha } from './wellnessDisplayUtils';
 import { ResilientImage } from './ResilientImage';
 import {
-  buildEventPresentationData,
   buildEventsSlideLayout,
   type EventPresentation,
 } from './eventsSlideUtils';
+import { useEventsPanelData } from '@/slides/data';
 
 interface EventsSlideProps {
   settings: Settings;
@@ -360,13 +361,41 @@ export const EventsSlide = memo(function EventsSlide({ settings, media }: Events
   const statusSoon = theme.statusPrestart || '#F59E0B';
   const statusNext = theme.statusNext || accentGold;
 
-  const allEvents = buildEventPresentationData(settings, media, new Date(), {
-    accentGold,
-    accentGreen,
-    statusLive,
-    statusSoon,
-    statusNext,
-  });
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const eventsData = useEventsPanelData({ settings, media, now });
+  const allEvents: EventPresentation[] = useMemo(() => {
+    const rankToBadgeBg = (rank: EventStatusRank): string => {
+      switch (rank) {
+        case 'live':
+          return statusLive;
+        case 'soon':
+          return statusSoon;
+        case 'near':
+          return accentGreen;
+        case 'far':
+        default:
+          return statusNext;
+      }
+    };
+    return eventsData.events.map((entry: EventSlideEntry) => ({
+      id: entry.id,
+      name: entry.title,
+      description: entry.description,
+      imageUrl: entry.imageUrl,
+      dateLabel: entry.dateLabel,
+      timeLabel: entry.timeLabel,
+      badgeLabel: entry.relativeLabel,
+      badgeBackground: rankToBadgeBg(entry.statusRank),
+      badgeTextColor: '#FFFDF8',
+      isLive: entry.isLive,
+      startsSoon: entry.startsSoon,
+    }));
+  }, [eventsData.events, accentGreen, statusLive, statusSoon, statusNext]);
 
   const layout = buildEventsSlideLayout(profile);
   const events = allEvents.slice(0, layout.maxEvents);

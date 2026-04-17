@@ -1,11 +1,11 @@
 import type { SlideConfig } from '@/types/slideshow.types';
-import type { Settings, InfoItem } from '@/types/settings.types';
+import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { useCompactDetector } from '@/hooks/useResponsiveLayout';
 import { ShieldCheck } from 'lucide-react';
 import { ResilientImage } from './ResilientImage';
+import { useInfoPanelData } from '@/slides/data';
 
 interface InfosSlideProps {
   slide: SlideConfig;
@@ -23,12 +23,9 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
 
-  const infos: InfoItem[] = settings.infos || [];
-  const selected = slide.infoId ? infos.find((i) => i.id === slide.infoId) : null;
-  const fallback = infos[0] || { id: 'default', title: 'Wellness Tipp', text: 'Bitte beachten Sie unsere Hinweise für einen angenehmen Aufenthalt.' };
-  const info = selected || fallback;
-  const imageUrl = info.imageId ? getMediaUploadUrl(media, info.imageId) : null;
-  const isBackground = info.imageMode === 'background' && imageUrl;
+  const info = useInfoPanelData({ settings, infoId: slide.infoId, media });
+  const imageUrl = info.imageUrl;
+  const isBackground = info.imageMode === 'background';
 
   if (compact) {
     return (

@@ -21,23 +21,58 @@ export type SlideTypeId =
 
 // ─── Per-slide data shapes ───────────────────────────────────────────────────
 
+export interface SaunaAroma {
+  id: string;
+  name: string;
+  emoji?: string;
+  color?: string;
+}
+
+export interface SaunaInfusionEntry {
+  id: string;
+  /** Raw start time "HH:mm" from the schedule row. */
+  time: string;
+  /** Duration in minutes. */
+  durationMin: number;
+  title: string;
+  description?: string;
+  /** Intensity 1–4 (a.k.a. flames). */
+  intensity?: number;
+  aromas?: SaunaAroma[];
+  /** True if the entry is currently running. */
+  isLive: boolean;
+  /** True if the entry is the next to start. */
+  isNext: boolean;
+  /** True if the entry is in the "pre-start" window but not yet live. */
+  isPrestart: boolean;
+  /** True if the entry already ended. */
+  isFinished: boolean;
+}
+
+export interface SaunaDetailInfo {
+  temperatureC?: number;
+  humidityPct?: number;
+  capacity?: number;
+  features?: string[];
+}
+
 export interface SaunaDetailData {
   saunaId: string;
   name: string;
+  /** Optional short subtitle (from sauna metadata). */
   subtitle?: string;
-  /** Upcoming aufguss entries (sorted ascending by start time). */
-  upcoming: Array<{
-    id: string;
-    title: string;
-    startsAt: string; // ISO-8601
-    endsAt: string; // ISO-8601
-    host?: string;
-    aromas?: Array<{ id: string; name: string; emoji?: string; color?: string }>;
-    isLive: boolean;
-    isNext: boolean;
-  }>;
-  /** Optional background media. */
-  backgroundMediaUrl?: string;
+  /** Free-text description (first lines used as badges in modern designs). */
+  description?: string;
+  /** Up to a handful of short label badges derived from description. */
+  infoBadges: string[];
+  /** Per-sauna accent color, if configured. */
+  accentColor?: string;
+  /** Resolved image URL, or null if no image set / unresolvable. */
+  imageUrl: string | null;
+  /** Static info (temperature, humidity, capacity, feature chips). */
+  info: SaunaDetailInfo;
+  /** Upcoming + live aufguss entries, sorted ascending by start time. */
+  upcoming: SaunaInfusionEntry[];
 }
 
 export interface SchedulePanelData {
@@ -52,28 +87,54 @@ export interface SchedulePanelData {
 export interface SchedulePanelCell {
   title: string;
   host?: string;
-  aromas?: Array<{ id: string; name: string; emoji?: string; color?: string }>;
+  aromas?: SaunaAroma[];
   isLive: boolean;
   isNext: boolean;
 }
 
+export type InfoImageMode = 'background' | 'side' | 'none';
+
 export interface InfoPanelData {
   id: string;
   title: string;
-  bodyMarkdown?: string;
-  iconUrl?: string;
+  /** Plain-text body. Renderers may treat lines as paragraphs. */
+  text: string;
+  /** Resolved image URL (from media library), or null if none. */
+  imageUrl: string | null;
+  /** Determines how the image relates to the body. */
+  imageMode: InfoImageMode;
   accentColor?: string;
 }
 
+export type EventStatusRank = 'live' | 'soon' | 'near' | 'far';
+
+export interface EventSlideEntry {
+  id: string;
+  title: string;
+  /** ISO-8601 start timestamp. */
+  startsAt: string;
+  /** ISO-8601 end timestamp. */
+  endsAt: string;
+  location?: string;
+  description?: string;
+  /** Resolved image URL, or null. */
+  imageUrl: string | null;
+  /** Rank for status-based styling without leaking colors into data. */
+  statusRank: EventStatusRank;
+  isLive: boolean;
+  /** True if the event starts within the "soon" window (default 180 min). */
+  startsSoon: boolean;
+  /** Pre-formatted, localized date label (e.g. "Mo. 17. Apr."). */
+  dateLabel: string;
+  /** Pre-formatted, localized time range label (e.g. "18:00 – 20:00"). */
+  timeLabel: string;
+  /** Pre-formatted relative label (e.g. "In 42 Min.", "Jetzt live"). */
+  relativeLabel: string;
+}
+
 export interface EventsPanelData {
-  events: Array<{
-    id: string;
-    title: string;
-    startsAt: string; // ISO-8601
-    endsAt?: string;
-    location?: string;
-    description?: string;
-  }>;
+  events: EventSlideEntry[];
+  /** ISO-8601 timestamp of when the data was computed. */
   generatedAt: string;
 }
 

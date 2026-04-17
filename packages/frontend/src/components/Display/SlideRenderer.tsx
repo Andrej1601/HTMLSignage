@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { getEffectiveMediaFit, type SlideConfig } from '@/types/slideshow.types';
+import { type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
@@ -12,7 +12,7 @@ import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
 import { ResilientVideo } from './ResilientVideo';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
-import { buildUploadUrl } from '@/utils/mediaUrl';
+import { useMediaImageData, useMediaVideoData } from '@/slides/data';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -51,10 +51,10 @@ function SlideRendererComponent({
         );
 
       case 'media-image':
-        return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
+        return <MediaImageSlide media={media} slide={slide} />;
 
       case 'media-video':
-        return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
+        return <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
 
       case 'infos':
         return <InfosSlide slide={slide} settings={settings} media={media} />;
@@ -96,10 +96,6 @@ function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
     list.find((s) => s.name === saunaId) ||
     list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
   );
-}
-
-function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefined {
-  return media?.find(m => m.id === mediaId);
 }
 
 // Individual Slide Components
@@ -151,19 +147,18 @@ function SaunaDetailSlide({
   );
 }
 
-function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }) {
-  if (!media) {
+function MediaImageSlide({ media, slide }: { media?: Media[]; slide: SlideConfig }) {
+  const data = useMediaImageData({ slide, media });
+  if (!data) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Bild nicht gefunden</div>;
   }
-
-  const fitMode = getEffectiveMediaFit(slide);
 
   return (
     <div className="w-full h-full relative bg-black">
       <ResilientImage
-        src={buildUploadUrl(media.filename)}
-        alt={media.originalName}
-        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+        src={data.url}
+        alt={data.altText ?? ''}
+        className={`w-full h-full ${data.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         fallback={
           <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
             Bild konnte nicht geladen werden
@@ -179,22 +174,22 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
   );
 }
 
-function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide: SlideConfig; onVideoEnded?: () => void }) {
-  if (!media) {
+function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media[]; slide: SlideConfig; onVideoEnded?: () => void }) {
+  const data = useMediaVideoData({ slide, media });
+  if (!data) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Video nicht gefunden</div>;
   }
 
-  const shouldLoop = slide.videoPlayback === 'loop-duration' || slide.videoPlayback === 'duration';
-  const fitMode = getEffectiveMediaFit(slide);
+  const shouldLoop = data.playback === 'loop-duration' || data.playback === 'duration';
 
   return (
     <div className="w-full h-full relative bg-black">
       <ResilientVideo
-        src={buildUploadUrl(media.filename)}
-        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+        src={data.url}
+        className={`w-full h-full ${data.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         autoPlay
         loop={shouldLoop}
-        muted
+        muted={data.mutedByDefault}
         playsInline
         onEnded={onVideoEnded}
         fallback={

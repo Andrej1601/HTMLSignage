@@ -1,22 +1,22 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import { getDefaultSettings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
 import type { SlideConfig } from '@/types/slideshow.types';
-import { normalizeSaunaNameKey } from '@/types/schedule.types';
 import { Flame } from 'lucide-react';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { ResilientImage } from './ResilientImage';
 import {
   isModernDisplayDesignStyle,
   loadSaunaDetailDashboard,
 } from './displayDynamicModules';
+import { useSaunaDetailData } from '@/slides/data';
 
 const LazySaunaDetailDashboard = lazy(loadSaunaDetailDashboard);
 
 interface DisplaySaunaDetailSlideProps {
+  /** Legacy prop — used as a hint only; data is re-resolved via the hook. */
   sauna?: Sauna;
   saunaId?: string;
   slide?: SlideConfig;
@@ -53,19 +53,21 @@ export function DisplaySaunaDetailSlide({
   const fonts = settings.fonts || defaults.fonts!;
   const designStyle = settings.designStyle || 'modern-wellness';
   const resolvedSaunaId = saunaId || slide?.saunaId || sauna?.id;
-  const resolvedSauna = useMemo(() => {
-    if (sauna) return sauna;
-    if (!resolvedSaunaId) return undefined;
 
-    const list = settings.saunas || [];
-    return (
-      list.find((item) => item.id === resolvedSaunaId) ||
-      list.find((item) => item.name === resolvedSaunaId) ||
-      list.find(
-        (item) => normalizeSaunaNameKey(item.name) === normalizeSaunaNameKey(resolvedSaunaId),
-      )
-    );
-  }, [resolvedSaunaId, sauna, settings.saunas]);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const data = useSaunaDetailData({
+    settings,
+    schedule,
+    saunaId: resolvedSaunaId,
+    media,
+    deviceId,
+    now,
+  });
 
   if (isModernDisplayDesignStyle(designStyle)) {
     return (
@@ -81,7 +83,7 @@ export function DisplaySaunaDetailSlide({
     );
   }
 
-  if (!resolvedSauna) {
+  if (!data) {
     return (
       <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
         {resolvedSaunaId ? 'Sauna nicht gefunden' : 'Keine Sauna ausgewählt'}
@@ -89,7 +91,7 @@ export function DisplaySaunaDetailSlide({
     );
   }
 
-  const imageUrl = getMediaUploadUrl(media, resolvedSauna.imageId);
+  const imageUrl = data.imageUrl;
 
   return (
     <div
@@ -112,20 +114,20 @@ export function DisplaySaunaDetailSlide({
           className="rounded-3xl p-12 shadow-2xl backdrop-blur-xs"
           style={{
             backgroundColor: imageUrl ? 'rgba(255, 255, 255, 0.95)' : theme.cellBg,
-            borderLeft: `12px solid ${resolvedSauna.color || theme.accent}`,
+            borderLeft: `12px solid ${data.accentColor || theme.accent}`,
           }}
         >
           <h1
             className="font-bold mb-6"
             style={{
               fontSize: `${(fonts.h1Scale || 1.5) * 3}rem`,
-              color: resolvedSauna.color || theme.fg,
+              color: data.accentColor || theme.fg,
             }}
           >
-            {slide?.title || resolvedSauna.name}
+            {slide?.title || data.name}
           </h1>
 
-          {resolvedSauna.description ? (
+          {(data.description ?? "") ? (
             <p
               className="mb-8"
               style={{
@@ -134,26 +136,26 @@ export function DisplaySaunaDetailSlide({
                 opacity: 0.8,
               }}
             >
-              {resolvedSauna.description}
+              {(data.description ?? "")}
             </p>
           ) : null}
 
           <div className="grid grid-cols-3 gap-8 mb-8">
-            {resolvedSauna.info?.temperature ? (
+            {data.info.temperatureC ? (
               <div
                 className="text-center p-6 rounded-2xl"
                 style={{
-                  backgroundColor: `${resolvedSauna.color || theme.accent}20`,
+                  backgroundColor: `${data.accentColor || theme.accent}20`,
                 }}
               >
                 <div
                   className="font-bold"
                   style={{
                     fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: resolvedSauna.color || theme.fg,
+                    color: data.accentColor || theme.fg,
                   }}
                 >
-                  {resolvedSauna.info.temperature}°C
+                  {data.info.temperatureC}°C
                 </div>
                 <div
                   style={{
@@ -167,21 +169,21 @@ export function DisplaySaunaDetailSlide({
               </div>
             ) : null}
 
-            {resolvedSauna.info?.humidity ? (
+            {data.info.humidityPct ? (
               <div
                 className="text-center p-6 rounded-2xl"
                 style={{
-                  backgroundColor: `${resolvedSauna.color || theme.accent}20`,
+                  backgroundColor: `${data.accentColor || theme.accent}20`,
                 }}
               >
                 <div
                   className="font-bold"
                   style={{
                     fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: resolvedSauna.color || theme.fg,
+                    color: data.accentColor || theme.fg,
                   }}
                 >
-                  {resolvedSauna.info.humidity}%
+                  {data.info.humidityPct}%
                 </div>
                 <div
                   style={{
@@ -195,21 +197,21 @@ export function DisplaySaunaDetailSlide({
               </div>
             ) : null}
 
-            {resolvedSauna.info?.capacity ? (
+            {data.info.capacity ? (
               <div
                 className="text-center p-6 rounded-2xl"
                 style={{
-                  backgroundColor: `${resolvedSauna.color || theme.accent}20`,
+                  backgroundColor: `${data.accentColor || theme.accent}20`,
                 }}
               >
                 <div
                   className="font-bold"
                   style={{
                     fontSize: `${(fonts.fontScale || 1) * 4}rem`,
-                    color: resolvedSauna.color || theme.fg,
+                    color: data.accentColor || theme.fg,
                   }}
                 >
-                  {resolvedSauna.info.capacity}
+                  {data.info.capacity}
                 </div>
                 <div
                   style={{
@@ -224,14 +226,14 @@ export function DisplaySaunaDetailSlide({
             ) : null}
           </div>
 
-          {resolvedSauna.info?.features && resolvedSauna.info.features.length > 0 ? (
+          {data.info.features && data.info.features.length > 0 ? (
             <div className="flex flex-wrap gap-3">
-              {resolvedSauna.info.features.map((feature, index) => (
+              {data.info.features.map((feature, index) => (
                 <span
                   key={index}
                   className="px-6 py-3 rounded-full font-semibold"
                   style={{
-                    backgroundColor: resolvedSauna.color || theme.flame,
+                    backgroundColor: data.accentColor || theme.flame,
                     color: '#FFFFFF',
                     fontSize: `${(fonts.badgeTextScale || 0.85) * 1.5}rem`,
                   }}
@@ -242,10 +244,10 @@ export function DisplaySaunaDetailSlide({
             </div>
           ) : null}
 
-          {resolvedSauna.info?.temperature ? (
+          {data.info.temperatureC ? (
             <div className="flex items-center justify-center gap-2 mt-8">
               {Array.from({
-                length: Math.min(4, Math.floor(resolvedSauna.info.temperature / 25)),
+                length: Math.min(4, Math.floor(data.info.temperatureC / 25)),
               }).map((_, index) => (
                 <Flame
                   key={index}
