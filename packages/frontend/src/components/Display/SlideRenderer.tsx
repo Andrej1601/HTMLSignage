@@ -5,6 +5,7 @@ import type { Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
 import { normalizeSaunaNameKey } from '@/types/schedule.types';
+import type { SlideRenderContext } from '@htmlsignage/design-sdk';
 import { DisplayContentPanel } from './DisplayContentPanel';
 import { DisplaySaunaDetailSlide } from './DisplaySaunaDetailSlide';
 import { InfosSlide } from './InfosSlide';
@@ -12,7 +13,8 @@ import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
 import { ResilientVideo } from './ResilientVideo';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
-import { useMediaImageData, useMediaVideoData } from '@/slides/data';
+import { useInfoPanelData, useMediaImageData, useMediaVideoData } from '@/slides/data';
+import { DesignHost, DEFAULT_DESIGN_ID, isKnownDesignId } from '@/designs';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -57,7 +59,7 @@ function SlideRendererComponent({
         return <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
 
       case 'infos':
-        return <InfosSlide slide={slide} settings={settings} media={media} />;
+        return <InfosSlideDispatch slide={slide} settings={settings} media={media} deviceId={deviceId} />;
 
       case 'events':
         return <EventsSlide settings={settings} media={media} />;
@@ -95,6 +97,43 @@ function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
     list.find((s) => s.id === saunaId) ||
     list.find((s) => s.name === saunaId) ||
     list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
+  );
+}
+
+function InfosSlideDispatch({
+  slide,
+  settings,
+  media,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  deviceId?: string;
+}) {
+  const useDesignPacks = settings.display?.useDesignPacks === true;
+  const configuredId = settings.display?.designPackId;
+  const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
+
+  const data = useInfoPanelData({ settings, infoId: slide.infoId, media });
+
+  const context: SlideRenderContext = {
+    zoneId: slide.zoneId ?? 'default',
+    durationMs: (slide.duration ?? 5) * 1000,
+    transitionsEnabled: true,
+    locale: 'de-DE',
+    deviceId,
+  };
+
+  return (
+    <DesignHost
+      slideType="infos"
+      data={data}
+      context={context}
+      enabled={useDesignPacks}
+      designId={designId}
+      fallback={<InfosSlide slide={slide} settings={settings} media={media} />}
+    />
   );
 }
 

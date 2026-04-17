@@ -78,6 +78,18 @@ export interface DisplaySettings {
   showSubtitles?: boolean;
   compactMode?: boolean;
   prestartMinutes?: number;
+  /**
+   * Opt-in to the new design-pack rendering path. When unset or false,
+   * the legacy display components remain authoritative. Scoped per
+   * device via the standard settings-override mechanism.
+   */
+  useDesignPacks?: boolean;
+  /**
+   * Optional design-pack identifier. When `useDesignPacks` is true and
+   * this is set to a known design id, that pack is used; otherwise the
+   * host falls back to the default design.
+   */
+  designPackId?: string;
 }
 
 export interface AudioSettings {
