@@ -1,4 +1,5 @@
 import { api } from './core';
+import { API_LONG_REQUEST_TIMEOUT_MS } from '@/utils/constants';
 import type {
   SystemAuditLogResponse,
   SystemBackupPreviewResponse,
@@ -36,6 +37,7 @@ export const systemApi = {
   exportBackup: async (): Promise<Blob> => {
     const { data } = await api.get('/system/backup/export', {
       responseType: 'blob',
+      timeout: API_LONG_REQUEST_TIMEOUT_MS,
     });
     return data as Blob;
   },
@@ -45,7 +47,9 @@ export const systemApi = {
     formData.append('backup', backupFile);
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
-    const { data } = await api.post<SystemJobStartResponse>('/system/backup/import', formData);
+    const { data } = await api.post<SystemJobStartResponse>('/system/backup/import', formData, {
+      timeout: API_LONG_REQUEST_TIMEOUT_MS,
+    });
     return data;
   },
 
@@ -57,7 +61,9 @@ export const systemApi = {
     formData.append('backup', backupFile);
     formData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
-    const { data } = await api.post<SystemBackupPreviewResponse>('/system/backup/import/preview', formData);
+    const { data } = await api.post<SystemBackupPreviewResponse>('/system/backup/import/preview', formData, {
+      timeout: API_LONG_REQUEST_TIMEOUT_MS,
+    });
     return data;
   },
 
