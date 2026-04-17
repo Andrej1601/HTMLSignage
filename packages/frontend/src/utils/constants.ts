@@ -8,6 +8,9 @@ export const ONLINE_THRESHOLD_MINUTES = 5;
 /** Default request timeout for API calls in milliseconds. */
 export const API_REQUEST_TIMEOUT_MS = 8000;
 
+/** Extended timeout for long-running API calls (e.g. backup export/import). */
+export const API_LONG_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** WebSocket reconnection settings. */
 export const WS_RECONNECT = {
   delayMs: 1000,
