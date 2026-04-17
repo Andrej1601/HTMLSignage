@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { DisplaySaunaDetailSlide } from '@/components/Display/DisplaySaunaDetailSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import type {
   DisplayLayoutContext,
@@ -93,13 +92,16 @@ export function renderTripleSaunaDetail(
   context: DisplayLayoutContext,
   saunaId?: string,
 ): ReactElement {
-  return (
-    <DisplaySaunaDetailSlide
-      schedule={context.localSchedule}
-      settings={context.effectiveSettings}
-      saunaId={saunaId}
-      media={context.mediaItems}
-      deviceId={context.displayDeviceId}
-    />
-  );
+  // Synthesize a minimal SlideConfig so the unified SlideRenderer /
+  // DesignHost pipeline resolves this slide through the active design
+  // pack — no direct legacy component rendering.
+  const slide: SlideConfig = {
+    id: `triple-sauna-${saunaId ?? 'none'}`,
+    type: 'sauna-detail',
+    enabled: true,
+    duration: 0,
+    order: 0,
+    saunaId,
+  };
+  return renderTripleSlideRenderer(context, slide);
 }

@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { DisplayContentPanel } from '@/components/Display/DisplayContentPanel';
 import {
   DisplayEditorialPanel,
   DisplayEditorialStage,
@@ -52,12 +51,24 @@ export function DisplayLayoutRenderer({
   const hasAnyZoneSlides = zones.some((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
 
   const renderContentPanel = (): ReactElement => {
+    // Route the "default" schedule slide through the unified
+    // SlideRenderer → DesignHost pipeline so it inherits the active
+    // design pack's look + token overrides.
+    const slide: SlideConfig = {
+      id: 'layout-content-panel',
+      type: 'content-panel',
+      enabled: true,
+      duration: 0,
+      order: 0,
+    };
     return (
-      <DisplayContentPanel
+      <SlideRenderer
         schedule={localSchedule}
         settings={effectiveSettings}
+        media={mediaItems}
         now={currentTime}
         deviceId={displayDeviceId}
+        slide={slide}
       />
     );
   };

@@ -1,10 +1,8 @@
-import { lazy, Suspense } from 'react';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
 } from '@/components/Display/displayLayoutRenderer.types';
-import { loadScheduleGridSlide } from '@/components/Display/displayDynamicModules';
 import {
   renderTripleSaunaDetail,
   renderTripleSlideRenderer,
@@ -17,22 +15,12 @@ interface DisplayClassicTripleLayoutProps {
   zoneStates: TripleZoneStateMap;
 }
 
-const LazyScheduleGridSlide = lazy(loadScheduleGridSlide);
-
-function ClassicTripleContentFallback() {
-  return <div className="w-full h-full bg-spa-bg-primary" aria-hidden="true" />;
-}
-
 export function DisplayClassicTripleLayout({
   context,
   zoneStates,
 }: DisplayClassicTripleLayoutProps) {
   const {
-    currentTime,
-    displayDeviceId,
-    effectiveSettings,
     enableTransitions,
-    localSchedule,
     resolveTransition,
     themeColors,
   } = context;
@@ -66,18 +54,7 @@ export function DisplayClassicTripleLayout({
             }
             progressColor={progressColor}
           >
-            {left.slide.type === 'content-panel' ? (
-              <Suspense fallback={<ClassicTripleContentFallback />}>
-                <LazyScheduleGridSlide
-                  schedule={localSchedule}
-                  settings={effectiveSettings}
-                  now={currentTime}
-                  deviceId={displayDeviceId}
-                />
-              </Suspense>
-            ) : (
-              renderTripleSlideRenderer(context, left.slide, left.zone?.id)
-            )}
+            {renderTripleSlideRenderer(context, left.slide, left.zone?.id)}
           </SlideTransition>
         </div>
       )}

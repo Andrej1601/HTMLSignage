@@ -1,7 +1,4 @@
 import { normalizeSaunaNameKey } from '@/types/schedule.types';
-import type { Sauna } from '@/types/sauna.types';
-
-const ACCENT_FALLBACKS = ['#F59E0B', '#10B981', '#c5a059', '#8B6F47'];
 
 export function timeToMinutes(timeStr: string): number {
   const [hRaw, mRaw] = String(timeStr ?? '').split(':');
@@ -39,15 +36,3 @@ export function resolveScheduleSaunaIndex(
   return saunaIndexByKey.get(normalizeSaunaNameKey(saunaName)) ?? -1;
 }
 
-export function getSaunaAccentColor(
-  sauna: Pick<Sauna, 'color'>,
-  index: number,
-  accentGreen: string,
-  accentGold: string,
-): string {
-  if (sauna.color && typeof sauna.color === 'string') {
-    return sauna.color;
-  }
-  const fallbackPalette = [accentGold, accentGreen, ...ACCENT_FALLBACKS];
-  return fallbackPalette[index % fallbackPalette.length];
-}
