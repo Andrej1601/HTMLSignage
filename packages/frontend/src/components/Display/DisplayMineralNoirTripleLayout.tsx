@@ -81,6 +81,7 @@ export function DisplayMineralNoirTripleLayout({
   const rightBottomClassName = isPortrait
     ? 'flex-[0.9] min-h-0'
     : isCompact ? 'h-36 shrink-0' : 'h-52 shrink-0';
+  const progressColor = themeColors.accentGold || themeColors.accent || '#C5A059';
 
   const renderLeftPanel = (): ReactElement => {
     if (!left.slide || left.slide.type === 'content-panel') return renderContentPanel();
@@ -149,6 +150,10 @@ export function DisplayMineralNoirTripleLayout({
               enabled={enableTransitions && (left.info?.shouldRotate || false)}
               duration={0.5}
               transition={resolveTransition(left.slide)}
+              progressDurationSec={
+                left.info?.shouldRotate ? (left.slide?.duration ?? 12) : undefined
+              }
+              progressColor={progressColor}
             >
               <div className="h-full w-full">{renderLeftPanel()}</div>
             </SlideTransition>
@@ -171,6 +176,10 @@ export function DisplayMineralNoirTripleLayout({
                 enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
                 duration={0.5}
                 transition={resolveTransition(topRight.slide)}
+                progressDurationSec={
+                  topRight.info?.shouldRotate ? (topRight.slide?.duration ?? 12) : undefined
+                }
+                progressColor={progressColor}
               >
                 <div className="h-full w-full">{renderTopRightPanel()}</div>
               </SlideTransition>
@@ -188,6 +197,10 @@ export function DisplayMineralNoirTripleLayout({
                 enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
                 duration={0.5}
                 transition={resolveTransition(bottomRight.slide)}
+                progressDurationSec={
+                  bottomRight.info?.shouldRotate ? (bottomRight.slide?.duration ?? 12) : undefined
+                }
+                progressColor={progressColor}
               >
                 <div className="h-full w-full">{renderBottomRightPanel()}</div>
               </SlideTransition>

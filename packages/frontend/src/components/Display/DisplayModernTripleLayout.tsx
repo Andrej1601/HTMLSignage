@@ -1,6 +1,5 @@
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
-import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -47,7 +46,6 @@ export function DisplayModernTripleLayout({
   const border = themeColors.gridTable || '#EBE5D3';
   const bottomBg = withAlpha(rightBg, 0.6);
 
-  const accentGreen = themeColors.accentGreen || themeColors.timeColBg || '#8F9779';
   const accentGold = themeColors.accentGold || themeColors.accent || '#A68A64';
   const bottomPanelClassName = isPortrait
     ? 'flex-[0.9] min-h-0 p-2.5'
@@ -136,6 +134,10 @@ export function DisplayModernTripleLayout({
           enabled={enableTransitions && (left.info?.shouldRotate || false)}
           duration={0.6}
           transition={resolveTransition(left.slide)}
+          progressDurationSec={
+            left.info?.shouldRotate ? (left.slide?.duration ?? 12) : undefined
+          }
+          progressColor={accentGold}
         >
           {renderLeftPanel()}
         </SlideTransition>
@@ -150,26 +152,13 @@ export function DisplayModernTripleLayout({
         }}
       >
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          {(topRight.info?.shouldRotate || false) && (
-            <SlideProgressIndicator
-              key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
-              className={classNames(
-                'absolute left-1/2 z-20 -translate-x-1/2',
-                isPortrait ? 'bottom-2.5' : 'bottom-3',
-              )}
-              compact
-              durationSec={topDurationSec}
-              startColor={accentGreen}
-              endColor={accentGold}
-              surfaceColor={rightBg}
-              borderColor={border}
-            />
-          )}
           <SlideTransition
             slideKey={topRight.slide?.id || topRight.info?.currentSlideIndex || 'top-fallback'}
             enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
             duration={0.6}
             transition={resolveTransition(topRight.slide)}
+            progressDurationSec={topRight.info?.shouldRotate ? topDurationSec : undefined}
+            progressColor={accentGold}
           >
             <div className="absolute inset-0 flex flex-col">
               {renderTopRightPanel()}
@@ -189,6 +178,10 @@ export function DisplayModernTripleLayout({
             enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
             duration={0.6}
             transition={resolveTransition(bottomRight.slide)}
+            progressDurationSec={
+              bottomRight.info?.shouldRotate ? (bottomRight.slide?.duration ?? 12) : undefined
+            }
+            progressColor={accentGold}
           >
             <div className="w-full h-full">
               {renderBottomRightPanel()}

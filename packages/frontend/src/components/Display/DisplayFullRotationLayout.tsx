@@ -38,6 +38,9 @@ export function DisplayFullRotationLayout({
   const zoneWithSlides = zones.find((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
   const zoneId = zoneWithSlides?.id || zones[0]?.id || 'main';
   const slide = getZoneSlide(zoneId) || currentSlide;
+  const zoneInfo = getZoneInfo(zoneId);
+  const shouldRotate = (zoneInfo?.totalSlides ?? 0) > 1;
+  const progressColor = context.themeColors.accentGold || context.themeColors.accent || '#A68A64';
 
   if (!slide) return null;
 
@@ -73,6 +76,8 @@ export function DisplayFullRotationLayout({
             enabled={enableTransitions}
             duration={0.6}
             transition={resolveTransition(slide)}
+            progressDurationSec={shouldRotate ? (slide.duration ?? 12) : undefined}
+            progressColor={progressColor}
           >
             {renderSlideWithPadding(slide, rendered)}
           </SlideTransition>
@@ -87,6 +92,8 @@ export function DisplayFullRotationLayout({
       enabled={enableTransitions}
       duration={0.6}
       transition={resolveTransition(slide)}
+      progressDurationSec={shouldRotate ? (slide.duration ?? 12) : undefined}
+      progressColor={progressColor}
     >
       {renderSlideWithPadding(slide, rendered)}
     </SlideTransition>

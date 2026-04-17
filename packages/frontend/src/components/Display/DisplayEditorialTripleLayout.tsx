@@ -1,6 +1,5 @@
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
-import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -47,7 +46,6 @@ export function DisplayEditorialTripleLayout({
   const rightSize = isPortrait ? 100 : 100 - leftSize;
   const topDurationSec = topRight.slide?.duration ?? 12;
   const accentWarm = themeColors.accentGold || themeColors.accent || '#A68A64';
-  const accentCool = themeColors.accentGreen || themeColors.timeColBg || '#8F9779';
   const stageContentClassName = isPortrait ? 'gap-3' : isCompact ? 'gap-3.5' : 'gap-5';
   const rightBottomClassName = isPortrait
     ? 'flex-[0.9] min-h-0'
@@ -139,6 +137,10 @@ export function DisplayEditorialTripleLayout({
               enabled={enableTransitions && (left.info?.shouldRotate || false)}
               duration={0.6}
               transition={resolveTransition(left.slide)}
+              progressDurationSec={
+                left.info?.shouldRotate ? (left.slide?.duration ?? 12) : undefined
+              }
+              progressColor={accentWarm}
             >
               <div className="h-full w-full">
                 {renderLeftPanel()}
@@ -152,21 +154,6 @@ export function DisplayEditorialTripleLayout({
           style={{ width: isPortrait ? '100%' : `${rightSize}%` }}
         >
           <div className="relative flex-1 min-h-0">
-            {(topRight.info?.shouldRotate || false) && (
-              <SlideProgressIndicator
-                key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
-                className={classNames(
-                  'absolute left-1/2 z-20 -translate-x-1/2',
-                  isPortrait ? 'bottom-2.5' : 'bottom-3',
-                )}
-                compact
-                durationSec={topDurationSec}
-                startColor={accentCool}
-                endColor={accentWarm}
-                surfaceColor={themeColors.cardBg || themeColors.cellBg || '#FFFFFF'}
-                borderColor={themeColors.cardBorder || themeColors.gridTable || '#EBE5D3'}
-              />
-            )}
             <DisplayEditorialPanel
               theme={themeColors}
               tone="glass"
@@ -176,6 +163,8 @@ export function DisplayEditorialTripleLayout({
                 enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
                 duration={0.6}
                 transition={resolveTransition(topRight.slide)}
+                progressDurationSec={topRight.info?.shouldRotate ? topDurationSec : undefined}
+                progressColor={accentWarm}
               >
                 <div className="h-full w-full">
                   {renderTopRightPanel()}
@@ -195,6 +184,10 @@ export function DisplayEditorialTripleLayout({
                 enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
                 duration={0.6}
                 transition={resolveTransition(bottomRight.slide)}
+                progressDurationSec={
+                  bottomRight.info?.shouldRotate ? (bottomRight.slide?.duration ?? 12) : undefined
+                }
+                progressColor={accentWarm}
               >
                 <div className="h-full w-full">
                   {renderBottomRightPanel()}

@@ -36,6 +36,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
   const bgBase = themeColors.dashboardBg || themeColors.bg || '#FDFBF7';
   const bg1 = themeColors.zebra1 || bgBase;
   const bg2 = themeColors.zebra2 || bgBase;
+  const progressColor = themeColors.accentGold || themeColors.accent || '#A68A64';
 
   const cellBgForIndex = (index: number) => (index === 0 || index === 3 ? bg1 : bg2);
 
@@ -92,6 +93,10 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
                   enabled={enableTransitions && (info?.shouldRotate || false)}
                   duration={0.6}
                   transition={resolveTransition(slide)}
+                  progressDurationSec={
+                    info?.shouldRotate ? (slide?.duration ?? 12) : undefined
+                  }
+                  progressColor={progressColor}
                 >
                   {renderCell(zone.id)}
                 </SlideTransition>
@@ -128,6 +133,10 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
                 enabled={enableTransitions && (info?.shouldRotate || false)}
                 duration={0.6}
                 transition={resolveTransition(slide)}
+                progressDurationSec={
+                  info?.shouldRotate ? (slide?.duration ?? 12) : undefined
+                }
+                progressColor={progressColor}
               >
                 {renderCell(zone.id)}
               </SlideTransition>

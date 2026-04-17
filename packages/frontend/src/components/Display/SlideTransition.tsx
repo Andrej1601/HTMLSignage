@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 
 type TransitionType = 'fade' | 'slide' | 'zoom' | 'none';
 
@@ -21,6 +22,15 @@ interface SlideTransitionProps {
   enabled?: boolean;
   duration?: number;
   transition?: TransitionType;
+  /**
+   * Slide duration in seconds. When provided (together with a non-empty
+   * `progressColor`), a thin full-width progress line is rendered at the
+   * bottom edge of the transition frame, visualising the time left until
+   * the next slide. Pass `undefined`/`0` to disable.
+   */
+  progressDurationSec?: number;
+  /** Accent color for the progress fill. Usually the theme's accentGold. */
+  progressColor?: string;
 }
 
 const fadeVariants: AnimationVariants = {
@@ -100,14 +110,39 @@ export function SlideTransition({
   enabled = true,
   duration = 0.6,
   transition = 'fade',
+  progressDurationSec,
+  progressColor,
 }: SlideTransitionProps) {
-  if (!enabled || transition === 'none') {
+  const shouldAnimate = enabled && transition !== 'none';
+  const showProgress =
+    typeof progressDurationSec === 'number'
+    && progressDurationSec > 0
+    && !!progressColor;
+
+  if (!shouldAnimate && !showProgress) {
     return <>{children}</>;
   }
 
-  return (
+  const inner = shouldAnimate ? (
     <SlideTransitionFrame key={slideKey} duration={duration} transition={transition}>
       {children}
     </SlideTransitionFrame>
+  ) : (
+    <>{children}</>
+  );
+
+  if (!showProgress) {
+    return inner;
+  }
+
+  return (
+    <div className="relative w-full h-full">
+      {inner}
+      <SlideProgressIndicator
+        key={`progress:${slideKey}`}
+        durationSec={progressDurationSec!}
+        color={progressColor!}
+      />
+    </div>
   );
 }

@@ -34,6 +34,7 @@ export function DisplayClassicTripleLayout({
     enableTransitions,
     localSchedule,
     resolveTransition,
+    themeColors,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
@@ -41,6 +42,7 @@ export function DisplayClassicTripleLayout({
   const isPortrait = profile.isPortrait;
   const leftSize = isPortrait ? 100 : (left.zone?.size || 66);
   const topRightSize = topRight.zone?.size || 50;
+  const progressColor = themeColors.accentGold || themeColors.accent || '#A68A64';
 
   return (
     <div
@@ -59,6 +61,10 @@ export function DisplayClassicTripleLayout({
             enabled={enableTransitions && (left.info?.shouldRotate || false)}
             duration={0.6}
             transition={resolveTransition(left.slide)}
+            progressDurationSec={
+              left.info?.shouldRotate ? (left.slide.duration ?? 12) : undefined
+            }
+            progressColor={progressColor}
           >
             {left.slide.type === 'content-panel' ? (
               <Suspense fallback={<ClassicTripleContentFallback />}>
@@ -90,6 +96,10 @@ export function DisplayClassicTripleLayout({
               enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
               duration={0.6}
               transition={resolveTransition(topRight.slide)}
+              progressDurationSec={
+                topRight.info?.shouldRotate ? (topRight.slide.duration ?? 12) : undefined
+              }
+              progressColor={progressColor}
             >
               {topRight.slide.type === 'sauna-detail' ? (
                 renderTripleSaunaDetail(context, topRight.slide.saunaId)
@@ -107,6 +117,10 @@ export function DisplayClassicTripleLayout({
               enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
               duration={0.6}
               transition={resolveTransition(bottomRight.slide)}
+              progressDurationSec={
+                bottomRight.info?.shouldRotate ? (bottomRight.slide.duration ?? 12) : undefined
+              }
+              progressColor={progressColor}
             >
               {bottomRight.slide.type === 'sauna-detail' ? (
                 renderTripleSaunaDetail(context, bottomRight.slide.saunaId)

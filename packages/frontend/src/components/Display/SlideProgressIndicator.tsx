@@ -3,82 +3,71 @@ import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 
 interface SlideProgressIndicatorProps {
+  /** Slide duration in seconds. */
   durationSec: number;
-  startColor: string;
-  endColor: string;
-  surfaceColor: string;
-  borderColor: string;
+  /** Accent colour for the progress fill. */
+  color: string;
+  /** Where to anchor the bar inside the parent. Default: bottom. */
+  position?: 'top' | 'bottom';
+  /** Track thickness in px. Default: 3. */
+  thicknessPx?: number;
   className?: string;
-  compact?: boolean;
 }
 
-function AnimatedProgressFill({
+/**
+ * Dezenter Slide-Progress-Indikator.
+ *
+ * Rendert eine dünne, volle-Breite Linie am oberen oder unteren Rand
+ * seines Containers. Der Füllanteil wächst linear von 0 % auf 100 %
+ * über `durationSec`. Nutzt eine CSS-Transform-Animation — keine
+ * weiteren Abhängigkeiten.
+ *
+ * Im Gegensatz zur vorherigen Pille wird der Indikator auf Zone-Ebene
+ * eingehängt (volle Breite, minimal hoch) und fällt so optisch zurück,
+ * bleibt aber jederzeit sichtbar.
+ */
+export function SlideProgressIndicator({
   durationSec,
-  endColor,
-  startColor,
-}: {
-  durationSec: number;
-  endColor: string;
-  startColor: string;
-}) {
+  color,
+  position = 'bottom',
+  thicknessPx = 3,
+  className,
+}: SlideProgressIndicatorProps) {
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setIsActive(true);
     });
-
     return () => {
       window.cancelAnimationFrame(frame);
     };
   }, []);
 
-  return (
-    <div
-      className="h-full origin-left rounded-full"
-      style={{
-        background: `linear-gradient(to right, ${startColor}, ${endColor})`,
-        transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
-        transition: `transform ${durationSec}s linear`,
-        willChange: 'transform',
-      }}
-    />
-  );
-}
+  const safeDuration = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 12;
 
-export function SlideProgressIndicator({
-  durationSec,
-  startColor,
-  endColor,
-  surfaceColor,
-  borderColor,
-  className,
-  compact = false,
-}: SlideProgressIndicatorProps) {
   return (
     <div
+      aria-hidden="true"
       className={classNames(
-        'pointer-events-none rounded-full border backdrop-blur-xl',
-        compact ? 'px-2 py-1.5' : 'px-2.5 py-2',
+        'pointer-events-none absolute left-0 right-0 z-20 overflow-hidden',
+        position === 'top' ? 'top-0' : 'bottom-0',
         className,
       )}
       style={{
-        backgroundColor: withAlpha(surfaceColor, 0.56),
-        borderColor: withAlpha(borderColor, 0.18),
-        boxShadow: `0 6px 18px ${withAlpha('#000000', 0.08)}`,
+        height: `${thicknessPx}px`,
+        backgroundColor: withAlpha(color, 0.14),
       }}
-      aria-hidden="true"
     >
       <div
-        className={classNames('overflow-hidden rounded-full', compact ? 'h-0.5 w-12' : 'h-1 w-16')}
-        style={{ backgroundColor: withAlpha(borderColor, 0.16) }}
-      >
-        <AnimatedProgressFill
-          durationSec={durationSec}
-          startColor={startColor}
-          endColor={endColor}
-        />
-      </div>
+        className="h-full origin-left"
+        style={{
+          backgroundColor: color,
+          transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
+          transition: `transform ${safeDuration}s linear`,
+          willChange: 'transform',
+        }}
+      />
     </div>
   );
 }
