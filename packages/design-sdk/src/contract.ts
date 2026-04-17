@@ -16,6 +16,12 @@ export interface SlideRenderContext {
   locale: string;
   /** Device identifier, for telemetry correlation. */
   deviceId?: string;
+  /**
+   * Callback invoked by `media-video` renderers when playback finishes.
+   * The host advances to the next slide when `playback === 'complete'`.
+   * Ignored for other slide types.
+   */
+  onVideoEnded?: () => void;
 }
 
 /**

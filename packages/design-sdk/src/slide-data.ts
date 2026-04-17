@@ -143,6 +143,10 @@ export interface MediaImageData {
   url: string;
   altText?: string;
   fit: 'cover' | 'contain';
+  /** Optional overlay title (from slide config). */
+  title?: string;
+  /** Whether the overlay title should be rendered. */
+  showTitle?: boolean;
 }
 
 export interface MediaVideoData {
@@ -151,6 +155,10 @@ export interface MediaVideoData {
   fit: 'cover' | 'contain';
   playback: 'duration' | 'complete' | 'loop-duration';
   mutedByDefault: boolean;
+  /** Optional overlay title (from slide config). */
+  title?: string;
+  /** Whether the overlay title should be rendered. */
+  showTitle?: boolean;
 }
 
 /** Discriminated map from slide type id → data shape. */

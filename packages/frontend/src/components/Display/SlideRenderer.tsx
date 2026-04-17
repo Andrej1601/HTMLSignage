@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
@@ -13,8 +13,15 @@ import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
 import { ResilientVideo } from './ResilientVideo';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
-import { useInfoPanelData, useMediaImageData, useMediaVideoData } from '@/slides/data';
-import { DesignHost, DEFAULT_DESIGN_ID, isKnownDesignId } from '@/designs';
+import {
+  useEventsPanelData,
+  useInfoPanelData,
+  useMediaImageData,
+  useMediaVideoData,
+  useSaunaDetailData,
+  useSchedulePanelData,
+} from '@/slides/data';
+import { DesignHost, DEFAULT_DESIGN_ID, isKnownDesignId, type DesignId } from '@/designs';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -38,31 +45,49 @@ function SlideRendererComponent({
   const content = (() => {
     switch (slide.type) {
       case 'content-panel':
-        return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
+        return (
+          <ContentPanelDispatch
+            slide={slide}
+            schedule={schedule}
+            settings={settings}
+            now={now}
+            deviceId={deviceId}
+          />
+        );
 
       case 'sauna-detail':
         return (
-          <SaunaDetailSlide
-            sauna={getSauna(settings, slide.saunaId)}
+          <SaunaDetailDispatch
             slide={slide}
             schedule={schedule}
             settings={settings}
             media={media}
+            now={now}
             deviceId={deviceId}
           />
         );
 
       case 'media-image':
-        return <MediaImageSlide media={media} slide={slide} />;
+        return (
+          <MediaImageDispatch slide={slide} settings={settings} media={media} deviceId={deviceId} />
+        );
 
       case 'media-video':
-        return <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
+        return (
+          <MediaVideoDispatch
+            slide={slide}
+            settings={settings}
+            media={media}
+            deviceId={deviceId}
+            onVideoEnded={onVideoEnded}
+          />
+        );
 
       case 'infos':
         return <InfosSlideDispatch slide={slide} settings={settings} media={media} deviceId={deviceId} />;
 
       case 'events':
-        return <EventsSlide settings={settings} media={media} />;
+        return <EventsSlideDispatch slide={slide} settings={settings} media={media} now={now} deviceId={deviceId} />;
 
       default:
         return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
@@ -100,6 +125,28 @@ function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
   );
 }
 
+function resolveDesignFlag(settings: Settings): { enabled: boolean; designId: DesignId } {
+  const enabled = settings.display?.useDesignPacks === true;
+  const configuredId = settings.display?.designPackId;
+  const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
+  return { enabled, designId };
+}
+
+function buildRenderContext(
+  slide: SlideConfig,
+  deviceId: string | undefined,
+  extra?: Partial<SlideRenderContext>,
+): SlideRenderContext {
+  return {
+    zoneId: slide.zoneId ?? 'default',
+    durationMs: (slide.duration ?? 5) * 1000,
+    transitionsEnabled: true,
+    locale: 'de-DE',
+    deviceId,
+    ...extra,
+  };
+}
+
 function InfosSlideDispatch({
   slide,
   settings,
@@ -111,28 +158,199 @@ function InfosSlideDispatch({
   media?: Media[];
   deviceId?: string;
 }) {
-  const useDesignPacks = settings.display?.useDesignPacks === true;
-  const configuredId = settings.display?.designPackId;
-  const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
-
+  const { enabled, designId } = resolveDesignFlag(settings);
   const data = useInfoPanelData({ settings, infoId: slide.infoId, media });
-
-  const context: SlideRenderContext = {
-    zoneId: slide.zoneId ?? 'default',
-    durationMs: (slide.duration ?? 5) * 1000,
-    transitionsEnabled: true,
-    locale: 'de-DE',
-    deviceId,
-  };
+  const context = buildRenderContext(slide, deviceId);
 
   return (
     <DesignHost
       slideType="infos"
       data={data}
       context={context}
-      enabled={useDesignPacks}
+      enabled={enabled}
       designId={designId}
       fallback={<InfosSlide slide={slide} settings={settings} media={media} />}
+    />
+  );
+}
+
+function MediaImageDispatch({
+  slide,
+  settings,
+  media,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  deviceId?: string;
+}) {
+  const { enabled, designId } = resolveDesignFlag(settings);
+  const data = useMediaImageData({ slide, media });
+  const context = buildRenderContext(slide, deviceId);
+
+  const legacy = <MediaImageSlide media={media} slide={slide} />;
+  if (!data) return legacy;
+
+  return (
+    <DesignHost
+      slideType="media-image"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      fallback={legacy}
+    />
+  );
+}
+
+function MediaVideoDispatch({
+  slide,
+  settings,
+  media,
+  deviceId,
+  onVideoEnded,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  deviceId?: string;
+  onVideoEnded?: () => void;
+}) {
+  const { enabled, designId } = resolveDesignFlag(settings);
+  const data = useMediaVideoData({ slide, media });
+  const context = buildRenderContext(slide, deviceId, { onVideoEnded });
+
+  const legacy = <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
+  if (!data) return legacy;
+
+  return (
+    <DesignHost
+      slideType="media-video"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      fallback={legacy}
+    />
+  );
+}
+
+function EventsSlideDispatch({
+  slide,
+  settings,
+  media,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const data = useEventsPanelData({ settings, media, now: effectiveNow });
+  const context = buildRenderContext(slide, deviceId);
+
+  return (
+    <DesignHost
+      slideType="events"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      fallback={<EventsSlide settings={settings} media={media} />}
+    />
+  );
+}
+
+function SaunaDetailDispatch({
+  slide,
+  schedule,
+  settings,
+  media,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  schedule: Schedule;
+  settings: Settings;
+  media?: Media[];
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const data = useSaunaDetailData({
+    settings,
+    schedule,
+    saunaId: slide.saunaId,
+    media,
+    deviceId,
+    now: effectiveNow,
+  });
+  const context = buildRenderContext(slide, deviceId);
+
+  const legacy = (
+    <SaunaDetailSlide
+      sauna={getSauna(settings, slide.saunaId)}
+      slide={slide}
+      schedule={schedule}
+      settings={settings}
+      media={media}
+      deviceId={deviceId}
+    />
+  );
+
+  if (!data) return legacy;
+
+  return (
+    <DesignHost
+      slideType="sauna-detail"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      fallback={legacy}
+    />
+  );
+}
+
+function ContentPanelDispatch({
+  slide,
+  schedule,
+  settings,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  schedule: Schedule;
+  settings: Settings;
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const data = useSchedulePanelData({
+    settings,
+    schedule,
+    deviceId,
+    now: effectiveNow,
+  });
+  const context = buildRenderContext(slide, deviceId);
+
+  return (
+    <DesignHost
+      slideType="content-panel"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      fallback={
+        <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />
+      }
     />
   );
 }

@@ -29,6 +29,8 @@ export function useMediaImageData(input: UseMediaImageDataInput): MediaImageData
       url: buildUploadUrl(found.filename),
       altText: found.originalName,
       fit: getEffectiveMediaFit(slide),
+      title: slide.title,
+      showTitle: slide.showTitle,
     };
   }, [media, slide]);
 }
@@ -53,6 +55,8 @@ export function useMediaVideoData(input: UseMediaVideoDataInput): MediaVideoData
       fit: getEffectiveMediaFit(slide),
       playback: slide.videoPlayback ?? 'complete',
       mutedByDefault: true,
+      title: slide.title,
+      showTitle: slide.showTitle,
     };
   }, [media, slide]);
 }
