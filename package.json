@@ -15,6 +15,7 @@
     "test:backend": "pnpm --filter backend test",
     "test:frontend": "pnpm --filter frontend test",
     "typecheck": "pnpm --filter backend typecheck && pnpm --filter frontend typecheck",
+    "new-design": "node ./packages/design-sdk/bin/new-design.mjs",
     "smoke": "node ./scripts/smoke-check.mjs",
     "kiosk": "pnpm --filter @htmlsignage/kiosk start",
     "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
