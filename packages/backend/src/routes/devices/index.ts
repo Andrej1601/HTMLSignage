@@ -96,10 +96,21 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
     const globalSchedule = normalizeScheduleData(scheduleData);
     const globalSettings = normalizeSettingsData(settingsData);
 
-    // Resolve slideshow config: device-specific slideshow takes priority over global settings
+    // Resolve slideshow config. Priority:
+    //   1. Device-specific slideshow (device.slideshowId set)
+    //   2. isDefault slideshow from the slideshows table (authoritative source for admin edits)
+    //   3. settings.slideshow JSON (legacy fallback)
     const effectiveSettings = { ...globalSettings };
     if (device.slideshowId && device.slideshow) {
       effectiveSettings.slideshow = (device.slideshow as unknown as { config: unknown }).config;
+    } else {
+      const defaultSlideshow = await prisma.slideshow.findFirst({
+        where: { isDefault: true },
+        select: { config: true },
+      });
+      if (defaultSlideshow) {
+        effectiveSettings.slideshow = defaultSlideshow.config;
+      }
     }
 
     // Resolve event slideshows: if any event references a slideshowId, embed the config

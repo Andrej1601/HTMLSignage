@@ -8,6 +8,7 @@ const ROLLBACK_DIR_PREFIX = '.backup-rollback-';
 import { pipeline } from 'stream/promises';
 import unzipper from 'unzipper';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma.js';
 import { UPLOAD_DIR } from './upload.js';
 import { broadcastScheduleUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
@@ -51,6 +52,15 @@ const BackupManifestMediaSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
+const BackupManifestSlideshowSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  isDefault: z.boolean().default(false),
+  config: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
 const ZipBackupManifestSchema = z.object({
   formatVersion: z.literal(BACKUP_ZIP_FORMAT_VERSION),
   exportedAt: z.string(),
@@ -60,10 +70,12 @@ const ZipBackupManifestSchema = z.object({
   schedule: ScheduleSchema,
   settings: z.record(z.string(), z.unknown()),
   media: z.array(BackupManifestMediaSchema).default([]),
+  slideshows: z.array(BackupManifestSlideshowSchema).default([]),
 });
 
 export type ZipBackupManifest = z.infer<typeof ZipBackupManifestSchema>;
 export type BackupManifestMediaItem = z.infer<typeof BackupManifestMediaSchema>;
+export type BackupManifestSlideshowItem = z.infer<typeof BackupManifestSlideshowSchema>;
 
 interface PreparedImportMedia {
   id: string;
@@ -391,6 +403,7 @@ async function importBackupData(
   preparedMedia: PreparedImportMedia[],
   scheduleData: unknown,
   settingsData: Record<string, unknown>,
+  slideshowsData: BackupManifestSlideshowItem[],
   replaceMedia: boolean,
   writtenFiles: string[],
 ) {
@@ -472,6 +485,51 @@ async function importBackupData(
         });
       }
 
+      // Restore slideshows only when the backup actually carries them. A legacy
+      // backup without slideshows must leave the local slideshows table alone,
+      // otherwise we'd wipe the user's data.
+      if (slideshowsData.length > 0) {
+        // If the backup contains an isDefault slideshow, clear the local default flag
+        // first so the unique semantic of "one default" is preserved during upsert.
+        const backupHasDefault = slideshowsData.some((item) => item.isDefault);
+        if (backupHasDefault) {
+          await tx.slideshow.updateMany({
+            where: { isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+
+        for (const item of slideshowsData) {
+          const createdAt = parseDateOrFallback(item.createdAt);
+          const updatedAt = parseDateOrFallback(item.updatedAt);
+          const config = item.config as Prisma.InputJsonValue;
+          await tx.slideshow.upsert({
+            where: { id: item.id },
+            create: {
+              id: item.id,
+              name: item.name,
+              isDefault: item.isDefault,
+              config,
+              createdAt,
+              updatedAt,
+            },
+            update: {
+              name: item.name,
+              isDefault: item.isDefault,
+              config,
+              updatedAt,
+            },
+          });
+        }
+
+        // Delete local slideshows not contained in the backup. onDelete:SetNull on
+        // Device.slideshowId cleanly unlinks devices from removed slideshows.
+        const backupIds = slideshowsData.map((item) => item.id);
+        await tx.slideshow.deleteMany({
+          where: { id: { notIn: backupIds } },
+        });
+      }
+
       return {
         schedule: scheduleToStore,
         settings: settingsToStore,
@@ -535,10 +593,11 @@ export function getBackupOperationFailure(
 }
 
 export async function buildBackupExportManifest(): Promise<ZipBackupManifest> {
-  const [scheduleRow, settingsRow, mediaRows, appVersion] = await Promise.all([
+  const [scheduleRow, settingsRow, mediaRows, slideshowRows, appVersion] = await Promise.all([
     prisma.schedule.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
     prisma.settings.findFirst({ where: { isActive: true }, orderBy: { version: 'desc' } }),
     prisma.media.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.slideshow.findMany({ orderBy: { createdAt: 'asc' } }),
     readLocalVersion(),
   ]);
 
@@ -570,6 +629,15 @@ export async function buildBackupExportManifest(): Promise<ZipBackupManifest> {
     });
   }
 
+  const manifestSlideshows: BackupManifestSlideshowItem[] = slideshowRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    isDefault: row.isDefault,
+    config: (row.config && typeof row.config === 'object' ? row.config : {}) as Record<string, unknown>,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+
   const manifestBase: Omit<ZipBackupManifest, 'checksum'> = {
     formatVersion: BACKUP_ZIP_FORMAT_VERSION,
     exportedAt: new Date().toISOString(),
@@ -578,6 +646,7 @@ export async function buildBackupExportManifest(): Promise<ZipBackupManifest> {
     schedule,
     settings,
     media: manifestMedia,
+    slideshows: manifestSlideshows,
   };
 
   return {
@@ -695,11 +764,12 @@ export async function importBackupArchive(
       preparedMedia,
       manifest.schedule,
       manifest.settings,
+      manifest.slideshows,
       replaceMedia,
       writtenFiles,
     );
     const normalizedWarnings = normalizeImportWarnings(warnings, localVersion);
-    reporter?.appendLog(`Backup importiert: ${preparedMedia.length} Medien, Plan v${result.scheduleVersion}, Settings v${result.settingsVersion}.`);
+    reporter?.appendLog(`Backup importiert: ${preparedMedia.length} Medien, ${manifest.slideshows.length} Slideshows, Plan v${result.scheduleVersion}, Settings v${result.settingsVersion}.`);
 
     return {
       importedMedia: preparedMedia.length,
