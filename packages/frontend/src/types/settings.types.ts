@@ -3,6 +3,7 @@
 // Re-exported here so existing imports don't need to change.
 export { COLOR_PALETTES, getColorPalette, generateDashboardColors, getDefaultSettings } from './theme.constants';
 
+import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
 import type { Sauna } from './sauna.types';
 import type { SlideshowConfig } from './slideshow.types';
 
@@ -79,17 +80,29 @@ export interface DisplaySettings {
   compactMode?: boolean;
   prestartMinutes?: number;
   /**
-   * Opt-in to the new design-pack rendering path. When unset or false,
-   * the legacy display components remain authoritative. Scoped per
-   * device via the standard settings-override mechanism.
+   * Deprecated since phase 3 — the design-pack pipeline is always
+   * active. Kept in the shape for backwards compatibility with older
+   * device settings JSON; the host ignores it.
    */
   useDesignPacks?: boolean;
   /**
-   * Optional design-pack identifier. When `useDesignPacks` is true and
-   * this is set to a known design id, that pack is used; otherwise the
-   * host falls back to the default design.
+   * Which design pack the active display(s) use. Must be a known
+   * `DesignId` from the registry; unknown values fall back to the
+   * registry's default.
    */
   designPackId?: string;
+  /**
+   * Optional JSON overrides applied on top of the active pack's
+   * default tokens. Use this to adjust colours, typography, spacing,
+   * radius or motion without rebuilding the pack — e.g. to give a
+   * tenant their own brand palette.
+   *
+   * Structure follows `DesignTokenOverrides` from
+   * `@htmlsignage/design-sdk` (category-level partials). The host
+   * layers the host's theme-palette derivation first, then these
+   * explicit overrides on top.
+   */
+  designTokenOverrides?: DesignTokenOverrides;
 }
 
 export interface AudioSettings {

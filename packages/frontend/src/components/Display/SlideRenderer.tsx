@@ -3,7 +3,7 @@ import { type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
-import type { SlideRenderContext } from '@htmlsignage/design-sdk';
+import type { DesignTokenOverrides, SlideRenderContext } from '@htmlsignage/design-sdk';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
 import {
   useEventsPanelData,
@@ -127,13 +127,35 @@ export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsE
 
 // ── Dispatcher helpers ──────────────────────────────────────────────────────
 
+/**
+ * Merge token override layers in the canonical order:
+ *   pack default  ←  theme-palette derivation  ←  explicit JSON overrides
+ * Returns `undefined` when nothing would override the pack.
+ */
+function mergeOverrideLayers(
+  base: DesignTokenOverrides | undefined,
+  top: DesignTokenOverrides | undefined,
+): DesignTokenOverrides | undefined {
+  if (!base) return top;
+  if (!top) return base;
+  return {
+    colors: { ...(base.colors ?? {}), ...(top.colors ?? {}) },
+    typography: { ...(base.typography ?? {}), ...(top.typography ?? {}) },
+    spacing: { ...(base.spacing ?? {}), ...(top.spacing ?? {}) },
+    radius: { ...(base.radius ?? {}), ...(top.radius ?? {}) },
+    motion: { ...(base.motion ?? {}), ...(top.motion ?? {}) },
+  };
+}
+
 function resolveDesign(settings: Settings): {
   designId: DesignId;
-  tokenOverrides: ReturnType<typeof themeToTokenOverrides>;
+  tokenOverrides: DesignTokenOverrides | undefined;
 } {
   const configuredId = settings.display?.designPackId;
   const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
-  const tokenOverrides = themeToTokenOverrides(settings.theme);
+  const fromTheme = themeToTokenOverrides(settings.theme);
+  const explicit = settings.display?.designTokenOverrides;
+  const tokenOverrides = mergeOverrideLayers(fromTheme, explicit);
   return { designId, tokenOverrides };
 }
 

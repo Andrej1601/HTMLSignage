@@ -16,6 +16,7 @@ import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
 import { DesignPackFlagCard } from '@/components/Settings/DesignPackFlagCard';
+import { DesignTokenOverrideEditor } from '@/components/Settings/DesignTokenOverrideEditor';
 import { usePermission } from '@/hooks/usePermission';
 
 const EventManager = lazy(() => import('@/components/Settings/EventManager').then(m => ({ default: m.EventManager })));
@@ -343,6 +344,10 @@ export function SettingsPage() {
                 {canSystem && (
                   <div className="space-y-4">
                     <DesignPackFlagCard
+                      display={localSettings.display}
+                      onChange={(display) => updateField('display', display)}
+                    />
+                    <DesignTokenOverrideEditor
                       display={localSettings.display}
                       onChange={(display) => updateField('display', display)}
                     />
