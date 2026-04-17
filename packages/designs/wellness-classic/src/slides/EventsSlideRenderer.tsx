@@ -3,8 +3,12 @@ import type {
   EventStatusRank,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { scaled, scaledFont } from './responsive';
 
-function badgeColorFor(rank: EventStatusRank, tokens: SlideRendererProps<'events'>['tokens']): string {
+function badgeColorFor(
+  rank: EventStatusRank,
+  tokens: SlideRendererProps<'events'>['tokens'],
+): string {
   switch (rank) {
     case 'live':
       return tokens.colors.statusLive;
@@ -22,64 +26,70 @@ interface EventCardProps {
   entry: EventSlideEntry;
   tokens: SlideRendererProps<'events'>['tokens'];
   size: 'lead' | 'secondary';
+  viewport: SlideRendererProps<'events'>['context']['viewport'];
 }
 
-function EventCard({ entry, tokens, size }: EventCardProps) {
-  const { colors, typography, spacing, radius } = tokens;
+function EventCard({ entry, tokens, size, viewport }: EventCardProps) {
+  const { colors, typography, radius } = tokens;
   const isLead = size === 'lead';
   const badgeBg = badgeColorFor(entry.statusRank, tokens);
+
+  const showImage = !!entry.imageUrl && !viewport.isUltraCompact;
+  const titleScale = isLead ? typography.scale2xl : typography.scaleLg;
 
   return (
     <article
       className="flex h-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surfaceElevated,
-        borderRadius: `${radius.lg}px`,
+        borderRadius: `${scaled(24, viewport, 8)}px`,
         border: `1px solid ${colors.border}`,
-        padding: `${spacing.lg}px`,
-        gap: `${spacing.md}px`,
+        padding: `${scaled(20, viewport, 8)}px`,
+        gap: `${scaled(12, viewport, 4)}px`,
       }}
     >
-      {entry.imageUrl ? (
+      {showImage ? (
         <div
           className="w-full overflow-hidden"
           style={{
             aspectRatio: isLead ? '16 / 9' : '3 / 2',
-            borderRadius: `${radius.md}px`,
+            borderRadius: `${scaled(12, viewport, 6)}px`,
           }}
         >
           <img
-            src={entry.imageUrl}
+            src={entry.imageUrl!}
             alt=""
             className="h-full w-full object-cover"
           />
         </div>
       ) : null}
 
-      <div className="flex items-center" style={{ gap: `${spacing.sm}px` }}>
+      <div className="flex flex-wrap items-center" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
         <span
           className="font-black uppercase"
           style={{
             backgroundColor: badgeBg,
             color: colors.textInverse,
             fontFamily: typography.fontBody,
-            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
-            letterSpacing: '0.18em',
-            padding: `${spacing.xs}px ${spacing.sm}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+            letterSpacing: '0.16em',
+            padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
             borderRadius: `${radius.pill}px`,
           }}
         >
           {entry.relativeLabel}
         </span>
-        <span
-          className="font-medium"
-          style={{
-            color: colors.textSecondary,
-            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
-          }}
-        >
-          {entry.dateLabel} · {entry.timeLabel}
-        </span>
+        {!viewport.isUltraCompact ? (
+          <span
+            className="font-medium"
+            style={{
+              color: colors.textSecondary,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+            }}
+          >
+            {entry.dateLabel} · {entry.timeLabel}
+          </span>
+        ) : null}
       </div>
 
       <h3
@@ -87,18 +97,18 @@ function EventCard({ entry, tokens, size }: EventCardProps) {
         style={{
           color: colors.textPrimary,
           fontFamily: typography.fontHeading,
-          fontSize: `${typography.baseSizePx * (isLead ? typography.scale2xl : typography.scaleLg)}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * titleScale, viewport, 12)}px`,
           lineHeight: 1.15,
         }}
       >
         {entry.title}
       </h3>
 
-      {entry.description ? (
+      {entry.description && !viewport.isCompact ? (
         <p
           style={{
             color: colors.textSecondary,
-            fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
             lineHeight: 1.5,
             display: '-webkit-box',
             WebkitLineClamp: isLead ? 4 : 2,
@@ -116,12 +126,13 @@ function EventCard({ entry, tokens, size }: EventCardProps) {
 /**
  * Wellness Classic — events slide renderer.
  *
- * Lead event gets the prominent card; up to three additional events
- * occupy a secondary column. Status-rank drives badge colour via
- * tokens — no per-event visual decisions in the data.
+ * Responsive: wide → lead + up to three secondary cards side-by-side;
+ * narrow → lead only, stacked vertically; ultra-compact → single compact
+ * card with date/time omitted.
  */
-export function EventsSlideRenderer({ data, tokens }: SlideRendererProps<'events'>) {
-  const { colors, typography, spacing } = tokens;
+export function EventsSlideRenderer({ data, tokens, context }: SlideRendererProps<'events'>) {
+  const { colors, typography } = tokens;
+  const { viewport } = context;
 
   if (data.events.length === 0) {
     return (
@@ -131,7 +142,7 @@ export function EventsSlideRenderer({ data, tokens }: SlideRendererProps<'events
           backgroundColor: colors.surface,
           color: colors.textSecondary,
           fontFamily: typography.fontBody,
-          fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
         }}
       >
         Aktuell sind keine Veranstaltungen geplant.
@@ -139,8 +150,12 @@ export function EventsSlideRenderer({ data, tokens }: SlideRendererProps<'events
     );
   }
 
+  const secondaryLimit = viewport.isNarrow || viewport.isCompact ? 0 : viewport.isShort ? 2 : 3;
   const [lead, ...rest] = data.events;
-  const secondary = rest.slice(0, 3);
+  const secondary = rest.slice(0, secondaryLimit);
+
+  const pad = scaled(20, viewport, 6);
+  const gap = scaled(20, viewport, 6);
 
   return (
     <div
@@ -148,16 +163,23 @@ export function EventsSlideRenderer({ data, tokens }: SlideRendererProps<'events
       style={{
         backgroundColor: colors.surface,
         color: colors.textPrimary,
-        padding: `${spacing.lg}px`,
-        gap: `${spacing.lg}px`,
-        gridTemplateColumns: secondary.length > 0 ? 'minmax(0, 1.35fr) minmax(0, 1fr)' : 'minmax(0, 1fr)',
+        padding: `${pad}px`,
+        gap: `${gap}px`,
+        gridTemplateColumns:
+          secondary.length > 0 ? 'minmax(0, 1.35fr) minmax(0, 1fr)' : 'minmax(0, 1fr)',
       }}
     >
-      <EventCard entry={lead} tokens={tokens} size="lead" />
+      <EventCard entry={lead} tokens={tokens} size="lead" viewport={viewport} />
       {secondary.length > 0 ? (
-        <div className="grid" style={{ gap: `${spacing.md}px`, gridAutoRows: '1fr' }}>
+        <div className="grid" style={{ gap: `${scaled(12, viewport, 4)}px`, gridAutoRows: '1fr' }}>
           {secondary.map((entry) => (
-            <EventCard key={entry.id} entry={entry} tokens={tokens} size="secondary" />
+            <EventCard
+              key={entry.id}
+              entry={entry}
+              tokens={tokens}
+              size="secondary"
+              viewport={viewport}
+            />
           ))}
         </div>
       ) : null}

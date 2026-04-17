@@ -1,4 +1,5 @@
 import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+import { scaled, scaledFont } from './responsive';
 
 /**
  * Wellness Classic — media-video slide renderer.
@@ -14,7 +15,9 @@ export function MediaVideoRenderer({
   context,
 }: SlideRendererProps<'media-video'>) {
   const { typography } = tokens;
+  const { viewport } = context;
   const shouldLoop = data.playback === 'loop-duration' || data.playback === 'duration';
+  const showTitle = data.showTitle && data.title && !viewport.isUltraCompact;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
@@ -27,10 +30,11 @@ export function MediaVideoRenderer({
         loop={shouldLoop}
         onEnded={context.onVideoEnded}
       />
-      {data.showTitle && data.title ? (
+      {showTitle ? (
         <div
-          className="absolute bottom-0 left-0 right-0 p-8"
+          className="absolute bottom-0 left-0 right-0"
           style={{
+            padding: `${scaled(32, viewport, 10)}px`,
             background: 'linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0) 100%)',
           }}
         >
@@ -39,7 +43,11 @@ export function MediaVideoRenderer({
             style={{
               color: '#FFFFFF',
               fontFamily: typography.fontHeading,
-              fontSize: `${typography.baseSizePx * typography.scale3xl * 1.2}px`,
+              fontSize: `${scaledFont(
+                typography.baseSizePx * typography.scale3xl * 1.2,
+                viewport,
+                16,
+              )}px`,
               lineHeight: 1.1,
             }}
           >

@@ -21,7 +21,13 @@ import {
   useSaunaDetailData,
   useSchedulePanelData,
 } from '@/slides/data';
-import { DesignHost, DEFAULT_DESIGN_ID, isKnownDesignId, type DesignId } from '@/designs';
+import {
+  DesignHost,
+  DEFAULT_DESIGN_ID,
+  isKnownDesignId,
+  themeToTokenOverrides,
+  type DesignId,
+} from '@/designs';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -125,18 +131,23 @@ function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
   );
 }
 
-function resolveDesignFlag(settings: Settings): { enabled: boolean; designId: DesignId } {
+function resolveDesignFlag(settings: Settings): {
+  enabled: boolean;
+  designId: DesignId;
+  tokenOverrides: ReturnType<typeof themeToTokenOverrides>;
+} {
   const enabled = settings.display?.useDesignPacks === true;
   const configuredId = settings.display?.designPackId;
   const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
-  return { enabled, designId };
+  const tokenOverrides = themeToTokenOverrides(settings.theme);
+  return { enabled, designId, tokenOverrides };
 }
 
 function buildRenderContext(
   slide: SlideConfig,
   deviceId: string | undefined,
-  extra?: Partial<SlideRenderContext>,
-): SlideRenderContext {
+  extra?: Partial<Omit<SlideRenderContext, 'viewport'>>,
+): Omit<SlideRenderContext, 'viewport'> {
   return {
     zoneId: slide.zoneId ?? 'default',
     durationMs: (slide.duration ?? 5) * 1000,
@@ -158,7 +169,7 @@ function InfosSlideDispatch({
   media?: Media[];
   deviceId?: string;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useInfoPanelData({ settings, infoId: slide.infoId, media });
   const context = buildRenderContext(slide, deviceId);
 
@@ -169,6 +180,7 @@ function InfosSlideDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={<InfosSlide slide={slide} settings={settings} media={media} />}
     />
   );
@@ -185,7 +197,7 @@ function MediaImageDispatch({
   media?: Media[];
   deviceId?: string;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useMediaImageData({ slide, media });
   const context = buildRenderContext(slide, deviceId);
 
@@ -199,6 +211,7 @@ function MediaImageDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={legacy}
     />
   );
@@ -217,7 +230,7 @@ function MediaVideoDispatch({
   deviceId?: string;
   onVideoEnded?: () => void;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useMediaVideoData({ slide, media });
   const context = buildRenderContext(slide, deviceId, { onVideoEnded });
 
@@ -231,6 +244,7 @@ function MediaVideoDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={legacy}
     />
   );
@@ -249,7 +263,7 @@ function EventsSlideDispatch({
   now?: Date;
   deviceId?: string;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const effectiveNow = useMemo(() => now ?? new Date(), [now]);
   const data = useEventsPanelData({ settings, media, now: effectiveNow });
   const context = buildRenderContext(slide, deviceId);
@@ -261,6 +275,7 @@ function EventsSlideDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={<EventsSlide settings={settings} media={media} />}
     />
   );
@@ -281,7 +296,7 @@ function SaunaDetailDispatch({
   now?: Date;
   deviceId?: string;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const effectiveNow = useMemo(() => now ?? new Date(), [now]);
   const data = useSaunaDetailData({
     settings,
@@ -313,6 +328,7 @@ function SaunaDetailDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={legacy}
     />
   );
@@ -331,7 +347,7 @@ function ContentPanelDispatch({
   now?: Date;
   deviceId?: string;
 }) {
-  const { enabled, designId } = resolveDesignFlag(settings);
+  const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const effectiveNow = useMemo(() => now ?? new Date(), [now]);
   const data = useSchedulePanelData({
     settings,
@@ -348,6 +364,7 @@ function ContentPanelDispatch({
       context={context}
       enabled={enabled}
       designId={designId}
+      tokenOverrides={tokenOverrides}
       fallback={
         <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />
       }

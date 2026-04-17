@@ -41,6 +41,7 @@ export type {
 } from './slide-data';
 
 export type {
+  SlideViewport,
   SlideRenderContext,
   SlideRendererProps,
   SlideRenderer,

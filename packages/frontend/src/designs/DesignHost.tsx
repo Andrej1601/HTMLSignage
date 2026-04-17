@@ -1,9 +1,11 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   DesignTokens,
+  DesignTokenOverrides,
   SlideDataFor,
   SlideRenderContext,
   SlideTypeId,
+  SlideViewport,
 } from '@htmlsignage/design-sdk';
 import { DesignErrorBoundary } from './DesignErrorBoundary';
 import { useDesign } from './useDesign';
@@ -14,8 +16,8 @@ interface DesignHostProps<T extends SlideTypeId> {
   slideType: T;
   /** Headless data produced by the slide-data hooks. */
   data: SlideDataFor<T>;
-  /** Render context passed through to the renderer. */
-  context: SlideRenderContext;
+  /** Partial context — the host fills in the measured viewport. */
+  context: Omit<SlideRenderContext, 'viewport'>;
   /**
    * Rendered in place of the design renderer when:
    * - no design pack is active / `enabled === false`,
@@ -33,10 +35,10 @@ interface DesignHostProps<T extends SlideTypeId> {
    * Optional overrides merged onto the design's default tokens.
    * Phase 4 lights this up for tenant/slideshow branding.
    */
-  tokenOverrides?: Partial<DesignTokens>;
+  tokenOverrides?: DesignTokenOverrides;
 }
 
-function mergeTokens(base: DesignTokens, overrides?: Partial<DesignTokens>): DesignTokens {
+function mergeTokens(base: DesignTokens, overrides?: DesignTokenOverrides): DesignTokens {
   if (!overrides) return base;
   return {
     colors: { ...base.colors, ...(overrides.colors ?? {}) },
@@ -45,6 +47,64 @@ function mergeTokens(base: DesignTokens, overrides?: Partial<DesignTokens>): Des
     radius: { ...base.radius, ...(overrides.radius ?? {}) },
     motion: { ...base.motion, ...(overrides.motion ?? {}) },
   };
+}
+
+/** Thresholds used to flag narrow / short / compact containers. */
+const NARROW_PX = 640;
+const SHORT_PX = 420;
+const COMPACT_PX = 320;
+const ULTRA_COMPACT_PX = 220;
+
+function deriveViewport(width: number, height: number): SlideViewport {
+  return {
+    width,
+    height,
+    isNarrow: width > 0 && width < NARROW_PX,
+    isShort: height > 0 && height < SHORT_PX,
+    isCompact: (width > 0 && width < COMPACT_PX) || (height > 0 && height < COMPACT_PX),
+    isUltraCompact:
+      (width > 0 && width < ULTRA_COMPACT_PX) || (height > 0 && height < ULTRA_COMPACT_PX),
+  };
+}
+
+/**
+ * Hook: observe a ref'd element's size with ResizeObserver, return the
+ * latest dimensions as a `SlideViewport`. Updates are throttled to the
+ * browser's animation frame to avoid layout thrash.
+ */
+function useMeasuredViewport(ref: React.RefObject<HTMLElement | null>): SlideViewport {
+  const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    let frame = 0;
+    const schedule = (w: number, h: number) => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
+      });
+    };
+
+    // Initial measurement (ResizeObserver fires async).
+    schedule(el.clientWidth, el.clientHeight);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const box = entry.contentRect;
+      schedule(Math.round(box.width), Math.round(box.height));
+    });
+    observer.observe(el);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [ref]);
+
+  return deriveViewport(size.width, size.height);
 }
 
 /**
@@ -63,17 +123,29 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
   const resolvedId: DesignId = designId ?? DEFAULT_DESIGN_ID;
   const { design, error } = useDesign(resolvedId);
 
-  if (!enabled || error || !design) return <>{fallback}</>;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const viewport = useMeasuredViewport(wrapperRef);
+
+  // Legacy-path render. Wrapped in the same sizing element so the flag
+  // flip doesn't reflow the page.
+  const renderedFallback = (
+    <div ref={wrapperRef} className="h-full w-full">
+      {fallback}
+    </div>
+  );
+
+  if (!enabled || error || !design) return renderedFallback;
 
   const renderer = design.renderers[slideType];
-  if (!renderer) return <>{fallback}</>;
+  if (!renderer) return renderedFallback;
 
   const tokens = mergeTokens(design.manifest.defaultTokens, tokenOverrides);
+  const fullContext: SlideRenderContext = { ...context, viewport };
 
   const content = createElement(renderer, {
     data,
     tokens,
-    context,
+    context: fullContext,
   });
 
   const wrapped = design.Wrapper
@@ -81,11 +153,13 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
     : content;
 
   return (
-    <DesignErrorBoundary
-      fallback={fallback}
-      resetKey={`${design.manifest.id}:${slideType}`}
-    >
-      {wrapped}
-    </DesignErrorBoundary>
+    <div ref={wrapperRef} className="h-full w-full">
+      <DesignErrorBoundary
+        fallback={fallback}
+        resetKey={`${design.manifest.id}:${slideType}`}
+      >
+        {wrapped}
+      </DesignErrorBoundary>
+    </div>
   );
 }

@@ -3,6 +3,27 @@ import type { DesignTokens } from './tokens';
 import type { SlideDataFor, SlideTypeId } from './slide-data';
 
 /**
+ * Measured viewport of the slide's container. Designs use this to adapt
+ * layout + typography to small / narrow / ultra-compact zones (where
+ * the same slide appears across a split-view / triple / grid layout).
+ *
+ * `width` / `height` are px. Flags are pre-computed by the host from a
+ * consistent set of thresholds so designs don't reinvent them.
+ */
+export interface SlideViewport {
+  width: number;
+  height: number;
+  /** Width-constrained — stack horizontally-aligned elements vertically. */
+  isNarrow: boolean;
+  /** Height-constrained — reduce vertical rhythm, hide chrome. */
+  isShort: boolean;
+  /** Either dimension very small — switch to a minimal, single-column layout. */
+  isCompact: boolean;
+  /** Both dimensions small — drop everything but the most essential info. */
+  isUltraCompact: boolean;
+}
+
+/**
  * Information every slide renderer receives alongside its data.
  */
 export interface SlideRenderContext {
@@ -16,6 +37,13 @@ export interface SlideRenderContext {
   locale: string;
   /** Device identifier, for telemetry correlation. */
   deviceId?: string;
+  /**
+   * Measured viewport of the rendering container. The host observes the
+   * wrapping element and updates this value on resize. Renderers should
+   * adapt via `viewport.isCompact` / `viewport.isUltraCompact` rather
+   * than hard-coded media queries.
+   */
+  viewport: SlideViewport;
   /**
    * Callback invoked by `media-video` renderers when playback finishes.
    * The host advances to the next slide when `playback === 'complete'`.

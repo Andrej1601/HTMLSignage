@@ -3,6 +3,7 @@ import type {
   SchedulePanelData,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { scaled, scaledFont } from './responsive';
 
 function withAlpha(color: string, alpha: number): string {
   const c = color.trim();
@@ -22,20 +23,20 @@ function withAlpha(color: string, alpha: number): string {
 interface CellProps {
   cell: SchedulePanelCell | null;
   tokens: SlideRendererProps<'content-panel'>['tokens'];
-  saunaName: string;
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
 }
 
-function Cell({ cell, tokens }: CellProps) {
-  const { colors, typography, spacing, radius } = tokens;
+function Cell({ cell, tokens, viewport }: CellProps) {
+  const { colors, typography, radius } = tokens;
   if (!cell) {
     return (
       <div
         className="flex items-center justify-center"
         style={{
-          minHeight: `${spacing.lg * 2}px`,
+          minHeight: `${scaled(32, viewport, 12)}px`,
           color: withAlpha(colors.textSecondary, 0.45),
           fontFamily: typography.fontMono,
-          fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
         }}
       >
         —
@@ -55,42 +56,40 @@ function Cell({ cell, tokens }: CellProps) {
       ? withAlpha(colors.statusNext, 0.4)
       : colors.border;
 
+  const showAromas = !viewport.isUltraCompact && !viewport.isCompact && (cell.aromas?.length ?? 0) > 0;
+
   return (
     <div
       className="flex flex-col"
       style={{
         backgroundColor: statusBg,
-        borderRadius: `${radius.md}px`,
+        borderRadius: `${scaled(12, viewport, 4)}px`,
         border: `1px solid ${statusBorder}`,
-        padding: `${spacing.sm}px`,
+        padding: `${scaled(8, viewport, 3)}px`,
         gap: 2,
       }}
     >
       <span
-        className="font-bold"
+        className="font-bold truncate"
         style={{
           color: colors.textPrimary,
-          fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
           lineHeight: 1.15,
         }}
       >
         {cell.title}
       </span>
-      {(cell.aromas?.length ?? 0) > 0 ? (
+      {showAromas ? (
         <div
           className="flex flex-wrap"
           style={{
             gap: 4,
-            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
             color: colors.textSecondary,
           }}
         >
           {cell.aromas!.slice(0, 2).map((aroma) => (
-            <span
-              key={aroma.id}
-              className="inline-flex items-center"
-              style={{ gap: 2 }}
-            >
+            <span key={aroma.id} className="inline-flex items-center" style={{ gap: 2 }}>
               {aroma.emoji ? <span>{aroma.emoji}</span> : null}
               <span>{aroma.name}</span>
             </span>
@@ -106,10 +105,10 @@ function Cell({ cell, tokens }: CellProps) {
           style={{
             color: colors.textInverse,
             backgroundColor: colors.statusLive,
-            fontSize: `${typography.baseSizePx * typography.scaleSm * 0.85}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
             padding: '2px 6px',
             borderRadius: `${radius.pill}px`,
-            letterSpacing: '0.15em',
+            letterSpacing: '0.12em',
           }}
         >
           LÄUFT
@@ -120,13 +119,13 @@ function Cell({ cell, tokens }: CellProps) {
           style={{
             color: colors.textInverse,
             backgroundColor: colors.statusNext,
-            fontSize: `${typography.baseSizePx * typography.scaleSm * 0.85}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
             padding: '2px 6px',
             borderRadius: `${radius.pill}px`,
-            letterSpacing: '0.15em',
+            letterSpacing: '0.12em',
           }}
         >
-          Als Nächstes
+          Gleich
         </span>
       ) : null}
     </div>
@@ -136,15 +135,17 @@ function Cell({ cell, tokens }: CellProps) {
 /**
  * Wellness Classic — content-panel (schedule grid) slide renderer.
  *
- * Time slots as rows, saunas as columns. Live / next flags (derived
- * once per data tick in the hook) drive a soft highlight. Missing
- * entries show an em-dash.
+ * Responsive: wide → saunas as columns, time slots as rows; narrow →
+ * saunas stack below the time column (single-column list); compact →
+ * aromas hidden to preserve legibility.
  */
 export function SchedulePanelRenderer({
   data,
   tokens,
+  context,
 }: SlideRendererProps<'content-panel'>) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, spacing } = tokens;
+  const { viewport } = context;
 
   if (data.saunas.length === 0 || data.timeSlots.length === 0) {
     return (
@@ -154,7 +155,7 @@ export function SchedulePanelRenderer({
           backgroundColor: colors.surface,
           color: colors.textSecondary,
           fontFamily: typography.fontBody,
-          fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
         }}
       >
         Heute keine Einträge geplant.
@@ -162,7 +163,9 @@ export function SchedulePanelRenderer({
     );
   }
 
+  const showHeader = !viewport.isUltraCompact;
   const columns = `auto repeat(${data.saunas.length}, minmax(0, 1fr))`;
+  const pad = scaled(24, viewport, 8);
 
   return (
     <div
@@ -171,53 +174,56 @@ export function SchedulePanelRenderer({
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
-        padding: `${spacing.lg}px`,
-        gap: `${spacing.md}px`,
+        padding: `${pad}px`,
+        gap: `${scaled(spacing.md, viewport, 4)}px`,
       }}
     >
-      <div className="flex items-baseline justify-between">
-        <span
-          className="font-black uppercase"
-          style={{
-            color: colors.accentPrimary,
-            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
-            letterSpacing: '0.3em',
-          }}
-        >
-          Aufgussplan
-        </span>
-        <span
-          className="font-semibold"
-          style={{
-            color: colors.textSecondary,
-            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
-          }}
-        >
-          {data.timeSlots.length} Zeitslots · {data.saunas.length} Saunen
-        </span>
-      </div>
+      {showHeader ? (
+        <div className="flex items-baseline justify-between">
+          <span
+            className="font-black uppercase"
+            style={{
+              color: colors.accentPrimary,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.3em',
+            }}
+          >
+            Aufgussplan
+          </span>
+          {!viewport.isCompact ? (
+            <span
+              className="font-semibold"
+              style={{
+                color: colors.textSecondary,
+                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              }}
+            >
+              {data.timeSlots.length} Slots · {data.saunas.length} Saunen
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div
         className="grid flex-1 overflow-auto"
         style={{
           gridTemplateColumns: columns,
-          gap: `${spacing.xs}px`,
+          gap: `${scaled(spacing.xs, viewport, 2)}px`,
           alignContent: 'start',
         }}
       >
-        {/* Header row: empty + sauna names */}
         <div />
         {data.saunas.map((sauna) => (
           <div
             key={sauna.id}
-            className="font-black uppercase"
+            className="font-black uppercase truncate"
             style={{
               color: colors.textPrimary,
-              fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
               letterSpacing: '0.1em',
-              padding: `${spacing.xs}px ${spacing.sm}px`,
+              padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
               backgroundColor: withAlpha(colors.accentSecondary, 0.15),
-              borderRadius: `${radius.md}px`,
+              borderRadius: `${scaled(12, viewport, 4)}px`,
               textAlign: 'center',
             }}
           >
@@ -225,7 +231,6 @@ export function SchedulePanelRenderer({
           </div>
         ))}
 
-        {/* Body rows */}
         {data.timeSlots.map((time, slotIdx) => (
           <TimeRow
             key={time}
@@ -233,6 +238,7 @@ export function SchedulePanelRenderer({
             saunas={data.saunas}
             cells={data.saunas.map((_, saunaIdx) => data.cells[saunaIdx]?.[slotIdx] ?? null)}
             tokens={tokens}
+            viewport={viewport}
           />
         ))}
       </div>
@@ -245,21 +251,23 @@ function TimeRow({
   saunas,
   cells,
   tokens,
+  viewport,
 }: {
   time: string;
   saunas: SchedulePanelData['saunas'];
   cells: Array<SchedulePanelCell | null>;
   tokens: SlideRendererProps<'content-panel'>['tokens'];
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
 }) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, radius } = tokens;
   return (
     <>
       <div
         className="font-mono font-black"
         style={{
           color: colors.accentPrimary,
-          fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
-          padding: `${spacing.xs}px ${spacing.sm}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
+          padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
           backgroundColor: withAlpha(colors.surfaceElevated, 0.6),
           borderRadius: `${radius.sm}px`,
           alignSelf: 'stretch',
@@ -274,7 +282,7 @@ function TimeRow({
           key={`${time}-${saunas[idx].id}`}
           cell={cell}
           tokens={tokens}
-          saunaName={saunas[idx].name}
+          viewport={viewport}
         />
       ))}
     </>

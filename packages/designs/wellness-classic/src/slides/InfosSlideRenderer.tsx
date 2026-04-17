@@ -1,17 +1,25 @@
 import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+import { scaled, scaledFont } from './responsive';
 
 /**
  * Wellness Classic — infos slide renderer.
  *
- * A deliberately small pilot: a light surface card with one headline,
- * one image (optional), and the body text. Typography and spacing
- * come from tokens; no business logic, no settings access.
+ * Responsive: narrow → hides the side image; ultra-compact → title
+ * + shortened body only. Background-image mode always overlays.
  */
-export function InfosSlideRenderer({ data, tokens }: SlideRendererProps<'infos'>) {
-  const { colors, typography, spacing, radius } = tokens;
+export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps<'infos'>) {
+  const { colors, typography } = tokens;
+  const { viewport } = context;
 
-  const hasBackgroundImage = data.imageMode === 'background' && data.imageUrl;
-  const hasSideImage = data.imageMode === 'side' && data.imageUrl;
+  const hasBackgroundImage = data.imageMode === 'background' && !!data.imageUrl;
+  const hasSideImage =
+    data.imageMode === 'side' && !!data.imageUrl && !viewport.isNarrow && !viewport.isCompact;
+
+  const pad = scaled(32, viewport, 8);
+  const gap = scaled(40, viewport, 12);
+  const titleSize = scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 14);
+  const bodySize = scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 11);
+  const lineClamp = viewport.isUltraCompact ? 3 : viewport.isCompact ? 4 : 6;
 
   return (
     <div
@@ -43,19 +51,16 @@ export function InfosSlideRenderer({ data, tokens }: SlideRendererProps<'infos'>
 
       <div
         className="relative z-10 flex h-full items-center"
-        style={{ padding: `${spacing.xl}px` }}
+        style={{ padding: `${pad}px` }}
       >
-        <div
-          className="flex w-full items-center"
-          style={{ gap: hasSideImage ? `${spacing.xl}px` : 0 }}
-        >
+        <div className="flex w-full items-center" style={{ gap: hasSideImage ? `${gap}px` : 0 }}>
           {hasSideImage && (
             <div
               className="shrink-0 overflow-hidden shadow-lg"
               style={{
                 width: '35%',
                 aspectRatio: '4 / 3',
-                borderRadius: `${radius.lg}px`,
+                borderRadius: `${scaled(24, viewport, 8)}px`,
               }}
             >
               <img
@@ -70,10 +75,10 @@ export function InfosSlideRenderer({ data, tokens }: SlideRendererProps<'infos'>
             <h2
               className="font-black uppercase"
               style={{
-                fontSize: `${typography.baseSizePx * typography.scale2xl}px`,
+                fontSize: `${titleSize}px`,
                 letterSpacing: '0.2em',
                 color: hasBackgroundImage ? colors.textInverse : colors.accentPrimary,
-                marginBottom: `${spacing.md}px`,
+                marginBottom: `${scaled(16, viewport, 4)}px`,
               }}
             >
               {data.title}
@@ -81,7 +86,7 @@ export function InfosSlideRenderer({ data, tokens }: SlideRendererProps<'infos'>
             <p
               className="font-semibold italic"
               style={{
-                fontSize: `${typography.baseSizePx * typography.scaleXl}px`,
+                fontSize: `${bodySize}px`,
                 lineHeight: 1.5,
                 color: hasBackgroundImage
                   ? 'rgba(255, 255, 255, 0.92)'
@@ -91,9 +96,9 @@ export function InfosSlideRenderer({ data, tokens }: SlideRendererProps<'infos'>
                     ? 'rgba(255, 255, 255, 0.7)'
                     : colors.accentSecondary
                 }`,
-                paddingLeft: `${spacing.md}px`,
+                paddingLeft: `${scaled(16, viewport, 6)}px`,
                 display: '-webkit-box',
-                WebkitLineClamp: 6,
+                WebkitLineClamp: lineClamp,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
               }}
