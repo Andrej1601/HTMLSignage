@@ -3,6 +3,8 @@ import { isApiVersionCompatible, safeParseDesignManifest } from '@htmlsignage/de
 
 export type DesignId =
   | 'wellness-classic'
+  | 'wellness-list'
+  | 'wellness-timeline'
   | 'modern-oasis'
   | 'editorial-resort'
   | 'mineral-noir';
@@ -20,6 +22,10 @@ export type DesignId =
 export const DESIGN_REGISTRY: Record<DesignId, () => Promise<Design>> = {
   'wellness-classic': () =>
     import('@htmlsignage/design-wellness-classic').then((mod) => mod.wellnessClassicDesign),
+  'wellness-list': () =>
+    import('@htmlsignage/design-wellness-list').then((mod) => mod.wellnessListDesign),
+  'wellness-timeline': () =>
+    import('@htmlsignage/design-wellness-timeline').then((mod) => mod.wellnessTimelineDesign),
   'modern-oasis': () =>
     import('@htmlsignage/design-modern-oasis').then((mod) => mod.modernOasisDesign),
   'editorial-resort': () =>

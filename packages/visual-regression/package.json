@@ -14,7 +14,9 @@
     "@htmlsignage/design-wellness-classic": "workspace:*",
     "@htmlsignage/design-modern-oasis": "workspace:*",
     "@htmlsignage/design-editorial-resort": "workspace:*",
-    "@htmlsignage/design-mineral-noir": "workspace:*"
+    "@htmlsignage/design-mineral-noir": "workspace:*",
+    "@htmlsignage/design-wellness-list": "workspace:*",
+    "@htmlsignage/design-wellness-timeline": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",

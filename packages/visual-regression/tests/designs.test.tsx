@@ -8,6 +8,8 @@ import type {
   SlideTypeId,
 } from '@htmlsignage/design-sdk';
 import { wellnessClassicDesign } from '@htmlsignage/design-wellness-classic';
+import { wellnessListDesign } from '@htmlsignage/design-wellness-list';
+import { wellnessTimelineDesign } from '@htmlsignage/design-wellness-timeline';
 import { modernOasisDesign } from '@htmlsignage/design-modern-oasis';
 import { editorialResortDesign } from '@htmlsignage/design-editorial-resort';
 import { mineralNoirDesign } from '@htmlsignage/design-mineral-noir';
@@ -15,6 +17,8 @@ import { DEFAULT_CONTEXT, SLIDE_FIXTURES } from './fixtures';
 
 const DESIGNS: Array<[string, Design]> = [
   ['wellness-classic', wellnessClassicDesign],
+  ['wellness-list', wellnessListDesign],
+  ['wellness-timeline', wellnessTimelineDesign],
   ['modern-oasis', modernOasisDesign],
   ['editorial-resort', editorialResortDesign],
   ['mineral-noir', mineralNoirDesign],

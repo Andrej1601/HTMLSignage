@@ -232,6 +232,44 @@ importers:
         specifier: ^4.1.2
         version: 4.1.2(@types/node@24.12.2)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.12.2)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
+  packages/designs/wellness-list:
+    dependencies:
+      '@htmlsignage/design-sdk':
+        specifier: workspace:*
+        version: link:../../design-sdk
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.2(@types/node@24.12.2)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.12.2)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/designs/wellness-timeline:
+    dependencies:
+      '@htmlsignage/design-sdk':
+        specifier: workspace:*
+        version: link:../../design-sdk
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.2(@types/node@24.12.2)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.12.2)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
   packages/frontend:
     dependencies:
       '@dnd-kit/core':
@@ -258,6 +296,12 @@ importers:
       '@htmlsignage/design-wellness-classic':
         specifier: workspace:*
         version: link:../designs/wellness-classic
+      '@htmlsignage/design-wellness-list':
+        specifier: workspace:*
+        version: link:../designs/wellness-list
+      '@htmlsignage/design-wellness-timeline':
+        specifier: workspace:*
+        version: link:../designs/wellness-timeline
       '@tanstack/react-query':
         specifier: ^5.96.2
         version: 5.96.2(react@19.2.4)
@@ -379,6 +423,12 @@ importers:
       '@htmlsignage/design-wellness-classic':
         specifier: workspace:*
         version: link:../designs/wellness-classic
+      '@htmlsignage/design-wellness-list':
+        specifier: workspace:*
+        version: link:../designs/wellness-list
+      '@htmlsignage/design-wellness-timeline':
+        specifier: workspace:*
+        version: link:../designs/wellness-timeline
     devDependencies:
       '@testing-library/react':
         specifier: ^16.3.2
