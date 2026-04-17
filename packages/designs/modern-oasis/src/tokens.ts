@@ -3,23 +3,24 @@ import type { DesignTokens } from '@htmlsignage/design-sdk';
 /**
  * Default token set for Modern Oasis.
  *
- * Tune the colours, typography and spacing here. Tenant/slideshow/device
- * overrides are applied on top by the host at render time — you only
- * need to set the pack's defaults.
+ * A contemporary, purple-accented palette — distinctly different from
+ * wellness-classic so that switching designs is visible at a glance.
+ * Tenant/slideshow/device overrides are applied on top by the host at
+ * render time.
  */
 export const modernOasisTokens: DesignTokens = {
   colors: {
-    surface: '#FFFFFF',
-    surfaceElevated: '#F5F5F5',
-    border: '#E5E5E5',
-    textPrimary: '#111111',
-    textSecondary: '#555555',
+    surface: '#F6F1EA',
+    surfaceElevated: '#FFFBF4',
+    border: '#E3D7C4',
+    textPrimary: '#2A1A33',
+    textSecondary: '#6B5473',
     textInverse: '#FFFFFF',
-    accentPrimary: '#3B82F6',
-    accentSecondary: '#93C5FD',
-    statusLive: '#10B981',
-    statusNext: '#3B82F6',
-    statusWarning: '#F59E0B',
+    accentPrimary: '#8B1D7A',
+    accentSecondary: '#C48BBE',
+    statusLive: '#16A34A',
+    statusNext: '#D97706',
+    statusWarning: '#EAB308',
   },
   typography: {
     fontBody:
@@ -38,7 +39,7 @@ export const modernOasisTokens: DesignTokens = {
     scale3xl: 2,
   },
   spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 },
-  radius: { sm: 4, md: 12, lg: 24, pill: 9999 },
+  radius: { sm: 6, md: 14, lg: 28, pill: 9999 },
   motion: {
     durationFast: 150,
     durationBase: 250,
