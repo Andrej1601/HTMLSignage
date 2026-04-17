@@ -1,0 +1,27 @@
+{
+  "name": "@htmlsignage/design-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Design contract, tokens, and schemas for HTMLSignage design packs.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
