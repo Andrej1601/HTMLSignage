@@ -17,6 +17,8 @@
     "@htmlsignage/design-sdk": "workspace:*",
     "@htmlsignage/design-wellness-classic": "workspace:*",
     "@htmlsignage/design-modern-oasis": "workspace:*",
+    "@htmlsignage/design-editorial-resort": "workspace:*",
+    "@htmlsignage/design-mineral-noir": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
