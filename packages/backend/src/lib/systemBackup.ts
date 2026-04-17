@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import crypto from 'crypto';
 import os from 'os';
 import path from 'path';
+
+const ROLLBACK_DIR_PREFIX = '.backup-rollback-';
 import { pipeline } from 'stream/promises';
 import unzipper from 'unzipper';
 import { z } from 'zod';
@@ -393,19 +395,24 @@ async function importBackupData(
   writtenFiles: string[],
 ) {
   const importedSchedule = normalizeScheduleData(scheduleData);
+
+  // Rollback staging MUST live inside UPLOAD_DIR so it shares the same mount point.
+  // Systemd's PrivateTmp + ReadWritePaths put /tmp and the uploads dir on separate
+  // bind mounts, so fs.rename() across them fails with EXDEV even on one disk.
+  await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const rollbackRoot = replaceMedia
-    ? await fs.mkdtemp(path.join(os.tmpdir(), 'htmlsignage-backup-rollback-'))
+    ? path.join(UPLOAD_DIR, `${ROLLBACK_DIR_PREFIX}${Date.now()}-${crypto.randomBytes(4).toString('hex')}`)
     : null;
-  const rollbackUploadsPath = rollbackRoot ? path.join(rollbackRoot, 'uploads') : null;
 
   try {
-    if (replaceMedia) {
-      if (existsSync(UPLOAD_DIR)) {
-        await fs.rename(UPLOAD_DIR, rollbackUploadsPath!);
+    if (replaceMedia && rollbackRoot) {
+      await fs.mkdir(rollbackRoot, { recursive: true });
+      const rollbackBasename = path.basename(rollbackRoot);
+      const existing = await fs.readdir(UPLOAD_DIR);
+      for (const entry of existing) {
+        if (entry === rollbackBasename || entry.startsWith(ROLLBACK_DIR_PREFIX)) continue;
+        await fs.rename(path.join(UPLOAD_DIR, entry), path.join(rollbackRoot, entry));
       }
-      await fs.mkdir(UPLOAD_DIR, { recursive: true });
-    } else {
-      await fs.mkdir(UPLOAD_DIR, { recursive: true });
     }
 
     await Promise.all(
@@ -482,10 +489,18 @@ async function importBackupData(
 
     return result;
   } catch (error) {
-    if (rollbackUploadsPath && existsSync(rollbackUploadsPath)) {
-      await fs.rm(UPLOAD_DIR, { recursive: true, force: true }).catch(() => {});
-      await fs.rename(rollbackUploadsPath, UPLOAD_DIR).catch(() => {});
-      await fs.rm(rollbackRoot!, { recursive: true, force: true }).catch(() => {});
+    if (rollbackRoot && existsSync(rollbackRoot)) {
+      const rollbackBasename = path.basename(rollbackRoot);
+      const newEntries = await fs.readdir(UPLOAD_DIR).catch(() => [] as string[]);
+      for (const entry of newEntries) {
+        if (entry === rollbackBasename) continue;
+        await fs.rm(path.join(UPLOAD_DIR, entry), { recursive: true, force: true }).catch(() => {});
+      }
+      const restored = await fs.readdir(rollbackRoot).catch(() => [] as string[]);
+      for (const entry of restored) {
+        await fs.rename(path.join(rollbackRoot, entry), path.join(UPLOAD_DIR, entry)).catch(() => {});
+      }
+      await fs.rm(rollbackRoot, { recursive: true, force: true }).catch(() => {});
     }
     throw error;
   }
