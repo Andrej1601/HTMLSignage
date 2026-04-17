@@ -9,8 +9,10 @@ interface SlideProgressIndicatorProps {
   color: string;
   /** Where to anchor the bar inside the parent. Default: bottom. */
   position?: 'top' | 'bottom';
-  /** Track thickness in px. Default: 3. */
+  /** Track thickness in px. Default: 2. */
   thicknessPx?: number;
+  /** Opacity of the filled portion (0–1). Default: 0.55. */
+  fillOpacity?: number;
   className?: string;
 }
 
@@ -30,7 +32,8 @@ export function SlideProgressIndicator({
   durationSec,
   color,
   position = 'bottom',
-  thicknessPx = 3,
+  thicknessPx = 2,
+  fillOpacity = 0.55,
   className,
 }: SlideProgressIndicatorProps) {
   const [isActive, setIsActive] = useState(false);
@@ -45,6 +48,7 @@ export function SlideProgressIndicator({
   }, []);
 
   const safeDuration = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 12;
+  const clampedFill = Math.max(0, Math.min(1, fillOpacity));
 
   return (
     <div
@@ -56,13 +60,13 @@ export function SlideProgressIndicator({
       )}
       style={{
         height: `${thicknessPx}px`,
-        backgroundColor: withAlpha(color, 0.14),
+        backgroundColor: withAlpha(color, 0.08),
       }}
     >
       <div
         className="h-full origin-left"
         style={{
-          backgroundColor: color,
+          backgroundColor: withAlpha(color, clampedFill),
           transform: isActive ? 'scaleX(1)' : 'scaleX(0)',
           transition: `transform ${safeDuration}s linear`,
           willChange: 'transform',
