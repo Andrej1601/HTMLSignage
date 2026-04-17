@@ -15,6 +15,7 @@ import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
+import { DesignPackFlagCard } from '@/components/Settings/DesignPackFlagCard';
 import { usePermission } from '@/hooks/usePermission';
 
 const EventManager = lazy(() => import('@/components/Settings/EventManager').then(m => ({ default: m.EventManager })));
@@ -340,9 +341,15 @@ export function SettingsPage() {
 
               <TabPanel id="system" activeTab={activeTab}>
                 {canSystem && (
-                  <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
-                    <SystemMaintenance />
-                  </Suspense>
+                  <div className="space-y-4">
+                    <DesignPackFlagCard
+                      display={localSettings.display}
+                      onChange={(display) => updateField('display', display)}
+                    />
+                    <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
+                      <SystemMaintenance />
+                    </Suspense>
+                  </div>
                 )}
               </TabPanel>
             </div>
