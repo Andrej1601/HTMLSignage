@@ -1,0 +1,29 @@
+{
+  "name": "@htmlsignage/visual-regression",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Snapshot-regression tests for every design pack \u00d7 slide type.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@htmlsignage/design-sdk": "workspace:*",
+    "@htmlsignage/design-wellness-classic": "workspace:*",
+    "@htmlsignage/design-modern-oasis": "workspace:*",
+    "@htmlsignage/design-editorial-resort": "workspace:*",
+    "@htmlsignage/design-mineral-noir": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.0.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}

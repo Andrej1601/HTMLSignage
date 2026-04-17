@@ -228,6 +228,9 @@ importers:
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.2(@types/node@24.12.2)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.12.2)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/frontend:
     dependencies:
@@ -358,6 +361,49 @@ importers:
       electron-builder:
         specifier: ^26.8.1
         version: 26.8.1(electron-builder-squirrel-windows@25.1.8)
+
+  packages/visual-regression:
+    dependencies:
+      '@htmlsignage/design-editorial-resort':
+        specifier: workspace:*
+        version: link:../designs/editorial-resort
+      '@htmlsignage/design-mineral-noir':
+        specifier: workspace:*
+        version: link:../designs/mineral-noir
+      '@htmlsignage/design-modern-oasis':
+        specifier: workspace:*
+        version: link:../designs/modern-oasis
+      '@htmlsignage/design-sdk':
+        specifier: workspace:*
+        version: link:../design-sdk
+      '@htmlsignage/design-wellness-classic':
+        specifier: workspace:*
+        version: link:../designs/wellness-classic
+    devDependencies:
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      jsdom:
+        specifier: ^29.0.1
+        version: 29.0.1
+      react:
+        specifier: ^19.2.4
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
+      typescript:
+        specifier: ^6.0.2
+        version: 6.0.2
+      vitest:
+        specifier: ^4.1.2
+        version: 4.1.2(@types/node@24.12.2)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.12.2)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
 packages:
 

@@ -1,0 +1,64 @@
+name: Design Regression
+
+on:
+  push:
+    branches: [main, DEV]
+    paths:
+      - 'packages/design-sdk/**'
+      - 'packages/designs/**'
+      - 'packages/visual-regression/**'
+      - 'packages/frontend/src/designs/**'
+      - 'packages/frontend/src/slides/**'
+      - '.github/workflows/design-regression.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packages/design-sdk/**'
+      - 'packages/designs/**'
+      - 'packages/visual-regression/**'
+      - 'packages/frontend/src/designs/**'
+      - 'packages/frontend/src/slides/**'
+      - '.github/workflows/design-regression.yml'
+
+jobs:
+  contract-tests:
+    name: Pack contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: SDK schemas
+        run: pnpm -F @htmlsignage/design-sdk test
+      - name: Pack manifests + renderer coverage
+        run: pnpm -F './packages/designs/*' test
+
+  snapshot-regression:
+    name: Renderer snapshot regression
+    runs-on: ubuntu-latest
+    needs: contract-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run snapshot suite
+        run: pnpm -F @htmlsignage/visual-regression test
+      - name: Upload diff snapshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-diffs
+          path: packages/visual-regression/tests/__snapshots__/
+          if-no-files-found: ignore
