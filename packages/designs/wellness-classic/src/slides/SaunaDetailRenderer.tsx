@@ -71,8 +71,8 @@ function IntensityFlames({
 }
 
 /**
- * Status-badge variants used across the row. Matches the legacy
- * look: subtle tinted background + matching border + uppercase label.
+ * Status-badge — solid-filled pill with inverse text, matching the
+ * legacy "VORBEI / GLEICH / LÄUFT" look from the ChronologicalList.
  */
 function StatusBadge({
   label,
@@ -85,19 +85,18 @@ function StatusBadge({
   tokens: SlideRendererProps<'sauna-detail'>['tokens'];
   viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
 }) {
-  const { typography, radius } = tokens;
+  const { typography, colors, radius } = tokens;
   return (
     <span
       className="font-black uppercase shrink-0"
       style={{
-        color,
-        backgroundColor: withAlpha(color, 0.15),
-        border: `1px solid ${withAlpha(color, 0.3)}`,
+        color: colors.textInverse,
+        backgroundColor: color,
         fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
-        padding: `${scaled(2, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+        padding: `${scaled(3, viewport, 2)}px ${scaled(12, viewport, 5)}px`,
         borderRadius: `${radius.pill}px`,
-        letterSpacing: '0.15em',
-        lineHeight: 1.4,
+        letterSpacing: '0.18em',
+        lineHeight: 1.3,
       }}
     >
       {label}
@@ -123,19 +122,23 @@ function InfusionRow({
     ? withAlpha(colors.statusLive, 0.12)
     : isPre
       ? withAlpha(colors.statusWarning, 0.12)
-      : isFinished
-        ? withAlpha(colors.surfaceElevated, 0.45)
-        : withAlpha(colors.surfaceElevated, 0.9);
+      : entry.isNext
+        ? withAlpha(colors.statusNext, 0.12)
+        : isFinished
+          ? withAlpha(colors.surfaceElevated, 0.45)
+          : withAlpha(colors.surfaceElevated, 0.9);
 
   const borderColor = isLive
     ? withAlpha(colors.statusLive, 0.3)
     : isPre
       ? withAlpha(colors.statusWarning, 0.3)
-      : colors.border;
+      : entry.isNext
+        ? withAlpha(colors.statusNext, 0.3)
+        : colors.border;
 
   const timeColor = isLive
     ? colors.statusLive
-    : isPre
+    : isPre || entry.isNext
       ? colors.statusWarning
       : isFinished
         ? withAlpha(colors.textPrimary, 0.35)
@@ -145,26 +148,29 @@ function InfusionRow({
     ? withAlpha(colors.textPrimary, 0.55)
     : colors.textPrimary;
 
-  // Flames: grey-outlined when finished, coloured-filled otherwise.
+  // Flames: muted when finished, coloured-filled otherwise.
   const flameActiveColor = isFinished
     ? withAlpha(colors.accentPrimary, 0.35)
     : isLive
       ? colors.statusLive
-      : isPre
+      : isPre || entry.isNext
         ? colors.statusWarning
         : colors.accentPrimary;
   const flameIdleColor = withAlpha(colors.accentPrimary, 0.2);
 
-  // Status badge config.
+  // Status badge config (solid pill, shown in row 2 right-hand side).
   const badge = isLive
     ? { label: 'LÄUFT', color: colors.statusLive }
     : isPre
       ? { label: 'GLEICH', color: colors.statusWarning }
-      : isFinished
-        ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
-        : entry.isNext
-          ? { label: 'GLEICH', color: colors.statusNext }
+      : entry.isNext
+        ? { label: 'GLEICH', color: colors.statusNext }
+        : isFinished
+          ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
           : null;
+
+  const hasAromas = (entry.aromas?.length ?? 0) > 0;
+  const hasSecondRow = hasAromas || badge !== null;
 
   return (
     <div
@@ -174,17 +180,20 @@ function InfusionRow({
         borderRadius: `${scaled(radius.lg, viewport, 6)}px`,
         border: `1px solid ${borderColor}`,
         padding: `${scaled(14, viewport, 6)}px ${scaled(16, viewport, 7)}px`,
-        gap: `${scaled(6, viewport, 2)}px`,
+        gap: `${scaled(8, viewport, 3)}px`,
       }}
     >
-      {/* Row 1: time + status badge | flames */}
-      <div className="flex items-center justify-between" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+      {/* Row 1: time + title | flames */}
+      <div
+        className="flex items-baseline justify-between"
+        style={{ gap: `${scaled(12, viewport, 4)}px` }}
+      >
         <div
-          className="flex items-center min-w-0"
-          style={{ gap: `${scaled(10, viewport, 4)}px` }}
+          className="flex items-baseline min-w-0"
+          style={{ gap: `${scaled(12, viewport, 4)}px` }}
         >
           <span
-            className="font-mono font-black"
+            className="font-mono font-black shrink-0"
             style={{
               color: timeColor,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 15)}px`,
@@ -194,14 +203,16 @@ function InfusionRow({
           >
             {entry.time}
           </span>
-          {badge ? (
-            <StatusBadge
-              label={badge.label}
-              color={badge.color}
-              tokens={tokens}
-              viewport={viewport}
-            />
-          ) : null}
+          <span
+            className="font-black uppercase min-w-0"
+            style={{
+              color: titleColor,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {entry.title}
+          </span>
         </div>
         {entry.intensity != null ? (
           <IntensityFlames
@@ -213,52 +224,54 @@ function InfusionRow({
         ) : null}
       </div>
 
-      {/* Row 2: title | duration */}
-      <div className="flex items-baseline justify-between" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
-        <span
-          className="font-black uppercase min-w-0"
-          style={{
-            color: titleColor,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
-            letterSpacing: '0.04em',
-          }}
+      {/* Row 2: aromas (left) | badge (right) */}
+      {hasSecondRow ? (
+        <div
+          className="flex items-center justify-between"
+          style={{ gap: `${scaled(8, viewport, 3)}px` }}
         >
-          {entry.title}
-        </span>
-        <span
-          className="font-black shrink-0"
-          style={{
-            color: withAlpha(colors.textSecondary, isFinished ? 0.45 : 0.7),
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-            letterSpacing: '0.08em',
-          }}
-        >
-          {entry.durationMin} MIN
-        </span>
-      </div>
-
-      {/* Row 3: aromas (optional) */}
-      {(entry.aromas?.length ?? 0) > 0 ? (
-        <div className="flex flex-wrap" style={{ gap: `${scaled(4, viewport, 2)}px` }}>
-          {entry.aromas!.slice(0, 3).map((aroma) => (
-            <span
-              key={aroma.id}
-              className="inline-flex items-center font-bold uppercase"
-              style={{
-                color: aroma.color ?? colors.textSecondary,
-                backgroundColor: withAlpha(aroma.color ?? colors.accentSecondary, 0.12),
-                border: `1px solid ${withAlpha(aroma.color ?? colors.accentSecondary, 0.3)}`,
-                borderRadius: `${radius.pill}px`,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-                padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
-                gap: `${scaled(4, viewport, 2)}px`,
-                opacity: isFinished ? 0.6 : 1,
-              }}
+          {hasAromas ? (
+            <div
+              className="flex flex-wrap min-w-0"
+              style={{ gap: `${scaled(4, viewport, 2)}px` }}
             >
-              {aroma.emoji ? <span>{aroma.emoji}</span> : null}
-              <span>{aroma.name}</span>
-            </span>
-          ))}
+              {entry.aromas!.slice(0, 3).map((aroma) => (
+                <span
+                  key={aroma.id}
+                  className="inline-flex items-center font-bold uppercase"
+                  style={{
+                    color: aroma.color ?? colors.textSecondary,
+                    backgroundColor: withAlpha(
+                      aroma.color ?? colors.accentSecondary,
+                      0.12,
+                    ),
+                    border: `1px solid ${withAlpha(
+                      aroma.color ?? colors.accentSecondary,
+                      0.3,
+                    )}`,
+                    borderRadius: `${radius.pill}px`,
+                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
+                    padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
+                    gap: `${scaled(4, viewport, 2)}px`,
+                    opacity: isFinished ? 0.6 : 1,
+                  }}
+                >
+                  {aroma.emoji ? <span>{aroma.emoji}</span> : null}
+                  <span>{aroma.name}</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          {badge ? (
+            <StatusBadge
+              label={badge.label}
+              color={badge.color}
+              tokens={tokens}
+              viewport={viewport}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>
