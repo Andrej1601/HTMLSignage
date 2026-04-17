@@ -30,6 +30,7 @@ export type {
   SaunaDetailInfo,
   SaunaDetailData,
   SchedulePanelData,
+  SchedulePanelSauna,
   SchedulePanelCell,
   InfoImageMode,
   InfoPanelData,

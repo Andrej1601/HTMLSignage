@@ -1,6 +1,7 @@
 import type {
   SchedulePanelCell,
   SchedulePanelData,
+  SchedulePanelSauna,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
@@ -21,29 +22,71 @@ function withAlpha(color: string, alpha: number): string {
   return c;
 }
 
-interface TimeSlotEntry {
+const ACCENT_FALLBACKS = ['#F59E0B', '#10B981', '#c5a059', '#8B6F47'];
+
+function saunaAccentFor(
+  sauna: SchedulePanelSauna,
+  index: number,
+  tokens: SlideRendererProps<'content-panel'>['tokens'],
+): string {
+  if (sauna.accentColor) return sauna.accentColor;
+  const palette = [tokens.colors.accentPrimary, tokens.colors.accentSecondary, ...ACCENT_FALLBACKS];
+  return palette[index % palette.length];
+}
+
+function FlameIcon({ size, color, filled }: { size: number; color: string; filled: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  );
+}
+
+interface SlotEntry {
   saunaId: string;
   saunaName: string;
+  saunaAccent: string;
   cell: SchedulePanelCell;
 }
 
-function entriesPerSlot(data: SchedulePanelData, slotIdx: number): TimeSlotEntry[] {
-  const entries: TimeSlotEntry[] = [];
+function entriesForSlot(
+  data: SchedulePanelData,
+  slotIdx: number,
+  tokens: SlideRendererProps<'content-panel'>['tokens'],
+): SlotEntry[] {
+  const entries: SlotEntry[] = [];
   data.saunas.forEach((sauna, saunaIdx) => {
+    if (sauna.isOutOfOrder) return;
     const cell = data.cells[saunaIdx]?.[slotIdx] ?? null;
     if (!cell) return;
-    entries.push({ saunaId: sauna.id, saunaName: sauna.name, cell });
+    entries.push({
+      saunaId: sauna.id,
+      saunaName: sauna.name,
+      saunaAccent: saunaAccentFor(sauna, saunaIdx, tokens),
+      cell,
+    });
   });
   return entries;
 }
 
 /**
- * Wellness Timeline — content-panel renderer.
+ * Wellness Timeline — content-panel renderer (legacy `modern-timeline`).
  *
- * Time-slots are the primary axis. Each slot renders as a row with the
- * timestamp prominent on the left and every sauna that has an entry at
- * that slot inlined as horizontal "tiles". Empty slots are skipped, so
- * the layout stays dense even on long opening hours.
+ * Time-slots are the primary axis. For each slot the renderer emits a
+ * row with the timestamp on a vertical rail and one tile per active
+ * sauna (with intensity flames, duration badge, and live/next/finished
+ * styling). Empty time slots are skipped so the layout stays dense
+ * even on long opening hours.
  */
 export function SchedulePanelRenderer({
   data,
@@ -70,7 +113,7 @@ export function SchedulePanelRenderer({
   }
 
   const slots = data.timeSlots
-    .map((time, slotIdx) => ({ time, slotIdx, entries: entriesPerSlot(data, slotIdx) }))
+    .map((time, slotIdx) => ({ time, slotIdx, entries: entriesForSlot(data, slotIdx, tokens) }))
     .filter((slot) => slot.entries.length > 0);
 
   const pad = scaled(24, viewport, 8);
@@ -104,7 +147,7 @@ export function SchedulePanelRenderer({
             fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
           }}
         >
-          {slots.length} Slots · {data.saunas.length} Saunen
+          {slots.length} Slots
         </span>
       </div>
 
@@ -112,7 +155,7 @@ export function SchedulePanelRenderer({
         <ol className="flex flex-col" style={{ gap: `${scaled(10, viewport, 4)}px` }}>
           {slots.map(({ time, slotIdx, entries }) => {
             const anyLive = entries.some((entry) => entry.cell.isLive);
-            const anyNext = entries.some((entry) => entry.cell.isNext);
+            const anyNext = entries.some((entry) => entry.cell.isNext || entry.cell.isPrestart);
             const railColor = anyLive
               ? colors.statusLive
               : anyNext
@@ -126,7 +169,7 @@ export function SchedulePanelRenderer({
               >
                 <div
                   className="flex shrink-0 flex-col items-center"
-                  style={{ width: scaled(72, viewport, 44) }}
+                  style={{ width: scaled(76, viewport, 48) }}
                 >
                   <span
                     className="font-mono font-black"
@@ -142,10 +185,7 @@ export function SchedulePanelRenderer({
                   <div
                     aria-hidden="true"
                     className="mt-1 grow"
-                    style={{
-                      width: 2,
-                      backgroundColor: withAlpha(railColor, 0.45),
-                    }}
+                    style={{ width: 2, backgroundColor: withAlpha(railColor, 0.4) }}
                   />
                 </div>
 
@@ -154,18 +194,27 @@ export function SchedulePanelRenderer({
                   style={{ gap: `${scaled(8, viewport, 3)}px` }}
                 >
                   {entries.map((entry) => {
-                    const isLive = entry.cell.isLive;
-                    const isNext = entry.cell.isNext;
+                    const cell = entry.cell;
+                    const isLive = cell.isLive;
+                    const isPrestart = cell.isPrestart === true;
+                    const isFinished = cell.isFinished === true;
+                    const isNext = cell.isNext;
                     const tileBg = isLive
                       ? withAlpha(colors.statusLive, 0.14)
-                      : isNext
-                        ? withAlpha(colors.statusNext, 0.14)
-                        : withAlpha(colors.surfaceElevated, 0.85);
+                      : isPrestart
+                        ? withAlpha(colors.statusWarning, 0.14)
+                        : isNext
+                          ? withAlpha(colors.statusNext, 0.14)
+                          : isFinished
+                            ? withAlpha(colors.surfaceElevated, 0.45)
+                            : withAlpha(colors.surfaceElevated, 0.85);
                     const tileBorder = isLive
                       ? withAlpha(colors.statusLive, 0.4)
-                      : isNext
-                        ? withAlpha(colors.statusNext, 0.4)
-                        : colors.border;
+                      : isPrestart
+                        ? withAlpha(colors.statusWarning, 0.4)
+                        : isNext
+                          ? withAlpha(colors.statusNext, 0.4)
+                          : colors.border;
                     return (
                       <div
                         key={`${time}-${entry.saunaId}`}
@@ -173,11 +222,13 @@ export function SchedulePanelRenderer({
                         style={{
                           backgroundColor: tileBg,
                           border: `1px solid ${tileBorder}`,
+                          borderLeft: `4px solid ${entry.saunaAccent}`,
                           borderRadius: `${scaled(radius.md, viewport, 4)}px`,
-                          padding: `${scaled(8, viewport, 3)}px ${scaled(12, viewport, 4)}px`,
-                          gap: `${scaled(2, viewport, 1)}px`,
-                          minWidth: scaled(180, viewport, 110),
-                          flex: '1 1 auto',
+                          padding: `${scaled(10, viewport, 4)}px ${scaled(12, viewport, 4)}px`,
+                          gap: `${scaled(4, viewport, 1)}px`,
+                          minWidth: scaled(220, viewport, 130),
+                          flex: '1 1 220px',
+                          opacity: isFinished ? 0.65 : 1,
                         }}
                       >
                         <span
@@ -190,63 +241,120 @@ export function SchedulePanelRenderer({
                         >
                           {entry.saunaName}
                         </span>
-                        <div className="flex items-center justify-between" style={{ gap: 8 }}>
+
+                        <div className="flex items-baseline justify-between" style={{ gap: 8 }}>
                           <span
                             className="font-black uppercase truncate"
                             style={{
-                              color: colors.textPrimary,
-                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
+                              color: isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary,
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
                               letterSpacing: '0.04em',
                             }}
                           >
-                            {entry.cell.title}
+                            {cell.title}
                           </span>
-                          {isLive ? (
-                            <span
-                              className="font-black uppercase shrink-0"
-                              style={{
-                                color: colors.textInverse,
-                                backgroundColor: colors.statusLive,
-                                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
-                                padding: '2px 6px',
-                                borderRadius: `${radius.pill}px`,
-                                letterSpacing: '0.16em',
-                              }}
-                            >
-                              LÄUFT
-                            </span>
-                          ) : isNext ? (
-                            <span
-                              className="font-black uppercase shrink-0"
-                              style={{
-                                color: colors.textInverse,
-                                backgroundColor: colors.statusNext,
-                                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
-                                padding: '2px 6px',
-                                borderRadius: `${radius.pill}px`,
-                                letterSpacing: '0.16em',
-                              }}
-                            >
-                              GLEICH
-                            </span>
-                          ) : null}
-                        </div>
-                        {(entry.cell.aromas?.length ?? 0) > 0 ? (
-                          <div
-                            className="flex flex-wrap"
-                            style={{
-                              gap: 4,
-                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-                              color: colors.textSecondary,
-                            }}
-                          >
-                            {entry.cell.aromas!.slice(0, 2).map((aroma) => (
-                              <span key={aroma.id} className="inline-flex items-center gap-1">
-                                {aroma.emoji ? <span>{aroma.emoji}</span> : null}
-                                <span>{aroma.name}</span>
-                              </span>
+                          <div className="flex shrink-0" style={{ gap: 2 }}>
+                            {[1, 2, 3, 4].map((i) => (
+                              <FlameIcon
+                                key={i}
+                                size={scaled(11, viewport, 8)}
+                                color={
+                                  i <= (cell.intensity ?? 1)
+                                    ? isFinished
+                                      ? withAlpha(colors.accentPrimary, 0.35)
+                                      : isLive
+                                        ? colors.statusLive
+                                        : colors.accentPrimary
+                                    : withAlpha(colors.accentPrimary, 0.2)
+                                }
+                                filled={i <= (cell.intensity ?? 1)}
+                              />
                             ))}
                           </div>
+                        </div>
+
+                        <div className="flex items-center justify-between" style={{ gap: 6 }}>
+                          {(cell.aromas?.length ?? 0) > 0 ? (
+                            <div
+                              className="flex flex-wrap min-w-0"
+                              style={{ gap: 4 }}
+                            >
+                              {cell.aromas!.slice(0, 2).map((aroma) => (
+                                <span
+                                  key={aroma.id}
+                                  className="inline-flex items-center font-bold uppercase"
+                                  style={{
+                                    color: aroma.color ?? colors.textSecondary,
+                                    backgroundColor: withAlpha(aroma.color ?? colors.accentSecondary, 0.12),
+                                    border: `1px solid ${withAlpha(aroma.color ?? colors.accentSecondary, 0.3)}`,
+                                    borderRadius: `${radius.pill}px`,
+                                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 7)}px`,
+                                    padding: '1px 6px',
+                                    gap: 3,
+                                  }}
+                                >
+                                  {aroma.emoji ? <span>{aroma.emoji}</span> : null}
+                                  <span>{aroma.name}</span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span />
+                          )}
+                          <span
+                            className="font-bold shrink-0"
+                            style={{
+                              color: withAlpha(colors.textSecondary, isFinished ? 0.4 : 0.7),
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
+                              letterSpacing: '0.08em',
+                            }}
+                          >
+                            {cell.durationMin} MIN
+                          </span>
+                        </div>
+
+                        {isLive ? (
+                          <span
+                            className="self-start font-black uppercase"
+                            style={{
+                              color: colors.textInverse,
+                              backgroundColor: colors.statusLive,
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
+                              padding: '2px 8px',
+                              borderRadius: `${radius.pill}px`,
+                              letterSpacing: '0.18em',
+                            }}
+                          >
+                            LÄUFT
+                          </span>
+                        ) : isPrestart || isNext ? (
+                          <span
+                            className="self-start font-black uppercase"
+                            style={{
+                              color: colors.textInverse,
+                              backgroundColor: isPrestart ? colors.statusWarning : colors.statusNext,
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
+                              padding: '2px 8px',
+                              borderRadius: `${radius.pill}px`,
+                              letterSpacing: '0.18em',
+                            }}
+                          >
+                            GLEICH
+                          </span>
+                        ) : isFinished ? (
+                          <span
+                            className="self-start font-black uppercase"
+                            style={{
+                              color: withAlpha(colors.textSecondary, 0.6),
+                              backgroundColor: withAlpha(colors.border, 0.3),
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
+                              padding: '2px 8px',
+                              borderRadius: `${radius.pill}px`,
+                              letterSpacing: '0.18em',
+                            }}
+                          >
+                            VORBEI
+                          </span>
                         ) : null}
                       </div>
                     );

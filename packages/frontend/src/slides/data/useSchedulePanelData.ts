@@ -169,7 +169,13 @@ export function useSchedulePanelData(input: UseSchedulePanelDataInput): Schedule
 
   return useMemo<SchedulePanelDataEnriched>(
     () => ({
-      saunas: saunasMeta.map((s) => ({ id: s.id, name: s.name })),
+      saunas: saunasMeta.map((s) => ({
+        id: s.id,
+        name: s.name,
+        accentColor: s.color || undefined,
+        temperatureC: s.info?.temperature ?? undefined,
+        isOutOfOrder: s.status === 'out-of-order' ? true : undefined,
+      })),
       saunasMeta,
       timeSlots,
       cells,

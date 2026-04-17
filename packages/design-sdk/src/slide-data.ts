@@ -75,9 +75,21 @@ export interface SaunaDetailData {
   upcoming: SaunaInfusionEntry[];
 }
 
+export interface SchedulePanelSauna {
+  id: string;
+  name: string;
+  /** Optional brand accent colour (e.g. for column-stripe styling). */
+  accentColor?: string;
+  /** Static sauna info that renderers may show in headers. */
+  temperatureC?: number;
+  /** True if the sauna is currently out of service — renderers should
+   * dim/hide its column. */
+  isOutOfOrder?: boolean;
+}
+
 export interface SchedulePanelData {
   /** Rows = saunas, columns = time slots. */
-  saunas: Array<{ id: string; name: string }>;
+  saunas: SchedulePanelSauna[];
   timeSlots: string[]; // e.g. ['10:00','11:00',...]
   /** Cell content indexed as [saunaIndex][timeSlotIndex]. `null` = empty. */
   cells: Array<Array<SchedulePanelCell | null>>;
@@ -85,11 +97,26 @@ export interface SchedulePanelData {
 }
 
 export interface SchedulePanelCell {
+  /** Scheduled start time in "HH:mm". */
+  time: string;
+  /** Duration in minutes. */
+  durationMin: number;
   title: string;
+  /** Optional host / instructor name. */
   host?: string;
+  /** Optional 1–4 intensity (a.k.a. flames). */
+  intensity?: number;
+  /** Optional plain-text description / subtitle. */
+  description?: string;
   aromas?: SaunaAroma[];
+  /** True if the slot is currently running. */
   isLive: boolean;
+  /** True if the slot is the next to start (global "next" marker). */
   isNext: boolean;
+  /** True if the slot is in its pre-start window. */
+  isPrestart?: boolean;
+  /** True if the slot already ended. */
+  isFinished?: boolean;
 }
 
 export type InfoImageMode = 'background' | 'side' | 'none';

@@ -104,23 +104,23 @@ export const saunaDetailFixture: SaunaDetailData = {
 
 export const schedulePanelFixture: SchedulePanelData = {
   saunas: [
-    { id: 'sauna-aufguss', name: 'Aufgusssauna' },
-    { id: 'sauna-finnisch', name: 'Finnische Sauna' },
-    { id: 'sauna-kelo', name: 'Kelosauna' },
+    { id: 'sauna-aufguss', name: 'Aufgusssauna', accentColor: '#8A1F78', temperatureC: 90 },
+    { id: 'sauna-finnisch', name: 'Finnische Sauna', accentColor: '#0EA5E9', temperatureC: 95 },
+    { id: 'sauna-kelo', name: 'Kelosauna', accentColor: '#DC2626', temperatureC: 85 },
   ],
   timeSlots: ['11:00', '13:00', '15:30', '16:30', '18:00', '19:00', '21:00'],
   cells: [
     [
       null,
-      { title: 'Fruchtoase', aromas: [{ id: 'lim', name: 'Limette' }], isLive: false, isNext: false },
-      { title: 'Vulkan', aromas: [{ id: 'med', name: 'Saunamed' }], isLive: true, isNext: false },
-      { title: 'Überraschung', isLive: false, isNext: true },
-      { title: 'Ice on Fire', isLive: false, isNext: false },
+      { time: '13:00', durationMin: 15, title: 'Fruchtoase', intensity: 2, aromas: [{ id: 'lim', name: 'Limette' }], isLive: false, isNext: false, isFinished: true },
+      { time: '15:30', durationMin: 15, title: 'Vulkan', intensity: 4, aromas: [{ id: 'med', name: 'Saunamed' }], isLive: true, isNext: false },
+      { time: '16:30', durationMin: 15, title: 'Überraschung', intensity: 2, isLive: false, isNext: true },
+      { time: '18:00', durationMin: 15, title: 'Ice on Fire', intensity: 3, isLive: false, isNext: false },
       null,
-      { title: 'Quittengeist', isLive: false, isNext: false },
+      { time: '21:00', durationMin: 15, title: 'Quittengeist', intensity: 1, isLive: false, isNext: false },
     ],
     [
-      { title: 'Guten Morgen', isLive: false, isNext: false },
+      { time: '11:00', durationMin: 15, title: 'Guten Morgen', intensity: 2, isLive: false, isNext: false, isFinished: true },
       null,
       null,
       null,
@@ -130,11 +130,11 @@ export const schedulePanelFixture: SchedulePanelData = {
     ],
     [
       null,
-      { title: 'Waldauszeit', isLive: false, isNext: false },
+      { time: '13:00', durationMin: 15, title: 'Waldauszeit', intensity: 2, isLive: false, isNext: false, isFinished: true },
       null,
       null,
       null,
-      { title: 'Waldauszeit', isLive: false, isNext: false },
+      { time: '19:00', durationMin: 15, title: 'Waldauszeit', intensity: 2, isLive: false, isNext: false },
       null,
     ],
   ],
