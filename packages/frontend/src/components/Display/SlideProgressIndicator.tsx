@@ -9,9 +9,9 @@ interface SlideProgressIndicatorProps {
   color: string;
   /** Where to anchor the bar inside the parent. Default: bottom. */
   position?: 'top' | 'bottom';
-  /** Track thickness in px. Default: 2. */
+  /** Track thickness in px. Default: 1.5. */
   thicknessPx?: number;
-  /** Opacity of the filled portion (0–1). Default: 0.55. */
+  /** Opacity of the filled portion (0–1). Default: 0.35. */
   fillOpacity?: number;
   className?: string;
 }
@@ -32,8 +32,8 @@ export function SlideProgressIndicator({
   durationSec,
   color,
   position = 'bottom',
-  thicknessPx = 2,
-  fillOpacity = 0.55,
+  thicknessPx = 1.5,
+  fillOpacity = 0.35,
   className,
 }: SlideProgressIndicatorProps) {
   const [isActive, setIsActive] = useState(false);
@@ -60,7 +60,7 @@ export function SlideProgressIndicator({
       )}
       style={{
         height: `${thicknessPx}px`,
-        backgroundColor: withAlpha(color, 0.08),
+        backgroundColor: withAlpha(color, 0.04),
       }}
     >
       <div
