@@ -88,12 +88,11 @@ export function DisplayMineralNoirTripleLayout({
     if (left.slide.type.startsWith('media-')) {
       return renderFullBleedMediaSlide(context, left.slide, left.zone?.id, t.bg);
     }
-    if (left.slide.type === 'sauna-detail') return renderTripleSaunaDetail(context, left.slide.saunaId);
+    // sauna-detail + everything else routes through the pack via SlideRenderer.
     return renderTripleSlideRenderer(context, left.slide, left.zone?.id);
   };
 
   const renderTopRightPanel = (): ReactElement => {
-    if (topRight.slide?.type === 'sauna-detail') return renderTripleSaunaDetail(context, topRight.slide.saunaId);
     if (topRight.slide) {
       if (topRight.slide.type.startsWith('media-')) {
         return renderFullBleedMediaSlide(context, topRight.slide, topRight.zone?.id, t.bg);
@@ -108,7 +107,6 @@ export function DisplayMineralNoirTripleLayout({
       if (bottomRight.slide.type.startsWith('media-')) {
         return renderFullBleedMediaSlide(context, bottomRight.slide, bottomRight.zone?.id, t.bg);
       }
-      if (bottomRight.slide.type === 'sauna-detail') return renderTripleSaunaDetail(context, bottomRight.slide.saunaId);
       return renderTripleSlideRenderer(context, bottomRight.slide, bottomRight.zone?.id);
     }
     return (

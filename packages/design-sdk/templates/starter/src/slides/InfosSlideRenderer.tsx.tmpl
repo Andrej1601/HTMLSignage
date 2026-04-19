@@ -1,0 +1,116 @@
+import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+
+/**
+ * {{DESIGN_NAME}} — infos renderer.
+ *
+ * Starter stub: title + body text, optional image. If the info has
+ * `imageMode === 'background'` we full-bleed it with a dark overlay;
+ * for `'side'` we put the image on the right half.
+ */
+export function InfosSlideRenderer({
+  data,
+  tokens,
+  context,
+}: SlideRendererProps<'infos'>) {
+  const { colors, typography, radius, spacing } = tokens;
+  const { viewport } = context;
+
+  const accent = data.accentColor ?? colors.accentPrimary;
+  const pad = viewport.isCompact ? spacing.md : spacing.xl;
+
+  if (data.imageMode === 'background' && data.imageUrl) {
+    return (
+      <div
+        className="relative flex h-full w-full flex-col justify-end overflow-hidden"
+        style={{ padding: `${pad}px`, color: colors.textInverse, fontFamily: typography.fontBody }}
+      >
+        <img src={data.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to top, ${colors.textPrimary}CC, ${colors.textPrimary}55 60%, transparent)`,
+          }}
+        />
+        <div className="relative z-10" style={{ maxWidth: '70%' }}>
+          <h2
+            className="font-black"
+            style={{
+              fontSize: `${typography.baseSizePx * typography.scale3xl}px`,
+              lineHeight: 1.05,
+              marginBottom: spacing.md,
+            }}
+          >
+            {data.title}
+          </h2>
+          <p
+            style={{
+              fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+              lineHeight: 1.4,
+              whiteSpace: 'pre-line',
+            }}
+          >
+            {data.text}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="grid h-full w-full overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        gridTemplateColumns: data.imageUrl && data.imageMode === 'side' ? '1fr 1fr' : '1fr',
+      }}
+    >
+      <section
+        className="flex flex-col justify-center"
+        style={{ padding: `${pad}px`, gap: `${spacing.md}px` }}
+      >
+        <span
+          className="inline-flex font-black uppercase"
+          style={{
+            alignSelf: 'flex-start',
+            color: colors.textInverse,
+            backgroundColor: accent,
+            padding: `${spacing.xs}px ${spacing.md}px`,
+            borderRadius: `${radius.pill}px`,
+            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+            letterSpacing: '0.25em',
+          }}
+        >
+          Info
+        </span>
+        <h2
+          className="font-black"
+          style={{
+            fontFamily: typography.fontHeading,
+            fontSize: `${typography.baseSizePx * typography.scale3xl}px`,
+            lineHeight: 1,
+            color: colors.textPrimary,
+          }}
+        >
+          {data.title}
+        </h2>
+        <p
+          style={{
+            fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+            lineHeight: 1.5,
+            color: colors.textSecondary,
+            whiteSpace: 'pre-line',
+          }}
+        >
+          {data.text}
+        </p>
+      </section>
+      {data.imageUrl && data.imageMode === 'side' ? (
+        <section className="relative overflow-hidden">
+          <img src={data.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        </section>
+      ) : null}
+    </div>
+  );
+}

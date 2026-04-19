@@ -6,7 +6,6 @@ import type {
 } from '@/components/Display/displayLayoutRenderer.types';
 import { loadScheduleGridSlide } from '@/components/Display/displayDynamicModules';
 import {
-  renderTripleSaunaDetail,
   renderTripleSlideRenderer,
 } from '@/components/Display/displayTripleLayoutUtils';
 import { classNames } from '@/utils/classNames';
@@ -101,11 +100,7 @@ export function DisplayClassicTripleLayout({
               }
               progressColor={progressColor}
             >
-              {topRight.slide.type === 'sauna-detail' ? (
-                renderTripleSaunaDetail(context, topRight.slide.saunaId)
-              ) : (
-                renderTripleSlideRenderer(context, topRight.slide, topRight.zone?.id)
-              )}
+              {renderTripleSlideRenderer(context, topRight.slide, topRight.zone?.id)}
             </SlideTransition>
           </div>
         )}
@@ -122,11 +117,7 @@ export function DisplayClassicTripleLayout({
               }
               progressColor={progressColor}
             >
-              {bottomRight.slide.type === 'sauna-detail' ? (
-                renderTripleSaunaDetail(context, bottomRight.slide.saunaId)
-              ) : (
-                renderTripleSlideRenderer(context, bottomRight.slide, bottomRight.zone?.id)
-              )}
+              {renderTripleSlideRenderer(context, bottomRight.slide, bottomRight.zone?.id)}
             </SlideTransition>
           </div>
         )}

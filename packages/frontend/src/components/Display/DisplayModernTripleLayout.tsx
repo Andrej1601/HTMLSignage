@@ -69,10 +69,6 @@ export function DisplayModernTripleLayout({
   };
 
   const renderTopRightPanel = () => {
-    if (topRight.slide?.type === 'sauna-detail') {
-      return renderTripleSaunaDetail(context, topRight.slide.saunaId);
-    }
-
     if (topRight.slide) {
       if (topRight.slide.type.startsWith('media-')) {
         return renderTriplePaddedSlide(context, topRight.slide, topRight.zone?.id, {
@@ -81,6 +77,10 @@ export function DisplayModernTripleLayout({
         });
       }
 
+      // sauna-detail and everything else route through the SlideRenderer
+      // dispatcher so the active design pack can render it (e.g. the
+      // wellness-classic SaunaDetailRenderer's image + infusion-list
+      // layout).
       return <div className="w-full h-full">{renderTripleSlideRenderer(context, topRight.slide, topRight.zone?.id)}</div>;
     }
 

@@ -8,6 +8,14 @@
     ".": "./src/index.ts"
   },
   "types": "./src/index.ts",
+  "bin": {
+    "new-design": "./bin/new-design.mjs"
+  },
+  "files": [
+    "src",
+    "bin",
+    "templates"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

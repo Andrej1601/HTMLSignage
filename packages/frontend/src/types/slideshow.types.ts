@@ -99,6 +99,7 @@ export interface SlideshowConfig {
   // Design override (per-slideshow, used for event slideshows)
   displayAppearance?: import('@/types/settings.types').DisplayAppearance;
   designStyle?: import('@/types/settings.types').DesignStyle;
+  saunaDetailStyle?: import('@/types/settings.types').SaunaDetailStyle;
   colorPalette?: import('@/types/settings.types').ColorPaletteName;
   theme?: Partial<import('@/types/settings.types').ThemeColors>;
 

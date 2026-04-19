@@ -16,6 +16,7 @@ import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
 import { DesignPackFlagCard } from '@/components/Settings/DesignPackFlagCard';
+import { DesignHealthCard } from '@/components/Settings/DesignHealthCard';
 import { usePermission } from '@/hooks/usePermission';
 
 const EventManager = lazy(() => import('@/components/Settings/EventManager').then(m => ({ default: m.EventManager })));
@@ -28,6 +29,10 @@ import type {
   Settings,
   ColorPaletteName,
 } from '@/types/settings.types';
+import {
+  buildSlideshowPreviewPayload,
+  resolvePreviewSlideshow,
+} from '@/pages/slideshowPage.utils';
 import { Save, RotateCcw, Palette, Music, Sparkles, Calendar, Info, Monitor, Wrench } from 'lucide-react';
 import { AutosaveIndicator } from '@/components/AutosaveIndicator';
 import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
@@ -283,6 +288,7 @@ export function SettingsPage() {
                     theme={localSettings.theme}
                     displayAppearance={localSettings.displayAppearance}
                     designStyle={localSettings.designStyle}
+                    saunaDetailStyle={localSettings.saunaDetailStyle}
                     colorPalette={localSettings.colorPalette}
                     onChange={(theme) => updateField('theme', theme)}
                     onDisplayAppearanceChange={(v) => {
@@ -292,6 +298,7 @@ export function SettingsPage() {
                       else if (v === 'wellness-stage') handleColorPaletteChange('wellness-warm');
                     }}
                     onDesignStyleChange={(v) => updateField('designStyle', v)}
+                    onSaunaDetailStyleChange={(v) => updateField('saunaDetailStyle', v)}
                     onColorPaletteChange={handleColorPaletteChange}
                     onSlideshowContextChange={setPreviewSlideshowId}
                   />
@@ -346,6 +353,7 @@ export function SettingsPage() {
                       display={localSettings.display}
                       onChange={(display) => updateField('display', display)}
                     />
+                    <DesignHealthCard />
                     <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
                       <SystemMaintenance />
                     </Suspense>
@@ -366,20 +374,31 @@ export function SettingsPage() {
               schedule={schedule || createDefaultSchedule()}
               settings={(() => {
                 if (!localSettings) return localSettings;
-                if (!previewSlideshowId) return localSettings;
-                const show = allSlideshows.find((s) => s.id === previewSlideshowId);
-                if (!show?.config) return localSettings;
-                const sc = show.config;
-                return {
-                  ...localSettings,
-                  slideshow: sc,
-                  ...(sc.displayAppearance ? { displayAppearance: sc.displayAppearance } : {}),
-                  ...(sc.designStyle ? { designStyle: sc.designStyle } : {}),
-                  ...(sc.colorPalette ? {
-                    colorPalette: sc.colorPalette,
-                    theme: generateDashboardColors(getColorPalette(sc.colorPalette)),
-                  } : {}),
-                };
+                // When the ThemeEditor is scoped to a specific slideshow,
+                // flatten that slideshow's design overrides onto the local
+                // settings — matches the Slideshow-Page preview and the
+                // live client's resolution logic.
+                //
+                // When scoped to "Globale Einstellungen" (no slideshow
+                // picked), render the globals as-is. Otherwise the user's
+                // in-flight global edits (palette / designStyle / theme)
+                // would be silently masked by slideshow-level overrides
+                // and look like the preview "doesn't update".
+                if (previewSlideshowId) {
+                  const show = resolvePreviewSlideshow(allSlideshows, previewSlideshowId);
+                  if (show?.config) {
+                    const payload = buildSlideshowPreviewPayload({
+                      settings: localSettings,
+                      previewSchedule: schedule || createDefaultSchedule(),
+                      editorConfig: show.config,
+                      editorPrestartMinutes:
+                        localSettings.display?.prestartMinutes ?? 10,
+                      isDirty: false,
+                    });
+                    if (payload?.settings) return payload.settings;
+                  }
+                }
+                return localSettings;
               })()}
             />
           </Suspense>

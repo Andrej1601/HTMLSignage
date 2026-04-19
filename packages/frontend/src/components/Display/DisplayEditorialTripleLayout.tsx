@@ -69,10 +69,6 @@ export function DisplayEditorialTripleLayout({
   };
 
   const renderTopRightPanel = () => {
-    if (topRight.slide?.type === 'sauna-detail') {
-      return renderTripleSaunaDetail(context, topRight.slide.saunaId);
-    }
-
     if (topRight.slide) {
       if (topRight.slide.type.startsWith('media-')) {
         return renderTriplePaddedSlide(context, topRight.slide, topRight.zone?.id, {
@@ -81,6 +77,7 @@ export function DisplayEditorialTripleLayout({
         });
       }
 
+      // sauna-detail routes through the pack via SlideRenderer.
       return (
         <div className="h-full w-full">
           {renderTripleSlideRenderer(context, topRight.slide, topRight.zone?.id)}

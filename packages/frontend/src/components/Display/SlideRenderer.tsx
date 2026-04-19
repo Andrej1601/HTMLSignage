@@ -357,6 +357,11 @@ function ContentPanelDispatch({
   });
   const context = buildRenderContext(slide, deviceId);
 
+  // The pack's SchedulePanelRenderer dispatches on `data.styleHint` and
+  // implements all three host styles (`list` / `matrix` / `timeline`) so
+  // the large and small zones can render identically. When the design
+  // pack flag is off, DesignHost falls back to ContentPanelSlide which
+  // uses the legacy DisplayContentPanel dispatcher.
   return (
     <DesignHost
       slideType="content-panel"

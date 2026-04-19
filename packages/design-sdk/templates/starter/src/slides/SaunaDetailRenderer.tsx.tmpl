@@ -1,0 +1,164 @@
+import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+
+/**
+ * {{DESIGN_NAME}} — sauna-detail renderer.
+ *
+ * Starter stub: split layout with image on the left (or accent panel
+ * if no image) and upcoming infusions on the right. Consider adding
+ * `hero` and `portrait` variants via `data.styleHint` dispatch once
+ * the split base looks right.
+ */
+export function SaunaDetailRenderer({
+  data,
+  tokens,
+  context,
+}: SlideRendererProps<'sauna-detail'>) {
+  const { colors, typography, radius, spacing } = tokens;
+  const { viewport } = context;
+
+  const accent = data.accentColor ?? colors.accentPrimary;
+  const pad = viewport.isCompact ? spacing.md : spacing.xl;
+
+  return (
+    <div
+      className="grid h-full w-full overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+      }}
+    >
+      <section
+        className="relative flex flex-col justify-end overflow-hidden"
+        style={{ padding: `${pad}px` }}
+      >
+        {data.imageUrl ? (
+          <img
+            src={data.imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: accent, opacity: 0.25 }}
+          />
+        )}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to top, ${colors.textPrimary}AA, transparent 70%)`,
+          }}
+        />
+        <div className="relative z-10 flex flex-col" style={{ gap: `${spacing.sm}px` }}>
+          <span
+            className="inline-flex font-black uppercase"
+            style={{
+              alignSelf: 'flex-start',
+              color: colors.textInverse,
+              backgroundColor: accent,
+              padding: `${spacing.xs}px ${spacing.md}px`,
+              borderRadius: `${radius.pill}px`,
+              fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+              letterSpacing: '0.25em',
+            }}
+          >
+            Sauna
+          </span>
+          <h2
+            className="font-black"
+            style={{
+              color: colors.textInverse,
+              fontFamily: typography.fontHeading,
+              fontSize: `${typography.baseSizePx * typography.scale3xl}px`,
+              lineHeight: 1,
+            }}
+          >
+            {data.name}
+          </h2>
+          {data.info.temperatureC != null ? (
+            <span
+              style={{
+                color: colors.textInverse,
+                fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+                fontWeight: 600,
+              }}
+            >
+              {data.info.temperatureC}°C
+              {data.info.humidityPct != null ? ` · ${data.info.humidityPct}%` : ''}
+            </span>
+          ) : null}
+        </div>
+      </section>
+
+      <section
+        className="flex min-h-0 flex-col overflow-hidden"
+        style={{ padding: `${pad}px`, gap: `${spacing.sm}px` }}
+      >
+        <span
+          className="font-black uppercase shrink-0"
+          style={{
+            color: colors.accentPrimary,
+            fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+            letterSpacing: '0.3em',
+          }}
+        >
+          Aufgussplan
+        </span>
+        {data.upcoming.length === 0 ? (
+          <div
+            className="flex flex-1 items-center justify-center"
+            style={{
+              color: colors.textSecondary,
+              fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+            }}
+          >
+            Heute keine Aufgüsse.
+          </div>
+        ) : (
+          <div
+            className="flex flex-col"
+            style={{ gap: `${spacing.xs}px`, overflowY: 'auto' }}
+          >
+            {data.upcoming.map((entry) => (
+              <div
+                key={entry.id}
+                className="flex items-center"
+                style={{
+                  backgroundColor: entry.isLive
+                    ? accent
+                    : colors.surfaceElevated,
+                  color: entry.isLive ? colors.textInverse : colors.textPrimary,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: `${radius.md}px`,
+                  padding: `${spacing.sm}px ${spacing.md}px`,
+                  gap: `${spacing.md}px`,
+                }}
+              >
+                <span
+                  className="font-mono font-black tabular-nums"
+                  style={{
+                    fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+                    minWidth: 72,
+                  }}
+                >
+                  {entry.time}
+                </span>
+                <span
+                  className="font-black uppercase truncate flex-1 min-w-0"
+                  style={{
+                    fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {entry.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

@@ -121,6 +121,14 @@ export interface MaintenanceScreenSettings {
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
 export type DisplayAppearance = 'wellness-stage' | 'editorial-resort' | 'mineral-noir';
+/**
+ * Visual variant for sauna-detail ("Aufguss-Fokus") slides. Picked
+ * up by the design pack's `SaunaDetailRenderer`.
+ *  - `split`    → image left, upcoming infusion list right (default)
+ *  - `hero`     → full-bleed image + floating info card overlay
+ *  - `portrait` → image-dominant vertical layout, infusion list below
+ */
+export type SaunaDetailStyle = 'split' | 'hero' | 'portrait';
 export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
@@ -239,6 +247,8 @@ export interface Settings {
   version: number;
   displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
+  /** Visual variant for sauna-detail slides. Defaults to `split`. */
+  saunaDetailStyle?: SaunaDetailStyle;
   colorPalette?: ColorPaletteName;
   theme?: ThemeColors;
   fonts?: FontSettings;

@@ -1,0 +1,140 @@
+import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+
+/**
+ * {{DESIGN_NAME}} — events renderer.
+ *
+ * Starter stub: vertical list of upcoming events with date, title,
+ * location. Live / soon entries get a status tint.
+ */
+export function EventsSlideRenderer({
+  data,
+  tokens,
+  context,
+}: SlideRendererProps<'events'>) {
+  const { colors, typography, radius, spacing } = tokens;
+  const { viewport } = context;
+
+  const pad = viewport.isCompact ? spacing.md : spacing.xl;
+
+  const statusBg = (rank: string) =>
+    rank === 'live'
+      ? colors.statusLive
+      : rank === 'soon'
+        ? colors.statusWarning
+        : rank === 'near'
+          ? colors.statusNext
+          : colors.border;
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: `${spacing.md}px`,
+      }}
+    >
+      <span
+        className="font-black uppercase"
+        style={{
+          color: colors.accentPrimary,
+          fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+          letterSpacing: '0.3em',
+        }}
+      >
+        Events
+      </span>
+
+      {data.events.length === 0 ? (
+        <div
+          className="flex flex-1 items-center justify-center"
+          style={{
+            color: colors.textSecondary,
+            fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+          }}
+        >
+          Keine Events geplant.
+        </div>
+      ) : (
+        <div
+          className="flex flex-col"
+          style={{ gap: `${spacing.sm}px`, overflowY: 'auto' }}
+        >
+          {data.events.map((event) => {
+            const start = new Date(event.startsAt);
+            const dateLabel = start.toLocaleDateString('de-DE', {
+              day: '2-digit',
+              month: '2-digit',
+            });
+            const timeLabel = start.toLocaleTimeString('de-DE', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            return (
+              <div
+                key={event.id}
+                className="flex"
+                style={{
+                  backgroundColor: colors.surfaceElevated,
+                  border: `1px solid ${colors.border}`,
+                  borderLeft: `4px solid ${statusBg(event.statusRank)}`,
+                  borderRadius: `${radius.md}px`,
+                  padding: `${spacing.md}px`,
+                  gap: `${spacing.md}px`,
+                }}
+              >
+                <div
+                  className="flex flex-col shrink-0"
+                  style={{ minWidth: 96 }}
+                >
+                  <span
+                    className="font-mono font-black tabular-nums"
+                    style={{
+                      color: colors.accentPrimary,
+                      fontSize: `${typography.baseSizePx * typography.scaleXl}px`,
+                    }}
+                  >
+                    {dateLabel}
+                  </span>
+                  <span
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+                    }}
+                  >
+                    {timeLabel}
+                  </span>
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span
+                    className="font-black uppercase truncate"
+                    style={{
+                      color: colors.textPrimary,
+                      fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {event.title}
+                  </span>
+                  {event.location ? (
+                    <span
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+                        marginTop: 2,
+                      }}
+                    >
+                      {event.location}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

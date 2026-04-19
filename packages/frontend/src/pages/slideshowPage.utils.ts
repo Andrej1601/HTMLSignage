@@ -1,10 +1,11 @@
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
-import type { SlideshowConfig } from '@/types/slideshow.types';
+import type { SlideshowConfig, SlideshowDefinition } from '@/types/slideshow.types';
 import type { SlideshowWorkflowSnapshot } from '@/services/api';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { isPlainRecord } from '@/utils/objectUtils';
 import { createDefaultSlideshowConfig } from '@/types/slideshow.types';
+import { generateDashboardColors, getColorPalette } from '@/types/settings.types';
 
 export function normalizeEditorConfig(raw: unknown, fallback?: SlideshowConfig | null): SlideshowConfig {
   const base = fallback || createDefaultSlideshowConfig();
@@ -50,16 +51,52 @@ export function buildSlideshowPreviewPayload(input: PreviewPayloadInput): {
     },
   });
 
+  // Flatten slideshow-level design overrides onto top-level settings so the
+  // preview resolves the same designStyle/displayAppearance/colorPalette as
+  // `DisplayClientPage.effectiveSettings` does on the live client.
+  const merged: Settings = {
+    ...globalSettings,
+    slideshow: {
+      ...editorConfig,
+      version: (editorConfig.version || 1) + (isDirty ? 1 : 0),
+    },
+  };
+
+  if (editorConfig.displayAppearance) {
+    merged.displayAppearance = editorConfig.displayAppearance;
+  }
+  if (editorConfig.designStyle) {
+    merged.designStyle = editorConfig.designStyle;
+  }
+  if (editorConfig.saunaDetailStyle) {
+    merged.saunaDetailStyle = editorConfig.saunaDetailStyle;
+  }
+  if (editorConfig.colorPalette) {
+    merged.colorPalette = editorConfig.colorPalette;
+    merged.theme = generateDashboardColors(getColorPalette(editorConfig.colorPalette));
+  }
+
   return {
     schedule: previewSchedule,
-    settings: migrateSettings({
-      ...globalSettings,
-      slideshow: {
-        ...editorConfig,
-        version: (editorConfig.version || 1) + (isDirty ? 1 : 0),
-      },
-    }),
+    settings: migrateSettings(merged),
   };
+}
+
+/**
+ * Resolve which slideshow should drive a preview. Prefers an explicit
+ * selection, otherwise falls back to the default slideshow, otherwise the
+ * first available one. Returns `null` if no slideshows exist.
+ */
+export function resolvePreviewSlideshow(
+  slideshows: SlideshowDefinition[] | undefined,
+  explicitId: string | null,
+): SlideshowDefinition | null {
+  const list = slideshows || [];
+  if (explicitId) {
+    const selected = list.find((s) => s.id === explicitId);
+    if (selected) return selected;
+  }
+  return list.find((s) => s.isDefault) || list[0] || null;
 }
 
 export function buildCurrentSlideshowSnapshot(input: {

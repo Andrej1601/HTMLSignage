@@ -1,6 +1,7 @@
 import { FlaskConical } from 'lucide-react';
 import type { DisplaySettings } from '@/types/settings.types';
 import { DESIGN_IDS, DEFAULT_DESIGN_ID, type DesignId } from '@/designs';
+import { useDesign } from '@/designs/useDesign';
 
 interface DesignPackFlagCardProps {
   display: DisplaySettings | undefined;
@@ -8,16 +9,19 @@ interface DesignPackFlagCardProps {
 }
 
 /**
- * Experimental toggle for the design-pack rendering pipeline.
+ * Admin toggle for the design-pack rendering pipeline.
  *
- * This is a test-only card — the permanent UI lands in the theme
- * editor during Phase 4 (tenant overrides). Until then, flipping this
- * flag per environment lets us A/B the new pack against the legacy
- * components without a deploy.
+ * When enabled, every slide type renders through the DesignHost using
+ * the pack selected below. On runtime error the ErrorBoundary auto-
+ * falls-back to the legacy renderer, so activation is safe.
+ *
+ * Renders the manifest's metadata (name, version, author, description)
+ * for the selected pack so operators can verify which design is active.
  */
 export function DesignPackFlagCard({ display, onChange }: DesignPackFlagCardProps) {
   const enabled = display?.useDesignPacks === true;
   const activeId = (display?.designPackId as DesignId | undefined) ?? DEFAULT_DESIGN_ID;
+  const { design } = useDesign(activeId);
 
   const setEnabled = (value: boolean) => {
     onChange({ ...(display ?? {}), useDesignPacks: value });
@@ -69,12 +73,32 @@ export function DesignPackFlagCard({ display, onChange }: DesignPackFlagCardProp
           >
             {DESIGN_IDS.map((id) => (
               <option key={id} value={id}>
-                {id}
+                {formatDesignLabel(id)}
               </option>
             ))}
           </select>
         </label>
       </div>
+
+      {/* Pack details card — shown as soon as the manifest resolves. */}
+      {design ? (
+        <div className="mt-4 rounded-lg border border-spa-bg-secondary bg-spa-surface p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm font-semibold text-spa-text-primary">
+                {design.manifest.name}
+              </span>
+              <span className="text-xs text-spa-text-secondary">
+                v{design.manifest.version} · {design.manifest.status}
+                {design.manifest.author ? ` · ${design.manifest.author}` : ''}
+              </span>
+            </div>
+          </div>
+          <p className="mt-2 text-sm text-spa-text-primary">
+            {design.manifest.description}
+          </p>
+        </div>
+      ) : null}
 
       <div className="mt-4 rounded-lg bg-spa-bg-primary px-3 py-2 text-xs text-spa-text-secondary">
         <strong className="text-spa-text-primary">Hinweis:</strong>{' '}
@@ -83,4 +107,17 @@ export function DesignPackFlagCard({ display, onChange }: DesignPackFlagCardProp
       </div>
     </div>
   );
+}
+
+/**
+ * Turn a kebab-case design id into a human label for the picker
+ * (e.g. `mineral-noir` → `Mineral Noir`). Kept tiny + synchronous —
+ * the real manifest names live behind a dynamic import which we
+ * don't want to pay for just to paint a dropdown.
+ */
+function formatDesignLabel(id: DesignId): string {
+  return id
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }

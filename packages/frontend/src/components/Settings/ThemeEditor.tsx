@@ -4,6 +4,7 @@ import type {
   DesignStyle,
   ColorPaletteName,
   DisplayAppearance,
+  SaunaDetailStyle,
 } from '@/types/settings.types';
 import { generateDashboardColors } from '@/types/settings.types';
 import { AppearanceSelector } from './AppearanceSelector';
@@ -17,10 +18,12 @@ interface ThemeEditorProps {
   theme: ThemeColors;
   displayAppearance?: DisplayAppearance;
   designStyle?: DesignStyle;
+  saunaDetailStyle?: SaunaDetailStyle;
   colorPalette?: ColorPaletteName;
   onChange: (theme: ThemeColors) => void;
   onDisplayAppearanceChange?: (appearance: DisplayAppearance) => void;
   onDesignStyleChange?: (style: DesignStyle) => void;
+  onSaunaDetailStyleChange?: (style: SaunaDetailStyle) => void;
   onColorPaletteChange?: (palette: ColorPaletteName) => void;
   onSlideshowContextChange?: (slideshowId: string | null) => void;
 }
@@ -29,10 +32,12 @@ export function ThemeEditor({
   theme,
   displayAppearance,
   designStyle,
+  saunaDetailStyle,
   colorPalette,
   onChange,
   onDisplayAppearanceChange,
   onDesignStyleChange,
+  onSaunaDetailStyleChange,
   onColorPaletteChange,
   onSlideshowContextChange,
 }: ThemeEditorProps) {
@@ -53,6 +58,8 @@ export function ThemeEditor({
   // When editing a slideshow, read its design overrides
   const effectiveAppearance = selectedSlideshow?.config.displayAppearance ?? displayAppearance;
   const effectiveDesignStyle = selectedSlideshow?.config.designStyle ?? designStyle;
+  const effectiveSaunaDetailStyle =
+    selectedSlideshow?.config.saunaDetailStyle ?? saunaDetailStyle;
   const effectivePalette = selectedSlideshow?.config.colorPalette ?? colorPalette;
 
   const handleSlideshowDesignChange = (patch: Partial<SlideshowConfig>) => {
@@ -83,6 +90,14 @@ export function ThemeEditor({
       handleSlideshowDesignChange({ designStyle: v });
     } else {
       onDesignStyleChange?.(v);
+    }
+  };
+
+  const handleSaunaDetailStyleChange = (v: SaunaDetailStyle) => {
+    if (selectedSlideshow) {
+      handleSlideshowDesignChange({ saunaDetailStyle: v });
+    } else {
+      onSaunaDetailStyleChange?.(v);
     }
   };
 
@@ -118,9 +133,9 @@ export function ThemeEditor({
             Änderungen gelten nur für <strong>{selectedSlideshow.name}</strong>.
             Nicht gesetzte Werte fallen auf die globalen Einstellungen zurück.
           </span>
-          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.colorPalette) && (
+          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette) && (
             <button
-              onClick={() => handleSlideshowDesignChange({ displayAppearance: undefined, designStyle: undefined, colorPalette: undefined, theme: undefined })}
+              onClick={() => handleSlideshowDesignChange({ displayAppearance: undefined, designStyle: undefined, saunaDetailStyle: undefined, colorPalette: undefined, theme: undefined })}
               className="shrink-0 ml-3 text-xs font-semibold text-spa-info-dark hover:underline"
             >
               Alle Overrides entfernen
@@ -148,8 +163,10 @@ export function ThemeEditor({
             <AppearanceSelector
               displayAppearance={effectiveAppearance}
               designStyle={effectiveDesignStyle}
+              saunaDetailStyle={effectiveSaunaDetailStyle}
               onDisplayAppearanceChange={handleAppearanceChange}
               onDesignStyleChange={handleDesignStyleChange}
+              onSaunaDetailStyleChange={handleSaunaDetailStyleChange}
             />
           </div>
 

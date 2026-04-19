@@ -1,6 +1,7 @@
 import type {
   SchedulePanelCell,
   SchedulePanelData,
+  SchedulePanelStyle,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
@@ -21,133 +22,145 @@ function withAlpha(color: string, alpha: number): string {
   return c;
 }
 
-interface CellProps {
-  cell: SchedulePanelCell | null;
-  tokens: SlideRendererProps<'content-panel'>['tokens'];
-  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+/**
+ * Inline SVG flame — closed Lucide-shape path. Reused for the
+ * intensity row in the list variant.
+ */
+function FlameIcon({ size, color, filled }: { size: number; color: string; filled: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  );
 }
 
-function Cell({ cell, tokens, viewport }: CellProps) {
-  const { colors, typography, radius } = tokens;
-  if (!cell) {
-    return (
-      <div
-        className="flex items-center justify-center"
-        style={{
-          minHeight: `${scaled(32, viewport, 12)}px`,
-          color: withAlpha(colors.textSecondary, 0.45),
-          fontFamily: typography.fontMono,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-        }}
-      >
-        —
-      </div>
-    );
-  }
-
-  const statusBg = cell.isLive
-    ? withAlpha(colors.statusLive, 0.15)
-    : cell.isNext
-      ? withAlpha(colors.statusNext, 0.15)
-      : withAlpha(colors.surfaceElevated, 0.8);
-
-  const statusBorder = cell.isLive
-    ? withAlpha(colors.statusLive, 0.4)
-    : cell.isNext
-      ? withAlpha(colors.statusNext, 0.4)
-      : colors.border;
-
+function IntensityFlames({
+  level,
+  size,
+  activeColor,
+  idleColor,
+}: {
+  level: number;
+  size: number;
+  activeColor: string;
+  idleColor: string;
+}) {
   return (
     <div
-      className="flex flex-col"
-      style={{
-        backgroundColor: statusBg,
-        borderRadius: `${scaled(12, viewport, 4)}px`,
-        border: `1px solid ${statusBorder}`,
-        padding: `${scaled(8, viewport, 3)}px`,
-        gap: 2,
-      }}
+      className="inline-flex items-center shrink-0"
+      style={{ gap: Math.max(1, Math.round(size * 0.08)) }}
     >
-      <span
-        className="font-bold"
-        style={{
-          color: colors.textPrimary,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
-          lineHeight: 1.15,
-        }}
-      >
-        {cell.title}
-      </span>
-      {(cell.aromas?.length ?? 0) > 0 ? (
-        <div
-          className="flex flex-wrap"
-          style={{
-            gap: 4,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-            color: colors.textSecondary,
-          }}
-        >
-          {cell.aromas!.slice(0, 2).map((aroma) => (
-            <span key={aroma.id} className="inline-flex items-center" style={{ gap: 2 }}>
-              {aroma.emoji ? <span>{aroma.emoji}</span> : null}
-              <span>{aroma.name}</span>
-            </span>
-          ))}
-          {(cell.aromas?.length ?? 0) > 2 ? (
-            <span>+{cell.aromas!.length - 2}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {cell.isLive ? (
-        <span
-          className="self-start font-black uppercase"
-          style={{
-            color: colors.textInverse,
-            backgroundColor: colors.statusLive,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
-            padding: '2px 6px',
-            borderRadius: `${radius.pill}px`,
-            letterSpacing: '0.12em',
-          }}
-        >
-          LÄUFT
-        </span>
-      ) : cell.isNext ? (
-        <span
-          className="self-start font-black uppercase"
-          style={{
-            color: colors.textInverse,
-            backgroundColor: colors.statusNext,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
-            padding: '2px 6px',
-            borderRadius: `${radius.pill}px`,
-            letterSpacing: '0.12em',
-          }}
-        >
-          Gleich
-        </span>
-      ) : null}
+      {[1, 2, 3, 4].map((i) => (
+        <FlameIcon
+          key={i}
+          size={size}
+          color={i <= level ? activeColor : idleColor}
+          filled={i <= level}
+        />
+      ))}
     </div>
   );
 }
 
 /**
- * Wellness Classic — content-panel (schedule grid) slide renderer.
- *
- * Structure is constant regardless of container size: time-slot rows x
- * sauna columns. Only padding, font sizes and gaps scale with the
- * viewport. When rows exceed the available height, the body auto-
- * scrolls instead of showing a scrollbar.
+ * Resolve a sauna's accent colour. Prefers an explicit `color` from the
+ * data; otherwise rotates through a deterministic palette built from the
+ * pack's accent tokens so every sauna still gets a stable visual marker.
  */
-export function SchedulePanelRenderer({
-  data,
-  tokens,
-  context,
-}: SlideRendererProps<'content-panel'>) {
-  const { colors, typography, spacing } = tokens;
-  const { viewport } = context;
+function resolveSaunaAccent(
+  sauna: SchedulePanelData['saunas'][number],
+  index: number,
+  tokens: SlideRendererProps<'content-panel'>['tokens'],
+): string {
+  if (sauna.color) return sauna.color;
+  const { colors } = tokens;
+  const palette = [
+    colors.accentPrimary,
+    colors.accentSecondary,
+    colors.statusLive,
+    colors.statusNext,
+    colors.statusWarning,
+  ];
+  return palette[index % palette.length];
+}
 
-  if (data.saunas.length === 0 || data.timeSlots.length === 0) {
+/**
+ * Wellness Classic — content-panel renderer.
+ *
+ * Dispatches on the host-supplied `styleHint`:
+ *   - `list`     → chronological list (one row per aufguss, sorted by time)
+ *   - `matrix`   → Saunakacheln grid (one column per sauna, stacked cards)
+ *   - `timeline` → proportional time axis (cards sized by duration)
+ *
+ * Each variant uses the pack's tokens so palette / tenant overrides flow
+ * through consistently regardless of which layout the host picks.
+ */
+export function SchedulePanelRenderer(props: SlideRendererProps<'content-panel'>) {
+  const hint: SchedulePanelStyle = props.data.styleHint ?? 'list';
+  switch (hint) {
+    case 'matrix':
+      return <GridVariant {...props} />;
+    case 'timeline':
+      return <TimelineVariant {...props} />;
+    case 'list':
+    default:
+      return <ListVariant {...props} />;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Variant: List (chronological)
+// ────────────────────────────────────────────────────────────────────────
+
+interface FlatEntry {
+  key: string;
+  time: string;
+  saunaIndex: number;
+  saunaName: string;
+  cell: SchedulePanelCell;
+}
+
+function flattenEntries(data: SchedulePanelData): FlatEntry[] {
+  const result: FlatEntry[] = [];
+  data.cells.forEach((saunaRow, saunaIdx) => {
+    saunaRow.forEach((cell, slotIdx) => {
+      if (!cell) return;
+      const time = cell.time ?? data.timeSlots[slotIdx] ?? '';
+      result.push({
+        key: `${saunaIdx}-${slotIdx}-${time}`,
+        time,
+        saunaIndex: saunaIdx,
+        saunaName: data.saunas[saunaIdx]?.name ?? '',
+        cell,
+      });
+    });
+  });
+  // Sort by HH:mm ascending
+  result.sort((a, b) => {
+    const [ah, am] = a.time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+    const [bh, bm] = b.time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+    return ah * 60 + am - (bh * 60 + bm);
+  });
+  return result;
+}
+
+function ListVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography } = tokens;
+  const { viewport } = context;
+  const entries = flattenEntries(data);
+  const pad = scaled(24, viewport, 8);
+
+  if (entries.length === 0) {
     return (
       <div
         className="flex h-full w-full items-center justify-center"
@@ -163,9 +176,6 @@ export function SchedulePanelRenderer({
     );
   }
 
-  const columns = `auto repeat(${data.saunas.length}, minmax(0, 1fr))`;
-  const pad = scaled(24, viewport, 8);
-
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden"
@@ -174,75 +184,55 @@ export function SchedulePanelRenderer({
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
         padding: `${pad}px`,
-        gap: `${scaled(spacing.md, viewport, 4)}px`,
+        gap: `${scaled(12, viewport, 4)}px`,
       }}
     >
-      <div className="flex items-baseline justify-between shrink-0">
-        <span
-          className="font-black uppercase"
-          style={{
-            color: colors.accentPrimary,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-            letterSpacing: '0.3em',
-          }}
-        >
-          Aufgussplan
-        </span>
-        <span
-          className="font-semibold"
-          style={{
-            color: colors.textSecondary,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-          }}
-        >
-          {data.timeSlots.length} Slots · {data.saunas.length} Saunen
-        </span>
-      </div>
-
+      {/* Legend strip: which sauna has which colour */}
       <div
-        className="grid shrink-0"
-        style={{
-          gridTemplateColumns: columns,
-          gap: `${scaled(spacing.xs, viewport, 2)}px`,
-        }}
+        className="flex flex-wrap shrink-0"
+        style={{ gap: `${scaled(12, viewport, 4)}px` }}
       >
-        <div />
-        {data.saunas.map((sauna) => (
-          <div
-            key={sauna.id}
-            className="font-black uppercase"
-            style={{
-              color: colors.textPrimary,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
-              letterSpacing: '0.1em',
-              padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
-              backgroundColor: withAlpha(colors.accentSecondary, 0.15),
-              borderRadius: `${scaled(12, viewport, 4)}px`,
-              textAlign: 'center',
-            }}
-          >
-            {sauna.name}
-          </div>
-        ))}
+        {data.saunas.map((sauna, idx) => {
+          const accent = resolveSaunaAccent(sauna, idx, tokens);
+          return (
+            <span
+              key={sauna.id}
+              className="inline-flex items-center font-black uppercase"
+              style={{
+                gap: `${scaled(6, viewport, 3)}px`,
+                color: colors.textSecondary,
+                fontSize: `${scaledFont(
+                  typography.baseSizePx * typography.scaleSm * 0.9,
+                  viewport,
+                  8,
+                )}px`,
+                letterSpacing: '0.2em',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: scaled(8, viewport, 5),
+                  height: scaled(8, viewport, 5),
+                  borderRadius: '9999px',
+                  backgroundColor: accent,
+                  display: 'inline-block',
+                }}
+              />
+              {sauna.name}
+            </span>
+          );
+        })}
       </div>
 
       <AutoScroll className="flex-1 min-h-0">
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns: columns,
-            gap: `${scaled(spacing.xs, viewport, 2)}px`,
-            alignContent: 'start',
-          }}
-        >
-          {data.timeSlots.map((time, slotIdx) => (
-            <TimeRow
-              key={time}
-              time={time}
-              saunas={data.saunas}
-              cells={data.saunas.map(
-                (_, saunaIdx) => data.cells[saunaIdx]?.[slotIdx] ?? null,
-              )}
+        <div className="flex flex-col" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+          {entries.map((entry, idx) => (
+            <ListEntryRow
+              sauna={data.saunas[entry.saunaIndex]}
+              key={entry.key}
+              entry={entry}
+              zebra={idx % 2 === 0}
               tokens={tokens}
               viewport={viewport}
             />
@@ -253,45 +243,1078 @@ export function SchedulePanelRenderer({
   );
 }
 
-function TimeRow({
+function ListEntryRow({
+  sauna,
+  entry,
+  zebra,
+  tokens,
+  viewport,
+}: {
+  sauna: SchedulePanelData['saunas'][number];
+  entry: FlatEntry;
+  zebra: boolean;
+  tokens: SlideRendererProps<'content-panel'>['tokens'];
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+}) {
+  const { colors, typography, radius } = tokens;
+  const { cell } = entry;
+  const accent = resolveSaunaAccent(sauna, entry.saunaIndex, tokens);
+
+  const isLive = cell.isLive;
+  const isPre = cell.isPrestart;
+  const isNext = cell.isNext;
+  const isFinished = cell.isFinished;
+
+  // Row tint: live > prestart > next > finished > zebra
+  const bg = isLive
+    ? withAlpha(colors.statusLive, 0.12)
+    : isPre
+      ? withAlpha(colors.statusWarning, 0.1)
+      : isNext
+        ? withAlpha(colors.statusNext, 0.1)
+        : isFinished
+          ? withAlpha(colors.surfaceElevated, zebra ? 0.4 : 0.25)
+          : withAlpha(colors.surfaceElevated, zebra ? 0.75 : 0.45);
+
+  const leftBorderColor = isLive
+    ? colors.statusLive
+    : isPre
+      ? colors.statusWarning
+      : isNext
+        ? colors.statusNext
+        : accent;
+
+  const timeColor = isLive
+    ? colors.statusLive
+    : isPre || isNext
+      ? colors.statusWarning
+      : isFinished
+        ? withAlpha(colors.textPrimary, 0.35)
+        : colors.textPrimary;
+
+  const titleColor = isFinished
+    ? withAlpha(colors.textPrimary, 0.55)
+    : colors.textPrimary;
+
+  const flameActive = isFinished
+    ? withAlpha(colors.accentPrimary, 0.35)
+    : isLive
+      ? colors.statusLive
+      : isPre || isNext
+        ? colors.statusWarning
+        : colors.accentPrimary;
+  const flameIdle = withAlpha(colors.accentPrimary, 0.2);
+
+  // Status badge (solid pill in the right-most slot)
+  const badge = isLive
+    ? { label: 'LÄUFT', color: colors.statusLive }
+    : isPre
+      ? { label: 'GLEICH', color: colors.statusWarning }
+      : isNext
+        ? { label: 'GLEICH', color: colors.statusNext }
+        : isFinished
+          ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
+          : null;
+
+  const intensity = cell.intensity ?? 0;
+  const duration = cell.durationMin ?? 15;
+
+  return (
+    <div
+      className="flex items-center"
+      style={{
+        backgroundColor: bg,
+        borderRadius: `${scaled(radius.lg, viewport, 6)}px`,
+        borderLeft: `${scaled(5, viewport, 3)}px solid ${leftBorderColor}`,
+        padding: `${scaled(10, viewport, 4)}px ${scaled(16, viewport, 6)}px`,
+        gap: `${scaled(14, viewport, 5)}px`,
+      }}
+    >
+      {/* Time column */}
+      <span
+        className="font-mono font-black shrink-0 tabular-nums"
+        style={{
+          color: timeColor,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 14)}px`,
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
+          minWidth: `${scaled(70, viewport, 44)}px`,
+        }}
+      >
+        {entry.time}
+      </span>
+
+      {/* Sauna tag */}
+      <span
+        className="inline-flex items-center font-black uppercase shrink-0"
+        style={{
+          gap: `${scaled(6, viewport, 3)}px`,
+          color: colors.textSecondary,
+          fontSize: `${scaledFont(
+            typography.baseSizePx * typography.scaleSm * 0.95,
+            viewport,
+            8,
+          )}px`,
+          letterSpacing: '0.2em',
+          minWidth: `${scaled(140, viewport, 80)}px`,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: scaled(8, viewport, 5),
+            height: scaled(8, viewport, 5),
+            borderRadius: '9999px',
+            backgroundColor: accent,
+            display: 'inline-block',
+          }}
+        />
+        <span className="truncate">{entry.saunaName}</span>
+      </span>
+
+      {/* Title */}
+      <span
+        className="font-black uppercase truncate flex-1 min-w-0"
+        style={{
+          color: titleColor,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+          letterSpacing: '0.04em',
+        }}
+      >
+        {cell.title}
+      </span>
+
+      {/* Flames */}
+      {intensity > 0 ? (
+        <IntensityFlames
+          level={intensity}
+          size={scaled(14, viewport, 9)}
+          activeColor={flameActive}
+          idleColor={flameIdle}
+        />
+      ) : null}
+
+      {/* Duration pill */}
+      <span
+        className="font-bold shrink-0"
+        style={{
+          color: withAlpha(colors.textPrimary, 0.55),
+          backgroundColor: withAlpha(colors.surfaceElevated, 0.7),
+          border: `1px solid ${withAlpha(colors.border, 0.7)}`,
+          borderRadius: `${radius.pill}px`,
+          fontSize: `${scaledFont(
+            typography.baseSizePx * typography.scaleSm * 0.9,
+            viewport,
+            8,
+          )}px`,
+          padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
+          letterSpacing: '0.1em',
+        }}
+      >
+        {duration} MIN
+      </span>
+
+      {/* Status badge */}
+      <span
+        className="shrink-0"
+        style={{
+          minWidth: `${scaled(80, viewport, 48)}px`,
+          textAlign: 'center',
+        }}
+      >
+        {badge ? (
+          <span
+            className="inline-flex items-center justify-center font-black uppercase"
+            style={{
+              color: colors.textInverse,
+              backgroundColor: badge.color,
+              fontSize: `${scaledFont(
+                typography.baseSizePx * typography.scaleSm * 0.85,
+                viewport,
+                7,
+              )}px`,
+              padding: `${scaled(3, viewport, 2)}px ${scaled(10, viewport, 4)}px`,
+              borderRadius: `${radius.pill}px`,
+              letterSpacing: '0.18em',
+              lineHeight: 1.3,
+            }}
+          >
+            {badge.label}
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+
+// ────────────────────────────────────────────────────────────────────────
+// Variant: Grid (modern-wellness / Saunakacheln)
+// ────────────────────────────────────────────────────────────────────────
+//
+// One column per sauna. Each column has a header (color bar + name +
+// temperature) and a vertically stacked list of cards. Long columns
+// auto-scroll so the layout stays constant across zone sizes.
+
+function GridVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography } = tokens;
+  const { viewport } = context;
+
+  if (data.saunas.length === 0) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center"
+        style={{
+          backgroundColor: colors.surface,
+          color: colors.textSecondary,
+          fontFamily: typography.fontBody,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+        }}
+      >
+        Keine Saunen sichtbar.
+      </div>
+    );
+  }
+
+  // Responsive column count: full-size 3-up, narrow → 2, very narrow → 1.
+  const gridColumns = viewport.width < 430 ? 1 : viewport.width < 700 ? 2 : 3;
+  const pad = scaled(20, viewport, 6);
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: `${scaled(16, viewport, 6)}px`,
+      }}
+    >
+      <div
+        className="grid flex-1 overflow-hidden"
+        style={{
+          gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+          gap: `${scaled(16, viewport, 6)}px`,
+        }}
+      >
+        {data.saunas.map((sauna, idx) => (
+          <GridSaunaColumn
+            key={sauna.id}
+            sauna={sauna}
+            index={idx}
+            entries={collectSaunaEntries(data, idx)}
+            tokens={tokens}
+            viewport={viewport}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function collectSaunaEntries(data: SchedulePanelData, saunaIdx: number): FlatEntry[] {
+  const result: FlatEntry[] = [];
+  const row = data.cells[saunaIdx] ?? [];
+  row.forEach((cell, slotIdx) => {
+    if (!cell) return;
+    const time = cell.time ?? data.timeSlots[slotIdx] ?? '';
+    result.push({
+      key: `${saunaIdx}-${slotIdx}-${time}`,
+      time,
+      saunaIndex: saunaIdx,
+      saunaName: data.saunas[saunaIdx]?.name ?? '',
+      cell,
+    });
+  });
+  result.sort((a, b) => {
+    const [ah, am] = a.time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+    const [bh, bm] = b.time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+    return ah * 60 + am - (bh * 60 + bm);
+  });
+  return result;
+}
+
+function GridSaunaColumn({
+  sauna,
+  index,
+  entries,
+  tokens,
+  viewport,
+}: {
+  sauna: SchedulePanelData['saunas'][number];
+  index: number;
+  entries: FlatEntry[];
+  tokens: SlideRendererProps<'content-panel'>['tokens'];
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+}) {
+  const { colors, typography, radius } = tokens;
+  const accent = resolveSaunaAccent(sauna, index, tokens);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* Column header: colour bar + name + temperature */}
+      <div
+        className="flex items-center shrink-0"
+        style={{
+          gap: `${scaled(10, viewport, 4)}px`,
+          paddingBottom: `${scaled(8, viewport, 3)}px`,
+          borderBottom: `2px solid ${withAlpha(colors.border, 0.8)}`,
+          marginBottom: `${scaled(10, viewport, 3)}px`,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: scaled(6, viewport, 3),
+            height: scaled(28, viewport, 14),
+            borderRadius: `${radius.pill}px`,
+            backgroundColor: sauna.outOfOrder
+              ? withAlpha(colors.textPrimary, 0.2)
+              : accent,
+          }}
+        />
+        <span
+          className="font-black uppercase min-w-0 flex-1 truncate"
+          style={{
+            color: sauna.outOfOrder ? withAlpha(colors.textPrimary, 0.45) : colors.textPrimary,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+            letterSpacing: '0.12em',
+          }}
+          title={sauna.name}
+        >
+          {sauna.name}
+        </span>
+        {!sauna.outOfOrder && typeof sauna.temperatureC === 'number' ? (
+          <span
+            className="font-bold shrink-0"
+            style={{
+              color: colors.accentPrimary,
+              backgroundColor: withAlpha(colors.surfaceElevated, 0.7),
+              border: `1px solid ${withAlpha(colors.border, 0.7)}`,
+              borderRadius: `${radius.pill}px`,
+              padding: `${scaled(2, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+            }}
+          >
+            {sauna.temperatureC}°C
+          </span>
+        ) : null}
+      </div>
+
+      {/* Body */}
+      {sauna.outOfOrder ? (
+        <div
+          className="flex flex-1 items-center justify-center"
+          style={{
+            backgroundColor: withAlpha(colors.surfaceElevated, 0.5),
+            border: `1px dashed ${withAlpha(colors.textPrimary, 0.25)}`,
+            borderRadius: `${scaled(radius.lg, viewport, 6)}px`,
+            color: withAlpha(colors.textPrimary, 0.5),
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
+            letterSpacing: '0.2em',
+            padding: `${scaled(16, viewport, 6)}px`,
+            textAlign: 'center',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+          }}
+        >
+          Außer Betrieb
+        </div>
+      ) : entries.length === 0 ? (
+        <div
+          className="flex flex-1 items-center justify-center"
+          style={{
+            color: withAlpha(colors.textSecondary, 0.6),
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
+            letterSpacing: '0.2em',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+          }}
+        >
+          Keine Aufgüsse
+        </div>
+      ) : (
+        <AutoScroll className="flex-1 min-h-0">
+          <div className="flex flex-col" style={{ gap: `${scaled(8, viewport, 3)}px` }}>
+            {entries.map((entry) => (
+              <GridCard
+                key={entry.key}
+                entry={entry}
+                accent={accent}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ))}
+          </div>
+        </AutoScroll>
+      )}
+    </div>
+  );
+}
+
+function GridCard({
+  entry,
+  accent,
+  tokens,
+  viewport,
+}: {
+  entry: FlatEntry;
+  accent: string;
+  tokens: SlideRendererProps<'content-panel'>['tokens'];
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+}) {
+  const { colors, typography, radius } = tokens;
+  const { cell } = entry;
+  const isLive = cell.isLive;
+  const isPre = cell.isPrestart;
+  const isNext = cell.isNext;
+  const isFinished = cell.isFinished;
+
+  const containerBg = isLive
+    ? withAlpha(colors.statusLive, 0.12)
+    : isPre
+      ? withAlpha(colors.statusWarning, 0.12)
+      : isNext
+        ? withAlpha(colors.statusNext, 0.12)
+        : isFinished
+          ? withAlpha(colors.surfaceElevated, 0.3)
+          : withAlpha(colors.surfaceElevated, 0.9);
+
+  const containerBorder = isLive
+    ? withAlpha(colors.statusLive, 0.45)
+    : isPre
+      ? withAlpha(colors.statusWarning, 0.4)
+      : isNext
+        ? withAlpha(colors.statusNext, 0.4)
+        : withAlpha(colors.border, 0.7);
+
+  const timeColor = isLive
+    ? colors.statusLive
+    : isPre || isNext
+      ? colors.statusWarning
+      : isFinished
+        ? withAlpha(colors.textPrimary, 0.35)
+        : colors.textPrimary;
+
+  const titleColor = isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary;
+
+  const flameActive = isFinished
+    ? withAlpha(colors.accentPrimary, 0.35)
+    : isLive
+      ? colors.statusLive
+      : isPre || isNext
+        ? colors.statusWarning
+        : accent;
+  const flameIdle = withAlpha(colors.accentPrimary, 0.2);
+
+  const badge = isLive
+    ? { label: 'LÄUFT', color: colors.statusLive }
+    : isPre
+      ? { label: 'GLEICH', color: colors.statusWarning }
+      : isNext
+        ? { label: 'GLEICH', color: colors.statusNext }
+        : isFinished
+          ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
+          : null;
+
+  const intensity = cell.intensity ?? 0;
+  const duration = cell.durationMin ?? 15;
+
+  return (
+    <div
+      className="flex flex-col"
+      style={{
+        backgroundColor: containerBg,
+        borderRadius: `${scaled(radius.lg, viewport, 5)}px`,
+        border: `1px solid ${containerBorder}`,
+        padding: `${scaled(10, viewport, 4)}px ${scaled(12, viewport, 5)}px`,
+        gap: `${scaled(6, viewport, 2)}px`,
+      }}
+    >
+      {/* Row 1: time + status badge | flames */}
+      <div
+        className="flex items-center justify-between"
+        style={{ gap: `${scaled(8, viewport, 3)}px` }}
+      >
+        <div
+          className="flex items-center min-w-0"
+          style={{ gap: `${scaled(8, viewport, 3)}px` }}
+        >
+          <span
+            className="font-mono font-black tabular-nums shrink-0"
+            style={{
+              color: timeColor,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 12)}px`,
+              lineHeight: 1,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {entry.time}
+          </span>
+          {badge ? (
+            <span
+              className="inline-flex items-center font-black uppercase shrink-0"
+              style={{
+                color: colors.textInverse,
+                backgroundColor: badge.color,
+                fontSize: `${scaledFont(
+                  typography.baseSizePx * typography.scaleSm * 0.82,
+                  viewport,
+                  7,
+                )}px`,
+                padding: `${scaled(2, viewport, 1)}px ${scaled(7, viewport, 3)}px`,
+                borderRadius: `${radius.pill}px`,
+                letterSpacing: '0.16em',
+              }}
+            >
+              {badge.label}
+            </span>
+          ) : null}
+        </div>
+        {intensity > 0 ? (
+          <IntensityFlames
+            level={intensity}
+            size={scaled(12, viewport, 8)}
+            activeColor={flameActive}
+            idleColor={flameIdle}
+          />
+        ) : null}
+      </div>
+
+      {/* Row 2: title | duration pill */}
+      <div
+        className="flex items-center justify-between"
+        style={{ gap: `${scaled(8, viewport, 3)}px` }}
+      >
+        <span
+          className="font-black uppercase truncate flex-1 min-w-0"
+          style={{
+            color: titleColor,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
+            letterSpacing: '0.04em',
+          }}
+        >
+          {cell.title}
+        </span>
+        <span
+          className="font-bold shrink-0"
+          style={{
+            color: withAlpha(colors.textPrimary, 0.6),
+            backgroundColor: withAlpha(colors.border, 0.3),
+            borderRadius: `${radius.pill}px`,
+            padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
+            fontSize: `${scaledFont(
+              typography.baseSizePx * typography.scaleSm * 0.85,
+              viewport,
+              7,
+            )}px`,
+            letterSpacing: '0.1em',
+          }}
+        >
+          {duration} MIN
+        </span>
+      </div>
+
+      {/* Row 3: aromas */}
+      {(cell.aromas?.length ?? 0) > 0 ? (
+        <div
+          className="flex flex-wrap"
+          style={{ gap: `${scaled(4, viewport, 2)}px` }}
+        >
+          {cell.aromas!.slice(0, 3).map((aroma) => (
+            <span
+              key={aroma.id}
+              className="inline-flex items-center font-bold uppercase"
+              style={{
+                color: aroma.color ?? colors.textSecondary,
+                backgroundColor: withAlpha(aroma.color ?? colors.accentSecondary, 0.12),
+                border: `1px solid ${withAlpha(
+                  aroma.color ?? colors.accentSecondary,
+                  0.3,
+                )}`,
+                borderRadius: `${radius.pill}px`,
+                fontSize: `${scaledFont(
+                  typography.baseSizePx * typography.scaleSm * 0.8,
+                  viewport,
+                  7,
+                )}px`,
+                padding: `${scaled(1, viewport, 1)}px ${scaled(6, viewport, 3)}px`,
+                gap: `${scaled(3, viewport, 1)}px`,
+                opacity: isFinished ? 0.6 : 1,
+              }}
+            >
+              {aroma.emoji ? <span>{aroma.emoji}</span> : null}
+              <span>{aroma.name}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Variant: Timeline (modern-timeline)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Event-indexed grid: left column = unique aufguss start times (only the
+// ones that actually have entries — empty time gaps are collapsed so the
+// total scroll length stays proportional to the *number* of events, not
+// to the length of the operating day). Each row is a fixed height so
+// cards look consistent regardless of their real duration.
+
+function parseTime(time: string): number {
+  const [h, m] = time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+  return h * 60 + m;
+}
+
+function formatTime(totalMin: number): string {
+  const h = Math.floor(totalMin / 60).toString().padStart(2, '0');
+  const m = (totalMin % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+/** Step for filler time slots shown between real aufguss times. */
+const TIMELINE_SLOT_STEP_MIN = 30;
+
+function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography } = tokens;
+  const { viewport } = context;
+
+  // Collect every non-empty cell, remember its sauna + slot origin.
+  interface TimelineEntry {
+    key: string;
+    saunaIndex: number;
+    time: string;
+    cell: SchedulePanelCell;
+  }
+  const allEntries: TimelineEntry[] = data.cells.flatMap((row, saunaIdx) =>
+    (row ?? []).flatMap((cell, slotIdx) => {
+      if (!cell) return [];
+      const time = cell.time ?? data.timeSlots[slotIdx] ?? '';
+      if (!time) return [];
+      return [{
+        key: `${saunaIdx}-${slotIdx}-${time}`,
+        saunaIndex: saunaIdx,
+        time,
+        cell,
+      }];
+    }),
+  );
+
+  if (data.saunas.length === 0 || allEntries.length === 0) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center"
+        style={{
+          backgroundColor: colors.surface,
+          color: colors.textSecondary,
+          fontFamily: typography.fontBody,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+        }}
+      >
+        Keine Aufgüsse für die Timeline geplant.
+      </div>
+    );
+  }
+
+  // Build the time axis: every half-hour tick between the earliest
+  // aufguss and the latest end time, plus any real event times that
+  // don't fall on a 30-minute boundary (so e.g. 15:30 + 15:45 would
+  // both show up). Preserves a recognisable "time grid" while still
+  // letting off-beat entries appear where they belong.
+  const entryStartMinutes = allEntries.map((e) => parseTime(e.time));
+  const entryEndMinutes = allEntries.map(
+    (e) => parseTime(e.time) + (e.cell.durationMin ?? 15),
+  );
+  const earliest = Math.min(...entryStartMinutes);
+  const latest = Math.max(...entryEndMinutes);
+  const axisStart =
+    Math.floor(earliest / TIMELINE_SLOT_STEP_MIN) * TIMELINE_SLOT_STEP_MIN;
+  const axisEnd =
+    Math.ceil(latest / TIMELINE_SLOT_STEP_MIN) * TIMELINE_SLOT_STEP_MIN;
+
+  const axisMinutes = new Set<number>();
+  for (let m = axisStart; m <= axisEnd; m += TIMELINE_SLOT_STEP_MIN) {
+    axisMinutes.add(m);
+  }
+  for (const m of entryStartMinutes) axisMinutes.add(m);
+
+  const uniqueTimes = Array.from(axisMinutes)
+    .sort((a, b) => a - b)
+    .map(formatTime);
+
+  const pad = scaled(20, viewport, 6);
+  const timeColWidth = scaled(72, viewport, 38);
+  // Minimum row height — rows are free to grow beyond this when there's
+  // room in the container, via `minmax(minPx, 1fr)` below. Prevents
+  // visual cramming when few events are scheduled while keeping things
+  // legible when many events squeeze into the zone (auto-scroll).
+  const minRowHeightPx = scaled(44, viewport, 24);
+  const rowGapPx = scaled(6, viewport, 2);
+
+  // Fast lookup of "entry at (sauna, time)".
+  const entryAt = new Map<string, TimelineEntry>();
+  for (const entry of allEntries) {
+    entryAt.set(`${entry.saunaIndex}:${entry.time}`, entry);
+  }
+
+  const gridTemplateColumns = `${timeColWidth}px repeat(${data.saunas.length}, minmax(0, 1fr))`;
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: `${scaled(12, viewport, 4)}px`,
+      }}
+    >
+      {/* Sauna header row */}
+      <div
+        className="grid shrink-0"
+        style={{
+          gridTemplateColumns,
+          gap: `${rowGapPx}px`,
+        }}
+      >
+        <div />
+        {data.saunas.map((sauna, idx) => {
+          const accent = resolveSaunaAccent(sauna, idx, tokens);
+          return (
+            <div
+              key={sauna.id}
+              className="flex items-center"
+              style={{
+                gap: `${scaled(6, viewport, 2)}px`,
+                paddingBottom: `${scaled(6, viewport, 2)}px`,
+                borderBottom: `2px solid ${withAlpha(colors.border, 0.7)}`,
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  width: scaled(8, viewport, 4),
+                  height: scaled(8, viewport, 4),
+                  borderRadius: '9999px',
+                  backgroundColor: sauna.outOfOrder
+                    ? withAlpha(colors.textPrimary, 0.25)
+                    : accent,
+                  display: 'inline-block',
+                }}
+              />
+              <span
+                className="font-black uppercase truncate flex-1 min-w-0"
+                style={{
+                  color: sauna.outOfOrder
+                    ? withAlpha(colors.textPrimary, 0.45)
+                    : colors.textPrimary,
+                  fontSize: `${scaledFont(
+                    typography.baseSizePx * typography.scaleSm,
+                    viewport,
+                    8,
+                  )}px`,
+                  letterSpacing: '0.16em',
+                }}
+                title={sauna.name}
+              >
+                {sauna.name}
+              </span>
+              {!sauna.outOfOrder && typeof sauna.temperatureC === 'number' ? (
+                <span
+                  className="font-bold shrink-0"
+                  style={{
+                    color: colors.accentPrimary,
+                    fontSize: `${scaledFont(
+                      typography.baseSizePx * typography.scaleSm * 0.85,
+                      viewport,
+                      8,
+                    )}px`,
+                  }}
+                >
+                  {sauna.temperatureC}°
+                </span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Event rows — one per unique start time. The grid stretches to
+          fill the available height (so few events use the whole zone
+          instead of clustering at the top) but each row has a minimum
+          height so many events can't squeeze to an unreadable size.
+          Auto-scroll takes over when min-heights exceed the zone. */}
+      <AutoScroll className="flex-1 min-h-0">
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns,
+            gridTemplateRows: `repeat(${uniqueTimes.length}, minmax(${minRowHeightPx}px, 1fr))`,
+            columnGap: `${rowGapPx}px`,
+            rowGap: `${scaled(4, viewport, 1)}px`,
+            minHeight: '100%',
+          }}
+        >
+          {uniqueTimes.map((time) => (
+            <TimelineRow
+              key={time}
+              time={time}
+              saunas={data.saunas}
+              entryAt={entryAt}
+              tokens={tokens}
+              viewport={viewport}
+            />
+          ))}
+        </div>
+      </AutoScroll>
+    </div>
+  );
+}
+
+function TimelineRow({
   time,
   saunas,
-  cells,
+  entryAt,
   tokens,
   viewport,
 }: {
   time: string;
   saunas: SchedulePanelData['saunas'];
-  cells: Array<SchedulePanelCell | null>;
+  entryAt: Map<string, { key: string; saunaIndex: number; time: string; cell: SchedulePanelCell }>;
   tokens: SlideRendererProps<'content-panel'>['tokens'];
   viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
 }) {
   const { colors, typography, radius } = tokens;
+  // Each child spans exactly one grid row; `h-full` lets them expand to
+  // fill whatever height the outer grid assigned this row (minmax).
   return (
     <>
+      {/* Time label (left axis column) */}
       <div
-        className="font-mono font-black"
+        className="font-mono font-black tabular-nums flex items-center justify-end h-full"
         style={{
           color: colors.accentPrimary,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
-          padding: `${scaled(4, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
-          backgroundColor: withAlpha(colors.surfaceElevated, 0.6),
-          borderRadius: `${radius.sm}px`,
-          alignSelf: 'stretch',
-          display: 'flex',
-          alignItems: 'center',
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
+          paddingRight: `${scaled(8, viewport, 3)}px`,
+          lineHeight: 1,
+          letterSpacing: '-0.02em',
         }}
       >
         {time}
       </div>
-      {cells.map((cell, idx) => (
-        <Cell
-          key={`${time}-${saunas[idx].id}`}
-          cell={cell}
-          tokens={tokens}
-          viewport={viewport}
-        />
-      ))}
+
+      {/* One cell per sauna */}
+      {saunas.map((sauna, idx) => {
+        const accent = resolveSaunaAccent(sauna, idx, tokens);
+        if (sauna.outOfOrder) {
+          return (
+            <div
+              key={`${time}-${sauna.id}`}
+              className="flex items-center justify-center h-full"
+              style={{
+                borderRadius: `${scaled(radius.sm, viewport, 3)}px`,
+                backgroundColor: withAlpha(colors.surfaceElevated, 0.4),
+                color: withAlpha(colors.textPrimary, 0.4),
+                fontSize: `${scaledFont(
+                  typography.baseSizePx * typography.scaleSm * 0.8,
+                  viewport,
+                  7,
+                )}px`,
+                letterSpacing: '0.18em',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+              }}
+            >
+              Außer Betrieb
+            </div>
+          );
+        }
+        const entry = entryAt.get(`${idx}:${time}`);
+        if (!entry) {
+          return (
+            <div
+              key={`${time}-${sauna.id}`}
+              className="flex items-center justify-center h-full"
+              style={{
+                color: withAlpha(colors.textSecondary, 0.35),
+                fontFamily: typography.fontMono,
+                fontSize: `${scaledFont(
+                  typography.baseSizePx * typography.scaleSm,
+                  viewport,
+                  8,
+                )}px`,
+              }}
+            >
+              —
+            </div>
+          );
+        }
+        return (
+          <TimelineCell
+            key={`${time}-${sauna.id}`}
+            entry={entry}
+            accent={accent}
+            tokens={tokens}
+            viewport={viewport}
+          />
+        );
+      })}
     </>
+  );
+}
+
+function TimelineCell({
+  entry,
+  accent,
+  tokens,
+  viewport,
+}: {
+  entry: { key: string; saunaIndex: number; time: string; cell: SchedulePanelCell };
+  accent: string;
+  tokens: SlideRendererProps<'content-panel'>['tokens'];
+  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+}) {
+  const { colors, typography, radius } = tokens;
+  const { cell } = entry;
+  const isLive = cell.isLive;
+  const isPre = cell.isPrestart;
+  const isNext = cell.isNext;
+  const isFinished = cell.isFinished;
+
+  const bg = isLive
+    ? withAlpha(colors.statusLive, 0.18)
+    : isPre
+      ? withAlpha(colors.statusWarning, 0.16)
+      : isNext
+        ? withAlpha(colors.statusNext, 0.16)
+        : isFinished
+          ? withAlpha(colors.surfaceElevated, 0.4)
+          : withAlpha(colors.surfaceElevated, 0.9);
+
+  const border = isLive
+    ? withAlpha(colors.statusLive, 0.5)
+    : isPre
+      ? withAlpha(colors.statusWarning, 0.4)
+      : isNext
+        ? withAlpha(colors.statusNext, 0.4)
+        : withAlpha(colors.border, 0.7);
+
+  const leftBar = isLive
+    ? colors.statusLive
+    : isPre
+      ? colors.statusWarning
+      : isNext
+        ? colors.statusNext
+        : accent;
+
+  const titleColor = isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary;
+
+  const flameActive = isFinished
+    ? withAlpha(colors.accentPrimary, 0.35)
+    : isLive
+      ? colors.statusLive
+      : isPre || isNext
+        ? colors.statusWarning
+        : accent;
+  const flameIdle = withAlpha(colors.accentPrimary, 0.2);
+
+  const badge = isLive
+    ? { label: 'LÄUFT', color: colors.statusLive }
+    : isPre
+      ? { label: 'GLEICH', color: colors.statusWarning }
+      : isNext
+        ? { label: 'GLEICH', color: colors.statusNext }
+        : isFinished
+          ? { label: 'VORBEI', color: withAlpha(colors.textPrimary, 0.55) }
+          : null;
+
+  const intensity = cell.intensity ?? 0;
+  const duration = cell.durationMin ?? 15;
+  const hasMinorRow = Boolean(badge) || intensity > 0;
+
+  return (
+    <div
+      className="flex items-center h-full"
+      style={{
+        backgroundColor: bg,
+        borderRadius: `${scaled(radius.md, viewport, 4)}px`,
+        border: `1px solid ${border}`,
+        borderLeft: `${scaled(4, viewport, 2)}px solid ${leftBar}`,
+        padding: `${scaled(4, viewport, 2)}px ${scaled(10, viewport, 4)}px`,
+        gap: `${scaled(8, viewport, 3)}px`,
+        opacity: isFinished ? 0.85 : 1,
+        overflow: 'hidden',
+      }}
+    >
+      <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
+        <span
+          className="font-black uppercase truncate"
+          style={{
+            color: titleColor,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
+            lineHeight: 1.15,
+            letterSpacing: '0.04em',
+          }}
+        >
+          {cell.title}
+        </span>
+        {hasMinorRow ? (
+          <div
+            className="flex items-center"
+            style={{ gap: `${scaled(6, viewport, 2)}px` }}
+          >
+            {intensity > 0 ? (
+              <IntensityFlames
+                level={intensity}
+                size={scaled(10, viewport, 7)}
+                activeColor={flameActive}
+                idleColor={flameIdle}
+              />
+            ) : null}
+            {badge ? (
+              <span
+                className="font-black uppercase shrink-0"
+                style={{
+                  color: colors.textInverse,
+                  backgroundColor: badge.color,
+                  fontSize: `${scaledFont(
+                    typography.baseSizePx * typography.scaleSm * 0.8,
+                    viewport,
+                    7,
+                  )}px`,
+                  padding: `${scaled(1, viewport, 1)}px ${scaled(6, viewport, 2)}px`,
+                  borderRadius: `${radius.pill}px`,
+                  letterSpacing: '0.16em',
+                  lineHeight: 1.3,
+                }}
+              >
+                {badge.label}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <span
+        className="font-bold shrink-0"
+        style={{
+          color: withAlpha(colors.textPrimary, 0.55),
+          backgroundColor: withAlpha(colors.border, 0.3),
+          borderRadius: `${radius.pill}px`,
+          padding: `${scaled(1, viewport, 1)}px ${scaled(7, viewport, 3)}px`,
+          fontSize: `${scaledFont(
+            typography.baseSizePx * typography.scaleSm * 0.8,
+            viewport,
+            7,
+          )}px`,
+          letterSpacing: '0.1em',
+        }}
+      >
+        {duration} MIN
+      </span>
+    </div>
   );
 }

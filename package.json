@@ -20,6 +20,7 @@
     "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
     "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
     "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows",
+    "new-design": "node packages/design-sdk/bin/new-design.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

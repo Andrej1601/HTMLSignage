@@ -1,5 +1,9 @@
 import { useMemo } from 'react';
-import type { SaunaDetailData, SaunaInfusionEntry } from '@htmlsignage/design-sdk';
+import type {
+  SaunaDetailData,
+  SaunaDetailStyle,
+  SaunaInfusionEntry,
+} from '@htmlsignage/design-sdk';
 import type { Schedule } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
@@ -118,6 +122,11 @@ export function useSaunaDetailData(input: UseSaunaDetailDataInput): SaunaDetailD
     settings.aromas,
   ]);
 
+  const styleHint: SaunaDetailStyle = useMemo(
+    () => normaliseSaunaDetailStyle(settings.saunaDetailStyle),
+    [settings.saunaDetailStyle],
+  );
+
   return useMemo<SaunaDetailData | null>(() => {
     if (!sauna) return null;
     return {
@@ -135,6 +144,17 @@ export function useSaunaDetailData(input: UseSaunaDetailDataInput): SaunaDetailD
         features: sauna.info?.features,
       },
       upcoming,
+      styleHint,
     };
-  }, [sauna, imageUrl, upcoming]);
+  }, [sauna, imageUrl, upcoming, styleHint]);
+}
+
+/**
+ * Accept the host's `settings.saunaDetailStyle` and clamp it to a value
+ * the SDK understands. Unknown / missing values fall back to `split`,
+ * which is guaranteed to be implemented by every pack.
+ */
+function normaliseSaunaDetailStyle(value: unknown): SaunaDetailStyle {
+  if (value === 'hero' || value === 'portrait' || value === 'split') return value;
+  return 'split';
 }

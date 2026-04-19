@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { DisplayContentPanel } from '@/components/Display/DisplayContentPanel';
 import {
   DisplayEditorialPanel,
   DisplayEditorialStage,
@@ -52,15 +51,30 @@ export function DisplayLayoutRenderer({
   const hasAnyZoneSlides = zones.some((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
 
   const renderContentPanel = (): ReactElement => {
+    // Route the large content panel through `SlideRenderer` so the active
+    // design pack gets a chance to render it. The slide type is fixed as
+    // 'content-panel'; the id is synthesised from the designStyle so the
+    // React subtree resets when the host switches styles.
+    const syntheticSlide: SlideConfig = {
+      id: `content-panel-large-${designStyle}`,
+      type: 'content-panel',
+      enabled: true,
+      duration: 0,
+      order: 0,
+      transition: 'none',
+    };
     return (
-      <DisplayContentPanel
+      <SlideRenderer
         schedule={localSchedule}
         settings={effectiveSettings}
+        media={mediaItems}
         now={currentTime}
         deviceId={displayDeviceId}
+        slide={syntheticSlide}
       />
     );
   };
+
 
   const renderSlideWithPadding = (
     slide: SlideConfig | null | undefined,

@@ -69,6 +69,7 @@ export function DisplayClientPage() {
     const merged = { ...base };
     if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance;
     if (sc.designStyle) merged.designStyle = sc.designStyle;
+    if (sc.saunaDetailStyle) merged.saunaDetailStyle = sc.saunaDetailStyle;
     if (sc.colorPalette) {
       merged.colorPalette = sc.colorPalette;
       merged.theme = generateDashboardColors(getColorPalette(sc.colorPalette));

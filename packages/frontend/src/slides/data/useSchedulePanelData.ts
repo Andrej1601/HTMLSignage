@@ -2,10 +2,11 @@ import { useMemo } from 'react';
 import type {
   SchedulePanelCell,
   SchedulePanelData,
+  SchedulePanelStyle,
 } from '@htmlsignage/design-sdk';
 import type { Schedule } from '@/types/schedule.types';
 import { resolveLivePresetKey } from '@/types/schedule.types';
-import type { Settings } from '@/types/settings.types';
+import type { DesignStyle, Settings } from '@/types/settings.types';
 import type { Sauna } from '@/types/sauna.types';
 import { getVisibleSaunas } from '@/types/sauna.types';
 import { getInfusionStatus } from '@/components/Display/wellnessDisplayUtils';
@@ -167,16 +168,48 @@ export function useSchedulePanelData(input: UseSchedulePanelDataInput): Schedule
     );
   }, [rawCells]);
 
+  const styleHint = useMemo<SchedulePanelStyle>(
+    () => designStyleToSchedulePanelStyle(settings.designStyle),
+    [settings.designStyle],
+  );
+
   return useMemo<SchedulePanelDataEnriched>(
     () => ({
-      saunas: saunasMeta.map((s) => ({ id: s.id, name: s.name })),
+      saunas: saunasMeta.map((s) => ({
+        id: s.id,
+        name: s.name,
+        color: s.color || undefined,
+        temperatureC: typeof s.info?.temperature === 'number' ? s.info.temperature : undefined,
+        outOfOrder: s.status === 'out-of-order',
+      })),
       saunasMeta,
       timeSlots,
       cells,
+      styleHint,
       generatedAt: now.toISOString(),
       presetKey: String(activePresetKey),
       hasData: Boolean(daySchedule?.rows && daySchedule.rows.length > 0),
     }),
-    [saunasMeta, timeSlots, cells, now, activePresetKey, daySchedule],
+    [saunasMeta, timeSlots, cells, styleHint, now, activePresetKey, daySchedule],
   );
+}
+
+/**
+ * Map the host's `designStyle` enum onto the SDK's `SchedulePanelStyle`
+ * hint. The SDK intentionally uses a more abstract vocabulary (`list`,
+ * `matrix`, `timeline`) so design packs don't have to reason about host
+ * terminology.
+ */
+function designStyleToSchedulePanelStyle(
+  style: DesignStyle | undefined,
+): SchedulePanelStyle {
+  switch (style) {
+    case 'compact-tiles':
+      return 'list';
+    case 'modern-timeline':
+      return 'timeline';
+    case 'modern-wellness':
+    default:
+      return 'matrix';
+  }
 }

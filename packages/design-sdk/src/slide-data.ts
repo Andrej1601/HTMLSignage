@@ -56,6 +56,15 @@ export interface SaunaDetailInfo {
   features?: string[];
 }
 
+/**
+ * Visual variant the host wants for a sauna-detail slide. Packs SHOULD
+ * implement at least `split` (image-left + upcoming-list-right) and MAY
+ * additionally implement `hero` (full-bleed image with a floating info
+ * card) and `portrait` (image-dominant vertical layout for tall zones).
+ * Renderers that don't implement a variant should fall back to `split`.
+ */
+export type SaunaDetailStyle = 'split' | 'hero' | 'portrait';
+
 export interface SaunaDetailData {
   saunaId: string;
   name: string;
@@ -73,15 +82,46 @@ export interface SaunaDetailData {
   info: SaunaDetailInfo;
   /** Upcoming + live aufguss entries, sorted ascending by start time. */
   upcoming: SaunaInfusionEntry[];
+  /**
+   * Which visual variant the host requests. Optional — a pack MAY ignore
+   * it and render its canonical layout.
+   */
+  styleHint?: SaunaDetailStyle;
 }
+
+/**
+ * Hint for the schedule-panel renderer to pick a visual variant.
+ * Designs SHOULD implement at least `list` (the legacy "chronological
+ * list") and MAY additionally implement `matrix` (time-rows × sauna-cols)
+ * and `timeline` (proportional time axis) when the palette/brand suits it.
+ * Renderers that don't implement a variant should fall back to `list`.
+ */
+export type SchedulePanelStyle = 'list' | 'matrix' | 'timeline';
 
 export interface SchedulePanelData {
   /** Rows = saunas, columns = time slots. */
-  saunas: Array<{ id: string; name: string }>;
+  saunas: Array<{
+    id: string;
+    name: string;
+    /** Sauna-specific accent colour; packs may fall back to a palette. */
+    color?: string;
+    /** Optional operating temperature shown in per-sauna headers. */
+    temperatureC?: number;
+    /**
+     * If true, the sauna is currently out of service. Packs SHOULD render
+     * the column with an "Außer Betrieb" overlay instead of cells.
+     */
+    outOfOrder?: boolean;
+  }>;
   timeSlots: string[]; // e.g. ['10:00','11:00',...]
   /** Cell content indexed as [saunaIndex][timeSlotIndex]. `null` = empty. */
   cells: Array<Array<SchedulePanelCell | null>>;
   generatedAt: string; // ISO-8601
+  /**
+   * Which visual variant the host requests. Optional — a pack MAY ignore
+   * it and render its single canonical layout.
+   */
+  styleHint?: SchedulePanelStyle;
 }
 
 export interface SchedulePanelCell {
@@ -90,6 +130,18 @@ export interface SchedulePanelCell {
   aromas?: SaunaAroma[];
   isLive: boolean;
   isNext: boolean;
+  /** Start time in "HH:mm" — required for list and timeline variants. */
+  time?: string;
+  /** Entry duration in minutes. */
+  durationMin?: number;
+  /** 1..4 intensity (flames). */
+  intensity?: number;
+  /** Optional descriptor shown under the title in list variants. */
+  description?: string;
+  /** True while within `prestartMinutes` but before start. */
+  isPrestart?: boolean;
+  /** True after start + duration. */
+  isFinished?: boolean;
 }
 
 export type InfoImageMode = 'background' | 'side' | 'none';
