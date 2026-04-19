@@ -867,7 +867,10 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
 
   const pad = scaled(spacingTokens.xl, viewport, 14);
   const labelColWidth = scaled(172, viewport, 100);
-  const rowHeight = scaled(74, viewport, 42);
+  // Timeline rows are taller than the other variants because each entry
+  // now places a time pill on top and spills the title below it — the
+  // row needs vertical breathing room for both to read at distance.
+  const rowHeight = scaled(96, viewport, 56);
 
   // Group flat entries by sauna index.
   const bySauna = new Map<number, FlatEntry[]>();
@@ -979,38 +982,49 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                   </div>
                 </div>
 
-                {/* Row track */}
+                {/* Row track — wrapper is overflow-visible so entry
+                    titles can spill to the right of their colored
+                    duration pill. The inner `trackBackdrop` clips the
+                    surface colour + tick lines + now-line; entries are
+                    stacked on top where they can overflow freely. */}
                 <div
                   className="relative"
                   style={{
                     height: rowHeight,
-                    borderRadius: radius.md,
-                    backgroundColor: withAlpha(colors.surfaceElevated, 0.55),
-                    border: `1px solid ${withAlpha(colors.border, 0.6)}`,
-                    overflow: 'hidden',
+                    overflow: 'visible',
                   }}
                 >
-                  {/* Half-hour tick lines */}
-                  {ticks.slice(1, -1).map((m) => {
-                    const pct = ((m - axisStart) / axisSpan) * 100;
-                    return (
-                      <div
-                        key={m}
-                        aria-hidden
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          left: `${pct}%`,
-                          width: 1,
-                          backgroundColor: withAlpha(colors.border, 0.5),
-                          pointerEvents: 'none',
-                        }}
-                      />
-                    );
-                  })}
+                  {/* Backdrop with tick lines — clipped */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      borderRadius: radius.md,
+                      backgroundColor: withAlpha(colors.surfaceElevated, 0.55),
+                      border: `1px solid ${withAlpha(colors.border, 0.6)}`,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {ticks.slice(1, -1).map((m) => {
+                      const pct = ((m - axisStart) / axisSpan) * 100;
+                      return (
+                        <div
+                          key={m}
+                          aria-hidden
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            left: `${pct}%`,
+                            width: 1,
+                            backgroundColor: withAlpha(colors.border, 0.5),
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
 
-                  {/* Now-line */}
+                  {/* Now-line — clipped to the track height */}
                   {nowPct != null && nowPct >= 0 && nowPct <= 100 ? (
                     <div
                       aria-hidden
@@ -1027,12 +1041,17 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                     />
                   ) : null}
 
-                  {/* Entries */}
+                  {/* Entries — each entry is a compact time pill at the
+                      top-left of its start position, with the title
+                      flowing BELOW it horizontally. The pill width
+                      reflects duration; the title is allowed to overflow
+                      the pill so even 30-min aufgüsse on an 11-hour axis
+                      render readably. */}
                   {rowEntries.map((entry) => {
                     const startPct = Math.max(0, ((entry.minutes - axisStart) / axisSpan) * 100);
                     const dur = entry.cell.durationMin ?? 15;
                     const endPct = Math.min(100, ((entry.minutes + dur - axisStart) / axisSpan) * 100);
-                    const widthPct = Math.max(4, endPct - startPct);
+                    const widthPct = Math.max(2.5, endPct - startPct);
                     const isFinished = !!entry.cell.isFinished;
                     const fill = entry.cell.isLive
                       ? colors.statusLive
@@ -1041,54 +1060,130 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                         : entry.cell.isNext
                           ? colors.statusNext
                           : accent;
+
+                    const pillTextColor = entry.cell.isLive
+                      ? colors.textPrimary
+                      : isFinished
+                        ? withAlpha(colors.textPrimary, 0.55)
+                        : colors.textPrimary;
+
+                    const titleColor = isFinished
+                      ? withAlpha(colors.textPrimary, 0.55)
+                      : colors.textPrimary;
+
+                    // How wide the title may grow horizontally. We allow
+                    // it to extend beyond the pill, but we cap it so two
+                    // adjacent entries don't collide. The cap scales
+                    // with the overall axis width — it's expressed in
+                    // % of the track — and never less than ~120px worth
+                    // at typical zoom.
+                    const titleMaxPct = Math.max(12, 100 / Math.max(4, rowEntries.length));
+
+                    // Entries near the right edge flip their title-flow
+                    // direction so the text extends leftward into the
+                    // empty track space instead of spilling past the
+                    // track's right edge. ~70% is the crossover — after
+                    // that we right-align the container so it grows
+                    // left toward earlier entries.
+                    const flipRight = startPct + titleMaxPct > 100;
+
+                    const endPctClamped = Math.min(100, startPct + widthPct);
+
                     return (
                       <div
                         key={entry.key}
                         title={entry.cell.title}
                         style={{
                           position: 'absolute',
-                          top: scaled(8, viewport, 3),
-                          bottom: scaled(8, viewport, 3),
-                          left: `${startPct}%`,
-                          width: `${widthPct}%`,
-                          padding: `${scaled(4, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
-                          borderRadius: radius.sm,
-                          backgroundColor: withAlpha(fill, isFinished ? 0.14 : entry.cell.isLive ? 0.32 : 0.22),
-                          border: `1px solid ${withAlpha(fill, isFinished ? 0.35 : 0.85)}`,
-                          boxShadow: entry.cell.isLive
-                            ? `0 0 18px ${withAlpha(colors.statusLive, 0.35)}`
-                            : 'none',
-                          overflow: 'hidden',
+                          top: scaled(6, viewport, 2),
+                          // Pin either the LEFT edge at startPct, or the
+                          // RIGHT edge at endPct for entries close to the
+                          // track's right edge — so titles extend toward
+                          // open space either way.
+                          left: flipRight ? undefined : `${startPct}%`,
+                          right: flipRight ? `${100 - endPctClamped}%` : undefined,
+                          // Container is as wide as we allow the title;
+                          // the colored pill inside stays duration-sized.
+                          width: `${titleMaxPct}%`,
+                          minWidth: scaled(110, viewport, 60),
+                          opacity: isFinished ? 0.75 : 1,
                           display: 'flex',
                           flexDirection: 'column',
-                          justifyContent: 'center',
-                          gap: 2,
-                          opacity: isFinished ? 0.75 : 1,
+                          alignItems: flipRight ? 'flex-end' : 'flex-start',
+                          gap: scaled(4, viewport, 1),
                           zIndex: 2,
+                          pointerEvents: 'none',
+                          textAlign: flipRight ? 'right' : 'left',
                         }}
                       >
-                        <span
-                          className="tabular-nums"
+                        {/* Duration pill — carries the time + a live dot */}
+                        <div
                           style={{
-                            color: entry.cell.isLive ? colors.statusLive : withAlpha(fill, 0.95),
-                            fontFamily: typography.fontMono,
-                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
-                            fontWeight: 600,
-                            letterSpacing: '0.03em',
-                            lineHeight: 1,
+                            width: `${(widthPct / titleMaxPct) * 100}%`,
+                            minWidth: scaled(54, viewport, 30),
+                            maxWidth: '100%',
+                            height: scaled(26, viewport, 18),
+                            borderRadius: radius.sm,
+                            backgroundColor: withAlpha(fill, isFinished ? 0.16 : entry.cell.isLive ? 0.34 : 0.26),
+                            border: `1px solid ${withAlpha(fill, isFinished ? 0.4 : 0.9)}`,
+                            boxShadow: entry.cell.isLive
+                              ? `0 0 14px ${withAlpha(colors.statusLive, 0.45)}`
+                              : `0 1px 0 ${withAlpha(fill, 0.1)}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: scaled(6, viewport, 2),
+                            padding: `0 ${scaled(8, viewport, 3)}px`,
+                            overflow: 'hidden',
                           }}
                         >
-                          {entry.time}
-                        </span>
+                          {entry.cell.isLive ? (
+                            <span
+                              aria-hidden
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                backgroundColor: colors.statusLive,
+                                boxShadow: `0 0 10px ${withAlpha(colors.statusLive, 0.95)}`,
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            className="tabular-nums"
+                            style={{
+                              color: pillTextColor,
+                              fontFamily: typography.fontMono,
+                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+                              fontWeight: 600,
+                              letterSpacing: '0.04em',
+                              lineHeight: 1,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {entry.time}
+                          </span>
+                        </div>
+
+                        {/* Title — lives BELOW the pill and may grow
+                            past its width. Readability first: the font
+                            sits on the track's dark backdrop so a
+                            subtle text-shadow keeps it legible even if
+                            a tick line passes behind it. */}
                         <span
-                          className="truncate"
                           style={{
-                            color: isFinished ? withAlpha(colors.textPrimary, 0.6) : colors.textPrimary,
+                            color: titleColor,
                             fontFamily: typography.fontHeading,
-                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase * 1.05, viewport, 9)}px`,
+                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase * 1.05, viewport, 10)}px`,
                             fontWeight: 500,
-                            lineHeight: 1.05,
+                            lineHeight: 1.15,
                             letterSpacing: '-0.005em',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            textShadow: `0 1px 3px ${withAlpha(colors.surface, 0.75)}`,
                           }}
                         >
                           {entry.cell.title}
@@ -1102,6 +1197,7 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                       style={{
                         position: 'absolute',
                         inset: 0,
+                        borderRadius: radius.md,
                         backgroundColor: withAlpha(colors.statusWarning, 0.08),
                         display: 'flex',
                         alignItems: 'center',
