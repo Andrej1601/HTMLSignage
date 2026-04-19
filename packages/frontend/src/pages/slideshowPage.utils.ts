@@ -75,6 +75,9 @@ export function buildSlideshowPreviewPayload(input: PreviewPayloadInput): {
     merged.colorPalette = editorConfig.colorPalette;
     merged.theme = generateDashboardColors(getColorPalette(editorConfig.colorPalette));
   }
+  if (editorConfig.header && Object.keys(editorConfig.header).length > 0) {
+    merged.header = { ...(merged.header ?? {}), ...editorConfig.header } as typeof merged.header;
+  }
 
   return {
     schedule: previewSchedule,

@@ -290,6 +290,7 @@ export function SettingsPage() {
                     designStyle={localSettings.designStyle}
                     saunaDetailStyle={localSettings.saunaDetailStyle}
                     colorPalette={localSettings.colorPalette}
+                    header={localSettings.header}
                     onChange={(theme) => updateField('theme', theme)}
                     onDisplayAppearanceChange={(v) => {
                       updateField('displayAppearance', v);
@@ -300,6 +301,7 @@ export function SettingsPage() {
                     onDesignStyleChange={(v) => updateField('designStyle', v)}
                     onSaunaDetailStyleChange={(v) => updateField('saunaDetailStyle', v)}
                     onColorPaletteChange={handleColorPaletteChange}
+                    onHeaderChange={(v) => updateField('header', v)}
                     onSlideshowContextChange={setPreviewSlideshowId}
                   />
                 )}

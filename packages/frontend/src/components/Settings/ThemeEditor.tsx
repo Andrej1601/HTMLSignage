@@ -4,13 +4,15 @@ import type {
   DesignStyle,
   ColorPaletteName,
   DisplayAppearance,
+  HeaderSettings,
   SaunaDetailStyle,
 } from '@/types/settings.types';
-import { generateDashboardColors } from '@/types/settings.types';
+import { generateDashboardColors, getDefaultSettings } from '@/types/settings.types';
 import { AppearanceSelector } from './AppearanceSelector';
 import { PaletteSelector } from './PaletteSelector';
 import { ColorTokenEditor } from './ColorTokenEditor';
 import { SlideshowTokenOverridesEditor } from './SlideshowTokenOverridesEditor';
+import { HeaderSettingsEditor } from './HeaderSettingsEditor';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
 import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
@@ -22,11 +24,13 @@ interface ThemeEditorProps {
   designStyle?: DesignStyle;
   saunaDetailStyle?: SaunaDetailStyle;
   colorPalette?: ColorPaletteName;
+  header?: HeaderSettings;
   onChange: (theme: ThemeColors) => void;
   onDisplayAppearanceChange?: (appearance: DisplayAppearance) => void;
   onDesignStyleChange?: (style: DesignStyle) => void;
   onSaunaDetailStyleChange?: (style: SaunaDetailStyle) => void;
   onColorPaletteChange?: (palette: ColorPaletteName) => void;
+  onHeaderChange?: (next: HeaderSettings) => void;
   onSlideshowContextChange?: (slideshowId: string | null) => void;
 }
 
@@ -36,13 +40,17 @@ export function ThemeEditor({
   designStyle,
   saunaDetailStyle,
   colorPalette,
+  header,
   onChange,
   onDisplayAppearanceChange,
   onDesignStyleChange,
   onSaunaDetailStyleChange,
   onColorPaletteChange,
+  onHeaderChange,
   onSlideshowContextChange,
 }: ThemeEditorProps) {
+  const defaults = getDefaultSettings();
+  const globalHeader = header ?? defaults.header!;
   const { data: slideshows = [] } = useSlideshows();
   const updateSlideshow = useUpdateSlideshow();
   const [selectedSlideshowId, setSelectedSlideshowId] = useState<string | null>(null);
@@ -63,6 +71,34 @@ export function ThemeEditor({
   const effectiveSaunaDetailStyle =
     selectedSlideshow?.config.saunaDetailStyle ?? saunaDetailStyle;
   const effectivePalette = selectedSlideshow?.config.colorPalette ?? colorPalette;
+
+  // Header: global value merged with any slideshow-level partial override
+  // so the editor always shows what the display actually renders.
+  const effectiveHeader: HeaderSettings = useMemo(
+    () => ({
+      ...globalHeader,
+      ...(selectedSlideshow?.config.header ?? {}),
+    }),
+    [globalHeader, selectedSlideshow?.config.header],
+  );
+
+  const handleHeaderChange = (next: HeaderSettings) => {
+    if (selectedSlideshow) {
+      // Persist only the fields that actually differ from the global
+      // baseline — keeps slideshow overrides minimal and honest.
+      const patch: Partial<HeaderSettings> = {};
+      (Object.keys(next) as Array<keyof HeaderSettings>).forEach((key) => {
+        if (next[key] !== globalHeader[key]) {
+          (patch as Record<string, unknown>)[key] = next[key];
+        }
+      });
+      handleSlideshowDesignChange({
+        header: Object.keys(patch).length > 0 ? patch : undefined,
+      });
+    } else {
+      onHeaderChange?.(next);
+    }
+  };
 
   const handleSlideshowDesignChange = (patch: Partial<SlideshowConfig>) => {
     if (!selectedSlideshow) return;
@@ -135,7 +171,7 @@ export function ThemeEditor({
             Änderungen gelten nur für <strong>{selectedSlideshow.name}</strong>.
             Nicht gesetzte Werte fallen auf die globalen Einstellungen zurück.
           </span>
-          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette || selectedSlideshow.config.tokenOverrides) && (
+          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette || selectedSlideshow.config.tokenOverrides || selectedSlideshow.config.header) && (
             <button
               onClick={() => handleSlideshowDesignChange({
                 displayAppearance: undefined,
@@ -144,6 +180,7 @@ export function ThemeEditor({
                 colorPalette: undefined,
                 theme: undefined,
                 tokenOverrides: undefined,
+                header: undefined,
               })}
               className="shrink-0 ml-3 text-xs font-semibold text-spa-info-dark hover:underline"
             >
@@ -152,6 +189,15 @@ export function ThemeEditor({
           )}
         </div>
       )}
+
+      {/* Branding header editor — shown first because the header sits
+          at the top of every display and operators expect to edit it
+          in that reading order. */}
+      <HeaderSettingsEditor
+        value={effectiveHeader}
+        onChange={handleHeaderChange}
+        scopeLabel={selectedSlideshow ? selectedSlideshow.name : 'Global'}
+      />
 
       {/* 2-column grid: Palette left, Settings right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

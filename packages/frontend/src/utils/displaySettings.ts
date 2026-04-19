@@ -59,6 +59,12 @@ export function applyActiveEventSettings(
         ...(isPlainRecord(sc.theme) ? (sc.theme as Partial<ThemeColors>) : {}),
       });
     }
+    if (isPlainRecord(sc.header) && Object.keys(sc.header).length > 0) {
+      merged.header = {
+        ...(merged.header ?? {}),
+        ...(sc.header as Partial<Settings['header']>),
+      } as Settings['header'];
+    }
   }
 
   // Apply color palette from legacy overrides

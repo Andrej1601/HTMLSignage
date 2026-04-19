@@ -72,6 +72,9 @@ export function DisplayClientPage() {
       merged.colorPalette = sc.colorPalette;
       merged.theme = generateDashboardColors(getColorPalette(sc.colorPalette));
     }
+    if (sc.header && Object.keys(sc.header).length > 0) {
+      merged.header = { ...(merged.header ?? {}), ...sc.header } as typeof merged.header;
+    }
     return merged;
   }, [displayDeviceId, localSettings, eventClock]);
 

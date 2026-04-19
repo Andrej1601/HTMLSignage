@@ -110,6 +110,13 @@ export interface SlideshowConfig {
    * code deploys.
    */
   tokenOverrides?: import('@htmlsignage/design-sdk').DesignTokenOverrides;
+  /**
+   * Partial override for the display's header/branding strip. Missing
+   * fields fall through to the global `settings.header`. Use for
+   * per-tenant / per-event branding (e.g. different logo text on an
+   * event-specific slideshow) without touching the global config.
+   */
+  header?: Partial<import('@/types/settings.types').HeaderSettings>;
 
   // Advanced
   pauseOnInteraction?: boolean;
