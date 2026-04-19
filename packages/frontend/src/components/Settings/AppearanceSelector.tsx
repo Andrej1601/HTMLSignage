@@ -12,6 +12,7 @@ import {
   Layers,
   LayoutGrid,
   BookOpen,
+  Flame,
   Gem,
   Clock,
   List,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 const APPEARANCE_ICONS: Record<string, typeof Layers> = {
+  'aurora-thermal': Flame,
   'wellness-stage': Layers,
   'editorial-resort': BookOpen,
   'mineral-noir': Gem,

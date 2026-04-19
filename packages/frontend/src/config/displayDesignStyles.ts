@@ -4,7 +4,12 @@ import type {
   SaunaDetailStyle,
 } from '@/types/settings.types';
 
-export const DEFAULT_DISPLAY_APPEARANCE: DisplayAppearance = 'wellness-stage';
+// Aurora Thermal — the production-flagship default. Warm charcoal stage
+// with polished brass accents, rendered by the `aurora-thermal` design
+// pack. Picks up all three SchedulePanel variants + sauna-detail variants.
+export const AURORA_THERMAL_DISPLAY_APPEARANCE: DisplayAppearance = 'aurora-thermal';
+export const DEFAULT_DISPLAY_APPEARANCE: DisplayAppearance = AURORA_THERMAL_DISPLAY_APPEARANCE;
+export const WELLNESS_STAGE_DISPLAY_APPEARANCE: DisplayAppearance = 'wellness-stage';
 export const EDITORIAL_DISPLAY_APPEARANCE: DisplayAppearance = 'editorial-resort';
 export const MINERAL_NOIR_DISPLAY_APPEARANCE: DisplayAppearance = 'mineral-noir';
 
@@ -22,7 +27,13 @@ export interface ScheduleDesignStyleOption {
 
 export const DISPLAY_APPEARANCE_OPTIONS: DisplayAppearanceOption[] = [
   {
-    id: DEFAULT_DISPLAY_APPEARANCE,
+    id: AURORA_THERMAL_DISPLAY_APPEARANCE,
+    title: 'Aurora Thermal',
+    description:
+      'Goldene Stunde in der Saunawelt — warme Charcoal-Bühne, Messing-Akzente, Display-Serif. Das Aushängeschild-Design.',
+  },
+  {
+    id: WELLNESS_STAGE_DISPLAY_APPEARANCE,
     title: 'Wellness Stage',
     description: 'Ruhige moderne Bühne mit klassischer Wellness-Anmutung.',
   },
@@ -93,6 +104,12 @@ export function isModernScheduleDesignStyleValue(
   designStyle: string | undefined,
 ): designStyle is DesignStyle {
   return MODERN_SCHEDULE_DESIGN_STYLES.includes(designStyle as DesignStyle);
+}
+
+export function isAuroraThermalDisplayAppearance(
+  displayAppearance: string | undefined,
+): displayAppearance is typeof AURORA_THERMAL_DISPLAY_APPEARANCE {
+  return displayAppearance === AURORA_THERMAL_DISPLAY_APPEARANCE;
 }
 
 export function isEditorialDisplayAppearance(

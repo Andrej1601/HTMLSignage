@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@htmlsignage/design-sdk": "workspace:*",
+    "@htmlsignage/design-aurora-thermal": "workspace:*",
     "@htmlsignage/design-wellness-classic": "workspace:*",
     "@htmlsignage/design-mineral-noir": "workspace:*",
     "@htmlsignage/design-editorial-resort": "workspace:*"

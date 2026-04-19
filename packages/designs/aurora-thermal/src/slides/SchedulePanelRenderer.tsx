@@ -1,0 +1,1128 @@
+import type {
+  SchedulePanelCell,
+  SchedulePanelData,
+  SchedulePanelStyle,
+  SlideRendererProps,
+} from '@htmlsignage/design-sdk';
+import { AutoScroll } from './AutoScroll';
+import {
+  auroraAmbientBackground,
+  brassHairline,
+  eyebrowStyles,
+  kickerStyles,
+  romanNumeral,
+  scaled,
+  scaledFont,
+  statusChipStyles,
+  withAlpha,
+} from './utils';
+
+type Tokens = SlideRendererProps<'content-panel'>['tokens'];
+type Viewport = SlideRendererProps<'content-panel'>['context']['viewport'];
+
+/**
+ * Aurora Thermal — content-panel dispatcher.
+ *
+ * Three variants share the warm-charcoal stage and brass vocabulary:
+ *   - list     — chronological "playbill for the evening"
+ *   - matrix   — saunas-as-columns grid, each cell is a brass card
+ *   - timeline — saunas-as-rows, proportional time axis with glowing
+ *                now-line. This is the one that turns heads.
+ */
+export function SchedulePanelRenderer(props: SlideRendererProps<'content-panel'>) {
+  const hint: SchedulePanelStyle = props.data.styleHint ?? 'list';
+  switch (hint) {
+    case 'matrix':
+      return <MatrixVariant {...props} />;
+    case 'timeline':
+      return <TimelineVariant {...props} />;
+    case 'list':
+    default:
+      return <ListVariant {...props} />;
+  }
+}
+
+// ── Shared helpers ─────────────────────────────────────────────────────────
+
+function parseTime(time: string): number {
+  const [h, m] = time.split(':').map((x) => Number.parseInt(x, 10) || 0);
+  return h * 60 + m;
+}
+
+function formatTime(totalMin: number): string {
+  const h = Math.floor(totalMin / 60).toString().padStart(2, '0');
+  const m = (totalMin % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+interface FlatEntry {
+  key: string;
+  time: string;
+  minutes: number;
+  saunaIndex: number;
+  saunaName: string;
+  saunaColor?: string;
+  cell: SchedulePanelCell;
+}
+
+function flattenEntries(data: SchedulePanelData): FlatEntry[] {
+  const rows: FlatEntry[] = [];
+  data.cells.forEach((row, saunaIdx) => {
+    row.forEach((cell, slotIdx) => {
+      if (!cell) return;
+      const time = cell.time ?? data.timeSlots[slotIdx] ?? '';
+      if (!time) return;
+      rows.push({
+        key: `${saunaIdx}-${slotIdx}-${time}`,
+        time,
+        minutes: parseTime(time),
+        saunaIndex: saunaIdx,
+        saunaName: data.saunas[saunaIdx]?.name ?? '',
+        saunaColor: data.saunas[saunaIdx]?.color,
+        cell,
+      });
+    });
+  });
+  return rows.sort((a, b) => a.minutes - b.minutes);
+}
+
+function statusMeta(cell: SchedulePanelCell, tokens: Tokens) {
+  const { colors } = tokens;
+  if (cell.isLive) return { color: colors.statusLive, label: 'Jetzt' };
+  if (cell.isPrestart) return { color: colors.statusWarning, label: 'Gleich' };
+  if (cell.isNext) return { color: colors.statusNext, label: 'Als Nächstes' };
+  if (cell.isFinished)
+    return { color: withAlpha(colors.textSecondary, 0.6), label: 'Beendet' };
+  return null;
+}
+
+/**
+ * Intensity mark — Roman numerals in a brass hairline ring.
+ * Keeps flames off the screen while reading at distance.
+ */
+function IntensityMark({
+  level,
+  color,
+  viewport,
+  tokens,
+}: {
+  level: number;
+  color: string;
+  viewport: Viewport;
+  tokens: Tokens;
+}) {
+  const { typography } = tokens;
+  const size = scaled(26, viewport, 16);
+  return (
+    <span
+      className="shrink-0 inline-flex items-center justify-center tabular-nums"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        border: `1px solid ${withAlpha(color, 0.65)}`,
+        color,
+        fontFamily: typography.fontMono,
+        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9)}px`,
+        fontWeight: 600,
+        letterSpacing: '0.02em',
+        backgroundColor: withAlpha(color, 0.08),
+      }}
+      aria-label={`Intensität ${level} von 4`}
+    >
+      {romanNumeral(level)}
+    </span>
+  );
+}
+
+/**
+ * Small brass status chip. Subtle inner glow when live.
+ */
+function StatusChip({
+  cell,
+  tokens,
+  viewport,
+}: {
+  cell: SchedulePanelCell;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const status = statusMeta(cell, tokens);
+  if (!status) return null;
+  const { typography } = tokens;
+  const size = scaledFont(typography.baseSizePx * typography.scaleSm * 0.88, viewport, 9);
+  return (
+    <span style={statusChipStyles(status.color, { isLive: cell.isLive, sizePx: size, fontFamily: typography.fontBody })}>
+      {cell.isLive ? (
+        <span
+          aria-hidden
+          style={{
+            width: Math.round(size * 0.55),
+            height: Math.round(size * 0.55),
+            borderRadius: '50%',
+            backgroundColor: status.color,
+            boxShadow: `0 0 ${Math.round(size * 0.9)}px ${withAlpha(status.color, 0.9)}`,
+          }}
+        />
+      ) : null}
+      {status.label}
+    </span>
+  );
+}
+
+// ── Common masthead ────────────────────────────────────────────────────────
+
+function Masthead({
+  count,
+  subtitle,
+  tokens,
+  viewport,
+}: {
+  count: number;
+  subtitle?: string;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { colors, typography } = tokens;
+  return (
+    <div
+      className="flex shrink-0 items-end justify-between"
+      style={{ gap: scaled(24, viewport, 8), paddingBottom: scaled(10, viewport, 3) }}
+    >
+      <div className="flex flex-col" style={{ gap: scaled(10, viewport, 3) }}>
+        <span
+          style={kickerStyles(
+            colors.accentPrimary,
+            scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
+          )}
+        >
+          Saunawelt · heute
+        </span>
+        <h1
+          style={{
+            color: colors.textPrimary,
+            fontFamily: typography.fontHeading,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.05, viewport, 22)}px`,
+            fontWeight: 400,
+            letterSpacing: '-0.02em',
+            lineHeight: 0.95,
+            margin: 0,
+          }}
+        >
+          Aufguss-Ritual
+        </h1>
+        {subtitle ? (
+          <span
+            style={eyebrowStyles(
+              withAlpha(colors.textSecondary, 0.92),
+              scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11),
+              typography.fontHeading,
+            )}
+          >
+            {subtitle}
+          </span>
+        ) : null}
+      </div>
+
+      <span
+        className="tabular-nums shrink-0"
+        style={{
+          color: withAlpha(colors.textSecondary, 0.85),
+          fontFamily: typography.fontMono,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          fontWeight: 500,
+        }}
+      >
+        {count} {count === 1 ? 'Aufguss' : 'Aufgüsse'}
+      </span>
+    </div>
+  );
+}
+
+function EmptyState({ tokens, viewport }: { tokens: Tokens; viewport: Viewport }) {
+  const { colors, typography } = tokens;
+  return (
+    <div
+      className="flex flex-1 flex-col items-center justify-center"
+      style={{ gap: scaled(16, viewport, 6), padding: scaled(32, viewport, 10) }}
+    >
+      <div style={{ ...brassHairline(colors, 1), width: scaled(120, viewport, 48) }} />
+      <span
+        style={{
+          color: withAlpha(colors.textSecondary, 0.9),
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 14)}px`,
+          fontStyle: 'italic',
+          fontWeight: 400,
+          textAlign: 'center',
+        }}
+      >
+        Heute kein Aufguss-Plan hinterlegt.
+      </span>
+      <span
+        style={eyebrowStyles(
+          withAlpha(colors.textSecondary, 0.7),
+          scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10),
+          typography.fontBody,
+        )}
+      >
+        Wir freuen uns dennoch auf Ihren Besuch.
+      </span>
+    </div>
+  );
+}
+
+// ── Variant: List (chronological playbill) ─────────────────────────────────
+
+function ListVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography, spacing } = tokens;
+  const { viewport } = context;
+  const entries = flattenEntries(data);
+  const pad = scaled(spacing.xl, viewport, 14);
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        background: auroraAmbientBackground(colors),
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: scaled(spacing.md, viewport, 8),
+      }}
+    >
+      <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
+      <div style={brassHairline(colors, 1)} />
+
+      {entries.length === 0 ? (
+        <EmptyState tokens={tokens} viewport={viewport} />
+      ) : (
+        <AutoScroll className="flex-1 min-h-0">
+          <div className="flex flex-col" style={{ paddingTop: scaled(12, viewport, 4) }}>
+            {entries.map((entry) => (
+              <ListRow
+                key={entry.key}
+                entry={entry}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ))}
+          </div>
+        </AutoScroll>
+      )}
+    </div>
+  );
+}
+
+function ListRow({
+  entry,
+  tokens,
+  viewport,
+}: {
+  entry: FlatEntry;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { colors, typography } = tokens;
+  const { cell } = entry;
+  const isFinished = !!cell.isFinished;
+
+  const timeColor = cell.isLive
+    ? colors.statusLive
+    : cell.isPrestart
+      ? colors.statusWarning
+      : cell.isNext
+        ? colors.statusNext
+        : isFinished
+          ? withAlpha(colors.textSecondary, 0.55)
+          : colors.textPrimary;
+
+  const titleColor = isFinished
+    ? withAlpha(colors.textPrimary, 0.5)
+    : colors.textPrimary;
+
+  const aromaList = (cell.aromas ?? []).slice(0, 4);
+
+  return (
+    <div
+      className="flex items-baseline"
+      style={{
+        borderBottom: `1px solid ${withAlpha(colors.border, 0.55)}`,
+        padding: `${scaled(22, viewport, 9)}px 0`,
+        gap: `${scaled(36, viewport, 12)}px`,
+        opacity: isFinished ? 0.75 : 1,
+        position: 'relative',
+      }}
+    >
+      {/* Sauna-colour leading stripe: subtle but makes rows scannable
+          when the user is quickly looking for "their" sauna. */}
+      {entry.saunaColor ? (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: -scaled(spacing(viewport, 'sm'), viewport, 4),
+            top: scaled(28, viewport, 10),
+            bottom: scaled(28, viewport, 10),
+            width: 2,
+            backgroundColor: withAlpha(entry.saunaColor, isFinished ? 0.35 : 0.85),
+            borderRadius: 1,
+          }}
+        />
+      ) : null}
+
+      <span
+        className="shrink-0 tabular-nums"
+        style={{
+          color: timeColor,
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 0.95, viewport, 22)}px`,
+          fontWeight: 400,
+          lineHeight: 0.95,
+          letterSpacing: '-0.015em',
+          minWidth: `${scaled(150, viewport, 84)}px`,
+          textShadow: cell.isLive
+            ? `0 0 24px ${withAlpha(colors.statusLive, 0.35)}`
+            : undefined,
+        }}
+      >
+        {entry.time}
+      </span>
+
+      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(6, viewport, 2) }}>
+        <span
+          className="truncate"
+          style={kickerStyles(
+            entry.saunaColor
+              ? withAlpha(entry.saunaColor, isFinished ? 0.6 : 1)
+              : colors.accentPrimary,
+            scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9),
+          )}
+        >
+          {entry.saunaName}
+          {cell.durationMin != null ? ` · ${cell.durationMin} Minuten` : ''}
+        </span>
+        <h3
+          className="truncate"
+          style={{
+            color: titleColor,
+            fontFamily: typography.fontHeading,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            lineHeight: 1.12,
+            margin: 0,
+          }}
+          title={cell.title}
+        >
+          {cell.title}
+        </h3>
+        {aromaList.length > 0 ? (
+          <div
+            className="flex flex-wrap items-center"
+            style={{ gap: `${scaled(8, viewport, 3)}px ${scaled(10, viewport, 4)}px`, marginTop: scaled(4, viewport, 1) }}
+          >
+            {aromaList.map((aroma) => {
+              const aromaColor = aroma.color || withAlpha(colors.accentSecondary, 0.9);
+              return (
+                <span
+                  key={aroma.id}
+                  className="inline-flex items-center"
+                  style={{
+                    gap: scaled(6, viewport, 2),
+                    padding: `${scaled(3, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+                    borderRadius: 9999,
+                    backgroundColor: withAlpha(aromaColor, isFinished ? 0.07 : 0.14),
+                    border: `1px solid ${withAlpha(aromaColor, isFinished ? 0.3 : 0.5)}`,
+                    color: withAlpha(aromaColor, isFinished ? 0.75 : 1),
+                    fontFamily: typography.fontBody,
+                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {aroma.emoji ? <span aria-hidden>{aroma.emoji}</span> : null}
+                  <span>{aroma.name}</span>
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+
+      {cell.intensity != null && cell.intensity > 0 ? (
+        <IntensityMark
+          level={cell.intensity}
+          color={
+            isFinished
+              ? withAlpha(colors.accentPrimary, 0.4)
+              : cell.isLive
+                ? colors.statusLive
+                : colors.accentPrimary
+          }
+          tokens={tokens}
+          viewport={viewport}
+        />
+      ) : null}
+
+      <div
+        className="shrink-0"
+        style={{ minWidth: `${scaled(126, viewport, 70)}px`, textAlign: 'right' }}
+      >
+        <StatusChip cell={cell} tokens={tokens} viewport={viewport} />
+      </div>
+    </div>
+  );
+}
+
+// Utility: resolve a spacing token by name (lets us scale spacing tokens
+// without hard-coding numbers inside ListRow). Falls back to md.
+function spacing(viewport: Viewport, key: 'xs' | 'sm' | 'md' | 'lg' | 'xl'): number {
+  const base = { xs: 4, sm: 12, md: 24, lg: 40, xl: 64 };
+  const abs = base[key] ?? base.md;
+  if (viewport.isUltraCompact) return Math.max(2, Math.round(abs * 0.5));
+  if (viewport.isCompact) return Math.max(4, Math.round(abs * 0.65));
+  return abs;
+}
+
+// ── Variant: Matrix (sauna columns × time rows) ────────────────────────────
+
+function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography, spacing: spacingTokens } = tokens;
+  const { viewport } = context;
+  const entries = flattenEntries(data);
+
+  if (data.saunas.length === 0 || entries.length === 0) {
+    return (
+      <div
+        className="flex h-full w-full flex-col overflow-hidden"
+        style={{
+          background: auroraAmbientBackground(colors),
+          color: colors.textPrimary,
+          fontFamily: typography.fontBody,
+          padding: `${scaled(spacingTokens.xl, viewport, 14)}px`,
+          gap: scaled(spacingTokens.md, viewport, 8),
+        }}
+      >
+        <Masthead count={0} tokens={tokens} viewport={viewport} />
+        <div style={brassHairline(colors, 1)} />
+        <EmptyState tokens={tokens} viewport={viewport} />
+      </div>
+    );
+  }
+
+  // Build unique time axis from the start times, then cluster into
+  // 15-minute buckets so adjacent slots don't fragment visually.
+  const bucketMinutes = 30;
+  const startMins = entries.map((e) => e.minutes);
+  const axisStart = Math.floor(Math.min(...startMins) / bucketMinutes) * bucketMinutes;
+  const axisEnd = Math.ceil(Math.max(...startMins) / bucketMinutes) * bucketMinutes + bucketMinutes;
+  const buckets: number[] = [];
+  for (let m = axisStart; m <= axisEnd; m += bucketMinutes) buckets.push(m);
+
+  // Group entries by (sauna, bucket).
+  const entryAt = new Map<string, FlatEntry[]>();
+  for (const e of entries) {
+    const bucket = axisStart + Math.floor((e.minutes - axisStart) / bucketMinutes) * bucketMinutes;
+    const key = `${e.saunaIndex}:${bucket}`;
+    const list = entryAt.get(key) ?? [];
+    list.push(e);
+    entryAt.set(key, list);
+  }
+
+  const pad = scaled(spacingTokens.xl, viewport, 14);
+  const timeColWidth = scaled(92, viewport, 52);
+  const gridTemplateColumns = `${timeColWidth}px repeat(${data.saunas.length}, minmax(0, 1fr))`;
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        background: auroraAmbientBackground(colors),
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: scaled(spacingTokens.md, viewport, 8),
+      }}
+    >
+      <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
+      <div style={brassHairline(colors, 1)} />
+
+      {/* Column heads */}
+      <div
+        className="grid shrink-0"
+        style={{
+          gridTemplateColumns,
+          columnGap: scaled(spacingTokens.sm, viewport, 4),
+          paddingBottom: scaled(6, viewport, 2),
+        }}
+      >
+        <div />
+        {data.saunas.map((sauna) => (
+          <SaunaColumnHeader
+            key={sauna.id}
+            sauna={sauna}
+            tokens={tokens}
+            viewport={viewport}
+          />
+        ))}
+      </div>
+
+      <AutoScroll className="flex-1 min-h-0">
+        <div
+          className="grid"
+          style={{
+            gridTemplateColumns,
+            columnGap: scaled(spacingTokens.sm, viewport, 4),
+            rowGap: scaled(spacingTokens.sm, viewport, 4),
+          }}
+        >
+          {buckets.map((bucket) => {
+            const timeLabel = formatTime(bucket);
+            return (
+              <MatrixBucketRow
+                key={bucket}
+                timeLabel={timeLabel}
+                bucket={bucket}
+                entryAt={entryAt}
+                saunaCount={data.saunas.length}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            );
+          })}
+        </div>
+      </AutoScroll>
+    </div>
+  );
+}
+
+function SaunaColumnHeader({
+  sauna,
+  tokens,
+  viewport,
+}: {
+  sauna: SchedulePanelData['saunas'][number];
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { colors, typography } = tokens;
+  const accent = sauna.color || colors.accentPrimary;
+  return (
+    <div className="flex flex-col" style={{ gap: scaled(4, viewport, 1) }}>
+      <div
+        style={{
+          height: 2,
+          width: scaled(36, viewport, 18),
+          backgroundColor: withAlpha(accent, 0.9),
+          borderRadius: 1,
+        }}
+      />
+      <span
+        className="truncate"
+        style={{
+          color: colors.textPrimary,
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+          fontWeight: 500,
+          letterSpacing: '-0.005em',
+          lineHeight: 1.1,
+        }}
+        title={sauna.name}
+      >
+        {sauna.name}
+      </span>
+      {sauna.temperatureC != null ? (
+        <span
+          className="tabular-nums"
+          style={{
+            color: withAlpha(colors.textSecondary, 0.85),
+            fontFamily: typography.fontMono,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9)}px`,
+            letterSpacing: '0.02em',
+          }}
+        >
+          {Math.round(sauna.temperatureC)} °C
+        </span>
+      ) : null}
+      {sauna.outOfOrder ? (
+        <span
+          style={{
+            color: withAlpha(colors.statusWarning, 0.9),
+            fontFamily: typography.fontBody,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
+            fontWeight: 600,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Außer Betrieb
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function MatrixBucketRow({
+  timeLabel,
+  bucket,
+  entryAt,
+  saunaCount,
+  tokens,
+  viewport,
+}: {
+  timeLabel: string;
+  bucket: number;
+  entryAt: Map<string, FlatEntry[]>;
+  saunaCount: number;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { colors, typography } = tokens;
+  return (
+    <>
+      <div className="flex items-start tabular-nums" style={{ paddingTop: scaled(8, viewport, 3) }}>
+        <span
+          style={{
+            color: withAlpha(colors.textSecondary, 0.95),
+            fontFamily: typography.fontMono,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+            letterSpacing: '0.04em',
+            fontWeight: 500,
+          }}
+        >
+          {timeLabel}
+        </span>
+      </div>
+      {Array.from({ length: saunaCount }).map((_, saunaIdx) => {
+        const cellKey = `${saunaIdx}:${bucket}`;
+        const items = entryAt.get(cellKey) ?? [];
+        return (
+          <div
+            key={cellKey}
+            className="flex flex-col"
+            style={{ gap: scaled(6, viewport, 2), minHeight: scaled(56, viewport, 24) }}
+          >
+            {items.map((entry) => (
+              <MatrixCell
+                key={entry.key}
+                entry={entry}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function MatrixCell({
+  entry,
+  tokens,
+  viewport,
+}: {
+  entry: FlatEntry;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { colors, typography, radius } = tokens;
+  const { cell } = entry;
+  const isFinished = !!cell.isFinished;
+  const accent = entry.saunaColor || colors.accentPrimary;
+
+  const borderColor = cell.isLive
+    ? withAlpha(colors.statusLive, 0.7)
+    : cell.isPrestart
+      ? withAlpha(colors.statusWarning, 0.6)
+      : cell.isNext
+        ? withAlpha(colors.statusNext, 0.55)
+        : withAlpha(colors.border, 0.85);
+
+  return (
+    <div
+      style={{
+        padding: `${scaled(10, viewport, 4)}px ${scaled(14, viewport, 5)}px`,
+        borderRadius: radius.md,
+        border: `1px solid ${borderColor}`,
+        backgroundColor: cell.isLive
+          ? withAlpha(colors.statusLive, 0.1)
+          : withAlpha(colors.surfaceElevated, 0.85),
+        boxShadow: cell.isLive
+          ? `0 0 20px ${withAlpha(colors.statusLive, 0.18)}`
+          : `0 1px 0 ${withAlpha(colors.accentPrimary, 0.04)}`,
+        opacity: isFinished ? 0.7 : 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: scaled(4, viewport, 1),
+      }}
+    >
+      <div className="flex items-center" style={{ gap: scaled(8, viewport, 3) }}>
+        <span
+          className="tabular-nums"
+          style={{
+            color: cell.isLive
+              ? colors.statusLive
+              : isFinished
+                ? withAlpha(colors.textSecondary, 0.7)
+                : accent,
+            fontFamily: typography.fontMono,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+            lineHeight: 1,
+          }}
+        >
+          {entry.time}
+        </span>
+        {cell.intensity != null && cell.intensity > 0 ? (
+          <IntensityMark
+            level={cell.intensity}
+            color={cell.isLive ? colors.statusLive : accent}
+            tokens={tokens}
+            viewport={viewport}
+          />
+        ) : null}
+      </div>
+      <span
+        className="line-clamp-2"
+        style={{
+          color: isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary,
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+          fontWeight: 500,
+          lineHeight: 1.2,
+          letterSpacing: '-0.005em',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitBoxOrient: 'vertical',
+          WebkitLineClamp: 2,
+        }}
+        title={cell.title}
+      >
+        {cell.title}
+      </span>
+      {cell.aromas && cell.aromas.length > 0 ? (
+        <span
+          className="truncate"
+          style={{
+            color: withAlpha(colors.textSecondary, 0.9),
+            fontFamily: typography.fontBody,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+          }}
+        >
+          {cell.aromas.map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name)).join(' · ')}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Variant: Timeline (saunas as rows, proportional time axis) ─────────────
+
+function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
+  const { colors, typography, spacing: spacingTokens, radius } = tokens;
+  const { viewport } = context;
+  const entries = flattenEntries(data);
+
+  if (data.saunas.length === 0 || entries.length === 0) {
+    return (
+      <div
+        className="flex h-full w-full flex-col overflow-hidden"
+        style={{
+          background: auroraAmbientBackground(colors),
+          color: colors.textPrimary,
+          fontFamily: typography.fontBody,
+          padding: `${scaled(spacingTokens.xl, viewport, 14)}px`,
+          gap: scaled(spacingTokens.md, viewport, 8),
+        }}
+      >
+        <Masthead count={0} tokens={tokens} viewport={viewport} />
+        <div style={brassHairline(colors, 1)} />
+        <EmptyState tokens={tokens} viewport={viewport} />
+      </div>
+    );
+  }
+
+  // Time axis: half-hour ticks spanning from first-entry-start rounded
+  // down to last-entry-end rounded up.
+  const startMinsList = entries.map((e) => e.minutes);
+  const endMinsList = entries.map((e) => e.minutes + (e.cell.durationMin ?? 15));
+  const axisStart = Math.floor(Math.min(...startMinsList) / 30) * 30;
+  const axisEnd = Math.max(axisStart + 120, Math.ceil(Math.max(...endMinsList) / 30) * 30);
+  const axisSpan = axisEnd - axisStart;
+  const ticks: number[] = [];
+  for (let m = axisStart; m <= axisEnd; m += 30) ticks.push(m);
+
+  // Now-line: derive from the freshest `isLive` entry, else hide it.
+  const live = entries.find((e) => e.cell.isLive);
+  const nowMinutes = live ? live.minutes + Math.max(0, (live.cell.durationMin ?? 15) / 2) : null;
+  const nowPct = nowMinutes != null ? ((nowMinutes - axisStart) / axisSpan) * 100 : null;
+
+  const pad = scaled(spacingTokens.xl, viewport, 14);
+  const labelColWidth = scaled(172, viewport, 100);
+  const rowHeight = scaled(74, viewport, 42);
+
+  // Group flat entries by sauna index.
+  const bySauna = new Map<number, FlatEntry[]>();
+  for (const e of entries) {
+    const list = bySauna.get(e.saunaIndex) ?? [];
+    list.push(e);
+    bySauna.set(e.saunaIndex, list);
+  }
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        background: auroraAmbientBackground(colors),
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: scaled(spacingTokens.md, viewport, 8),
+      }}
+    >
+      <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
+
+      {/* Axis */}
+      <div
+        className="grid shrink-0"
+        style={{
+          gridTemplateColumns: `${labelColWidth}px 1fr`,
+          columnGap: scaled(spacingTokens.md, viewport, 8),
+          alignItems: 'end',
+        }}
+      >
+        <div />
+        <div className="relative" style={{ paddingBottom: scaled(8, viewport, 3) }}>
+          <div
+            className="flex justify-between tabular-nums"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontFamily: typography.fontMono,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.05em',
+              fontWeight: 500,
+            }}
+          >
+            {ticks.map((m) => (
+              <span key={m}>{formatTime(m)}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={brassHairline(colors, 1)} />
+
+      <AutoScroll className="flex-1 min-h-0">
+        <div className="flex flex-col" style={{ gap: scaled(spacingTokens.sm, viewport, 4), paddingTop: scaled(12, viewport, 4) }}>
+          {data.saunas.map((sauna, saunaIdx) => {
+            const rowEntries = bySauna.get(saunaIdx) ?? [];
+            const accent = sauna.color || colors.accentPrimary;
+            return (
+              <div
+                key={sauna.id}
+                className="grid"
+                style={{
+                  gridTemplateColumns: `${labelColWidth}px 1fr`,
+                  columnGap: scaled(spacingTokens.md, viewport, 8),
+                  alignItems: 'center',
+                }}
+              >
+                {/* Row label */}
+                <div
+                  className="flex items-center"
+                  style={{ gap: scaled(10, viewport, 4), minHeight: rowHeight }}
+                >
+                  <div
+                    style={{
+                      width: 3,
+                      height: scaled(36, viewport, 18),
+                      backgroundColor: withAlpha(accent, 0.9),
+                      borderRadius: 2,
+                    }}
+                  />
+                  <div className="flex flex-col min-w-0">
+                    <span
+                      className="truncate"
+                      style={{
+                        color: colors.textPrimary,
+                        fontFamily: typography.fontHeading,
+                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+                        fontWeight: 500,
+                        letterSpacing: '-0.005em',
+                        lineHeight: 1.15,
+                      }}
+                      title={sauna.name}
+                    >
+                      {sauna.name}
+                    </span>
+                    {sauna.temperatureC != null ? (
+                      <span
+                        className="tabular-nums"
+                        style={{
+                          color: withAlpha(colors.textSecondary, 0.85),
+                          fontFamily: typography.fontMono,
+                          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
+                          letterSpacing: '0.03em',
+                          marginTop: 2,
+                        }}
+                      >
+                        {Math.round(sauna.temperatureC)} °C
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                {/* Row track */}
+                <div
+                  className="relative"
+                  style={{
+                    height: rowHeight,
+                    borderRadius: radius.md,
+                    backgroundColor: withAlpha(colors.surfaceElevated, 0.55),
+                    border: `1px solid ${withAlpha(colors.border, 0.6)}`,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Half-hour tick lines */}
+                  {ticks.slice(1, -1).map((m) => {
+                    const pct = ((m - axisStart) / axisSpan) * 100;
+                    return (
+                      <div
+                        key={m}
+                        aria-hidden
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: `${pct}%`,
+                          width: 1,
+                          backgroundColor: withAlpha(colors.border, 0.5),
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* Now-line */}
+                  {nowPct != null && nowPct >= 0 && nowPct <= 100 ? (
+                    <div
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        top: -2,
+                        bottom: -2,
+                        left: `${nowPct}%`,
+                        width: 2,
+                        backgroundColor: colors.statusLive,
+                        boxShadow: `0 0 14px ${withAlpha(colors.statusLive, 0.9)}, 0 0 32px ${withAlpha(colors.statusLive, 0.45)}`,
+                        zIndex: 1,
+                      }}
+                    />
+                  ) : null}
+
+                  {/* Entries */}
+                  {rowEntries.map((entry) => {
+                    const startPct = Math.max(0, ((entry.minutes - axisStart) / axisSpan) * 100);
+                    const dur = entry.cell.durationMin ?? 15;
+                    const endPct = Math.min(100, ((entry.minutes + dur - axisStart) / axisSpan) * 100);
+                    const widthPct = Math.max(4, endPct - startPct);
+                    const isFinished = !!entry.cell.isFinished;
+                    const fill = entry.cell.isLive
+                      ? colors.statusLive
+                      : entry.cell.isPrestart
+                        ? colors.statusWarning
+                        : entry.cell.isNext
+                          ? colors.statusNext
+                          : accent;
+                    return (
+                      <div
+                        key={entry.key}
+                        title={entry.cell.title}
+                        style={{
+                          position: 'absolute',
+                          top: scaled(8, viewport, 3),
+                          bottom: scaled(8, viewport, 3),
+                          left: `${startPct}%`,
+                          width: `${widthPct}%`,
+                          padding: `${scaled(4, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+                          borderRadius: radius.sm,
+                          backgroundColor: withAlpha(fill, isFinished ? 0.14 : entry.cell.isLive ? 0.32 : 0.22),
+                          border: `1px solid ${withAlpha(fill, isFinished ? 0.35 : 0.85)}`,
+                          boxShadow: entry.cell.isLive
+                            ? `0 0 18px ${withAlpha(colors.statusLive, 0.35)}`
+                            : 'none',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          gap: 2,
+                          opacity: isFinished ? 0.75 : 1,
+                          zIndex: 2,
+                        }}
+                      >
+                        <span
+                          className="tabular-nums"
+                          style={{
+                            color: entry.cell.isLive ? colors.statusLive : withAlpha(fill, 0.95),
+                            fontFamily: typography.fontMono,
+                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 8)}px`,
+                            fontWeight: 600,
+                            letterSpacing: '0.03em',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {entry.time}
+                        </span>
+                        <span
+                          className="truncate"
+                          style={{
+                            color: isFinished ? withAlpha(colors.textPrimary, 0.6) : colors.textPrimary,
+                            fontFamily: typography.fontHeading,
+                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase * 1.05, viewport, 9)}px`,
+                            fontWeight: 500,
+                            lineHeight: 1.05,
+                            letterSpacing: '-0.005em',
+                          }}
+                        >
+                          {entry.cell.title}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {sauna.outOfOrder ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: withAlpha(colors.statusWarning, 0.08),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: withAlpha(colors.statusWarning, 0.95),
+                        fontFamily: typography.fontBody,
+                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+                        fontWeight: 700,
+                        letterSpacing: '0.18em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Außer Betrieb
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </AutoScroll>
+    </div>
+  );
+}

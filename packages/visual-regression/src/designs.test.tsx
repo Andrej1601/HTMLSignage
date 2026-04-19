@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Design, SaunaDetailStyle, SchedulePanelStyle } from '@htmlsignage/design-sdk';
+import { auroraThermalDesign } from '@htmlsignage/design-aurora-thermal';
 import { wellnessClassicDesign } from '@htmlsignage/design-wellness-classic';
 import { mineralNoirDesign } from '@htmlsignage/design-mineral-noir';
 import { editorialResortDesign } from '@htmlsignage/design-editorial-resort';
@@ -24,6 +25,7 @@ import { renderSlideToHtml } from './harness';
  */
 
 const DESIGNS: Array<{ id: string; design: Design }> = [
+  { id: 'aurora-thermal', design: auroraThermalDesign },
   { id: 'wellness-classic', design: wellnessClassicDesign },
   { id: 'mineral-noir', design: mineralNoirDesign },
   { id: 'editorial-resort', design: editorialResortDesign },

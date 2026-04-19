@@ -118,6 +118,29 @@ function areSlideRendererPropsEqual(prev: SlideRendererProps, next: SlideRendere
 export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsEqual);
 
 // Helper functions
+/**
+ * Map `displayAppearance` → the design pack that visually matches it.
+ * Only used as a fallback when the operator hasn't explicitly set
+ * `settings.display.designPackId`. Keeping this mapping in one place
+ * means flipping the production default is a one-line change.
+ */
+function deriveDesignIdFromAppearance(
+  appearance: Settings['displayAppearance'],
+): DesignId | null {
+  switch (appearance) {
+    case 'aurora-thermal':
+      return 'aurora-thermal';
+    case 'wellness-stage':
+      return 'wellness-classic';
+    case 'editorial-resort':
+      return 'editorial-resort';
+    case 'mineral-noir':
+      return 'mineral-noir';
+    default:
+      return null;
+  }
+}
+
 function resolveDesignFlag(settings: Settings): {
   enabled: boolean;
   designId: DesignId;
@@ -125,7 +148,13 @@ function resolveDesignFlag(settings: Settings): {
 } {
   const enabled = settings.display?.useDesignPacks === true;
   const configuredId = settings.display?.designPackId;
-  const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
+  // Priority: explicit config → appearance-derived → global default.
+  // The appearance fallback means switching the appearance selector is
+  // enough to pick up the matching pack without a separate config knob.
+  const appearanceDerived = deriveDesignIdFromAppearance(settings.displayAppearance);
+  const designId = isKnownDesignId(configuredId)
+    ? configuredId
+    : appearanceDerived ?? DEFAULT_DESIGN_ID;
 
   // Layer order (lowest → highest priority):
   //   1. Pack defaults (supplied by the pack itself via DesignHost)

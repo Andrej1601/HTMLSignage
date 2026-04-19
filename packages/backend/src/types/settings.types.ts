@@ -109,7 +109,7 @@ export const SlideshowConfigSchema = z.object({
 }).catchall(z.unknown()).optional();
 
 export const EventSettingsOverridesSchema = z.object({
-  displayAppearance: z.enum(['wellness-stage', 'editorial-resort', 'mineral-noir']).optional(),
+  displayAppearance: z.enum(['aurora-thermal', 'wellness-stage', 'editorial-resort', 'mineral-noir']).optional(),
   designStyle: z.enum(['modern-wellness', 'modern-timeline', 'compact-tiles']).optional(),
   colorPalette: z.string().optional(),
   theme: z.record(z.string(), z.string()).optional(),
@@ -133,7 +133,7 @@ export const SettingsSchema = z.object({
   header: HeaderSettingsSchema,
   maintenanceScreen: MaintenanceScreenSchema,
   saunas: z.array(SaunaSchema).optional(),
-  displayAppearance: z.enum(['wellness-stage', 'editorial-resort', 'mineral-noir']).optional(),
+  displayAppearance: z.enum(['aurora-thermal', 'wellness-stage', 'editorial-resort', 'mineral-noir']).optional(),
   designStyle: z.enum(['modern-wellness', 'modern-timeline', 'compact-tiles']).optional(),
   colorPalette: z.string().optional(),
   slideshow: SlideshowConfigSchema,

@@ -1,7 +1,11 @@
 import type { Design } from '@htmlsignage/design-sdk';
 import { isApiVersionCompatible, safeParseDesignManifest } from '@htmlsignage/design-sdk';
 
-export type DesignId = 'wellness-classic' | 'mineral-noir' | 'editorial-resort';
+export type DesignId =
+  | 'aurora-thermal'
+  | 'wellness-classic'
+  | 'mineral-noir'
+  | 'editorial-resort';
 
 /**
  * Registry of design packs available to the host.
@@ -14,6 +18,8 @@ export type DesignId = 'wellness-classic' | 'mineral-noir' | 'editorial-resort';
  * `DesignId`.
  */
 export const DESIGN_REGISTRY: Record<DesignId, () => Promise<Design>> = {
+  'aurora-thermal': () =>
+    import('@htmlsignage/design-aurora-thermal').then((mod) => mod.auroraThermalDesign),
   'wellness-classic': () =>
     import('@htmlsignage/design-wellness-classic').then((mod) => mod.wellnessClassicDesign),
   'mineral-noir': () =>
@@ -24,7 +30,14 @@ export const DESIGN_REGISTRY: Record<DesignId, () => Promise<Design>> = {
 
 export const DESIGN_IDS = Object.keys(DESIGN_REGISTRY) as DesignId[];
 
-export const DEFAULT_DESIGN_ID: DesignId = 'wellness-classic';
+/**
+ * Aurora Thermal is the production default — warm-charcoal stage with
+ * brass accents and modern display serif typography, designed as the
+ * Saunawelt flagship. Operators can still switch to the three
+ * alternative packs (wellness-classic, mineral-noir, editorial-resort)
+ * via settings without redeploying.
+ */
+export const DEFAULT_DESIGN_ID: DesignId = 'aurora-thermal';
 
 export function isKnownDesignId(value: unknown): value is DesignId {
   return typeof value === 'string' && value in DESIGN_REGISTRY;

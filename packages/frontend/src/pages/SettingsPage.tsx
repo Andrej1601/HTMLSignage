@@ -295,8 +295,12 @@ export function SettingsPage() {
                     onChange={(theme) => updateField('theme', theme)}
                     onDisplayAppearanceChange={(v) => {
                       updateField('displayAppearance', v);
-                      // Auto-select the matching palette so the appearance looks correct out of the box
-                      if (v === 'mineral-noir') handleColorPaletteChange('mineral-noir');
+                      // Auto-select the matching palette so the appearance
+                      // looks correct out of the box. Each appearance has
+                      // a hand-tuned palette whose ThemeColors translate
+                      // cleanly to the pack's tokens via `themeBridge`.
+                      if (v === 'aurora-thermal') handleColorPaletteChange('aurora-thermal');
+                      else if (v === 'mineral-noir') handleColorPaletteChange('mineral-noir');
                       else if (v === 'wellness-stage') handleColorPaletteChange('wellness-warm');
                     }}
                     onDesignStyleChange={(v) => updateField('designStyle', v)}

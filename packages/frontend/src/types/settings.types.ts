@@ -127,7 +127,11 @@ export interface MaintenanceScreenSettings {
 }
 
 export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type DisplayAppearance = 'wellness-stage' | 'editorial-resort' | 'mineral-noir';
+export type DisplayAppearance =
+  | 'aurora-thermal'
+  | 'wellness-stage'
+  | 'editorial-resort'
+  | 'mineral-noir';
 /**
  * Visual variant for sauna-detail ("Aufguss-Fokus") slides. Picked
  * up by the design pack's `SaunaDetailRenderer`.
@@ -145,7 +149,9 @@ export type BuiltinPaletteName =
   | 'wellness-warm'
   | 'ocean-breeze'
   | 'alpine-wood'
-  | 'aufguss-ritual';
+  | 'aufguss-ritual'
+  | 'aurora-thermal'
+  | 'mineral-noir';
 
 // Includes built-in palette IDs and custom palette IDs (cuid strings)
 export type ColorPaletteName = BuiltinPaletteName | (string & {});
