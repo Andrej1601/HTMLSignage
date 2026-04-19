@@ -25,7 +25,7 @@ import {
 import { ONLINE_THRESHOLD_MINUTES } from '@/utils/constants';
 import { getMinutesSince, toValidDate } from '@/utils/dateUtils';
 import { isPlainRecord } from '@/utils/objectUtils';
-import { getDeviceOverrideSettings, hasDeviceOverrides } from '@/utils/deviceUtils';
+import { hasDeviceOverrides } from '@/utils/deviceUtils';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
 import { resolveEffectiveDeviceSettings } from '@/utils/displaySettings';
 import {
@@ -55,39 +55,6 @@ export function getLatestMediaItem(media: Media[]): Media | null {
 export function isSlideshowConfig(value: unknown): value is SlideshowConfig {
   if (!isPlainRecord(value)) return false;
   return typeof value.layout === 'string' && Array.isArray(value.slides);
-}
-
-function getSlideshowFingerprint(config: SlideshowConfig): string {
-  const normalizedSlides = [...(config.slides || [])]
-    .sort((a, b) => (a.order || 0) - (b.order || 0))
-    .map((slide) => ({
-      type: slide.type,
-      enabled: slide.enabled,
-      duration: slide.duration,
-      order: slide.order,
-      zoneId: slide.zoneId || 'main',
-      saunaId: slide.saunaId || null,
-      mediaId: slide.mediaId || null,
-      infoId: slide.infoId || null,
-      transition: slide.transition || 'none',
-      videoPlayback: slide.videoPlayback || null,
-      mediaFit: slide.mediaFit || null,
-    }));
-
-  return JSON.stringify({
-    layout: config.layout,
-    defaultDuration: config.defaultDuration,
-    defaultTransition: config.defaultTransition,
-    enableTransitions: config.enableTransitions,
-    slides: normalizedSlides,
-  });
-}
-
-export function getDeviceSlideshowOverride(device: Device): SlideshowConfig | null {
-  const overrideSettings = getDeviceOverrideSettings(device);
-  const slideshow = overrideSettings.slideshow;
-  if (!isSlideshowConfig(slideshow)) return null;
-  return slideshow;
 }
 
 function getConnectivityState(lastSeen?: string): {
@@ -264,44 +231,25 @@ export function buildRunningSlideshows(
   settings: Settings | null | undefined,
 ): RunningSlideshowGroup[] {
   const globalConfig = settings?.slideshow || createDefaultSlideshowConfig();
-  const groups: RunningSlideshowGroup[] = [];
-  const overrideGroups = new Map<string, RunningSlideshowGroup>();
 
+  // Devices now pick up their slideshow via `device.slideshowId` (managed as
+  // first-class Slideshow entities). The legacy "device-settings override"
+  // branch has been removed — all devices without an explicit assignment use
+  // the global slideshow.
   const globalDeviceNames = onlinePairedDevices
-    .filter((device) => !(device.mode === 'override' && getDeviceSlideshowOverride(device)))
+    .filter((device) => !device.slideshowId)
     .map((device) => device.name);
 
-  groups.push({
-    id: 'global',
-    source: 'global',
-    title: 'Globale Slideshow',
-    config: globalConfig,
-    slides: getEnabledSlides(globalConfig),
-    deviceNames: globalDeviceNames,
-  });
-
-  for (const device of onlinePairedDevices) {
-    if (device.mode !== 'override') continue;
-    const overrideConfig = getDeviceSlideshowOverride(device);
-    if (!overrideConfig) continue;
-    const fingerprint = getSlideshowFingerprint(overrideConfig);
-    const existing = overrideGroups.get(fingerprint);
-    if (existing) {
-      existing.deviceNames.push(device.name);
-      continue;
-    }
-
-    overrideGroups.set(fingerprint, {
-      id: `override-${overrideGroups.size + 1}`,
-      source: 'override',
-      title: `Override Slideshow ${overrideGroups.size + 1}`,
-      config: overrideConfig,
-      slides: getEnabledSlides(overrideConfig),
-      deviceNames: [device.name],
-    });
-  }
-
-  return [...groups, ...Array.from(overrideGroups.values())];
+  return [
+    {
+      id: 'global',
+      source: 'global',
+      title: 'Globale Slideshow',
+      config: globalConfig,
+      slides: getEnabledSlides(globalConfig),
+      deviceNames: globalDeviceNames,
+    },
+  ];
 }
 
 function countActiveSlides(config: SlideshowConfig): number {
@@ -320,19 +268,16 @@ export function buildDeviceSlideshowRows(
   const globalSlideCount = countActiveSlides(globalConfig);
 
   return pairedDevices.map((device) => {
-    const overrideConfig = getDeviceSlideshowOverride(device);
     const hasDeviceSlideshow = Boolean(device.slideshowId && device.slideshow);
-    const hasOverride = device.mode === 'override' && overrideConfig !== null;
-    const activeConfig = hasOverride ? overrideConfig! : globalConfig;
-    const slideCount = hasOverride ? countActiveSlides(activeConfig) : globalSlideCount;
+    // Slide count for explicitly assigned slideshows isn't available here
+    // without the full slideshow config — fall back to the global slideshow
+    // metric for assigned devices so the dashboard still shows something
+    // useful. The editor deep-link below already routes to the correct target.
+    const slideCount = globalSlideCount;
     const minutes = getMinutesSince(device.lastSeen);
     const isOnline = minutes !== null && minutes < ONLINE_THRESHOLD_MINUTES;
 
-    const slideshowTitle = hasDeviceSlideshow
-      ? device.slideshow!.name
-      : hasOverride
-        ? 'Override Slideshow'
-        : 'Globale Slideshow';
+    const slideshowTitle = hasDeviceSlideshow ? device.slideshow!.name : 'Globale Slideshow';
 
     return {
       deviceId: device.id,
@@ -343,7 +288,7 @@ export function buildDeviceSlideshowRows(
       slideCount,
       lastSeen: device.lastSeen || null,
       isOnline,
-      editorTarget: hasDeviceSlideshow ? `slideshow:${device.slideshowId}` : hasOverride ? `device:${device.id}` : 'global',
+      editorTarget: hasDeviceSlideshow ? `slideshow:${device.slideshowId}` : 'global',
     };
   });
 }
@@ -361,8 +306,6 @@ export function buildDeviceMonitoring(
       const {
         settings: effectiveDeviceSettings,
         activeEvent,
-        hasOverrideSettings,
-        hasOverrideSlideshow,
       } = resolveEffectiveDeviceSettings(settings ?? undefined, device, now);
       const audioState = getAudioLabel(effectiveDeviceSettings, media);
 
@@ -371,16 +314,18 @@ export function buildDeviceMonitoring(
         isSlideshowConfig(activeEvent.settingsOverrides.slideshow),
       );
 
+      const hasAssignedSlideshow = Boolean(device.slideshowId && device.slideshow);
+
       const slideshowLabel = eventUsesSlideshowOverride
         ? `Event-Layout${activeEvent ? ` · ${activeEvent.name}` : ''}`
-        : hasOverrideSlideshow && device.mode === 'override'
-          ? 'Override-Slideshow'
+        : hasAssignedSlideshow
+          ? device.slideshow!.name
           : 'Globale Slideshow';
 
       const slideshowTone: StatusTone = eventUsesSlideshowOverride
         ? 'info'
-        : hasOverrideSlideshow && device.mode === 'override'
-          ? 'warning'
+        : hasAssignedSlideshow
+          ? 'info'
           : 'success';
 
       const warnings: DashboardDeviceMonitoringWarning[] = [];
@@ -396,8 +341,8 @@ export function buildDeviceMonitoring(
         }
       }
 
-      if (device.mode === 'override' && !hasOverrideSettings) {
-        warnings.push({ label: 'Override ohne Inhalt', tone: 'warning' });
+      if (device.mode === 'override' && !hasDeviceOverrides(device)) {
+        warnings.push({ label: 'Schedule-Override ohne Inhalt', tone: 'warning' });
       }
 
       if (audioState.missingSource) {
@@ -569,12 +514,12 @@ export function buildAttentionItems(input: BuildAttentionItemsInput): DashboardA
   if (liveState.activeOverrideDevices > 0) {
     items.push({
       id: 'active-overrides',
-      title: `${liveState.activeOverrideDevices} Override${liveState.activeOverrideDevices === 1 ? '' : 's'} aktiv`,
-      detail: 'Ein Teil der Geräte läuft aktuell nicht auf der globalen Slideshow.',
+      title: `${liveState.activeOverrideDevices} Schedule-Override${liveState.activeOverrideDevices === 1 ? '' : 's'} aktiv`,
+      detail: 'Ein Teil der Geräte läuft aktuell mit einem gerätespezifischen Aufgussplan.',
       tone: 'info',
-      href: '/slideshow',
-      actionLabel: 'Overrides prüfen',
-      area: 'slideshow',
+      href: '/devices',
+      actionLabel: 'Geräte prüfen',
+      area: 'devices',
       priority: 2,
     });
   }

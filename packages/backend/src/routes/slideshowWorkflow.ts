@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
@@ -8,13 +7,10 @@ import { requirePermission } from '../lib/permissions.js';
 import { listAuditLogs, logAuditEvent } from '../lib/audit.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import {
-  buildDeviceWorkflowOverrideSettings,
   buildGlobalSettingsWorkflowPayload,
-  buildLiveDeviceWorkflowSnapshot,
   buildLiveGlobalWorkflowSnapshot,
   buildWorkflowActionAuditDetails,
   buildWorkflowHistoryDeleteAuditDetails,
-  cloneWorkflowJson,
   createWorkflowHistoryEntry,
   getCurrentWorkflowDraftEntry,
   getWorkflowTargetNameFromDetails,
@@ -26,8 +22,7 @@ import {
   WorkflowSnapshotSchema,
   WorkflowTargetSchema,
 } from '../lib/slideshowWorkflow.js';
-import { isPlainRecord } from '../lib/utils.js';
-import { broadcastDeviceUpdate, broadcastSettingsUpdate } from '../websocket/index.js';
+import { broadcastSettingsUpdate } from '../websocket/index.js';
 import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
 
 const router = Router();
@@ -91,62 +86,23 @@ async function publishGlobal(req: AuthRequest, snapshot: WorkflowSnapshot, actio
 }
 
 async function publishDevice(
-  req: AuthRequest,
-  targetId: string,
-  snapshot: WorkflowSnapshot,
-  action: 'slideshow.publish' | 'slideshow.rollback',
-  sourceHistoryId?: string,
+  _req: AuthRequest,
+  _targetId: string,
+  _snapshot: WorkflowSnapshot,
+  _action: 'slideshow.publish' | 'slideshow.rollback',
+  _sourceHistoryId?: string,
 ) {
-  const device = await prisma.device.findUnique({
-    where: { id: targetId },
-    include: { overrides: true, user: { select: { username: true } } },
-  });
-
-  if (!device) {
-    return { status: 404 as const, body: { error: 'not-found', message: 'Gerät nicht gefunden' } };
-  }
-
-  const nextSettings = buildDeviceWorkflowOverrideSettings(device.overrides?.settings, snapshot);
-  const nextSchedule = isPlainRecord(device.overrides?.schedule)
-    ? cloneWorkflowJson(device.overrides?.schedule)
-    : {};
-
-  await prisma.deviceOverride.upsert({
-    where: { deviceId: targetId },
-    create: {
-      deviceId: targetId,
-      schedule: nextSchedule as Prisma.InputJsonValue,
-      settings: nextSettings as Prisma.InputJsonValue,
+  // Device-scoped slideshow publishing has been retired. Slideshows are now
+  // first-class entities — assign one to a device via `device.slideshowId`
+  // instead (PATCH /api/devices/:id). This stub exists so the route handlers
+  // keep compiling; the dispatcher below returns 410 Gone for device targets.
+  return {
+    status: 410 as const,
+    body: {
+      error: 'gone',
+      message: 'Gerätespezifisches Slideshow-Publishing wurde entfernt. Weise dem Gerät stattdessen eine Slideshow über `slideshowId` zu.',
     },
-    update: {
-      settings: nextSettings as Prisma.InputJsonValue,
-      schedule: nextSchedule as Prisma.InputJsonValue,
-    },
-  });
-
-  const refreshed = await prisma.device.findUnique({
-    where: { id: targetId },
-    include: { overrides: true, user: { select: { username: true } } },
-  });
-
-  if (refreshed) {
-    broadcastDeviceUpdate(refreshed);
-  }
-
-  await logAuditEvent(req, {
-    action,
-    resource: targetId,
-    details: buildWorkflowActionAuditDetails({
-      targetType: 'device',
-      targetId,
-      targetName: device.name,
-      deviceMode: device.mode,
-      sourceHistoryId: sourceHistoryId || null,
-      snapshot,
-    }),
-  });
-
-  return { ok: true, deviceMode: device.mode };
+  };
 }
 
 router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), async (req: AuthRequest, res) => {
@@ -181,9 +137,13 @@ router.get('/workflow', authMiddleware, requirePermission('slideshow:manage'), a
       return res.status(404).json({ error: 'not-found', message: 'Gerät nicht gefunden' });
     }
 
+    // Device-scoped slideshow workflows no longer have a distinct "live"
+    // snapshot — the device shows whatever slideshow is attached via
+    // `device.slideshowId`. Falling back to the global snapshot so the
+    // workflow panel stays usable while legacy device targets are retired.
     const liveSnapshot = targetType === 'global'
       ? buildLiveGlobalWorkflowSnapshot(activeSettings?.data)
-      : buildLiveDeviceWorkflowSnapshot(device?.overrides?.settings);
+      : buildLiveGlobalWorkflowSnapshot(activeSettings?.data);
 
     return res.json({
       ok: true,

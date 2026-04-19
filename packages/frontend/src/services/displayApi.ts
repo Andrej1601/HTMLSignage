@@ -10,7 +10,7 @@ import type {
   DeviceSnapshotUploadResponse,
 } from './api/types';
 
-import { deepMerge, isPlainRecord } from '@/utils/objectUtils';
+import { isPlainRecord } from '@/utils/objectUtils';
 
 let hasWarnedDisplayConfigFallback = false;
 
@@ -27,24 +27,19 @@ async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfig
 
   const overrides = device.overrides;
   const hasScheduleOverride = hasObjectKeys(overrides?.schedule);
-  const hasSettingsOverride = hasObjectKeys(overrides?.settings);
   const useOverrides = device.mode === 'override';
 
   const effectiveSchedule = useOverrides && hasScheduleOverride
     ? (overrides!.schedule as Schedule)
     : schedule;
-  const effectiveSettings = useOverrides && hasSettingsOverride
-    ? deepMerge<Settings>(settings, overrides!.settings as Partial<Settings>)
-    : settings;
 
   return {
     deviceId: device.id,
     maintenanceMode: Boolean(device.maintenanceMode),
     mode: device.mode,
     hasScheduleOverride,
-    hasSettingsOverride,
     schedule: effectiveSchedule,
-    settings: effectiveSettings,
+    settings,
   };
 }
 

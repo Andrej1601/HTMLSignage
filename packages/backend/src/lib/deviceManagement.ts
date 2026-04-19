@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
-import { isPlainRecord, deepMerge } from './utils.js';
+import { isPlainRecord } from './utils.js';
 import { DEFAULT_HEADER } from './schedule.js';
 
 export interface DeviceFleetState {
@@ -23,10 +23,6 @@ export function normalizeSettingsData(raw: unknown): Record<string, unknown> {
     data.header = { ...DEFAULT_HEADER };
   }
   return data;
-}
-
-export function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
-  return isPlainRecord(raw) && Object.keys(raw).length > 0;
 }
 
 export function normalizeDeviceGroupName(value: string | null | undefined): string | null {
@@ -168,18 +164,15 @@ export function buildDeviceDisplayConfigPayload(input: {
   globalSchedule: unknown;
   globalSettings: Record<string, unknown>;
   overrideSchedule: unknown;
-  overrideSettings: unknown;
 }): {
   deviceId: string;
   maintenanceMode: boolean;
   mode: DeviceMode;
   hasScheduleOverride: boolean;
-  hasSettingsOverride: boolean;
   schedule: unknown;
   settings: Record<string, unknown>;
 } {
   const hasScheduleOverride = Boolean(input.overrideSchedule);
-  const hasSettingsOverride = hasSettingsOverrideData(input.overrideSettings);
   const isOverrideMode = input.mode === 'override';
 
   return {
@@ -187,13 +180,10 @@ export function buildDeviceDisplayConfigPayload(input: {
     maintenanceMode: input.maintenanceMode,
     mode: input.mode,
     hasScheduleOverride,
-    hasSettingsOverride,
     schedule: isOverrideMode && hasScheduleOverride
       ? input.overrideSchedule
       : input.globalSchedule,
-    settings: isOverrideMode && hasSettingsOverride
-      ? deepMerge(input.globalSettings, normalizeSettingsData(input.overrideSettings)) as Record<string, unknown>
-      : input.globalSettings,
+    settings: input.globalSettings,
   };
 }
 

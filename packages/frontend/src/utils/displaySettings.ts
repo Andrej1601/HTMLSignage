@@ -11,14 +11,9 @@ import {
   type ThemeColors,
 } from '@/types/settings.types';
 import { findMediaById, buildUploadUrl, toAbsoluteMediaUrl } from '@/utils/mediaUrl';
-import { getDeviceOverrideSettings } from '@/utils/deviceUtils';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
 import { deepMergeRecords, isPlainRecord } from '@/utils/objectUtils';
 import { migrateSettings } from '@/utils/slideshowMigration';
-
-function isSlideshowLike(value: unknown): boolean {
-  return isPlainRecord(value) && Array.isArray((value as { slides?: unknown }).slides);
-}
 
 export function applyActiveEventSettings(
   baseSettings: Settings | undefined,
@@ -53,6 +48,9 @@ export function applyActiveEventSettings(
     const sc = slideshowConfig as unknown as Record<string, unknown>;
     if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance as Settings['displayAppearance'];
     if (sc.designStyle) merged.designStyle = sc.designStyle as Settings['designStyle'];
+    if (sc.saunaDetailStyle) {
+      merged.saunaDetailStyle = sc.saunaDetailStyle as Settings['saunaDetailStyle'];
+    }
     if (sc.colorPalette) {
       const palette = sc.colorPalette as ColorPaletteName;
       merged.colorPalette = palette;
@@ -88,30 +86,13 @@ export function resolveEffectiveDeviceSettings(
 ): {
   settings: Settings;
   activeEvent: Event | null;
-  hasOverrideSettings: boolean;
-  hasOverrideSlideshow: boolean;
 } {
   const normalizedGlobal = migrateSettings(globalSettings || getDefaultSettings());
-  const overrideSettings = getDeviceOverrideSettings(device ?? null);
-  const hasOverrideSettings = Object.keys(overrideSettings).length > 0;
-  const hasOverrideSlideshow = isSlideshowLike(overrideSettings.slideshow);
-
-  const baseSettings = device?.mode === 'override' && hasOverrideSettings
-    ? migrateSettings(
-        deepMergeRecords(
-          normalizedGlobal as unknown as Record<string, unknown>,
-          overrideSettings,
-        ) as unknown as Settings,
-      )
-    : normalizedGlobal;
-
-  const { settings, activeEvent } = applyActiveEventSettings(baseSettings, now, device?.id);
+  const { settings, activeEvent } = applyActiveEventSettings(normalizedGlobal, now, device?.id);
 
   return {
     settings,
     activeEvent,
-    hasOverrideSettings,
-    hasOverrideSlideshow,
   };
 }
 

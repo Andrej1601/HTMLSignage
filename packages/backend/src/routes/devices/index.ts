@@ -148,7 +148,6 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
       globalSchedule,
       globalSettings: effectiveSettings,
       overrideSchedule,
-      overrideSettings: device.overrides?.settings,
     }));
   } catch (error) {
     console.error('[devices] Error fetching display config:', error);
@@ -358,7 +357,9 @@ router.post('/:id/control', authMiddleware, requirePermission('devices:manage'),
   }
 });
 
-// POST /api/devices/:id/overrides - Set device overrides (auth required)
+// POST /api/devices/:id/overrides - Set device schedule override (auth required)
+// Device-level overrides are scoped to the schedule only. Design/theme/slideshow
+// customisations flow to devices via the `device.slideshowId` assignment.
 router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
     const validated = OverridesSchema.parse(req.body);
@@ -367,12 +368,10 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
       where: { deviceId: str(req.params.id)!! },
       create: {
         deviceId: str(req.params.id)!!,
-        schedule: (validated.schedule || {}) as unknown as Prisma.InputJsonValue,
-        settings: (validated.settings || {}) as unknown as Prisma.InputJsonValue,
+        schedule: validated.schedule as unknown as Prisma.InputJsonValue,
       },
       update: {
         schedule: validated.schedule as unknown as Prisma.InputJsonValue,
-        settings: validated.settings as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -390,8 +389,7 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
       action: 'device.override.update',
       resource: str(req.params.id)!,
       details: {
-        hasSchedule: Boolean(validated.schedule),
-        hasSettings: Boolean(validated.settings),
+        hasSchedule: true,
       },
     });
 

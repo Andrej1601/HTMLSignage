@@ -1,5 +1,4 @@
 import type { Schedule } from './schedule.types';
-import type { Settings } from './settings.types';
 
 export type DeviceMode = 'auto' | 'override';
 
@@ -32,7 +31,6 @@ export interface DeviceOverride {
   id: string;
   deviceId: string;
   schedule?: Schedule;
-  settings?: Settings;
 }
 
 export interface CreateDeviceRequest {

@@ -97,8 +97,10 @@ model Device {
 model DeviceOverride {
   id       String @id @default(cuid())
   deviceId String @unique
+  // Per-device schedule override. The legacy `settings` JSON column was
+  // dropped — design/theme/slideshow customisation now lives exclusively on
+  // SlideshowConfig and reaches devices via `device.slideshowId`.
   schedule Json
-  settings Json
   device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@map("device_overrides")
