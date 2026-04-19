@@ -38,7 +38,7 @@ export function DisplayEditorialTripleLayout({
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
-  const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
+  const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
 
   const isPortrait = profile.isPortrait;
   const isCompact = profile.isCompact;
@@ -116,6 +116,7 @@ export function DisplayEditorialTripleLayout({
       subtitle={stageMeta.subtitle}
       title={stageMeta.title}
       meta={stageMeta.meta}
+      logoImageUrl={stageMeta.logoImageUrl}
     >
       <div
         ref={containerRef}

@@ -1,5 +1,8 @@
-import { PanelTop } from 'lucide-react';
+import { useMemo } from 'react';
+import { PanelTop, Image as ImageIcon } from 'lucide-react';
 import type { HeaderSettings } from '@/types/settings.types';
+import { useMedia } from '@/hooks/useMedia';
+import { buildUploadUrl } from '@/utils/mediaUrl';
 
 interface HeaderSettingsEditorProps {
   /** Currently-effective header settings (already merged + defaulted). */
@@ -29,6 +32,15 @@ export function HeaderSettingsEditor({
   const set = <K extends keyof HeaderSettings>(key: K, next: HeaderSettings[K]) => {
     onChange({ ...value, [key]: next });
   };
+
+  // Image picker pulls image-type media only. Keeps the grid scoped to
+  // things that actually make sense as a logo — videos would just break.
+  const { data: media } = useMedia({ type: 'image' });
+  const images = useMemo(() => media || [], [media]);
+  const currentImage = useMemo(
+    () => images.find((item) => item.id === value.logoImageId),
+    [images, value.logoImageId],
+  );
 
   return (
     <div className="rounded-xl border border-spa-border bg-spa-surface p-5 shadow-xs">
@@ -116,6 +128,94 @@ export function HeaderSettingsEditor({
             onChange={(event) => set('subtitle', event.target.value)}
             className="w-full rounded-lg border border-spa-border bg-spa-bg-primary px-3 py-2 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-1 focus:ring-spa-primary disabled:cursor-not-allowed disabled:opacity-60"
           />
+        </div>
+
+        {/* Logo image picker. Optional — when set, displays render this
+            image instead of the two-tone title text. */}
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
+              Logo-Bild
+            </label>
+            {value.logoImageId ? (
+              <button
+                type="button"
+                disabled={disabled || !value.enabled}
+                onClick={() => set('logoImageId', undefined)}
+                className="text-[11px] font-semibold text-spa-text-secondary hover:text-spa-primary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Entfernen
+              </button>
+            ) : null}
+          </div>
+          <p className="mb-2 text-xs text-spa-text-secondary">
+            Optional. Wenn gesetzt, rendern Displays dieses Bild statt des
+            Titels. Lade Bilder vorher in der Mediathek hoch (Typ: Bild).
+          </p>
+
+          {currentImage ? (
+            <div className="mb-2 flex items-center gap-3 rounded-lg border border-spa-border bg-spa-bg-primary px-3 py-2">
+              <img
+                src={buildUploadUrl(currentImage.filename)}
+                alt={currentImage.originalName}
+                className="h-10 w-10 shrink-0 rounded object-contain bg-white"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-spa-text-primary">
+                  {currentImage.originalName}
+                </div>
+                <div className="text-[11px] text-spa-text-secondary">
+                  Aktuell ausgewählt
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {images.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-lg border border-dashed border-spa-border bg-spa-surface px-3 py-3 text-xs text-spa-text-secondary">
+              <ImageIcon className="h-4 w-4 text-spa-primary" />
+              Keine Bilder verfügbar. Lade zuerst eines in der Mediathek hoch.
+            </div>
+          ) : (
+            <div className="grid max-h-48 grid-cols-3 gap-2 overflow-y-auto rounded-lg border border-spa-border bg-spa-surface p-2 md:grid-cols-4">
+              <button
+                type="button"
+                disabled={disabled || !value.enabled}
+                onClick={() => set('logoImageId', undefined)}
+                className={`flex aspect-square items-center justify-center rounded-md border-2 px-2 text-center text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  !value.logoImageId
+                    ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                    : 'border-spa-border text-spa-text-secondary hover:border-spa-primary/40'
+                }`}
+              >
+                Nur Text
+              </button>
+              {images.map((image) => {
+                const isSelected = value.logoImageId === image.id;
+                return (
+                  <button
+                    key={image.id}
+                    type="button"
+                    disabled={disabled || !value.enabled}
+                    onClick={() => set('logoImageId', image.id)}
+                    title={image.originalName}
+                    className={`group relative aspect-square overflow-hidden rounded-md border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isSelected
+                        ? 'border-spa-primary ring-2 ring-spa-primary/20'
+                        : 'border-spa-border hover:border-spa-primary/40'
+                    }`}
+                  >
+                    <img
+                      src={buildUploadUrl(image.filename)}
+                      alt={image.originalName}
+                      className="h-full w-full bg-white object-contain"
+                      loading="lazy"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Toggles */}

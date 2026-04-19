@@ -57,7 +57,7 @@ export function DisplayFullRotationLayout({
   );
 
   if (isEditorialDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
+    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
 
     return (
       <DisplayEditorialStage
@@ -65,6 +65,7 @@ export function DisplayFullRotationLayout({
         subtitle={stageMeta.subtitle}
         title={stageMeta.title}
         meta={stageMeta.meta}
+        logoImageUrl={stageMeta.logoImageUrl}
         contentClassName="h-[calc(100%-4.25rem)]"
       >
         <DisplayEditorialPanel

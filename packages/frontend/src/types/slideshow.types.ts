@@ -117,6 +117,14 @@ export interface SlideshowConfig {
    * event-specific slideshow) without touching the global config.
    */
   header?: Partial<import('@/types/settings.types').HeaderSettings>;
+  /**
+   * Partial override for the maintenance screen shown when the display
+   * runtime goes into maintenance mode. Missing fields fall through to
+   * `settings.maintenanceScreen`. Lets you ship slideshow-specific
+   * maintenance copy (e.g. different language / event branding) without
+   * touching the global default.
+   */
+  maintenanceScreen?: Partial<import('@/types/settings.types').MaintenanceScreenSettings>;
 
   // Advanced
   pauseOnInteraction?: boolean;

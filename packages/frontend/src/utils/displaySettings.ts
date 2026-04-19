@@ -65,6 +65,15 @@ export function applyActiveEventSettings(
         ...(sc.header as Partial<Settings['header']>),
       } as Settings['header'];
     }
+    if (
+      isPlainRecord(sc.maintenanceScreen) &&
+      Object.keys(sc.maintenanceScreen).length > 0
+    ) {
+      merged.maintenanceScreen = {
+        ...(merged.maintenanceScreen ?? {}),
+        ...(sc.maintenanceScreen as Partial<Settings['maintenanceScreen']>),
+      } as Settings['maintenanceScreen'];
+    }
   }
 
   // Apply color palette from legacy overrides

@@ -11,6 +11,7 @@ import {
 } from '@/components/Display/displayMineralNoirChrome';
 import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotationLayout';
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
+import { DisplayHeader } from '@/components/Display/DisplayHeader';
 import { DisplaySplitLayout } from '@/components/Display/DisplaySplitLayout';
 import { DisplayTripleLayout } from '@/components/Display/DisplayTripleLayout';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
@@ -25,6 +26,8 @@ import type {
   SlidePaddingOptions,
 } from '@/components/Display/displayLayoutRenderer.types';
 import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import { getDefaultSettings } from '@/types/settings.types';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 
 export function DisplayLayoutRenderer({
   currentSlide,
@@ -158,72 +161,115 @@ export function DisplayLayoutRenderer({
     zones,
   };
 
-  if (!hasAnyZoneSlides) {
-    if (isEditorialDisplayAppearance(displayAppearance)) {
-      const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
+  const renderInner = (): ReactElement => {
+    if (!hasAnyZoneSlides) {
+      if (isEditorialDisplayAppearance(displayAppearance)) {
+        const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
 
-      return (
-        <DisplayEditorialStage
-          theme={themeColors}
-          subtitle={stageMeta.subtitle}
-          title={stageMeta.title}
-          meta={stageMeta.meta}
-        >
-          <DisplayEditorialPanel
+        return (
+          <DisplayEditorialStage
             theme={themeColors}
-            tone="paper"
+            subtitle={stageMeta.subtitle}
+            title={stageMeta.title}
+            meta={stageMeta.meta}
+            logoImageUrl={stageMeta.logoImageUrl}
           >
-            {renderContentPanel()}
-          </DisplayEditorialPanel>
-        </DisplayEditorialStage>
-      );
+            <DisplayEditorialPanel
+              theme={themeColors}
+              tone="paper"
+            >
+              {renderContentPanel()}
+            </DisplayEditorialPanel>
+          </DisplayEditorialStage>
+        );
+      }
+
+      if (isMineralNoirDisplayAppearance(displayAppearance)) {
+        const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime, mediaItems);
+
+        return (
+          <MineralNoirStage
+            theme={themeColors}
+            subtitle={stageMeta.subtitle}
+            title={stageMeta.title}
+            meta={stageMeta.meta}
+            logoImageUrl={stageMeta.logoImageUrl}
+          >
+            <MineralNoirPanel
+              theme={themeColors}
+              accentTone="emerald"
+            >
+              {renderContentPanel()}
+            </MineralNoirPanel>
+          </MineralNoirStage>
+        );
+      }
+
+      // The design pack handles every `designStyle` through
+      // `renderContentPanel()`. The old `OverviewSlide` fallback (for
+      // unrecognised styles) has been retired — the pack + host settings
+      // together guarantee a valid style always resolves.
+      return renderContentPanel();
     }
 
-    if (isMineralNoirDisplayAppearance(displayAppearance)) {
-      const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime);
+    switch (safeLayout) {
+      case 'full-rotation':
+        return (
+          <DisplayFullRotationLayout
+            context={layoutContext}
+            currentSlide={currentSlide}
+            currentSlideIndex={currentSlideIndex}
+          />
+        );
 
-      return (
-        <MineralNoirStage
-          theme={themeColors}
-          subtitle={stageMeta.subtitle}
-          title={stageMeta.title}
-          meta={stageMeta.meta}
-        >
-          <MineralNoirPanel
-            theme={themeColors}
-            accentTone="emerald"
-          >
-            {renderContentPanel()}
-          </MineralNoirPanel>
-        </MineralNoirStage>
-      );
+      case 'triple-view':
+        return <DisplayTripleLayout context={layoutContext} />;
+
+      case 'grid-2x2':
+        return <DisplayGridLayout context={layoutContext} />;
+
+      case 'split-view':
+      default:
+        return <DisplaySplitLayout context={layoutContext} />;
     }
+  };
 
-    // The design pack handles every `designStyle` through
-    // `renderContentPanel()`. The old `OverviewSlide` fallback (for
-    // unrecognised styles) has been retired — the pack + host settings
-    // together guarantee a valid style always resolves.
-    return renderContentPanel();
+  const inner = renderInner();
+
+  // Editorial Resort and Mineral Noir ship their own stage-chrome with
+  // branding (title/subtitle/meta). For those appearances the header
+  // settings are consumed via `getEditorialStageMeta` /
+  // `getMineralNoirStageMeta`, so we render the inner directly.
+  //
+  // For the default "wellness-stage" appearance there is no built-in
+  // chrome — so we wrap the output with `DisplayHeader` when the header
+  // is enabled. `DisplayHeader` itself early-returns when `enabled` is
+  // false, so the check below is an optimisation, not a correctness gate.
+  if (
+    isEditorialDisplayAppearance(displayAppearance) ||
+    isMineralNoirDisplayAppearance(displayAppearance)
+  ) {
+    return inner;
   }
 
-  switch (safeLayout) {
-    case 'full-rotation':
-      return (
-        <DisplayFullRotationLayout
-          context={layoutContext}
-          currentSlide={currentSlide}
-          currentSlideIndex={currentSlideIndex}
-        />
-      );
+  const headerSettings =
+    effectiveSettings.header ?? getDefaultSettings().header!;
 
-    case 'triple-view':
-      return <DisplayTripleLayout context={layoutContext} />;
-
-    case 'grid-2x2':
-      return <DisplayGridLayout context={layoutContext} />;
-
-    case 'split-view':
-    default:
-      return <DisplaySplitLayout context={layoutContext} />;
+  if (!headerSettings.enabled) {
+    return inner;
   }
+
+  const logoImageUrl =
+    getMediaUploadUrl(mediaItems, headerSettings.logoImageId) ?? undefined;
+
+  return (
+    <div className="flex h-full w-full flex-col">
+      <DisplayHeader
+        settings={headerSettings}
+        theme={themeColors}
+        logoImageUrl={logoImageUrl}
+      />
+      <div className="min-h-0 flex-1">{inner}</div>
+    </div>
+  );
 }

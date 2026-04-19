@@ -55,7 +55,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
   const mainSize = hasPersistent && hasMain ? 100 - gridSizePercent : hasMain ? 100 : 0;
 
   if (isMineralNoirDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getMineralNoirStageMeta(context.effectiveSettings, context.currentTime);
+    const stageMeta = getMineralNoirStageMeta(context.effectiveSettings, context.currentTime, context.mediaItems);
     const renderNoirPanel = (
       slide: typeof persistentSlide,
       info: typeof persistentInfo,
@@ -94,7 +94,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
 
     if (isVertical) {
       return (
-        <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta}>
+        <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta} logoImageUrl={stageMeta.logoImageUrl}>
           <div className="flex h-full gap-px">
             {scheduleFirst ? (
               <>
@@ -113,7 +113,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
     }
 
     return (
-      <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta}>
+      <MineralNoirStage theme={themeColors} subtitle={stageMeta.subtitle} title={stageMeta.title} meta={stageMeta.meta} logoImageUrl={stageMeta.logoImageUrl}>
         <div className="flex h-full flex-col gap-px">
           {scheduleFirst ? (
             <>
@@ -132,7 +132,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
   }
 
   if (isEditorialDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getEditorialStageMeta(context.effectiveSettings, context.currentTime);
+    const stageMeta = getEditorialStageMeta(context.effectiveSettings, context.currentTime, context.mediaItems);
     const renderPanel = (
       slide: typeof persistentSlide,
       info: typeof persistentInfo,
@@ -163,6 +163,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
           subtitle={stageMeta.subtitle}
           title={stageMeta.title}
           meta={stageMeta.meta}
+          logoImageUrl={stageMeta.logoImageUrl}
           contentClassName="h-[calc(100%-4.25rem)]"
         >
           <div className="flex h-full gap-5">
@@ -204,6 +205,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
         subtitle={stageMeta.subtitle}
         title={stageMeta.title}
         meta={stageMeta.meta}
+        logoImageUrl={stageMeta.logoImageUrl}
         contentClassName="h-[calc(100%-4.25rem)]"
       >
         <div className="flex h-full flex-col gap-5">

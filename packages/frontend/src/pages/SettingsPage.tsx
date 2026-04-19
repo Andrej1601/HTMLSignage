@@ -291,6 +291,7 @@ export function SettingsPage() {
                     saunaDetailStyle={localSettings.saunaDetailStyle}
                     colorPalette={localSettings.colorPalette}
                     header={localSettings.header}
+                    maintenanceScreen={localSettings.maintenanceScreen}
                     onChange={(theme) => updateField('theme', theme)}
                     onDisplayAppearanceChange={(v) => {
                       updateField('displayAppearance', v);

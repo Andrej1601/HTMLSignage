@@ -71,7 +71,7 @@ export function DisplayMineralNoirTripleLayout({
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
-  const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime);
+  const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime, mediaItems);
   const t = getMineralTokens(themeColors);
 
   const isPortrait = profile.isPortrait;
@@ -128,6 +128,7 @@ export function DisplayMineralNoirTripleLayout({
       subtitle={stageMeta.subtitle}
       title={stageMeta.title}
       meta={stageMeta.meta}
+      logoImageUrl={stageMeta.logoImageUrl}
     >
       <div
         ref={containerRef}

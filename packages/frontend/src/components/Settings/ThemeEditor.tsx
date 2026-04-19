@@ -5,14 +5,17 @@ import type {
   ColorPaletteName,
   DisplayAppearance,
   HeaderSettings,
+  MaintenanceScreenSettings,
   SaunaDetailStyle,
 } from '@/types/settings.types';
 import { generateDashboardColors, getDefaultSettings } from '@/types/settings.types';
+import { normalizeMaintenanceScreenSettings } from '@/config/maintenanceScreen';
 import { AppearanceSelector } from './AppearanceSelector';
 import { PaletteSelector } from './PaletteSelector';
 import { ColorTokenEditor } from './ColorTokenEditor';
 import { SlideshowTokenOverridesEditor } from './SlideshowTokenOverridesEditor';
 import { HeaderSettingsEditor } from './HeaderSettingsEditor';
+import { MaintenanceScreenEditor } from './MaintenanceScreenEditor';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
 import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
@@ -25,6 +28,7 @@ interface ThemeEditorProps {
   saunaDetailStyle?: SaunaDetailStyle;
   colorPalette?: ColorPaletteName;
   header?: HeaderSettings;
+  maintenanceScreen?: MaintenanceScreenSettings;
   onChange: (theme: ThemeColors) => void;
   onDisplayAppearanceChange?: (appearance: DisplayAppearance) => void;
   onDesignStyleChange?: (style: DesignStyle) => void;
@@ -41,6 +45,7 @@ export function ThemeEditor({
   saunaDetailStyle,
   colorPalette,
   header,
+  maintenanceScreen,
   onChange,
   onDisplayAppearanceChange,
   onDesignStyleChange,
@@ -51,6 +56,13 @@ export function ThemeEditor({
 }: ThemeEditorProps) {
   const defaults = getDefaultSettings();
   const globalHeader = header ?? defaults.header!;
+  // The global maintenance-screen value may be partial, so normalise it
+  // before merging with slideshow-level overrides. This mirrors how the
+  // display runtime consumes the same value at render-time.
+  const globalMaintenance = useMemo(
+    () => normalizeMaintenanceScreenSettings(maintenanceScreen),
+    [maintenanceScreen],
+  );
   const { data: slideshows = [] } = useSlideshows();
   const updateSlideshow = useUpdateSlideshow();
   const [selectedSlideshowId, setSelectedSlideshowId] = useState<string | null>(null);
@@ -82,6 +94,16 @@ export function ThemeEditor({
     [globalHeader, selectedSlideshow?.config.header],
   );
 
+  // Same pattern for the maintenance screen: normalised global value is
+  // the baseline, slideshow-level partial overrides win.
+  const effectiveMaintenance: MaintenanceScreenSettings = useMemo(
+    () => ({
+      ...globalMaintenance,
+      ...(selectedSlideshow?.config.maintenanceScreen ?? {}),
+    }),
+    [globalMaintenance, selectedSlideshow?.config.maintenanceScreen],
+  );
+
   const handleHeaderChange = (next: HeaderSettings) => {
     if (selectedSlideshow) {
       // Persist only the fields that actually differ from the global
@@ -104,6 +126,26 @@ export function ThemeEditor({
     if (!selectedSlideshow) return;
     const config: SlideshowConfig = { ...selectedSlideshow.config, ...patch };
     updateSlideshow.mutate({ id: selectedSlideshow.id, updates: { config } });
+  };
+
+  const handleMaintenanceScreenChange = (next: MaintenanceScreenSettings) => {
+    if (selectedSlideshow) {
+      // Only persist fields that actually differ from the normalised
+      // global baseline — keeps overrides minimal and honest.
+      const patch: Partial<MaintenanceScreenSettings> = {};
+      (Object.keys(next) as Array<keyof MaintenanceScreenSettings>).forEach((key) => {
+        if (next[key] !== globalMaintenance[key]) {
+          (patch as Record<string, unknown>)[key] = next[key];
+        }
+      });
+      handleSlideshowDesignChange({
+        maintenanceScreen: Object.keys(patch).length > 0 ? patch : undefined,
+      });
+    } else {
+      // Global edits are still done via the dedicated Maintenance tab in
+      // SettingsPage, so we don't wire a global callback here. When no
+      // slideshow is selected the editor isn't shown in the first place.
+    }
   };
 
   const applyPalette = (paletteId: ColorPaletteName, paletteColors: Partial<ThemeColors>) => {
@@ -171,7 +213,7 @@ export function ThemeEditor({
             Änderungen gelten nur für <strong>{selectedSlideshow.name}</strong>.
             Nicht gesetzte Werte fallen auf die globalen Einstellungen zurück.
           </span>
-          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette || selectedSlideshow.config.tokenOverrides || selectedSlideshow.config.header) && (
+          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette || selectedSlideshow.config.tokenOverrides || selectedSlideshow.config.header || selectedSlideshow.config.maintenanceScreen) && (
             <button
               onClick={() => handleSlideshowDesignChange({
                 displayAppearance: undefined,
@@ -181,6 +223,7 @@ export function ThemeEditor({
                 theme: undefined,
                 tokenOverrides: undefined,
                 header: undefined,
+                maintenanceScreen: undefined,
               })}
               className="shrink-0 ml-3 text-xs font-semibold text-spa-info-dark hover:underline"
             >
@@ -249,6 +292,32 @@ export function ThemeEditor({
           )}
         </section>
       </div>
+
+      {/* Per-slideshow maintenance-screen override — only shown when a
+          slideshow is selected. Global edits remain on the dedicated
+          Maintenance tab in Settings. */}
+      {selectedSlideshow && (
+        <div className="rounded-xl border border-spa-border bg-spa-surface p-5 shadow-xs">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-semibold text-spa-text-primary">
+                Wartungsscreen-Override
+              </h4>
+              <p className="mt-0.5 text-xs text-spa-text-secondary">
+                Nur abweichende Felder werden gespeichert. Leer gelassene
+                Felder erben die globale Einstellung.
+              </p>
+            </div>
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-spa-text-secondary">
+              {selectedSlideshow.name}
+            </span>
+          </div>
+          <MaintenanceScreenEditor
+            value={effectiveMaintenance}
+            onChange={handleMaintenanceScreenChange}
+          />
+        </div>
+      )}
     </div>
   );
 }

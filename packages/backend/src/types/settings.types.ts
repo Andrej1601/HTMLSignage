@@ -48,6 +48,11 @@ export const HeaderSettingsSchema = z.object({
   enabled: z.boolean(),
   showLogo: z.boolean(),
   logoText: z.string().optional(),
+  /**
+   * Optional media id for a brand-image logo. When set, displays render
+   * this image instead of the two-tone `logoText`.
+   */
+  logoImageId: z.string().optional(),
   showClock: z.boolean(),
   showDate: z.boolean(),
   subtitle: z.string().optional(),

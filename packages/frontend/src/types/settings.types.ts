@@ -104,6 +104,13 @@ export interface HeaderSettings {
   enabled: boolean;
   showLogo: boolean;
   logoText?: string;
+  /**
+   * Optional media id for a brand-image logo. When set, displays render
+   * this image (via `getMediaUploadUrl`) instead of the two-tone
+   * `logoText`. Keeping `logoText` as a fallback means screens still
+   * show something meaningful if the image can't be resolved.
+   */
+  logoImageId?: string;
   showClock: boolean;
   showDate: boolean;
   subtitle?: string;

@@ -12,9 +12,11 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import type { Settings, ThemeColors } from '@/types/settings.types';
+import type { Media } from '@/types/media.types';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 
 // ── Token extractor ───────────────────────────────────────────────────────────
 
@@ -47,6 +49,12 @@ export interface MineralNoirStageProps {
   title?: string;
   subtitle?: string;
   meta?: string;
+  /**
+   * Optional resolved image URL for the header logo. When set, replaces
+   * the `title` text in the masthead. `title` is still used as alt text
+   * if present.
+   */
+  logoImageUrl?: string;
   className?: string;
   children: ReactNode;
 }
@@ -54,21 +62,48 @@ export interface MineralNoirStageProps {
 export function getMineralNoirStageMeta(
   settings: Settings,
   currentTime: Date,
-): { title: string; subtitle: string; meta: string } {
-  const subtitle = (settings.header?.subtitle?.trim() || 'Saunawelt').toUpperCase();
-  const rawLogoText = (settings.header?.logoText || '').trim();
-  const title =
-    !rawLogoText || /^html\s*signage$/i.test(rawLogoText)
+  media?: Media[],
+): { title: string; subtitle: string; meta: string; logoImageUrl?: string } {
+  const header = settings.header;
+
+  if (header && header.enabled === false) {
+    return { title: '', subtitle: '', meta: '' };
+  }
+
+  const showLogo = header?.showLogo ?? true;
+  const showClock = header?.showClock ?? true;
+  const showDate = header?.showDate ?? true;
+
+  const subtitle = showLogo
+    ? (header?.subtitle?.trim() || 'Saunawelt').toUpperCase()
+    : '';
+  const rawLogoText = (header?.logoText || '').trim();
+  const title = !showLogo
+    ? ''
+    : !rawLogoText || /^html\s*signage$/i.test(rawLogoText)
       ? 'Westfalenbad Hagen'
       : rawLogoText;
-  const meta = new Intl.DateTimeFormat('de-DE', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(currentTime).toUpperCase();
-  return { title, subtitle, meta };
+
+  const datePart = showDate
+    ? new Intl.DateTimeFormat('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+      }).format(currentTime)
+    : '';
+  const timePart = showClock
+    ? new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(currentTime)
+    : '';
+  const meta = [datePart, timePart].filter(Boolean).join(' · ').toUpperCase();
+
+  const logoImageUrl = showLogo
+    ? getMediaUploadUrl(media, header?.logoImageId) ?? undefined
+    : undefined;
+
+  return { title, subtitle, meta, logoImageUrl };
 }
 
 export function MineralNoirStage({
@@ -76,6 +111,7 @@ export function MineralNoirStage({
   title,
   subtitle,
   meta,
+  logoImageUrl,
   className,
   children,
 }: MineralNoirStageProps) {
@@ -116,7 +152,7 @@ export function MineralNoirStage({
       <div style={cornerStyle('br')} />
 
       {/* Header bar */}
-      {(title || subtitle || meta) && (
+      {(title || subtitle || meta || logoImageUrl) && (
         <div
           className={classNames(
             'relative z-10 flex shrink-0 items-center justify-between',
@@ -135,6 +171,16 @@ export function MineralNoirStage({
                 borderRadius: '1px',
               }}
             />
+            {logoImageUrl ? (
+              <img
+                src={logoImageUrl}
+                alt={title || 'Logo'}
+                className={classNames(
+                  'shrink-0 object-contain',
+                  isUltraCompact ? 'h-7 max-w-[6rem]' : isCompact ? 'h-9 max-w-[8rem]' : 'h-11 max-w-[10rem]',
+                )}
+              />
+            ) : null}
             <div className="flex flex-col gap-0.5 min-w-0">
               {subtitle && (
                 <span
@@ -147,7 +193,7 @@ export function MineralNoirStage({
                   {subtitle}
                 </span>
               )}
-              {title && (
+              {title && !logoImageUrl && (
                 <span
                   className={classNames(
                     'font-semibold tracking-tight truncate',
@@ -182,7 +228,7 @@ export function MineralNoirStage({
       )}
 
       {/* Hairline-Trennlinie mit Smaragd-Akzent */}
-      {(title || subtitle || meta) && (
+      {(title || subtitle || meta || logoImageUrl) && (
         <div className="relative z-10 shrink-0 mb-3 flex items-center gap-2">
           <div
             className="shrink-0"

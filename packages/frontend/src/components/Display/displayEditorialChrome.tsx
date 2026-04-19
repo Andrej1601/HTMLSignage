@@ -1,9 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Settings, ThemeColors } from '@/types/settings.types';
+import type { Media } from '@/types/media.types';
 import { Waves } from 'lucide-react';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 
 interface EditorialTokens {
   accentCool: string;
@@ -20,6 +22,12 @@ interface DisplayEditorialStageProps {
   subtitle?: string;
   title?: string;
   meta?: string;
+  /**
+   * Optional resolved image URL for the header logo. When set, replaces
+   * the `title` text in the masthead pill. Passing `title` alongside is
+   * fine — it's used as the `alt` text.
+   */
+  logoImageUrl?: string;
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -89,26 +97,59 @@ function getEditorialPanelStyle(
   };
 }
 
-export function getEditorialStageMeta(settings: Settings, currentTime: Date): {
+export function getEditorialStageMeta(
+  settings: Settings,
+  currentTime: Date,
+  media?: Media[],
+): {
   subtitle: string;
   title: string;
   meta: string;
+  logoImageUrl?: string;
 } {
-  const subtitle = settings.header?.subtitle?.trim() || 'Saunawelt';
-  const rawLogoText = (settings.header?.logoText || '').trim();
-  const title =
-    !rawLogoText || /^html\s*signage$/i.test(rawLogoText)
+  const header = settings.header;
+
+  // Operator disabled the header entirely → hide the masthead. Stage
+  // consumers render the banner only when at least one of
+  // title/subtitle/meta is non-empty, so returning '' suppresses it.
+  if (header && header.enabled === false) {
+    return { subtitle: '', title: '', meta: '' };
+  }
+
+  const showLogo = header?.showLogo ?? true;
+  const showClock = header?.showClock ?? true;
+  const showDate = header?.showDate ?? true;
+
+  const subtitle = showLogo ? (header?.subtitle?.trim() || 'Saunawelt') : '';
+  const rawLogoText = (header?.logoText || '').trim();
+  const title = !showLogo
+    ? ''
+    : !rawLogoText || /^html\s*signage$/i.test(rawLogoText)
       ? 'Westfalenbad Hagen'
       : rawLogoText;
-  const meta = new Intl.DateTimeFormat('de-DE', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(currentTime);
 
-  return { subtitle, title, meta };
+  // `meta` carries both date and clock. We compose it from the pieces the
+  // operator asked for and fall back to '' when both toggles are off.
+  const dateParts = showDate
+    ? new Intl.DateTimeFormat('de-DE', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+      }).format(currentTime)
+    : '';
+  const timeParts = showClock
+    ? new Intl.DateTimeFormat('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(currentTime)
+    : '';
+  const meta = [dateParts, timeParts].filter(Boolean).join(' · ');
+
+  const logoImageUrl = showLogo
+    ? getMediaUploadUrl(media, header?.logoImageId) ?? undefined
+    : undefined;
+
+  return { subtitle, title, meta, logoImageUrl };
 }
 
 export function DisplayEditorialStage({
@@ -116,6 +157,7 @@ export function DisplayEditorialStage({
   subtitle,
   title,
   meta,
+  logoImageUrl,
   className,
   contentClassName,
   children,
@@ -161,14 +203,14 @@ export function DisplayEditorialStage({
         />
       </div>
 
-      {(subtitle || title || meta) && (
+      {(subtitle || title || meta || logoImageUrl) && (
         <div
           className={classNames(
             'relative z-10 flex items-center justify-between px-1',
             isUltraCompact ? 'mb-2 gap-2' : isCompact ? 'mb-3 gap-3' : 'mb-4 gap-4 px-2',
           )}
         >
-          {subtitle || title ? (
+          {subtitle || title || logoImageUrl ? (
             <div
               className={classNames(
                 'inline-flex max-w-[72%] items-center rounded-full border',
@@ -179,19 +221,30 @@ export function DisplayEditorialStage({
                 backgroundColor: withAlpha(tokens.card, 0.58),
               }}
             >
-              <div
-                className={classNames(
-                  'flex shrink-0 items-center justify-center rounded-full border',
-                  isUltraCompact ? 'h-6 w-6' : isCompact ? 'h-7 w-7' : 'h-8 w-8',
-                )}
-                style={{
-                  color: tokens.accentWarm,
-                  borderColor: withAlpha(tokens.accentWarm, 0.22),
-                  backgroundColor: withAlpha(tokens.accentWarm, 0.1),
-                }}
-              >
-                <Waves className={classNames(isUltraCompact ? 'h-3 w-3' : 'h-4 w-4')} />
-              </div>
+              {logoImageUrl ? (
+                <img
+                  src={logoImageUrl}
+                  alt={title || 'Logo'}
+                  className={classNames(
+                    'shrink-0 rounded-full object-contain bg-white/70',
+                    isUltraCompact ? 'h-6 w-6' : isCompact ? 'h-7 w-7' : 'h-8 w-8',
+                  )}
+                />
+              ) : (
+                <div
+                  className={classNames(
+                    'flex shrink-0 items-center justify-center rounded-full border',
+                    isUltraCompact ? 'h-6 w-6' : isCompact ? 'h-7 w-7' : 'h-8 w-8',
+                  )}
+                  style={{
+                    color: tokens.accentWarm,
+                    borderColor: withAlpha(tokens.accentWarm, 0.22),
+                    backgroundColor: withAlpha(tokens.accentWarm, 0.1),
+                  }}
+                >
+                  <Waves className={classNames(isUltraCompact ? 'h-3 w-3' : 'h-4 w-4')} />
+                </div>
+              )}
               <div className={classNames('flex min-w-0 items-baseline whitespace-nowrap', isCompact ? 'gap-2' : 'gap-2.5')}>
                 {subtitle ? (
                   <span
@@ -204,7 +257,7 @@ export function DisplayEditorialStage({
                     {subtitle}
                   </span>
                 ) : null}
-                {title ? (
+                {title && !logoImageUrl ? (
                   <span
                     className={classNames(
                       'truncate font-semibold tracking-tight',

@@ -67,7 +67,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
   };
 
   if (isEditorialDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
+    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
 
     return (
       <DisplayEditorialStage
@@ -75,6 +75,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
         subtitle={stageMeta.subtitle}
         title={stageMeta.title}
         meta={stageMeta.meta}
+        logoImageUrl={stageMeta.logoImageUrl}
         contentClassName="h-[calc(100%-4.25rem)]"
       >
         <div className="grid h-full grid-cols-2 grid-rows-2 gap-5">

@@ -75,6 +75,15 @@ export function DisplayClientPage() {
     if (sc.header && Object.keys(sc.header).length > 0) {
       merged.header = { ...(merged.header ?? {}), ...sc.header } as typeof merged.header;
     }
+    // Per-slideshow maintenance-screen override. Missing fields fall
+    // through to the global `settings.maintenanceScreen`, matching the
+    // header-override semantics operators already rely on.
+    if (sc.maintenanceScreen && Object.keys(sc.maintenanceScreen).length > 0) {
+      merged.maintenanceScreen = {
+        ...(merged.maintenanceScreen ?? {}),
+        ...sc.maintenanceScreen,
+      } as typeof merged.maintenanceScreen;
+    }
     return merged;
   }, [displayDeviceId, localSettings, eventClock]);
 
@@ -96,14 +105,18 @@ export function DisplayClientPage() {
     [resolvedAudioSettings, mediaItems],
   );
 
-  const maintenanceScreen = useMemo(
-    () => normalizeMaintenanceScreenSettings(effectiveSettings.maintenanceScreen),
-    [effectiveSettings.maintenanceScreen],
+  // `normalizeMaintenanceScreenSettings` is a pure, cheap normaliser.
+  // React Compiler handles the memoization — manual `useMemo` wrappers
+  // around reads from `effectiveSettings.maintenanceScreen` trip its
+  // "preserve manual memoization" lint when the source sometimes comes
+  // from a merge and sometimes from settings directly.
+  const maintenanceScreen = normalizeMaintenanceScreenSettings(
+    effectiveSettings.maintenanceScreen,
   );
 
-  const maintenanceBackgroundUrl = useMemo(
-    () => getMediaUploadUrl(mediaItems, maintenanceScreen.backgroundImageId),
-    [maintenanceScreen.backgroundImageId, mediaItems],
+  const maintenanceBackgroundUrl = getMediaUploadUrl(
+    mediaItems,
+    maintenanceScreen.backgroundImageId,
   );
 
   const {

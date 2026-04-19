@@ -78,6 +78,15 @@ export function buildSlideshowPreviewPayload(input: PreviewPayloadInput): {
   if (editorConfig.header && Object.keys(editorConfig.header).length > 0) {
     merged.header = { ...(merged.header ?? {}), ...editorConfig.header } as typeof merged.header;
   }
+  if (
+    editorConfig.maintenanceScreen &&
+    Object.keys(editorConfig.maintenanceScreen).length > 0
+  ) {
+    merged.maintenanceScreen = {
+      ...(merged.maintenanceScreen ?? {}),
+      ...editorConfig.maintenanceScreen,
+    } as typeof merged.maintenanceScreen;
+  }
 
   return {
     schedule: previewSchedule,
