@@ -67,11 +67,18 @@ export const systemApi = {
     return data;
   },
 
-  getAuditLog: async (limit = 50, cursor?: string | null): Promise<SystemAuditLogResponse> => {
+  getAuditLog: async (
+    limit = 50,
+    cursor?: string | null,
+    actions?: readonly string[],
+  ): Promise<SystemAuditLogResponse> => {
     const { data } = await api.get<SystemAuditLogResponse>('/system/audit', {
       params: {
         limit,
         ...(cursor ? { cursor } : {}),
+        // Axios serialises array params as `actions=a&actions=b` by
+        // default, which is exactly what our backend expects.
+        ...(actions && actions.length > 0 ? { actions: [...actions] } : {}),
       },
     });
     return data;

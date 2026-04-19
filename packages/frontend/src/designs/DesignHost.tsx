@@ -10,6 +10,7 @@ import type {
 import { DesignErrorBoundary } from './DesignErrorBoundary';
 import { useDesign } from './useDesign';
 import { DEFAULT_DESIGN_ID, type DesignId } from './registry';
+import { reportDesignError } from './telemetry';
 
 interface DesignHostProps<T extends SlideTypeId> {
   /** The slide type being rendered — selects the right renderer in the pack. */
@@ -157,6 +158,15 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
       <DesignErrorBoundary
         fallback={fallback}
         resetKey={`${design.manifest.id}:${slideType}`}
+        onError={(error, info) =>
+          reportDesignError({
+            designId: design.manifest.id,
+            slideType,
+            error,
+            info,
+            deviceId: context.deviceId,
+          })
+        }
       >
         {wrapped}
       </DesignErrorBoundary>

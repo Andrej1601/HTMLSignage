@@ -10,7 +10,23 @@ router.get('/audit', async (req: AuthRequest, res) => {
     const limit = Number.isFinite(parsedLimit) ? parsedLimit : undefined;
     const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : null;
 
-    const result = await listAuditLogs({ limit, cursor });
+    // Optional `actions` filter, accepted as either `?actions=a,b` or
+    // repeated `?actions=a&actions=b`. Trimmed, empty values dropped.
+    const rawActions = req.query.actions;
+    let actions: string[] | undefined;
+    if (Array.isArray(rawActions)) {
+      actions = rawActions
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => value.length > 0);
+    } else if (typeof rawActions === 'string') {
+      actions = rawActions
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0);
+    }
+    if (actions && actions.length === 0) actions = undefined;
+
+    const result = await listAuditLogs({ limit, cursor, actions });
     res.json({
       ok: true,
       items: result.items,
