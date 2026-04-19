@@ -2,12 +2,8 @@ import { memo, useMemo } from 'react';
 import { type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
-import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
-import { normalizeSaunaNameKey } from '@/types/schedule.types';
 import type { SlideRenderContext } from '@htmlsignage/design-sdk';
-import { DisplayContentPanel } from './DisplayContentPanel';
-import { DisplaySaunaDetailSlide } from './DisplaySaunaDetailSlide';
 import { InfosSlide } from './InfosSlide';
 import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
@@ -121,16 +117,6 @@ function areSlideRendererPropsEqual(prev: SlideRendererProps, next: SlideRendere
 export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsEqual);
 
 // Helper functions
-function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
-  if (!saunaId) return undefined;
-  const list = settings.saunas || [];
-  return (
-    list.find((s) => s.id === saunaId) ||
-    list.find((s) => s.name === saunaId) ||
-    list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
-  );
-}
-
 function resolveDesignFlag(settings: Settings): {
   enabled: boolean;
   designId: DesignId;
@@ -308,18 +294,9 @@ function SaunaDetailDispatch({
   });
   const context = buildRenderContext(slide, deviceId);
 
-  const legacy = (
-    <SaunaDetailSlide
-      sauna={getSauna(settings, slide.saunaId)}
-      slide={slide}
-      schedule={schedule}
-      settings={settings}
-      media={media}
-      deviceId={deviceId}
-    />
-  );
-
-  if (!data) return legacy;
+  if (!data) {
+    return <PlaceholderSlide message="Sauna nicht gefunden" />;
+  }
 
   return (
     <DesignHost
@@ -329,7 +306,7 @@ function SaunaDetailDispatch({
       enabled={enabled}
       designId={designId}
       tokenOverrides={tokenOverrides}
-      fallback={legacy}
+      fallback={<PlaceholderSlide message="Design-Pack nicht aktiv" />}
     />
   );
 }
@@ -360,8 +337,7 @@ function ContentPanelDispatch({
   // The pack's SchedulePanelRenderer dispatches on `data.styleHint` and
   // implements all three host styles (`list` / `matrix` / `timeline`) so
   // the large and small zones can render identically. When the design
-  // pack flag is off, DesignHost falls back to ContentPanelSlide which
-  // uses the legacy DisplayContentPanel dispatcher.
+  // pack flag is off or fails to load, the placeholder is shown.
   return (
     <DesignHost
       slideType="content-panel"
@@ -370,59 +346,31 @@ function ContentPanelDispatch({
       enabled={enabled}
       designId={designId}
       tokenOverrides={tokenOverrides}
-      fallback={
-        <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />
-      }
+      fallback={<PlaceholderSlide message="Design-Pack nicht aktiv" />}
     />
   );
 }
 
-// Individual Slide Components
-
-function ContentPanelSlide({
-  schedule,
-  settings,
-  slide,
-  now,
-  deviceId,
-}: {
-  schedule: Schedule;
-  settings: Settings;
-  slide: SlideConfig;
-  now?: Date;
-  deviceId?: string;
-}) {
-  return <DisplayContentPanel schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
-}
-
-function SaunaDetailSlide({
-  sauna,
-  slide,
-  schedule,
-  settings,
-  media,
-  deviceId,
-}: {
-  sauna?: Sauna;
-  slide: SlideConfig;
-  schedule: Schedule;
-  settings: Settings;
-  media?: Media[];
-  deviceId?: string;
-}) {
-  if (!sauna) {
-    return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Sauna nicht gefunden</div>;
-  }
-
+/**
+ * Minimal in-zone placeholder used whenever the design pack can't
+ * render the slide (feature flag off, pack missing renderer, pack
+ * crashed and the boundary swapped us in). Intentionally silent on
+ * colours beyond what the shell already paints — the zone's parent
+ * applies the theme surface.
+ */
+function PlaceholderSlide({ message }: { message: string }) {
   return (
-    <DisplaySaunaDetailSlide
-      sauna={sauna}
-      slide={slide}
-      schedule={schedule}
-      settings={settings}
-      media={media}
-      deviceId={deviceId}
-    />
+    <div
+      className="flex h-full w-full items-center justify-center"
+      style={{ color: 'currentColor', opacity: 0.45 }}
+    >
+      <span
+        className="font-semibold uppercase"
+        style={{ fontSize: 13, letterSpacing: '0.25em' }}
+      >
+        {message}
+      </span>
+    </div>
   );
 }
 

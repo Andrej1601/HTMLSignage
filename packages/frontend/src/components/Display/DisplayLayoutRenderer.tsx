@@ -13,7 +13,6 @@ import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotat
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
 import { DisplaySplitLayout } from '@/components/Display/DisplaySplitLayout';
 import { DisplayTripleLayout } from '@/components/Display/DisplayTripleLayout';
-import { OverviewSlide } from '@/components/Display/OverviewSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import {
@@ -200,16 +199,11 @@ export function DisplayLayoutRenderer({
       );
     }
 
-    return isModernDesign ? (
-      renderContentPanel()
-    ) : (
-      <OverviewSlide
-        schedule={localSchedule}
-        settings={effectiveSettings}
-        now={currentTime}
-        deviceId={displayDeviceId}
-      />
-    );
+    // The design pack handles every `designStyle` through
+    // `renderContentPanel()`. The old `OverviewSlide` fallback (for
+    // unrecognised styles) has been retired — the pack + host settings
+    // together guarantee a valid style always resolves.
+    return renderContentPanel();
   }
 
   switch (safeLayout) {

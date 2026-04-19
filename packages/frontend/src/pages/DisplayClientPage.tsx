@@ -3,7 +3,6 @@ import { useSlideshow } from '@/hooks/useSlideshow';
 import { useDisplayClientRuntime } from '@/hooks/useDisplayClientRuntime';
 import { useDisplaySnapshotCapture } from '@/hooks/useDisplaySnapshotCapture';
 import { DisplayLayoutRenderer } from '@/components/Display/DisplayLayoutRenderer';
-import { preloadDisplayModules } from '@/components/Display/displayDynamicModules';
 import { normalizeDisplayLayout } from '@/components/Display/displayLayoutUtils';
 import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type { SlideConfig } from '@/types/slideshow.types';
@@ -38,7 +37,6 @@ export function DisplayClientPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const displayRootRef = useRef<HTMLDivElement | null>(null);
   const lastPrefetchedAssetSignatureRef = useRef<string | null>(null);
-  const lastPreloadedModuleSignatureRef = useRef<string | null>(null);
   const {
     displayDeviceId,
     displayDeviceName,
@@ -118,14 +116,6 @@ export function DisplayClientPage() {
     () => displayAssetUrls.join('|'),
     [displayAssetUrls],
   );
-  const displayModulePreloadSignature = useMemo(() => {
-    const slideSignature = (effectiveSettings.slideshow?.slides || [])
-      .map((slide) => `${slide.id}:${slide.type}`)
-      .join('|');
-
-    return `${effectiveSettings.designStyle || 'modern-wellness'}|${slideSignature}`;
-  }, [effectiveSettings.designStyle, effectiveSettings.slideshow?.slides]);
-
   useEffect(() => {
     if (lastPrefetchedAssetSignatureRef.current === displayAssetSignature) {
       return;
@@ -135,21 +125,9 @@ export function DisplayClientPage() {
     void prefetchDisplayAssets(displayAssetUrls);
   }, [displayAssetSignature, displayAssetUrls]);
 
-  useEffect(() => {
-    if (lastPreloadedModuleSignatureRef.current === displayModulePreloadSignature) {
-      return;
-    }
-
-    lastPreloadedModuleSignatureRef.current = displayModulePreloadSignature;
-    preloadDisplayModules({
-      designStyle: effectiveSettings.designStyle,
-      slides: effectiveSettings.slideshow?.slides,
-    });
-  }, [
-    displayModulePreloadSignature,
-    effectiveSettings.designStyle,
-    effectiveSettings.slideshow?.slides,
-  ]);
+  // Design packs handle their own code-split loading via dynamic imports
+  // registered in `@/designs/registry.ts`. The old per-slide-type preload
+  // was specific to the retired `displayDynamicModules` lazy loaders.
 
   const tryPlayAudio = useCallback(async () => {
     const audio = audioRef.current;

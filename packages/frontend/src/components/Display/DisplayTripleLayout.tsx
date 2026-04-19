@@ -1,4 +1,3 @@
-import { DisplayClassicTripleLayout } from '@/components/Display/DisplayClassicTripleLayout';
 import { DisplayEditorialTripleLayout } from '@/components/Display/DisplayEditorialTripleLayout';
 import { DisplayMineralNoirTripleLayout } from '@/components/Display/DisplayMineralNoirTripleLayout';
 import { DisplayModernTripleLayout } from '@/components/Display/DisplayModernTripleLayout';
@@ -21,9 +20,9 @@ export function DisplayTripleLayout({ context }: DisplayTripleLayoutProps) {
     return <DisplayEditorialTripleLayout context={context} zoneStates={zoneStates} />;
   }
 
-  return context.isModernDesign ? (
-    <DisplayModernTripleLayout context={context} zoneStates={zoneStates} />
-  ) : (
-    <DisplayClassicTripleLayout context={context} zoneStates={zoneStates} />
-  );
+  // `DisplayModernTripleLayout` is the canonical triple-layout. The
+  // previous `DisplayClassicTripleLayout` fallback has been retired —
+  // every supported `designStyle` now qualifies as "modern" and every
+  // schedule style is covered by the active design pack.
+  return <DisplayModernTripleLayout context={context} zoneStates={zoneStates} />;
 }
