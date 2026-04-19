@@ -21,6 +21,8 @@
     "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
     "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows",
     "new-design": "node packages/design-sdk/bin/new-design.mjs",
+    "test:visual": "pnpm --filter @htmlsignage/visual-regression test",
+    "test:visual:update": "pnpm --filter @htmlsignage/visual-regression test:update",
     "prepare": "husky"
   },
   "devDependencies": {

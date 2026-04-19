@@ -1,0 +1,30 @@
+{
+  "name": "@htmlsignage/visual-regression",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Structural HTML snapshot tests for the design-pack renderers.",
+  "scripts": {
+    "test": "vitest run",
+    "test:update": "vitest run -u",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@htmlsignage/design-sdk": "workspace:*",
+    "@htmlsignage/design-wellness-classic": "workspace:*",
+    "@htmlsignage/design-mineral-noir": "workspace:*",
+    "@htmlsignage/design-editorial-resort": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.1",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
+}
