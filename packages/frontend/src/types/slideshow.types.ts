@@ -102,6 +102,14 @@ export interface SlideshowConfig {
   saunaDetailStyle?: import('@/types/settings.types').SaunaDetailStyle;
   colorPalette?: import('@/types/settings.types').ColorPaletteName;
   theme?: Partial<import('@/types/settings.types').ThemeColors>;
+  /**
+   * Per-slideshow design-pack token overrides. Layered on top of the
+   * pack's `defaultTokens` and on top of the theme-derived overrides
+   * emitted by `themeToTokenOverrides`. Use this for tenant-specific
+   * tweaks (e.g. brand colour accents, tighter/looser spacing) without
+   * code deploys.
+   */
+  tokenOverrides?: import('@htmlsignage/design-sdk').DesignTokenOverrides;
 
   // Advanced
   pauseOnInteraction?: boolean;

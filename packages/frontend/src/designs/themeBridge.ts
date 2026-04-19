@@ -46,3 +46,33 @@ export function themeToTokenOverrides(
   if (Object.keys(colors).length === 0) return undefined;
   return { colors };
 }
+
+/**
+ * Compose a theme-derived override with an explicit per-slideshow
+ * override (typically typed in by an operator via the admin UI). The
+ * explicit override wins token-by-token so tenants can selectively
+ * re-skin a pack without re-specifying every colour.
+ *
+ *   base = themeToTokenOverrides(theme)   // auto-mapped from palette
+ *   top  = slideshow.tokenOverrides       // hand-curated brand tweaks
+ *
+ * → `top` takes precedence inside each section, missing fields fall
+ * through to `base`, then to the pack's `defaultTokens`.
+ */
+export function mergeTokenOverrides(
+  base: DesignTokenOverrides | undefined,
+  top: DesignTokenOverrides | undefined,
+): DesignTokenOverrides | undefined {
+  if (!base && !top) return undefined;
+  if (!base) return top;
+  if (!top) return base;
+
+  const out: DesignTokenOverrides = {};
+  for (const key of ['colors', 'typography', 'spacing', 'radius', 'motion'] as const) {
+    const merged = { ...(base[key] ?? {}), ...(top[key] ?? {}) };
+    if (Object.keys(merged).length > 0) {
+      (out as Record<string, unknown>)[key] = merged;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}

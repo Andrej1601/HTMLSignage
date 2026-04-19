@@ -21,6 +21,7 @@ import {
   DesignHost,
   DEFAULT_DESIGN_ID,
   isKnownDesignId,
+  mergeTokenOverrides,
   themeToTokenOverrides,
   type DesignId,
 } from '@/designs';
@@ -120,12 +121,21 @@ export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsE
 function resolveDesignFlag(settings: Settings): {
   enabled: boolean;
   designId: DesignId;
-  tokenOverrides: ReturnType<typeof themeToTokenOverrides>;
+  tokenOverrides: ReturnType<typeof mergeTokenOverrides>;
 } {
   const enabled = settings.display?.useDesignPacks === true;
   const configuredId = settings.display?.designPackId;
   const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
-  const tokenOverrides = themeToTokenOverrides(settings.theme);
+
+  // Layer order (lowest → highest priority):
+  //   1. Pack defaults (supplied by the pack itself via DesignHost)
+  //   2. Theme-derived overrides (auto-mapped from the host palette)
+  //   3. Explicit slideshow `tokenOverrides` (hand-typed brand tweaks)
+  // `mergeTokenOverrides` composes (2) + (3) and the DesignHost layers
+  // that on top of (1).
+  const themeOverrides = themeToTokenOverrides(settings.theme);
+  const slideshowOverrides = settings.slideshow?.tokenOverrides;
+  const tokenOverrides = mergeTokenOverrides(themeOverrides, slideshowOverrides);
   return { enabled, designId, tokenOverrides };
 }
 

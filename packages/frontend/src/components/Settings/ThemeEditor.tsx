@@ -10,8 +10,10 @@ import { generateDashboardColors } from '@/types/settings.types';
 import { AppearanceSelector } from './AppearanceSelector';
 import { PaletteSelector } from './PaletteSelector';
 import { ColorTokenEditor } from './ColorTokenEditor';
+import { SlideshowTokenOverridesEditor } from './SlideshowTokenOverridesEditor';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
+import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
 import { Presentation } from 'lucide-react';
 
 interface ThemeEditorProps {
@@ -133,9 +135,16 @@ export function ThemeEditor({
             Änderungen gelten nur für <strong>{selectedSlideshow.name}</strong>.
             Nicht gesetzte Werte fallen auf die globalen Einstellungen zurück.
           </span>
-          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette) && (
+          {(selectedSlideshow.config.displayAppearance || selectedSlideshow.config.designStyle || selectedSlideshow.config.saunaDetailStyle || selectedSlideshow.config.colorPalette || selectedSlideshow.config.tokenOverrides) && (
             <button
-              onClick={() => handleSlideshowDesignChange({ displayAppearance: undefined, designStyle: undefined, saunaDetailStyle: undefined, colorPalette: undefined, theme: undefined })}
+              onClick={() => handleSlideshowDesignChange({
+                displayAppearance: undefined,
+                designStyle: undefined,
+                saunaDetailStyle: undefined,
+                colorPalette: undefined,
+                theme: undefined,
+                tokenOverrides: undefined,
+              })}
               className="shrink-0 ml-3 text-xs font-semibold text-spa-info-dark hover:underline"
             >
               Alle Overrides entfernen
@@ -181,6 +190,16 @@ export function ThemeEditor({
                 onChange={onChange}
               />
             </div>
+          )}
+
+          {/* Per-slideshow design-pack token overrides */}
+          {selectedSlideshow && (
+            <SlideshowTokenOverridesEditor
+              value={selectedSlideshow.config.tokenOverrides}
+              onChange={(next: DesignTokenOverrides | undefined) =>
+                handleSlideshowDesignChange({ tokenOverrides: next })
+              }
+            />
           )}
         </section>
       </div>
