@@ -98,7 +98,13 @@ function IntensityMark({
   );
 }
 
-function StatCell({
+/**
+ * Compact stat chip — a single datum as `LABEL · value` (e.g.
+ * "TEMP · 90 °C"). Three or four of these line up in a row without
+ * eating the vertical budget the aufguss list needs. Replaces the
+ * old `StatCell` stacked layout which blew up to 34px value text.
+ */
+function StatChip({
   label,
   value,
   color,
@@ -112,30 +118,44 @@ function StatCell({
   viewport: Viewport;
 }) {
   const { typography } = tokens;
+  const textSize = scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10);
   return (
-    <div className="flex flex-col" style={{ gap: scaled(4, viewport, 1) }}>
+    <span
+      className="inline-flex items-baseline"
+      style={{
+        gap: scaled(6, viewport, 2),
+        padding: `${scaled(4, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+        borderRadius: 9999,
+        border: `1px solid ${withAlpha(color, 0.4)}`,
+        backgroundColor: withAlpha(color, 0.08),
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          ...kickerStyles(
+            withAlpha(color, 0.8),
+            scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
+          ),
+          letterSpacing: '0.2em',
+        }}
+      >
+        {label}
+      </span>
       <span
         className="tabular-nums"
         style={{
           color,
-          fontFamily: typography.fontHeading,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
-          fontWeight: 500,
+          fontFamily: typography.fontMono,
+          fontSize: `${textSize}px`,
+          fontWeight: 600,
+          letterSpacing: '0.02em',
           lineHeight: 1,
-          letterSpacing: '-0.015em',
         }}
       >
         {value}
       </span>
-      <span
-        style={kickerStyles(
-          withAlpha(color, 0.75),
-          scaledFont(typography.baseSizePx * typography.scaleSm * 0.88, viewport, 8),
-        )}
-      >
-        {label}
-      </span>
-    </div>
+    </span>
   );
 }
 
@@ -151,7 +171,7 @@ function StatRow({
   const { colors } = tokens;
   const accent = data.accentColor || colors.accentPrimary;
   const stats = [
-    { label: 'Temperatur', value: fmtTemperature(data.info.temperatureC) },
+    { label: 'Temp', value: fmtTemperature(data.info.temperatureC) },
     { label: 'Feuchte', value: fmtHumidity(data.info.humidityPct) },
     {
       label: 'Plätze',
@@ -163,15 +183,11 @@ function StatRow({
 
   return (
     <div
-      className="flex"
-      style={{
-        gap: scaled(36, viewport, 14),
-        paddingTop: scaled(10, viewport, 3),
-        paddingBottom: scaled(10, viewport, 3),
-      }}
+      className="flex flex-wrap"
+      style={{ gap: `${scaled(6, viewport, 2)}px ${scaled(8, viewport, 3)}px` }}
     >
       {stats.map((stat) => (
-        <StatCell
+        <StatChip
           key={stat.label}
           label={stat.label}
           value={stat.value}
@@ -261,8 +277,10 @@ function InfusionRow({
       className="flex items-baseline"
       style={{
         borderTop: first ? 'none' : `1px solid ${withAlpha(colors.border, 0.55)}`,
-        padding: `${scaled(18, viewport, 7)}px 0`,
-        gap: scaled(24, viewport, 9),
+        // Compacted to give the list more breathing room on small
+        // sauna-detail zones without sacrificing line-height comfort.
+        padding: `${scaled(12, viewport, 5)}px 0`,
+        gap: scaled(20, viewport, 8),
         opacity: isFinished ? 0.75 : 1,
       }}
     >
@@ -271,11 +289,11 @@ function InfusionRow({
         style={{
           color: timeColor,
           fontFamily: typography.fontHeading,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl * 1.1, viewport, 14)}px`,
           fontWeight: 500,
           lineHeight: 1,
           letterSpacing: '-0.01em',
-          minWidth: scaled(94, viewport, 52),
+          minWidth: scaled(80, viewport, 46),
           textShadow: entry.isLive
             ? `0 0 18px ${withAlpha(colors.statusLive, 0.35)}`
             : undefined,
@@ -384,70 +402,104 @@ function InfusionRow({
 
 /**
  * Sauna masthead — brass kicker + large serif name + subtitle.
- * Shared by Split, Hero, Portrait so the name reads identically across.
+ *
+ * Two contexts:
+ *   - `onImage`: rendered over an image. Wraps the text in a brass-
+ *     bordered glass card so the name is readable regardless of the
+ *     image's luminance (the old textShadow-only approach lost the
+ *     ivory text on light-coloured saunas).
+ *   - otherwise: plain text on the panel — the itinerary backdrop
+ *     already carries its own contrast.
  */
 function SaunaMasthead({
   data,
   tokens,
   viewport,
   onImage = false,
+  compact = false,
 }: {
   data: SaunaDetailData;
   tokens: Tokens;
   viewport: Viewport;
   onImage?: boolean;
+  /** If true, shrink scale so the masthead fits into a narrow header strip. */
+  compact?: boolean;
 }) {
-  const { colors, typography } = tokens;
+  const { colors, typography, radius } = tokens;
   const accent = data.accentColor || colors.accentPrimary;
-  const nameColor = onImage ? colors.textPrimary : colors.textPrimary;
-  const kickerColor = onImage ? colors.accentPrimary : accent;
+  const kickerColor = accent;
+  const nameScale = compact ? typography.scale2xl * 1.05 : typography.scale3xl * 1.05;
+  const subtitleScale = compact ? typography.scaleBase : typography.scaleLg;
 
-  return (
-    <div className="flex flex-col" style={{ gap: scaled(10, viewport, 3) }}>
+  const content = (
+    <div className="flex flex-col min-w-0" style={{ gap: scaled(compact ? 4 : 8, viewport, 2) }}>
       <span
-        style={{
-          ...kickerStyles(
-            kickerColor,
-            scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-          ),
-          textShadow: onImage ? `0 1px 6px ${withAlpha(colors.surface, 0.7)}` : undefined,
-        }}
+        style={kickerStyles(
+          kickerColor,
+          scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 9),
+        )}
       >
         Aufguss-Fokus
       </span>
       <h2
+        className="truncate"
         style={{
-          color: nameColor,
+          color: colors.textPrimary,
           fontFamily: typography.fontHeading,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.15, viewport, 24)}px`,
-          fontWeight: 400,
+          fontSize: `${scaledFont(typography.baseSizePx * nameScale, viewport, 18)}px`,
+          fontWeight: 500,
           letterSpacing: '-0.02em',
-          lineHeight: 0.95,
+          lineHeight: 1,
           margin: 0,
-          textShadow: onImage ? `0 2px 14px ${withAlpha(colors.surface, 0.65)}` : undefined,
         }}
+        title={data.name}
       >
         {data.name}
       </h2>
       {data.subtitle ? (
         <span
-          style={{
-            ...eyebrowStyles(
-              withAlpha(colors.textSecondary, onImage ? 1 : 0.92),
-              scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12),
-              typography.fontHeading,
-            ),
-            textShadow: onImage ? `0 1px 6px ${withAlpha(colors.surface, 0.6)}` : undefined,
-          }}
+          className="truncate"
+          style={eyebrowStyles(
+            withAlpha(colors.textSecondary, 0.95),
+            scaledFont(typography.baseSizePx * subtitleScale, viewport, 11),
+            typography.fontHeading,
+          )}
         >
           {data.subtitle}
         </span>
       ) : null}
     </div>
   );
+
+  if (!onImage) return content;
+
+  // On-image: wrap in a brass-bordered glass card so the name reads
+  // against any background (dark stone, bright steam, etc.).
+  return (
+    <div
+      className="flex flex-col min-w-0"
+      style={{
+        gap: scaled(compact ? 4 : 8, viewport, 2),
+        padding: `${scaled(12, viewport, 5)}px ${scaled(16, viewport, 6)}px`,
+        borderRadius: radius.md,
+        border: `1px solid ${withAlpha(accent, 0.55)}`,
+        backgroundColor: withAlpha(colors.surface, 0.72),
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: `0 14px 34px ${withAlpha(colors.surface, 0.5)}`,
+      }}
+    >
+      {content}
+    </div>
+  );
 }
 
 // ── Variant: Split ─────────────────────────────────────────────────────────
+//
+// Image left (3/5), itinerary right (2/5). The sauna name lives on the
+// itinerary side where it reads cleanly against the dark panel, not
+// over variable image luminance. The image carries only the LiveBadge —
+// image luminance can't hide a single brass-bordered chip.
 
 function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
   const { colors, typography, spacing, radius } = tokens;
@@ -468,7 +520,9 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
         gridTemplateColumns: viewport.isNarrow ? '1fr' : '3fr 2fr',
       }}
     >
-      {/* Image panel */}
+      {/* Image panel — clean, no overlaid text. Just the LiveBadge
+          floating top-left so the viewer can see what's running right
+          now without reading any text over the photo. */}
       <section
         className="relative overflow-hidden"
         style={{
@@ -485,21 +539,16 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
               src={data.imageUrl}
               alt={data.name}
               className="absolute inset-0 h-full w-full object-cover"
-              style={{ filter: 'saturate(1.05) brightness(0.92)' }}
+              style={{ filter: 'saturate(1.06) brightness(0.95)' }}
             />
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.0)} 40%, ${withAlpha(colors.surface, 0.88)} 100%)`,
-              }}
-            />
-            {/* Subtle brass frame glow */}
+            {/* Subtle brass frame glow — no bottom darkener now that
+                no text sits on the image. */}
             <div
               aria-hidden
               className="absolute inset-0 pointer-events-none"
               style={{
                 borderRadius: radius.lg,
-                boxShadow: `inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.18)}, inset 0 60px 120px ${withAlpha(colors.accentPrimary, 0.06)}`,
+                boxShadow: `inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.2)}, inset 0 60px 120px ${withAlpha(colors.accentPrimary, 0.06)}`,
               }}
             />
           </>
@@ -507,76 +556,35 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
           <EmptyImagePanel tokens={tokens} viewport={viewport} />
         )}
 
-        {/* Live indicator floats top-left on the image */}
         {liveOrNext ? (
           <div
             className="absolute"
             style={{
-              top: scaled(24, viewport, 10),
-              left: scaled(24, viewport, 10),
+              top: scaled(20, viewport, 8),
+              left: scaled(20, viewport, 8),
             }}
           >
             <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
           </div>
         ) : null}
-
-        {/* Masthead floats bottom-left */}
-        <div
-          className="absolute"
-          style={{
-            bottom: scaled(28, viewport, 12),
-            left: scaled(28, viewport, 12),
-            right: scaled(28, viewport, 12),
-          }}
-        >
-          <SaunaMasthead data={data} tokens={tokens} viewport={viewport} onImage />
-        </div>
       </section>
 
-      {/* Itinerary panel */}
+      {/* Itinerary panel — sauna name + stats + list. Compact header so
+          the aufguss list gets the vertical real estate it deserves. */}
       <section
         className="flex flex-col min-h-0"
         style={{
           padding: `${pad}px`,
-          gap: scaled(spacing.md, viewport, 8),
+          gap: scaled(spacing.sm, viewport, 4),
         }}
       >
-        <div className="flex flex-col" style={{ gap: scaled(8, viewport, 3) }}>
-          <span
-            style={kickerStyles(
-              accent,
-              scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-            )}
-          >
-            Heute geplant
-          </span>
-          <div className="flex items-end justify-between" style={{ gap: scaled(12, viewport, 4) }}>
-            <h3
-              style={{
-                color: colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 18)}px`,
-                fontWeight: 400,
-                letterSpacing: '-0.015em',
-                lineHeight: 1,
-                margin: 0,
-              }}
-            >
-              Aufguss-Plan
-            </h3>
-            <span
-              className="tabular-nums"
-              style={{
-                color: withAlpha(colors.textSecondary, 0.85),
-                fontFamily: typography.fontMono,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-                letterSpacing: '0.04em',
-              }}
-            >
-              {data.upcoming.length} {data.upcoming.length === 1 ? 'Termin' : 'Termine'}
-            </span>
-          </div>
-        </div>
+        {/* Sauna name as the primary headline on the panel */}
+        <SaunaMasthead
+          data={data}
+          tokens={tokens}
+          viewport={viewport}
+          compact={viewport.isCompact}
+        />
 
         <StatRow data={data} tokens={tokens} viewport={viewport} />
 
@@ -585,6 +593,35 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
         ) : data.infoBadges.length > 0 ? (
           <FeatureChips features={data.infoBadges} tokens={tokens} viewport={viewport} />
         ) : null}
+
+        {/* Aufguss-Liste header: compact one-liner — kicker + count */}
+        <div
+          className="flex items-baseline justify-between"
+          style={{
+            gap: scaled(12, viewport, 4),
+            paddingTop: scaled(4, viewport, 1),
+          }}
+        >
+          <span
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9),
+            )}
+          >
+            Aufguss-Plan heute
+          </span>
+          <span
+            className="tabular-nums"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontFamily: typography.fontMono,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {data.upcoming.length} {data.upcoming.length === 1 ? 'Termin' : 'Termine'}
+          </span>
+        </div>
 
         <div style={brassHairline(colors, 1)} />
 
@@ -727,8 +764,16 @@ function EmptyInfusions({ tokens, viewport }: { tokens: Tokens; viewport: Viewpo
 
 // ── Variant: Hero ──────────────────────────────────────────────────────────
 
+// ── Variant: Hero ──────────────────────────────────────────────────────────
+//
+// Image occupies the top 55% of the stage as a pure hero; the bottom
+// 45% is a brass-bordered aufguss panel carrying the full upcoming
+// list. The old "floating now-card" design gave the aufgüsse barely
+// two visible rows on a 16:9 display — this layout shows 4–6 depending
+// on zone height without the image ever losing its dramatic billing.
+
 function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
   const pad = scaled(spacing.xl, viewport, 14);
@@ -736,228 +781,143 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const liveOrNext =
     data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
 
-  const shortListing = data.upcoming
-    .filter((e) => !e.isFinished)
-    .slice(0, viewport.isCompact ? 2 : 3);
+  const imageHeight = viewport.isCompact ? '50%' : '55%';
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden"
+      className="flex h-full w-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
       }}
     >
-      {data.imageUrl ? (
-        <img
-          src={data.imageUrl}
-          alt={data.name}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ filter: 'saturate(1.06) brightness(0.82)' }}
-        />
-      ) : (
-        <div
-          className="absolute inset-0"
-          style={{ background: auroraAmbientBackground(colors) }}
-        />
-      )}
-
-      {/* Gradient vignette — warmer at the bottom to match the brass. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.25)} 0%, ${withAlpha(colors.surface, 0.0)} 30%, ${withAlpha(colors.surface, 0.55)} 65%, ${withAlpha(colors.surface, 0.95)} 100%)`,
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(ellipse 60% 40% at 50% 100%, ${withAlpha(colors.accentPrimary, 0.18)} 0%, transparent 70%)`,
-        }}
-      />
-
-      {/* Top: live badge */}
-      {liveOrNext ? (
-        <div
-          className="absolute"
-          style={{ top: pad, left: pad }}
-        >
-          <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
-        </div>
-      ) : null}
-
-      {/* Center-bottom: name + description */}
-      <div
-        className="absolute"
-        style={{
-          left: pad,
-          right: pad,
-          bottom: pad,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: scaled(20, viewport, 8),
-        }}
+      {/* Top: hero image */}
+      <section
+        className="relative shrink-0 overflow-hidden"
+        style={{ height: imageHeight }}
       >
-        <SaunaMasthead data={data} tokens={tokens} viewport={viewport} onImage />
+        {data.imageUrl ? (
+          <img
+            src={data.imageUrl}
+            alt={data.name}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(1.06) brightness(0.9)' }}
+          />
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{ background: auroraAmbientBackground(colors) }}
+          />
+        )}
 
-        {/* The "now" card — brass bordered, glass-blurred */}
+        {/* Subtle bottom fade into the aufguss panel */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.0)} 60%, ${withAlpha(colors.surface, 0.85)} 100%)`,
+          }}
+        />
+
+        {/* Live badge top-left */}
         {liveOrNext ? (
           <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: scaled(10, viewport, 3),
-              padding: `${scaled(20, viewport, 7)}px ${scaled(24, viewport, 9)}px`,
-              borderRadius: radius.lg,
-              border: `1px solid ${withAlpha(accent, 0.5)}`,
-              backgroundColor: withAlpha(colors.surface, 0.55),
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              boxShadow: `0 24px 60px ${withAlpha(colors.surface, 0.6)}`,
-              maxWidth: 720,
-            }}
+            className="absolute"
+            style={{ top: pad, left: pad }}
           >
-            <div className="flex items-baseline" style={{ gap: scaled(18, viewport, 7) }}>
-              <span
-                className="tabular-nums"
-                style={{
-                  color: liveOrNext.isLive ? colors.statusLive : colors.textPrimary,
-                  fontFamily: typography.fontHeading,
-                  fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 20)}px`,
-                  fontWeight: 400,
-                  letterSpacing: '-0.02em',
-                  lineHeight: 0.95,
-                  textShadow: liveOrNext.isLive
-                    ? `0 0 22px ${withAlpha(colors.statusLive, 0.35)}`
-                    : undefined,
-                }}
-              >
-                {liveOrNext.time}
-              </span>
-              <div className="flex flex-col min-w-0 flex-1" style={{ gap: scaled(4, viewport, 1) }}>
-                <span
-                  style={kickerStyles(
-                    accent,
-                    scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-                  )}
-                >
-                  {liveOrNext.isLive
-                    ? 'Läuft gerade'
-                    : liveOrNext.isNext
-                      ? 'Als Nächstes'
-                      : liveOrNext.isPrestart
-                        ? 'Gleich'
-                        : 'Geplant'}
-                </span>
-                <h3
-                  style={{
-                    color: colors.textPrimary,
-                    fontFamily: typography.fontHeading,
-                    fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 15)}px`,
-                    fontWeight: 500,
-                    letterSpacing: '-0.005em',
-                    lineHeight: 1.1,
-                    margin: 0,
-                  }}
-                >
-                  {liveOrNext.title}
-                </h3>
-              </div>
-              {liveOrNext.intensity != null && liveOrNext.intensity > 0 ? (
-                <IntensityMark
-                  level={liveOrNext.intensity}
-                  color={liveOrNext.isLive ? colors.statusLive : accent}
-                  tokens={tokens}
-                  viewport={viewport}
-                />
-              ) : null}
-            </div>
-
-            {liveOrNext.aromas && liveOrNext.aromas.length > 0 ? (
-              <div
-                className="flex flex-wrap"
-                style={{ gap: `${scaled(6, viewport, 2)}px ${scaled(8, viewport, 3)}px` }}
-              >
-                {liveOrNext.aromas.map((aroma) => {
-                  const aromaColor = aroma.color || accent;
-                  return (
-                    <span
-                      key={aroma.id}
-                      className="inline-flex items-center"
-                      style={{
-                        gap: scaled(5, viewport, 2),
-                        padding: `${scaled(3, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
-                        borderRadius: 9999,
-                        backgroundColor: withAlpha(aromaColor, 0.16),
-                        border: `1px solid ${withAlpha(aromaColor, 0.5)}`,
-                        color: aromaColor,
-                        fontFamily: typography.fontBody,
-                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {aroma.emoji ? <span aria-hidden>{aroma.emoji}</span> : null}
-                      {aroma.name}
-                    </span>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {shortListing.length > 1 ? (
-              <>
-                <div style={{ ...brassHairline(colors, 1), opacity: 0.6 }} />
-                <div className="flex flex-col" style={{ gap: scaled(6, viewport, 2) }}>
-                  <span
-                    style={kickerStyles(
-                      withAlpha(colors.textSecondary, 0.8),
-                      scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
-                    )}
-                  >
-                    Im Anschluss
-                  </span>
-                  <div className="flex flex-col" style={{ gap: scaled(4, viewport, 1) }}>
-                    {shortListing.slice(1).map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-baseline"
-                        style={{ gap: scaled(14, viewport, 5) }}
-                      >
-                        <span
-                          className="shrink-0 tabular-nums"
-                          style={{
-                            color: withAlpha(colors.textPrimary, 0.85),
-                            fontFamily: typography.fontMono,
-                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
-                            fontWeight: 500,
-                            letterSpacing: '0.02em',
-                            minWidth: scaled(62, viewport, 36),
-                          }}
-                        >
-                          {entry.time}
-                        </span>
-                        <span
-                          className="truncate"
-                          style={{
-                            color: withAlpha(colors.textPrimary, 0.85),
-                            fontFamily: typography.fontHeading,
-                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
-                            fontWeight: 400,
-                            lineHeight: 1.15,
-                          }}
-                        >
-                          {entry.title}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : null}
+            <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
           </div>
         ) : null}
-      </div>
+
+        {/* Sauna masthead bottom-left in a brass glass card so the
+            name reads on any image. */}
+        <div
+          className="absolute"
+          style={{
+            left: pad,
+            right: pad,
+            bottom: pad,
+            maxWidth: 620,
+          }}
+        >
+          <SaunaMasthead
+            data={data}
+            tokens={tokens}
+            viewport={viewport}
+            onImage
+            compact={viewport.isCompact}
+          />
+        </div>
+      </section>
+
+      {/* Bottom: aufguss panel with full list + compact chrome */}
+      <section
+        className="flex min-h-0 flex-1 flex-col"
+        style={{
+          padding: `${pad}px`,
+          gap: scaled(spacing.sm, viewport, 3),
+          background: auroraAmbientBackground(colors),
+        }}
+      >
+        {/* Header row: kicker + stats + count */}
+        <div
+          className="flex flex-wrap items-center justify-between"
+          style={{ gap: scaled(spacing.md, viewport, 6) }}
+        >
+          <div className="flex flex-col" style={{ gap: scaled(4, viewport, 1) }}>
+            <span
+              style={kickerStyles(
+                accent,
+                scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9),
+              )}
+            >
+              Aufguss-Plan heute
+            </span>
+            <span
+              className="tabular-nums"
+              style={{
+                color: withAlpha(colors.textSecondary, 0.9),
+                fontFamily: typography.fontMono,
+                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+                letterSpacing: '0.04em',
+              }}
+            >
+              {data.upcoming.length} {data.upcoming.length === 1 ? 'Termin' : 'Termine'}
+            </span>
+          </div>
+          <StatRow data={data} tokens={tokens} viewport={viewport} />
+        </div>
+
+        {/* Feature chips just below the header row, if any */}
+        {data.info.features && data.info.features.length > 0 ? (
+          <FeatureChips features={data.info.features} tokens={tokens} viewport={viewport} />
+        ) : data.infoBadges.length > 0 ? (
+          <FeatureChips features={data.infoBadges} tokens={tokens} viewport={viewport} />
+        ) : null}
+
+        <div style={brassHairline(colors, 1)} />
+
+        {data.upcoming.length === 0 ? (
+          <EmptyInfusions tokens={tokens} viewport={viewport} />
+        ) : (
+          <AutoScroll className="flex-1 min-h-0">
+            <div className="flex flex-col">
+              {data.upcoming.map((entry, idx) => (
+                <InfusionRow
+                  key={entry.id}
+                  entry={entry}
+                  tokens={tokens}
+                  viewport={viewport}
+                  accent={accent}
+                  first={idx === 0}
+                />
+              ))}
+            </div>
+          </AutoScroll>
+        )}
+      </section>
+
     </div>
   );
 }
@@ -982,97 +942,104 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
         fontFamily: typography.fontBody,
       }}
     >
-      {/* Upper image half */}
+      {/* Upper image — 38% (was 52%). On portrait zones we want the
+          aufguss list to command at least 60% so enough entries fit
+          without the scroll immediately kicking in. */}
       <section
         className="relative shrink-0"
         style={{
-          height: '52%',
+          height: viewport.isCompact ? '36%' : '38%',
           margin: `${pad}px ${pad}px 0 ${pad}px`,
           borderRadius: radius.lg,
           overflow: 'hidden',
           border: `1px solid ${withAlpha(colors.border, 0.85)}`,
-          boxShadow: `0 22px 52px ${withAlpha(colors.surface, 0.55)}`,
+          boxShadow: `0 20px 48px ${withAlpha(colors.surface, 0.5)}`,
         }}
       >
         {data.imageUrl ? (
-          <>
-            <img
-              src={data.imageUrl}
-              alt={data.name}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ filter: 'saturate(1.05) brightness(0.88)' }}
-            />
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.1)} 30%, ${withAlpha(colors.surface, 0.85)} 100%)`,
-              }}
-            />
-          </>
+          <img
+            src={data.imageUrl}
+            alt={data.name}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(1.06) brightness(0.95)' }}
+          />
         ) : (
           <EmptyImagePanel tokens={tokens} viewport={viewport} />
         )}
+
+        {/* Subtle brass frame glow — no bottom-darkener needed now
+            that the name sits on the panel below the image. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            borderRadius: radius.lg,
+            boxShadow: `inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.2)}`,
+          }}
+        />
 
         {liveOrNext ? (
           <div
             className="absolute"
             style={{
-              top: scaled(20, viewport, 8),
-              left: scaled(20, viewport, 8),
+              top: scaled(16, viewport, 6),
+              left: scaled(16, viewport, 6),
             }}
           >
             <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
           </div>
         ) : null}
-
-        <div
-          className="absolute"
-          style={{
-            bottom: scaled(24, viewport, 10),
-            left: scaled(24, viewport, 10),
-            right: scaled(24, viewport, 10),
-          }}
-        >
-          <SaunaMasthead data={data} tokens={tokens} viewport={viewport} onImage />
-        </div>
       </section>
 
-      {/* Lower itinerary half */}
+      {/* Lower itinerary — ~62%. Sauna name + stats in the header row,
+          then the full list. Compact chrome so entries win the
+          vertical budget. */}
       <section
         className="flex flex-1 min-h-0 flex-col"
         style={{
           padding: `${pad}px`,
-          gap: scaled(spacing.md, viewport, 6),
+          gap: scaled(spacing.sm, viewport, 4),
         }}
       >
+        <SaunaMasthead
+          data={data}
+          tokens={tokens}
+          viewport={viewport}
+          compact
+        />
+
+        <StatRow data={data} tokens={tokens} viewport={viewport} />
+
+        {data.info.features && data.info.features.length > 0 ? (
+          <FeatureChips features={data.info.features} tokens={tokens} viewport={viewport} />
+        ) : data.infoBadges.length > 0 ? (
+          <FeatureChips features={data.infoBadges} tokens={tokens} viewport={viewport} />
+        ) : null}
+
+        {/* Compact list header — kicker + count on one line */}
         <div
-          className="flex items-end justify-between"
-          style={{ gap: scaled(16, viewport, 6) }}
+          className="flex items-baseline justify-between"
+          style={{ gap: scaled(12, viewport, 4), paddingTop: scaled(4, viewport, 1) }}
         >
-          <div className="flex flex-col" style={{ gap: scaled(6, viewport, 2) }}>
-            <span
-              style={kickerStyles(
-                accent,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-              )}
-            >
-              Heute geplant
-            </span>
-            <h3
-              style={{
-                color: colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
-                fontWeight: 400,
-                letterSpacing: '-0.015em',
-                lineHeight: 1,
-                margin: 0,
-              }}
-            >
-              Aufguss-Plan
-            </h3>
-          </div>
-          <StatRow data={data} tokens={tokens} viewport={viewport} />
+          <span
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9),
+            )}
+          >
+            Aufguss-Plan heute
+          </span>
+          <span
+            className="tabular-nums"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontFamily: typography.fontMono,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.04em',
+            }}
+          >
+            {data.upcoming.length} {data.upcoming.length === 1 ? 'Termin' : 'Termine'}
+          </span>
         </div>
 
         <div style={brassHairline(colors, 1)} />

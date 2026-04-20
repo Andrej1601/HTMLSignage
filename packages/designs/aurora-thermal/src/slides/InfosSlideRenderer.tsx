@@ -16,13 +16,19 @@ type Viewport = SlideRendererProps<'infos'>['context']['viewport'];
  *
  * Three layout modes — each inherits the same typographic voice:
  *
- *   - background image → full-bleed photo with a bottom masthead
- *                        block anchored over a vignette
+ *   - background image → full-bleed photo; text lives in a brass-
+ *                        bordered glass card at the bottom-left so
+ *                        contrast survives any image luminance
  *   - side image       → 55/45 split, editorial column left, framed
  *                        photograph right
  *   - no image         → centred editorial column on the ambient
  *                        background; brass corner ornaments give it
  *                        weight without relying on a photo
+ *
+ * Contrast rule: body copy is rendered at full `textPrimary` alpha
+ * across all three modes. The previous 0.92–0.95 multiplier was too
+ * dim on the warm-charcoal surface and triggered legibility
+ * complaints from the floor.
  */
 export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps<'infos'>) {
   const { colors, typography, spacing, radius } = tokens;
@@ -45,38 +51,47 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           src={data.imageUrl}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
-          style={{ filter: 'saturate(1.05) brightness(0.78)' }}
+          style={{ filter: 'saturate(1.06) brightness(0.72)' }}
         />
-        {/* Vignette — warmer at the bottom, matches brass */}
+        {/* Vignette — stronger at the bottom so the glass card sits on
+            a guaranteed-dark region no matter what the photo shows. */}
         <div
-          className="absolute inset-0"
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
           style={{
-            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.15)} 0%, ${withAlpha(colors.surface, 0.0)} 30%, ${withAlpha(colors.surface, 0.65)} 65%, ${withAlpha(colors.surface, 0.96)} 100%)`,
+            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.3)} 0%, ${withAlpha(colors.surface, 0.0)} 30%, ${withAlpha(colors.surface, 0.7)} 65%, ${withAlpha(colors.surface, 0.97)} 100%)`,
           }}
         />
         <div
-          className="absolute inset-0"
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse 60% 40% at 50% 100%, ${withAlpha(accent, 0.22)} 0%, transparent 70%)`,
+            background: `radial-gradient(ellipse 60% 40% at 50% 100%, ${withAlpha(accent, 0.2)} 0%, transparent 70%)`,
           }}
         />
 
+        {/* Text lives in a brass-bordered glass card — guarantees
+            contrast regardless of image luminance. */}
         <div
           className="relative z-10 flex flex-col"
           style={{
-            padding: `${pad}px`,
-            gap: scaled(18, viewport, 7),
-            maxWidth: '78%',
+            margin: `${pad}px`,
+            padding: `${scaled(24, viewport, 10)}px ${scaled(32, viewport, 12)}px`,
+            borderRadius: radius.lg,
+            border: `1px solid ${withAlpha(accent, 0.5)}`,
+            backgroundColor: withAlpha(colors.surface, 0.78),
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            boxShadow: `0 22px 52px ${withAlpha(colors.surface, 0.55)}`,
+            gap: scaled(16, viewport, 6),
+            maxWidth: '80%',
           }}
         >
           <span
-            style={{
-              ...kickerStyles(
-                accent,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 10),
-              ),
-              textShadow: `0 1px 6px ${withAlpha(colors.surface, 0.65)}`,
-            }}
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 10),
+            )}
           >
             Aus der Saunawelt
           </span>
@@ -84,28 +99,26 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             style={{
               color: colors.textPrimary,
               fontFamily: typography.fontHeading,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.3, viewport, 26)}px`,
-              fontWeight: 400,
-              lineHeight: 0.95,
-              letterSpacing: '-0.025em',
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.2, viewport, 24)}px`,
+              fontWeight: 500,
+              lineHeight: 0.98,
+              letterSpacing: '-0.02em',
               margin: 0,
-              textShadow: `0 2px 14px ${withAlpha(colors.surface, 0.72)}`,
             }}
           >
             {data.title}
           </h2>
-          <div style={{ ...brassHairline(colors, 1), width: scaled(160, viewport, 70) }} />
+          <div style={{ ...brassHairline(colors, 1), width: scaled(140, viewport, 60) }} />
           <p
             style={{
-              color: withAlpha(colors.textPrimary, 0.95),
+              color: colors.textPrimary,
               fontFamily: typography.fontBody,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg * 1.08, viewport, 13)}px`,
               lineHeight: 1.55,
               whiteSpace: 'pre-line',
               fontWeight: 400,
-              maxWidth: 860,
+              maxWidth: 820,
               margin: 0,
-              textShadow: `0 1px 6px ${withAlpha(colors.surface, 0.6)}`,
             }}
           >
             {data.text}
@@ -131,7 +144,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
       >
         <section
           className="flex flex-col justify-center min-w-0"
-          style={{ padding: `${pad}px`, gap: scaled(20, viewport, 7) }}
+          style={{ padding: `${pad}px`, gap: scaled(18, viewport, 7) }}
         >
           <span
             style={kickerStyles(
@@ -145,10 +158,10 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             style={{
               color: colors.textPrimary,
               fontFamily: typography.fontHeading,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.15, viewport, 22)}px`,
-              fontWeight: 400,
-              lineHeight: 0.95,
-              letterSpacing: '-0.025em',
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.1, viewport, 22)}px`,
+              fontWeight: 500,
+              lineHeight: 0.98,
+              letterSpacing: '-0.02em',
               margin: 0,
             }}
           >
@@ -157,8 +170,11 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           <div style={{ ...brassHairline(colors, 1), width: scaled(140, viewport, 60) }} />
           <p
             style={{
-              color: withAlpha(colors.textPrimary, 0.92),
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
+              // Full-alpha textPrimary; the 0.92 multiplier was too
+              // dim on warm charcoal and dropped below comfortable
+              // legibility for operators reading from across the spa.
+              color: colors.textPrimary,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg * 1.08, viewport, 13)}px`,
               lineHeight: 1.6,
               whiteSpace: 'pre-line',
               fontWeight: 400,
@@ -171,7 +187,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           </p>
           <span
             style={eyebrowStyles(
-              withAlpha(colors.textSecondary, 0.85),
+              withAlpha(colors.textPrimary, 0.75),
               scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10),
               typography.fontHeading,
             )}
@@ -193,14 +209,14 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             src={data.imageUrl ?? undefined}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(1.06) brightness(0.95)' }}
+            style={{ filter: 'saturate(1.06) brightness(0.98)' }}
           />
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none"
             style={{
               borderRadius: radius.lg,
-              boxShadow: `inset 0 0 0 1px ${withAlpha(accent, 0.22)}, inset 0 -80px 120px ${withAlpha(colors.surface, 0.25)}`,
+              boxShadow: `inset 0 0 0 1px ${withAlpha(accent, 0.22)}, inset 0 -80px 120px ${withAlpha(colors.surface, 0.2)}`,
             }}
           />
         </section>
@@ -245,10 +261,10 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           style={{
             color: colors.textPrimary,
             fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.3, viewport, 24)}px`,
-            fontWeight: 400,
-            lineHeight: 0.95,
-            letterSpacing: '-0.025em',
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.2, viewport, 24)}px`,
+            fontWeight: 500,
+            lineHeight: 0.98,
+            letterSpacing: '-0.02em',
             margin: 0,
             textAlign: 'center',
           }}
@@ -258,8 +274,8 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
         <div style={{ ...brassHairline(colors, 1), width: scaled(120, viewport, 56), alignSelf: 'center' }} />
         <p
           style={{
-            color: withAlpha(colors.textPrimary, 0.94),
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
+            color: colors.textPrimary,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg * 1.08, viewport, 13)}px`,
             lineHeight: 1.65,
             whiteSpace: 'pre-line',
             fontWeight: 400,
