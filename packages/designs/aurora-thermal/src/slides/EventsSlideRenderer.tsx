@@ -160,7 +160,11 @@ function EventRow({
     ? start.toLocaleDateString('de-DE', { weekday: 'long' })
     : '';
 
-  const hasImage = Boolean(event.imageUrl);
+  // Image is expensive on horizontal budget — show it only when the
+  // row is genuinely wide. A 150px thumbnail + gap + status column
+  // would push the title area under 300px on a typical 960px zone,
+  // which is the complaint we're fixing here.
+  const hasImage = Boolean(event.imageUrl) && !viewport.isNarrow && !viewport.isCompact;
 
   return (
     <div
@@ -168,17 +172,18 @@ function EventRow({
       style={{
         borderTop: first ? `1px solid ${withAlpha(colors.border, 0.55)}` : 'none',
         borderBottom: `1px solid ${withAlpha(colors.border, 0.55)}`,
-        padding: `${scaled(20, viewport, 8)}px 0`,
-        gap: scaled(28, viewport, 10),
+        padding: `${scaled(16, viewport, 7)}px 0`,
+        gap: scaled(22, viewport, 8),
         position: 'relative',
       }}
     >
-      {/* Left: brass-accent rule + day block */}
+      {/* Left: brass-accent rule + day block — compacted so the title
+          wins real estate on medium-width zones. */}
       <div
         className="shrink-0 flex"
         style={{
-          gap: scaled(18, viewport, 6),
-          minWidth: scaled(160, viewport, 96),
+          gap: scaled(14, viewport, 5),
+          minWidth: scaled(116, viewport, 74),
           alignItems: 'stretch',
         }}
       >
@@ -196,14 +201,14 @@ function EventRow({
         />
         <div
           className="flex flex-col"
-          style={{ gap: scaled(6, viewport, 2), justifyContent: 'center' }}
+          style={{ gap: scaled(4, viewport, 1), justifyContent: 'center' }}
         >
           <span
             className="tabular-nums"
             style={{
               color: colors.textPrimary,
               fontFamily: typography.fontHeading,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.15, viewport, 24)}px`,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 0.9, viewport, 22)}px`,
               fontWeight: 400,
               lineHeight: 0.9,
               letterSpacing: '-0.02em',
@@ -215,7 +220,7 @@ function EventRow({
             <span
               style={kickerStyles(
                 colors.accentPrimary,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 9),
+                scaledFont(typography.baseSizePx * typography.scaleSm * 0.88, viewport, 8),
               )}
             >
               {monthLabel}
@@ -225,7 +230,7 @@ function EventRow({
             <span
               style={eyebrowStyles(
                 withAlpha(colors.textSecondary, 0.88),
-                scaledFont(typography.baseSizePx * typography.scaleBase * 0.92, viewport, 9),
+                scaledFont(typography.baseSizePx * typography.scaleBase * 0.88, viewport, 9),
                 typography.fontHeading,
               )}
             >
@@ -235,8 +240,10 @@ function EventRow({
         </div>
       </div>
 
-      {/* Middle: title + meta */}
-      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(8, viewport, 3), justifyContent: 'center' }}>
+      {/* Middle: title + meta — flex-1 so it absorbs all slack space.
+          Title gets up to 3 lines when space allows; on narrow zones
+          we drop to 2 to protect the date column. */}
+      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(6, viewport, 2), justifyContent: 'center' }}>
         <h3
           style={{
             color: colors.textPrimary,
@@ -249,7 +256,7 @@ function EventRow({
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: 2,
+            WebkitLineClamp: viewport.isNarrow ? 2 : 3,
           }}
           title={event.title}
         >
@@ -257,12 +264,12 @@ function EventRow({
         </h3>
         <div
           className="flex items-baseline flex-wrap"
-          style={{ gap: `${scaled(6, viewport, 2)}px ${scaled(14, viewport, 5)}px` }}
+          style={{ gap: `${scaled(4, viewport, 1)}px ${scaled(12, viewport, 4)}px` }}
         >
           <span
             className="tabular-nums"
             style={{
-              color: withAlpha(colors.textSecondary, 0.95),
+              color: withAlpha(colors.textPrimary, 0.9),
               fontFamily: typography.fontMono,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
               fontWeight: 500,
@@ -274,7 +281,7 @@ function EventRow({
           {event.location ? (
             <span
               style={eyebrowStyles(
-                withAlpha(colors.textSecondary, 0.92),
+                withAlpha(colors.textPrimary, 0.82),
                 scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11),
                 typography.fontHeading,
               )}
@@ -285,9 +292,8 @@ function EventRow({
         </div>
         {event.description ? (
           <p
-            className="truncate"
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
+              color: withAlpha(colors.textPrimary, 0.85),
               fontFamily: typography.fontBody,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
               lineHeight: 1.45,
@@ -296,7 +302,7 @@ function EventRow({
               overflow: 'hidden',
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: viewport.isCompact ? 1 : 2,
+              WebkitLineClamp: viewport.isCompact ? 1 : viewport.isNarrow ? 2 : 3,
             }}
           >
             {event.description}
@@ -304,16 +310,18 @@ function EventRow({
         ) : null}
       </div>
 
-      {/* Right: polaroid image + status */}
+      {/* Right: image + status. Image is dropped on non-wide zones so
+          the middle column gets the full slack. Status column is also
+          slimmer than before — "Jetzt / Bald / Geplant" fits in ~86px. */}
       <div
         className="shrink-0 flex items-center"
-        style={{ gap: scaled(18, viewport, 6) }}
+        style={{ gap: scaled(14, viewport, 5) }}
       >
-        {hasImage && !viewport.isCompact ? (
+        {hasImage ? (
           <div
             style={{
-              width: scaled(150, viewport, 72),
-              height: scaled(96, viewport, 52),
+              width: scaled(130, viewport, 64),
+              height: scaled(84, viewport, 46),
               borderRadius: radius.md,
               overflow: 'hidden',
               border: `1px solid ${withAlpha(colors.accentPrimary, 0.35)}`,
@@ -332,12 +340,12 @@ function EventRow({
 
         <div
           className="flex flex-col items-end"
-          style={{ gap: scaled(8, viewport, 3), minWidth: scaled(118, viewport, 60) }}
+          style={{ gap: scaled(6, viewport, 2), minWidth: scaled(92, viewport, 54) }}
         >
           <span
             style={statusChipStyles(status.color, {
               isLive: event.isLive,
-              sizePx: scaledFont(typography.baseSizePx * typography.scaleSm * 0.88, viewport, 8),
+              sizePx: scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
               fontFamily: typography.fontBody,
             })}
           >
@@ -357,11 +365,16 @@ function EventRow({
           </span>
           {event.relativeLabel ? (
             <span
-              style={eyebrowStyles(
-                withAlpha(colors.textSecondary, 0.85),
-                scaledFont(typography.baseSizePx * typography.scaleBase * 0.92, viewport, 9),
-                typography.fontHeading,
-              )}
+              className="truncate"
+              style={{
+                ...eyebrowStyles(
+                  withAlpha(colors.textSecondary, 0.85),
+                  scaledFont(typography.baseSizePx * typography.scaleBase * 0.88, viewport, 9),
+                  typography.fontHeading,
+                ),
+                textAlign: 'right',
+                maxWidth: scaled(120, viewport, 72),
+              }}
             >
               {event.relativeLabel}
             </span>

@@ -347,11 +347,14 @@ function ListRow({
 
   return (
     <div
-      className="flex items-baseline"
+      className="flex items-center"
       style={{
         borderBottom: `1px solid ${withAlpha(colors.border, 0.55)}`,
-        padding: `${scaled(22, viewport, 9)}px 0`,
-        gap: `${scaled(36, viewport, 12)}px`,
+        // Tighter rows so more time slots fit on a typical 1080p
+        // schedule screen. Was 22/0 → felt airy but only 6–7 rows
+        // were visible at once on wellness-stage layouts.
+        padding: `${scaled(14, viewport, 6)}px 0`,
+        gap: `${scaled(28, viewport, 10)}px`,
         opacity: isFinished ? 0.75 : 1,
         position: 'relative',
       }}
@@ -364,8 +367,8 @@ function ListRow({
           style={{
             position: 'absolute',
             left: -scaled(spacing(viewport, 'sm'), viewport, 4),
-            top: scaled(28, viewport, 10),
-            bottom: scaled(28, viewport, 10),
+            top: scaled(18, viewport, 6),
+            bottom: scaled(18, viewport, 6),
             width: 2,
             backgroundColor: withAlpha(entry.saunaColor, isFinished ? 0.35 : 0.85),
             borderRadius: 1,
@@ -378,11 +381,13 @@ function ListRow({
         style={{
           color: timeColor,
           fontFamily: typography.fontHeading,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 0.95, viewport, 22)}px`,
+          // Smaller than scale3xl × 0.95 so the time column doesn't
+          // eat the track when an entry's title is long.
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 20)}px`,
           fontWeight: 400,
           lineHeight: 0.95,
           letterSpacing: '-0.015em',
-          minWidth: `${scaled(150, viewport, 84)}px`,
+          minWidth: `${scaled(120, viewport, 72)}px`,
           textShadow: cell.isLive
             ? `0 0 24px ${withAlpha(colors.statusLive, 0.35)}`
             : undefined,
@@ -391,7 +396,7 @@ function ListRow({
         {entry.time}
       </span>
 
-      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(6, viewport, 2) }}>
+      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(4, viewport, 1) }}>
         <span
           className="truncate"
           style={kickerStyles(
@@ -402,17 +407,17 @@ function ListRow({
           )}
         >
           {entry.saunaName}
-          {cell.durationMin != null ? ` · ${cell.durationMin} Minuten` : ''}
+          {cell.durationMin != null ? ` · ${cell.durationMin} Min` : ''}
         </span>
         <h3
           className="truncate"
           style={{
             color: titleColor,
             fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 16)}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl * 1.1, viewport, 14)}px`,
             fontWeight: 500,
             letterSpacing: '-0.01em',
-            lineHeight: 1.12,
+            lineHeight: 1.1,
             margin: 0,
           }}
           title={cell.title}
@@ -422,7 +427,7 @@ function ListRow({
         {aromaList.length > 0 ? (
           <div
             className="flex flex-wrap items-center"
-            style={{ gap: `${scaled(8, viewport, 3)}px ${scaled(10, viewport, 4)}px`, marginTop: scaled(4, viewport, 1) }}
+            style={{ gap: `${scaled(6, viewport, 2)}px ${scaled(8, viewport, 3)}px`, marginTop: scaled(3, viewport, 1) }}
           >
             {aromaList.map((aroma) => {
               const aromaColor = aroma.color || withAlpha(colors.accentSecondary, 0.9);
@@ -431,14 +436,14 @@ function ListRow({
                   key={aroma.id}
                   className="inline-flex items-center"
                   style={{
-                    gap: scaled(6, viewport, 2),
-                    padding: `${scaled(3, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+                    gap: scaled(5, viewport, 2),
+                    padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
                     borderRadius: 9999,
                     backgroundColor: withAlpha(aromaColor, isFinished ? 0.07 : 0.14),
                     border: `1px solid ${withAlpha(aromaColor, isFinished ? 0.3 : 0.5)}`,
                     color: withAlpha(aromaColor, isFinished ? 0.75 : 1),
                     fontFamily: typography.fontBody,
-                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 8)}px`,
                     fontWeight: 500,
                     letterSpacing: '0.02em',
                     lineHeight: 1.1,
@@ -453,25 +458,33 @@ function ListRow({
         ) : null}
       </div>
 
-      {cell.intensity != null && cell.intensity > 0 ? (
-        <IntensityMark
-          level={cell.intensity}
-          color={
-            isFinished
-              ? withAlpha(colors.accentPrimary, 0.4)
-              : cell.isLive
-                ? colors.statusLive
-                : colors.accentPrimary
-          }
-          tokens={tokens}
-          viewport={viewport}
-        />
-      ) : null}
-
+      {/* Right column: intensity + status share a single fixed-width
+          container with right-aligned content. This guarantees the
+          intensity pill stays in its visual column regardless of
+          whether the status chip is present (previously an empty
+          `minWidth` div could collapse, leaving intensity floating at
+          the far right edge). */}
       <div
-        className="shrink-0"
-        style={{ minWidth: `${scaled(126, viewport, 70)}px`, textAlign: 'right' }}
+        className="shrink-0 flex items-center justify-end"
+        style={{
+          minWidth: scaled(150, viewport, 84),
+          gap: scaled(10, viewport, 4),
+        }}
       >
+        {cell.intensity != null && cell.intensity > 0 ? (
+          <IntensityMark
+            level={cell.intensity}
+            color={
+              isFinished
+                ? withAlpha(colors.accentPrimary, 0.4)
+                : cell.isLive
+                  ? colors.statusLive
+                  : colors.accentPrimary
+            }
+            tokens={tokens}
+            viewport={viewport}
+          />
+        ) : null}
         <StatusChip cell={cell} tokens={tokens} viewport={viewport} />
       </div>
     </div>
