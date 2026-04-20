@@ -4,17 +4,17 @@ import type {
   DesignStyle,
   ColorPaletteName,
   DisplayAppearance,
-  HeaderSettings,
+  DisplaySettings,
   MaintenanceScreenSettings,
   SaunaDetailStyle,
 } from '@/types/settings.types';
-import { generateDashboardColors, getDefaultSettings } from '@/types/settings.types';
+import { generateDashboardColors } from '@/types/settings.types';
 import { normalizeMaintenanceScreenSettings } from '@/config/maintenanceScreen';
 import { AppearanceSelector } from './AppearanceSelector';
 import { PaletteSelector } from './PaletteSelector';
 import { ColorTokenEditor } from './ColorTokenEditor';
 import { SlideshowTokenOverridesEditor } from './SlideshowTokenOverridesEditor';
-import { HeaderSettingsEditor } from './HeaderSettingsEditor';
+import { DesignPackFlagCard } from './DesignPackFlagCard';
 import { MaintenanceScreenEditor } from './MaintenanceScreenEditor';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
@@ -27,14 +27,25 @@ interface ThemeEditorProps {
   designStyle?: DesignStyle;
   saunaDetailStyle?: SaunaDetailStyle;
   colorPalette?: ColorPaletteName;
-  header?: HeaderSettings;
   maintenanceScreen?: MaintenanceScreenSettings;
+  /**
+   * Full `display` settings block — used by the embedded
+   * `DesignPackFlagCard` to toggle the pack-rendering pipeline and
+   * pick the active pack. Must be passed when the consumer wants the
+   * design-pack card to appear.
+   */
+  display?: DisplaySettings;
   onChange: (theme: ThemeColors) => void;
   onDisplayAppearanceChange?: (appearance: DisplayAppearance) => void;
   onDesignStyleChange?: (style: DesignStyle) => void;
   onSaunaDetailStyleChange?: (style: SaunaDetailStyle) => void;
   onColorPaletteChange?: (palette: ColorPaletteName) => void;
-  onHeaderChange?: (next: HeaderSettings) => void;
+  /**
+   * Emits the next `display` block when the design-pack card is edited.
+   * Optional: when omitted the pack card is read-only (still rendered
+   * but inert).
+   */
+  onDisplayChange?: (next: DisplaySettings) => void;
   onSlideshowContextChange?: (slideshowId: string | null) => void;
 }
 
@@ -44,18 +55,16 @@ export function ThemeEditor({
   designStyle,
   saunaDetailStyle,
   colorPalette,
-  header,
   maintenanceScreen,
+  display,
   onChange,
   onDisplayAppearanceChange,
   onDesignStyleChange,
   onSaunaDetailStyleChange,
   onColorPaletteChange,
-  onHeaderChange,
+  onDisplayChange,
   onSlideshowContextChange,
 }: ThemeEditorProps) {
-  const defaults = getDefaultSettings();
-  const globalHeader = header ?? defaults.header!;
   // The global maintenance-screen value may be partial, so normalise it
   // before merging with slideshow-level overrides. This mirrors how the
   // display runtime consumes the same value at render-time.
@@ -84,16 +93,6 @@ export function ThemeEditor({
     selectedSlideshow?.config.saunaDetailStyle ?? saunaDetailStyle;
   const effectivePalette = selectedSlideshow?.config.colorPalette ?? colorPalette;
 
-  // Header: global value merged with any slideshow-level partial override
-  // so the editor always shows what the display actually renders.
-  const effectiveHeader: HeaderSettings = useMemo(
-    () => ({
-      ...globalHeader,
-      ...(selectedSlideshow?.config.header ?? {}),
-    }),
-    [globalHeader, selectedSlideshow?.config.header],
-  );
-
   // Same pattern for the maintenance screen: normalised global value is
   // the baseline, slideshow-level partial overrides win.
   const effectiveMaintenance: MaintenanceScreenSettings = useMemo(
@@ -103,24 +102,6 @@ export function ThemeEditor({
     }),
     [globalMaintenance, selectedSlideshow?.config.maintenanceScreen],
   );
-
-  const handleHeaderChange = (next: HeaderSettings) => {
-    if (selectedSlideshow) {
-      // Persist only the fields that actually differ from the global
-      // baseline — keeps slideshow overrides minimal and honest.
-      const patch: Partial<HeaderSettings> = {};
-      (Object.keys(next) as Array<keyof HeaderSettings>).forEach((key) => {
-        if (next[key] !== globalHeader[key]) {
-          (patch as Record<string, unknown>)[key] = next[key];
-        }
-      });
-      handleSlideshowDesignChange({
-        header: Object.keys(patch).length > 0 ? patch : undefined,
-      });
-    } else {
-      onHeaderChange?.(next);
-    }
-  };
 
   const handleSlideshowDesignChange = (patch: Partial<SlideshowConfig>) => {
     if (!selectedSlideshow) return;
@@ -233,14 +214,14 @@ export function ThemeEditor({
         </div>
       )}
 
-      {/* Branding header editor — shown first because the header sits
-          at the top of every display and operators expect to edit it
-          in that reading order. */}
-      <HeaderSettingsEditor
-        value={effectiveHeader}
-        onChange={handleHeaderChange}
-        scopeLabel={selectedSlideshow ? selectedSlideshow.name : 'Global'}
-      />
+      {/* Design-Pack selector — lives in the colours-and-design tab since
+          switching packs is the most visual / opinionated change an
+          operator can make. Only rendered at the global scope; per-
+          slideshow pack overrides would duplicate the appearance-→-pack
+          mapping we already do in `SlideRenderer`. */}
+      {!selectedSlideshow && display && onDisplayChange ? (
+        <DesignPackFlagCard display={display} onChange={onDisplayChange} />
+      ) : null}
 
       {/* 2-column grid: Palette left, Settings right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

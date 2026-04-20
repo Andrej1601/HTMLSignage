@@ -15,7 +15,7 @@ import { AudioSettings } from '@/components/Settings/AudioSettings';
 import { AromaLibraryManager } from '@/components/Settings/AromaLibraryManager';
 import { InfoManager } from '@/components/Settings/InfoManager';
 import { MaintenanceScreenEditor } from '@/components/Settings/MaintenanceScreenEditor';
-import { DesignPackFlagCard } from '@/components/Settings/DesignPackFlagCard';
+import { HeaderSettingsEditor } from '@/components/Settings/HeaderSettingsEditor';
 import { DesignHealthCard } from '@/components/Settings/DesignHealthCard';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -290,8 +290,8 @@ export function SettingsPage() {
                     designStyle={localSettings.designStyle}
                     saunaDetailStyle={localSettings.saunaDetailStyle}
                     colorPalette={localSettings.colorPalette}
-                    header={localSettings.header}
                     maintenanceScreen={localSettings.maintenanceScreen}
+                    display={localSettings.display}
                     onChange={(theme) => updateField('theme', theme)}
                     onDisplayAppearanceChange={(v) => {
                       updateField('displayAppearance', v);
@@ -306,7 +306,7 @@ export function SettingsPage() {
                     onDesignStyleChange={(v) => updateField('designStyle', v)}
                     onSaunaDetailStyleChange={(v) => updateField('saunaDetailStyle', v)}
                     onColorPaletteChange={handleColorPaletteChange}
-                    onHeaderChange={(v) => updateField('header', v)}
+                    onDisplayChange={(display) => updateField('display', display)}
                     onSlideshowContextChange={setPreviewSlideshowId}
                   />
                 )}
@@ -356,9 +356,15 @@ export function SettingsPage() {
               <TabPanel id="system" activeTab={activeTab}>
                 {canSystem && (
                   <div className="space-y-4">
-                    <DesignPackFlagCard
-                      display={localSettings.display}
-                      onChange={(display) => updateField('display', display)}
+                    {/* Header / Kopfzeile — edited globally here. Per-
+                        slideshow overrides still live on the
+                        `config.header` field and are cleared via the
+                        "Alle Overrides entfernen" button in the
+                        colours-and-design tab. */}
+                    <HeaderSettingsEditor
+                      value={localSettings.header ?? getDefaultSettings().header!}
+                      onChange={(next) => updateField('header', next)}
+                      scopeLabel="Global"
                     />
                     <DesignHealthCard />
                     <Suspense fallback={<LoadingSpinner label="Lade Systemwartung..." />}>
