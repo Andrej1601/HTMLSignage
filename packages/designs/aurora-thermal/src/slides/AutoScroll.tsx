@@ -1,18 +1,21 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
 /**
- * Gentle vertical auto-scroll for overflowing lists.
+ * Gentle auto-scroll for overflowing content — vertical by default,
+ * horizontal when `axis="x"`.
  *
- * Cycles: wait (startDelay) → scroll-down → pause → scroll-up → pause →
- * repeat. Uses rAF so the timing keeps up with the display's actual
- * refresh rate. Degrades gracefully when content fits the container
- * (no transform applied).
+ * Cycles: wait (startDelay) → scroll to far edge → pause → scroll
+ * back → pause → repeat. Uses rAF so the timing keeps up with the
+ * display's actual refresh rate. Degrades gracefully when content
+ * fits the container (no transform applied).
  *
  * Speed is intentionally slow — a sauna display should feel like it's
  * breathing, not auctioneering.
  */
 interface AutoScrollProps {
   children: ReactNode;
+  /** Scroll direction. Defaults to vertical (`'y'`). */
+  axis?: 'x' | 'y';
   speedPxPerSec?: number;
   startDelayMs?: number;
   pauseMs?: number;
@@ -21,6 +24,7 @@ interface AutoScrollProps {
 
 export function AutoScroll({
   children,
+  axis = 'y',
   speedPxPerSec = 10,
   startDelayMs = 4500,
   pauseMs = 1800,
@@ -40,12 +44,14 @@ export function AutoScroll({
     let cachedCycleMs = 0;
 
     const recalc = () => {
-      const max = Math.max(0, content.scrollHeight - container.clientHeight);
+      const max = axis === 'x'
+        ? Math.max(0, content.scrollWidth - container.clientWidth)
+        : Math.max(0, content.scrollHeight - container.clientHeight);
       if (max === cachedMax) return;
       cachedMax = max;
       if (max === 0) {
         cachedCycleMs = 0;
-        content.style.transform = 'translateY(0)';
+        content.style.transform = 'translate3d(0,0,0)';
         return;
       }
       const scrollMs = (max / Math.max(4, speedPxPerSec)) * 1000;
@@ -53,10 +59,16 @@ export function AutoScroll({
       cycleStart = performance.now() + startDelayMs;
     };
 
+    const applyTransform = (offset: number) => {
+      content.style.transform = axis === 'x'
+        ? `translate3d(${-offset}px,0,0)`
+        : `translate3d(0,${-offset}px,0)`;
+    };
+
     const tick = () => {
       const now = performance.now();
       if (cachedCycleMs === 0 || now < cycleStart) {
-        content.style.transform = 'translateY(0)';
+        applyTransform(0);
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -71,7 +83,7 @@ export function AutoScroll({
         offset = cachedMax - ((elapsed - halfCycle) / scrollMs) * cachedMax;
       } else offset = 0;
 
-      content.style.transform = `translateY(${-offset}px)`;
+      applyTransform(offset);
       raf = requestAnimationFrame(tick);
     };
 
@@ -86,7 +98,7 @@ export function AutoScroll({
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, [speedPxPerSec, startDelayMs, pauseMs]);
+  }, [axis, speedPxPerSec, startDelayMs, pauseMs]);
 
   return (
     <div
@@ -96,7 +108,12 @@ export function AutoScroll({
     >
       <div
         ref={contentRef}
-        style={{ willChange: 'transform', transform: 'translateY(0)' }}
+        style={{
+          willChange: 'transform',
+          transform: 'translate3d(0,0,0)',
+          display: axis === 'x' ? 'inline-block' : 'block',
+          minWidth: axis === 'x' ? 'max-content' : undefined,
+        }}
       >
         {children}
       </div>

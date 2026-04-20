@@ -824,7 +824,17 @@ function MatrixCell({
   );
 }
 
-// ── Variant: Timeline (saunas as rows, proportional time axis) ─────────────
+
+// ── Variant: Timeline (saunas as rows, fixed-width time axis + h-scroll) ───
+//
+// The timeline reads like a thermal bath's daily programme poster:
+//   - Each 30-min slot gets a fixed pixel width so entry cards have
+//     room for the full title inside the tile (no outside overflow).
+//   - The combined track is typically wider than the screen; we wrap
+//     it in a horizontal `AutoScroll` so the display cycles through
+//     the full day without an operator touching it.
+//   - A brass "JETZT"-banner pinned to the now-line keeps the live
+//     moment visible even when the auto-scroll drifts past it.
 
 function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
   const { colors, typography, spacing: spacingTokens, radius } = tokens;
@@ -850,29 +860,49 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
     );
   }
 
-  // Time axis: half-hour ticks spanning from first-entry-start rounded
-  // down to last-entry-end rounded up.
+  // Time axis: half-hour ticks from first-entry-start rounded down to
+  // last-entry-end rounded up. At least 2h of axis so a single short
+  // aufguss still renders a legible bar.
   const startMinsList = entries.map((e) => e.minutes);
   const endMinsList = entries.map((e) => e.minutes + (e.cell.durationMin ?? 15));
   const axisStart = Math.floor(Math.min(...startMinsList) / 30) * 30;
   const axisEnd = Math.max(axisStart + 120, Math.ceil(Math.max(...endMinsList) / 30) * 30);
-  const axisSpan = axisEnd - axisStart;
+  const axisSpan = axisEnd - axisStart; // minutes
   const ticks: number[] = [];
   for (let m = axisStart; m <= axisEnd; m += 30) ticks.push(m);
 
-  // Now-line: derive from the freshest `isLive` entry, else hide it.
+  // Fixed pixel width per 30-min slot. Scales modestly with viewport so
+  // we don't crush cards on tiny zones.
+  const slotWidth = scaled(130, viewport, 72);
+  const pxPerMinute = slotWidth / 30;
+  const tracksWidth = (axisSpan / 30) * slotWidth;
+
+  // Now-line: prefer the midpoint of a live entry, fall back to the
+  // schedule's `generatedAt` timestamp (deterministic for snapshot
+  // tests), and finally `new Date()` as a last resort. That way the
+  // banner stays anchored to "something happening now" when an
+  // aufguss is running, and otherwise tracks the schedule clock.
   const live = entries.find((e) => e.cell.isLive);
-  const nowMinutes = live ? live.minutes + Math.max(0, (live.cell.durationMin ?? 15) / 2) : null;
-  const nowPct = nowMinutes != null ? ((nowMinutes - axisStart) / axisSpan) * 100 : null;
+  const generatedDate = data.generatedAt ? new Date(data.generatedAt) : null;
+  const clockDate =
+    generatedDate && Number.isFinite(generatedDate.getTime())
+      ? generatedDate
+      : new Date();
+  const nowMinutesFromClock = clockDate.getHours() * 60 + clockDate.getMinutes();
+  const nowMinutes = live
+    ? live.minutes + Math.max(0, (live.cell.durationMin ?? 15) / 2)
+    : nowMinutesFromClock;
+  const nowPx = (nowMinutes - axisStart) * pxPerMinute;
+  const nowVisible = nowPx >= 0 && nowPx <= tracksWidth;
+  const nowClockLabel = formatTime(nowMinutesFromClock);
 
   const pad = scaled(spacingTokens.xl, viewport, 14);
-  const labelColWidth = scaled(172, viewport, 100);
-  // Timeline rows are taller than the other variants because each entry
-  // now places a time pill on top and spills the title below it — the
-  // row needs vertical breathing room for both to read at distance.
-  const rowHeight = scaled(96, viewport, 56);
+  const labelColWidth = scaled(190, viewport, 110);
+  const rowHeight = scaled(88, viewport, 52);
+  const axisLabelHeight = scaled(40, viewport, 24);
+  const nowBannerHeight = scaled(30, viewport, 22);
 
-  // Group flat entries by sauna index.
+  // Group flat entries by sauna index for track rendering.
   const bySauna = new Map<number, FlatEntry[]>();
   for (const e of entries) {
     const list = bySauna.get(e.saunaIndex) ?? [];
@@ -892,109 +922,184 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
       }}
     >
       <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
+      <div style={brassHairline(colors, 1)} />
 
-      {/* Axis */}
+      {/* Two-column layout: sauna labels on the left (fixed), horizontally
+          auto-scrolling tracks on the right. Row heights in both columns
+          match pixel-for-pixel so the labels line up with their tracks. */}
       <div
-        className="grid shrink-0"
+        className="grid flex-1 min-h-0"
         style={{
           gridTemplateColumns: `${labelColWidth}px 1fr`,
           columnGap: scaled(spacingTokens.md, viewport, 8),
-          alignItems: 'end',
+          alignItems: 'start',
         }}
       >
-        <div />
-        <div className="relative" style={{ paddingBottom: scaled(8, viewport, 3) }}>
+        {/* Left column: sticky sauna labels */}
+        <div className="flex flex-col" style={{ gap: scaled(spacingTokens.sm, viewport, 4) }}>
+          {/* Spacer matches axis + now-banner height so label rows align */}
           <div
-            className="flex justify-between tabular-nums"
+            aria-hidden
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
-              fontFamily: typography.fontMono,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-              letterSpacing: '0.05em',
-              fontWeight: 500,
+              height: axisLabelHeight + nowBannerHeight + scaled(10, viewport, 4),
             }}
-          >
-            {ticks.map((m) => (
-              <span key={m}>{formatTime(m)}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div style={brassHairline(colors, 1)} />
-
-      <AutoScroll className="flex-1 min-h-0">
-        <div className="flex flex-col" style={{ gap: scaled(spacingTokens.sm, viewport, 4), paddingTop: scaled(12, viewport, 4) }}>
-          {data.saunas.map((sauna, saunaIdx) => {
-            const rowEntries = bySauna.get(saunaIdx) ?? [];
+          />
+          {data.saunas.map((sauna) => {
             const accent = sauna.color || colors.accentPrimary;
             return (
               <div
                 key={sauna.id}
-                className="grid"
+                className="flex items-center"
                 style={{
-                  gridTemplateColumns: `${labelColWidth}px 1fr`,
-                  columnGap: scaled(spacingTokens.md, viewport, 8),
-                  alignItems: 'center',
+                  gap: scaled(12, viewport, 4),
+                  minHeight: rowHeight,
                 }}
               >
-                {/* Row label */}
                 <div
-                  className="flex items-center"
-                  style={{ gap: scaled(10, viewport, 4), minHeight: rowHeight }}
-                >
-                  <div
+                  style={{
+                    width: 3,
+                    height: scaled(40, viewport, 20),
+                    backgroundColor: withAlpha(accent, 0.9),
+                    borderRadius: 2,
+                    flexShrink: 0,
+                  }}
+                />
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className="truncate"
                     style={{
-                      width: 3,
-                      height: scaled(36, viewport, 18),
-                      backgroundColor: withAlpha(accent, 0.9),
-                      borderRadius: 2,
+                      color: colors.textPrimary,
+                      fontFamily: typography.fontHeading,
+                      fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+                      fontWeight: 500,
+                      letterSpacing: '-0.005em',
+                      lineHeight: 1.15,
+                    }}
+                    title={sauna.name}
+                  >
+                    {sauna.name}
+                  </span>
+                  {sauna.temperatureC != null ? (
+                    <span
+                      className="tabular-nums"
+                      style={{
+                        color: withAlpha(colors.textSecondary, 0.85),
+                        fontFamily: typography.fontMono,
+                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
+                        letterSpacing: '0.03em',
+                        marginTop: 2,
+                      }}
+                    >
+                      {Math.round(sauna.temperatureC)} °C
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right column: horizontally auto-scrolling tracks */}
+        <AutoScroll axis="x" className="h-full" speedPxPerSec={14} startDelayMs={5000}>
+          <div
+            className="flex flex-col"
+            style={{
+              width: tracksWidth,
+              gap: scaled(spacingTokens.sm, viewport, 4),
+            }}
+          >
+            {/* Axis labels row */}
+            <div className="relative" style={{ height: axisLabelHeight, width: tracksWidth }}>
+              {ticks.map((m, idx) => {
+                const left = idx * slotWidth;
+                const isMajor = m % 60 === 0;
+                return (
+                  <div
+                    key={m}
+                    className="absolute tabular-nums"
+                    style={{
+                      left,
+                      bottom: 0,
+                      transform: 'translateX(-50%)',
+                      color: withAlpha(
+                        colors.textSecondary,
+                        isMajor ? 0.95 : 0.7,
+                      ),
+                      fontFamily: typography.fontMono,
+                      fontSize: `${scaledFont(
+                        typography.baseSizePx * (isMajor ? typography.scaleBase : typography.scaleSm),
+                        viewport,
+                        isMajor ? 10 : 9,
+                      )}px`,
+                      letterSpacing: '0.04em',
+                      fontWeight: isMajor ? 600 : 500,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {formatTime(m)}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* "JETZT" banner + now-line — rendered once, spans all rows */}
+            <div
+              className="relative"
+              style={{ height: nowBannerHeight, width: tracksWidth }}
+            >
+              {nowVisible ? (
+                <div
+                  className="absolute flex items-center tabular-nums"
+                  style={{
+                    left: nowPx,
+                    top: 0,
+                    transform: 'translateX(-50%)',
+                    gap: scaled(6, viewport, 2),
+                    padding: `${scaled(4, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+                    borderRadius: 9999,
+                    backgroundColor: withAlpha(colors.statusLive, 0.22),
+                    border: `1px solid ${withAlpha(colors.statusLive, 0.75)}`,
+                    boxShadow: `0 0 18px ${withAlpha(colors.statusLive, 0.5)}`,
+                    color: colors.statusLive,
+                    fontFamily: typography.fontBody,
+                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9)}px`,
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    zIndex: 3,
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      backgroundColor: colors.statusLive,
+                      boxShadow: `0 0 10px ${withAlpha(colors.statusLive, 0.95)}`,
                     }}
                   />
-                  <div className="flex flex-col min-w-0">
-                    <span
-                      className="truncate"
-                      style={{
-                        color: colors.textPrimary,
-                        fontFamily: typography.fontHeading,
-                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
-                        fontWeight: 500,
-                        letterSpacing: '-0.005em',
-                        lineHeight: 1.15,
-                      }}
-                      title={sauna.name}
-                    >
-                      {sauna.name}
-                    </span>
-                    {sauna.temperatureC != null ? (
-                      <span
-                        className="tabular-nums"
-                        style={{
-                          color: withAlpha(colors.textSecondary, 0.85),
-                          fontFamily: typography.fontMono,
-                          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
-                          letterSpacing: '0.03em',
-                          marginTop: 2,
-                        }}
-                      >
-                        {Math.round(sauna.temperatureC)} °C
-                      </span>
-                    ) : null}
-                  </div>
+                  Jetzt · {nowClockLabel}
                 </div>
+              ) : null}
+            </div>
 
-                {/* Row track — wrapper is overflow-visible so entry
-                    titles can spill to the right of their colored
-                    duration pill. The inner `trackBackdrop` clips the
-                    surface colour + tick lines + now-line; entries are
-                    stacked on top where they can overflow freely. */}
+            {/* One track per sauna */}
+            {data.saunas.map((sauna, saunaIdx) => {
+              const rowEntries = bySauna.get(saunaIdx) ?? [];
+              const accent = sauna.color || colors.accentPrimary;
+              return (
                 <div
+                  key={sauna.id}
                   className="relative"
                   style={{
                     height: rowHeight,
-                    overflow: 'visible',
+                    width: tracksWidth,
                   }}
                 >
-                  {/* Backdrop with tick lines — clipped */}
+                  {/* Track backdrop */}
                   <div
                     className="absolute inset-0"
                     style={{
@@ -1004,8 +1109,10 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                       overflow: 'hidden',
                     }}
                   >
-                    {ticks.slice(1, -1).map((m) => {
-                      const pct = ((m - axisStart) / axisSpan) * 100;
+                    {/* Tick lines */}
+                    {ticks.slice(1, -1).map((m, idx) => {
+                      const left = (idx + 1) * slotWidth;
+                      const isMajor = m % 60 === 0;
                       return (
                         <div
                           key={m}
@@ -1014,9 +1121,12 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                             position: 'absolute',
                             top: 0,
                             bottom: 0,
-                            left: `${pct}%`,
+                            left,
                             width: 1,
-                            backgroundColor: withAlpha(colors.border, 0.5),
+                            backgroundColor: withAlpha(
+                              colors.border,
+                              isMajor ? 0.65 : 0.4,
+                            ),
                             pointerEvents: 'none',
                           }}
                         />
@@ -1024,15 +1134,15 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                     })}
                   </div>
 
-                  {/* Now-line — clipped to the track height */}
-                  {nowPct != null && nowPct >= 0 && nowPct <= 100 ? (
+                  {/* Now-line glows through every track */}
+                  {nowVisible ? (
                     <div
                       aria-hidden
                       style={{
                         position: 'absolute',
-                        top: -2,
-                        bottom: -2,
-                        left: `${nowPct}%`,
+                        top: 0,
+                        bottom: 0,
+                        left: nowPx,
                         width: 2,
                         backgroundColor: colors.statusLive,
                         boxShadow: `0 0 14px ${withAlpha(colors.statusLive, 0.9)}, 0 0 32px ${withAlpha(colors.statusLive, 0.45)}`,
@@ -1041,17 +1151,11 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                     />
                   ) : null}
 
-                  {/* Entries — each entry is a compact time pill at the
-                      top-left of its start position, with the title
-                      flowing BELOW it horizontally. The pill width
-                      reflects duration; the title is allowed to overflow
-                      the pill so even 30-min aufgüsse on an 11-hour axis
-                      render readably. */}
+                  {/* Entries */}
                   {rowEntries.map((entry) => {
-                    const startPct = Math.max(0, ((entry.minutes - axisStart) / axisSpan) * 100);
+                    const startPx = Math.max(0, (entry.minutes - axisStart) * pxPerMinute);
                     const dur = entry.cell.durationMin ?? 15;
-                    const endPct = Math.min(100, ((entry.minutes + dur - axisStart) / axisSpan) * 100);
-                    const widthPct = Math.max(2.5, endPct - startPct);
+                    const widthPx = Math.max(scaled(70, viewport, 40), dur * pxPerMinute);
                     const isFinished = !!entry.cell.isFinished;
                     const fill = entry.cell.isLive
                       ? colors.statusLive
@@ -1061,33 +1165,14 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                           ? colors.statusNext
                           : accent;
 
-                    const pillTextColor = entry.cell.isLive
-                      ? colors.textPrimary
+                    const timeColor = entry.cell.isLive
+                      ? colors.statusLive
                       : isFinished
-                        ? withAlpha(colors.textPrimary, 0.55)
-                        : colors.textPrimary;
-
+                        ? withAlpha(colors.textPrimary, 0.6)
+                        : withAlpha(fill, 0.95);
                     const titleColor = isFinished
                       ? withAlpha(colors.textPrimary, 0.55)
                       : colors.textPrimary;
-
-                    // How wide the title may grow horizontally. We allow
-                    // it to extend beyond the pill, but we cap it so two
-                    // adjacent entries don't collide. The cap scales
-                    // with the overall axis width — it's expressed in
-                    // % of the track — and never less than ~120px worth
-                    // at typical zoom.
-                    const titleMaxPct = Math.max(12, 100 / Math.max(4, rowEntries.length));
-
-                    // Entries near the right edge flip their title-flow
-                    // direction so the text extends leftward into the
-                    // empty track space instead of spilling past the
-                    // track's right edge. ~70% is the crossover — after
-                    // that we right-align the container so it grows
-                    // left toward earlier entries.
-                    const flipRight = startPct + titleMaxPct > 100;
-
-                    const endPctClamped = Math.min(100, startPct + widthPct);
 
                     return (
                       <div
@@ -1096,45 +1181,34 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                         style={{
                           position: 'absolute',
                           top: scaled(6, viewport, 2),
-                          // Pin either the LEFT edge at startPct, or the
-                          // RIGHT edge at endPct for entries close to the
-                          // track's right edge — so titles extend toward
-                          // open space either way.
-                          left: flipRight ? undefined : `${startPct}%`,
-                          right: flipRight ? `${100 - endPctClamped}%` : undefined,
-                          // Container is as wide as we allow the title;
-                          // the colored pill inside stays duration-sized.
-                          width: `${titleMaxPct}%`,
-                          minWidth: scaled(110, viewport, 60),
-                          opacity: isFinished ? 0.75 : 1,
+                          bottom: scaled(6, viewport, 2),
+                          left: startPx,
+                          width: widthPx,
+                          padding: `${scaled(8, viewport, 3)}px ${scaled(12, viewport, 4)}px`,
+                          borderRadius: radius.md,
+                          backgroundColor: withAlpha(
+                            fill,
+                            isFinished ? 0.14 : entry.cell.isLive ? 0.32 : 0.22,
+                          ),
+                          border: `1px solid ${withAlpha(
+                            fill,
+                            isFinished ? 0.4 : 0.9,
+                          )}`,
+                          boxShadow: entry.cell.isLive
+                            ? `0 0 18px ${withAlpha(colors.statusLive, 0.35)}`
+                            : `0 1px 0 ${withAlpha(fill, 0.08)}`,
+                          overflow: 'hidden',
                           display: 'flex',
                           flexDirection: 'column',
-                          alignItems: flipRight ? 'flex-end' : 'flex-start',
-                          gap: scaled(4, viewport, 1),
+                          justifyContent: 'center',
+                          gap: scaled(3, viewport, 1),
+                          opacity: isFinished ? 0.75 : 1,
                           zIndex: 2,
-                          pointerEvents: 'none',
-                          textAlign: flipRight ? 'right' : 'left',
                         }}
                       >
-                        {/* Duration pill — carries the time + a live dot */}
                         <div
-                          style={{
-                            width: `${(widthPct / titleMaxPct) * 100}%`,
-                            minWidth: scaled(54, viewport, 30),
-                            maxWidth: '100%',
-                            height: scaled(26, viewport, 18),
-                            borderRadius: radius.sm,
-                            backgroundColor: withAlpha(fill, isFinished ? 0.16 : entry.cell.isLive ? 0.34 : 0.26),
-                            border: `1px solid ${withAlpha(fill, isFinished ? 0.4 : 0.9)}`,
-                            boxShadow: entry.cell.isLive
-                              ? `0 0 14px ${withAlpha(colors.statusLive, 0.45)}`
-                              : `0 1px 0 ${withAlpha(fill, 0.1)}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: scaled(6, viewport, 2),
-                            padding: `0 ${scaled(8, viewport, 3)}px`,
-                            overflow: 'hidden',
-                          }}
+                          className="flex items-center tabular-nums"
+                          style={{ gap: scaled(6, viewport, 2) }}
                         >
                           {entry.cell.isLive ? (
                             <span
@@ -1150,28 +1224,33 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                             />
                           ) : null}
                           <span
-                            className="tabular-nums"
                             style={{
-                              color: pillTextColor,
+                              color: timeColor,
                               fontFamily: typography.fontMono,
                               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
                               fontWeight: 600,
                               letterSpacing: '0.04em',
                               lineHeight: 1,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
                             }}
                           >
                             {entry.time}
                           </span>
+                          {entry.cell.intensity != null && entry.cell.intensity > 0 ? (
+                            <span
+                              className="tabular-nums"
+                              style={{
+                                color: timeColor,
+                                fontFamily: typography.fontMono,
+                                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8)}px`,
+                                fontWeight: 500,
+                                letterSpacing: '0.06em',
+                                opacity: 0.85,
+                              }}
+                            >
+                              · {romanNumeral(entry.cell.intensity)}
+                            </span>
+                          ) : null}
                         </div>
-
-                        {/* Title — lives BELOW the pill and may grow
-                            past its width. Readability first: the font
-                            sits on the track's dark backdrop so a
-                            subtle text-shadow keeps it legible even if
-                            a tick line passes behind it. */}
                         <span
                           style={{
                             color: titleColor,
@@ -1180,10 +1259,10 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                             fontWeight: 500,
                             lineHeight: 1.15,
                             letterSpacing: '-0.005em',
-                            whiteSpace: 'nowrap',
                             overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            textShadow: `0 1px 3px ${withAlpha(colors.surface, 0.75)}`,
+                            display: '-webkit-box',
+                            WebkitBoxOrient: 'vertical',
+                            WebkitLineClamp: 2,
                           }}
                         >
                           {entry.cell.title}
@@ -1208,17 +1287,18 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                         fontWeight: 700,
                         letterSpacing: '0.18em',
                         textTransform: 'uppercase',
+                        zIndex: 2,
                       }}
                     >
                       Außer Betrieb
                     </div>
                   ) : null}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </AutoScroll>
+              );
+            })}
+          </div>
+        </AutoScroll>
+      </div>
     </div>
   );
 }
