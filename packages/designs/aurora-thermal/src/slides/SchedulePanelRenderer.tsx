@@ -184,59 +184,59 @@ function Masthead({
   viewport: Viewport;
 }) {
   const { colors, typography } = tokens;
+  // Compact one-liner: title on the left, "heute · N Aufgüsse" on the
+  // right. The old "SAUNAWELT · HEUTE" kicker was redundant with the
+  // display header; the title also dropped a notch (scale3xl*1.05
+  // was ~50px → scale2xl*1.1 ≈ 37px) so the list wins ~40px of
+  // vertical headroom per slide.
   return (
     <div
-      className="flex shrink-0 items-end justify-between"
-      style={{ gap: scaled(24, viewport, 8), paddingBottom: scaled(10, viewport, 3) }}
+      className="flex shrink-0 items-baseline justify-between"
+      style={{ gap: scaled(20, viewport, 6), paddingBottom: scaled(2, viewport, 1) }}
     >
-      <div className="flex flex-col" style={{ gap: scaled(10, viewport, 3) }}>
-        <span
-          style={kickerStyles(
-            colors.accentPrimary,
-            scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-          )}
-        >
-          Saunawelt · heute
-        </span>
-        <h1
-          style={{
-            color: colors.textPrimary,
-            fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.05, viewport, 22)}px`,
-            fontWeight: 400,
-            letterSpacing: '-0.02em',
-            lineHeight: 0.95,
-            margin: 0,
-          }}
-        >
-          Aufguss-Ritual
-        </h1>
+      <h1
+        style={{
+          color: colors.textPrimary,
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 18)}px`,
+          fontWeight: 500,
+          letterSpacing: '-0.015em',
+          lineHeight: 1,
+          margin: 0,
+        }}
+      >
+        Aufguss-Ritual
+      </h1>
+
+      <div
+        className="flex items-baseline shrink-0"
+        style={{ gap: scaled(10, viewport, 3) }}
+      >
         {subtitle ? (
           <span
             style={eyebrowStyles(
-              withAlpha(colors.textSecondary, 0.92),
-              scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11),
+              withAlpha(colors.textSecondary, 0.9),
+              scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10),
               typography.fontHeading,
             )}
           >
             {subtitle}
           </span>
         ) : null}
+        <span
+          className="tabular-nums"
+          style={{
+            color: withAlpha(colors.textSecondary, 0.9),
+            fontFamily: typography.fontMono,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
+            letterSpacing: '0.04em',
+            fontWeight: 500,
+            textTransform: 'uppercase',
+          }}
+        >
+          heute · {count} {count === 1 ? 'Aufguss' : 'Aufgüsse'}
+        </span>
       </div>
-
-      <span
-        className="tabular-nums shrink-0"
-        style={{
-          color: withAlpha(colors.textSecondary, 0.85),
-          fontFamily: typography.fontMono,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          fontWeight: 500,
-        }}
-      >
-        {count} {count === 1 ? 'Aufguss' : 'Aufgüsse'}
-      </span>
     </div>
   );
 }
@@ -439,9 +439,16 @@ function ListRow({
                     gap: scaled(5, viewport, 2),
                     padding: `${scaled(2, viewport, 1)}px ${scaled(8, viewport, 3)}px`,
                     borderRadius: 9999,
-                    backgroundColor: withAlpha(aromaColor, isFinished ? 0.07 : 0.14),
-                    border: `1px solid ${withAlpha(aromaColor, isFinished ? 0.3 : 0.5)}`,
-                    color: withAlpha(aromaColor, isFinished ? 0.75 : 1),
+                    backgroundColor: withAlpha(aromaColor, isFinished ? 0.08 : 0.18),
+                    border: `1px solid ${withAlpha(aromaColor, isFinished ? 0.35 : 0.7)}`,
+                    // Text is always ivory (textPrimary), never the aroma
+                    // colour — the previous green-on-green-tinted-background
+                    // dropped below WCAG legibility for darker aromas.
+                    // Aroma identity is carried by the border + subtle bg
+                    // tint + emoji.
+                    color: isFinished
+                      ? withAlpha(colors.textPrimary, 0.6)
+                      : colors.textPrimary,
                     fontFamily: typography.fontBody,
                     fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 8)}px`,
                     fontWeight: 500,

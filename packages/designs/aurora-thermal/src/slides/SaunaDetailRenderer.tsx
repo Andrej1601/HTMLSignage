@@ -333,9 +333,13 @@ function InfusionRow({
                     gap: scaled(5, viewport, 2),
                     padding: `${scaled(2, viewport, 1)}px ${scaled(9, viewport, 3)}px`,
                     borderRadius: 9999,
-                    backgroundColor: withAlpha(color, isFinished ? 0.06 : 0.12),
-                    border: `1px solid ${withAlpha(color, isFinished ? 0.28 : 0.48)}`,
-                    color: withAlpha(color, isFinished ? 0.75 : 1),
+                    backgroundColor: withAlpha(color, isFinished ? 0.08 : 0.18),
+                    border: `1px solid ${withAlpha(color, isFinished ? 0.35 : 0.7)}`,
+                    // Text = ivory (textPrimary), not the aroma colour —
+                    // guaranteed legible on the warm-charcoal backdrop.
+                    color: isFinished
+                      ? withAlpha(colors.textPrimary, 0.6)
+                      : colors.textPrimary,
                     fontFamily: typography.fontBody,
                     fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 8)}px`,
                     fontWeight: 500,
@@ -428,8 +432,11 @@ function SaunaMasthead({
   const { colors, typography, radius } = tokens;
   const accent = data.accentColor || colors.accentPrimary;
   const kickerColor = accent;
-  const nameScale = compact ? typography.scale2xl * 1.05 : typography.scale3xl * 1.05;
-  const subtitleScale = compact ? typography.scaleBase : typography.scaleLg;
+  // Sauna-detail name sits at the same typographic weight as the
+  // Schedule / Events h1 so module headings read as a family. Was
+  // scale3xl × 1.05 → ~50px; now scale2xl × 1.1 → ~37px.
+  const nameScale = compact ? typography.scale2xl * 0.95 : typography.scale2xl * 1.1;
+  const subtitleScale = compact ? typography.scaleSm * 1.05 : typography.scaleBase;
 
   const content = (
     <div className="flex flex-col min-w-0" style={{ gap: scaled(compact ? 4 : 8, viewport, 2) }}>
@@ -781,7 +788,10 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const liveOrNext =
     data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
 
-  const imageHeight = viewport.isCompact ? '50%' : '55%';
+  // Hero image gets the top 40% (35% on compact zones), leaving the
+  // bottom 60–65% for the aufguss list. Previous 55/45 split left
+  // barely enough room for 3 aufgüsse on a 1080p wellness-stage.
+  const imageHeight = viewport.isCompact ? '35%' : '40%';
 
   return (
     <div

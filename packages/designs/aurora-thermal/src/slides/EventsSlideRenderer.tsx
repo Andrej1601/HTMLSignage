@@ -7,7 +7,6 @@ import {
   kickerStyles,
   scaled,
   scaledFont,
-  statusChipStyles,
   withAlpha,
 } from './utils';
 
@@ -45,42 +44,35 @@ export function EventsSlideRenderer({
         gap: scaled(spacing.md, viewport, 8),
       }}
     >
-      {/* Masthead */}
+      {/* Masthead — one line. Title + right-aligned count. The old
+          two-line "Auf einen Blick / Events · Termine" kicker-stack
+          ate vertical space that belongs to the list. */}
       <div
-        className="flex items-end justify-between shrink-0"
-        style={{ paddingBottom: scaled(6, viewport, 2) }}
+        className="flex items-baseline justify-between shrink-0"
+        style={{ gap: scaled(16, viewport, 6), paddingBottom: scaled(2, viewport, 1) }}
       >
-        <div className="flex flex-col" style={{ gap: scaled(8, viewport, 3) }}>
-          <span
-            style={kickerStyles(
-              colors.accentPrimary,
-              scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-            )}
-          >
-            Auf einen Blick
-          </span>
-          <h1
-            style={{
-              color: colors.textPrimary,
-              fontFamily: typography.fontHeading,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 20)}px`,
-              fontWeight: 400,
-              letterSpacing: '-0.02em',
-              lineHeight: 0.95,
-              margin: 0,
-            }}
-          >
-            Events · Termine
-          </h1>
-        </div>
-        <span
-          className="tabular-nums"
+        <h1
           style={{
-            color: withAlpha(colors.textSecondary, 0.85),
+            color: colors.textPrimary,
+            fontFamily: typography.fontHeading,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 18)}px`,
+            fontWeight: 500,
+            letterSpacing: '-0.015em',
+            lineHeight: 1,
+            margin: 0,
+          }}
+        >
+          Termine
+        </h1>
+        <span
+          className="tabular-nums shrink-0"
+          style={{
+            color: withAlpha(colors.textSecondary, 0.9),
             fontFamily: typography.fontMono,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
             letterSpacing: '0.04em',
             fontWeight: 500,
+            textTransform: 'uppercase',
           }}
         >
           {data.events.length} {data.events.length === 1 ? 'Termin' : 'Termine'}
@@ -160,10 +152,8 @@ function EventRow({
     ? start.toLocaleDateString('de-DE', { weekday: 'long' })
     : '';
 
-  // Image is expensive on horizontal budget — show it only when the
-  // row is genuinely wide. A 150px thumbnail + gap + status column
-  // would push the title area under 300px on a typical 960px zone,
-  // which is the complaint we're fixing here.
+  // Image moved to the far right. Still hidden on truly narrow/compact
+  // zones since a 130×84 thumbnail would push the title under 240px.
   const hasImage = Boolean(event.imageUrl) && !viewport.isNarrow && !viewport.isCompact;
 
   return (
@@ -177,13 +167,16 @@ function EventRow({
         position: 'relative',
       }}
     >
-      {/* Left: brass-accent rule + day block — compacted so the title
-          wins real estate on medium-width zones. */}
+      {/* Left: brass rule + date stack + relative-label pill below.
+          The standalone "Jetzt / Bald / Geplant" column is gone —
+          the live beat is carried by the brass rule glowing ember,
+          the relative-label ("In 4 Tagen", "Jetzt live") sits in
+          a small pill directly under the weekday. */}
       <div
         className="shrink-0 flex"
         style={{
           gap: scaled(14, viewport, 5),
-          minWidth: scaled(116, viewport, 74),
+          minWidth: scaled(128, viewport, 82),
           alignItems: 'stretch',
         }}
       >
@@ -200,7 +193,7 @@ function EventRow({
           }}
         />
         <div
-          className="flex flex-col"
+          className="flex flex-col min-w-0"
           style={{ gap: scaled(4, viewport, 1), justifyContent: 'center' }}
         >
           <span
@@ -237,18 +230,58 @@ function EventRow({
               {weekdayLabel}
             </span>
           ) : null}
+          {event.relativeLabel ? (
+            <span
+              className="inline-flex items-center"
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: scaled(4, viewport, 1),
+                gap: scaled(6, viewport, 2),
+                padding: `${scaled(3, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
+                borderRadius: 9999,
+                border: `1px solid ${withAlpha(status.color, event.isLive ? 0.75 : 0.5)}`,
+                backgroundColor: withAlpha(status.color, event.isLive ? 0.2 : 0.1),
+                color: status.color,
+                fontFamily: typography.fontBody,
+                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9)}px`,
+                fontWeight: 600,
+                letterSpacing: '0.04em',
+                lineHeight: 1.1,
+                whiteSpace: 'nowrap',
+                boxShadow: event.isLive
+                  ? `0 0 12px ${withAlpha(status.color, 0.45)}`
+                  : 'none',
+              }}
+            >
+              {event.isLive ? (
+                <span
+                  aria-hidden
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    backgroundColor: status.color,
+                    boxShadow: `0 0 10px ${withAlpha(status.color, 0.95)}`,
+                  }}
+                />
+              ) : null}
+              {event.relativeLabel}
+            </span>
+          ) : null}
         </div>
       </div>
 
-      {/* Middle: title + meta — flex-1 so it absorbs all slack space.
-          Title gets up to 3 lines when space allows; on narrow zones
-          we drop to 2 to protect the date column. */}
-      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(6, viewport, 2), justifyContent: 'center' }}>
+      {/* Middle: title + meta — flex-1 absorbs most of the horizontal
+          budget now that the status column is gone. */}
+      <div
+        className="flex flex-1 min-w-0 flex-col"
+        style={{ gap: scaled(6, viewport, 2), justifyContent: 'center' }}
+      >
         <h3
           style={{
             color: colors.textPrimary,
             fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.05, viewport, 16)}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 18)}px`,
             fontWeight: 500,
             letterSpacing: '-0.01em',
             lineHeight: 1.1,
@@ -310,77 +343,29 @@ function EventRow({
         ) : null}
       </div>
 
-      {/* Right: image + status. Image is dropped on non-wide zones so
-          the middle column gets the full slack. Status column is also
-          slimmer than before — "Jetzt / Bald / Geplant" fits in ~86px. */}
-      <div
-        className="shrink-0 flex items-center"
-        style={{ gap: scaled(14, viewport, 5) }}
-      >
-        {hasImage ? (
-          <div
-            style={{
-              width: scaled(130, viewport, 64),
-              height: scaled(84, viewport, 46),
-              borderRadius: radius.md,
-              overflow: 'hidden',
-              border: `1px solid ${withAlpha(colors.accentPrimary, 0.35)}`,
-              boxShadow: `0 14px 34px ${withAlpha(colors.surface, 0.5)}, inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.14)}`,
-              position: 'relative',
-            }}
-          >
-            <img
-              src={event.imageUrl ?? undefined}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ filter: 'saturate(1.05) brightness(0.95)' }}
-            />
-          </div>
-        ) : null}
-
+      {/* Right: only the image. No status column. */}
+      {hasImage ? (
         <div
-          className="flex flex-col items-end"
-          style={{ gap: scaled(6, viewport, 2), minWidth: scaled(92, viewport, 54) }}
+          className="shrink-0"
+          style={{
+            width: scaled(150, viewport, 72),
+            height: scaled(100, viewport, 54),
+            borderRadius: radius.md,
+            overflow: 'hidden',
+            border: `1px solid ${withAlpha(colors.accentPrimary, 0.35)}`,
+            boxShadow: `0 14px 34px ${withAlpha(colors.surface, 0.5)}, inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.14)}`,
+            position: 'relative',
+            alignSelf: 'center',
+          }}
         >
-          <span
-            style={statusChipStyles(status.color, {
-              isLive: event.isLive,
-              sizePx: scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
-              fontFamily: typography.fontBody,
-            })}
-          >
-            {event.isLive ? (
-              <span
-                aria-hidden
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  backgroundColor: status.color,
-                  boxShadow: `0 0 10px ${withAlpha(status.color, 0.95)}`,
-                }}
-              />
-            ) : null}
-            {status.label}
-          </span>
-          {event.relativeLabel ? (
-            <span
-              className="truncate"
-              style={{
-                ...eyebrowStyles(
-                  withAlpha(colors.textSecondary, 0.85),
-                  scaledFont(typography.baseSizePx * typography.scaleBase * 0.88, viewport, 9),
-                  typography.fontHeading,
-                ),
-                textAlign: 'right',
-                maxWidth: scaled(120, viewport, 72),
-              }}
-            >
-              {event.relativeLabel}
-            </span>
-          ) : null}
+          <img
+            src={event.imageUrl ?? undefined}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(1.05) brightness(0.95)' }}
+          />
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
