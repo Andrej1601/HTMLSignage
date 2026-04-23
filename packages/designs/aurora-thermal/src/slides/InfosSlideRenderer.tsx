@@ -3,70 +3,50 @@ import { AutoScroll } from './AutoScroll';
 import {
   auroraAmbientBackground,
   brassHairline,
-  eyebrowStyles,
   kickerStyles,
   scaled,
   scaledFont,
   withAlpha,
 } from './utils';
 
-type Viewport = SlideRendererProps<'infos'>['context']['viewport'];
-
 /**
  * Aurora Thermal — infos renderer.
  *
- * Three layout modes. All three share one invariant: the body text is
- * wrapped in an `AutoScroll` so long copy gently pans vertically
- * inside whatever room the zone actually provides. Earlier versions
- * just clipped with `overflow: hidden`, which meant a compact split-
- * view zone could cut off the second half of an info's paragraph.
+ * Three layout modes, modelled on Mineral Noir's cleaner editorial
+ * composition: text flows directly on the ambient surface (or on the
+ * image for background-mode), no floating glass card. Body copy is
+ * wrapped in `AutoScroll` so long copy pans gently inside whatever
+ * room the zone actually provides.
  *
- *   - background image → full-bleed photo; text lives in a brass-
- *                        bordered glass card at the bottom-left so
- *                        contrast survives any image luminance
- *   - side image       → 55/45 split, editorial column left, framed
- *                        photograph right; stacks to 1 column on
- *                        narrow zones so the text always has room
- *   - no image         → centred editorial column on the ambient
- *                        background; brass corner ornaments give it
- *                        weight without relying on a photo
- *
- * Contrast rule: body copy is rendered at full `textPrimary` alpha
- * across all three modes. The previous 0.92–0.95 multiplier was too
- * dim on the warm-charcoal surface and triggered legibility
- * complaints from the floor.
+ *   - background image → full-bleed photo with warm wash + bottom
+ *                        gradient; text at the bottom-left
+ *   - side image       → 60/40 split (text 6fr, image 4fr); stacks
+ *                        vertically on narrow zones
+ *   - no image         → centred prose on the ambient backdrop
  */
 export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps<'infos'>) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor ?? colors.accentPrimary;
 
-  // Padding adapts: a 64px outer margin on a 400×300 zone eats half
-  // the canvas. We scale the outer pad down aggressively on compact
-  // zones so there's real room for the headline + body. On wider
-  // zones `spacing.lg` (40px) replaces the old `xl` (64px) so the
-  // module visually fills its zone rather than "floating" inside an
-  // obvious outer-padding frame.
+  // Padding adapts: a 40px outer margin on a 400×300 zone eats half
+  // the canvas. We scale down aggressively on compact zones.
   const pad = viewport.isUltraCompact
     ? scaled(14, viewport, 6)
     : viewport.isCompact
       ? scaled(20, viewport, 8)
       : scaled(spacing.lg, viewport, 12);
 
-  // Heading & body scales — sized so a 3-line headline + a few
-  // paragraphs of body still fit comfortably on common zones. On
-  // compact zones we give the body a head start by dropping the
-  // heading a notch.
   const headingScale = viewport.isUltraCompact
     ? typography.scale2xl
     : viewport.isCompact
       ? typography.scale3xl * 0.95
-      : typography.scale3xl * 1.15;
+      : typography.scale3xl * 1.2;
   const bodyScale = viewport.isUltraCompact
     ? typography.scaleBase
     : viewport.isCompact
       ? typography.scaleLg
-      : typography.scaleLg * 1.08;
+      : typography.scaleLg * 1.05;
 
   // ── Mode: background ────────────────────────────────────────────────────
   if (data.imageMode === 'background' && data.imageUrl) {
@@ -83,84 +63,77 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           src={data.imageUrl}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
-          style={{ filter: 'saturate(1.06) brightness(0.72)' }}
+          style={{ filter: 'saturate(1.02) brightness(0.7)' }}
         />
-        {/* Vignette — stronger at the bottom so the glass card sits on
-            a guaranteed-dark region no matter what the photo shows. */}
+        {/* Warm wash — cools the whole image so text reads. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ backgroundColor: withAlpha(colors.surface, 0.4) }}
+        />
+        {/* Bottom gradient — stronger at the text column's anchor so
+            the prose always sits on a near-solid base. */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0.3)} 0%, ${withAlpha(colors.surface, 0.0)} 30%, ${withAlpha(colors.surface, 0.7)} 65%, ${withAlpha(colors.surface, 0.97)} 100%)`,
+            background: `linear-gradient(to top, ${withAlpha(colors.surface, 0.95)} 0%, ${withAlpha(colors.surface, 0.3)} 55%, transparent 100%)`,
           }}
         />
+        {/* Warm accent glow at the bottom */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse 60% 40% at 50% 100%, ${withAlpha(accent, 0.2)} 0%, transparent 70%)`,
+            background: `radial-gradient(ellipse 60% 40% at 50% 100%, ${withAlpha(accent, 0.18)} 0%, transparent 70%)`,
           }}
         />
 
-        {/* Text sits in a brass-bordered glass bar anchored to the
-            bottom edge — full-width edge-to-edge (no outer margin)
-            and only the top corners round so it reads as a unified
-            foot strip on the photo rather than a floating card.
-            Height is still capped at 75% of the zone so a visible
-            slice of the photograph always remains. */}
         <div
           className="relative z-10 flex min-h-0 flex-col"
           style={{
-            padding: `${scaled(18, viewport, 8)}px ${pad}px`,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-            borderTop: `1px solid ${withAlpha(accent, 0.5)}`,
-            backgroundColor: withAlpha(colors.surface, 0.82),
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
-            boxShadow: `0 -22px 52px ${withAlpha(colors.surface, 0.55)}`,
-            gap: scaled(12, viewport, 4),
-            maxHeight: '75%',
+            padding: `${pad}px`,
+            gap: scaled(14, viewport, 5),
+            maxWidth: viewport.isCompact ? '92%' : '72%',
+            maxHeight: '72%',
           }}
         >
-          <div className="flex shrink-0 flex-col" style={{ gap: scaled(10, viewport, 3) }}>
-            <span
-              style={kickerStyles(
-                accent,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 10),
-              )}
-            >
-              Aus der Saunawelt
-            </span>
-            <h2
-              style={{
-                color: colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(typography.baseSizePx * headingScale, viewport, 20)}px`,
-                fontWeight: 500,
-                lineHeight: 0.98,
-                letterSpacing: '-0.02em',
-                margin: 0,
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: viewport.isCompact ? 2 : 3,
-              }}
-            >
-              {data.title}
-            </h2>
-            <div style={{ ...brassHairline(colors, 1), width: scaled(120, viewport, 52) }} />
-          </div>
+          <span
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
+            )}
+          >
+            {data.title ? 'Info' : 'Hinweis'}
+          </span>
+          <h2
+            style={{
+              color: colors.textPrimary,
+              fontFamily: typography.fontHeading,
+              fontSize: `${scaledFont(typography.baseSizePx * headingScale, viewport, 20)}px`,
+              fontWeight: 500,
+              lineHeight: 1.0,
+              letterSpacing: '-0.02em',
+              margin: 0,
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: viewport.isCompact ? 2 : 3,
+            }}
+          >
+            {data.title}
+          </h2>
+          <div style={{ ...brassHairline(colors, 1), width: scaled(120, viewport, 56) }} />
           <AutoScroll className="min-h-0 flex-1">
             <p
               style={{
-                color: colors.textPrimary,
+                color: withAlpha(colors.textPrimary, 0.92),
                 fontFamily: typography.fontBody,
                 fontSize: `${scaledFont(typography.baseSizePx * bodyScale, viewport, 11)}px`,
                 lineHeight: 1.55,
                 whiteSpace: 'pre-line',
                 fontWeight: 400,
-                maxWidth: 820,
+                maxWidth: 760,
                 margin: 0,
               }}
             >
@@ -173,8 +146,6 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
   }
 
   // ── Mode: side image ────────────────────────────────────────────────────
-  // Stack vertically on narrow OR compact zones so the text always
-  // gets a full-width column to breathe in.
   const hasSideImage = Boolean(data.imageUrl) && data.imageMode === 'side';
   const stackVertical = hasSideImage && (viewport.isNarrow || viewport.isCompact);
 
@@ -186,80 +157,64 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           background: auroraAmbientBackground(colors),
           color: colors.textPrimary,
           fontFamily: typography.fontBody,
-          gridTemplateColumns: '55fr 45fr',
+          gridTemplateColumns: '6fr 4fr',
         }}
       >
         <section
-          className="flex min-h-0 flex-col justify-center min-w-0"
+          className="flex min-h-0 flex-col justify-center"
           style={{ padding: `${pad}px`, gap: scaled(14, viewport, 5) }}
         >
-          <div className="flex shrink-0 flex-col" style={{ gap: scaled(14, viewport, 5) }}>
-            <span
-              style={kickerStyles(
-                accent,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 10),
-              )}
-            >
-              Aus der Saunawelt
-            </span>
-            <h2
-              style={{
-                color: colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(typography.baseSizePx * headingScale, viewport, 18)}px`,
-                fontWeight: 500,
-                lineHeight: 0.98,
-                letterSpacing: '-0.02em',
-                margin: 0,
-              }}
-            >
-              {data.title}
-            </h2>
-            <div style={{ ...brassHairline(colors, 1), width: scaled(140, viewport, 60) }} />
-          </div>
+          <span
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
+            )}
+          >
+            Info
+          </span>
+          <h2
+            style={{
+              color: colors.textPrimary,
+              fontFamily: typography.fontHeading,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.1, viewport, 18)}px`,
+              fontWeight: 500,
+              lineHeight: 1.0,
+              letterSpacing: '-0.02em',
+              margin: 0,
+            }}
+          >
+            {data.title}
+          </h2>
+          <div style={{ ...brassHairline(colors, 1), width: scaled(100, viewport, 50) }} />
           <AutoScroll className="min-h-0 flex-1">
             <p
               style={{
-                color: colors.textPrimary,
+                color: withAlpha(colors.textPrimary, 0.92),
                 fontSize: `${scaledFont(typography.baseSizePx * bodyScale, viewport, 11)}px`,
-                lineHeight: 1.6,
+                lineHeight: 1.55,
                 whiteSpace: 'pre-line',
                 fontWeight: 400,
-                maxWidth: 680,
+                maxWidth: 720,
                 margin: 0,
-                textWrap: 'pretty' as React.CSSProperties['textWrap'],
               }}
             >
               {data.text}
             </p>
           </AutoScroll>
-          <span
-            style={eyebrowStyles(
-              withAlpha(colors.textPrimary, 0.75),
-              scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10),
-              typography.fontHeading,
-            )}
-          >
-            Ihre Saunawelt
-          </span>
         </section>
-
-        {/* Image column — fills the right half edge-to-edge. The
-            previous `margin: pad` wrapped the image in a visible
-            rounded card inside the module, creating the "card within
-            a card" effect the user asked us to drop. */}
         <section className="relative overflow-hidden">
           <img
             src={data.imageUrl ?? undefined}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(1.06) brightness(0.98)' }}
+            style={{ filter: 'saturate(1.05) brightness(0.92)' }}
           />
           <div
             aria-hidden
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-y-0 left-0 pointer-events-none"
             style={{
-              boxShadow: `inset 1px 0 0 0 ${withAlpha(accent, 0.22)}, inset 0 -80px 120px ${withAlpha(colors.surface, 0.2)}`,
+              width: 1,
+              backgroundColor: withAlpha(accent, 0.35),
             }}
           />
         </section>
@@ -268,9 +223,6 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
   }
 
   // ── Mode: side-image stacked OR no-image ───────────────────────────────
-  // Vertical column layout. When `stackVertical` is true we show the
-  // image on top (38%), text below. Otherwise: ambient backdrop with
-  // brass corner ornaments and a centred editorial column.
   return (
     <div
       className="flex h-full w-full flex-col overflow-hidden"
@@ -281,8 +233,6 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
       }}
     >
       {stackVertical && data.imageUrl ? (
-        // Image fills the full top band edge-to-edge; no rounded inner
-        // card. The ambient backdrop is enough visual frame.
         <section
           className="relative shrink-0 overflow-hidden"
           style={{ height: viewport.isUltraCompact ? '28%' : '36%' }}
@@ -291,13 +241,13 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             src={data.imageUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(1.06) brightness(0.98)' }}
+            style={{ filter: 'saturate(1.05) brightness(0.95)' }}
           />
           <div
             aria-hidden
             className="absolute inset-0 pointer-events-none"
             style={{
-              boxShadow: `inset 0 -1px 0 0 ${withAlpha(accent, 0.22)}`,
+              boxShadow: `inset 0 -1px 0 0 ${withAlpha(accent, 0.3)}`,
             }}
           />
         </section>
@@ -308,74 +258,58 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
         style={{ padding: `${pad}px` }}
       >
         <div
-          className="relative flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
           style={{
             gap: scaled(14, viewport, 5),
             maxWidth: 880,
-            padding: viewport.isCompact
-              ? `${scaled(18, viewport, 8)}px ${scaled(20, viewport, 10)}px`
-              : `${scaled(40, viewport, 14)}px ${scaled(52, viewport, 18)}px`,
           }}
         >
-          {/* Brass corner ornaments — only on wider zones where the
-              paper margin is big enough for them to read as ornaments
-              rather than clutter. */}
-          {!stackVertical && !viewport.isCompact ? (
-            <>
-              <CornerOrnament placement="tl" viewport={viewport} accent={accent} />
-              <CornerOrnament placement="tr" viewport={viewport} accent={accent} />
-              <CornerOrnament placement="bl" viewport={viewport} accent={accent} />
-              <CornerOrnament placement="br" viewport={viewport} accent={accent} />
-            </>
-          ) : null}
-
-          <div className="flex shrink-0 flex-col" style={{ gap: scaled(12, viewport, 4), alignItems: stackVertical ? 'flex-start' : 'center' }}>
-            <span
-              style={kickerStyles(
+          <span
+            style={{
+              ...kickerStyles(
                 accent,
-                scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 10),
-              )}
-            >
-              Aus der Saunawelt · Info
-            </span>
-            <h2
-              style={{
-                color: colors.textPrimary,
-                fontFamily: typography.fontHeading,
-                fontSize: `${scaledFont(typography.baseSizePx * headingScale, viewport, 20)}px`,
-                fontWeight: 500,
-                lineHeight: 0.98,
-                letterSpacing: '-0.02em',
-                margin: 0,
-                textAlign: stackVertical ? 'left' : 'center',
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: viewport.isCompact ? 2 : 3,
-              }}
-            >
-              {data.title}
-            </h2>
-            <div
-              style={{
-                ...brassHairline(colors, 1),
-                width: scaled(120, viewport, 56),
-                alignSelf: stackVertical ? 'flex-start' : 'center',
-              }}
-            />
-          </div>
-
+                scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
+              ),
+              alignSelf: stackVertical ? 'flex-start' : 'center',
+            }}
+          >
+            Info
+          </span>
+          <h2
+            style={{
+              color: colors.textPrimary,
+              fontFamily: typography.fontHeading,
+              fontSize: `${scaledFont(typography.baseSizePx * headingScale, viewport, 20)}px`,
+              fontWeight: 500,
+              lineHeight: 1.0,
+              letterSpacing: '-0.02em',
+              margin: 0,
+              textAlign: stackVertical ? 'left' : 'center',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: viewport.isCompact ? 2 : 3,
+            }}
+          >
+            {data.title}
+          </h2>
+          <div
+            style={{
+              ...brassHairline(colors, 1),
+              width: scaled(120, viewport, 56),
+              alignSelf: stackVertical ? 'flex-start' : 'center',
+            }}
+          />
           <AutoScroll className="min-h-0 flex-1">
             <p
               style={{
-                color: colors.textPrimary,
+                color: withAlpha(colors.textPrimary, 0.92),
                 fontSize: `${scaledFont(typography.baseSizePx * bodyScale, viewport, 11)}px`,
-                lineHeight: 1.6,
+                lineHeight: 1.55,
                 whiteSpace: 'pre-line',
                 fontWeight: 400,
                 margin: 0,
                 textAlign: stackVertical ? 'left' : 'center',
-                textWrap: 'pretty' as React.CSSProperties['textWrap'],
               }}
             >
               {data.text}
@@ -384,36 +318,5 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
         </div>
       </section>
     </div>
-  );
-}
-
-function CornerOrnament({
-  placement,
-  viewport,
-  accent,
-}: {
-  placement: 'tl' | 'tr' | 'bl' | 'br';
-  viewport: Viewport;
-  accent: string;
-}) {
-  const size = scaled(32, viewport, 16);
-  const isTop = placement.startsWith('t');
-  const isLeft = placement.endsWith('l');
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: 'absolute',
-        width: size,
-        height: size,
-        [isTop ? 'top' : 'bottom']: 0,
-        [isLeft ? 'left' : 'right']: 0,
-        borderTop: isTop ? `1px solid ${withAlpha(accent, 0.75)}` : 'none',
-        borderBottom: !isTop ? `1px solid ${withAlpha(accent, 0.75)}` : 'none',
-        borderLeft: isLeft ? `1px solid ${withAlpha(accent, 0.75)}` : 'none',
-        borderRight: !isLeft ? `1px solid ${withAlpha(accent, 0.75)}` : 'none',
-        pointerEvents: 'none',
-      }}
-    />
   );
 }

@@ -62,9 +62,9 @@ export function AppearanceSelector({
       {/* Display Appearance */}
       <div className="bg-spa-surface rounded-xl border border-spa-border p-4 shadow-xs">
         <label className="block text-[10px] font-bold uppercase tracking-widest text-spa-text-secondary mb-3">
-          Visuelle Aufmachung
+          Bühne
         </label>
-        <div className="space-y-2" role="radiogroup" aria-label="Visuelle Aufmachung">
+        <div className="space-y-2" role="radiogroup" aria-label="Bühne">
           {DISPLAY_APPEARANCE_OPTIONS.map((option) => {
             const Icon = APPEARANCE_ICONS[option.id] ?? Gem;
             const isActive = displayAppearance === option.id;

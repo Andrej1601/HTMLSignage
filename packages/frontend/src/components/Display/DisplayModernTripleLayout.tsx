@@ -47,11 +47,15 @@ export function DisplayModernTripleLayout({
   const bottomBg = withAlpha(rightBg, 0.6);
 
   const accentGold = themeColors.accentGold || themeColors.accent || '#A68A64';
+  // Bottom-right panel fills the zone edge-to-edge. The previous
+  // `p-2.5` / `p-3` / `p-4` outer padding added a visible gutter
+  // around the embedded slide that modern packs already handle
+  // with their own inner spacing.
   const bottomPanelClassName = isPortrait
-    ? 'flex-[0.9] min-h-0 p-2.5'
+    ? 'flex-[0.9] min-h-0'
     : isCompact
-      ? 'h-32 p-3'
-      : 'h-44 p-4';
+      ? 'h-32'
+      : 'h-44';
 
   const renderLeftPanel = () => {
     if (!left.slide || left.slide.type === 'content-panel') {
