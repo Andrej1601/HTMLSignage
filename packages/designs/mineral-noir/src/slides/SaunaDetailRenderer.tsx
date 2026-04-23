@@ -663,30 +663,43 @@ function HeroInfusionTile({
           </span>
         ) : null}
       </div>
-      {entry.intensity != null && entry.intensity > 0 ? (
-        <IntensityDots
-          level={entry.intensity}
-          color={entry.isLive ? colors.statusLive : accent}
-          muted={withAlpha(colors.textSecondary, 0.4)}
-          viewport={viewport}
-        />
-      ) : null}
-      {status ? (
-        <span
-          className="shrink-0"
-          style={{
-            color: status.color,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.78, viewport, 7)}px`,
-            letterSpacing: '0.28em',
-            textTransform: 'uppercase',
-            fontWeight: 700,
-            minWidth: scaled(70, viewport, 44),
-            textAlign: 'right',
-          }}
-        >
-          {status.label}
-        </span>
-      ) : null}
+      {/* Intensity column — fixed width, centered. Kept even when
+          empty so dots across rows always hang from the same
+          vertical line regardless of status presence. */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: scaled(72, viewport, 42) }}
+      >
+        {entry.intensity != null && entry.intensity > 0 ? (
+          <IntensityDots
+            level={entry.intensity}
+            color={entry.isLive ? colors.statusLive : accent}
+            muted={withAlpha(colors.textSecondary, 0.4)}
+            viewport={viewport}
+          />
+        ) : null}
+      </div>
+
+      {/* Status column — fixed width, right-aligned. Holds its slot
+          even when empty so the intensity column can't drift right. */}
+      <div
+        className="shrink-0 flex items-center justify-end"
+        style={{ width: scaled(78, viewport, 48) }}
+      >
+        {status ? (
+          <span
+            style={{
+              color: status.color,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.78, viewport, 7)}px`,
+              letterSpacing: '0.28em',
+              textTransform: 'uppercase',
+              fontWeight: 700,
+            }}
+          >
+            {status.label}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

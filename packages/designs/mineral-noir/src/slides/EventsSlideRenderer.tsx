@@ -103,9 +103,16 @@ function EventRow({
     ? `${fmt(start)}${Number.isFinite(end.getTime()) ? ` – ${fmt(end)}` : ''}`
     : '';
 
+  // Image replaces the old "geplant" right-column label. The left
+  // date-stack already encodes the "geplant" beat via the sharp
+  // edges and the mono date — so dropping the standalone label
+  // costs no information. Hidden on narrow / compact zones where
+  // the title would be squeezed.
+  const hasImage = Boolean(event.imageUrl) && !viewport.isNarrow && !viewport.isCompact;
+
   return (
     <div
-      className="flex items-baseline"
+      className="flex items-stretch"
       style={{
         borderTop: first ? `1px solid ${withAlpha(colors.border, 0.85)}` : 'none',
         borderBottom: `1px solid ${withAlpha(colors.border, 0.85)}`,
@@ -114,7 +121,7 @@ function EventRow({
       }}
     >
       <div
-        className="shrink-0 flex flex-col"
+        className="shrink-0 flex flex-col justify-center"
         style={{ minWidth: scaled(130, viewport, 80), gap: scaled(4, viewport, 1) }}
       >
         <span
@@ -140,9 +147,28 @@ function EventRow({
             {weekdayLabel}
           </span>
         ) : null}
+        {/* Small status line under the weekday — replaces the old
+            right-column label without adding a separate column. */}
+        {status.label ? (
+          <span
+            style={{
+              color: status.color,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.78, viewport, 7)}px`,
+              letterSpacing: '0.28em',
+              textTransform: 'uppercase',
+              fontWeight: 700,
+              marginTop: scaled(2, viewport, 1),
+            }}
+          >
+            {status.label}
+          </span>
+        ) : null}
       </div>
 
-      <div className="flex flex-1 min-w-0 flex-col" style={{ gap: scaled(4, viewport, 2) }}>
+      <div
+        className="flex flex-1 min-w-0 flex-col justify-center"
+        style={{ gap: scaled(4, viewport, 2) }}
+      >
         <span
           className="truncate"
           style={{
@@ -170,20 +196,24 @@ function EventRow({
         </span>
       </div>
 
-      <span
-        className="shrink-0"
-        style={{
-          color: status.color,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.8, viewport, 7)}px`,
-          letterSpacing: '0.3em',
-          textTransform: 'uppercase',
-          fontWeight: 700,
-          minWidth: scaled(80, viewport, 48),
-          textAlign: 'right',
-        }}
-      >
-        {status.label}
-      </span>
+      {hasImage ? (
+        <div
+          className="shrink-0 self-center relative overflow-hidden"
+          style={{
+            width: scaled(140, viewport, 68),
+            height: scaled(92, viewport, 52),
+            border: `1px solid ${withAlpha(colors.border, 0.9)}`,
+            boxShadow: `0 10px 26px ${withAlpha(colors.surface, 0.5)}`,
+          }}
+        >
+          <img
+            src={event.imageUrl ?? undefined}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(0.85) brightness(0.9)' }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
