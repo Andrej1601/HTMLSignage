@@ -107,15 +107,55 @@ function StatChip({
   color,
   tokens,
   viewport,
+  compact = false,
 }: {
   label: string;
   value: string;
   color: string;
   tokens: Tokens;
   viewport: Viewport;
+  /** When true, drop the pill chrome and shrink the font — used
+      inside the Portrait variant's image header where the stats are
+      supporting metadata under the sauna name, not a stat dashboard. */
+  compact?: boolean;
 }) {
   const { typography } = tokens;
-  const textSize = scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10);
+  const textSize = compact
+    ? scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9)
+    : scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10);
+  const labelSize = compact
+    ? scaledFont(typography.baseSizePx * typography.scaleSm * 0.78, viewport, 7)
+    : scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8);
+
+  if (compact) {
+    // Plain-text inline stat — no pill. "TEMP 90 °C" style.
+    return (
+      <span className="inline-flex items-baseline" style={{ gap: scaled(4, viewport, 1) }}>
+        <span
+          style={{
+            ...kickerStyles(withAlpha(color, 0.78), labelSize),
+            letterSpacing: '0.22em',
+          }}
+        >
+          {label}
+        </span>
+        <span
+          className="tabular-nums"
+          style={{
+            color,
+            fontFamily: typography.fontMono,
+            fontSize: `${textSize}px`,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span
       className="inline-flex items-baseline"
@@ -130,10 +170,7 @@ function StatChip({
     >
       <span
         style={{
-          ...kickerStyles(
-            withAlpha(color, 0.8),
-            scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
-          ),
+          ...kickerStyles(withAlpha(color, 0.8), labelSize),
           letterSpacing: '0.2em',
         }}
       >
@@ -160,10 +197,12 @@ function StatRow({
   data,
   tokens,
   viewport,
+  compact = false,
 }: {
   data: SaunaDetailData;
   tokens: Tokens;
   viewport: Viewport;
+  compact?: boolean;
 }) {
   const { colors } = tokens;
   const accent = data.accentColor || colors.accentPrimary;
@@ -180,8 +219,12 @@ function StatRow({
 
   return (
     <div
-      className="flex flex-wrap"
-      style={{ gap: `${scaled(6, viewport, 2)}px ${scaled(8, viewport, 3)}px` }}
+      className="flex flex-wrap items-baseline"
+      style={{
+        gap: compact
+          ? `${scaled(4, viewport, 1)}px ${scaled(14, viewport, 5)}px`
+          : `${scaled(6, viewport, 2)}px ${scaled(8, viewport, 3)}px`,
+      }}
     >
       {stats.map((stat) => (
         <StatChip
@@ -191,6 +234,7 @@ function StatRow({
           color={accent}
           tokens={tokens}
           viewport={viewport}
+          compact={compact}
         />
       ))}
     </div>
@@ -1028,7 +1072,10 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           }}
         >
           <SaunaMasthead data={data} tokens={tokens} viewport={viewport} compact />
-          <StatRow data={data} tokens={tokens} viewport={viewport} />
+          {/* Compact stats — plain-text inline, beneath the sauna
+              name. Smaller font than the body panel's chip-style
+              StatRow so the row reads as supporting metadata. */}
+          <StatRow data={data} tokens={tokens} viewport={viewport} compact />
         </div>
       </section>
 

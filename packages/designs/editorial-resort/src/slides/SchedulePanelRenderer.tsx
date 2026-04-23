@@ -860,29 +860,19 @@ function Masthead({
         borderBottom: `1px solid ${colors.border}`,
       }}
     >
-      <div className="flex flex-col" style={{ gap: scaled(4, viewport, 1) }}>
-        <span
-          style={kickerStyles(
-            colors.accentPrimary,
-            scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
-          )}
-        >
-          Aus der Saunawelt
-        </span>
-        <h1
-          style={{
-            color: colors.textPrimary,
-            fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 18)}px`,
-            fontWeight: 600,
-            letterSpacing: '-0.015em',
-            lineHeight: 1,
-            margin: 0,
-          }}
-        >
-          Aufgussplan
-        </h1>
-      </div>
+      <h1
+        style={{
+          color: colors.textPrimary,
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 18)}px`,
+          fontWeight: 600,
+          letterSpacing: '-0.015em',
+          lineHeight: 1,
+          margin: 0,
+        }}
+      >
+        Aufgussplan
+      </h1>
       <span
         className="tabular-nums"
         style={{

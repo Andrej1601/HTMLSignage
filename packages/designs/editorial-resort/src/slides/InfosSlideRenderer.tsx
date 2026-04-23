@@ -60,7 +60,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
               textShadow: `0 1px 6px ${withAlpha(colors.textPrimary, 0.6)}`,
             }}
           >
-            Aus der Saunawelt · Info
+            Info
           </span>
           <h2
             style={{
@@ -125,7 +125,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
           )}
         >
-          Aus der Saunawelt · Info
+          Info
         </span>
         <h2
           style={{

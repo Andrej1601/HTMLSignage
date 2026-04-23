@@ -119,7 +119,7 @@ function EventRow({
   tokens: SlideRendererProps<'events'>['tokens'];
   viewport: SlideRendererProps<'events'>['context']['viewport'];
 }) {
-  const { colors, typography } = tokens;
+  const { colors, typography, radius } = tokens;
   const status = eventStatus(event.statusRank, tokens);
 
   const start = new Date(event.startsAt);
@@ -135,9 +135,13 @@ function EventRow({
     ? `${fmtTime(start)}${Number.isFinite(end.getTime()) ? ' – ' + fmtTime(end) : ''}`
     : '';
 
+  // Image replaces the old "geplant" right column. Hidden on truly
+  // narrow/compact zones so the title always keeps its room.
+  const hasImage = Boolean(event.imageUrl) && !viewport.isNarrow && !viewport.isCompact;
+
   return (
     <div
-      className="flex items-baseline"
+      className="flex items-stretch"
       style={{
         borderTop: first ? `1px solid ${colors.border}` : 'none',
         borderBottom: `1px solid ${colors.border}`,
@@ -165,7 +169,7 @@ function EventRow({
               : 'none',
           }}
         />
-        <div className="flex flex-col items-baseline" style={{ gap: scaled(6, viewport, 2) }}>
+        <div className="flex flex-col items-baseline" style={{ gap: scaled(6, viewport, 2), justifyContent: 'center' }}>
           <span
             className="tabular-nums"
             style={{
@@ -192,11 +196,9 @@ function EventRow({
         </div>
       </div>
 
-      {/* Title + meta column — flex-1 now absorbs the slack the old
-          "geplant" right column used to hold. Title can also wrap to
-          up to 2 lines on normal zones. */}
+      {/* Title + meta column — flex-1 absorbs all slack. */}
       <div
-        className="flex flex-1 min-w-0 flex-col"
+        className="flex flex-1 min-w-0 flex-col justify-center"
         style={{ gap: scaled(6, viewport, 2) }}
       >
         {weekdayLabel ? (
@@ -240,6 +242,32 @@ function EventRow({
           {event.location ? ` · ${event.location}` : ''}
         </span>
       </div>
+
+      {/* Event image — takes the spot where "geplant" used to sit.
+          Served from the event.imageUrl; hidden only on narrow /
+          compact zones where its 150×100 thumbnail would push the
+          title under 240px. */}
+      {hasImage ? (
+        <div
+          className="shrink-0 self-center"
+          style={{
+            width: scaled(150, viewport, 72),
+            height: scaled(100, viewport, 54),
+            borderRadius: radius.md,
+            overflow: 'hidden',
+            border: `1px solid ${withAlpha(colors.accentPrimary, 0.35)}`,
+            boxShadow: `0 10px 28px ${withAlpha(colors.textPrimary, 0.12)}`,
+            position: 'relative',
+          }}
+        >
+          <img
+            src={event.imageUrl ?? undefined}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(0.98) brightness(0.97)' }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

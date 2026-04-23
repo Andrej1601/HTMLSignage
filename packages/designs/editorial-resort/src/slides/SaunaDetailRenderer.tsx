@@ -154,6 +154,56 @@ function StatCell({
   );
 }
 
+/**
+ * Compact one-line stat — small-caps label + value on the same
+ * baseline. Used inside the Portrait variant's image header where the
+ * name already carries the hero weight and the stats are supporting
+ * info (not a dashboard).
+ */
+function InlineStat({
+  label,
+  value,
+  tokens,
+  viewport,
+}: {
+  label: string;
+  value: string;
+  tokens: SlideRendererProps<'sauna-detail'>['tokens'];
+  viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
+}) {
+  const { typography } = tokens;
+  return (
+    <span className="inline-flex items-baseline" style={{ gap: scaled(4, viewport, 1) }}>
+      <span
+        style={{
+          ...kickerStyles(
+            'rgba(255, 255, 255, 0.75)',
+            scaledFont(typography.baseSizePx * typography.scaleSm * 0.82, viewport, 7),
+          ),
+          letterSpacing: '0.22em',
+          textShadow: '0 1px 4px rgba(0,0,0,0.55)',
+        }}
+      >
+        {label}
+      </span>
+      <span
+        className="tabular-nums"
+        style={{
+          color: 'rgba(255, 255, 255, 0.98)',
+          fontFamily: typography.fontHeading,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg * 0.95, viewport, 10)}px`,
+          fontWeight: 500,
+          letterSpacing: '-0.005em',
+          lineHeight: 1,
+          textShadow: '0 1px 6px rgba(0,0,0,0.55)',
+        }}
+      >
+        {value}
+      </span>
+    </span>
+  );
+}
+
 function InfusionRow({
   entry,
   first,
@@ -340,7 +390,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
               scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
             )}
           >
-            Aus der Saunawelt · Porträt
+            Porträt
           </span>
           <h2
             style={{
@@ -759,14 +809,17 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
         fontFamily: typography.fontBody,
       }}
     >
-      {/* Photograph header */}
+      {/* Photograph header — sauna name + stats ride on the image
+          so the body section below has the full vertical budget for
+          the upcoming-list. Stats sit in a smaller serif size beneath
+          the name. */}
       <div className="relative" style={{ flex: '0 0 38%', overflow: 'hidden' }}>
         {data.imageUrl ? (
           <img
             src={data.imageUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(0.95) brightness(0.85)' }}
+            style={{ filter: 'saturate(0.95) brightness(0.8)' }}
           />
         ) : (
           <div className="absolute inset-0" style={{ backgroundColor: colors.surfaceElevated }} />
@@ -774,8 +827,8 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
         <div
           className="absolute inset-x-0 bottom-0"
           style={{
-            height: '55%',
-            background: `linear-gradient(to top, ${withAlpha(colors.textPrimary, 0.75)} 0%, transparent 100%)`,
+            height: '65%',
+            background: `linear-gradient(to top, ${withAlpha(colors.textPrimary, 0.82)} 0%, transparent 100%)`,
           }}
         />
         <div
@@ -809,34 +862,52 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           >
             {data.name}
           </h2>
+          {/* Stats row under the title — smaller font, same ivory on
+              the dark gradient. "Temp · 90°C · Feuchte · 10% · Plätze · 12"
+              style separator keeps it one line. */}
+          {(data.info.temperatureC != null || data.info.humidityPct != null || data.info.capacity != null) ? (
+            <div
+              className="flex flex-wrap items-baseline"
+              style={{
+                gap: `${scaled(4, viewport, 1)}px ${scaled(14, viewport, 5)}px`,
+                marginTop: scaled(2, viewport, 1),
+              }}
+            >
+              {data.info.temperatureC != null ? (
+                <InlineStat
+                  label="Temp"
+                  value={`${data.info.temperatureC}°C`}
+                  tokens={tokens}
+                  viewport={viewport}
+                />
+              ) : null}
+              {data.info.humidityPct != null ? (
+                <InlineStat
+                  label="Feuchte"
+                  value={`${data.info.humidityPct}%`}
+                  tokens={tokens}
+                  viewport={viewport}
+                />
+              ) : null}
+              {data.info.capacity != null ? (
+                <InlineStat
+                  label="Plätze"
+                  value={String(data.info.capacity)}
+                  tokens={tokens}
+                  viewport={viewport}
+                />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body — stats moved up into the image, so this section is
+          effectively all list (plus upcoming-list kicker). */}
       <div
         className="flex min-h-0 flex-1 flex-col"
         style={{ padding: `${pad}px`, gap: scaled(14, viewport, 5) }}
       >
-        {(data.info.temperatureC != null || data.info.humidityPct != null || data.info.capacity != null) ? (
-          <div
-            className="flex flex-wrap shrink-0"
-            style={{
-              gap: scaled(22, viewport, 8),
-              paddingBottom: scaled(10, viewport, 4),
-              borderBottom: `1px solid ${colors.border}`,
-            }}
-          >
-            {data.info.temperatureC != null ? (
-              <StatCell label="Temperatur" value={`${data.info.temperatureC}°C`} color={colors.textPrimary} tokens={tokens} viewport={viewport} />
-            ) : null}
-            {data.info.humidityPct != null ? (
-              <StatCell label="Feuchte" value={`${data.info.humidityPct}%`} color={colors.textPrimary} tokens={tokens} viewport={viewport} />
-            ) : null}
-            {data.info.capacity != null ? (
-              <StatCell label="Plätze" value={String(data.info.capacity)} color={colors.textPrimary} tokens={tokens} viewport={viewport} />
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="flex items-baseline justify-between shrink-0">
           <span
