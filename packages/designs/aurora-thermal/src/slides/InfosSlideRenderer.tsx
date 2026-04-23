@@ -70,7 +70,6 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
 
   // ── Mode: background ────────────────────────────────────────────────────
   if (data.imageMode === 'background' && data.imageUrl) {
-    const cardMaxWidth = viewport.isCompact ? '92%' : '80%';
     return (
       <div
         className="relative flex h-full w-full flex-col justify-end overflow-hidden"
@@ -103,23 +102,24 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           }}
         />
 
-        {/* Text lives in a brass-bordered glass card — guarantees
-            contrast regardless of image luminance. Card height is
-            capped to 75% of the zone so there's always a visible slice
-            of the photograph even on a tiny split zone. */}
+        {/* Text sits in a brass-bordered glass bar anchored to the
+            bottom edge — full-width edge-to-edge (no outer margin)
+            and only the top corners round so it reads as a unified
+            foot strip on the photo rather than a floating card.
+            Height is still capped at 75% of the zone so a visible
+            slice of the photograph always remains. */}
         <div
           className="relative z-10 flex min-h-0 flex-col"
           style={{
-            margin: `${pad}px`,
-            padding: `${scaled(18, viewport, 8)}px ${scaled(24, viewport, 10)}px`,
-            borderRadius: radius.lg,
-            border: `1px solid ${withAlpha(accent, 0.5)}`,
+            padding: `${scaled(18, viewport, 8)}px ${pad}px`,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            borderTop: `1px solid ${withAlpha(accent, 0.5)}`,
             backgroundColor: withAlpha(colors.surface, 0.82),
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
-            boxShadow: `0 22px 52px ${withAlpha(colors.surface, 0.55)}`,
+            boxShadow: `0 -22px 52px ${withAlpha(colors.surface, 0.55)}`,
             gap: scaled(12, viewport, 4),
-            maxWidth: cardMaxWidth,
             maxHeight: '75%',
           }}
         >
