@@ -31,7 +31,11 @@ export function EventsSlideRenderer({
 }: SlideRendererProps<'events'>) {
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
-  const pad = scaled(spacing.xl, viewport, 14);
+  // Content padding uses `lg` instead of `xl` so the module fills more
+  // of its zone edge-to-edge. Outer padding was 64px on a normal
+  // viewport — visually read as a border/frame. 40px still reads as
+  // breathing room but the ambient backdrop no longer "floats".
+  const pad = scaled(spacing.lg, viewport, 12);
 
   return (
     <div
@@ -239,9 +243,13 @@ function EventRow({
                 gap: scaled(6, viewport, 2),
                 padding: `${scaled(3, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
                 borderRadius: 9999,
-                border: `1px solid ${withAlpha(status.color, event.isLive ? 0.75 : 0.5)}`,
-                backgroundColor: withAlpha(status.color, event.isLive ? 0.2 : 0.1),
-                color: status.color,
+                border: `1px solid ${withAlpha(status.color, event.isLive ? 0.8 : 0.55)}`,
+                backgroundColor: withAlpha(status.color, event.isLive ? 0.25 : 0.14),
+                // Text = ivory for contrast against the colored tint.
+                // Previously text was `status.color`, which on a same-
+                // hue tinted pill dropped below legibility (brass text
+                // on brass pill, ember text on ember pill).
+                color: colors.textPrimary,
                 fontFamily: typography.fontBody,
                 fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9)}px`,
                 fontWeight: 600,
@@ -281,15 +289,22 @@ function EventRow({
           style={{
             color: colors.textPrimary,
             fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 18)}px`,
+            // Smaller than the previous scale2xl×1.1 (~37px) which made
+            // a three-word title "Winterweihnachts­zauber…" fall off the
+            // end. scaleXl×1.15 (~30px) lets the same title wrap to 3–4
+            // lines cleanly without clipping.
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl * 1.15, viewport, 14)}px`,
             fontWeight: 500,
             letterSpacing: '-0.01em',
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             margin: 0,
+            // Allow natural word-breaking for long compound German
+            // nouns so the title never gets hard-cut mid-word.
+            overflowWrap: 'anywhere',
             overflow: 'hidden',
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
-            WebkitLineClamp: viewport.isNarrow ? 2 : 3,
+            WebkitLineClamp: viewport.isCompact ? 2 : viewport.isNarrow ? 3 : 4,
           }}
           title={event.title}
         >
@@ -332,10 +347,17 @@ function EventRow({
               lineHeight: 1.45,
               fontWeight: 400,
               margin: 0,
+              // Natural wrap (was clamped to 1–3 lines). `overflowWrap:
+              // anywhere` lets long compound words break rather than
+              // escape the column; `textWrap: pretty` evens out ragged
+              // line ends so the paragraph reads like set copy.
+              overflowWrap: 'anywhere',
+              whiteSpace: 'pre-line',
+              textWrap: 'pretty' as React.CSSProperties['textWrap'],
               overflow: 'hidden',
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: viewport.isCompact ? 1 : viewport.isNarrow ? 2 : 3,
+              WebkitLineClamp: viewport.isCompact ? 2 : viewport.isNarrow ? 3 : 5,
             }}
           >
             {event.description}

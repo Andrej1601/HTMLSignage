@@ -280,7 +280,7 @@ function ListVariant({ data, tokens, context }: SlideRendererProps<'content-pane
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const entries = flattenEntries(data);
-  const pad = scaled(spacing.xl, viewport, 14);
+  const pad = scaled(spacing.lg, viewport, 12);
 
   return (
     <div
@@ -523,7 +523,7 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
           background: auroraAmbientBackground(colors),
           color: colors.textPrimary,
           fontFamily: typography.fontBody,
-          padding: `${scaled(spacingTokens.xl, viewport, 14)}px`,
+          padding: `${scaled(spacingTokens.lg, viewport, 12)}px`,
           gap: scaled(spacingTokens.md, viewport, 8),
         }}
       >
@@ -553,7 +553,7 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
     entryAt.set(key, list);
   }
 
-  const pad = scaled(spacingTokens.xl, viewport, 14);
+  const pad = scaled(spacingTokens.lg, viewport, 12);
   const timeColWidth = scaled(92, viewport, 52);
   const gridTemplateColumns = `${timeColWidth}px repeat(${data.saunas.length}, minmax(0, 1fr))`;
 
@@ -869,7 +869,7 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
           background: auroraAmbientBackground(colors),
           color: colors.textPrimary,
           fontFamily: typography.fontBody,
-          padding: `${scaled(spacingTokens.xl, viewport, 14)}px`,
+          padding: `${scaled(spacingTokens.lg, viewport, 12)}px`,
           gap: scaled(spacingTokens.md, viewport, 8),
         }}
       >
@@ -916,7 +916,7 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
   const nowVisible = nowPx >= 0 && nowPx <= tracksWidth;
   const nowClockLabel = formatTime(nowMinutesFromClock);
 
-  const pad = scaled(spacingTokens.xl, viewport, 14);
+  const pad = scaled(spacingTokens.lg, viewport, 12);
   const labelColWidth = scaled(190, viewport, 110);
   const rowHeight = scaled(88, viewport, 52);
   const axisLabelHeight = scaled(40, viewport, 24);

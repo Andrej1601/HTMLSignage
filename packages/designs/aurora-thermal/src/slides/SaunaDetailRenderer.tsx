@@ -509,13 +509,18 @@ function SaunaMasthead({
 // image luminance can't hide a single brass-bordered chip.
 
 function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
-  const pad = scaled(spacing.xl, viewport, 14);
+  // Itinerary padding uses `lg` (40px) rather than `xl` (64px) so
+  // the right column reaches the zone edges. The image column fills
+  // the left edge-to-edge, so this keeps the visual balance.
+  const pad = scaled(spacing.lg, viewport, 12);
 
-  const liveOrNext =
-    data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
+  // Split variant only shows the LiveBadge when an aufguss is actually
+  // running. The "Als Nächstes" badge is redundant with the itinerary
+  // list on the right — the list already marks the next entry.
+  const liveEntry = data.upcoming.find((e) => e.isLive) ?? null;
 
   return (
     <div
@@ -527,43 +532,23 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
         gridTemplateColumns: viewport.isNarrow ? '1fr' : '3fr 2fr',
       }}
     >
-      {/* Image panel — clean, no overlaid text. Just the LiveBadge
-          floating top-left so the viewer can see what's running right
-          now without reading any text over the photo. */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          margin: `${pad}px 0 ${pad}px ${pad}px`,
-          borderRadius: radius.lg,
-          border: `1px solid ${withAlpha(colors.border, 0.85)}`,
-          boxShadow: `0 28px 60px ${withAlpha(colors.surface, 0.55)}`,
-          backgroundColor: withAlpha(colors.surfaceElevated, 0.9),
-        }}
-      >
+      {/* Image panel — fills the entire left column edge-to-edge (no
+          margin/border). The ambient backdrop behind the module already
+          provides the visual seal; an inset rounded frame around the
+          image added an unnecessary "card inside a card" feel. */}
+      <section className="relative overflow-hidden">
         {data.imageUrl ? (
-          <>
-            <img
-              src={data.imageUrl}
-              alt={data.name}
-              className="absolute inset-0 h-full w-full object-cover"
-              style={{ filter: 'saturate(1.06) brightness(0.95)' }}
-            />
-            {/* Subtle brass frame glow — no bottom darkener now that
-                no text sits on the image. */}
-            <div
-              aria-hidden
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                borderRadius: radius.lg,
-                boxShadow: `inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.2)}, inset 0 60px 120px ${withAlpha(colors.accentPrimary, 0.06)}`,
-              }}
-            />
-          </>
+          <img
+            src={data.imageUrl}
+            alt={data.name}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ filter: 'saturate(1.06) brightness(0.95)' }}
+          />
         ) : (
           <EmptyImagePanel tokens={tokens} viewport={viewport} />
         )}
 
-        {liveOrNext ? (
+        {liveEntry ? (
           <div
             className="absolute"
             style={{
@@ -571,7 +556,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
               left: scaled(20, viewport, 8),
             }}
           >
-            <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
+            <LiveBadge entry={liveEntry} tokens={tokens} viewport={viewport} />
           </div>
         ) : null}
       </section>
@@ -783,7 +768,9 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
-  const pad = scaled(spacing.xl, viewport, 14);
+  // Aufguss panel padding `lg` instead of `xl` so the list fills more
+  // of the zone, matching the rest of Aurora Thermal.
+  const pad = scaled(spacing.lg, viewport, 12);
 
   const liveOrNext =
     data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
@@ -935,10 +922,13 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
 // ── Variant: Portrait ──────────────────────────────────────────────────────
 
 function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
-  const { colors, typography, spacing, radius } = tokens;
+  const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
-  const pad = scaled(spacing.xl, viewport, 14);
+  // Portrait padding also dropped from `xl` to `lg` so the module
+  // body uses the zone edges rather than floating inside an obvious
+  // frame. Consistent with Schedule / Events / Infos.
+  const pad = scaled(spacing.lg, viewport, 12);
 
   const liveOrNext =
     data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
@@ -952,19 +942,12 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
         fontFamily: typography.fontBody,
       }}
     >
-      {/* Upper image — 38% (was 52%). On portrait zones we want the
-          aufguss list to command at least 60% so enough entries fit
-          without the scroll immediately kicking in. */}
+      {/* Upper image — 38% of the zone, edge-to-edge (no card margin).
+          The list area below provides all the visual containment
+          needed. */}
       <section
-        className="relative shrink-0"
-        style={{
-          height: viewport.isCompact ? '36%' : '38%',
-          margin: `${pad}px ${pad}px 0 ${pad}px`,
-          borderRadius: radius.lg,
-          overflow: 'hidden',
-          border: `1px solid ${withAlpha(colors.border, 0.85)}`,
-          boxShadow: `0 20px 48px ${withAlpha(colors.surface, 0.5)}`,
-        }}
+        className="relative shrink-0 overflow-hidden"
+        style={{ height: viewport.isCompact ? '36%' : '38%' }}
       >
         {data.imageUrl ? (
           <img
@@ -977,14 +960,14 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           <EmptyImagePanel tokens={tokens} viewport={viewport} />
         )}
 
-        {/* Subtle brass frame glow — no bottom-darkener needed now
-            that the name sits on the panel below the image. */}
+        {/* Hairline brass seal at the image's bottom — separates image
+            from the itinerary without introducing a full rounded
+            border. */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
-            borderRadius: radius.lg,
-            boxShadow: `inset 0 0 0 1px ${withAlpha(colors.accentPrimary, 0.2)}`,
+            boxShadow: `inset 0 -1px 0 0 ${withAlpha(colors.accentPrimary, 0.3)}`,
           }}
         />
 

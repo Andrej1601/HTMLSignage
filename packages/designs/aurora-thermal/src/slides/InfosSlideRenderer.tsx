@@ -43,12 +43,15 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
 
   // Padding adapts: a 64px outer margin on a 400×300 zone eats half
   // the canvas. We scale the outer pad down aggressively on compact
-  // zones so there's real room for the headline + body.
+  // zones so there's real room for the headline + body. On wider
+  // zones `spacing.lg` (40px) replaces the old `xl` (64px) so the
+  // module visually fills its zone rather than "floating" inside an
+  // obvious outer-padding frame.
   const pad = viewport.isUltraCompact
-    ? scaled(16, viewport, 8)
+    ? scaled(14, viewport, 6)
     : viewport.isCompact
-      ? scaled(24, viewport, 10)
-      : scaled(spacing.xl, viewport, 14);
+      ? scaled(20, viewport, 8)
+      : scaled(spacing.lg, viewport, 12);
 
   // Heading & body scales — sized so a 3-line headline + a few
   // paragraphs of body still fit comfortably on common zones. On
@@ -241,15 +244,11 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           </span>
         </section>
 
-        <section
-          className="relative overflow-hidden"
-          style={{
-            margin: `${pad}px ${pad}px ${pad}px 0`,
-            borderRadius: radius.lg,
-            border: `1px solid ${withAlpha(colors.border, 0.85)}`,
-            boxShadow: `0 22px 52px ${withAlpha(colors.surface, 0.55)}`,
-          }}
-        >
+        {/* Image column — fills the right half edge-to-edge. The
+            previous `margin: pad` wrapped the image in a visible
+            rounded card inside the module, creating the "card within
+            a card" effect the user asked us to drop. */}
+        <section className="relative overflow-hidden">
           <img
             src={data.imageUrl ?? undefined}
             alt=""
@@ -260,8 +259,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             aria-hidden
             className="absolute inset-0 pointer-events-none"
             style={{
-              borderRadius: radius.lg,
-              boxShadow: `inset 0 0 0 1px ${withAlpha(accent, 0.22)}, inset 0 -80px 120px ${withAlpha(colors.surface, 0.2)}`,
+              boxShadow: `inset 1px 0 0 0 ${withAlpha(accent, 0.22)}, inset 0 -80px 120px ${withAlpha(colors.surface, 0.2)}`,
             }}
           />
         </section>
@@ -283,15 +281,11 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
       }}
     >
       {stackVertical && data.imageUrl ? (
+        // Image fills the full top band edge-to-edge; no rounded inner
+        // card. The ambient backdrop is enough visual frame.
         <section
           className="relative shrink-0 overflow-hidden"
-          style={{
-            height: viewport.isUltraCompact ? '28%' : '36%',
-            margin: `${pad}px ${pad}px 0 ${pad}px`,
-            borderRadius: radius.md,
-            border: `1px solid ${withAlpha(colors.border, 0.85)}`,
-            boxShadow: `0 14px 32px ${withAlpha(colors.surface, 0.45)}`,
-          }}
+          style={{ height: viewport.isUltraCompact ? '28%' : '36%' }}
         >
           <img
             src={data.imageUrl}
@@ -303,8 +297,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             aria-hidden
             className="absolute inset-0 pointer-events-none"
             style={{
-              borderRadius: radius.md,
-              boxShadow: `inset 0 0 0 1px ${withAlpha(accent, 0.22)}`,
+              boxShadow: `inset 0 -1px 0 0 ${withAlpha(accent, 0.22)}`,
             }}
           />
         </section>
