@@ -145,37 +145,56 @@ function EventRow({
         gap: scaled(28, viewport, 10),
       }}
     >
-      {/* Large serif date block */}
+      {/* Large serif date block — the brass rule on the left glows
+          `status.color` (ember for live, warm-brass for "geplant",
+          etc.) so the status beat is still carried without the
+          standalone right-column label. */}
       <div
-        className="shrink-0 flex flex-col items-baseline"
-        style={{ minWidth: scaled(130, viewport, 74), gap: scaled(6, viewport, 2) }}
+        className="shrink-0 flex items-stretch"
+        style={{ gap: scaled(14, viewport, 5), minWidth: scaled(130, viewport, 74) }}
       >
-        <span
-          className="tabular-nums"
+        <div
           style={{
-            color: colors.textPrimary,
-            fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 22)}px`,
-            fontWeight: 500,
-            lineHeight: 0.9,
-            letterSpacing: '-0.015em',
+            width: 2,
+            borderRadius: 1,
+            backgroundColor: event.isLive
+              ? status.color
+              : withAlpha(status.color, 0.7),
+            boxShadow: event.isLive
+              ? `0 0 12px ${withAlpha(status.color, 0.5)}`
+              : 'none',
           }}
-        >
-          {dayLabel}
-        </span>
-        {monthLabel ? (
+        />
+        <div className="flex flex-col items-baseline" style={{ gap: scaled(6, viewport, 2) }}>
           <span
-            style={kickerStyles(
-              withAlpha(colors.textSecondary, 0.9),
-              scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8),
-            )}
+            className="tabular-nums"
+            style={{
+              color: colors.textPrimary,
+              fontFamily: typography.fontHeading,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl, viewport, 22)}px`,
+              fontWeight: 500,
+              lineHeight: 0.9,
+              letterSpacing: '-0.015em',
+            }}
           >
-            {monthLabel}
+            {dayLabel}
           </span>
-        ) : null}
+          {monthLabel ? (
+            <span
+              style={kickerStyles(
+                withAlpha(colors.textSecondary, 0.9),
+                scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8),
+              )}
+            >
+              {monthLabel}
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {/* Title + meta column */}
+      {/* Title + meta column — flex-1 now absorbs the slack the old
+          "geplant" right column used to hold. Title can also wrap to
+          up to 2 lines on normal zones. */}
       <div
         className="flex flex-1 min-w-0 flex-col"
         style={{ gap: scaled(6, viewport, 2) }}
@@ -191,15 +210,19 @@ function EventRow({
           </span>
         ) : null}
         <h3
-          className="truncate"
           style={{
             color: colors.textPrimary,
             fontFamily: typography.fontHeading,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 15)}px`,
             fontWeight: 600,
             letterSpacing: '-0.01em',
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             margin: 0,
+            overflowWrap: 'anywhere',
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: viewport.isCompact ? 2 : 3,
           }}
           title={event.title}
         >
@@ -215,22 +238,6 @@ function EventRow({
         >
           {timeLabel}
           {event.location ? ` · ${event.location}` : ''}
-        </span>
-      </div>
-
-      {/* Status */}
-      <div className="shrink-0" style={{ minWidth: scaled(100, viewport, 60), textAlign: 'right' }}>
-        <span
-          style={{
-            color: status.color,
-            fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-            fontStyle: 'italic',
-            fontWeight: 400,
-            letterSpacing: '0.03em',
-          }}
-        >
-          {status.label}
         </span>
       </div>
     </div>

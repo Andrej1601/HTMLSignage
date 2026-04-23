@@ -52,6 +52,7 @@ export type {
   DesignWrapper,
   DesignCapability,
   DesignStatus,
+  IntensityDisplay,
   DesignManifest,
   Design,
 } from './contract';

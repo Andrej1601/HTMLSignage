@@ -1,4 +1,5 @@
 import type {
+  IntensityDisplay,
   SaunaDetailData,
   SaunaDetailStyle,
   SaunaInfusionEntry,
@@ -6,11 +7,11 @@ import type {
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import {
+  IntensityMark as SharedIntensityMark,
   auroraAmbientBackground,
   brassHairline,
   eyebrowStyles,
   kickerStyles,
-  romanNumeral,
   scaled,
   scaledFont,
   statusChipStyles,
@@ -68,33 +69,26 @@ function IntensityMark({
   tokens,
   viewport,
   sizePx,
+  display,
 }: {
   level: number;
   color: string;
   tokens: Tokens;
   viewport: Viewport;
   sizePx?: number;
+  display: IntensityDisplay;
 }) {
-  const { typography } = tokens;
+  const { typography, colors } = tokens;
   const size = sizePx ?? scaled(30, viewport, 18);
   return (
-    <span
-      className="shrink-0 inline-flex items-center justify-center tabular-nums"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border: `1px solid ${withAlpha(color, 0.65)}`,
-        color,
-        fontFamily: typography.fontMono,
-        fontSize: `${Math.round(size * 0.38)}px`,
-        fontWeight: 600,
-        backgroundColor: withAlpha(color, 0.08),
-      }}
-      aria-label={`Intensität ${level} von 4`}
-    >
-      {romanNumeral(level)}
-    </span>
+    <SharedIntensityMark
+      level={level}
+      color={color}
+      idleColor={withAlpha(colors.accentPrimary, 0.2)}
+      size={size}
+      display={display}
+      fontFamily={typography.fontMono}
+    />
   );
 }
 
@@ -245,12 +239,14 @@ function InfusionRow({
   viewport,
   accent,
   first = false,
+  intensityDisplay,
 }: {
   entry: SaunaInfusionEntry;
   tokens: Tokens;
   viewport: Viewport;
   accent: string;
   first?: boolean;
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography } = tokens;
   const status = statusMeta(entry, tokens);
@@ -369,6 +365,7 @@ function InfusionRow({
           tokens={tokens}
           viewport={viewport}
           sizePx={scaled(28, viewport, 16)}
+          display={intensityDisplay}
         />
       ) : null}
 
@@ -512,6 +509,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
   // Itinerary padding uses `lg` (40px) rather than `xl` (64px) so
   // the right column reaches the zone edges. The image column fills
   // the left edge-to-edge, so this keeps the visual balance.
@@ -630,6 +628,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
                   viewport={viewport}
                   accent={accent}
                   first={idx === 0}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>
@@ -768,6 +767,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
   // Aufguss panel padding `lg` instead of `xl` so the list fills more
   // of the zone, matching the rest of Aurora Thermal.
   const pad = scaled(spacing.lg, viewport, 12);
@@ -908,6 +908,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
                   viewport={viewport}
                   accent={accent}
                   first={idx === 0}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>
@@ -925,6 +926,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
   // Portrait padding also dropped from `xl` to `lg` so the module
   // body uses the zone edges rather than floating inside an obvious
   // frame. Consistent with Schedule / Events / Infos.
@@ -1050,6 +1052,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
                   viewport={viewport}
                   accent={accent}
                   first={idx === 0}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>

@@ -90,6 +90,14 @@ export interface DisplaySettings {
    * host falls back to the default design.
    */
   designPackId?: string;
+  /**
+   * How aufguss intensity renders across packs.
+   *   - 'flames' (default) — four flame icons filled up to the level
+   *   - 'roman'            — single Roman numeral in a brass ring
+   * The pack may ignore the hint; canonical behaviour is implemented
+   * by every stable Aurora / Editorial / Wellness pack.
+   */
+  intensityDisplay?: 'flames' | 'roman';
 }
 
 export interface AudioSettings {

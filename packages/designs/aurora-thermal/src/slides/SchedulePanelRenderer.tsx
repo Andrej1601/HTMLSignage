@@ -1,4 +1,5 @@
 import type {
+  IntensityDisplay,
   SchedulePanelCell,
   SchedulePanelData,
   SchedulePanelStyle,
@@ -6,6 +7,7 @@ import type {
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import {
+  IntensityMark as SharedIntensityMark,
   auroraAmbientBackground,
   brassHairline,
   eyebrowStyles,
@@ -97,41 +99,37 @@ function statusMeta(cell: SchedulePanelCell, tokens: Tokens) {
 }
 
 /**
- * Intensity mark — Roman numerals in a brass hairline ring.
- * Keeps flames off the screen while reading at distance.
+ * Intensity mark — flames by default, Roman numerals when the host's
+ * `intensityDisplay` context prefers them. Thin wrapper over the
+ * shared utility so each pack can pick a size / idle colour that
+ * matches its surface.
  */
 function IntensityMark({
   level,
   color,
+  idleColor,
   viewport,
   tokens,
+  display,
 }: {
   level: number;
   color: string;
+  idleColor?: string;
   viewport: Viewport;
   tokens: Tokens;
+  display: IntensityDisplay;
 }) {
-  const { typography } = tokens;
+  const { typography, colors } = tokens;
   const size = scaled(26, viewport, 16);
   return (
-    <span
-      className="shrink-0 inline-flex items-center justify-center tabular-nums"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border: `1px solid ${withAlpha(color, 0.65)}`,
-        color,
-        fontFamily: typography.fontMono,
-        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9)}px`,
-        fontWeight: 600,
-        letterSpacing: '0.02em',
-        backgroundColor: withAlpha(color, 0.08),
-      }}
-      aria-label={`Intensität ${level} von 4`}
-    >
-      {romanNumeral(level)}
-    </span>
+    <SharedIntensityMark
+      level={level}
+      color={color}
+      idleColor={idleColor ?? withAlpha(colors.accentPrimary, 0.2)}
+      size={size}
+      display={display}
+      fontFamily={typography.fontMono}
+    />
   );
 }
 
@@ -281,6 +279,7 @@ function ListVariant({ data, tokens, context }: SlideRendererProps<'content-pane
   const { viewport } = context;
   const entries = flattenEntries(data);
   const pad = scaled(spacing.lg, viewport, 12);
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   return (
     <div
@@ -307,6 +306,7 @@ function ListVariant({ data, tokens, context }: SlideRendererProps<'content-pane
                 entry={entry}
                 tokens={tokens}
                 viewport={viewport}
+                intensityDisplay={intensityDisplay}
               />
             ))}
           </div>
@@ -320,10 +320,12 @@ function ListRow({
   entry,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   entry: FlatEntry;
   tokens: Tokens;
   viewport: Viewport;
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography } = tokens;
   const { cell } = entry;
@@ -490,6 +492,7 @@ function ListRow({
             }
             tokens={tokens}
             viewport={viewport}
+            display={intensityDisplay}
           />
         ) : null}
         <StatusChip cell={cell} tokens={tokens} viewport={viewport} />
@@ -514,6 +517,7 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
   const { colors, typography, spacing: spacingTokens } = tokens;
   const { viewport } = context;
   const entries = flattenEntries(data);
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   if (data.saunas.length === 0 || entries.length === 0) {
     return (
@@ -611,6 +615,7 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
                 saunaCount={data.saunas.length}
                 tokens={tokens}
                 viewport={viewport}
+                intensityDisplay={intensityDisplay}
               />
             );
           })}
@@ -693,6 +698,7 @@ function MatrixBucketRow({
   saunaCount,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   timeLabel: string;
   bucket: number;
@@ -700,6 +706,7 @@ function MatrixBucketRow({
   saunaCount: number;
   tokens: Tokens;
   viewport: Viewport;
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography } = tokens;
   return (
@@ -732,6 +739,7 @@ function MatrixBucketRow({
                 entry={entry}
                 tokens={tokens}
                 viewport={viewport}
+                intensityDisplay={intensityDisplay}
               />
             ))}
           </div>
@@ -745,10 +753,12 @@ function MatrixCell({
   entry,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   entry: FlatEntry;
   tokens: Tokens;
   viewport: Viewport;
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography, radius } = tokens;
   const { cell } = entry;
@@ -805,6 +815,7 @@ function MatrixCell({
             color={cell.isLive ? colors.statusLive : accent}
             tokens={tokens}
             viewport={viewport}
+            display={intensityDisplay}
           />
         ) : null}
       </div>
@@ -860,6 +871,7 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
   const { colors, typography, spacing: spacingTokens, radius } = tokens;
   const { viewport } = context;
   const entries = flattenEntries(data);
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   if (data.saunas.length === 0 || entries.length === 0) {
     return (
@@ -1256,19 +1268,54 @@ function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-
                             {entry.time}
                           </span>
                           {entry.cell.intensity != null && entry.cell.intensity > 0 ? (
-                            <span
-                              className="tabular-nums"
-                              style={{
-                                color: timeColor,
-                                fontFamily: typography.fontMono,
-                                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8)}px`,
-                                fontWeight: 500,
-                                letterSpacing: '0.06em',
-                                opacity: 0.85,
-                              }}
-                            >
-                              · {romanNumeral(entry.cell.intensity)}
-                            </span>
+                            intensityDisplay === 'roman' ? (
+                              <span
+                                className="tabular-nums"
+                                style={{
+                                  color: timeColor,
+                                  fontFamily: typography.fontMono,
+                                  fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8)}px`,
+                                  fontWeight: 500,
+                                  letterSpacing: '0.06em',
+                                  opacity: 0.85,
+                                }}
+                              >
+                                · {romanNumeral(entry.cell.intensity)}
+                              </span>
+                            ) : (
+                              // Compact inline flame cluster — only
+                              // filled flames, no idle ones, since the
+                              // timeline cell is too narrow for a full
+                              // 4-flame row.
+                              <span
+                                aria-label={`Intensität ${entry.cell.intensity} von 4`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  color: timeColor,
+                                  opacity: 0.9,
+                                }}
+                              >
+                                <span style={{ opacity: 0.7, marginRight: 2 }}>·</span>
+                                {Array.from({ length: entry.cell.intensity }).map((_, i) => (
+                                  <svg
+                                    key={i}
+                                    width={scaled(10, viewport, 7)}
+                                    height={scaled(10, viewport, 7)}
+                                    viewBox="0 0 24 24"
+                                    fill={timeColor}
+                                    stroke={timeColor}
+                                    strokeWidth={1.8}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden
+                                  >
+                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                                  </svg>
+                                ))}
+                              </span>
+                            )
                           ) : null}
                         </div>
                         <span

@@ -24,6 +24,14 @@ export interface SlideViewport {
 }
 
 /**
+ * How the host wants aufguss intensity to be displayed. A pack is free
+ * to honour or ignore this, but the canonical mapping is:
+ *   - 'flames' — four flame icons, filled up to the intensity level
+ *   - 'roman'  — a single Roman numeral (I / II / III / IV) in a ring
+ */
+export type IntensityDisplay = 'flames' | 'roman';
+
+/**
  * Information every slide renderer receives alongside its data.
  */
 export interface SlideRenderContext {
@@ -44,6 +52,12 @@ export interface SlideRenderContext {
    * than hard-coded media queries.
    */
   viewport: SlideViewport;
+  /**
+   * Preferred intensity display style. Falls back to 'flames' when
+   * absent so existing packs keep their familiar fire icons without
+   * changes. Configurable globally via `settings.display.intensityDisplay`.
+   */
+  intensityDisplay?: IntensityDisplay;
   /**
    * Callback invoked by `media-video` renderers when playback finishes.
    * The host advances to the next slide when `playback === 'complete'`.

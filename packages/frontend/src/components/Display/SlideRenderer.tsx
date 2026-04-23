@@ -171,6 +171,7 @@ function resolveDesignFlag(settings: Settings): {
 function buildRenderContext(
   slide: SlideConfig,
   deviceId: string | undefined,
+  settings: Settings,
   extra?: Partial<Omit<SlideRenderContext, 'viewport'>>,
 ): Omit<SlideRenderContext, 'viewport'> {
   return {
@@ -179,6 +180,11 @@ function buildRenderContext(
     transitionsEnabled: true,
     locale: 'de-DE',
     deviceId,
+    // Intensity display preference flows from host settings into every
+    // renderer's context so packs can honour a single operator-level
+    // choice without each slide plumbing it themselves. Default
+    // 'flames' matches the historical wellness-classic behaviour.
+    intensityDisplay: settings.display?.intensityDisplay ?? 'flames',
     ...extra,
   };
 }
@@ -196,7 +202,7 @@ function InfosSlideDispatch({
 }) {
   const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useInfoPanelData({ settings, infoId: slide.infoId, media });
-  const context = buildRenderContext(slide, deviceId);
+  const context = buildRenderContext(slide, deviceId, settings);
 
   return (
     <DesignHost
@@ -224,7 +230,7 @@ function MediaImageDispatch({
 }) {
   const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useMediaImageData({ slide, media });
-  const context = buildRenderContext(slide, deviceId);
+  const context = buildRenderContext(slide, deviceId, settings);
 
   const legacy = <MediaImageSlide media={media} slide={slide} />;
   if (!data) return legacy;
@@ -257,7 +263,7 @@ function MediaVideoDispatch({
 }) {
   const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const data = useMediaVideoData({ slide, media });
-  const context = buildRenderContext(slide, deviceId, { onVideoEnded });
+  const context = buildRenderContext(slide, deviceId, settings, { onVideoEnded });
 
   const legacy = <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
   if (!data) return legacy;
@@ -291,7 +297,7 @@ function EventsSlideDispatch({
   const { enabled, designId, tokenOverrides } = resolveDesignFlag(settings);
   const effectiveNow = useMemo(() => now ?? new Date(), [now]);
   const data = useEventsPanelData({ settings, media, now: effectiveNow });
-  const context = buildRenderContext(slide, deviceId);
+  const context = buildRenderContext(slide, deviceId, settings);
 
   return (
     <DesignHost
@@ -331,7 +337,7 @@ function SaunaDetailDispatch({
     deviceId,
     now: effectiveNow,
   });
-  const context = buildRenderContext(slide, deviceId);
+  const context = buildRenderContext(slide, deviceId, settings);
 
   if (!data) {
     return <PlaceholderSlide message="Sauna nicht gefunden" />;
@@ -371,7 +377,7 @@ function ContentPanelDispatch({
     deviceId,
     now: effectiveNow,
   });
-  const context = buildRenderContext(slide, deviceId);
+  const context = buildRenderContext(slide, deviceId, settings);
 
   // The pack's SchedulePanelRenderer dispatches on `data.styleHint` and
   // implements all three host styles (`list` / `matrix` / `timeline`) so

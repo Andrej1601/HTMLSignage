@@ -1,4 +1,5 @@
 import type {
+  IntensityDisplay,
   SchedulePanelCell,
   SchedulePanelData,
   SchedulePanelStyle,
@@ -6,6 +7,7 @@ import type {
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import {
+  IntensityMark,
   eyebrowStyles,
   kickerStyles,
   scaled,
@@ -90,52 +92,37 @@ function statusMeta(
 }
 
 /**
- * Inline intensity badge: roman numerals in a thin-ruled circle —
- * a nod to hotel-room plaques. Keeps the metric legible without
- * crowding the row with icons.
+ * Local wrapper around the shared `IntensityMark` that adapts the
+ * flame/Roman choice to the host's `intensityDisplay` preference and
+ * dims the colour for finished entries.
  */
-function IntensityMark({
+function ScheduleIntensityMark({
   level,
-  color,
+  activeColor,
+  idleColor,
   viewport,
   tokens,
+  intensityDisplay,
 }: {
   level: number;
-  color: string;
+  activeColor: string;
+  idleColor: string;
   viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
   tokens: SlideRendererProps<'content-panel'>['tokens'];
+  intensityDisplay: IntensityDisplay;
 }) {
   const { typography } = tokens;
   const size = scaled(22, viewport, 14);
   return (
-    <span
-      className="shrink-0 inline-flex items-center justify-center"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border: `1px solid ${color}`,
-        color,
-        fontFamily: typography.fontMono,
-        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
-        fontWeight: 600,
-        letterSpacing: '0.02em',
-      }}
-      aria-label={`Intensität ${level} von 4`}
-    >
-      {romanNumeral(level)}
-    </span>
+    <IntensityMark
+      level={level}
+      color={activeColor}
+      idleColor={idleColor}
+      size={size}
+      display={intensityDisplay}
+      fontFamily={typography.fontMono}
+    />
   );
-}
-
-function romanNumeral(n: number): string {
-  switch (n) {
-    case 1: return 'I';
-    case 2: return 'II';
-    case 3: return 'III';
-    case 4: return 'IV';
-    default: return '';
-  }
 }
 
 function StatusWord({
@@ -174,6 +161,7 @@ function ListVariant({ data, tokens, context }: SlideRendererProps<'content-pane
   const { viewport } = context;
   const entries = flattenEntries(data);
   const pad = scaled(spacing.xl, viewport, 10);
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   return (
     <div
@@ -200,6 +188,7 @@ function ListVariant({ data, tokens, context }: SlideRendererProps<'content-pane
                 first={idx === 0}
                 tokens={tokens}
                 viewport={viewport}
+                intensityDisplay={intensityDisplay}
               />
             ))}
           </div>
@@ -214,11 +203,13 @@ function ListRow({
   first,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   entry: FlatEntry;
   first: boolean;
   tokens: SlideRendererProps<'content-panel'>['tokens'];
   viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography } = tokens;
   const { cell } = entry;
@@ -309,17 +300,19 @@ function ListRow({
       </div>
 
       {cell.intensity != null && cell.intensity > 0 ? (
-        <IntensityMark
+        <ScheduleIntensityMark
           level={cell.intensity}
-          color={
+          activeColor={
             isFinished
               ? withAlpha(colors.accentPrimary, 0.45)
               : cell.isLive
                 ? colors.statusLive
                 : colors.accentPrimary
           }
+          idleColor={withAlpha(colors.accentPrimary, 0.2)}
           tokens={tokens}
           viewport={viewport}
+          intensityDisplay={intensityDisplay}
         />
       ) : null}
 

@@ -1,5 +1,5 @@
-import type { CSSProperties } from 'react';
-import type { ColorTokens, SlideViewport } from '@htmlsignage/design-sdk';
+import type { CSSProperties, ReactNode } from 'react';
+import type { ColorTokens, IntensityDisplay, SlideViewport } from '@htmlsignage/design-sdk';
 
 /**
  * Convert a hex color to an rgba() string with the given alpha.
@@ -136,8 +136,7 @@ export function statusChipStyles(
 }
 
 /**
- * Roman-numeral intensity mark in a brass ring. Quieter than a column
- * of flame emoji; reads unambiguously from across the room.
+ * Roman-numeral helper for the 'roman' intensity-display style.
  */
 export function romanNumeral(n: number): string {
   switch (n) {
@@ -147,4 +146,97 @@ export function romanNumeral(n: number): string {
     case 4: return 'IV';
     default: return '';
   }
+}
+
+/**
+ * Inline SVG flame — closed Lucide-shape path. Rendered four times at
+ * different fill states for the intensity row.
+ */
+export function FlameIcon({
+  size,
+  color,
+  filled,
+}: {
+  size: number;
+  color: string;
+  filled: boolean;
+}): ReactNode {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? color : 'none'}
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </svg>
+  );
+}
+
+/**
+ * Shared intensity mark for Aurora Thermal. Picks flames or Roman
+ * numerals based on the host's `intensityDisplay` hint (default
+ * 'flames' to match operator expectations).
+ */
+export function IntensityMark({
+  level,
+  color,
+  idleColor,
+  size,
+  display,
+  fontFamily,
+}: {
+  level: number;
+  color: string;
+  idleColor: string;
+  size: number;
+  display: IntensityDisplay;
+  fontFamily: string;
+}): ReactNode {
+  if (display === 'roman') {
+    return (
+      <span
+        className="shrink-0 inline-flex items-center justify-center tabular-nums"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          border: `1px solid ${withAlpha(color, 0.65)}`,
+          color,
+          fontFamily,
+          fontSize: `${Math.round(size * 0.4)}px`,
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+          lineHeight: 1,
+          backgroundColor: withAlpha(color, 0.08),
+        }}
+        aria-label={`Intensität ${level} von 4`}
+      >
+        {romanNumeral(level)}
+      </span>
+    );
+  }
+  const gap = Math.max(1, Math.round(size * 0.14));
+  const flameSize = Math.round(size * 0.88);
+  return (
+    <span
+      className="shrink-0 inline-flex items-center"
+      style={{ gap }}
+      aria-label={`Intensität ${level} von 4`}
+    >
+      {[1, 2, 3, 4].map((i) => (
+        <FlameIcon
+          key={i}
+          size={flameSize}
+          color={i <= level ? color : idleColor}
+          filled={i <= level}
+        />
+      ))}
+    </span>
+  );
 }

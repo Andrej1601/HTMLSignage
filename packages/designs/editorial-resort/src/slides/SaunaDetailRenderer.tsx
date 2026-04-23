@@ -1,10 +1,12 @@
 import type {
+  IntensityDisplay,
   SaunaDetailStyle,
   SaunaInfusionEntry,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import {
+  IntensityMark,
   eyebrowStyles,
   kickerStyles,
   scaled,
@@ -47,47 +49,37 @@ function statusMeta(
   return null;
 }
 
-function IntensityMark({
+/**
+ * Local wrapper around the shared `IntensityMark` — picks flames /
+ * Roman based on the host's `intensityDisplay` preference.
+ */
+function SaunaIntensityMark({
   level,
-  color,
+  activeColor,
+  idleColor,
   viewport,
   tokens,
+  intensityDisplay,
 }: {
   level: number;
-  color: string;
+  activeColor: string;
+  idleColor: string;
   viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
   tokens: SlideRendererProps<'sauna-detail'>['tokens'];
+  intensityDisplay: IntensityDisplay;
 }) {
   const { typography } = tokens;
   const size = scaled(24, viewport, 14);
   return (
-    <span
-      className="shrink-0 inline-flex items-center justify-center"
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        border: `1px solid ${color}`,
-        color,
-        fontFamily: typography.fontMono,
-        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
-        fontWeight: 600,
-      }}
-      aria-label={`Intensität ${level} von 4`}
-    >
-      {romanNumeral(level)}
-    </span>
+    <IntensityMark
+      level={level}
+      color={activeColor}
+      idleColor={idleColor}
+      size={size}
+      display={intensityDisplay}
+      fontFamily={typography.fontMono}
+    />
   );
-}
-
-function romanNumeral(n: number): string {
-  switch (n) {
-    case 1: return 'I';
-    case 2: return 'II';
-    case 3: return 'III';
-    case 4: return 'IV';
-    default: return '';
-  }
 }
 
 function StatusWord({
@@ -165,11 +157,13 @@ function InfusionRow({
   first,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   entry: SaunaInfusionEntry;
   first: boolean;
   tokens: SlideRendererProps<'sauna-detail'>['tokens'];
   viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography } = tokens;
   const status = statusMeta(entry, tokens);
@@ -238,7 +232,11 @@ function InfusionRow({
               typography.fontHeading,
             )}
           >
-            mit {entry.aromas!.slice(0, 3).map((a) => a.name).join(', ')}
+            mit{' '}
+            {entry.aromas!
+              .slice(0, 3)
+              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+              .join(', ')}
           </span>
         ) : null}
       </div>
@@ -255,11 +253,13 @@ function InfusionRow({
         </span>
       ) : null}
       {entry.intensity != null && entry.intensity > 0 ? (
-        <IntensityMark
+        <SaunaIntensityMark
           level={entry.intensity}
-          color={entry.isLive ? colors.statusLive : colors.accentPrimary}
+          activeColor={entry.isLive ? colors.statusLive : colors.accentPrimary}
+          idleColor={withAlpha(colors.accentPrimary, 0.2)}
           tokens={tokens}
           viewport={viewport}
+          intensityDisplay={intensityDisplay}
         />
       ) : null}
       {status ? (
@@ -283,6 +283,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
   const { viewport } = context;
   const pad = scaled(spacing.xl, viewport, 10);
   const accent = data.accentColor ?? colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   return (
     <div
@@ -291,7 +292,11 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
-        gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)',
+        // Itinerary gets more room than the photograph — was 1.05/1
+        // (≈ 51/49) which left the aufguss list cramped. Now 0.85/1.15
+        // (≈ 42/58) so 6–8 entries fit without scrolling on a typical
+        // 1080p wellness-stage zone.
+        gridTemplateColumns: 'minmax(0, 0.85fr) minmax(0, 1.15fr)',
       }}
     >
       {/* Left: photograph with serif title overlay */}
@@ -448,6 +453,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
                   first={idx === 0}
                   tokens={tokens}
                   viewport={viewport}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>
@@ -469,6 +475,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const { viewport } = context;
   const pad = scaled(spacing.xl, viewport, 10);
   const accent = data.accentColor ?? colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
 
   return (
     <div
@@ -603,6 +610,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
                   accent={accent}
                   tokens={tokens}
                   viewport={viewport}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>
@@ -618,11 +626,13 @@ function HeroSlip({
   accent,
   tokens,
   viewport,
+  intensityDisplay,
 }: {
   entry: SaunaInfusionEntry;
   accent: string;
   tokens: SlideRendererProps<'sauna-detail'>['tokens'];
   viewport: SlideRendererProps<'sauna-detail'>['context']['viewport'];
+  intensityDisplay: IntensityDisplay;
 }) {
   const { colors, typography, radius } = tokens;
   const status = statusMeta(entry, tokens);
@@ -688,16 +698,22 @@ function HeroSlip({
               typography.fontHeading,
             )}
           >
-            mit {entry.aromas!.slice(0, 3).map((a) => a.name).join(', ')}
+            mit{' '}
+            {entry.aromas!
+              .slice(0, 3)
+              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+              .join(', ')}
           </span>
         ) : null}
       </div>
       {entry.intensity != null && entry.intensity > 0 ? (
-        <IntensityMark
+        <SaunaIntensityMark
           level={entry.intensity}
-          color={entry.isLive ? colors.statusLive : accent}
+          activeColor={entry.isLive ? colors.statusLive : accent}
+          idleColor={withAlpha(colors.accentPrimary, 0.2)}
           tokens={tokens}
           viewport={viewport}
+          intensityDisplay={intensityDisplay}
         />
       ) : null}
       {status ? (
@@ -718,6 +734,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const pad = scaled(spacing.lg, viewport, 8);
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
   const accent = data.accentColor ?? colors.accentPrimary;
 
   return (
@@ -851,6 +868,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
                   first={idx === 0}
                   tokens={tokens}
                   viewport={viewport}
+                  intensityDisplay={intensityDisplay}
                 />
               ))}
             </div>
