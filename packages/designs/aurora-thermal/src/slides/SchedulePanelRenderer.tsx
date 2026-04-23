@@ -120,7 +120,10 @@ function IntensityMark({
   display: IntensityDisplay;
 }) {
   const { typography, colors } = tokens;
-  const size = scaled(26, viewport, 16);
+  // Flames + Roman ring were too large before — 26px on a row with
+  // ~60px line height pushed the visual centre off. 18px sits more
+  // comfortably alongside the time column.
+  const size = scaled(18, viewport, 12);
   return (
     <SharedIntensityMark
       level={level}
@@ -467,17 +470,15 @@ function ListRow({
         ) : null}
       </div>
 
-      {/* Right column: intensity + status share a single fixed-width
-          container with right-aligned content. This guarantees the
-          intensity pill stays in its visual column regardless of
-          whether the status chip is present (previously an empty
-          `minWidth` div could collapse, leaving intensity floating at
-          the far right edge). */}
+      {/* Intensity column — fixed width, centered. Renders a blank
+          slot (not null) when the entry has no intensity so rows
+          without intensity keep the flames' column empty rather than
+          collapsing and dragging the status chip left. Same idea
+          wellness-classic uses. */}
       <div
-        className="shrink-0 flex items-center justify-end"
+        className="shrink-0 flex items-center justify-center"
         style={{
-          minWidth: scaled(150, viewport, 84),
-          gap: scaled(10, viewport, 4),
+          width: scaled(110, viewport, 68),
         }}
       >
         {cell.intensity != null && cell.intensity > 0 ? (
@@ -495,6 +496,17 @@ function ListRow({
             display={intensityDisplay}
           />
         ) : null}
+      </div>
+
+      {/* Status column — fixed width, centered. Empty when no status,
+          but still holds its width so the neighbouring intensity
+          column never drifts into its spot. */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{
+          width: scaled(112, viewport, 66),
+        }}
+      >
         <StatusChip cell={cell} tokens={tokens} viewport={viewport} />
       </div>
     </div>

@@ -112,7 +112,9 @@ function ScheduleIntensityMark({
   intensityDisplay: IntensityDisplay;
 }) {
   const { typography } = tokens;
-  const size = scaled(22, viewport, 14);
+  // Four small flames fit comfortably alongside the serif title; the
+  // old 22px ring was oversized for the row rhythm.
+  const size = scaled(16, viewport, 10);
   return (
     <IntensityMark
       level={level}
@@ -294,31 +296,45 @@ function ListRow({
               typography.fontHeading,
             )}
           >
-            mit {cell.aromas!.slice(0, 3).map((a) => a.name).join(', ')}
+            mit{' '}
+            {cell.aromas!
+              .slice(0, 3)
+              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+              .join(', ')}
           </span>
         ) : null}
       </div>
 
-      {cell.intensity != null && cell.intensity > 0 ? (
-        <ScheduleIntensityMark
-          level={cell.intensity}
-          activeColor={
-            isFinished
-              ? withAlpha(colors.accentPrimary, 0.45)
-              : cell.isLive
-                ? colors.statusLive
-                : colors.accentPrimary
-          }
-          idleColor={withAlpha(colors.accentPrimary, 0.2)}
-          tokens={tokens}
-          viewport={viewport}
-          intensityDisplay={intensityDisplay}
-        />
-      ) : null}
-
+      {/* Intensity column — fixed width, centered. Kept even when
+          empty so flames across rows always align vertically. */}
       <div
-        className="shrink-0"
-        style={{ minWidth: `${scaled(86, viewport, 54)}px`, textAlign: 'right' }}
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: `${scaled(110, viewport, 64)}px` }}
+      >
+        {cell.intensity != null && cell.intensity > 0 ? (
+          <ScheduleIntensityMark
+            level={cell.intensity}
+            activeColor={
+              isFinished
+                ? withAlpha(colors.accentPrimary, 0.45)
+                : cell.isLive
+                  ? colors.statusLive
+                  : colors.accentPrimary
+            }
+            idleColor={withAlpha(colors.accentPrimary, 0.2)}
+            tokens={tokens}
+            viewport={viewport}
+            intensityDisplay={intensityDisplay}
+          />
+        ) : null}
+      </div>
+
+      {/* Status column — fixed width, right-aligned. Empty-but-reserved
+          so adjacent columns don't collapse when an entry has no
+          status marker (Gleich / Vorbei / …). */}
+      <div
+        className="shrink-0 flex items-center justify-end"
+        style={{ width: `${scaled(86, viewport, 54)}px` }}
       >
         {status ? (
           <StatusWord

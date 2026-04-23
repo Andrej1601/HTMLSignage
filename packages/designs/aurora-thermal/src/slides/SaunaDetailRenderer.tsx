@@ -79,7 +79,10 @@ function IntensityMark({
   display: IntensityDisplay;
 }) {
   const { typography, colors } = tokens;
-  const size = sizePx ?? scaled(30, viewport, 18);
+  // 30px was too large in a row context — 20px still reads at a
+  // typical display distance while leaving the time/title the
+  // visual priority.
+  const size = sizePx ?? scaled(20, viewport, 14);
   return (
     <SharedIntensityMark
       level={level}
@@ -352,28 +355,40 @@ function InfusionRow({
         ) : null}
       </div>
 
-      {entry.intensity != null && entry.intensity > 0 ? (
-        <IntensityMark
-          level={entry.intensity}
-          color={
-            isFinished
-              ? withAlpha(colors.accentPrimary, 0.4)
-              : entry.isLive
-                ? colors.statusLive
-                : accent
-          }
-          tokens={tokens}
-          viewport={viewport}
-          sizePx={scaled(28, viewport, 16)}
-          display={intensityDisplay}
-        />
-      ) : null}
+      {/* Intensity column — fixed width, centered. Always rendered
+          (empty slot if no intensity) so all rows' flames hang from
+          the same vertical line regardless of whether a status chip
+          is present on any given row. */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: scaled(92, viewport, 56) }}
+      >
+        {entry.intensity != null && entry.intensity > 0 ? (
+          <IntensityMark
+            level={entry.intensity}
+            color={
+              isFinished
+                ? withAlpha(colors.accentPrimary, 0.4)
+                : entry.isLive
+                  ? colors.statusLive
+                  : accent
+            }
+            tokens={tokens}
+            viewport={viewport}
+            sizePx={scaled(18, viewport, 12)}
+            display={intensityDisplay}
+          />
+        ) : null}
+      </div>
 
-      {status ? (
-        <div
-          className="shrink-0"
-          style={{ minWidth: scaled(120, viewport, 66), textAlign: 'right' }}
-        >
+      {/* Status column — fixed width, centered. Holds its slot even
+          when empty so the intensity column can't drift right into
+          this space. */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: scaled(120, viewport, 66) }}
+      >
+        {status ? (
           <span
             style={statusChipStyles(status.color, {
               isLive: entry.isLive,
@@ -395,8 +410,8 @@ function InfusionRow({
             ) : null}
             {status.label}
           </span>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -944,9 +959,10 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
         fontFamily: typography.fontBody,
       }}
     >
-      {/* Upper image — 38% of the zone, edge-to-edge (no card margin).
-          The list area below provides all the visual containment
-          needed. */}
+      {/* Upper image — 38% of the zone. Sauna masthead + stats now
+          ride ON the image in a brass-glass card so the list below
+          gets the full 62% (previously the masthead + stats ate a
+          40–50px strip at the top of the list). */}
       <section
         className="relative shrink-0 overflow-hidden"
         style={{ height: viewport.isCompact ? '36%' : '38%' }}
@@ -956,15 +972,23 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
             src={data.imageUrl}
             alt={data.name}
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(1.06) brightness(0.95)' }}
+            style={{ filter: 'saturate(1.06) brightness(0.85)' }}
           />
         ) : (
           <EmptyImagePanel tokens={tokens} viewport={viewport} />
         )}
 
-        {/* Hairline brass seal at the image's bottom — separates image
-            from the itinerary without introducing a full rounded
-            border. */}
+        {/* Bottom gradient keeps the image a guaranteed-dark base for
+            the masthead card. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0)} 30%, ${withAlpha(colors.surface, 0.7)} 100%)`,
+          }}
+        />
+
+        {/* Hairline brass seal at the image's bottom edge */}
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
@@ -977,18 +1001,40 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           <div
             className="absolute"
             style={{
-              top: scaled(16, viewport, 6),
-              left: scaled(16, viewport, 6),
+              top: scaled(12, viewport, 5),
+              left: scaled(12, viewport, 5),
             }}
           >
             <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
           </div>
         ) : null}
+
+        {/* Masthead + stats float at the image bottom — edge-to-edge
+            foot strip, dark glass so text is legible on any image. */}
+        <div
+          className="absolute"
+          style={{
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: `${scaled(12, viewport, 5)}px ${pad}px`,
+            background: withAlpha(colors.surface, 0.55),
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderTop: `1px solid ${withAlpha(colors.accentPrimary, 0.45)}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: scaled(10, viewport, 3),
+          }}
+        >
+          <SaunaMasthead data={data} tokens={tokens} viewport={viewport} compact />
+          <StatRow data={data} tokens={tokens} viewport={viewport} />
+        </div>
       </section>
 
-      {/* Lower itinerary — ~62%. Sauna name + stats in the header row,
-          then the full list. Compact chrome so entries win the
-          vertical budget. */}
+      {/* Lower itinerary — ~62%, headed by a compact kicker + count
+          only. Features / stats are on the image above, so this
+          section is almost entirely the list. */}
       <section
         className="flex flex-1 min-h-0 flex-col"
         style={{
@@ -996,15 +1042,6 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           gap: scaled(spacing.sm, viewport, 4),
         }}
       >
-        <SaunaMasthead
-          data={data}
-          tokens={tokens}
-          viewport={viewport}
-          compact
-        />
-
-        <StatRow data={data} tokens={tokens} viewport={viewport} />
-
         {data.info.features && data.info.features.length > 0 ? (
           <FeatureChips features={data.info.features} tokens={tokens} viewport={viewport} />
         ) : data.infoBadges.length > 0 ? (

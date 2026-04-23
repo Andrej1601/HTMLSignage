@@ -69,7 +69,9 @@ function SaunaIntensityMark({
   intensityDisplay: IntensityDisplay;
 }) {
   const { typography } = tokens;
-  const size = scaled(24, viewport, 14);
+  // Smaller flames match the row's visual rhythm — 24px was imbalanced
+  // against a ~14px time label.
+  const size = scaled(16, viewport, 10);
   return (
     <IntensityMark
       level={level}
@@ -252,26 +254,37 @@ function InfusionRow({
           {entry.durationMin}′
         </span>
       ) : null}
-      {entry.intensity != null && entry.intensity > 0 ? (
-        <SaunaIntensityMark
-          level={entry.intensity}
-          activeColor={entry.isLive ? colors.statusLive : colors.accentPrimary}
-          idleColor={withAlpha(colors.accentPrimary, 0.2)}
-          tokens={tokens}
-          viewport={viewport}
-          intensityDisplay={intensityDisplay}
-        />
-      ) : null}
-      {status ? (
-        <div className="shrink-0" style={{ minWidth: scaled(68, viewport, 42), textAlign: 'right' }}>
+      {/* Fixed-width intensity column so all rows' flames line up
+          vertically regardless of status presence. */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: scaled(90, viewport, 54) }}
+      >
+        {entry.intensity != null && entry.intensity > 0 ? (
+          <SaunaIntensityMark
+            level={entry.intensity}
+            activeColor={entry.isLive ? colors.statusLive : colors.accentPrimary}
+            idleColor={withAlpha(colors.accentPrimary, 0.2)}
+            tokens={tokens}
+            viewport={viewport}
+            intensityDisplay={intensityDisplay}
+          />
+        ) : null}
+      </div>
+      {/* Fixed-width status column, reserves its slot even when empty. */}
+      <div
+        className="shrink-0 flex items-center justify-end"
+        style={{ width: scaled(72, viewport, 42) }}
+      >
+        {status ? (
           <StatusWord
             label={status.label}
             color={status.color}
             tokens={tokens}
             viewport={viewport}
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

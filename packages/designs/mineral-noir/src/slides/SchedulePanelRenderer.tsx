@@ -333,20 +333,29 @@ function ListRow({
         </span>
       ) : null}
 
-      {/* Intensity */}
-      {cell.intensity != null && cell.intensity > 0 ? (
-        <IntensityDots
-          level={cell.intensity}
-          color={cell.isLive ? colors.statusLive : colors.accentPrimary}
-          muted={withAlpha(colors.textSecondary, 0.35)}
-          viewport={viewport}
-        />
-      ) : null}
-
-      {/* Status */}
+      {/* Intensity column — fixed width, centered. Empty-but-reserved
+          so dots across rows hang from the same vertical line
+          regardless of whether the neighbouring status slot is in use. */}
       <div
-        className="shrink-0"
-        style={{ minWidth: `${scaled(86, viewport, 54)}px`, textAlign: 'right' }}
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: `${scaled(72, viewport, 44)}px` }}
+      >
+        {cell.intensity != null && cell.intensity > 0 ? (
+          <IntensityDots
+            level={cell.intensity}
+            color={cell.isLive ? colors.statusLive : colors.accentPrimary}
+            muted={withAlpha(colors.textSecondary, 0.35)}
+            viewport={viewport}
+          />
+        ) : null}
+      </div>
+
+      {/* Status column — also fixed width, right-aligned. Keeps its
+          slot even when empty to prevent the intensity column from
+          drifting into it. */}
+      <div
+        className="shrink-0 flex items-center justify-end"
+        style={{ width: `${scaled(86, viewport, 54)}px` }}
       >
         {status ? (
           <StatusPill
