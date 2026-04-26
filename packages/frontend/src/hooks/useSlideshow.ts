@@ -7,7 +7,7 @@ import {
   getSlidesByZone,
   shouldZoneRotate,
 } from '@/types/slideshow.types';
-import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import type { SlideConfig } from '@/types/slideshow.types';
 import type { Media } from '@/types/media.types';
 import { buildUploadUrl } from '@/utils/mediaUrl';
 import { ENV_IS_DEV } from '@/config/env';
@@ -103,7 +103,6 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
   // Per-zone timers: zones must advance independently (a change in one zone must not reset others).
   const zoneTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const zoneTimerKeysRef = useRef<Record<string, string | undefined>>({});
-  const lastTimerConfigRef = useRef<{ slides: SlideConfig[]; zones: Zone[]; defaultDuration: number } | null>(null);
 
   const clearAllZoneTimers = useCallback(() => {
     Object.values(zoneTimersRef.current).forEach((t) => {
@@ -263,20 +262,14 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
       delete zoneTimerKeysRef.current[zoneId];
     };
 
-    const timerConfigChanged =
-      !lastTimerConfigRef.current ||
-      lastTimerConfigRef.current.slides !== slides ||
-      lastTimerConfigRef.current.zones !== zones ||
-      lastTimerConfigRef.current.defaultDuration !== (slideshowConfig.defaultDuration || 0);
-
-    if (timerConfigChanged) {
-      clearAllZoneTimers();
-      lastTimerConfigRef.current = {
-        slides,
-        zones,
-        defaultDuration: slideshowConfig.defaultDuration || 0,
-      };
-    }
+    // Note: we used to call `clearAllZoneTimers()` whenever the
+    // `slides` array reference changed. That was way too aggressive —
+    // every parent settings-update produces a new array reference even
+    // when the actual slide list is unchanged (true for the embedded
+    // settings preview, where `migrateSettings` always returns a new
+    // object). The per-zone loop below already handles the real change
+    // cases via `timerKey === ${slide.id}:${duration}` — same key →
+    // keep timer running, different key → reset. Trust it.
 
     if (!enabled || isPaused || slides.length === 0) {
       clearAllZoneTimers();

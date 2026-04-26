@@ -160,6 +160,37 @@ export function SettingsPage() {
   ] : [], [isDirty, handleSave]);
   useCommandPaletteActions(paletteActions);
 
+  // Settings + schedule passed into the embedded preview. Memoised so
+  // the preview iframe doesn't get bombarded with new settings refs on
+  // every parent render — that previously reset slide rotation timers
+  // and made deletions look like they "didn't take effect" because the
+  // iframe kept re-mounting / re-applying the latest settings.
+  const previewSchedule = useMemo(
+    () => schedule || createDefaultSchedule(),
+    [schedule],
+  );
+  const previewSettings = useMemo<Settings | null>(() => {
+    if (!localSettings) return null;
+    // When the ThemeEditor is scoped to a specific slideshow, flatten
+    // that slideshow's design overrides onto the local settings —
+    // matches the Slideshow-Page preview and the live client's
+    // resolution logic. Otherwise render the globals as-is.
+    if (previewSlideshowId) {
+      const show = resolvePreviewSlideshow(allSlideshows, previewSlideshowId);
+      if (show?.config) {
+        const payload = buildSlideshowPreviewPayload({
+          settings: localSettings,
+          previewSchedule,
+          editorConfig: show.config,
+          editorPrestartMinutes: localSettings.display?.prestartMinutes ?? 10,
+          isDirty: false,
+        });
+        if (payload?.settings) return payload.settings;
+      }
+    }
+    return localSettings;
+  }, [localSettings, previewSlideshowId, allSlideshows, previewSchedule]);
+
   const tabs: Tab<TabId>[] = [
     { id: 'theme', label: 'Farben & Design', icon: Palette },
     { id: 'audio', label: 'Audio', icon: Music },
@@ -383,37 +414,12 @@ export function SettingsPage() {
           icon={Monitor}
         >
           <Suspense fallback={<LoadingSpinner label="Lade Vorschau..." />}>
-            <DisplayScenarioPreview
-              schedule={schedule || createDefaultSchedule()}
-              settings={(() => {
-                if (!localSettings) return localSettings;
-                // When the ThemeEditor is scoped to a specific slideshow,
-                // flatten that slideshow's design overrides onto the local
-                // settings — matches the Slideshow-Page preview and the
-                // live client's resolution logic.
-                //
-                // When scoped to "Globale Einstellungen" (no slideshow
-                // picked), render the globals as-is. Otherwise the user's
-                // in-flight global edits (palette / designStyle / theme)
-                // would be silently masked by slideshow-level overrides
-                // and look like the preview "doesn't update".
-                if (previewSlideshowId) {
-                  const show = resolvePreviewSlideshow(allSlideshows, previewSlideshowId);
-                  if (show?.config) {
-                    const payload = buildSlideshowPreviewPayload({
-                      settings: localSettings,
-                      previewSchedule: schedule || createDefaultSchedule(),
-                      editorConfig: show.config,
-                      editorPrestartMinutes:
-                        localSettings.display?.prestartMinutes ?? 10,
-                      isDirty: false,
-                    });
-                    if (payload?.settings) return payload.settings;
-                  }
-                }
-                return localSettings;
-              })()}
-            />
+            {previewSettings ? (
+              <DisplayScenarioPreview
+                schedule={previewSchedule}
+                settings={previewSettings}
+              />
+            ) : null}
           </Suspense>
         </SectionCard>
       </div>
