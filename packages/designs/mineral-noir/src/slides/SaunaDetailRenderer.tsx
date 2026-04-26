@@ -174,20 +174,6 @@ function InfusionRow({
         ) : null}
       </div>
 
-      {entry.durationMin != null ? (
-        <span
-          className="shrink-0 tabular-nums"
-          style={{
-            color: mutedTextColor,
-            fontFamily: typography.fontMono,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-            letterSpacing: '0.05em',
-          }}
-        >
-          {entry.durationMin}′
-        </span>
-      ) : null}
-
       {/* Intensity column — fixed width, centered. */}
       <div
         className="shrink-0 flex items-center justify-center"
@@ -290,7 +276,10 @@ function SplitVariant({
         backgroundColor: colors.surface,
         color: colors.textPrimary,
         fontFamily: typography.fontBody,
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        // Image:list = 2:3 (40% / 60%) statt 1:1 — gibt der Aufguss-Liste
+        // die nötige Breite für Title + Aroma; das Bild bleibt dabei
+        // immer noch eine vollwertige Bühne.
+        gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 3fr)',
       }}
     >
       {/* Image panel */}
@@ -454,17 +443,27 @@ function HeroVariant({
       ) : (
         <div className="absolute inset-0" style={{ backgroundColor: colors.surfaceElevated }} />
       )}
-      {/* Deep vignette */}
-      <div
-        className="absolute inset-0"
-        style={{ backgroundColor: withAlpha(colors.surface, 0.55) }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(to bottom, ${withAlpha(colors.surface, 0.2)} 0%, ${withAlpha(colors.surface, 0.5)} 45%, ${withAlpha(colors.surface, 0.88)} 100%)`,
-        }}
-      />
+      {/* Deep vignette — tint from `heroOverlay`, intensity via
+          `context.heroOverlayIntensity` (display slider). */}
+      {(() => {
+        const overlay = colors.heroOverlay ?? colors.surface;
+        const k = context.heroOverlayIntensity ?? 1;
+        const a = (base: number) => Math.max(0, Math.min(1, base * k));
+        return (
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: withAlpha(overlay, a(0.55)) }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to bottom, ${withAlpha(overlay, a(0.2))} 0%, ${withAlpha(overlay, a(0.5))} 45%, ${withAlpha(overlay, a(0.88))} 100%)`,
+              }}
+            />
+          </>
+        );
+      })()}
 
       {/* Top chrome: tag + name + stats row */}
       <div
@@ -659,7 +658,10 @@ function HeroInfusionTile({
               textTransform: 'uppercase',
             }}
           >
-            {entry.aromas!.slice(0, 3).map((a) => a.name).join(' · ')}
+            {entry.aromas!
+              .slice(0, 3)
+              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+              .join(' · ')}
           </span>
         ) : null}
       </div>

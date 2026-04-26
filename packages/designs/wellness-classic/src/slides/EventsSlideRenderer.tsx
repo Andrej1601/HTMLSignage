@@ -57,7 +57,7 @@ function EventCard({ entry, tokens, size, viewport }: EventCardProps) {
         >
           <img
             src={entry.imageUrl}
-            alt=""
+            alt={entry.title}
             className="h-full w-full object-cover"
           />
         </div>

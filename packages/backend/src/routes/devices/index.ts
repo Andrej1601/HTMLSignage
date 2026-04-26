@@ -101,8 +101,8 @@ router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest,
     //   2. isDefault slideshow from the slideshows table (authoritative source for admin edits)
     //   3. settings.slideshow JSON (legacy fallback)
     const effectiveSettings = { ...globalSettings };
-    if (device.slideshowId && device.slideshow) {
-      effectiveSettings.slideshow = (device.slideshow as unknown as { config: unknown }).config;
+    if (device.slideshow?.config !== undefined) {
+      effectiveSettings.slideshow = device.slideshow.config;
     } else {
       const defaultSlideshow = await prisma.slideshow.findFirst({
         where: { isDefault: true },

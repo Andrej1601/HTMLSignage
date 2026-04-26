@@ -3,23 +3,9 @@ import type {
   SaunaInfusionEntry,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { withAlpha } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import { scaled, scaledFont } from './responsive';
-
-function withAlpha(color: string, alpha: number): string {
-  const c = color.trim();
-  const clamped = Math.max(0, Math.min(1, alpha));
-  if (c.startsWith('#')) {
-    const raw = c.slice(1);
-    const hex = raw.length === 3 ? raw.split('').map((ch) => ch + ch).join('') : raw;
-    if (hex.length !== 6) return c;
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${clamped})`;
-  }
-  return c;
-}
 
 /**
  * Inline SVG flame — closed path (Lucide-shape). The previous version
@@ -594,23 +580,35 @@ function HeroVariant({
       )}
       {/* Strong darken wash so glassmorphism tiles sit on a deeply
           fogged field. Two stacked layers: a base full-area shade and
-          a stronger gradient from the tile zone downward. */}
-      <div
-        className="absolute inset-0"
-        style={{ backgroundColor: withAlpha(colors.textPrimary, 0.45) }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(to bottom, ${withAlpha(
-            colors.textPrimary,
-            0.1,
-          )} 0%, ${withAlpha(colors.textPrimary, 0.55)} 38%, ${withAlpha(
-            colors.textPrimary,
-            0.85,
-          )} 100%)`,
-        }}
-      />
+          a stronger gradient from the tile zone downward. Tint comes
+          from `colors.heroOverlay`; the per-display intensity slider
+          (`context.heroOverlayIntensity`) multiplies the base alphas
+          so operators can dial in "lighter photo" or "darker for text". */}
+      {(() => {
+        const overlay = colors.heroOverlay ?? colors.textPrimary;
+        const k = context.heroOverlayIntensity ?? 1;
+        const a = (base: number) => Math.max(0, Math.min(1, base * k));
+        return (
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: withAlpha(overlay, a(0.45)) }}
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to bottom, ${withAlpha(
+                  overlay,
+                  a(0.1),
+                )} 0%, ${withAlpha(overlay, a(0.55))} 38%, ${withAlpha(
+                  overlay,
+                  a(0.85),
+                )} 100%)`,
+              }}
+            />
+          </>
+        );
+      })()}
 
       {/* Top zone: Sauna tag + name + stats chips */}
       <div

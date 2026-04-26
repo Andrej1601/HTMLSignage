@@ -23,6 +23,12 @@ export const mineralNoirTokens: DesignTokens = {
     statusLive: '#7DD3C0',
     statusNext: '#9CA3AF',
     statusWarning: '#E8B86A',
+
+    // Smaragd stripe — Mineral Noir's signature edge marker.
+    accentStripe: '#7DD3C0',
+    // Hero-overlay tint: the slate stage colour, so photos settle into
+    // the cool charcoal field.
+    heroOverlay: '#0C0F14',
   },
   typography: {
     fontBody:

@@ -195,7 +195,7 @@ export function createDefaultSchedule(): Schedule {
 
 // Helper to copy day schedule
 export function copyDaySchedule(source: DaySchedule): DaySchedule {
-  return JSON.parse(JSON.stringify(source));
+  return structuredClone(source);
 }
 
 // Normalize sauna names so schedule mappings survive cosmetic renames (case, hyphens, umlauts, etc.).

@@ -60,6 +60,10 @@ export default [
     rules: {
       ...typescriptBaseRules,
       ...reactHooks.configs.recommended.rules,
+      // Off because our Context modules deliberately co-locate the Provider
+      // component with its hook (e.g. WebSocketContext + useWebSocketStatus)
+      // and chrome modules co-locate components with theming helpers.
+      // Splitting purely for HMR Fast-Refresh isn't worth the file churn.
       'react-refresh/only-export-components': 'off',
     },
   },

@@ -76,7 +76,7 @@ function isThemeComplete(theme: Partial<ThemeColors> | undefined, palette: Parti
  * this runs on every postMessage and would otherwise reset the
  * slide-rotation timer.
  */
-export function migrateSettings(settings: Settings): Settings {
+export function migrateSettings(settings: Partial<Settings>): Settings {
   // ── Display appearance / design style normalization ─────────────────────
   const targetDisplayAppearance = resolveTargetAppearance(
     settings.displayAppearance,
@@ -187,14 +187,16 @@ export function migrateSettings(settings: Settings): Settings {
   // ── Short-circuit when no changes are needed ────────────────────────────
   // Returning the original `settings` reference matters: consumers
   // depend on `===` equality to short-circuit re-renders / effects.
+  const versionFilled = typeof settings.version === 'number';
   if (
+    versionFilled &&
     !displayAppearanceChanged &&
     !designStyleChanged &&
     !eventsChanged &&
     !themeChanged &&
     !slideshowChanged
   ) {
-    return settings;
+    return settings as Settings;
   }
 
   if (themeChanged || slideshowChanged) {
@@ -203,6 +205,7 @@ export function migrateSettings(settings: Settings): Settings {
 
   return {
     ...settings,
+    version: settings.version ?? 1,
     displayAppearance: displayAppearanceChanged ? targetDisplayAppearance : settings.displayAppearance,
     designStyle: designStyleChanged ? targetDesignStyle : settings.designStyle,
     events: eventsChanged ? normalizedEvents : settings.events,

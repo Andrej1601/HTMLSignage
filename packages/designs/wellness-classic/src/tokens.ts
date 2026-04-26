@@ -21,6 +21,13 @@ export const wellnessClassicTokens: DesignTokens = {
     statusLive: '#10B981',
     statusNext: '#D4A574',
     statusWarning: '#F59E0B',
+
+    // Tan stripe matches the brand accent on tan surfaces.
+    accentStripe: '#D4A574',
+    // Hero-overlay default: deep espresso. Was implicit `textPrimary`
+    // before — naming it explicitly lets operators darken/lighten the
+    // wash when bright sauna photos bleached the original brown tone.
+    heroOverlay: '#3A1F00',
   },
   typography: {
     fontBody:

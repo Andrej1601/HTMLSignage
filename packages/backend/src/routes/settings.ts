@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { createVersionedRecord, VersionConflictError } from '../lib/versionedEntity.js';
 import { broadcastSettingsUpdate } from '../websocket/index.js';
-import { authMiddleware, type AuthRequest } from '../lib/auth.js';
+import { authMiddleware, authOrDeviceMiddleware, type AuthRequest } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -12,8 +12,8 @@ import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
 
 const router = Router();
 
-// GET /api/settings
-router.get('/', async (req, res) => {
+// GET /api/settings (admin user OR paired device)
+router.get('/', authOrDeviceMiddleware, async (_req: AuthRequest, res) => {
   try {
     const settings = await prisma.settings.findFirst({
       where: { isActive: true },
@@ -37,6 +37,20 @@ router.get('/', async (req, res) => {
         height: 8,
       };
       console.log('[settings] Added default header configuration');
+    }
+
+    // The legacy `settings.slideshow` JSON is no longer persisted. To
+    // keep callers (dashboard, slide editors) working without a separate
+    // slideshow API call, mirror the canonical Standard-Slideshow
+    // (slideshows row with `isDefault: true`) into the response.
+    if (!data.slideshow) {
+      const defaultSlideshow = await prisma.slideshow.findFirst({
+        where: { isDefault: true },
+        select: { config: true },
+      });
+      if (defaultSlideshow) {
+        data.slideshow = defaultSlideshow.config;
+      }
     }
 
     res.json(data);

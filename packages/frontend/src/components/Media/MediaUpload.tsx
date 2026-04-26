@@ -27,6 +27,13 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
   const uploadMutation = useUploadMedia();
   const isUploading = uploadProgress !== null;
 
+  // Auto-clear success messages after 2.5s, with cleanup so unmounting cancels the timer.
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(''), 2500);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
+
   const acceptedTypes = useMemo(() => ([
     ...ACCEPTED_IMAGE_TYPES,
     ...ACCEPTED_AUDIO_TYPES,
@@ -146,10 +153,6 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       setSuccessMessage(
         `${uploadedCount} Datei${uploadedCount === 1 ? '' : 'en'} wurde${uploadedCount === 1 ? '' : 'n'} erfolgreich hochgeladen.`
       );
-
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 2500);
       return;
     }
 

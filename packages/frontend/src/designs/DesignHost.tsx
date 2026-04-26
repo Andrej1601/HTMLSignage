@@ -37,6 +37,13 @@ interface DesignHostProps<T extends SlideTypeId> {
    * Phase 4 lights this up for tenant/slideshow branding.
    */
   tokenOverrides?: DesignTokenOverrides;
+  /**
+   * When true, draw a vertical accent stripe on the left edge of the
+   * rendered slide using `tokens.colors.accentPrimary`. Pack-agnostic —
+   * each pack contributes its own brand colour, the stripe geometry is
+   * the same everywhere. Inspired by Mineral-Noir's panel-edge marker.
+   */
+  accentStripe?: boolean;
 }
 
 function mergeTokens(base: DesignTokens, overrides?: DesignTokenOverrides): DesignTokens {
@@ -119,7 +126,7 @@ function useMeasuredViewport(ref: React.RefObject<HTMLElement | null>): SlideVie
  * component path stays authoritative until Phase 3.
  */
 export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
-  const { slideType, data, context, fallback, enabled, designId, tokenOverrides } = props;
+  const { slideType, data, context, fallback, enabled, designId, tokenOverrides, accentStripe } = props;
 
   const resolvedId: DesignId = designId ?? DEFAULT_DESIGN_ID;
   const { design, error } = useDesign(resolvedId);
@@ -128,9 +135,10 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
   const viewport = useMeasuredViewport(wrapperRef);
 
   // Legacy-path render. Wrapped in the same sizing element so the flag
-  // flip doesn't reflow the page.
+  // flip doesn't reflow the page. The accent stripe still applies — it
+  // sits outside the slide content so the legacy pack also gets it.
   const renderedFallback = (
-    <div ref={wrapperRef} className="h-full w-full">
+    <div ref={wrapperRef} className="relative h-full w-full">
       {fallback}
     </div>
   );
@@ -154,7 +162,7 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
     : content;
 
   return (
-    <div ref={wrapperRef} className="h-full w-full">
+    <div ref={wrapperRef} className="relative h-full w-full">
       <DesignErrorBoundary
         fallback={fallback}
         resetKey={`${design.manifest.id}:${slideType}`}
@@ -170,6 +178,22 @@ export function DesignHost<T extends SlideTypeId>(props: DesignHostProps<T>) {
       >
         {wrapped}
       </DesignErrorBoundary>
+      {/* Accent stripe — Mineral-Noir inspiration, pack-agnostic. Sits
+          on top of the slide as an absolute layer so no renderer needs
+          to opt in or leave room. `pointer-events-none` keeps it inert.
+          Colour: explicit `colors.accentStripe` if the pack/operator
+          set one, otherwise falls back to the brand-leading
+          `accentPrimary` so existing packs keep their look. */}
+      {accentStripe ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 z-20"
+          style={{
+            width: 3,
+            backgroundColor: tokens.colors.accentStripe ?? tokens.colors.accentPrimary,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

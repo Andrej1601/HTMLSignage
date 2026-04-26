@@ -1,12 +1,6 @@
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import type { DisplayLayoutContext } from '@/components/Display/displayLayoutRenderer.types';
-import {
-  DisplayEditorialPanel,
-  DisplayEditorialStage,
-  getEditorialStageMeta,
-} from '@/components/Display/displayEditorialChrome';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import { classNames } from '@/utils/classNames';
 
 interface DisplayGridLayoutProps {
@@ -65,49 +59,6 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
       outerClassName: 'p-6 w-full h-full',
     });
   };
-
-  if (isEditorialDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
-
-    return (
-      <DisplayEditorialStage
-        theme={themeColors}
-        subtitle={stageMeta.subtitle}
-        title={stageMeta.title}
-        meta={stageMeta.meta}
-        logoImageUrl={stageMeta.logoImageUrl}
-        contentClassName="h-[calc(100%-4.25rem)]"
-      >
-        <div className="grid h-full grid-cols-2 grid-rows-2 gap-5">
-          {zones.slice(0, 4).map((zone, index) => {
-            const info = getZoneInfo(zone.id);
-            const slide = getZoneSlide(zone.id);
-
-            return (
-              <DisplayEditorialPanel
-                key={zone.id}
-                theme={themeColors}
-                tone={index % 2 === 0 ? 'paper' : 'glass'}
-              >
-                <SlideTransition
-                  slideKey={slide?.id || `${zone.id}-empty`}
-                  enabled={enableTransitions && (info?.shouldRotate || false)}
-                  duration={0.6}
-                  transition={resolveTransition(slide)}
-                  progressDurationSec={
-                    info?.shouldRotate ? (slide?.duration ?? 12) : undefined
-                  }
-                  progressColor={progressColor}
-                >
-                  {renderCell(zone.id)}
-                </SlideTransition>
-              </DisplayEditorialPanel>
-            );
-          })}
-        </div>
-      </DisplayEditorialStage>
-    );
-  }
 
   return (
     <div className="w-full h-full p-8" style={{ backgroundColor: isModernDesign ? bgBase : undefined }}>

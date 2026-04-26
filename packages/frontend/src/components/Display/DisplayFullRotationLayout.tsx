@@ -1,12 +1,6 @@
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import type { DisplayLayoutContext } from '@/components/Display/displayLayoutRenderer.types';
-import {
-  DisplayEditorialPanel,
-  DisplayEditorialStage,
-  getEditorialStageMeta,
-} from '@/components/Display/displayEditorialChrome';
-import { isEditorialDisplayAppearance } from '@/config/displayDesignStyles';
 import type { SlideConfig } from '@/types/slideshow.types';
 
 interface DisplayFullRotationLayoutProps {
@@ -55,37 +49,6 @@ export function DisplayFullRotationLayout({
       onVideoEnded={() => onVideoEnded(zoneId)}
     />
   );
-
-  if (isEditorialDisplayAppearance(context.displayAppearance)) {
-    const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
-
-    return (
-      <DisplayEditorialStage
-        theme={context.themeColors}
-        subtitle={stageMeta.subtitle}
-        title={stageMeta.title}
-        meta={stageMeta.meta}
-        logoImageUrl={stageMeta.logoImageUrl}
-        contentClassName="h-[calc(100%-4.25rem)]"
-      >
-        <DisplayEditorialPanel
-          theme={context.themeColors}
-          tone="paper"
-        >
-          <SlideTransition
-            slideKey={slide.id || currentSlideIndex}
-            enabled={enableTransitions}
-            duration={0.6}
-            transition={resolveTransition(slide)}
-            progressDurationSec={shouldRotate ? (slide.duration ?? 12) : undefined}
-            progressColor={progressColor}
-          >
-            {renderSlideWithPadding(slide, rendered)}
-          </SlideTransition>
-        </DisplayEditorialPanel>
-      </DisplayEditorialStage>
-    );
-  }
 
   return (
     <SlideTransition

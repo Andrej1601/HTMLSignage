@@ -59,20 +59,38 @@ export class PrismaStore implements Store {
 
   async decrement(key: string): Promise<void> {
     const prefixedKey = this.prefixKey(key);
-    await prisma.rateLimit.update({
-      where: { key: prefixedKey },
-      data: { count: { decrement: 1 } },
-    }).catch(() => {});
+    try {
+      await prisma.rateLimit.update({
+        where: { key: prefixedKey },
+        data: { count: { decrement: 1 } },
+      });
+    } catch (error) {
+      // P2025 (record not found) is expected when the window already expired.
+      if ((error as { code?: string }).code !== 'P2025') {
+        console.warn(`[rateLimiter] decrement(${prefixedKey}) failed:`, error);
+      }
+    }
   }
 
   async resetKey(key: string): Promise<void> {
-    await prisma.rateLimit.delete({
-      where: { key: this.prefixKey(key) },
-    }).catch(() => {});
+    const prefixedKey = this.prefixKey(key);
+    try {
+      await prisma.rateLimit.delete({
+        where: { key: prefixedKey },
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'P2025') {
+        console.warn(`[rateLimiter] resetKey(${prefixedKey}) failed:`, error);
+      }
+    }
   }
 
   async resetAll(): Promise<void> {
-    await prisma.rateLimit.deleteMany({}).catch(() => {});
+    try {
+      await prisma.rateLimit.deleteMany({});
+    } catch (error) {
+      console.warn('[rateLimiter] resetAll failed:', error);
+    }
   }
 }
 

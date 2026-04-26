@@ -69,3 +69,16 @@ export {
   parseDesignManifest,
   safeParseDesignManifest,
 } from './schemas';
+
+// ─── Shared renderer utilities ──────────────────────────────────────────────
+export { withAlpha } from './utils/colors';
+export { responsiveScale, scaled, scaledFont } from './utils/viewport';
+export { romanNumeral, FlameIcon, IntensityMark } from './utils/intensity';
+
+// ─── Shared renderer components ─────────────────────────────────────────────
+export { AutoScroll } from './components/AutoScroll';
+export {
+  SchedulePanelGrid,
+  IntensityFlames,
+  resolveSaunaAccent,
+} from './components/SchedulePanelGrid';

@@ -1,38 +1,18 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { ColorTokens, IntensityDisplay, SlideViewport } from '@htmlsignage/design-sdk';
+import type { ColorTokens, IntensityDisplay } from '@htmlsignage/design-sdk';
+import {
+  withAlpha,
+  scaled,
+  scaledFont,
+  responsiveScale,
+  IntensityMark as SharedIntensityMark,
+  romanNumeral,
+  FlameIcon,
+} from '@htmlsignage/design-sdk';
 
-/**
- * Convert a hex color to an rgba() string with the given alpha.
- * Passes through non-hex values unchanged (rgb/hsl/oklch work as-is).
- */
-export function withAlpha(color: string, alpha: number): string {
-  const c = color.trim();
-  const clamped = Math.max(0, Math.min(1, alpha));
-  if (!c.startsWith('#')) return c;
-  const raw = c.slice(1);
-  const hex = raw.length === 3 ? raw.split('').map((ch) => ch + ch).join('') : raw;
-  if (hex.length !== 6) return c;
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${clamped})`;
-}
-
-/** Viewport-derived scale factor. Smaller zones → smaller numbers. */
-export function responsiveScale(viewport: SlideViewport): number {
-  if (viewport.isUltraCompact) return 0.55;
-  if (viewport.isCompact) return 0.7;
-  if (viewport.isShort || viewport.isNarrow) return 0.85;
-  return 1;
-}
-
-export function scaled(px: number, viewport: SlideViewport, floor = 2): number {
-  return Math.max(floor, Math.round(px * responsiveScale(viewport)));
-}
-
-export function scaledFont(basePx: number, viewport: SlideViewport, min = 10): number {
-  return Math.max(min, Math.round(basePx * responsiveScale(viewport)));
-}
+// Re-export SDK primitives under the same names so call-sites inside this
+// pack keep using `from './utils'` without churn.
+export { withAlpha, scaled, scaledFont, responsiveScale, romanNumeral, FlameIcon };
 
 /**
  * Aurora's ambient corner-glow — the signature atmospheric backdrop.
@@ -136,61 +116,11 @@ export function statusChipStyles(
 }
 
 /**
- * Roman-numeral helper for the 'roman' intensity-display style.
+ * Aurora-flavoured intensity mark. Wraps the shared SDK component with
+ * the pack-specific tuning that gives the brass-on-dark look its bite:
+ * slightly larger flames, tabular roman numerals on a faint chip.
  */
-export function romanNumeral(n: number): string {
-  switch (n) {
-    case 1: return 'I';
-    case 2: return 'II';
-    case 3: return 'III';
-    case 4: return 'IV';
-    default: return '';
-  }
-}
-
-/**
- * Inline SVG flame — closed Lucide-shape path. Rendered four times at
- * different fill states for the intensity row.
- */
-export function FlameIcon({
-  size,
-  color,
-  filled,
-}: {
-  size: number;
-  color: string;
-  filled: boolean;
-}): ReactNode {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={filled ? color : 'none'}
-      stroke={color}
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-    </svg>
-  );
-}
-
-/**
- * Shared intensity mark for Aurora Thermal. Picks flames or Roman
- * numerals based on the host's `intensityDisplay` hint (default
- * 'flames' to match operator expectations).
- */
-export function IntensityMark({
-  level,
-  color,
-  idleColor,
-  size,
-  display,
-  fontFamily,
-}: {
+export function IntensityMark(props: {
   level: number;
   color: string;
   idleColor: string;
@@ -198,45 +128,14 @@ export function IntensityMark({
   display: IntensityDisplay;
   fontFamily: string;
 }): ReactNode {
-  if (display === 'roman') {
-    return (
-      <span
-        className="shrink-0 inline-flex items-center justify-center tabular-nums"
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          border: `1px solid ${withAlpha(color, 0.65)}`,
-          color,
-          fontFamily,
-          fontSize: `${Math.round(size * 0.4)}px`,
-          fontWeight: 600,
-          letterSpacing: '0.02em',
-          lineHeight: 1,
-          backgroundColor: withAlpha(color, 0.08),
-        }}
-        aria-label={`Intensität ${level} von 4`}
-      >
-        {romanNumeral(level)}
-      </span>
-    );
-  }
-  const gap = Math.max(1, Math.round(size * 0.14));
-  const flameSize = Math.round(size * 0.88);
   return (
-    <span
-      className="shrink-0 inline-flex items-center"
-      style={{ gap }}
-      aria-label={`Intensität ${level} von 4`}
-    >
-      {[1, 2, 3, 4].map((i) => (
-        <FlameIcon
-          key={i}
-          size={flameSize}
-          color={i <= level ? color : idleColor}
-          filled={i <= level}
-        />
-      ))}
-    </span>
+    <SharedIntensityMark
+      {...props}
+      flameRatio={0.88}
+      romanFontRatio={0.4}
+      romanBorderAlpha={0.65}
+      romanBackground
+      romanTabularNums
+    />
   );
 }

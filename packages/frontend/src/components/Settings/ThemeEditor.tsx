@@ -14,8 +14,8 @@ import { AppearanceSelector } from './AppearanceSelector';
 import { PaletteSelector } from './PaletteSelector';
 import { ColorTokenEditor } from './ColorTokenEditor';
 import { SlideshowTokenOverridesEditor } from './SlideshowTokenOverridesEditor';
-import { DesignPackFlagCard } from './DesignPackFlagCard';
 import { MaintenanceScreenEditor } from './MaintenanceScreenEditor';
+import { DEFAULT_DESIGN_ID, isKnownDesignId, type DesignId } from '@/designs';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
 import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
@@ -51,14 +51,18 @@ interface ThemeEditorProps {
 
 export function ThemeEditor({
   theme,
-  displayAppearance,
+  // displayAppearance kept on the props interface for API compat with
+  // older parents; the new editor ignores it (Bühne-Konzept entfernt).
+  displayAppearance: _displayAppearance,
   designStyle,
   saunaDetailStyle,
   colorPalette,
   maintenanceScreen,
   display,
   onChange,
-  onDisplayAppearanceChange,
+  // Bühnen-Chrome wird nicht mehr durch die UI gewechselt; der Prop
+  // bleibt für API-Kompatibilität bestehen, wird aber ignoriert.
+  onDisplayAppearanceChange: _onDisplayAppearanceChange,
   onDesignStyleChange,
   onSaunaDetailStyleChange,
   onColorPaletteChange,
@@ -87,7 +91,6 @@ export function ThemeEditor({
   );
 
   // When editing a slideshow, read its design overrides
-  const effectiveAppearance = selectedSlideshow?.config.displayAppearance ?? displayAppearance;
   const effectiveDesignStyle = selectedSlideshow?.config.designStyle ?? designStyle;
   const effectiveSaunaDetailStyle =
     selectedSlideshow?.config.saunaDetailStyle ?? saunaDetailStyle;
@@ -138,13 +141,37 @@ export function ThemeEditor({
     }
   };
 
-  const handleAppearanceChange = (v: DisplayAppearance) => {
-    if (selectedSlideshow) {
-      handleSlideshowDesignChange({ displayAppearance: v });
-    } else {
-      onDisplayAppearanceChange?.(v);
+  // Pack-Wechsel: setzt nur `display.designPackId`. Das alte
+  // `displayAppearance`-Feld (= Bühnen-Chrome) wird bewusst nicht mehr
+  // mit-gemappt — die Bühnen-Optionen wurden aus der UI entfernt und
+  // sollen sich nicht durch die Hintertür reaktivieren. Globaler Scope
+  // only — per-Slideshow-Pack-Override ist nicht implementiert.
+  const handleDesignPackChange = (id: DesignId) => {
+    if (selectedSlideshow) return;
+    if (display && onDisplayChange) {
+      onDisplayChange({ ...display, designPackId: id });
     }
   };
+
+  const handleAccentStripesChange = (next: boolean) => {
+    if (display && onDisplayChange) {
+      onDisplayChange({ ...display, accentStripes: next });
+    }
+  };
+
+  const handleHeroOverlayIntensityChange = (next: number) => {
+    if (display && onDisplayChange) {
+      onDisplayChange({ ...display, heroOverlayIntensity: next });
+    }
+  };
+
+  // Effective pack id — explicit config wins, otherwise the global default.
+  // The legacy `displayAppearance`-derived fallback is gone (Bühne-Konzept
+  // wurde entfernt); fresh installs land on the production default pack.
+  const configuredPackId = display?.designPackId;
+  const activeDesignPackId: DesignId = isKnownDesignId(configuredPackId)
+    ? configuredPackId
+    : DEFAULT_DESIGN_ID;
 
   const handleDesignStyleChange = (v: DesignStyle) => {
     if (selectedSlideshow) {
@@ -214,14 +241,6 @@ export function ThemeEditor({
         </div>
       )}
 
-      {/* Design-Pack selector — lives in the colours-and-design tab since
-          switching packs is the most visual / opinionated change an
-          operator can make. Only rendered at the global scope; per-
-          slideshow pack overrides would duplicate the appearance-→-pack
-          mapping we already do in `SlideRenderer`. */}
-      {!selectedSlideshow && display && onDisplayChange ? (
-        <DesignPackFlagCard display={display} onChange={onDisplayChange} />
-      ) : null}
 
       {/* 2-column grid: Palette left, Settings right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -240,12 +259,18 @@ export function ThemeEditor({
             <h3 className="text-lg font-semibold text-spa-text-primary mb-1">Darstellung</h3>
             <p className="text-sm text-spa-text-secondary mb-4">Display-Erscheinungsbild und Design-Stil</p>
             <AppearanceSelector
-              displayAppearance={effectiveAppearance}
+              designPackId={activeDesignPackId}
               designStyle={effectiveDesignStyle}
               saunaDetailStyle={effectiveSaunaDetailStyle}
-              onDisplayAppearanceChange={handleAppearanceChange}
+              accentStripes={display?.accentStripes === true}
+              onDesignPackChange={handleDesignPackChange}
               onDesignStyleChange={handleDesignStyleChange}
               onSaunaDetailStyleChange={handleSaunaDetailStyleChange}
+              onAccentStripesChange={
+                !selectedSlideshow && display && onDisplayChange
+                  ? handleAccentStripesChange
+                  : undefined
+              }
             />
           </div>
 
@@ -258,6 +283,10 @@ export function ThemeEditor({
               <ColorTokenEditor
                 theme={theme}
                 onChange={onChange}
+                heroOverlayIntensity={display?.heroOverlayIntensity ?? 1}
+                onHeroOverlayIntensityChange={
+                  display && onDisplayChange ? handleHeroOverlayIntensityChange : undefined
+                }
               />
             </div>
           )}

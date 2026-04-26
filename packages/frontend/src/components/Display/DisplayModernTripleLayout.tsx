@@ -1,5 +1,4 @@
 import { SlideTransition } from '@/components/Display/SlideTransition';
-import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -24,13 +23,11 @@ export function DisplayModernTripleLayout({
 }: DisplayModernTripleLayoutProps) {
   const {
     designStyle,
-    effectiveSettings,
     enableTransitions,
     renderContentPanel,
     resolveTransition,
     showZoneBorders,
     themeColors,
-    mediaItems,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
@@ -103,13 +100,13 @@ export function DisplayModernTripleLayout({
       return renderTripleSlideRenderer(context, bottomRight.slide, bottomRight.zone?.id);
     }
 
+    // Empty bottom-right zone — show a quiet placeholder so operators
+    // see the gap. The previous Wellness-styled tips/events fallback was
+    // retired with the rest of the legacy chrome pipeline.
     return (
-      <WellnessBottomPanel
-        displayAppearance={context.displayAppearance}
-        settings={effectiveSettings}
-        theme={themeColors}
-        media={mediaItems}
-      />
+      <div className="flex h-full w-full items-center justify-center text-spa-text-secondary text-sm">
+        Keine Slides
+      </div>
     );
   };
 

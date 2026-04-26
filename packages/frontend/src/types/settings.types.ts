@@ -7,6 +7,23 @@ import type { Sauna } from './sauna.types';
 import type { SlideshowConfig } from './slideshow.types';
 
 export interface ThemeColors {
+  // ─── Canonical SDK color tokens ─────────────────────────────────────────
+  // These are the 11 tokens every design pack consumes. The legacy fields
+  // below remain for backwards compatibility (older settings, the legacy
+  // schedule grid renderer); themeBridge prefers the SDK fields when set.
+  surface?: string;          // Body / panel base — the stage colour
+  surfaceElevated?: string;  // Cards, sub-panels (typically a notch lighter than surface)
+  border?: string;           // Card borders, hairlines, dividers
+  textPrimary?: string;      // Headlines, card titles, main copy
+  textSecondary?: string;    // Labels, meta, sub-lines
+  textInverse?: string;      // Text drawn on filled accent / status backgrounds
+  accentPrimary?: string;    // Brand-leading accent (brass, gold, palette key colour)
+  accentSecondary?: string;  // Counter-accent (moss, secondary brand tone)
+  statusWarning?: string;    // Prestart / "GLEICH" pill colour
+  accentStripe?: string;     // Optional: tint for the optional vertical accent-stripe overlay
+  heroOverlay?: string;      // Optional: tint for the wash drawn over hero-variant background images
+
+  // ─── Legacy fields (Pre-Design-Pack era) ────────────────────────────────
   // Background & Foreground
   bg: string;
   fg: string;
@@ -98,6 +115,19 @@ export interface DisplaySettings {
    * by every stable Aurora / Editorial / Wellness pack.
    */
   intensityDisplay?: 'flames' | 'roman';
+  /**
+   * Wenn true: Jeder Slide-Renderer bekommt einen vertikalen Akzentstreifen
+   * am linken Rand in der Pack-Hauptfarbe (`tokens.colors.accentPrimary`).
+   * Optik analog zum Mineral-Noir-Panel-Style. Pack-agnostisch — die Farbe
+   * kommt vom aktiven Pack, der Streifen ist immer derselbe.
+   */
+  accentStripes?: boolean;
+  /**
+   * Multiplier für die Stärke des Hero-Wash über Hintergrundbildern
+   * (Aufguss-Fokus „Hero"). `1` = Pack-Standard, `< 1` = heller (mehr
+   * Foto sichtbar), `> 1` = dunkler. Sinnvoller Range: 0.5 – 1.5.
+   */
+  heroOverlayIntensity?: number;
 }
 
 export interface AudioSettings {

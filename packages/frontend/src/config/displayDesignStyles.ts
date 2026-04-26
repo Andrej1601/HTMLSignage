@@ -13,41 +13,11 @@ export const WELLNESS_STAGE_DISPLAY_APPEARANCE: DisplayAppearance = 'wellness-st
 export const EDITORIAL_DISPLAY_APPEARANCE: DisplayAppearance = 'editorial-resort';
 export const MINERAL_NOIR_DISPLAY_APPEARANCE: DisplayAppearance = 'mineral-noir';
 
-export interface DisplayAppearanceOption {
-  id: DisplayAppearance;
-  title: string;
-  description: string;
-}
-
 export interface ScheduleDesignStyleOption {
   id: DesignStyle;
   title: string;
   description: string;
 }
-
-export const DISPLAY_APPEARANCE_OPTIONS: DisplayAppearanceOption[] = [
-  {
-    id: AURORA_THERMAL_DISPLAY_APPEARANCE,
-    title: 'Aurora Thermal',
-    description:
-      'Goldene Stunde in der Saunawelt — warme Charcoal-Bühne, Messing-Akzente, Display-Serif. Das Aushängeschild-Design.',
-  },
-  {
-    id: WELLNESS_STAGE_DISPLAY_APPEARANCE,
-    title: 'Wellness Stage',
-    description: 'Ruhige moderne Bühne mit klassischer Wellness-Anmutung.',
-  },
-  {
-    id: EDITORIAL_DISPLAY_APPEARANCE,
-    title: 'Editorial Resort',
-    description: 'Inszenierte Resort-Bühne mit Karten, Lichtflächen und Magazin-Look.',
-  },
-  {
-    id: MINERAL_NOIR_DISPLAY_APPEARANCE,
-    title: 'Mineral Noir',
-    description: 'Architektonischer Dark-Luxus — kühles Schiefer, Platin-Typografie, kein Schnörkel.',
-  },
-];
 
 export const SCHEDULE_DESIGN_STYLE_OPTIONS: ScheduleDesignStyleOption[] = [
   {
@@ -106,29 +76,20 @@ export function isModernScheduleDesignStyleValue(
   return MODERN_SCHEDULE_DESIGN_STYLES.includes(designStyle as DesignStyle);
 }
 
-export function isAuroraThermalDisplayAppearance(
-  displayAppearance: string | undefined,
-): displayAppearance is typeof AURORA_THERMAL_DISPLAY_APPEARANCE {
-  return displayAppearance === AURORA_THERMAL_DISPLAY_APPEARANCE;
-}
-
-export function isEditorialDisplayAppearance(
-  displayAppearance: string | undefined,
-): displayAppearance is typeof EDITORIAL_DISPLAY_APPEARANCE {
-  return displayAppearance === EDITORIAL_DISPLAY_APPEARANCE;
-}
-
-export function isMineralNoirDisplayAppearance(
-  displayAppearance: string | undefined,
-): displayAppearance is typeof MINERAL_NOIR_DISPLAY_APPEARANCE {
-  return displayAppearance === MINERAL_NOIR_DISPLAY_APPEARANCE;
-}
-
+/**
+ * Human-readable label for a stored `displayAppearance`. Used by the
+ * dashboard activity feed to surface settings changes from the legacy
+ * appearance era; the constant values are still recognised so older
+ * records render with a sensible label.
+ */
 export function getDisplayAppearanceLabel(displayAppearance: string | undefined): string {
-  return (
-    DISPLAY_APPEARANCE_OPTIONS.find((appearance) => appearance.id === displayAppearance)?.title ||
-    DISPLAY_APPEARANCE_OPTIONS[0].title
-  );
+  switch (displayAppearance) {
+    case AURORA_THERMAL_DISPLAY_APPEARANCE: return 'Aurora Thermal';
+    case WELLNESS_STAGE_DISPLAY_APPEARANCE: return 'Wellness Stage';
+    case EDITORIAL_DISPLAY_APPEARANCE: return 'Editorial Resort';
+    case MINERAL_NOIR_DISPLAY_APPEARANCE: return 'Mineral Noir';
+    default: return 'Aurora Thermal';
+  }
 }
 
 export function getScheduleDesignStyleLabel(designStyle: string | undefined): string {

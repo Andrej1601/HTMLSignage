@@ -170,7 +170,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
       const response = await systemApi.listJobs(10);
       const updateJob = response.items.find((job) => job.type === 'system-update') || null;
       setLatestJob(updateJob);
-    } catch {
+    } catch (_err) {
       // Secondary status polling should not spam the UI.
     }
   }, []);

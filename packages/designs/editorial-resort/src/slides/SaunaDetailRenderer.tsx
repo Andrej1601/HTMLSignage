@@ -559,13 +559,22 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
       ) : (
         <div className="absolute inset-0" style={{ backgroundColor: colors.surfaceElevated }} />
       )}
-      {/* Gentle editorial wash — paper feel on top half, darker at bottom for tiles */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `linear-gradient(to bottom, ${withAlpha(colors.textPrimary, 0.2)} 0%, ${withAlpha(colors.textPrimary, 0.45)} 45%, ${withAlpha(colors.textPrimary, 0.8)} 100%)`,
-        }}
-      />
+      {/* Gentle editorial wash — paper feel on top half, darker at bottom for tiles.
+          Tint from `heroOverlay`, intensity via
+          `context.heroOverlayIntensity` (display slider). */}
+      {(() => {
+        const overlay = colors.heroOverlay ?? colors.textPrimary;
+        const k = context.heroOverlayIntensity ?? 1;
+        const a = (base: number) => Math.max(0, Math.min(1, base * k));
+        return (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(to bottom, ${withAlpha(overlay, a(0.2))} 0%, ${withAlpha(overlay, a(0.45))} 45%, ${withAlpha(overlay, a(0.8))} 100%)`,
+            }}
+          />
+        );
+      })()}
 
       {/* Top: kicker + serif headline */}
       <div

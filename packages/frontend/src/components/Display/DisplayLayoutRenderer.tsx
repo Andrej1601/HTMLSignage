@@ -1,21 +1,10 @@
 import type { ReactElement } from 'react';
-import {
-  DisplayEditorialPanel,
-  DisplayEditorialStage,
-  getEditorialStageMeta,
-} from '@/components/Display/displayEditorialChrome';
-import {
-  MineralNoirPanel,
-  MineralNoirStage,
-  getMineralNoirStageMeta,
-} from '@/components/Display/displayMineralNoirChrome';
 import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotationLayout';
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
 import { DisplayHeader } from '@/components/Display/DisplayHeader';
 import { DisplaySplitLayout } from '@/components/Display/DisplaySplitLayout';
 import { DisplayTripleLayout } from '@/components/Display/DisplayTripleLayout';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
-import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import {
   isMediaSlide,
   needsModernSlidePadding,
@@ -33,7 +22,6 @@ export function DisplayLayoutRenderer({
   currentSlide,
   currentSlideIndex,
   currentTime,
-  displayAppearance,
   designStyle,
   displayDeviceId,
   effectiveSettings,
@@ -77,19 +65,11 @@ export function DisplayLayoutRenderer({
     );
   };
 
-
   const renderSlideWithPadding = (
     slide: SlideConfig | null | undefined,
     rendered: ReactElement,
     options?: SlidePaddingOptions,
   ): ReactElement => {
-    if (slide && isMediaSlide(slide) && (
-      isEditorialDisplayAppearance(displayAppearance) ||
-      isMineralNoirDisplayAppearance(displayAppearance)
-    )) {
-      return rendered;
-    }
-
     if (!slide || !needsModernSlidePadding(isModernDesign, slide)) {
       return rendered;
     }
@@ -141,7 +121,6 @@ export function DisplayLayoutRenderer({
 
   const layoutContext: DisplayLayoutContext = {
     currentTime,
-    displayAppearance,
     designStyle,
     displayDeviceId,
     effectiveSettings,
@@ -163,52 +142,9 @@ export function DisplayLayoutRenderer({
 
   const renderInner = (): ReactElement => {
     if (!hasAnyZoneSlides) {
-      if (isEditorialDisplayAppearance(displayAppearance)) {
-        const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime, mediaItems);
-
-        return (
-          <DisplayEditorialStage
-            theme={themeColors}
-            subtitle={stageMeta.subtitle}
-            title={stageMeta.title}
-            meta={stageMeta.meta}
-            logoImageUrl={stageMeta.logoImageUrl}
-          >
-            <DisplayEditorialPanel
-              theme={themeColors}
-              tone="paper"
-            >
-              {renderContentPanel()}
-            </DisplayEditorialPanel>
-          </DisplayEditorialStage>
-        );
-      }
-
-      if (isMineralNoirDisplayAppearance(displayAppearance)) {
-        const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime, mediaItems);
-
-        return (
-          <MineralNoirStage
-            theme={themeColors}
-            subtitle={stageMeta.subtitle}
-            title={stageMeta.title}
-            meta={stageMeta.meta}
-            logoImageUrl={stageMeta.logoImageUrl}
-          >
-            <MineralNoirPanel
-              theme={themeColors}
-              accentTone="emerald"
-            >
-              {renderContentPanel()}
-            </MineralNoirPanel>
-          </MineralNoirStage>
-        );
-      }
-
-      // The design pack handles every `designStyle` through
-      // `renderContentPanel()`. The old `OverviewSlide` fallback (for
-      // unrecognised styles) has been retired — the pack + host settings
-      // together guarantee a valid style always resolves.
+      // The active design pack handles every `designStyle` through
+      // `renderContentPanel()`. No legacy chrome wrapping any more —
+      // the pack draws its own stage.
       return renderContentPanel();
     }
 
@@ -236,22 +172,10 @@ export function DisplayLayoutRenderer({
 
   const inner = renderInner();
 
-  // Editorial Resort and Mineral Noir ship their own stage-chrome with
-  // branding (title/subtitle/meta). For those appearances the header
-  // settings are consumed via `getEditorialStageMeta` /
-  // `getMineralNoirStageMeta`, so we render the inner directly.
-  //
-  // For the default "wellness-stage" appearance there is no built-in
-  // chrome — so we wrap the output with `DisplayHeader` when the header
-  // is enabled. `DisplayHeader` itself early-returns when `enabled` is
-  // false, so the check below is an optimisation, not a correctness gate.
-  if (
-    isEditorialDisplayAppearance(displayAppearance) ||
-    isMineralNoirDisplayAppearance(displayAppearance)
-  ) {
-    return inner;
-  }
-
+  // Header (logo + clock + date) is rendered above every layout when
+  // enabled. Legacy pack-specific stage chromes (Editorial / Mineral
+  // Noir) are gone; the active design pack renders its own in-slide
+  // chrome where applicable.
   const headerSettings =
     effectiveSettings.header ?? getDefaultSettings().header!;
 

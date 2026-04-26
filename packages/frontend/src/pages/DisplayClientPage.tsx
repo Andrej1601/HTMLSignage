@@ -7,10 +7,7 @@ import { normalizeDisplayLayout } from '@/components/Display/displayLayoutUtils'
 import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type { SlideConfig } from '@/types/slideshow.types';
 import { ENV_IS_DEV } from '@/config/env';
-import {
-  DEFAULT_DISPLAY_APPEARANCE,
-  isModernScheduleDesignStyleValue,
-} from '@/config/displayDesignStyles';
+import { isModernScheduleDesignStyleValue } from '@/config/displayDesignStyles';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { classNames } from '@/utils/classNames';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
@@ -373,7 +370,6 @@ export function DisplayClientPage() {
   }
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
-  const displayAppearance = effectiveSettings.displayAppearance || DEFAULT_DISPLAY_APPEARANCE;
   const isModernDesign = isModernScheduleDesignStyleValue(designStyle);
   const displayNow = new Date(eventClock);
 
@@ -389,7 +385,6 @@ export function DisplayClientPage() {
           currentSlide={currentSlide}
           currentSlideIndex={currentSlideIndex}
           currentTime={displayNow}
-          displayAppearance={displayAppearance}
           designStyle={designStyle}
           displayDeviceId={displayDeviceId || undefined}
           effectiveSettings={effectiveSettings}

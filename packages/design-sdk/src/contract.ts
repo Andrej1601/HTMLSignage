@@ -59,6 +59,15 @@ export interface SlideRenderContext {
    */
   intensityDisplay?: IntensityDisplay;
   /**
+   * Multiplier for the hero-image overlay alpha values. `1` (default)
+   * keeps the pack's built-in look, `< 1` lets more of the photo
+   * through (lighter wash), `> 1` darkens further. Renderers that
+   * draw a hero overlay should multiply their hard-coded alphas by
+   * this factor and clamp to [0, 1]. Configurable globally via
+   * `settings.display.heroOverlayIntensity`.
+   */
+  heroOverlayIntensity?: number;
+  /**
    * Callback invoked by `media-video` renderers when playback finishes.
    * The host advances to the next slide when `playback === 'complete'`.
    * Ignored for other slide types.

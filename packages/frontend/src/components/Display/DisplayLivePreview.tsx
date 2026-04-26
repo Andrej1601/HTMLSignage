@@ -66,9 +66,13 @@ export function DisplayLivePreview({
   useEffect(() => {
     if (isReady) return;
     requestReady();
-    const timer = window.setInterval(requestReady, 1500);
+    // Fast retry catches listeners that attach just after iframe load; the
+    // interval keeps polling until the embedded preview reports ready.
+    const fastRetry = window.setTimeout(requestReady, 120);
+    const interval = window.setInterval(requestReady, 1500);
     return () => {
-      window.clearInterval(timer);
+      window.clearTimeout(fastRetry);
+      window.clearInterval(interval);
     };
   }, [isReady, requestReady]);
 
@@ -91,10 +95,9 @@ export function DisplayLivePreview({
         src={src}
         className="absolute inset-0 h-full w-full border-0"
         onLoad={() => {
+          // Resetting isReady re-runs the polling effect, which fires requestReady
+          // immediately + a 120ms fast retry + a 1.5s interval — all with cleanup.
           setIsReady(false);
-          // Trigger immediately and shortly after load to catch early/late listeners reliably.
-          requestReady();
-          window.setTimeout(requestReady, 120);
         }}
       />
 

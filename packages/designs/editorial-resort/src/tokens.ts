@@ -28,6 +28,12 @@ export const editorialResortTokens: DesignTokens = {
     statusLive: '#3D6B3B',
     statusNext: '#7A6547',
     statusWarning: '#C17817',
+
+    // Tobacco stripe matches the brand accent.
+    accentStripe: '#8B5A2B',
+    // Hero-overlay tint: deep warm-ink — the editorial "ink-on-paper"
+    // gravitas without bleaching to the cream surface.
+    heroOverlay: '#2B2822',
   },
   typography: {
     fontBody:

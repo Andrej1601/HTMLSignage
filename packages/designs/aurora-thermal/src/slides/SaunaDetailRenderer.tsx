@@ -813,16 +813,374 @@ function EmptyInfusions({ tokens, viewport }: { tokens: Tokens; viewport: Viewpo
 }
 
 // ── Variant: Hero ──────────────────────────────────────────────────────────
-
-// ── Variant: Hero ──────────────────────────────────────────────────────────
 //
-// Image occupies the top 55% of the stage as a pure hero; the bottom
-// 45% is a brass-bordered aufguss panel carrying the full upcoming
-// list. The old "floating now-card" design gave the aufgüsse barely
-// two visible rows on a 16:9 display — this layout shows 4–6 depending
-// on zone height without the image ever losing its dramatic billing.
+// Cinematic full-bleed sauna shot, deeply tinted by the warm-charcoal
+// surface so the brass kicker / Fraunces masthead / mono stats read on
+// any image. The aufguss list rides at the bottom as frosted-brass tiles
+// — close to the Mineral Noir hero composition but voiced in Aurora's
+// brass-on-amber dialect (Fraunces titles, brass borders, ember glows).
+// Best when the sauna has a strong photo: think candlelit cedar, not
+// stock IDs.
 
 function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
+  const { colors, typography, spacing, radius } = tokens;
+  const { viewport } = context;
+  const accent = data.accentColor || colors.accentPrimary;
+  const intensityDisplay = context.intensityDisplay ?? 'flames';
+  const pad = scaled(spacing.lg, viewport, 12);
+
+  const stats: Array<{ label: string; value: string }> = [];
+  if (data.info.temperatureC != null) stats.push({ label: 'Temperatur', value: `${Math.round(data.info.temperatureC)} °C` });
+  if (data.info.humidityPct != null) stats.push({ label: 'Feuchte', value: `${Math.round(data.info.humidityPct)} %` });
+  if (data.info.capacity != null) stats.push({ label: 'Plätze', value: String(data.info.capacity) });
+
+  return (
+    <div
+      className="relative flex h-full w-full flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+      }}
+    >
+      {/* Full-bleed background image with warm brass tint */}
+      {data.imageUrl ? (
+        <img
+          src={data.imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter: 'saturate(1.1) brightness(0.55)' }}
+        />
+      ) : (
+        <div className="absolute inset-0" style={{ background: auroraAmbientBackground(colors) }} />
+      )}
+      {/* Warm surface wash so candlelight tones the whole frame.
+          Tint from `heroOverlay`; intensity tunable via
+          `context.heroOverlayIntensity` (display slider). */}
+      {(() => {
+        const overlay = colors.heroOverlay ?? colors.surface;
+        const k = context.heroOverlayIntensity ?? 1;
+        const a = (base: number) => Math.max(0, Math.min(1, base * k));
+        return (
+          <>
+            <div
+              className="absolute inset-0"
+              style={{ backgroundColor: withAlpha(overlay, a(0.5)) }}
+            />
+            {/* Top-down gradient deepens toward the aufguss list so titles
+                stay legible without a hard panel break. */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(to bottom, ${withAlpha(overlay, a(0.25))} 0%, ${withAlpha(overlay, a(0.55))} 45%, ${withAlpha(overlay, a(0.92))} 100%)`,
+              }}
+            />
+          </>
+        );
+      })()}
+      {/* Brass corner glow — Aurora signature */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background: `radial-gradient(ellipse 60% 45% at 8% 0%, ${withAlpha(colors.accentPrimary, 0.18)} 0%, transparent 60%)`,
+        }}
+      />
+
+      {/* Top chrome: kicker + sauna name + stats row */}
+      <div
+        className="relative z-10 flex flex-col shrink-0"
+        style={{ padding: `${pad}px`, gap: scaled(14, viewport, 5) }}
+      >
+        <span
+          style={kickerStyles(
+            accent,
+            scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
+          )}
+        >
+          Sauna
+        </span>
+        <h2
+          className="truncate"
+          style={{
+            color: colors.textPrimary,
+            fontFamily: typography.fontHeading,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.1, viewport, 18)}px`,
+            fontWeight: 500,
+            lineHeight: 0.95,
+            letterSpacing: '-0.02em',
+            margin: 0,
+          }}
+        >
+          {data.name}
+        </h2>
+        {stats.length > 0 ? (
+          <div className="flex flex-wrap" style={{ gap: scaled(28, viewport, 10) }}>
+            {stats.map((stat) => (
+              <HeroStatCell
+                key={stat.label}
+                label={stat.label}
+                value={stat.value}
+                color={colors.textPrimary}
+                tokens={tokens}
+                viewport={viewport}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Bottom: brass-frosted aufguss tiles */}
+      <div
+        className="relative z-10 flex min-h-0 flex-1 flex-col"
+        style={{ padding: `0 ${pad}px ${pad}px`, gap: scaled(10, viewport, 4) }}
+      >
+        <div
+          className="flex items-baseline justify-between shrink-0"
+          style={{ paddingBottom: scaled(4, viewport, 1) }}
+        >
+          <span
+            style={kickerStyles(
+              accent,
+              scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
+            )}
+          >
+            Aufgussplan
+          </span>
+          <span
+            className="tabular-nums"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontFamily: typography.fontMono,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
+              letterSpacing: '0.1em',
+            }}
+          >
+            {data.upcoming.length.toString().padStart(2, '0')} Einträge
+          </span>
+        </div>
+
+        {data.upcoming.length === 0 ? (
+          <div
+            className="flex flex-1 items-center justify-center"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              border: `1px solid ${withAlpha(colors.accentPrimary, 0.35)}`,
+              borderRadius: radius.md,
+              backgroundColor: withAlpha(colors.surfaceElevated, 0.45),
+              backdropFilter: 'blur(14px) saturate(140%)',
+              WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+            }}
+          >
+            Heute keine Aufgüsse
+          </div>
+        ) : (
+          <AutoScroll className="flex-1 min-h-0">
+            <div className="flex flex-col" style={{ gap: scaled(6, viewport, 2) }}>
+              {data.upcoming.map((entry) => (
+                <HeroInfusionTile
+                  key={entry.id}
+                  entry={entry}
+                  accent={accent}
+                  tokens={tokens}
+                  viewport={viewport}
+                  intensityDisplay={intensityDisplay}
+                />
+              ))}
+            </div>
+          </AutoScroll>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HeroStatCell({
+  label,
+  value,
+  color,
+  tokens,
+  viewport,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  tokens: Tokens;
+  viewport: Viewport;
+}) {
+  const { typography } = tokens;
+  return (
+    <div className="flex flex-col" style={{ gap: scaled(4, viewport, 2) }}>
+      <span
+        className="tabular-nums"
+        style={{
+          color,
+          fontFamily: typography.fontMono,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl, viewport, 14)}px`,
+          fontWeight: 500,
+          lineHeight: 1,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {value}
+      </span>
+      <span
+        style={kickerStyles(
+          withAlpha(color, 0.7),
+          scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8),
+        )}
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function HeroInfusionTile({
+  entry,
+  accent,
+  tokens,
+  viewport,
+  intensityDisplay,
+}: {
+  entry: SaunaInfusionEntry;
+  accent: string;
+  tokens: Tokens;
+  viewport: Viewport;
+  intensityDisplay: IntensityDisplay;
+}) {
+  const { colors, typography, radius } = tokens;
+  const status = statusMeta(entry, tokens);
+  const isFinished = entry.isFinished;
+
+  const leftBar = entry.isLive
+    ? colors.statusLive
+    : entry.isPrestart
+      ? colors.statusWarning
+      : entry.isNext
+        ? colors.statusNext
+        : accent;
+
+  const titleColor = isFinished
+    ? withAlpha(colors.textPrimary, 0.55)
+    : colors.textPrimary;
+
+  return (
+    <div
+      className="flex items-center"
+      style={{
+        backgroundColor: withAlpha(colors.surfaceElevated, 0.55),
+        backdropFilter: 'blur(16px) saturate(150%)',
+        WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+        border: `1px solid ${withAlpha(colors.accentPrimary, 0.25)}`,
+        borderLeft: `2px solid ${leftBar}`,
+        borderRadius: `${scaled(radius.md, viewport, 3)}px`,
+        padding: `${scaled(12, viewport, 5)}px ${scaled(16, viewport, 6)}px`,
+        gap: scaled(14, viewport, 5),
+        opacity: isFinished ? 0.78 : 1,
+        boxShadow: entry.isLive
+          ? `0 6px 22px ${withAlpha(colors.statusLive, 0.25)}, inset 0 0 0 1px ${withAlpha(colors.statusLive, 0.18)}`
+          : `0 6px 20px ${withAlpha(colors.surface, 0.5)}`,
+      }}
+    >
+      <span
+        className="shrink-0 tabular-nums"
+        style={{
+          color: entry.isLive ? colors.statusLive : colors.textPrimary,
+          fontFamily: typography.fontMono,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 12)}px`,
+          fontWeight: 500,
+          letterSpacing: '0.02em',
+          minWidth: scaled(74, viewport, 44),
+        }}
+      >
+        {entry.time}
+      </span>
+      <div className="flex flex-col flex-1 min-w-0" style={{ gap: scaled(2, viewport, 1) }}>
+        <span
+          className="truncate"
+          style={{
+            color: titleColor,
+            fontFamily: typography.fontHeading,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
+            fontWeight: 500,
+            letterSpacing: '-0.005em',
+          }}
+          title={entry.title}
+        >
+          {entry.title}
+        </span>
+        {(entry.aromas?.length ?? 0) > 0 ? (
+          <span
+            className="truncate"
+            style={{
+              color: withAlpha(colors.textSecondary, 0.85),
+              fontFamily: typography.fontBody,
+              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 8)}px`,
+              letterSpacing: '0.06em',
+              fontStyle: 'italic',
+            }}
+          >
+            {entry.aromas!
+              .slice(0, 3)
+              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+              .join(' · ')}
+          </span>
+        ) : null}
+      </div>
+      {/* Intensity column — fixed width */}
+      <div
+        className="shrink-0 flex items-center justify-center"
+        style={{ width: scaled(72, viewport, 42) }}
+      >
+        {entry.intensity != null && entry.intensity > 0 ? (
+          <IntensityMark
+            level={entry.intensity}
+            color={isFinished
+              ? withAlpha(colors.accentPrimary, 0.45)
+              : entry.isLive
+                ? colors.statusLive
+                : accent}
+            tokens={tokens}
+            viewport={viewport}
+            sizePx={scaled(16, viewport, 11)}
+            display={intensityDisplay}
+          />
+        ) : null}
+      </div>
+      {/* Status column — fixed width, brass chip pattern */}
+      <div
+        className="shrink-0 flex items-center justify-end"
+        style={{ width: scaled(86, viewport, 50) }}
+      >
+        {status ? (
+          <span
+            style={statusChipStyles(status.color, {
+              isLive: entry.isLive,
+              sizePx: scaledFont(typography.baseSizePx * typography.scaleSm * 0.78, viewport, 7),
+              fontFamily: typography.fontBody,
+            })}
+          >
+            {status.label}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ── Variant: Portrait ──────────────────────────────────────────────────────
+//
+// Image occupies the top 40% of the stage; the bottom 60% is a brass-
+// bordered aufguss panel carrying the full upcoming list. Used to live
+// in the `hero` slot but was indistinguishable from the previous
+// portrait variant — now lives where it belongs and the new full-bleed
+// hero (below) carries the cinematic billing.
+
+function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
   const { colors, typography, spacing } = tokens;
   const { viewport } = context;
   const accent = data.accentColor || colors.accentPrimary;
@@ -834,7 +1192,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
   const liveOrNext =
     data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
 
-  // Hero image gets the top 40% (35% on compact zones), leaving the
+  // Image gets the top 40% (35% on compact zones), leaving the
   // bottom 60–65% for the aufguss list. Previous 55/45 split left
   // barely enough room for 3 aufgüsse on a 1080p wellness-stage.
   const imageHeight = viewport.isCompact ? '35%' : '40%';
@@ -975,174 +1333,6 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
         )}
       </section>
 
-    </div>
-  );
-}
-
-// ── Variant: Portrait ──────────────────────────────────────────────────────
-
-function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail'>) {
-  const { colors, typography, spacing } = tokens;
-  const { viewport } = context;
-  const accent = data.accentColor || colors.accentPrimary;
-  const intensityDisplay = context.intensityDisplay ?? 'flames';
-  // Portrait padding also dropped from `xl` to `lg` so the module
-  // body uses the zone edges rather than floating inside an obvious
-  // frame. Consistent with Schedule / Events / Infos.
-  const pad = scaled(spacing.lg, viewport, 12);
-
-  const liveOrNext =
-    data.upcoming.find((e) => e.isLive) ?? data.upcoming.find((e) => !e.isFinished);
-
-  return (
-    <div
-      className="flex h-full w-full flex-col overflow-hidden"
-      style={{
-        background: auroraAmbientBackground(colors),
-        color: colors.textPrimary,
-        fontFamily: typography.fontBody,
-      }}
-    >
-      {/* Upper image — 38% of the zone. Sauna masthead + stats now
-          ride ON the image in a brass-glass card so the list below
-          gets the full 62% (previously the masthead + stats ate a
-          40–50px strip at the top of the list). */}
-      <section
-        className="relative shrink-0 overflow-hidden"
-        style={{ height: viewport.isCompact ? '36%' : '38%' }}
-      >
-        {data.imageUrl ? (
-          <img
-            src={data.imageUrl}
-            alt={data.name}
-            className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(1.06) brightness(0.85)' }}
-          />
-        ) : (
-          <EmptyImagePanel tokens={tokens} viewport={viewport} />
-        )}
-
-        {/* Bottom gradient keeps the image a guaranteed-dark base for
-            the masthead card. */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `linear-gradient(180deg, ${withAlpha(colors.surface, 0)} 30%, ${withAlpha(colors.surface, 0.7)} 100%)`,
-          }}
-        />
-
-        {/* Hairline brass seal at the image's bottom edge */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            boxShadow: `inset 0 -1px 0 0 ${withAlpha(colors.accentPrimary, 0.3)}`,
-          }}
-        />
-
-        {liveOrNext ? (
-          <div
-            className="absolute"
-            style={{
-              top: scaled(12, viewport, 5),
-              left: scaled(12, viewport, 5),
-            }}
-          >
-            <LiveBadge entry={liveOrNext} tokens={tokens} viewport={viewport} />
-          </div>
-        ) : null}
-
-        {/* Masthead + stats float at the image bottom — edge-to-edge
-            foot strip, dark glass so text is legible on any image. */}
-        <div
-          className="absolute"
-          style={{
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: `${scaled(12, viewport, 5)}px ${pad}px`,
-            background: withAlpha(colors.surface, 0.55),
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            borderTop: `1px solid ${withAlpha(colors.accentPrimary, 0.45)}`,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: scaled(10, viewport, 3),
-          }}
-        >
-          <SaunaMasthead data={data} tokens={tokens} viewport={viewport} compact />
-          {/* Compact stats — plain-text inline, beneath the sauna
-              name. Smaller font than the body panel's chip-style
-              StatRow so the row reads as supporting metadata. */}
-          <StatRow data={data} tokens={tokens} viewport={viewport} compact />
-        </div>
-      </section>
-
-      {/* Lower itinerary — ~62%, headed by a compact kicker + count
-          only. Features / stats are on the image above, so this
-          section is almost entirely the list. */}
-      <section
-        className="flex flex-1 min-h-0 flex-col"
-        style={{
-          padding: `${pad}px`,
-          gap: scaled(spacing.sm, viewport, 4),
-        }}
-      >
-        {data.info.features && data.info.features.length > 0 ? (
-          <FeatureChips features={data.info.features} tokens={tokens} viewport={viewport} />
-        ) : data.infoBadges.length > 0 ? (
-          <FeatureChips features={data.infoBadges} tokens={tokens} viewport={viewport} />
-        ) : null}
-
-        {/* Compact list header — kicker + count on one line */}
-        <div
-          className="flex items-baseline justify-between"
-          style={{ gap: scaled(12, viewport, 4), paddingTop: scaled(4, viewport, 1) }}
-        >
-          <span
-            style={kickerStyles(
-              accent,
-              scaledFont(typography.baseSizePx * typography.scaleSm * 0.9, viewport, 9),
-            )}
-          >
-            Aufguss-Plan heute
-          </span>
-          <span
-            className="tabular-nums"
-            style={{
-              color: withAlpha(colors.textSecondary, 0.85),
-              fontFamily: typography.fontMono,
-              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-              letterSpacing: '0.04em',
-            }}
-          >
-            {data.upcoming.length} {data.upcoming.length === 1 ? 'Termin' : 'Termine'}
-          </span>
-        </div>
-
-        <div style={brassHairline(colors, 1)} />
-
-        {data.upcoming.length === 0 ? (
-          <EmptyInfusions tokens={tokens} viewport={viewport} />
-        ) : (
-          <AutoScroll className="flex-1 min-h-0">
-            <div className="flex flex-col">
-              {data.upcoming.map((entry, idx) => (
-                <InfusionRow
-                  key={entry.id}
-                  entry={entry}
-                  tokens={tokens}
-                  viewport={viewport}
-                  accent={accent}
-                  first={idx === 0}
-                  intensityDisplay={intensityDisplay}
-                />
-              ))}
-            </div>
-          </AutoScroll>
-        )}
-      </section>
     </div>
   );
 }

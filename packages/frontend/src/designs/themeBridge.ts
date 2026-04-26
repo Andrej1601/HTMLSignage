@@ -20,28 +20,42 @@ export function themeToTokenOverrides(
 
   const colors: ColorOverrides = {};
 
-  const surface = theme.dashboardBg || theme.bg;
+  // Vorrang: explizit gesetzte SDK-Felder (vom neuen ColorTokenEditor
+  // direkt geschrieben) > Legacy-Felder (Pre-Design-Pack Schema).
+  const surface = theme.surface || theme.dashboardBg || theme.bg;
   if (surface) colors.surface = surface;
 
-  const elevated = theme.cardBg || theme.cellBg;
+  const elevated = theme.surfaceElevated || theme.cardBg || theme.cellBg;
   if (elevated) colors.surfaceElevated = elevated;
 
-  const border = theme.cardBorder || theme.gridTable;
+  const border = theme.border || theme.cardBorder || theme.gridTable;
   if (border) colors.border = border;
 
-  const textPrimary = theme.textMain || theme.fg;
+  const textPrimary = theme.textPrimary || theme.textMain || theme.fg;
   if (textPrimary) colors.textPrimary = textPrimary;
 
-  if (theme.textMuted) colors.textSecondary = theme.textMuted;
+  const textSecondary = theme.textSecondary || theme.textMuted;
+  if (textSecondary) colors.textSecondary = textSecondary;
 
-  const accentPrimary = theme.accentGold || theme.accent;
+  if (theme.textInverse) colors.textInverse = theme.textInverse;
+
+  const accentPrimary = theme.accentPrimary || theme.accentGold || theme.accent;
   if (accentPrimary) colors.accentPrimary = accentPrimary;
 
-  if (theme.accentGreen) colors.accentSecondary = theme.accentGreen;
+  const accentSecondary = theme.accentSecondary || theme.accentGreen;
+  if (accentSecondary) colors.accentSecondary = accentSecondary;
 
   if (theme.statusLive) colors.statusLive = theme.statusLive;
   if (theme.statusNext) colors.statusNext = theme.statusNext;
-  if (theme.statusPrestart) colors.statusWarning = theme.statusPrestart;
+
+  const statusWarning = theme.statusWarning || theme.statusPrestart;
+  if (statusWarning) colors.statusWarning = statusWarning;
+
+  // Optional renderer-effect tints. If unset on the theme, the pack
+  // default kicks in (renderers fall back via `?? accentPrimary` /
+  // `?? surface` / `?? textPrimary`).
+  if (theme.accentStripe) colors.accentStripe = theme.accentStripe;
+  if (theme.heroOverlay) colors.heroOverlay = theme.heroOverlay;
 
   if (Object.keys(colors).length === 0) return undefined;
   return { colors };

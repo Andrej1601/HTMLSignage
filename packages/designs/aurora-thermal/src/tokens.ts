@@ -46,6 +46,13 @@ export const auroraThermalTokens: DesignTokens = {
     statusNext: '#B8874A',
     // Warning: ember amber-red, reserved for prestart / caution.
     statusWarning: '#CE5E3E',
+
+    // Optional accent stripe (left-edge marker) — defaults to brass so
+    // it reads on the warm-charcoal stage; operators can override.
+    accentStripe: '#D4A057',
+    // Hero-image overlay tint — warm charcoal matches the stage so
+    // photos "settle" into the dark surroundings rather than poking out.
+    heroOverlay: '#1B1410',
   },
 
   typography: {

@@ -208,7 +208,7 @@ function EventRow({
         >
           <img
             src={event.imageUrl ?? undefined}
-            alt=""
+            alt={event.title}
             className="absolute inset-0 h-full w-full object-cover"
             style={{ filter: 'saturate(0.85) brightness(0.9)' }}
           />

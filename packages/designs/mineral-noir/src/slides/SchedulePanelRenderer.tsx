@@ -4,26 +4,30 @@ import type {
   SchedulePanelStyle,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { SchedulePanelGrid } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import { labelStyles, scaled, scaledFont, withAlpha } from './utils';
 
 /**
  * Mineral Noir — content-panel dispatcher.
  *
- * Three variants share the architectural vocabulary (hairline rules,
- * platinum accent, monospaced timestamps, generous whitespace) but
- * lay out the data differently:
  *   - list     — flat chronological feed, one row per entry
- *   - matrix   — time rows × sauna columns, half-hour grid
- *   - timeline — event-indexed rows, evenly stretched to fill height
+ *   - matrix   — Saunakacheln-Grid via the shared SDK component, voiced
+ *                in Mineral Noir's architectural sans register.
+ *   - timeline — Mineral Noir's pack-native time-rows × sauna-columns
+ *                grid (was under `matrix` before; now offered under
+ *                modern-timeline so operators have both flavours).
+ *
+ * The previous "stretched rows" timeline was retired in favour of the
+ * native matrix at this slot — same swap Aurora already shipped.
  */
 export function SchedulePanelRenderer(props: SlideRendererProps<'content-panel'>) {
   const hint: SchedulePanelStyle = props.data.styleHint ?? 'list';
   switch (hint) {
     case 'matrix':
-      return <MatrixVariant {...props} />;
+      return <SchedulePanelGrid {...props} voice="mineral" />;
     case 'timeline':
-      return <TimelineVariant {...props} />;
+      return <MatrixVariant {...props} />;
     case 'list':
     default:
       return <ListVariant {...props} />;
@@ -600,234 +604,6 @@ function MatrixCell({
           }}
         >
           {cell.aromas!.slice(0, 2).map((a) => a.name).join(' · ')}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-// ── Variant: Timeline (stretched rows) ──────────────────────────────────────
-
-function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
-  const { colors, typography, spacing } = tokens;
-  const { viewport } = context;
-
-  const entries = flattenEntries(data);
-  if (data.saunas.length === 0 || entries.length === 0) {
-    return <EmptyStandalone tokens={tokens} viewport={viewport} />;
-  }
-
-  const startMins = entries.map((e) => parseTime(e.time));
-  const endMins = entries.map((e) => parseTime(e.time) + (e.cell.durationMin ?? 15));
-  const axisStart = Math.floor(Math.min(...startMins) / 30) * 30;
-  const axisEnd = Math.ceil(Math.max(...endMins) / 30) * 30;
-  const axis = new Set<number>();
-  for (let m = axisStart; m <= axisEnd; m += 30) axis.add(m);
-  for (const m of startMins) axis.add(m);
-  const times = Array.from(axis).sort((a, b) => a - b).map(formatTime);
-
-  const entryAt = new Map<string, FlatEntry>();
-  for (const e of entries) entryAt.set(`${e.saunaIndex}:${e.time}`, e);
-
-  const pad = scaled(spacing.lg, viewport, 8);
-  const timeColWidth = scaled(84, viewport, 48);
-  const gridTemplateColumns = `${timeColWidth}px repeat(${data.saunas.length}, minmax(0, 1fr))`;
-  const minRow = scaled(52, viewport, 30);
-
-  return (
-    <div
-      className="flex h-full w-full flex-col overflow-hidden"
-      style={{
-        backgroundColor: colors.surface,
-        color: colors.textPrimary,
-        fontFamily: typography.fontBody,
-        padding: `${pad}px`,
-        gap: `${scaled(spacing.md, viewport, 6)}px`,
-      }}
-    >
-      <PanelHeader count={entries.length} tokens={tokens} viewport={viewport} />
-
-      <div
-        className="grid shrink-0"
-        style={{
-          gridTemplateColumns,
-          columnGap: `${scaled(spacing.sm, viewport, 3)}px`,
-          paddingBottom: scaled(10, viewport, 4),
-          borderBottom: `1px solid ${withAlpha(colors.border, 0.85)}`,
-        }}
-      >
-        <div />
-        {data.saunas.map((sauna) => (
-          <SaunaColumnHeader
-            key={sauna.id}
-            sauna={sauna}
-            tokens={tokens}
-            viewport={viewport}
-          />
-        ))}
-      </div>
-
-      <AutoScroll className="flex-1 min-h-0">
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns,
-            gridTemplateRows: `repeat(${times.length}, minmax(${minRow}px, 1fr))`,
-            columnGap: `${scaled(spacing.sm, viewport, 3)}px`,
-            rowGap: 0,
-            minHeight: '100%',
-          }}
-        >
-          {times.map((time) => (
-            <TimelineRow
-              key={time}
-              time={time}
-              saunas={data.saunas}
-              entryAt={entryAt}
-              tokens={tokens}
-              viewport={viewport}
-            />
-          ))}
-        </div>
-      </AutoScroll>
-    </div>
-  );
-}
-
-function TimelineRow({
-  time,
-  saunas,
-  entryAt,
-  tokens,
-  viewport,
-}: {
-  time: string;
-  saunas: SchedulePanelData['saunas'];
-  entryAt: Map<string, FlatEntry>;
-  tokens: SlideRendererProps<'content-panel'>['tokens'];
-  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
-}) {
-  const { colors, typography } = tokens;
-
-  return (
-    <>
-      <div
-        className="flex items-center justify-end tabular-nums h-full"
-        style={{
-          color: withAlpha(colors.textSecondary, 0.9),
-          fontFamily: typography.fontMono,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-          padding: `0 ${scaled(12, viewport, 5)}px`,
-          borderBottom: `1px solid ${withAlpha(colors.border, 0.35)}`,
-          letterSpacing: '0.02em',
-        }}
-      >
-        {time}
-      </div>
-      {saunas.map((sauna, saunaIdx) => {
-        const entry = sauna.outOfOrder ? null : entryAt.get(`${saunaIdx}:${time}`);
-        return (
-          <div
-            key={`${time}-${sauna.id}`}
-            className="flex items-center h-full"
-            style={{
-              padding: `${scaled(6, viewport, 2)}px ${scaled(10, viewport, 4)}px`,
-              borderBottom: `1px solid ${withAlpha(colors.border, 0.35)}`,
-            }}
-          >
-            {entry ? (
-              <TimelineCell entry={entry} tokens={tokens} viewport={viewport} />
-            ) : null}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-function TimelineCell({
-  entry,
-  tokens,
-  viewport,
-}: {
-  entry: FlatEntry;
-  tokens: SlideRendererProps<'content-panel'>['tokens'];
-  viewport: SlideRendererProps<'content-panel'>['context']['viewport'];
-}) {
-  const { colors, typography } = tokens;
-  const { cell } = entry;
-  const status = statusColors(cell, tokens);
-  const isFinished = cell.isFinished;
-
-  const leftBar = cell.isLive
-    ? colors.statusLive
-    : cell.isPrestart
-      ? colors.statusWarning
-      : cell.isNext
-        ? colors.statusNext
-        : colors.accentPrimary;
-
-  return (
-    <div
-      className="flex w-full items-center h-full"
-      style={{
-        borderLeft: `2px solid ${leftBar}`,
-        paddingLeft: scaled(10, viewport, 4),
-        gap: scaled(10, viewport, 4),
-        opacity: isFinished ? 0.65 : 1,
-      }}
-    >
-      <div
-        className="flex flex-col flex-1 min-w-0"
-        style={{ gap: scaled(2, viewport, 1) }}
-      >
-        <span
-          className="truncate"
-          style={{
-            color: isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary,
-            fontFamily: typography.fontHeading,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
-            fontWeight: 700,
-            letterSpacing: '0.02em',
-          }}
-          title={cell.title}
-        >
-          {cell.title}
-        </span>
-        {cell.durationMin != null ? (
-          <span
-            className="tabular-nums"
-            style={{
-              color: withAlpha(colors.textSecondary, 0.85),
-              fontFamily: typography.fontMono,
-              fontSize: `${scaledFont(
-                typography.baseSizePx * typography.scaleSm * 0.85,
-                viewport,
-                8,
-              )}px`,
-              letterSpacing: '0.04em',
-            }}
-          >
-            {cell.durationMin}′
-          </span>
-        ) : null}
-      </div>
-      {status ? (
-        <span
-          className="shrink-0"
-          style={{
-            color: status.color,
-            fontSize: `${scaledFont(
-              typography.baseSizePx * typography.scaleSm * 0.75,
-              viewport,
-              7,
-            )}px`,
-            letterSpacing: '0.26em',
-            textTransform: 'uppercase',
-            fontWeight: 700,
-          }}
-        >
-          {status.label}
         </span>
       ) : null}
     </div>

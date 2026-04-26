@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import type { DraggableSyntheticListeners } from '@dnd-kit/core';
 
 interface SaunaCardProps {
   sauna: Sauna;
@@ -39,7 +40,7 @@ export function SaunaCard(props: SaunaCardProps & { isDragging?: boolean }) {
 
 interface InternalProps extends SaunaCardProps {
   isDragging?: boolean;
-  dragListeners?: Record<string, any>;
+  dragListeners?: DraggableSyntheticListeners;
 }
 
 function SaunaCardInner({ sauna, onEdit, onDelete, isDragging, dragListeners }: InternalProps) {

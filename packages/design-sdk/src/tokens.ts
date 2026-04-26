@@ -37,6 +37,23 @@ export interface ColorTokens {
   statusNext: string;
   /** "Starting soon" / warning. */
   statusWarning: string;
+
+  /**
+   * Optional: explicit colour for the host's vertical accent stripe
+   * (the optional Mineral-Noir-style left-edge marker controlled via
+   * `display.accentStripes`). If unset, hosts fall back to
+   * `accentPrimary`. Lets operators tune the stripe independently of
+   * the brand-leading accent.
+   */
+  accentStripe?: string;
+  /**
+   * Optional: tint colour used as the wash/overlay over hero
+   * background images (full-bleed sauna-detail Hero variant). If unset,
+   * packs typically fall back to `textPrimary` or `surface`. Most
+   * useful for wellness-classic where the default brown wash can render
+   * too light over bright sauna photos.
+   */
+  heroOverlay?: string;
 }
 
 /** Typography tokens. Font families, weights, and a base scale. */

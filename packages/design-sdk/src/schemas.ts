@@ -46,6 +46,8 @@ export const colorTokensSchema = z.object({
   statusLive: cssColor,
   statusNext: cssColor,
   statusWarning: cssColor,
+  accentStripe: cssColor.optional(),
+  heroOverlay: cssColor.optional(),
 }) satisfies z.ZodType<ColorTokens>;
 
 export const typographyTokensSchema = z.object({

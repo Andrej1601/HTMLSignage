@@ -124,8 +124,10 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     }
 
     if (parsedPayload.settings) {
+      // postMessage payload is structurally untyped (origin checked in handler);
+      // migrateSettings tolerates Partial<Settings> and fills version + theme defaults.
       applySettings(
-        migrateSettings(parsedPayload.settings as unknown as Settings),
+        migrateSettings(parsedPayload.settings as Partial<Settings>),
         { persist: false },
       );
       setHasPreviewPayload(true);

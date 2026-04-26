@@ -5,6 +5,7 @@ import type {
   SchedulePanelStyle,
   SlideRendererProps,
 } from '@htmlsignage/design-sdk';
+import { SchedulePanelGrid } from '@htmlsignage/design-sdk';
 import { AutoScroll } from './AutoScroll';
 import {
   IntensityMark as SharedIntensityMark,
@@ -12,7 +13,6 @@ import {
   brassHairline,
   eyebrowStyles,
   kickerStyles,
-  romanNumeral,
   scaled,
   scaledFont,
   statusChipStyles,
@@ -25,19 +25,23 @@ type Viewport = SlideRendererProps<'content-panel'>['context']['viewport'];
 /**
  * Aurora Thermal — content-panel dispatcher.
  *
- * Three variants share the warm-charcoal stage and brass vocabulary:
- *   - list     — chronological "playbill for the evening"
- *   - matrix   — saunas-as-columns grid, each cell is a brass card
- *   - timeline — saunas-as-rows, proportional time axis with glowing
- *                now-line. This is the one that turns heads.
+ *   - list     — chronological "playbill for the evening" (compact-tiles)
+ *   - matrix   — Wellness-Classic Saunakacheln grid (modern-wellness),
+ *                rendered with Aurora's brass palette. Shared via SDK
+ *                so all packs that opt in stay in lock-step.
+ *   - timeline — Aurora's saunas-as-columns brass grid (formerly the
+ *                "matrix" slot), now offered under the modern-timeline
+ *                designStyle. The previous timeline variant was retired
+ *                in favour of giving operators the brass grid + grid
+ *                pair as the two flavours.
  */
 export function SchedulePanelRenderer(props: SlideRendererProps<'content-panel'>) {
   const hint: SchedulePanelStyle = props.data.styleHint ?? 'list';
   switch (hint) {
     case 'matrix':
-      return <MatrixVariant {...props} />;
+      return <SchedulePanelGrid {...props} voice="editorial" />;
     case 'timeline':
-      return <TimelineVariant {...props} />;
+      return <MatrixVariant {...props} />;
     case 'list':
     default:
       return <ListVariant {...props} />;
@@ -111,6 +115,7 @@ function IntensityMark({
   viewport,
   tokens,
   display,
+  sizePx,
 }: {
   level: number;
   color: string;
@@ -118,12 +123,14 @@ function IntensityMark({
   viewport: Viewport;
   tokens: Tokens;
   display: IntensityDisplay;
+  /** Override the default 18px footprint (e.g. 13px for the dense matrix grid). */
+  sizePx?: number;
 }) {
   const { typography, colors } = tokens;
-  // Flames + Roman ring were too large before — 26px on a row with
-  // ~60px line height pushed the visual centre off. 18px sits more
-  // comfortably alongside the time column.
-  const size = scaled(18, viewport, 12);
+  // Default 18px sits comfortably alongside list-row times. Cells in
+  // the dense matrix override down to ~13px so the mark doesn't
+  // dominate a small card.
+  const size = sizePx ?? scaled(18, viewport, 12);
   return (
     <SharedIntensityMark
       level={level}
@@ -550,8 +557,7 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
     );
   }
 
-  // Build unique time axis from the start times, then cluster into
-  // 15-minute buckets so adjacent slots don't fragment visually.
+  // Time axis in 30-minute buckets.
   const bucketMinutes = 30;
   const startMins = entries.map((e) => e.minutes);
   const axisStart = Math.floor(Math.min(...startMins) / bucketMinutes) * bucketMinutes;
@@ -569,13 +575,28 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
     entryAt.set(key, list);
   }
 
+  // Per-bucket flag: any sauna has an entry here? Drives the row-height
+  // compression — empty buckets shrink to a hairline so the visible
+  // time-window roughly doubles without the layout fragmenting.
+  const bucketHasItems = new Map<number, boolean>();
+  for (const bucket of buckets) {
+    let any = false;
+    for (let s = 0; s < data.saunas.length; s++) {
+      if ((entryAt.get(`${s}:${bucket}`)?.length ?? 0) > 0) {
+        any = true;
+        break;
+      }
+    }
+    bucketHasItems.set(bucket, any);
+  }
+
   const pad = scaled(spacingTokens.lg, viewport, 12);
-  const timeColWidth = scaled(92, viewport, 52);
+  const timeColWidth = scaled(82, viewport, 48);
   const gridTemplateColumns = `${timeColWidth}px repeat(${data.saunas.length}, minmax(0, 1fr))`;
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden"
+      className="relative flex h-full w-full flex-col overflow-hidden"
       style={{
         background: auroraAmbientBackground(colors),
         color: colors.textPrimary,
@@ -584,40 +605,53 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
         gap: scaled(spacingTokens.md, viewport, 8),
       }}
     >
-      <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
-      <div style={brassHairline(colors, 1)} />
-
-      {/* Column heads */}
+      {/* Brass corner glow — gives the panel material weight. */}
       <div
-        className="grid shrink-0"
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
         style={{
-          gridTemplateColumns,
-          columnGap: scaled(spacingTokens.sm, viewport, 4),
-          paddingBottom: scaled(6, viewport, 2),
+          background: `radial-gradient(ellipse 60% 40% at 0% 0%, ${withAlpha(colors.accentPrimary, 0.08)} 0%, transparent 60%)`,
         }}
-      >
-        <div />
-        {data.saunas.map((sauna) => (
-          <SaunaColumnHeader
-            key={sauna.id}
-            sauna={sauna}
-            tokens={tokens}
-            viewport={viewport}
-          />
-        ))}
+      />
+
+      <div className="relative z-10 flex flex-col" style={{ gap: scaled(spacingTokens.md, viewport, 8) }}>
+        <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
+        <div style={brassHairline(colors, 1)} />
+
+        {/* Column heads */}
+        <div
+          className="grid shrink-0"
+          style={{
+            gridTemplateColumns,
+            columnGap: scaled(spacingTokens.sm, viewport, 4),
+            paddingBottom: scaled(6, viewport, 2),
+          }}
+        >
+          <div />
+          {data.saunas.map((sauna) => (
+            <SaunaColumnHeader
+              key={sauna.id}
+              sauna={sauna}
+              tokens={tokens}
+              viewport={viewport}
+            />
+          ))}
+        </div>
       </div>
 
-      <AutoScroll className="flex-1 min-h-0">
+      <AutoScroll className="relative z-10 flex-1 min-h-0">
         <div
           className="grid"
           style={{
             gridTemplateColumns,
             columnGap: scaled(spacingTokens.sm, viewport, 4),
-            rowGap: scaled(spacingTokens.sm, viewport, 4),
+            rowGap: scaled(3, viewport, 1),
           }}
         >
           {buckets.map((bucket) => {
             const timeLabel = formatTime(bucket);
+            const isMajorHour = bucket % 60 === 0;
+            const isEmpty = !bucketHasItems.get(bucket);
             return (
               <MatrixBucketRow
                 key={bucket}
@@ -628,6 +662,8 @@ function MatrixVariant({ data, tokens, context }: SlideRendererProps<'content-pa
                 tokens={tokens}
                 viewport={viewport}
                 intensityDisplay={intensityDisplay}
+                isMajorHour={isMajorHour}
+                isEmpty={isEmpty}
               />
             );
           })}
@@ -711,6 +747,8 @@ function MatrixBucketRow({
   tokens,
   viewport,
   intensityDisplay,
+  isMajorHour,
+  isEmpty,
 }: {
   timeLabel: string;
   bucket: number;
@@ -719,18 +757,53 @@ function MatrixBucketRow({
   tokens: Tokens;
   viewport: Viewport;
   intensityDisplay: IntensityDisplay;
+  isMajorHour: boolean;
+  isEmpty: boolean;
 }) {
   const { colors, typography } = tokens;
+
+  // Time-label styling. Major hour (XX:00) reads as the primary axis tick;
+  // half-hour (XX:30) is dimmed and a notch smaller so the eye can scan
+  // hours at a glance without being distracted.
+  const labelOpacity = isMajorHour ? (isEmpty ? 0.55 : 0.95) : isEmpty ? 0.28 : 0.55;
+  const labelWeight = isMajorHour ? 600 : 400;
+  const labelSize = isMajorHour
+    ? scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)
+    : scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9);
+
+  // Empty buckets collapse to a thin spacer so the visible time-window
+  // fits roughly twice as many hours. Major hours stay a touch taller
+  // than half-hour spacers so the rhythm is still legible.
+  const emptyMin = isMajorHour
+    ? scaled(20, viewport, 8)
+    : scaled(12, viewport, 5);
+
+  // Subtle brass hairline above each major hour — gives the eye a
+  // horizontal anchor point every 60 minutes without painting a heavy
+  // grid. Renders as `box-shadow` on the time-label cell so it spans
+  // the whole row visually without extra grid items.
+  const majorTickShadow = isMajorHour
+    ? `inset 0 1px 0 0 ${withAlpha(colors.accentPrimary, 0.25)}`
+    : undefined;
+
   return (
     <>
-      <div className="flex items-start tabular-nums" style={{ paddingTop: scaled(8, viewport, 3) }}>
+      <div
+        className="flex items-start tabular-nums"
+        style={{
+          paddingTop: isEmpty ? scaled(2, viewport, 1) : scaled(6, viewport, 2),
+          boxShadow: majorTickShadow,
+        }}
+      >
         <span
           style={{
-            color: withAlpha(colors.textSecondary, 0.95),
+            color: colors.textSecondary,
             fontFamily: typography.fontMono,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+            fontSize: `${labelSize}px`,
             letterSpacing: '0.04em',
-            fontWeight: 500,
+            fontWeight: labelWeight,
+            opacity: labelOpacity,
+            lineHeight: 1,
           }}
         >
           {timeLabel}
@@ -743,7 +816,11 @@ function MatrixBucketRow({
           <div
             key={cellKey}
             className="flex flex-col"
-            style={{ gap: scaled(6, viewport, 2), minHeight: scaled(56, viewport, 24) }}
+            style={{
+              gap: scaled(4, viewport, 1),
+              minHeight: items.length > 0 ? 0 : emptyMin,
+              boxShadow: majorTickShadow,
+            }}
           >
             {items.map((entry) => (
               <MatrixCell
@@ -778,32 +855,47 @@ function MatrixCell({
   const accent = entry.saunaColor || colors.accentPrimary;
 
   const borderColor = cell.isLive
-    ? withAlpha(colors.statusLive, 0.7)
+    ? withAlpha(colors.statusLive, 0.55)
     : cell.isPrestart
-      ? withAlpha(colors.statusWarning, 0.6)
+      ? withAlpha(colors.statusWarning, 0.45)
       : cell.isNext
-        ? withAlpha(colors.statusNext, 0.55)
-        : withAlpha(colors.border, 0.85);
+        ? withAlpha(colors.statusNext, 0.4)
+        : isFinished
+          ? withAlpha(colors.border, 0.45)
+          : withAlpha(colors.accentPrimary, 0.22);
+
+  // Frosted-brass material: warm surface with a hint of brass on the
+  // left edge so the eye reads "sauna lane" without a heavy column rule.
+  const leftAccent = cell.isLive
+    ? colors.statusLive
+    : cell.isPrestart
+      ? colors.statusWarning
+      : cell.isNext
+        ? colors.statusNext
+        : accent;
 
   return (
     <div
       style={{
-        padding: `${scaled(10, viewport, 4)}px ${scaled(14, viewport, 5)}px`,
+        padding: `${scaled(7, viewport, 3)}px ${scaled(11, viewport, 4)}px`,
         borderRadius: radius.md,
         border: `1px solid ${borderColor}`,
+        borderLeft: `2px solid ${withAlpha(leftAccent, isFinished ? 0.45 : 0.85)}`,
         backgroundColor: cell.isLive
-          ? withAlpha(colors.statusLive, 0.1)
-          : withAlpha(colors.surfaceElevated, 0.85),
+          ? withAlpha(colors.statusLive, 0.08)
+          : withAlpha(colors.surfaceElevated, 0.7),
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         boxShadow: cell.isLive
-          ? `0 0 20px ${withAlpha(colors.statusLive, 0.18)}`
-          : `0 1px 0 ${withAlpha(colors.accentPrimary, 0.04)}`,
-        opacity: isFinished ? 0.7 : 1,
+          ? `0 4px 18px ${withAlpha(colors.statusLive, 0.22)}, inset 0 0 0 1px ${withAlpha(colors.statusLive, 0.18)}`
+          : `0 1px 0 ${withAlpha(colors.accentPrimary, 0.06)}`,
+        opacity: isFinished ? 0.72 : 1,
         display: 'flex',
         flexDirection: 'column',
-        gap: scaled(4, viewport, 1),
+        gap: scaled(3, viewport, 1),
       }}
     >
-      <div className="flex items-center" style={{ gap: scaled(8, viewport, 3) }}>
+      <div className="flex items-center justify-between" style={{ gap: scaled(6, viewport, 2) }}>
         <span
           className="tabular-nums"
           style={{
@@ -813,7 +905,7 @@ function MatrixCell({
                 ? withAlpha(colors.textSecondary, 0.7)
                 : accent,
             fontFamily: typography.fontMono,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10)}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 9)}px`,
             fontWeight: 600,
             letterSpacing: '0.02em',
             lineHeight: 1,
@@ -827,6 +919,7 @@ function MatrixCell({
             color={cell.isLive ? colors.statusLive : accent}
             tokens={tokens}
             viewport={viewport}
+            sizePx={scaled(13, viewport, 9)}
             display={intensityDisplay}
           />
         ) : null}
@@ -836,7 +929,7 @@ function MatrixCell({
         style={{
           color: isFinished ? withAlpha(colors.textPrimary, 0.55) : colors.textPrimary,
           fontFamily: typography.fontHeading,
-          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
+          fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
           fontWeight: 500,
           lineHeight: 1.2,
           letterSpacing: '-0.005em',
@@ -853,11 +946,12 @@ function MatrixCell({
         <span
           className="truncate"
           style={{
-            color: withAlpha(colors.textSecondary, 0.9),
+            color: withAlpha(colors.textSecondary, 0.85),
             fontFamily: typography.fontBody,
-            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
+            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 7)}px`,
             fontWeight: 500,
-            letterSpacing: '0.01em',
+            letterSpacing: '0.02em',
+            fontStyle: 'italic',
           }}
         >
           {cell.aromas.map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name)).join(' · ')}
@@ -868,516 +962,3 @@ function MatrixCell({
 }
 
 
-// ── Variant: Timeline (saunas as rows, fixed-width time axis + h-scroll) ───
-//
-// The timeline reads like a thermal bath's daily programme poster:
-//   - Each 30-min slot gets a fixed pixel width so entry cards have
-//     room for the full title inside the tile (no outside overflow).
-//   - The combined track is typically wider than the screen; we wrap
-//     it in a horizontal `AutoScroll` so the display cycles through
-//     the full day without an operator touching it.
-//   - A brass "JETZT"-banner pinned to the now-line keeps the live
-//     moment visible even when the auto-scroll drifts past it.
-
-function TimelineVariant({ data, tokens, context }: SlideRendererProps<'content-panel'>) {
-  const { colors, typography, spacing: spacingTokens, radius } = tokens;
-  const { viewport } = context;
-  const entries = flattenEntries(data);
-  const intensityDisplay = context.intensityDisplay ?? 'flames';
-
-  if (data.saunas.length === 0 || entries.length === 0) {
-    return (
-      <div
-        className="flex h-full w-full flex-col overflow-hidden"
-        style={{
-          background: auroraAmbientBackground(colors),
-          color: colors.textPrimary,
-          fontFamily: typography.fontBody,
-          padding: `${scaled(spacingTokens.lg, viewport, 12)}px`,
-          gap: scaled(spacingTokens.md, viewport, 8),
-        }}
-      >
-        <Masthead count={0} tokens={tokens} viewport={viewport} />
-        <div style={brassHairline(colors, 1)} />
-        <EmptyState tokens={tokens} viewport={viewport} />
-      </div>
-    );
-  }
-
-  // Time axis: half-hour ticks from first-entry-start rounded down to
-  // last-entry-end rounded up. At least 2h of axis so a single short
-  // aufguss still renders a legible bar.
-  const startMinsList = entries.map((e) => e.minutes);
-  const endMinsList = entries.map((e) => e.minutes + (e.cell.durationMin ?? 15));
-  const axisStart = Math.floor(Math.min(...startMinsList) / 30) * 30;
-  const axisEnd = Math.max(axisStart + 120, Math.ceil(Math.max(...endMinsList) / 30) * 30);
-  const axisSpan = axisEnd - axisStart; // minutes
-  const ticks: number[] = [];
-  for (let m = axisStart; m <= axisEnd; m += 30) ticks.push(m);
-
-  // Fixed pixel width per 30-min slot. Scales modestly with viewport so
-  // we don't crush cards on tiny zones.
-  const slotWidth = scaled(130, viewport, 72);
-  const pxPerMinute = slotWidth / 30;
-  const tracksWidth = (axisSpan / 30) * slotWidth;
-
-  // Now-line: prefer the midpoint of a live entry, fall back to the
-  // schedule's `generatedAt` timestamp (deterministic for snapshot
-  // tests), and finally `new Date()` as a last resort. That way the
-  // banner stays anchored to "something happening now" when an
-  // aufguss is running, and otherwise tracks the schedule clock.
-  const live = entries.find((e) => e.cell.isLive);
-  const generatedDate = data.generatedAt ? new Date(data.generatedAt) : null;
-  const clockDate =
-    generatedDate && Number.isFinite(generatedDate.getTime())
-      ? generatedDate
-      : new Date();
-  const nowMinutesFromClock = clockDate.getHours() * 60 + clockDate.getMinutes();
-  const nowMinutes = live
-    ? live.minutes + Math.max(0, (live.cell.durationMin ?? 15) / 2)
-    : nowMinutesFromClock;
-  const nowPx = (nowMinutes - axisStart) * pxPerMinute;
-  const nowVisible = nowPx >= 0 && nowPx <= tracksWidth;
-  const nowClockLabel = formatTime(nowMinutesFromClock);
-
-  const pad = scaled(spacingTokens.lg, viewport, 12);
-  const labelColWidth = scaled(190, viewport, 110);
-  const rowHeight = scaled(88, viewport, 52);
-  const axisLabelHeight = scaled(40, viewport, 24);
-  const nowBannerHeight = scaled(30, viewport, 22);
-
-  // Group flat entries by sauna index for track rendering.
-  const bySauna = new Map<number, FlatEntry[]>();
-  for (const e of entries) {
-    const list = bySauna.get(e.saunaIndex) ?? [];
-    list.push(e);
-    bySauna.set(e.saunaIndex, list);
-  }
-
-  return (
-    <div
-      className="flex h-full w-full flex-col overflow-hidden"
-      style={{
-        background: auroraAmbientBackground(colors),
-        color: colors.textPrimary,
-        fontFamily: typography.fontBody,
-        padding: `${pad}px`,
-        gap: scaled(spacingTokens.md, viewport, 8),
-      }}
-    >
-      <Masthead count={entries.length} tokens={tokens} viewport={viewport} />
-      <div style={brassHairline(colors, 1)} />
-
-      {/* Two-column layout: sauna labels on the left (fixed), horizontally
-          auto-scrolling tracks on the right. Row heights in both columns
-          match pixel-for-pixel so the labels line up with their tracks. */}
-      <div
-        className="grid flex-1 min-h-0"
-        style={{
-          gridTemplateColumns: `${labelColWidth}px 1fr`,
-          columnGap: scaled(spacingTokens.md, viewport, 8),
-          alignItems: 'start',
-        }}
-      >
-        {/* Left column: sticky sauna labels */}
-        <div className="flex flex-col" style={{ gap: scaled(spacingTokens.sm, viewport, 4) }}>
-          {/* Spacer matches axis + now-banner height so label rows align */}
-          <div
-            aria-hidden
-            style={{
-              height: axisLabelHeight + nowBannerHeight + scaled(10, viewport, 4),
-            }}
-          />
-          {data.saunas.map((sauna) => {
-            const accent = sauna.color || colors.accentPrimary;
-            return (
-              <div
-                key={sauna.id}
-                className="flex items-center"
-                style={{
-                  gap: scaled(12, viewport, 4),
-                  minHeight: rowHeight,
-                }}
-              >
-                <div
-                  style={{
-                    width: 3,
-                    height: scaled(40, viewport, 20),
-                    backgroundColor: withAlpha(accent, 0.9),
-                    borderRadius: 2,
-                    flexShrink: 0,
-                  }}
-                />
-                <div className="flex flex-col min-w-0">
-                  <span
-                    className="truncate"
-                    style={{
-                      color: colors.textPrimary,
-                      fontFamily: typography.fontHeading,
-                      fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
-                      fontWeight: 500,
-                      letterSpacing: '-0.005em',
-                      lineHeight: 1.15,
-                    }}
-                    title={sauna.name}
-                  >
-                    {sauna.name}
-                  </span>
-                  {sauna.temperatureC != null ? (
-                    <span
-                      className="tabular-nums"
-                      style={{
-                        color: withAlpha(colors.textSecondary, 0.85),
-                        fontFamily: typography.fontMono,
-                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 8)}px`,
-                        letterSpacing: '0.03em',
-                        marginTop: 2,
-                      }}
-                    >
-                      {Math.round(sauna.temperatureC)} °C
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Right column: horizontally auto-scrolling tracks */}
-        <AutoScroll axis="x" className="h-full" speedPxPerSec={14} startDelayMs={5000}>
-          <div
-            className="flex flex-col"
-            style={{
-              width: tracksWidth,
-              gap: scaled(spacingTokens.sm, viewport, 4),
-            }}
-          >
-            {/* Axis labels row */}
-            <div className="relative" style={{ height: axisLabelHeight, width: tracksWidth }}>
-              {ticks.map((m, idx) => {
-                const left = idx * slotWidth;
-                const isMajor = m % 60 === 0;
-                return (
-                  <div
-                    key={m}
-                    className="absolute tabular-nums"
-                    style={{
-                      left,
-                      bottom: 0,
-                      transform: 'translateX(-50%)',
-                      color: withAlpha(
-                        colors.textSecondary,
-                        isMajor ? 0.95 : 0.7,
-                      ),
-                      fontFamily: typography.fontMono,
-                      fontSize: `${scaledFont(
-                        typography.baseSizePx * (isMajor ? typography.scaleBase : typography.scaleSm),
-                        viewport,
-                        isMajor ? 10 : 9,
-                      )}px`,
-                      letterSpacing: '0.04em',
-                      fontWeight: isMajor ? 600 : 500,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {formatTime(m)}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* "JETZT" banner + now-line — rendered once, spans all rows */}
-            <div
-              className="relative"
-              style={{ height: nowBannerHeight, width: tracksWidth }}
-            >
-              {nowVisible ? (
-                <div
-                  className="absolute flex items-center tabular-nums"
-                  style={{
-                    left: nowPx,
-                    top: 0,
-                    transform: 'translateX(-50%)',
-                    gap: scaled(6, viewport, 2),
-                    padding: `${scaled(4, viewport, 1)}px ${scaled(10, viewport, 4)}px`,
-                    borderRadius: 9999,
-                    backgroundColor: withAlpha(colors.statusLive, 0.22),
-                    border: `1px solid ${withAlpha(colors.statusLive, 0.75)}`,
-                    boxShadow: `0 0 18px ${withAlpha(colors.statusLive, 0.5)}`,
-                    color: colors.statusLive,
-                    fontFamily: typography.fontBody,
-                    fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9)}px`,
-                    fontWeight: 700,
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    lineHeight: 1,
-                    whiteSpace: 'nowrap',
-                    zIndex: 3,
-                  }}
-                >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: '50%',
-                      backgroundColor: colors.statusLive,
-                      boxShadow: `0 0 10px ${withAlpha(colors.statusLive, 0.95)}`,
-                    }}
-                  />
-                  Jetzt · {nowClockLabel}
-                </div>
-              ) : null}
-            </div>
-
-            {/* One track per sauna */}
-            {data.saunas.map((sauna, saunaIdx) => {
-              const rowEntries = bySauna.get(saunaIdx) ?? [];
-              const accent = sauna.color || colors.accentPrimary;
-              return (
-                <div
-                  key={sauna.id}
-                  className="relative"
-                  style={{
-                    height: rowHeight,
-                    width: tracksWidth,
-                  }}
-                >
-                  {/* Track backdrop */}
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      borderRadius: radius.md,
-                      backgroundColor: withAlpha(colors.surfaceElevated, 0.55),
-                      border: `1px solid ${withAlpha(colors.border, 0.6)}`,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Tick lines */}
-                    {ticks.slice(1, -1).map((m, idx) => {
-                      const left = (idx + 1) * slotWidth;
-                      const isMajor = m % 60 === 0;
-                      return (
-                        <div
-                          key={m}
-                          aria-hidden
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            bottom: 0,
-                            left,
-                            width: 1,
-                            backgroundColor: withAlpha(
-                              colors.border,
-                              isMajor ? 0.65 : 0.4,
-                            ),
-                            pointerEvents: 'none',
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Now-line glows through every track */}
-                  {nowVisible ? (
-                    <div
-                      aria-hidden
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: nowPx,
-                        width: 2,
-                        backgroundColor: colors.statusLive,
-                        boxShadow: `0 0 14px ${withAlpha(colors.statusLive, 0.9)}, 0 0 32px ${withAlpha(colors.statusLive, 0.45)}`,
-                        zIndex: 1,
-                      }}
-                    />
-                  ) : null}
-
-                  {/* Entries */}
-                  {rowEntries.map((entry) => {
-                    const startPx = Math.max(0, (entry.minutes - axisStart) * pxPerMinute);
-                    const dur = entry.cell.durationMin ?? 15;
-                    const widthPx = Math.max(scaled(70, viewport, 40), dur * pxPerMinute);
-                    const isFinished = !!entry.cell.isFinished;
-                    const fill = entry.cell.isLive
-                      ? colors.statusLive
-                      : entry.cell.isPrestart
-                        ? colors.statusWarning
-                        : entry.cell.isNext
-                          ? colors.statusNext
-                          : accent;
-
-                    const timeColor = entry.cell.isLive
-                      ? colors.statusLive
-                      : isFinished
-                        ? withAlpha(colors.textPrimary, 0.6)
-                        : withAlpha(fill, 0.95);
-                    const titleColor = isFinished
-                      ? withAlpha(colors.textPrimary, 0.55)
-                      : colors.textPrimary;
-
-                    return (
-                      <div
-                        key={entry.key}
-                        title={entry.cell.title}
-                        style={{
-                          position: 'absolute',
-                          top: scaled(6, viewport, 2),
-                          bottom: scaled(6, viewport, 2),
-                          left: startPx,
-                          width: widthPx,
-                          padding: `${scaled(8, viewport, 3)}px ${scaled(12, viewport, 4)}px`,
-                          borderRadius: radius.md,
-                          backgroundColor: withAlpha(
-                            fill,
-                            isFinished ? 0.14 : entry.cell.isLive ? 0.32 : 0.22,
-                          ),
-                          border: `1px solid ${withAlpha(
-                            fill,
-                            isFinished ? 0.4 : 0.9,
-                          )}`,
-                          boxShadow: entry.cell.isLive
-                            ? `0 0 18px ${withAlpha(colors.statusLive, 0.35)}`
-                            : `0 1px 0 ${withAlpha(fill, 0.08)}`,
-                          overflow: 'hidden',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                          gap: scaled(3, viewport, 1),
-                          opacity: isFinished ? 0.75 : 1,
-                          zIndex: 2,
-                        }}
-                      >
-                        <div
-                          className="flex items-center tabular-nums"
-                          style={{ gap: scaled(6, viewport, 2) }}
-                        >
-                          {entry.cell.isLive ? (
-                            <span
-                              aria-hidden
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: '50%',
-                                backgroundColor: colors.statusLive,
-                                boxShadow: `0 0 10px ${withAlpha(colors.statusLive, 0.95)}`,
-                                flexShrink: 0,
-                              }}
-                            />
-                          ) : null}
-                          <span
-                            style={{
-                              color: timeColor,
-                              fontFamily: typography.fontMono,
-                              fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-                              fontWeight: 600,
-                              letterSpacing: '0.04em',
-                              lineHeight: 1,
-                            }}
-                          >
-                            {entry.time}
-                          </span>
-                          {entry.cell.intensity != null && entry.cell.intensity > 0 ? (
-                            intensityDisplay === 'roman' ? (
-                              <span
-                                className="tabular-nums"
-                                style={{
-                                  color: timeColor,
-                                  fontFamily: typography.fontMono,
-                                  fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.85, viewport, 8)}px`,
-                                  fontWeight: 500,
-                                  letterSpacing: '0.06em',
-                                  opacity: 0.85,
-                                }}
-                              >
-                                · {romanNumeral(entry.cell.intensity)}
-                              </span>
-                            ) : (
-                              // Compact inline flame cluster — only
-                              // filled flames, no idle ones, since the
-                              // timeline cell is too narrow for a full
-                              // 4-flame row.
-                              <span
-                                aria-label={`Intensität ${entry.cell.intensity} von 4`}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 1,
-                                  color: timeColor,
-                                  opacity: 0.9,
-                                }}
-                              >
-                                <span style={{ opacity: 0.7, marginRight: 2 }}>·</span>
-                                {Array.from({ length: entry.cell.intensity }).map((_, i) => (
-                                  <svg
-                                    key={i}
-                                    width={scaled(10, viewport, 7)}
-                                    height={scaled(10, viewport, 7)}
-                                    viewBox="0 0 24 24"
-                                    fill={timeColor}
-                                    stroke={timeColor}
-                                    strokeWidth={1.8}
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden
-                                  >
-                                    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                                  </svg>
-                                ))}
-                              </span>
-                            )
-                          ) : null}
-                        </div>
-                        <span
-                          style={{
-                            color: titleColor,
-                            fontFamily: typography.fontHeading,
-                            fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase * 1.05, viewport, 10)}px`,
-                            fontWeight: 500,
-                            lineHeight: 1.15,
-                            letterSpacing: '-0.005em',
-                            overflow: 'hidden',
-                            display: '-webkit-box',
-                            WebkitBoxOrient: 'vertical',
-                            WebkitLineClamp: 2,
-                          }}
-                        >
-                          {entry.cell.title}
-                        </span>
-                      </div>
-                    );
-                  })}
-
-                  {sauna.outOfOrder ? (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        borderRadius: radius.md,
-                        backgroundColor: withAlpha(colors.statusWarning, 0.08),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: withAlpha(colors.statusWarning, 0.95),
-                        fontFamily: typography.fontBody,
-                        fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
-                        fontWeight: 700,
-                        letterSpacing: '0.18em',
-                        textTransform: 'uppercase',
-                        zIndex: 2,
-                      }}
-                    >
-                      Außer Betrieb
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </AutoScroll>
-      </div>
-    </div>
-  );
-}

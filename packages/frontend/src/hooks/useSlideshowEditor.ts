@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDevices } from '@/hooks/useDevices';
 import { useSlideshows, useUpdateSlideshow, useCreateSlideshow, useDeleteSlideshow } from '@/hooks/useSlideshows';
@@ -37,24 +37,29 @@ export function useSlideshowEditor() {
     [devices],
   );
 
-  // Slideshow selection
+  // Slideshow selection: explicit user pick (null = derive default from list).
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedSlideshowId, setSelectedSlideshowId] = useState<string | null>(() => {
+  const [explicitSelection, setExplicitSelection] = useState<string | null>(() => {
     return searchParams.get('slideshow') || null;
   });
 
-  // When slideshows load, select default if nothing selected
-  if (slideshows.length > 0 && (!selectedSlideshowId || !slideshows.some((s) => s.id === selectedSlideshowId))) {
-    const defaultShow = slideshows.find((s) => s.isDefault);
-    setSelectedSlideshowId(defaultShow?.id || slideshows[0].id);
-  }
+  // Effective ID is either the user's pick (if it still exists) or the default.
+  // Derived state — no setState-in-effect, so the list automatically self-heals
+  // when a slideshow is deleted out from under the current selection.
+  const selectedSlideshowId = useMemo<string | null>(() => {
+    if (slideshows.length === 0) return null;
+    if (explicitSelection && slideshows.some((s) => s.id === explicitSelection)) {
+      return explicitSelection;
+    }
+    return slideshows.find((s) => s.isDefault)?.id || slideshows[0].id;
+  }, [explicitSelection, slideshows]);
 
   // Clear ?slideshow= from URL after consuming it
   useEffect(() => {
     if (searchParams.has('slideshow')) {
       setSearchParams((prev) => { prev.delete('slideshow'); return prev; }, { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams]);
 
   const selectedSlideshow = useMemo(
     () => slideshows.find((s) => s.id === selectedSlideshowId) || null,
@@ -82,12 +87,18 @@ export function useSlideshowEditor() {
     setIsDirty(false);
   }, [settings]);
 
-  // Auto-load when slideshow selection changes
-  const [prevSelectedId, setPrevSelectedId] = useState<string | null>(null);
-  if (selectedSlideshow && !isDirty && selectedSlideshow.id !== prevSelectedId) {
-    setPrevSelectedId(selectedSlideshow.id);
+  // Auto-load when slideshow selection changes (skip if user has unsaved edits).
+  // This is a deliberate "sync editor draft to source of truth" effect — the editor
+  // owns mutable draft state that must reset when the user picks a different slideshow.
+  // Can't be derived state because the user actively edits between resets.
+  const prevSelectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedSlideshow || isDirty) return;
+    if (selectedSlideshow.id === prevSelectedIdRef.current) return;
+    prevSelectedIdRef.current = selectedSlideshow.id;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional draft sync; see comment above
     loadEditorFromSlideshow(selectedSlideshow);
-  }
+  }, [selectedSlideshow, isDirty, loadEditorFromSlideshow]);
 
   // Preview payload
   const previewPayload = useMemo(() => {
@@ -108,9 +119,6 @@ export function useSlideshowEditor() {
     audioOverride: null,
   }), [editorConfig, media, previewPayload?.settings, settings]);
 
-  // currentSnapshot can be used for future workflow integration
-  // const currentSnapshot = useMemo(() => buildCurrentSlideshowSnapshot({ editorConfig, editorPrestartMinutes }), [editorConfig, editorPrestartMinutes]);
-
   // Flags
   const isLoading = settingsLoading || slideshowsLoading;
   const error = settingsError;
@@ -124,7 +132,7 @@ export function useSlideshowEditor() {
       setConfirmAction({ type: 'switch-slideshow', nextSlideshowId: nextId });
       return;
     }
-    setSelectedSlideshowId(nextId);
+    setExplicitSelection(nextId);
     setIsDirty(false);
   };
 
@@ -140,7 +148,7 @@ export function useSlideshowEditor() {
     if (!confirmAction) return;
 
     if (confirmAction.type === 'switch-slideshow') {
-      setSelectedSlideshowId(confirmAction.nextSlideshowId);
+      setExplicitSelection(confirmAction.nextSlideshowId);
       setIsDirty(false);
     } else if (confirmAction.type === 'reset') {
       loadEditorFromSlideshow(selectedSlideshow);
@@ -150,7 +158,7 @@ export function useSlideshowEditor() {
           // Select default slideshow after deletion
           const remaining = slideshows.filter((s) => s.id !== confirmAction.slideshow.id);
           const next = remaining.find((s) => s.isDefault) || remaining[0];
-          if (next) setSelectedSlideshowId(next.id);
+          if (next) setExplicitSelection(next.id);
         },
       });
     }
@@ -179,7 +187,7 @@ export function useSlideshowEditor() {
       { name, copyFromId },
       {
         onSuccess: (created) => {
-          setSelectedSlideshowId(created.id);
+          setExplicitSelection(created.id);
           setIsDirty(false);
         },
       },

@@ -206,6 +206,7 @@ export function getColorPalette(id: ColorPaletteName): Partial<ThemeColors> {
 
 export function generateDashboardColors(baseColors: Partial<ThemeColors>): ThemeColors {
   const colors = { ...baseColors } as ThemeColors;
+  // Legacy dashboard fields — derive from base palette where missing.
   if (!colors.dashboardBg) colors.dashboardBg = colors.bg;
   if (!colors.cardBg) colors.cardBg = colors.cellBg || colors.bg;
   if (!colors.cardBorder) colors.cardBorder = colors.gridTable;
@@ -216,7 +217,46 @@ export function generateDashboardColors(baseColors: Partial<ThemeColors>): Theme
   if (!colors.statusLive) colors.statusLive = '#10B981';
   if (!colors.statusNext) colors.statusNext = colors.accentGold || colors.accent;
   if (!colors.statusPrestart) colors.statusPrestart = '#F59E0B';
+
+  // ─── SDK-token mirror fields ────────────────────────────────────────────
+  // Auto-populate from the legacy fields so the new ColorTokenEditor and
+  // themeBridge can read the canonical SDK token names directly. Operators
+  // who haven't customised anything get sensible defaults; explicit edits
+  // via the editor write to these fields and win in themeBridge.
+  if (!colors.surface) colors.surface = colors.dashboardBg;
+  if (!colors.surfaceElevated) colors.surfaceElevated = colors.cardBg;
+  if (!colors.border) colors.border = colors.cardBorder;
+  if (!colors.textPrimary) colors.textPrimary = colors.textMain;
+  if (!colors.textSecondary) colors.textSecondary = colors.textMuted;
+  if (!colors.textInverse) colors.textInverse = isLightColor(colors.surface) ? '#1B1410' : '#FFFFFF';
+  if (!colors.accentPrimary) colors.accentPrimary = colors.accentGold;
+  if (!colors.accentSecondary) colors.accentSecondary = colors.accentGreen;
+  if (!colors.statusWarning) colors.statusWarning = colors.statusPrestart;
+  // Renderer-effect tints. Defaults match the legacy implicit behaviour
+  // so the editor shows a sensible value before the operator overrides.
+  if (!colors.accentStripe) colors.accentStripe = colors.accentPrimary;
+  if (!colors.heroOverlay) colors.heroOverlay = colors.textPrimary;
   return colors;
+}
+
+/**
+ * Approx-luminance check. Used solely to pick a sensible default for
+ * `textInverse` (text drawn on filled accent backgrounds): a light surface
+ * means inverse text should be dark, and vice-versa. Operators can always
+ * override the result via the ColorTokenEditor.
+ */
+function isLightColor(hex: string | undefined): boolean {
+  if (!hex || !hex.startsWith('#')) return false;
+  const raw = hex.slice(1);
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  if (full.length !== 6) return false;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  // ITU-R BT.709 relative luminance, no gamma correction needed for a
+  // coarse "is this brighter than middle gray?" test.
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luma > 140;
 }
 
 // ─── Default Settings Factory ─────────────────────────────────────────────────

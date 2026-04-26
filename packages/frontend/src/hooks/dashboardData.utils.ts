@@ -244,7 +244,7 @@ export function buildRunningSlideshows(
     {
       id: 'global',
       source: 'global',
-      title: 'Globale Slideshow',
+      title: 'Standard-Slideshow',
       config: globalConfig,
       slides: getEnabledSlides(globalConfig),
       deviceNames: globalDeviceNames,
@@ -277,7 +277,7 @@ export function buildDeviceSlideshowRows(
     const minutes = getMinutesSince(device.lastSeen);
     const isOnline = minutes !== null && minutes < ONLINE_THRESHOLD_MINUTES;
 
-    const slideshowTitle = hasDeviceSlideshow ? device.slideshow!.name : 'Globale Slideshow';
+    const slideshowTitle = hasDeviceSlideshow ? device.slideshow!.name : 'Standard-Slideshow';
 
     return {
       deviceId: device.id,
@@ -320,7 +320,7 @@ export function buildDeviceMonitoring(
         ? `Event-Layout${activeEvent ? ` · ${activeEvent.name}` : ''}`
         : hasAssignedSlideshow
           ? device.slideshow!.name
-          : 'Globale Slideshow';
+          : 'Standard-Slideshow';
 
       const slideshowTone: StatusTone = eventUsesSlideshowOverride
         ? 'info'

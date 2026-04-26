@@ -145,6 +145,7 @@ model Media {
 
   @@index([type])
   @@index([createdAt(sort: Desc)])
+  @@index([uploadedBy])
   @@map("media")
 }
 
