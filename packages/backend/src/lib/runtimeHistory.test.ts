@@ -128,7 +128,7 @@ test('filterRuntimeHistoryPoints keeps only points in the requested period', () 
 
   assert.equal(filtered.length, 2);
   assert.deepEqual(filtered.map((point) => point.timestamp), [
-    points[1].timestamp,
-    points[2].timestamp,
+    points[1]!.timestamp,
+    points[2]!.timestamp,
   ]);
 });

@@ -1,8 +1,10 @@
 import type { PairingResponse } from '@/types/auth.types';
 import type { Device } from '@/types/device.types';
 import type { Media } from '@/types/media.types';
-import { createDefaultSchedule, type Schedule, type ScheduleResponse } from '@/types/schedule.types';
+import { createDefaultSchedule, type Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
+import { ScheduleSchema } from '@htmlsignage/shared/schedule';
+import { SettingsSchema } from '@htmlsignage/shared/settings';
 import { fetchApi } from './api/core';
 import type {
   ApiOkResponse,
@@ -45,24 +47,32 @@ async function getDisplayConfigFallback(id: string): Promise<DeviceDisplayConfig
 
 export const displayScheduleApi = {
   getSchedule: async (): Promise<Schedule> => {
-    const data = await fetchApi<ScheduleResponse>('/schedule');
-
-    if (!data || typeof data !== 'object' || !('presets' in data)) {
-      const fallbackVersion =
-        typeof (data as { version?: unknown } | null)?.version === 'number'
-          ? (data as { version: number }).version
-          : 1;
-      const normalized = createDefaultSchedule();
-      normalized.version = fallbackVersion;
-      return normalized;
+    const data = await fetchApi<unknown>('/schedule');
+    const parsed = ScheduleSchema.safeParse(data);
+    if (parsed.success) {
+      return parsed.data;
     }
 
-    return data;
+    console.warn('[displayScheduleApi] Invalid schedule payload, falling back to default:', parsed.error.issues);
+    const fallbackVersion =
+      typeof (data as { version?: unknown } | null)?.version === 'number'
+        ? (data as { version: number }).version
+        : 1;
+    const normalized = createDefaultSchedule();
+    normalized.version = fallbackVersion;
+    return normalized;
   },
 };
 
 export const displaySettingsApi = {
-  getSettings: async (): Promise<Settings> => fetchApi<Settings>('/settings'),
+  getSettings: async (): Promise<Settings> => {
+    const data = await fetchApi<unknown>('/settings');
+    const parsed = SettingsSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn('[displaySettingsApi] Invalid settings payload:', parsed.error.issues);
+    }
+    return data as Settings;
+  },
 };
 
 export const displayMediaApi = {

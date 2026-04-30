@@ -107,12 +107,14 @@ export function SlideshowConfigPanel({
 
     const zoneId = selectedZone || zones[0]?.id || 'main';
     const zoneSlides = getSlidesByZone(config.slides, zoneId);
-    const newSlide: SlideConfig = {
+    // Spread of a discriminated union doesn't preserve the discriminator
+    // through TS inference, so the cast is required at the boundary.
+    const newSlide = {
       ...slideData,
       id: generateId(),
       zoneId,
       order: zoneSlides.length,
-    };
+    } as SlideConfig;
 
     onChange({
       ...config,

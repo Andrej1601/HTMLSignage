@@ -99,7 +99,25 @@ export function SlideshowPage() {
             editor.confirmAction?.type === 'switch-slideshow'
               ? 'Ungespeicherte Änderungen verwerfen und Slideshow wechseln?'
               : editor.confirmAction?.type === 'delete-slideshow'
-                ? `„${editor.confirmAction.slideshow.name}" wirklich löschen? Zugewiesene Geräte werden auf die Standard-Slideshow zurückgesetzt.`
+                ? (() => {
+                    const slideshow = editor.confirmAction.slideshow;
+                    const deviceCount = slideshow.assignedDevices?.length ?? 0;
+                    const parts = [`„${slideshow.name}" wirklich löschen?`];
+                    if (deviceCount > 0) {
+                      const deviceNames = slideshow.assignedDevices
+                        ?.map((d) => d.name)
+                        .filter(Boolean)
+                        .join(', ');
+                      parts.push(
+                        `${deviceCount} ${deviceCount === 1 ? 'Gerät wird' : 'Geräte werden'} auf die Standard-Slideshow zurückgesetzt${deviceNames ? ` (${deviceNames})` : ''}.`,
+                      );
+                    } else {
+                      parts.push('Aktuell ist kein Gerät direkt zugewiesen.');
+                    }
+                    parts.push('Verknüpfte Event-Referenzen werden ebenfalls bereinigt.');
+                    parts.push('Diese Aktion kann nicht rückgängig gemacht werden.');
+                    return parts.join('\n\n');
+                  })()
                 : 'Ungespeicherte Änderungen verwerfen?'
           }
           confirmLabel={editor.confirmAction?.type === 'delete-slideshow' ? 'Löschen' : 'Verwerfen'}

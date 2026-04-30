@@ -128,18 +128,34 @@ function resolveDesignFlag(settings: Settings): {
   // `useDesignPacks` flag (kept in the type for backwards-compat with
   // older settings records).
   const enabled = true;
-  const configuredId = settings.display?.designPackId;
+
+  // Pack resolution: per-slideshow override wins over global. Lets event
+  // and standard slideshows swap between completely different visual
+  // identities on the same display.
+  const slideshowPackId = settings.slideshow?.designPackId;
+  const globalPackId = settings.display?.designPackId;
+  const configuredId = slideshowPackId || globalPackId;
   const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
 
   // Layer order (lowest → highest priority):
   //   1. Pack defaults (supplied by the pack itself via DesignHost)
-  //   2. Theme-derived overrides (auto-mapped from the host palette)
-  //   3. Explicit slideshow `tokenOverrides` (hand-typed brand tweaks)
-  // `mergeTokenOverrides` composes (2) + (3) and the DesignHost layers
-  // that on top of (1).
-  const themeOverrides = themeToTokenOverrides(settings.theme);
-  const slideshowOverrides = settings.slideshow?.tokenOverrides;
-  const tokenOverrides = mergeTokenOverrides(themeOverrides, slideshowOverrides);
+  //   2. Global theme-derived overrides (from settings.theme palette)
+  //   3. Per-slideshow theme-derived overrides (from slideshow.theme)
+  //   4. Explicit slideshow `tokenOverrides` (hand-typed brand tweaks)
+  // `mergeTokenOverrides` composes the layers; later args win.
+  const globalThemeOverrides = themeToTokenOverrides(settings.theme);
+  const slideshowTheme = settings.slideshow?.theme;
+  // Build a synthetic ThemeColors from the merged theme so per-slideshow
+  // theme tweaks reach the design tokens.
+  const slideshowThemeOverrides = slideshowTheme
+    ? themeToTokenOverrides({ ...settings.theme, ...slideshowTheme } as Settings['theme'])
+    : undefined;
+  const slideshowExplicitOverrides = settings.slideshow?.tokenOverrides;
+  const tokenOverrides = mergeTokenOverrides(
+    globalThemeOverrides,
+    slideshowThemeOverrides,
+    slideshowExplicitOverrides,
+  );
   const accentStripe = settings.display?.accentStripes === true;
   return { enabled, designId, tokenOverrides, accentStripe };
 }
@@ -181,7 +197,8 @@ function InfosSlideDispatch({
   deviceId?: string;
 }) {
   const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
-  const data = useInfoPanelData({ settings, infoId: slide.infoId, media });
+  const infoId = slide.type === 'infos' ? slide.infoId : undefined;
+  const data = useInfoPanelData({ settings, infoId, media });
   const context = buildRenderContext(slide, deviceId, settings);
 
   return (
@@ -313,10 +330,11 @@ function SaunaDetailDispatch({
 }) {
   const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
   const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const saunaId = slide.type === 'sauna-detail' ? slide.saunaId : undefined;
   const data = useSaunaDetailData({
     settings,
     schedule,
-    saunaId: slide.saunaId,
+    saunaId,
     media,
     deviceId,
     now: effectiveNow,

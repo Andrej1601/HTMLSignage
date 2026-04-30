@@ -6,6 +6,22 @@ export { COLOR_PALETTES, getColorPalette, generateDashboardColors, getDefaultSet
 import type { Sauna } from './sauna.types';
 import type { SlideshowConfig } from './slideshow.types';
 
+// Atomic union types now live in @htmlsignage/shared — re-exported here so
+// existing FE imports keep working while having a single source of truth.
+import type {
+  ClockPosition,
+  DisplayAppearance,
+  DesignStyle,
+  SaunaDetailStyle,
+} from '@htmlsignage/shared/settings';
+
+export type {
+  ClockPosition,
+  DisplayAppearance,
+  DesignStyle,
+  SaunaDetailStyle,
+};
+
 export interface ThemeColors {
   // ─── Canonical SDK color tokens ─────────────────────────────────────────
   // These are the 11 tokens every design pack consumes. The legacy fields
@@ -85,7 +101,7 @@ export interface SlideSettings {
   defaultDuration?: number;
   transitionDuration?: number;
   showClock?: boolean;
-  clockPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  clockPosition?: import('@htmlsignage/shared/settings').ClockPosition;
 }
 
 export interface DisplaySettings {
@@ -164,20 +180,8 @@ export interface MaintenanceScreenSettings {
   displayStyle?: 'glass' | 'overlay';
 }
 
-export type DesignStyle = 'modern-wellness' | 'modern-timeline' | 'compact-tiles';
-export type DisplayAppearance =
-  | 'aurora-thermal'
-  | 'wellness-stage'
-  | 'editorial-resort'
-  | 'mineral-noir';
-/**
- * Visual variant for sauna-detail ("Aufguss-Fokus") slides. Picked
- * up by the design pack's `SaunaDetailRenderer`.
- *  - `split`    → image left, upcoming infusion list right (default)
- *  - `hero`     → full-bleed image + floating info card overlay
- *  - `portrait` → image-dominant vertical layout, infusion list below
- */
-export type SaunaDetailStyle = 'split' | 'hero' | 'portrait';
+// DesignStyle, DisplayAppearance, SaunaDetailStyle are re-exported from
+// @htmlsignage/shared at the top of this file (single source of truth).
 export type BuiltinPaletteName =
   | 'standard-warm'
   | 'modern-spa'
@@ -315,25 +319,24 @@ export interface Settings {
   events?: Event[];
 }
 
-// ─── Event helpers ───────────────────────────────────────────────────────────
+// ─── Event helpers ──────────────────────────────────────────────────────────
+// Pure event logic lives in @htmlsignage/shared. We re-export and adapt
+// signatures so existing FE callers (which pass FE-typed Settings/Event)
+// keep working — the shared helpers accept structurally compatible values.
+
+import {
+  isEventActive as sharedIsEventActive,
+  eventTargetsDevice as sharedEventTargetsDevice,
+  getActiveEvent as sharedGetActiveEvent,
+  type EventEntry,
+} from '@htmlsignage/shared/settings';
 
 export function isEventActive(event: Event, now: Date = new Date()): boolean {
-  if (!event.isActive) return false;
-  const startDateTime = new Date(`${event.startDate}T${event.startTime}`);
-  const endDate = event.endDate || event.startDate;
-  const endTime = event.endTime || '23:59';
-  const endDateTime = new Date(`${endDate}T${endTime}`);
-  return now >= startDateTime && now <= endDateTime;
+  return sharedIsEventActive(event as unknown as EventEntry, now);
 }
 
 export function eventTargetsDevice(event: Event, deviceId?: string | null): boolean {
-  const targets = Array.isArray(event.targetDeviceIds)
-    ? event.targetDeviceIds.map((value) => String(value).trim()).filter(Boolean)
-    : [];
-
-  if (targets.length === 0) return true;
-  if (!deviceId) return true;
-  return targets.includes(deviceId);
+  return sharedEventTargetsDevice(event as unknown as EventEntry, deviceId);
 }
 
 export function getActiveEvent(
@@ -341,13 +344,10 @@ export function getActiveEvent(
   now: Date = new Date(),
   deviceId?: string | null,
 ): Event | null {
-  if (!settings.events) return null;
-  const activeEvents = settings.events
-    .filter((event) => isEventActive(event, now) && eventTargetsDevice(event, deviceId))
-    .sort((a, b) => {
-      const aStart = new Date(`${a.startDate}T${a.startTime}`);
-      const bStart = new Date(`${b.startDate}T${b.startTime}`);
-      return bStart.getTime() - aStart.getTime();
-    });
-  return activeEvents[0] || null;
+  const result = sharedGetActiveEvent(
+    { events: settings.events as unknown as EventEntry[] | undefined },
+    now,
+    deviceId,
+  );
+  return result as unknown as Event | null;
 }

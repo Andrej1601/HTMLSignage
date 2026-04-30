@@ -16,7 +16,7 @@ import type { Schedule } from '../types/schedule.types.js';
 const router = Router();
 
 // GET /api/schedule - Get current schedule
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   try {
     const schedule = await prisma.schedule.findFirst({
       where: { isActive: true },
@@ -24,14 +24,16 @@ router.get('/', async (req, res) => {
     });
 
     if (!schedule) {
-      return res.json(createDefaultSchedule(1));
+      return res.json(createDefaultSchedule({ version: 1 }));
     }
 
     // Always return schedule in current schema to keep frontend stable.
     res.json(normalizeScheduleData(schedule.data));
+    return;
   } catch (error) {
     console.error('[schedule] Error fetching schedule:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Zeitplan konnte nicht geladen werden' });
+    return;
   }
 });
 
@@ -80,9 +82,11 @@ router.get('/history', async (req, res) => {
     });
 
     res.json(result);
+    return;
   } catch (error) {
     console.error('[schedule] Error fetching history:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Zeitplan konnte nicht geladen werden' });
+    return;
   }
 });
 
@@ -116,6 +120,7 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
       version,
       id,
     });
+    return;
   } catch (error) {
     if (error instanceof VersionConflictError) {
       return res.status(409).json({
@@ -132,6 +137,7 @@ router.post('/', authMiddleware, requirePermission('schedule:write'), mutationLi
     }
     console.error('[schedule] Error saving schedule:', error);
     res.status(500).json({ error: 'save-failed', message: 'Zeitplan konnte nicht gespeichert werden' });
+    return;
   }
 });
 
@@ -147,9 +153,11 @@ router.get('/:id', async (req, res) => {
     }
 
     res.json(normalizeScheduleData(schedule.data));
+    return;
   } catch (error) {
     console.error('[schedule] Error fetching schedule:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Zeitplan konnte nicht geladen werden' });
+    return;
   }
 });
 

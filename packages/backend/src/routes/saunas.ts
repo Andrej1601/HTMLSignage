@@ -45,6 +45,7 @@ router.patch(
       broadcastSettingsUpdate(data);
 
       res.json({ ok: true, saunaId, status, version });
+      return;
     } catch (error) {
       if (error instanceof SaunaNotFoundError) {
         return res.status(404).json({ error: 'not-found', message: 'Sauna nicht gefunden' });
@@ -54,6 +55,7 @@ router.patch(
       }
       console.error('[saunas] Error updating status:', error);
       res.status(500).json({ error: 'update-failed', message: 'Sauna-Status konnte nicht aktualisiert werden' });
+      return;
     }
   }
 );

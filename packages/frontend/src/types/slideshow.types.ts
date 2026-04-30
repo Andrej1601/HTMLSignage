@@ -1,4 +1,24 @@
 // Slideshow Configuration Types
+//
+// Atomic unions (SlideType, LayoutType, VideoPlaybackMode, MediaFitMode,
+// TransitionType) live in @htmlsignage/shared — re-exported here so
+// existing FE imports keep working while having a single source of truth.
+
+import type {
+  SlideType,
+  LayoutType,
+  VideoPlaybackMode,
+  MediaFitMode,
+  TransitionType,
+} from '@htmlsignage/shared/settings';
+
+export type {
+  SlideType,
+  LayoutType,
+  VideoPlaybackMode,
+  MediaFitMode,
+  TransitionType,
+};
 
 export interface SlideshowDefinition {
   id: string;
@@ -10,32 +30,6 @@ export interface SlideshowDefinition {
   deviceCount?: number;
   assignedDevices?: Array<{ id: string; name: string }>;
 }
-
-// Slide types
-export type SlideType =
-  | 'content-panel' // Persistent content panel (e.g. schedule grid)
-  | 'sauna-detail' // Individual sauna with info
-  | 'media-image' // Image from media library
-  | 'media-video' // Video from media library
-  | 'infos' // Info panel (wellness tips, house rules, etc.)
-  | 'events'; // Events panel
-
-// Layout options for the slideshow display
-export type LayoutType =
-  | 'split-view' // Persistent panel + rotating content
-  | 'full-rotation' // Full screen rotation of all slides
-  | 'triple-view' // 1 left, 2 right (stacked) - Dashboard style
-  | 'grid-2x2'; // 4 items in 2x2 grid
-
-// Video playback behavior
-export type VideoPlaybackMode =
-  | 'duration' // Play for specified duration (loop if needed)
-  | 'complete' // Play until video ends
-  | 'loop-duration'; // Loop video for duration
-
-export type MediaFitMode =
-  | 'cover' // Fill available area, may crop edges
-  | 'contain'; // Show full media, may add letterboxing
 
 // Zone types
 export type ZoneType =
@@ -52,28 +46,47 @@ export interface Zone {
   size?: number; // percentage (30-70) for persistent zones
 }
 
-// Individual slide configuration
-export interface SlideConfig {
-  id: string;
+// Individual slide configuration — discriminated union.
+// Variant-specific fields are required on the matching variant only; consumers
+// must narrow by `slide.type` before reading variant-specific fields.
+export type {
+  ContentPanelSlide,
+  SaunaDetailSlide,
+  MediaImageSlide,
+  MediaVideoSlide,
+  InfosSlide,
+  EventsSlide,
+} from '@htmlsignage/shared/settings';
+
+import type {
+  SlideConfigShared,
+  VideoPlaybackMode as _VideoPlaybackMode,
+  MediaFitMode as _MediaFitMode,
+  TransitionType as _TransitionType,
+} from '@htmlsignage/shared/settings';
+
+export type SlideConfig = SlideConfigShared;
+
+/**
+ * Editor-internal form state — flat, all-optional variant fields. The editor
+ * keeps this looser shape because the user is mid-edit and partial state is
+ * expected. On save, the form is collapsed into the strict DU `SlideConfig`
+ * via a runtime type/check that lives in the editor.
+ */
+export interface SlideFormData {
   type: SlideType;
   enabled: boolean;
-  duration: number; // seconds
+  duration: number;
   order: number;
-  zoneId?: string; // Which zone this slide belongs to (for multi-zone layouts)
-
-  // Type-specific config
-  saunaId?: string; // For sauna-detail
-  mediaId?: string; // For media-image, media-video
-  videoPlayback?: VideoPlaybackMode; // For media-video
-  mediaFit?: MediaFitMode; // For media-image, media-video
-  infoId?: string; // For infos
-
-  // Display options
-  title?: string; // Custom title override
+  zoneId?: string;
+  saunaId?: string;
+  mediaId?: string;
+  videoPlayback?: _VideoPlaybackMode;
+  mediaFit?: _MediaFitMode;
+  infoId?: string;
+  title?: string;
   showTitle?: boolean;
-  transition?: 'fade' | 'slide' | 'zoom' | 'none';
-
-  // Advanced
+  transition?: _TransitionType;
   customCss?: string;
   notes?: string;
 }
@@ -86,7 +99,7 @@ export interface SlideshowConfig {
 
   // Global settings
   defaultDuration: number; // seconds
-  defaultTransition: 'fade' | 'slide' | 'zoom' | 'none';
+  defaultTransition: import('@htmlsignage/shared/settings').TransitionType;
   enableTransitions: boolean;
 
   // Persistent zone settings (for layouts with persistent panel)
@@ -102,6 +115,13 @@ export interface SlideshowConfig {
   saunaDetailStyle?: import('@/types/settings.types').SaunaDetailStyle;
   colorPalette?: import('@/types/settings.types').ColorPaletteName;
   theme?: Partial<import('@/types/settings.types').ThemeColors>;
+  /**
+   * Per-slideshow design-pack override. When set, this pack is used for
+   * the slideshow regardless of the global `display.designPackId`. Lets
+   * the same display swap between completely different visual identities
+   * (e.g. event slideshow vs. standard) without per-device hacks.
+   */
+  designPackId?: string;
   /**
    * Per-slideshow design-pack token overrides. Layered on top of the
    * pack's `defaultTokens` and on top of the theme-derived overrides
@@ -325,7 +345,10 @@ export function getSlideTypeOption(type: SlideType): SlideTypeOption | undefined
   return SLIDE_TYPE_OPTIONS.find((opt) => opt.type === type);
 }
 
-export function getEffectiveMediaFit(slide: Pick<SlideConfig, 'type' | 'mediaFit'>): MediaFitMode {
+/** Resolves the media-fit for image/video slides; default depends on type. */
+export function getEffectiveMediaFit(
+  slide: { type: SlideType; mediaFit?: import('@htmlsignage/shared/settings').MediaFitMode },
+): MediaFitMode {
   if (slide.mediaFit) return slide.mediaFit;
   return slide.type === 'media-video' ? 'contain' : 'cover';
 }

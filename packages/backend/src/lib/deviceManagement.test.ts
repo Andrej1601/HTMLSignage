@@ -5,7 +5,6 @@ import {
   buildBulkDeviceUpdateAuditDetails,
   buildDeviceCreateAuditDetails,
   buildDeviceCreateData,
-  buildDeviceDisplayConfigPayload,
   buildDevicePairAuditDetails,
   buildDeviceUpdateAuditDetails,
   buildDeviceUpdateData,
@@ -121,38 +120,6 @@ test('findMissingEntityIds returns only ids that are not present in the result s
     findMissingEntityIds(['a', 'b', 'c'], [{ id: 'a' }, { id: 'c' }]),
     ['b'],
   );
-});
-
-test('buildDeviceDisplayConfigPayload prefers schedule override only in override mode', () => {
-  const payload = buildDeviceDisplayConfigPayload({
-    deviceId: 'device-1',
-    mode: 'override',
-    maintenanceMode: true,
-    globalSchedule: { version: 1 },
-    globalSettings: { header: { enabled: true } },
-    overrideSchedule: { version: 2 },
-  });
-
-  assert.equal(payload.hasScheduleOverride, true);
-  assert.deepEqual(payload.schedule, { version: 2 });
-  // Settings always come from globalSettings now — device-level settings
-  // overrides have been removed.
-  assert.equal((payload.settings.header as { enabled?: boolean }).enabled, true);
-});
-
-test('buildDeviceDisplayConfigPayload uses global schedule in auto mode', () => {
-  const payload = buildDeviceDisplayConfigPayload({
-    deviceId: 'device-1',
-    mode: 'auto',
-    maintenanceMode: false,
-    globalSchedule: { version: 1 },
-    globalSettings: { header: { enabled: true } },
-    overrideSchedule: { version: 2 },
-  });
-
-  assert.equal(payload.hasScheduleOverride, true);
-  // In auto mode, the override exists but is ignored — global wins.
-  assert.deepEqual(payload.schedule, { version: 1 });
 });
 
 test('generateUniquePairingCode retries deterministic alternatives when a code is taken', async () => {

@@ -12,8 +12,8 @@ describe('updateSaunaStatusInSettings', () => {
     };
     const result = updateSaunaStatusInSettings(data, 's1', 'on');
     const saunas = result.saunas as Array<Record<string, unknown>>;
-    assert.equal(saunas[0].status, 'on');
-    assert.equal(saunas[1].status, 'off');
+    assert.equal(saunas[0]!.status, 'on');
+    assert.equal(saunas[1]!.status, 'off');
   });
 
   it('throws SaunaNotFoundError for unknown id', () => {
@@ -46,9 +46,9 @@ describe('updateSaunaStatusInSettings', () => {
     };
     const result = updateSaunaStatusInSettings(data, 's1', 'heating');
     const saunas = result.saunas as Array<Record<string, unknown>>;
-    assert.equal(saunas[0].temp, 80);
-    assert.equal(saunas[0].name, 'Finnish');
-    assert.equal(saunas[0].status, 'heating');
+    assert.equal(saunas[0]!.temp, 80);
+    assert.equal(saunas[0]!.name, 'Finnish');
+    assert.equal(saunas[0]!.status, 'heating');
   });
 
   it('preserves other fields on data object', () => {

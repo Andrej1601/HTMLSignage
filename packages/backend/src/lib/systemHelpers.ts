@@ -153,9 +153,14 @@ export function compareVersions(a: string, b: string): number {
 
 export async function readLocalVersion(): Promise<string> {
   const pkgPath = path.join(REPO_ROOT, 'package.json');
-  const raw = await fs.readFile(pkgPath, 'utf-8');
-  const pkg = JSON.parse(raw) as { version?: string };
-  return pkg.version || '0.0.0';
+  try {
+    const raw = await fs.readFile(pkgPath, 'utf-8');
+    const pkg = JSON.parse(raw) as { version?: string };
+    return pkg.version || '0.0.0';
+  } catch (error) {
+    console.warn('[systemHelpers] readLocalVersion failed:', error);
+    return '0.0.0';
+  }
 }
 
 export async function checkDirtyTree(): Promise<boolean> {

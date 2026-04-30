@@ -60,7 +60,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-spa-text-secondary text-sm">{message}</p>
+      <p className="text-spa-text-secondary text-sm whitespace-pre-wrap">{message}</p>
     </Dialog>
   );
 }

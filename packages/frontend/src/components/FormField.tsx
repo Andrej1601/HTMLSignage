@@ -7,7 +7,7 @@ import clsx from 'clsx';
 /* ------------------------------------------------------------------ */
 
 const inputBase =
-  'w-full px-4 py-2 border border-spa-bg-secondary rounded-lg text-spa-text-primary bg-spa-surface focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+  'w-full px-4 py-2 border border-spa-text-secondary/40 rounded-lg text-spa-text-primary bg-spa-surface focus:outline-hidden focus:ring-2 focus:ring-spa-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
 const inputError =
   'border-spa-error focus:ring-spa-error';

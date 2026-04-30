@@ -113,6 +113,7 @@ export function LayoutPicker({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {LAYOUT_OPTIONS.map((option) => (
           <button
+            type="button"
             key={option.type}
             onClick={() => onLayoutChange(option.type)}
             disabled={disabled}

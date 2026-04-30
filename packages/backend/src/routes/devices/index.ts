@@ -2,27 +2,23 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
-import { ScheduleSchema } from '../../types/schedule.types.js';
 import { broadcastDeviceCommand, broadcastDeviceUpdate } from '../../websocket/index.js';
-import { getCachedGlobalConfig } from '../../lib/globalConfigCache.js';
 import { authMiddleware, deviceAuthMiddleware, type AuthRequest, str } from '../../lib/auth.js';
 import { requirePermission } from '../../lib/permissions.js';
 import { mutationLimiter, heartbeatLimiter } from '../../lib/rateLimiter.js';
 import { logAuditEvent } from '../../lib/audit.js';
-import { normalizeScheduleData } from '../../lib/schedule.js';
 import {
   attachDeviceSnapshotMeta,
 } from '../../lib/deviceSnapshots.js';
 import {
   buildDeviceCreateAuditDetails,
   buildDeviceCreateData,
-  buildDeviceDisplayConfigPayload,
   buildDeviceUpdateAuditDetails,
   buildDeviceUpdateData,
   decodeSnapshotDataUrl,
-  normalizeSettingsData,
   readDeviceFleetState,
 } from '../../lib/deviceManagement.js';
+import { resolveDeviceDisplayConfig } from '../../services/displayConfig.js';
 import {
   saveDeviceSnapshot,
   deleteDeviceSnapshot,
@@ -74,84 +70,26 @@ router.get('/', authMiddleware, requirePermission('devices:manage'), async (_req
     res.setHeader('X-Result-Offset', String(offset));
     const devicesWithSnapshots = await attachDeviceSnapshotMetaList(devices);
     res.json(devicesWithSnapshots);
+    return;
   } catch (error) {
     console.error('[devices] Error listing:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
+    return;
   }
 });
 
 // GET /api/devices/:id/display-config - Effective schedule/settings for a specific device (device token)
 router.get('/:id/display-config', deviceAuthMiddleware, async (req: AuthRequest, res) => {
   try {
-    const device = await prisma.device.findUnique({
-      where: { id: str(req.params.id)! },
-      include: { overrides: true, slideshow: true },
-    });
-
-    if (!device) {
+    const payload = await resolveDeviceDisplayConfig(str(req.params.id)!);
+    if (!payload) {
       return res.status(404).json({ error: 'not-found', message: 'Device not found' });
     }
-
-    const { scheduleData, settingsData } = await getCachedGlobalConfig();
-    const globalSchedule = normalizeScheduleData(scheduleData);
-    const globalSettings = normalizeSettingsData(settingsData);
-
-    // Resolve slideshow config. Priority:
-    //   1. Device-specific slideshow (device.slideshowId set)
-    //   2. isDefault slideshow from the slideshows table (authoritative source for admin edits)
-    //   3. settings.slideshow JSON (legacy fallback)
-    const effectiveSettings = { ...globalSettings };
-    if (device.slideshow?.config !== undefined) {
-      effectiveSettings.slideshow = device.slideshow.config;
-    } else {
-      const defaultSlideshow = await prisma.slideshow.findFirst({
-        where: { isDefault: true },
-        select: { config: true },
-      });
-      if (defaultSlideshow) {
-        effectiveSettings.slideshow = defaultSlideshow.config;
-      }
-    }
-
-    // Resolve event slideshows: if any event references a slideshowId, embed the config
-    if (Array.isArray(effectiveSettings.events)) {
-      const eventSlideshowIds = effectiveSettings.events
-        .map((e: { slideshowId?: string }) => e.slideshowId)
-        .filter((id): id is string => Boolean(id));
-      if (eventSlideshowIds.length > 0) {
-        const eventSlideshows = await prisma.slideshow.findMany({
-          where: { id: { in: eventSlideshowIds } },
-          select: { id: true, config: true },
-        });
-        const slideshowMap = new Map(eventSlideshows.map((s) => [s.id, s.config]));
-        effectiveSettings.events = effectiveSettings.events.map(
-          (event: Record<string, unknown>) => {
-            const sid = event.slideshowId as string | undefined;
-            if (!sid || !slideshowMap.has(sid)) return event;
-            return {
-              ...event,
-              settingsOverrides: { slideshow: slideshowMap.get(sid) },
-            };
-          },
-        );
-      }
-    }
-
-    const scheduleOverride = ScheduleSchema.safeParse(device.overrides?.schedule);
-    const overrideSchedule = scheduleOverride.success ? scheduleOverride.data : null;
-    const fleetState = readDeviceFleetState(device);
-
-    return res.json(buildDeviceDisplayConfigPayload({
-      deviceId: device.id,
-      maintenanceMode: fleetState.maintenanceMode,
-      mode: device.mode as 'auto' | 'override',
-      globalSchedule,
-      globalSettings: effectiveSettings,
-      overrideSchedule,
-    }));
+    return res.json(payload);
   } catch (error) {
     console.error('[devices] Error fetching display config:', error);
     return res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -169,9 +107,11 @@ router.get('/:id', authMiddleware, requirePermission('devices:manage'), async (r
 
     const deviceWithSnapshot = await attachDeviceSnapshotMeta(device);
     res.json(deviceWithSnapshot);
+    return;
   } catch (error) {
     console.error('[devices] Error fetching device:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Geräte konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -196,6 +136,7 @@ router.post('/:id/snapshot', deviceAuthMiddleware, heartbeatLimiter, async (req:
     }
     console.error('[devices] Error saving snapshot:', error);
     return res.status(500).json({ error: 'snapshot-save-failed', message: 'Snapshot konnte nicht gespeichert werden' });
+    return;
   }
 });
 
@@ -227,12 +168,14 @@ router.post('/', authMiddleware, requirePermission('devices:manage'), mutationLi
     });
 
     res.json(device);
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error creating device:', error);
     res.status(500).json({ error: 'create-failed', message: 'Gerät konnte nicht erstellt werden' });
+    return;
   }
 });
 
@@ -254,12 +197,14 @@ router.patch('/:id', authMiddleware, requirePermission('devices:manage'), mutati
     });
 
     res.json(device);
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error updating device:', error);
     res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
+    return;
   }
 });
 
@@ -282,9 +227,11 @@ router.delete('/:id', authMiddleware, requirePermission('devices:manage'), mutat
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[devices] Error deleting device:', error);
     res.status(500).json({ error: 'delete-failed', message: 'Gerät konnte nicht gelöscht werden' });
+    return;
   }
 });
 
@@ -314,9 +261,11 @@ router.post('/:id/revoke-token', authMiddleware, requirePermission('devices:mana
     });
 
     res.json({ ok: true, message: 'Device-Token wurde widerrufen' });
+    return;
   } catch (error) {
     console.error('[devices] Error revoking device token:', error);
     res.status(500).json({ error: 'revoke-failed', message: 'Token konnte nicht widerrufen werden' });
+    return;
   }
 });
 
@@ -329,9 +278,11 @@ router.post('/:id/heartbeat', deviceAuthMiddleware, heartbeatLimiter, async (req
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[devices] Heartbeat error:', error);
     res.status(500).json({ error: 'update-failed', message: 'Gerät konnte nicht aktualisiert werden' });
+    return;
   }
 });
 
@@ -348,12 +299,14 @@ router.post('/:id/control', authMiddleware, requirePermission('devices:manage'),
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error sending control command:', error);
     res.status(500).json({ error: 'command-failed', message: 'Befehl konnte nicht ausgeführt werden' });
+    return;
   }
 });
 
@@ -394,12 +347,14 @@ router.post('/:id/overrides', authMiddleware, requirePermission('devices:manage'
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[devices] Error setting overrides:', error);
     res.status(500).json({ error: 'overrides-failed', message: 'Überschreibungen konnten nicht gespeichert werden' });
+    return;
   }
 });
 
@@ -424,9 +379,11 @@ router.delete('/:id/overrides', authMiddleware, requirePermission('devices:manag
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[devices] Error clearing overrides:', error);
     res.status(500).json({ error: 'clear-overrides-failed', message: 'Überschreibungen konnten nicht gelöscht werden' });
+    return;
   }
 });
 

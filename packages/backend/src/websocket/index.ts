@@ -1,7 +1,25 @@
 import { Server as SocketIOServer } from 'socket.io';
+import type {
+  BulkDeviceUpdatePayload,
+  ClientToServerEvents,
+  DeviceCommandPayload,
+  DeviceUpdatePayload,
+  InterServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from '@htmlsignage/shared/websocket';
+import { ScheduleSchema } from '@htmlsignage/shared/schedule';
+import { SettingsSchema } from '@htmlsignage/shared/settings';
 import { verifyAnyToken, verifyDeviceToken, verifyUserToken } from '../lib/auth.js';
 
-let io: SocketIOServer | null = null;
+type TypedIO = SocketIOServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+
+let io: TypedIO | null = null;
 const LOG_WS = process.env.NODE_ENV === 'development' || process.env.LOG_LEVEL === 'debug';
 
 const ADMIN_ROOM = 'devices-admin';
@@ -9,10 +27,11 @@ const ADMIN_ROOM = 'devices-admin';
 function extractAuthCookie(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;
   const match = /(?:^|;\s*)auth_token=([^;]+)/.exec(cookieHeader);
-  return match ? decodeURIComponent(match[1]) : null;
+  if (!match || !match[1]) return null;
+  return decodeURIComponent(match[1]);
 }
 
-export function setupWebSocket(ioInstance: SocketIOServer) {
+export function setupWebSocket(ioInstance: TypedIO) {
   io = ioInstance;
 
   // Handshake middleware: derive userId from auth_token cookie so admin sockets
@@ -124,31 +143,44 @@ export function setupWebSocket(ioInstance: SocketIOServer) {
   });
 }
 
-// Broadcast functions
+// Broadcast functions — typed against the shared event contract.
+//
+// Schedule/Settings broadcasts validate the payload shape at runtime so we
+// never push malformed data onto the wire (catches drift between writers
+// and the schema). Callers may pass `unknown` because most write-paths
+// pull JSON columns out of Prisma whose type is loose at compile time.
 export function broadcastScheduleUpdate(data: unknown) {
-  if (io) {
-    io.to('schedule-updates').emit('schedule:updated', data);
-    if (LOG_WS) {
-      console.log('[ws] Broadcasted schedule update');
-    }
+  if (!io) return;
+  const parsed = ScheduleSchema.safeParse(data);
+  if (!parsed.success) {
+    console.warn('[ws] Refusing to broadcast invalid schedule payload:', parsed.error.issues);
+    return;
+  }
+  io.to('schedule-updates').emit('schedule:updated', parsed.data);
+  if (LOG_WS) {
+    console.log('[ws] Broadcasted schedule update');
   }
 }
 
 export function broadcastSettingsUpdate(data: unknown) {
-  if (io) {
-    io.to('settings-updates').emit('settings:updated', data);
-    if (LOG_WS) {
-      console.log('[ws] Broadcasted settings update');
-    }
+  if (!io) return;
+  const parsed = SettingsSchema.safeParse(data);
+  if (!parsed.success) {
+    console.warn('[ws] Refusing to broadcast invalid settings payload:', parsed.error.issues);
+    return;
+  }
+  io.to('settings-updates').emit('settings:updated', parsed.data);
+  if (LOG_WS) {
+    console.log('[ws] Broadcasted settings update');
   }
 }
 
-export function broadcastDeviceUpdate(data: unknown) {
+export function broadcastDeviceUpdate(data: DeviceUpdatePayload) {
   if (!io) return;
   // Admin UIs receive every device update via the authenticated admin room.
   io.to(ADMIN_ROOM).emit('device:updated', data);
   // The owning device also receives its own update (for command/override echoes).
-  const id = (data as { id?: unknown } | null)?.id;
+  const id = data.id;
   if (typeof id === 'string') {
     io.to(`device:${id}`).emit('device:updated', data);
   }
@@ -162,7 +194,7 @@ export function broadcastDeviceUpdate(data: unknown) {
  * of N individual `device:updated` events.  Prevents broadcast storms during
  * bulk operations (e.g. 50 devices × 20 admin sockets = 1 000 events → 1 event).
  */
-export function broadcastBulkDeviceUpdate(devices: unknown[]) {
+export function broadcastBulkDeviceUpdate(devices: BulkDeviceUpdatePayload) {
   if (!io) return;
   io.to(ADMIN_ROOM).emit('devices:bulk-updated', devices);
   if (LOG_WS) {
@@ -170,7 +202,7 @@ export function broadcastBulkDeviceUpdate(devices: unknown[]) {
   }
 }
 
-export function broadcastDeviceCommand(deviceId: string, data: unknown) {
+export function broadcastDeviceCommand(deviceId: string, data: DeviceCommandPayload) {
   if (io) {
     // Broadcast to specific device
     io.to(`device:${deviceId}`).emit('device:command', data);

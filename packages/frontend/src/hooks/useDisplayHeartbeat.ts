@@ -27,9 +27,7 @@ export function useDisplayHeartbeat(options: {
           console.log('[Display] Heartbeat sent');
         }
       } catch (error) {
-        if (ENV_IS_DEV) {
-          console.error('[Display] Heartbeat failed:', error);
-        }
+        console.warn('[Display] Heartbeat failed:', error);
       } finally {
         heartbeatInFlightRef.current = false;
       }

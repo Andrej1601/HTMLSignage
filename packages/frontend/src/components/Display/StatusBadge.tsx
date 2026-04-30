@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import type { ThemeColors } from '@/types/settings.types';
 
 interface StatusBadgeProps {
@@ -14,10 +13,8 @@ export function StatusBadge({ status, theme, size = 'md' }: StatusBadgeProps) {
 
   if (status === 'ongoing') {
     return (
-      <motion.span
-        animate={{ opacity: [1, 0.4, 1] }}
-        transition={{ repeat: Infinity, duration: 2 }}
-        className={`font-black uppercase tracking-wider rounded ${
+      <span
+        className={`font-black uppercase tracking-wider rounded animate-pulse ${
           isSm
             ? 'text-[9px] px-1.5 py-0.5'
             : 'text-[10px] px-2 py-1'
@@ -28,7 +25,7 @@ export function StatusBadge({ status, theme, size = 'md' }: StatusBadgeProps) {
         }}
       >
         LÄUFT
-      </motion.span>
+      </span>
     );
   }
 

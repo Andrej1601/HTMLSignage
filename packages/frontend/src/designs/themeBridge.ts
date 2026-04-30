@@ -74,16 +74,18 @@ export function themeToTokenOverrides(
  * through to `base`, then to the pack's `defaultTokens`.
  */
 export function mergeTokenOverrides(
-  base: DesignTokenOverrides | undefined,
-  top: DesignTokenOverrides | undefined,
+  ...layers: Array<DesignTokenOverrides | undefined>
 ): DesignTokenOverrides | undefined {
-  if (!base && !top) return undefined;
-  if (!base) return top;
-  if (!top) return base;
+  const present = layers.filter((l): l is DesignTokenOverrides => Boolean(l));
+  if (present.length === 0) return undefined;
+  if (present.length === 1) return present[0];
 
   const out: DesignTokenOverrides = {};
   for (const key of ['colors', 'typography', 'spacing', 'radius', 'motion'] as const) {
-    const merged = { ...(base[key] ?? {}), ...(top[key] ?? {}) };
+    const merged: Record<string, unknown> = {};
+    for (const layer of present) {
+      Object.assign(merged, layer[key] ?? {});
+    }
     if (Object.keys(merged).length > 0) {
       (out as Record<string, unknown>)[key] = merged;
     }

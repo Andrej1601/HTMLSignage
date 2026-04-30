@@ -23,7 +23,10 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
 
-  const info = useInfoPanelData({ settings, infoId: slide.infoId, media });
+  // `infoId` only exists on the `infos` variant; other variants degrade
+  // to "show all infos" mode by omitting it.
+  const infoId = slide.type === 'infos' ? slide.infoId : undefined;
+  const info = useInfoPanelData({ settings, infoId, media });
   const imageUrl = info.imageUrl;
   const isBackground = info.imageMode === 'background';
 

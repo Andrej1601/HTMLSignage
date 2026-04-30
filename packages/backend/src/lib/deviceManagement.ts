@@ -44,7 +44,7 @@ export function readDeviceFleetState(device: unknown): DeviceFleetState {
 
 export function decodeSnapshotDataUrl(imageDataUrl: string): Buffer | null {
   const match = imageDataUrl.match(/^data:image\/jpeg;base64,([a-zA-Z0-9+/=\s]+)$/);
-  if (!match) return null;
+  if (!match || !match[1]) return null;
   return Buffer.from(match[1], 'base64');
 }
 
@@ -157,35 +157,9 @@ export function buildDevicePairAuditDetails(input: {
   };
 }
 
-export function buildDeviceDisplayConfigPayload(input: {
-  deviceId: string;
-  mode: DeviceMode;
-  maintenanceMode: boolean;
-  globalSchedule: unknown;
-  globalSettings: Record<string, unknown>;
-  overrideSchedule: unknown;
-}): {
-  deviceId: string;
-  maintenanceMode: boolean;
-  mode: DeviceMode;
-  hasScheduleOverride: boolean;
-  schedule: unknown;
-  settings: Record<string, unknown>;
-} {
-  const hasScheduleOverride = Boolean(input.overrideSchedule);
-  const isOverrideMode = input.mode === 'override';
-
-  return {
-    deviceId: input.deviceId,
-    maintenanceMode: input.maintenanceMode,
-    mode: input.mode,
-    hasScheduleOverride,
-    schedule: isOverrideMode && hasScheduleOverride
-      ? input.overrideSchedule
-      : input.globalSchedule,
-    settings: input.globalSettings,
-  };
-}
+// `buildDeviceDisplayConfigPayload` was moved to `services/displayConfig.ts`
+// as `assembleDisplayConfig` plus pure pipeline stages. The route handler
+// now calls `resolveDeviceDisplayConfig(deviceId)` directly.
 
 function hashBrowserIdToPairingCode(value: string): string {
   return parseInt(

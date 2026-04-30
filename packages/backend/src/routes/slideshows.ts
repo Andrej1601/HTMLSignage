@@ -83,9 +83,11 @@ router.get('/', authMiddleware, requirePermission('slideshow:manage'), async (re
 
     res.setHeader('X-Total-Count', String(totalCount));
     res.json(result);
+    return;
   } catch (error) {
     console.error('[slideshows] Error listing:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Slideshows konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -112,9 +114,11 @@ router.get('/:id', authMiddleware, requirePermission('slideshow:manage'), async 
       assignedDevices: devices,
       deviceCount: devices.length,
     });
+    return;
   } catch (error) {
     console.error('[slideshows] Error fetching slideshow:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Slideshow konnte nicht geladen werden' });
+    return;
   }
 });
 
@@ -163,12 +167,14 @@ router.post('/', authMiddleware, requirePermission('slideshow:manage'), mutation
 
     const { devices: createdDevices, ...createdRest } = slideshow;
     res.json({ ...createdRest, assignedDevices: createdDevices, deviceCount: createdDevices.length });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshows] Error creating slideshow:', error);
     res.status(500).json({ error: 'create-failed', message: 'Slideshow konnte nicht erstellt werden' });
+    return;
   }
 });
 
@@ -216,12 +222,14 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
 
     const { devices: updatedDevices, ...updatedRest } = slideshow;
     res.json({ ...updatedRest, assignedDevices: updatedDevices, deviceCount: updatedDevices.length });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[slideshows] Error updating slideshow:', error);
     res.status(500).json({ error: 'update-failed', message: 'Slideshow konnte nicht aktualisiert werden' });
+    return;
   }
 });
 
@@ -229,9 +237,19 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
 
 router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mutationLimiter, async (req: AuthRequest, res) => {
   try {
+    const slideshowId = str(req.params.id);
+    if (!slideshowId) {
+      return res.status(400).json({ error: 'invalid-id', message: 'Slideshow-ID fehlt' });
+    }
+
     const existing = await prisma.slideshow.findUnique({
-      where: { id: str(req.params.id) },
-      select: { id: true, name: true, isDefault: true },
+      where: { id: slideshowId },
+      select: {
+        id: true,
+        name: true,
+        isDefault: true,
+        devices: { select: { id: true, name: true } },
+      },
     });
 
     if (!existing) {
@@ -239,27 +257,79 @@ router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mut
     }
 
     if (existing.isDefault) {
-      return res.status(400).json({ error: 'cannot-delete-default', message: 'Standard-Slideshow kann nicht gelöscht werden' });
+      return res.status(400).json({
+        error: 'cannot-delete-default',
+        message: 'Standard-Slideshow kann nicht gelöscht werden',
+      });
     }
 
-    // Reassign devices that reference this slideshow to null
+    // Find events (in active settings JSON) that still reference this
+    // slideshow so we can clear those refs as part of the same write —
+    // otherwise deleted slideshows would leave dangling pointers that
+    // silently fall back to the default at display-config resolve time.
+    const activeSettings = await prisma.settings.findFirst({
+      where: { isActive: true },
+      orderBy: { version: 'desc' },
+      select: { id: true, data: true, version: true },
+    });
+
+    let clearedEventCount = 0;
+    if (activeSettings) {
+      const settingsData = { ...(activeSettings.data as Record<string, unknown>) };
+      const events = Array.isArray(settingsData.events) ? settingsData.events : null;
+      if (events) {
+        const updatedEvents = events.map((event) => {
+          if (
+            event && typeof event === 'object' && !Array.isArray(event)
+            && (event as Record<string, unknown>).slideshowId === slideshowId
+          ) {
+            const next = { ...(event as Record<string, unknown>) };
+            delete next.slideshowId;
+            clearedEventCount += 1;
+            return next;
+          }
+          return event;
+        });
+        if (clearedEventCount > 0) {
+          settingsData.events = updatedEvents;
+          await prisma.settings.update({
+            where: { id: activeSettings.id },
+            data: { data: settingsData as Prisma.InputJsonValue },
+          });
+        }
+      }
+    }
+
+    // Reassign devices that reference this slideshow → null (fall back
+    // to the default Standard-Slideshow at display-config resolve time).
     await prisma.device.updateMany({
-      where: { slideshowId: str(req.params.id) },
+      where: { slideshowId },
       data: { slideshowId: null },
     });
 
-    await prisma.slideshow.delete({ where: { id: str(req.params.id) } });
+    await prisma.slideshow.delete({ where: { id: slideshowId } });
 
     await logAuditEvent(req, {
       action: 'slideshow.delete',
-      resource: str(req.params.id),
-      details: { name: existing.name },
+      resource: slideshowId,
+      details: {
+        name: existing.name,
+        reassignedDeviceCount: existing.devices.length,
+        reassignedDeviceIds: existing.devices.map((d) => d.id),
+        clearedEventCount,
+      },
     });
 
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      reassignedDeviceCount: existing.devices.length,
+      clearedEventCount,
+    });
+    return;
   } catch (error) {
     console.error('[slideshows] Error deleting slideshow:', error);
     res.status(500).json({ error: 'delete-failed', message: 'Slideshow konnte nicht gelöscht werden' });
+    return;
   }
 });
 

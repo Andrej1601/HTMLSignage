@@ -1,4 +1,5 @@
 import type { Settings } from '@/types/settings.types';
+import { SettingsSchema } from '@htmlsignage/shared/settings';
 import { api } from './core';
 import type { SaveVersionedResponse } from './types';
 
@@ -34,8 +35,12 @@ function normalizeForSave(settings: Settings): Settings {
 
 export const settingsApi = {
   getSettings: async (): Promise<Settings> => {
-    const { data } = await api.get<Settings>('/settings');
-    return data;
+    const { data } = await api.get<unknown>('/settings');
+    const parsed = SettingsSchema.safeParse(data);
+    if (!parsed.success) {
+      console.warn('[settingsApi] Invalid settings payload:', parsed.error.issues);
+    }
+    return data as Settings;
   },
 
   saveSettings: async (settings: Settings): Promise<SaveVersionedResponse> => {

@@ -151,9 +151,11 @@ router.get('/', authOrDeviceMiddleware, async (req, res) => {
     res.setHeader('X-Result-Limit', String(limit));
     res.setHeader('X-Result-Offset', String(offset));
     res.json(mediaWithUrls);
+    return;
   } catch (error) {
     console.error('[media] Error listing media:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -170,9 +172,11 @@ router.get('/tags', authOrDeviceMiddleware, async (_req, res) => {
       .map((row) => row.tag?.trim() || '')
       .filter((tag) => tag.length > 0);
     res.json(tags);
+    return;
   } catch (error) {
     console.error('[media] Error listing media tags:', error);
     res.status(500).json({ error: 'fetch-tags-failed', message: 'Tags konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -196,9 +200,11 @@ router.get('/:id', authOrDeviceMiddleware, async (req, res) => {
       ...media,
       url: `/uploads/${media.filename}`,
     });
+    return;
   } catch (error) {
     console.error('[media] Error fetching media:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -213,6 +219,7 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), upload
     if (!signatureCheck.ok) {
       try {
         await fsPromises.unlink(req.file.path);
+        return;
       } catch (unlinkError) {
         console.error('[media] Error deleting invalid upload:', unlinkError);
       }
@@ -252,6 +259,7 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), upload
       ...media,
       url: `/uploads/${media.filename}`,
     });
+    return;
   } catch (error) {
     console.error('[media] Error uploading file:', error);
 
@@ -259,12 +267,14 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), upload
     if (req.file) {
       try {
         await fsPromises.unlink(req.file.path);
+        return;
       } catch (unlinkError) {
         console.error('[media] Error deleting file after error:', unlinkError);
       }
     }
 
     res.status(500).json({ error: 'upload-failed', message: 'Upload fehlgeschlagen' });
+    return;
   }
 });
 
@@ -293,12 +303,14 @@ router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mut
       ...media,
       url: `/uploads/${media.filename}`,
     });
+    return;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
     console.error('[media] Error updating media tags:', error);
     res.status(500).json({ error: 'update-tags-failed', message: 'Tags konnten nicht aktualisiert werden' });
+    return;
   }
 });
 
@@ -331,6 +343,7 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
     const filePath = path.join(UPLOAD_DIR, media.filename);
     try {
       await fsPromises.unlink(filePath);
+      return;
     } catch (fsError) {
       const code = (fsError as NodeJS.ErrnoException).code;
       if (code !== 'ENOENT') {
@@ -339,9 +352,11 @@ router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutatio
     }
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[media] Error deleting media:', error);
     res.status(500).json({ error: 'delete-failed', message: 'Medium konnte nicht gelöscht werden' });
+    return;
   }
 });
 

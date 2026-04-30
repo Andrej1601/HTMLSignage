@@ -24,10 +24,10 @@ export function useMediaUsage(settings: Settings | undefined): Map<string, Media
       return entry;
     }
 
-    // Slides
+    // Slides — only media-image / media-video variants reference media.
     if (settings.slideshow?.slides) {
       for (const slide of settings.slideshow.slides) {
-        if (slide.mediaId) {
+        if (slide.type === 'media-image' || slide.type === 'media-video') {
           ensure(slide.mediaId).slides.push(slide.title || slide.type);
         }
       }

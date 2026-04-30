@@ -39,24 +39,29 @@ router.get('/', authOrDeviceMiddleware, async (_req: AuthRequest, res) => {
       console.log('[settings] Added default header configuration');
     }
 
-    // The legacy `settings.slideshow` JSON is no longer persisted. To
-    // keep callers (dashboard, slide editors) working without a separate
-    // slideshow API call, mirror the canonical Standard-Slideshow
-    // (slideshows row with `isDefault: true`) into the response.
-    if (!data.slideshow) {
-      const defaultSlideshow = await prisma.slideshow.findFirst({
-        where: { isDefault: true },
-        select: { config: true },
-      });
-      if (defaultSlideshow) {
-        data.slideshow = defaultSlideshow.config;
-      }
+    // The canonical slideshow lives in the `slideshows` table (row with
+    // `isDefault: true`). We ALWAYS mirror that into the response and
+    // never trust a stale `settings.data.slideshow` JSON from records
+    // written before the slideshow split. That stale field is exactly
+    // why "Globale Einstellungen" used to show different slides than
+    // "Standard" — a snapshot got persisted into settings.data and
+    // diverged from the live Standard-Slideshow over time.
+    const defaultSlideshow = await prisma.slideshow.findFirst({
+      where: { isDefault: true },
+      select: { config: true },
+    });
+    if (defaultSlideshow) {
+      data.slideshow = defaultSlideshow.config;
+    } else {
+      delete data.slideshow;
     }
 
     res.json(data);
+    return;
   } catch (error) {
     console.error('[settings] Error fetching:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Einstellungen konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -88,6 +93,7 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
     });
 
     res.json({ ok: true, version });
+    return;
   } catch (error) {
     if (error instanceof VersionConflictError) {
       return res.status(409).json({
@@ -101,6 +107,7 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
     }
     console.error('[settings] Error saving:', error);
     res.status(500).json({ error: 'save-failed', message: 'Einstellungen konnten nicht gespeichert werden' });
+    return;
   }
 });
 

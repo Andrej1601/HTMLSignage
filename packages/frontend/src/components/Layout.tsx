@@ -44,7 +44,7 @@ function NavSections({
       {sections.map((section) => (
         <div key={section.key} className="space-y-1.5">
           <div className="px-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
               {section.title}
             </p>
           </div>
@@ -193,7 +193,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Logo/Brand */}
           <div className="flex h-24 shrink-0 flex-col justify-center border-b border-white/10 px-5">
             <h1 className="text-lg font-bold tracking-tight">Signage Control Center</h1>
-            <p className="mt-1 text-xs text-white/70">
+            <p className="mt-1 text-xs text-white/85">
               Displays, Inhalte und Systembetrieb in einem Blick.
             </p>
           </div>
@@ -207,7 +207,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium">{user.username}</p>
-                  <p className="text-xs text-white/70">{user.roles[0]}</p>
+                  <p className="text-xs text-white/85">{user.roles[0]}</p>
                 </div>
               </div>
             </div>
@@ -265,7 +265,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Search className="mr-3 shrink-0 h-5 w-5" />
                 Suche
               </span>
-              <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
+              <kbd className="text-[10px] text-white/85 border border-white/30 rounded px-1.5 py-0.5">⌘K</kbd>
             </button>
             <button
               onClick={() => setMode(effectiveTheme === 'dark' ? 'light' : 'dark')}
@@ -306,7 +306,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="ml-4 flex-1">
           <h1 className="text-xl font-bold">HTMLSignage</h1>
           {activeNavigation && (
-            <p className="mt-0.5 text-[11px] text-white/80">{activeNavigation.name}</p>
+            <p className="mt-0.5 text-[11px] text-white/90">{activeNavigation.name}</p>
           )}
         </div>
         {!wsConnected && (
@@ -334,7 +334,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium">{user.username}</p>
-                      <p className="text-xs text-white/70">{user.roles[0]}</p>
+                      <p className="text-xs text-white/85">{user.roles[0]}</p>
                     </div>
                   </div>
                 </div>
@@ -363,7 +363,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <Icon className="mr-3 h-6 w-6 shrink-0" />
                         <div className="min-w-0">
                           <p>{item.name}</p>
-                          <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
+                          <p className="mt-0.5 text-xs text-white/85">{item.description}</p>
                         </div>
                       </Link>
                     );

@@ -54,6 +54,9 @@ export class PrismaStore implements Store {
     `;
 
     const row = rows[0];
+    if (!row) {
+      throw new Error(`[rateLimiter] increment(${prefixedKey}) returned no row`);
+    }
     return { totalHits: Number(row.count), resetTime: row.expiresAt };
   }
 

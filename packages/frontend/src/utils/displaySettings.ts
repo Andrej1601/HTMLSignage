@@ -139,7 +139,9 @@ export function collectDisplayAssetUrls(settings: Settings | undefined, media?: 
   const mediaItems = media || [];
 
   settings.slideshow?.slides?.forEach((slide) => {
-    addMediaIdUrl(urls, mediaItems, slide.mediaId);
+    if (slide.type === 'media-image' || slide.type === 'media-video') {
+      addMediaIdUrl(urls, mediaItems, slide.mediaId);
+    }
   });
 
   settings.infos?.forEach((info) => {
@@ -157,7 +159,9 @@ export function collectDisplayAssetUrls(settings: Settings | undefined, media?: 
     const eventSlideshow = event.settingsOverrides?.slideshow;
     if (eventSlideshow?.slides) {
       eventSlideshow.slides.forEach((slide) => {
-        addMediaIdUrl(urls, mediaItems, slide.mediaId);
+        if (slide.type === 'media-image' || slide.type === 'media-video') {
+          addMediaIdUrl(urls, mediaItems, slide.mediaId);
+        }
       });
     }
   });

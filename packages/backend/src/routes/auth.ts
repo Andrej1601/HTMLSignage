@@ -4,7 +4,7 @@ import { createHash, randomBytes } from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../lib/prisma.js';
 import { PrismaStore } from '../lib/rateLimiter.js';
-import { hashPassword, comparePassword, generateToken, authMiddleware, hashSessionTokenForExport, type AuthRequest } from '../lib/auth.js';
+import { hashPassword, comparePassword, generateToken, authMiddleware, hashSessionTokenForExport, issueCsrfCookie, refreshCsrfTokenHeader, clearCsrfCookie, type AuthRequest } from '../lib/auth.js';
 import { sendPasswordResetEmail } from '../lib/mailer.js';
 import { assertUsernameAvailable, UserConflictError } from '../lib/userValidation.js';
 
@@ -161,6 +161,7 @@ router.post('/register', authLimiter, async (req, res) => {
       maxAge: SESSION_TTL_MS,
       path: '/',
     });
+    issueCsrfCookie(res);
     res.json({
       user: {
         id: user.id,
@@ -169,6 +170,7 @@ router.post('/register', authLimiter, async (req, res) => {
         roles: user.roles,
       },
     });
+    return;
   } catch (error) {
     if (error instanceof UserConflictError) {
       return res.status(400).json({ error: error.code, message: error.message });
@@ -178,6 +180,7 @@ router.post('/register', authLimiter, async (req, res) => {
     }
     console.error('[auth] Registration error:', error);
     res.status(500).json({ error: 'registration-failed', message: 'Registrierung fehlgeschlagen' });
+    return;
   }
 });
 
@@ -221,6 +224,7 @@ router.post('/login', authLimiter, async (req, res) => {
       maxAge: SESSION_TTL_MS,
       path: '/',
     });
+    issueCsrfCookie(res);
     res.json({
       user: {
         id: user.id,
@@ -229,12 +233,14 @@ router.post('/login', authLimiter, async (req, res) => {
         roles: user.roles,
       },
     });
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[auth] Login error:', error);
     res.status(500).json({ error: 'login-failed', message: 'Anmeldung fehlgeschlagen' });
+    return;
   }
 });
 
@@ -360,7 +366,9 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.substring(7);
+    const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const cookieToken = typeof req.cookies?.auth_token === 'string' ? req.cookies.auth_token : null;
+    const token = headerToken || cookieToken;
 
     if (token) {
       await prisma.session.deleteMany({
@@ -369,10 +377,13 @@ router.post('/logout', authMiddleware, async (req: AuthRequest, res) => {
     }
 
     res.clearCookie('auth_token', { path: '/' });
+    clearCsrfCookie(res);
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[auth] Logout error:', error);
     res.status(500).json({ error: 'logout-failed', message: 'Abmeldung fehlgeschlagen' });
+    return;
   }
 });
 
@@ -383,10 +394,16 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
       return res.status(401).json({ error: 'unauthorized', message: 'Nicht authentifiziert' });
     }
 
+    // Always emit the CSRF token via response header so cross-origin SPAs
+    // can pick it up even when their session cookie predates this feature.
+    refreshCsrfTokenHeader(req, res);
+
     res.json(req.user);
+    return;
   } catch (error) {
     console.error('[auth] Me error:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Benutzerdaten konnten nicht geladen werden' });
+    return;
   }
 });
 

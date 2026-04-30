@@ -24,7 +24,6 @@ async function cacheDisplayAsset(url: string): Promise<void> {
   if (existing) return;
 
   const response = await fetch(url, {
-    cache: 'no-store',
     credentials: 'same-origin',
   });
 

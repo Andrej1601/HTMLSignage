@@ -17,11 +17,12 @@ export interface UseMediaImageDataInput {
 
 /**
  * Resolve a media-image slide into its headless data shape. Returns `null`
- * when the referenced media cannot be found.
+ * when the slide is not a media-image variant or the media cannot be found.
  */
 export function useMediaImageData(input: UseMediaImageDataInput): MediaImageData | null {
   const { slide, media } = input;
   return useMemo<MediaImageData | null>(() => {
+    if (slide.type !== 'media-image') return null;
     const found = findMedia(media, slide.mediaId);
     if (!found) return null;
     return {
@@ -42,11 +43,12 @@ export interface UseMediaVideoDataInput {
 
 /**
  * Resolve a media-video slide into its headless data shape. Returns `null`
- * when the referenced media cannot be found.
+ * when the slide is not a media-video variant or the media cannot be found.
  */
 export function useMediaVideoData(input: UseMediaVideoDataInput): MediaVideoData | null {
   const { slide, media } = input;
   return useMemo<MediaVideoData | null>(() => {
+    if (slide.type !== 'media-video') return null;
     const found = findMedia(media, slide.mediaId);
     if (!found) return null;
     return {

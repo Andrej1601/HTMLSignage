@@ -233,7 +233,7 @@ export function DisplayClientPage() {
     [defaultTransition]
   );
 
-  const defaults = getDefaultSettings();
+  const defaults = useMemo(() => getDefaultSettings(), []);
   const themeColors = effectiveSettings.theme || defaults.theme!;
   const safeLayout = normalizeDisplayLayout(layout);
   const isLoading =

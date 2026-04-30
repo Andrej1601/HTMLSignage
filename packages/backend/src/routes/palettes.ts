@@ -39,9 +39,11 @@ router.get('/', async (_req, res) => {
       orderBy: { createdAt: 'asc' },
     });
     res.json(palettes);
+    return;
   } catch (error) {
     console.error('[palettes] Error fetching:', error);
     res.status(500).json({ error: 'fetch-failed' });
+    return;
   }
 });
 
@@ -53,12 +55,14 @@ router.post('/', authMiddleware, requirePermission('settings:manage'), mutationL
       data: { name, colors: colors as unknown as Prisma.InputJsonValue },
     });
     res.status(201).json(palette);
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[palettes] Error creating:', error);
     res.status(500).json({ error: 'create-failed' });
+    return;
   }
 });
 
@@ -71,12 +75,14 @@ router.put('/:id', authMiddleware, requirePermission('settings:manage'), mutatio
       data: { name, colors: colors as unknown as Prisma.InputJsonValue },
     });
     res.json(palette);
+    return;
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'validation-failed', details: error.issues });
     }
     console.error('[palettes] Error updating:', error);
     res.status(500).json({ error: 'update-failed' });
+    return;
   }
 });
 
@@ -87,9 +93,11 @@ router.delete('/:id', authMiddleware, requirePermission('settings:manage'), muta
       where: { id: str(req.params.id) },
     });
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[palettes] Error deleting:', error);
     res.status(500).json({ error: 'delete-failed' });
+    return;
   }
 });
 

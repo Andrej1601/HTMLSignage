@@ -230,8 +230,9 @@ export function summarizeRuntimeHistoryPoints(points: RuntimeHistoryPoint[]): Ru
     };
   }
 
-  const first = points[0];
-  const last = points[points.length - 1];
+  // Length is guaranteed >0 by the early-return above.
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
   const firstTs = parseIso(first.timestamp);
   const lastTs = parseIso(last.timestamp);
   const totalOnline = points.reduce((sum, point) => sum + point.onlineDevices, 0);

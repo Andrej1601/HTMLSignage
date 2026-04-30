@@ -21,6 +21,7 @@ export function SaunaPickerField({ saunas, selectedId, onSelect }: SaunaPickerFi
         <div className="grid grid-cols-2 gap-2">
           {saunas.map((sauna) => (
             <button
+              type="button"
               key={sauna.id}
               onClick={() => onSelect(sauna.id)}
               className={clsx(

@@ -215,9 +215,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         const message = error instanceof Error ? error.message : 'Display-Konfiguration konnte nicht geladen werden';
         setScheduleError(message);
         setSettingsError(message);
-        if (ENV_IS_DEV) {
-          console.error('[Display] Failed to load effective display config:', error);
-        }
+        console.error('[Display] Failed to load effective display config:', error);
         const cachedSchedule = readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
         const cachedSettings = readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
         if (cachedSchedule) applySchedule(cachedSchedule, { persist: false });
@@ -271,9 +269,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
           applySchedule(schedule);
         }
       } catch (error) {
-        if (ENV_IS_DEV) {
-          console.warn('[Display] Fallback schedule load failed:', error);
-        }
+        console.warn('[Display] Fallback schedule load failed:', error);
       } finally {
         if (isMounted) {
           setScheduleLoading(false);
@@ -313,9 +309,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
           applySettings(settings);
         }
       } catch (error) {
-        if (ENV_IS_DEV) {
-          console.warn('[Display] Fallback settings load failed:', error);
-        }
+        console.warn('[Display] Fallback settings load failed:', error);
       } finally {
         if (isMounted) {
           setSettingsLoading(false);

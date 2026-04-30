@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SlideConfig, SlideType } from '@/types/slideshow.types';
+import type { SlideConfig, SlideFormData, SlideType } from '@/types/slideshow.types';
 import { SLIDE_TYPE_OPTIONS, getEffectiveMediaFit, getSlideTypeOption } from '@/types/slideshow.types';
 import type { Media } from '@/types/media.types';
 import { useSettings } from '@/hooks/useSettings';
@@ -30,7 +30,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
   const images = media?.filter((m: Media) => m.type === 'image') || [];
   const videos = media?.filter((m: Media) => m.type === 'video') || [];
 
-  const [formData, setFormData] = useState<Omit<SlideConfig, 'id'>>({
+  const [formData, setFormData] = useState<SlideFormData>({
     type: 'content-panel',
     enabled: true,
     duration: 10,
@@ -46,21 +46,24 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
   if (slideKey !== prevSlideKey) {
     setPrevSlideKey(slideKey);
     if (slide) {
+      // Source slide is a DU member, but the editor's form state is the
+      // looser SlideFormData. Read variant-specific fields via a flat view.
+      const source = slide as SlideFormData;
       setFormData({
-        type: slide.type,
-        enabled: slide.enabled,
-        duration: slide.duration,
-        order: slide.order,
-        saunaId: slide.saunaId,
-        mediaId: slide.mediaId,
-        videoPlayback: slide.videoPlayback,
-        mediaFit: slide.mediaFit,
-        infoId: slide.infoId,
-        title: slide.title,
-        showTitle: slide.showTitle,
-        transition: slide.transition,
-        customCss: slide.customCss,
-        notes: slide.notes,
+        type: source.type,
+        enabled: source.enabled,
+        duration: source.duration,
+        order: source.order,
+        saunaId: source.saunaId,
+        mediaId: source.mediaId,
+        videoPlayback: source.videoPlayback,
+        mediaFit: source.mediaFit,
+        infoId: source.infoId,
+        title: source.title,
+        showTitle: source.showTitle,
+        transition: source.transition,
+        customCss: source.customCss,
+        notes: source.notes,
       });
     } else {
       setFormData({
@@ -96,10 +99,13 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       return;
     }
 
+    // Editor maintains a flat SlideFormData while the parent expects the
+    // strict DU. We've validated the variant-required fields above, so the
+    // cast is sound at this point.
     if (slide && 'id' in slide) {
-      onSave({ ...slide, ...formData });
+      onSave({ ...slide, ...formData } as SlideConfig);
     } else {
-      onSave(formData);
+      onSave(formData as Omit<SlideConfig, 'id'>);
     }
   };
 
@@ -150,6 +156,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {SLIDE_TYPE_OPTIONS.map((option) => (
               <button
+                type="button"
                 key={option.type}
                 onClick={() => handleTypeChange(option.type)}
                 className={clsx(
@@ -215,7 +222,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, mediaFit: option.value as SlideConfig['mediaFit'] })}
+                    onClick={() => setFormData({ ...formData, mediaFit: option.value as SlideFormData['mediaFit'] })}
                     className={clsx(
                       'rounded-xl border p-3 text-left transition-all',
                       isActive

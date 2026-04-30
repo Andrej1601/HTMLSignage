@@ -27,7 +27,7 @@ const UpdateUserSchema = z.object({
 });
 
 // GET /api/users - List all users (requires users:manage)
-router.get('/', requirePermission('users:manage'), async (req: AuthRequest, res) => {
+router.get('/', requirePermission('users:manage'), async (_req: AuthRequest, res) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -42,9 +42,11 @@ router.get('/', requirePermission('users:manage'), async (req: AuthRequest, res)
     });
 
     res.json(users);
+    return;
   } catch (error) {
     console.error('[users] Error listing users:', error);
     res.status(500).json({ error: 'fetch-failed', message: 'Benutzer konnten nicht geladen werden' });
+    return;
   }
 });
 
@@ -84,6 +86,7 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
     });
 
     res.json(user);
+    return;
   } catch (error) {
     if (error instanceof UserConflictError) {
       return res.status(400).json({ error: error.code, message: error.message });
@@ -93,6 +96,7 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
     }
     console.error('[users] Error creating user:', error);
     res.status(500).json({ error: 'create-failed', message: 'Benutzer konnte nicht erstellt werden' });
+    return;
   }
 });
 
@@ -150,6 +154,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
     });
 
     res.json(updatedUser);
+    return;
   } catch (error) {
     if (error instanceof UserConflictError) {
       return res.status(400).json({ error: error.code, message: error.message });
@@ -159,6 +164,7 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
     }
     console.error('[users] Error updating user:', error);
     res.status(500).json({ error: 'update-failed', message: 'Benutzer konnte nicht aktualisiert werden' });
+    return;
   }
 });
 
@@ -191,9 +197,11 @@ router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async 
     });
 
     res.json({ ok: true });
+    return;
   } catch (error) {
     console.error('[users] Error deleting user:', error);
     res.status(500).json({ error: 'delete-failed', message: 'Benutzer konnte nicht gelöscht werden' });
+    return;
   }
 });
 

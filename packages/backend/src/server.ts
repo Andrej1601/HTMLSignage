@@ -6,6 +6,12 @@ import { createServer } from 'http';
 import os from 'os';
 import crypto from 'crypto';
 import { Server as SocketIOServer } from 'socket.io';
+import type {
+  ClientToServerEvents,
+  InterServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from '@htmlsignage/shared/websocket';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -13,6 +19,7 @@ import cookieParser from 'cookie-parser';
 import { prisma } from './lib/prisma.js';
 import { startMaintenanceScheduler, stopMaintenanceScheduler } from './lib/maintenance.js';
 import { setupWebSocket } from './websocket/index.js';
+import { csrfTokensMatch } from './lib/auth.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 import scheduleRouter from './routes/schedule.js';
 import settingsRouter from './routes/settings.js';
@@ -85,10 +92,19 @@ const corsOptions = {
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  // Expose CSRF token + request id to the SPA so the cross-origin frontend
+  // can read them from response headers (document.cookie cannot see cookies
+  // set by a different origin).
+  exposedHeaders: ['X-CSRF-Token', 'X-Request-ID'],
 };
 
-// Socket.IO Setup
-export const io = new SocketIOServer(httpServer, {
+// Socket.IO Setup — typed against the shared event contract.
+export const io = new SocketIOServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>(httpServer, {
   cors: corsOptions,
 });
 
@@ -105,16 +121,18 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// CSRF protection via custom header check for cookie-based auth
+// CSRF protection via Double-Submit-Cookie pattern (timing-safe header == cookie)
 app.use((req, res, next) => {
   const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   if (isMutation && req.cookies?.auth_token) {
-    const csrfToken = req.headers['x-csrf-token'];
-    if (!csrfToken || typeof csrfToken !== 'string' || !csrfToken.trim()) {
-      return res.status(403).json({
-        error: 'csrf-token-missing',
-        message: 'CSRF token required for mutation requests.',
+    const headerToken = req.headers['x-csrf-token'];
+    const cookieToken = req.cookies?.csrf_token;
+    if (!csrfTokensMatch(headerToken, cookieToken)) {
+      res.status(403).json({
+        error: 'csrf-token-invalid',
+        message: 'CSRF token missing or invalid.',
       });
+      return;
     }
   }
   next();
@@ -156,7 +174,7 @@ app.use('/uploads', (req, res, next) => {
   }
   next();
 }, express.static(UPLOAD_DIR, {
-  dotfiles: 'allow',
+  dotfiles: 'deny',
   immutable: true,
   maxAge: '30d',
   setHeaders: (res, filePath) => {
@@ -168,7 +186,7 @@ app.use('/uploads', (req, res, next) => {
 }));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

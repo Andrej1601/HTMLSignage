@@ -230,7 +230,7 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
           type: s.type,
           id: s.id,
           enabled: s.enabled,
-          saunaId: s.saunaId || 'N/A',
+          saunaId: s.type === 'sauna-detail' ? s.saunaId : 'N/A',
           duration: s.duration,
         })),
       };

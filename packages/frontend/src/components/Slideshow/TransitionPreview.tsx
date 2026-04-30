@@ -37,6 +37,7 @@ export function TransitionPreview({ transition }: TransitionPreviewProps) {
       const timer = setTimeout(() => setActive(true), 50);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [active]);
 
   // Replay on click
