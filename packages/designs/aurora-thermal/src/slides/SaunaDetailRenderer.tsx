@@ -22,6 +22,19 @@ type Tokens = SlideRendererProps<'sauna-detail'>['tokens'];
 type Viewport = SlideRendererProps<'sauna-detail'>['context']['viewport'];
 
 /**
+ * Hero / photo-overlay text is conceptually a theatrical light-on-dark
+ * moment regardless of the active theme. The image is darkened to
+ * `brightness(0.55)` and washed with the (dark) `heroOverlay` tint, so
+ * the text on top must always be light. The pack's theme-driven
+ * `textPrimary` flips to dark on light themes (where it correctly reads
+ * as dark-on-light surface text), but in the hero context that produces
+ * dark-on-dark and the title disappears. Use Aurora's signature warm
+ * ivory here — the dark-mode `textPrimary` value, hard-pinned.
+ */
+const PHOTO_TEXT_LIGHT = '#F5E9D7';
+const PHOTO_TEXT_LIGHT_MUTED = 'rgba(245, 233, 215, 0.78)';
+
+/**
  * Aurora Thermal — sauna-detail dispatcher.
  *
  *   split    — image left (3/5) + itinerary right (2/5). The default.
@@ -839,7 +852,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surface,
-        color: colors.textPrimary,
+        color: PHOTO_TEXT_LIGHT,
         fontFamily: typography.fontBody,
       }}
     >
@@ -903,13 +916,14 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
         <h2
           className="truncate"
           style={{
-            color: colors.textPrimary,
+            color: PHOTO_TEXT_LIGHT,
             fontFamily: typography.fontHeading,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.1, viewport, 18)}px`,
             fontWeight: 500,
             lineHeight: 0.95,
             letterSpacing: '-0.02em',
             margin: 0,
+            textShadow: '0 2px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.7)',
           }}
         >
           {data.name}
@@ -921,7 +935,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
                 key={stat.label}
                 label={stat.label}
                 value={stat.value}
-                color={colors.textPrimary}
+                color={PHOTO_TEXT_LIGHT}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -950,7 +964,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
           <span
             className="tabular-nums"
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
+              color: PHOTO_TEXT_LIGHT_MUTED,
               fontFamily: typography.fontMono,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
               letterSpacing: '0.1em',
@@ -964,7 +978,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
           <div
             className="flex flex-1 items-center justify-center"
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
+              color: PHOTO_TEXT_LIGHT_MUTED,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',

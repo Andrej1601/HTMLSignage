@@ -7,6 +7,17 @@ import { AutoScroll } from './AutoScroll';
 import { labelStyles, scaled, scaledFont, withAlpha } from './utils';
 
 /**
+ * Photo-overlay text is conceptually a light-on-dark theatrical moment
+ * regardless of the active theme. The image is darkened by a brightness
+ * filter + dark `heroOverlay` wash, so text on top must always be light.
+ * The pack's `textPrimary` flips to dark on light themes (correct for
+ * UI surfaces, wrong for photo overlays). Pinned to Mineral Noir's
+ * dark-mode brand ivory.
+ */
+const PHOTO_TEXT_LIGHT = '#E6E2D6';
+const PHOTO_TEXT_LIGHT_MUTED = 'rgba(230, 226, 214, 0.75)';
+
+/**
  * Mineral Noir — sauna-detail dispatcher.
  *
  *   split    — image left, upcoming list right (default)
@@ -312,12 +323,12 @@ function SplitVariant({
           <h2
             className="font-black"
             style={{
-              color: colors.textPrimary,
+              color: data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.1, viewport, 16)}px`,
               lineHeight: 0.95,
               letterSpacing: '-0.02em',
-              textShadow: data.imageUrl ? `0 2px 12px ${withAlpha(colors.surface, 0.9)}` : 'none',
+              textShadow: data.imageUrl ? '0 2px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.7)' : 'none',
             }}
           >
             {data.name}
@@ -331,7 +342,7 @@ function SplitVariant({
               <StatCell
                 label="Temperatur"
                 value={`${data.info.temperatureC}°C`}
-                color={colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -340,7 +351,7 @@ function SplitVariant({
               <StatCell
                 label="Feuchte"
                 value={`${data.info.humidityPct}%`}
-                color={colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -349,7 +360,7 @@ function SplitVariant({
               <StatCell
                 label="Plätze"
                 value={String(data.info.capacity)}
-                color={colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -429,7 +440,7 @@ function HeroVariant({
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surface,
-        color: colors.textPrimary,
+        color: PHOTO_TEXT_LIGHT,
         fontFamily: typography.fontBody,
       }}
     >
@@ -476,11 +487,12 @@ function HeroVariant({
         <h2
           className="font-black truncate"
           style={{
-            color: colors.textPrimary,
+            color: PHOTO_TEXT_LIGHT,
             fontFamily: typography.fontHeading,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.25, viewport, 18)}px`,
             lineHeight: 0.95,
             letterSpacing: '-0.02em',
+            textShadow: '0 2px 8px rgba(0,0,0,0.55), 0 1px 2px rgba(0,0,0,0.7)',
           }}
         >
           {data.name}
@@ -490,7 +502,7 @@ function HeroVariant({
             <StatCell
               label="Temperatur"
               value={`${data.info.temperatureC}°C`}
-              color={colors.textPrimary}
+              color={PHOTO_TEXT_LIGHT}
               tokens={tokens}
               viewport={viewport}
             />
@@ -499,7 +511,7 @@ function HeroVariant({
             <StatCell
               label="Feuchte"
               value={`${data.info.humidityPct}%`}
-              color={colors.textPrimary}
+              color={PHOTO_TEXT_LIGHT}
               tokens={tokens}
               viewport={viewport}
             />
@@ -508,7 +520,7 @@ function HeroVariant({
             <StatCell
               label="Plätze"
               value={String(data.info.capacity)}
-              color={colors.textPrimary}
+              color={PHOTO_TEXT_LIGHT}
               tokens={tokens}
               viewport={viewport}
             />
@@ -531,7 +543,7 @@ function HeroVariant({
           <span
             className="tabular-nums"
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
+              color: PHOTO_TEXT_LIGHT_MUTED,
               fontFamily: typography.fontMono,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9)}px`,
               letterSpacing: '0.1em',
@@ -545,7 +557,7 @@ function HeroVariant({
           <div
             className="flex flex-1 items-center justify-center"
             style={{
-              color: withAlpha(colors.textSecondary, 0.85),
+              color: PHOTO_TEXT_LIGHT_MUTED,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 11)}px`,
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
@@ -727,27 +739,31 @@ function PortraitVariant({
         fontFamily: typography.fontBody,
       }}
     >
-      <div className="relative" style={{ flex: '0 0 38%', overflow: 'hidden' }}>
+      <div className="relative" style={{ flex: '0 0 42%', overflow: 'hidden' }}>
         {data.imageUrl ? (
           <img
             src={data.imageUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ filter: 'saturate(0.85) brightness(0.72)' }}
+            style={{ filter: 'saturate(0.85) brightness(0.78)' }}
           />
         ) : (
           <div className="absolute inset-0" style={{ backgroundColor: colors.surfaceElevated }} />
         )}
+        {/* Smooth surface fade — anchors at fully-opaque `surface` so the
+            image strip blends into the data panel below without a visible
+            seam. Multi-stop curve avoids the previous hard edge that
+            appeared where 0.95 alpha met the 1.0 panel. */}
         <div
           className="absolute inset-x-0 bottom-0"
           style={{
-            height: '60%',
-            background: `linear-gradient(to top, ${withAlpha(colors.surface, 0.95)} 0%, ${withAlpha(colors.surface, 0.2)} 100%)`,
+            height: '78%',
+            background: `linear-gradient(to top, ${colors.surface} 0%, ${withAlpha(colors.surface, 0.92)} 22%, ${withAlpha(colors.surface, 0.55)} 55%, ${withAlpha(colors.surface, 0.15)} 80%, ${withAlpha(colors.surface, 0)} 100%)`,
           }}
         />
         <div
           className="relative z-10 flex h-full flex-col justify-end"
-          style={{ padding: `${pad}px`, gap: scaled(8, viewport, 3) }}
+          style={{ padding: `${pad}px`, gap: scaled(6, viewport, 2) }}
         >
           <span style={labelStyles(accent, scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 9))}>
             Sauna
@@ -765,6 +781,48 @@ function PortraitVariant({
           >
             {data.name}
           </h2>
+          {/* Compact inline stats — sits under the title inside the image
+              area so the data panel below has the full vertical budget
+              for the upcoming-list. */}
+          {(data.info.temperatureC != null || data.info.humidityPct != null || data.info.capacity != null) ? (
+            <div
+              className="flex flex-wrap items-baseline tabular-nums"
+              style={{
+                gap: `${scaled(2, viewport, 1)}px ${scaled(14, viewport, 5)}px`,
+                marginTop: scaled(4, viewport, 1),
+                color: colors.textPrimary,
+                fontFamily: typography.fontMono,
+                fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+              }}
+            >
+              {data.info.temperatureC != null ? (
+                <span>
+                  {data.info.temperatureC}°C
+                  <span style={{ color: withAlpha(colors.textSecondary, 0.85), marginLeft: scaled(4, viewport, 1), fontSize: '0.78em', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+                    Temp
+                  </span>
+                </span>
+              ) : null}
+              {data.info.humidityPct != null ? (
+                <span>
+                  {data.info.humidityPct}%
+                  <span style={{ color: withAlpha(colors.textSecondary, 0.85), marginLeft: scaled(4, viewport, 1), fontSize: '0.78em', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+                    Feuchte
+                  </span>
+                </span>
+              ) : null}
+              {data.info.capacity != null ? (
+                <span>
+                  {data.info.capacity}
+                  <span style={{ color: withAlpha(colors.textSecondary, 0.85), marginLeft: scaled(4, viewport, 1), fontSize: '0.78em', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+                    Plätze
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -772,40 +830,6 @@ function PortraitVariant({
         className="flex min-h-0 flex-1 flex-col"
         style={{ padding: `${pad}px`, gap: scaled(14, viewport, 5) }}
       >
-        {/* Stats strip */}
-        <div
-          className="flex flex-wrap shrink-0"
-          style={{ gap: scaled(22, viewport, 8) }}
-        >
-          {data.info.temperatureC != null ? (
-            <StatCell
-              label="Temperatur"
-              value={`${data.info.temperatureC}°C`}
-              color={colors.textPrimary}
-              tokens={tokens}
-              viewport={viewport}
-            />
-          ) : null}
-          {data.info.humidityPct != null ? (
-            <StatCell
-              label="Feuchte"
-              value={`${data.info.humidityPct}%`}
-              color={colors.textPrimary}
-              tokens={tokens}
-              viewport={viewport}
-            />
-          ) : null}
-          {data.info.capacity != null ? (
-            <StatCell
-              label="Plätze"
-              value={String(data.info.capacity)}
-              color={colors.textPrimary}
-              tokens={tokens}
-              viewport={viewport}
-            />
-          ) : null}
-        </div>
-
         <div className="flex items-baseline justify-between shrink-0">
           <span style={labelStyles(colors.accentPrimary, scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10))}>
             Aufgussplan

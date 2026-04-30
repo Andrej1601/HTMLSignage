@@ -40,11 +40,15 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
           />
+          {/* Stronger uniform darken so the title/body keep contrast on
+              both bright (sunny wood) and dark photo backgrounds — the
+              previous gradient left the top only 15 % darkened, which
+              washed out white text on light-toned images. */}
           <div
             className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 65%, rgba(0,0,0,0.75) 100%)',
+                'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.78) 100%)',
             }}
           />
         </>
@@ -81,8 +85,19 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
               style={{
                 fontSize: `${titleSize}px`,
                 letterSpacing: '0.2em',
-                color: hasBackgroundImage ? colors.textInverse : colors.accentPrimary,
+                // Side/none modes paint over the light tan surface, so
+                // accentPrimary (also tan) had near-zero contrast. Use
+                // textPrimary instead for a proper read.
+                // Always white over the darkened photo gradient — the
+                // theme's `textInverse` flips to dark on light surfaces
+                // (it's intended for filled accent backgrounds, not for
+                // photo overlays), which made the title invisible on
+                // light themes paired with dark photos.
+                color: hasBackgroundImage ? '#FFFFFF' : colors.textPrimary,
                 marginBottom: `${scaled(16, viewport, 4)}px`,
+                textShadow: hasBackgroundImage
+                  ? '0 2px 6px rgba(0,0,0,0.7), 0 1px 2px rgba(0,0,0,0.85)'
+                  : undefined,
               }}
             >
               {data.title}
@@ -94,7 +109,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
                   fontSize: `${bodySize}px`,
                   lineHeight: 1.5,
                   color: hasBackgroundImage
-                    ? 'rgba(255, 255, 255, 0.92)'
+                    ? 'rgba(255, 255, 255, 0.95)'
                     : colors.textSecondary,
                   borderLeft: `4px solid ${
                     hasBackgroundImage
@@ -103,6 +118,9 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
                   }`,
                   paddingLeft: `${scaled(16, viewport, 6)}px`,
                   margin: 0,
+                  textShadow: hasBackgroundImage
+                    ? '0 1px 4px rgba(0,0,0,0.7)'
+                    : undefined,
                 }}
               >
                 {data.text}

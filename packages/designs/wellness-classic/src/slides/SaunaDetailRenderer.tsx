@@ -8,6 +8,17 @@ import { AutoScroll } from './AutoScroll';
 import { scaled, scaledFont } from './responsive';
 
 /**
+ * Text drawn over a darkened photo overlay must always be light,
+ * regardless of the active theme's `textInverse`. The theme's
+ * `textInverse` is sized for filled accent backgrounds (where a light
+ * surface flips it to dark), which is the wrong behaviour for
+ * photo-overlay text where the dark gradient wash is the actual
+ * background. Use a hard white here so light themes don't render
+ * unreadable dark-on-dark text in the hero.
+ */
+const PHOTO_TEXT_LIGHT = '#FFFFFF';
+
+/**
  * Inline SVG flame — closed path (Lucide-shape). The previous version
  * used an open path which the browser rendered as a half-crescent.
  */
@@ -350,7 +361,7 @@ function SplitVariant({
             className="inline-flex items-center font-black uppercase"
             style={{
               alignSelf: 'flex-start',
-              color: data.imageUrl ? colors.textInverse : colors.textPrimary,
+              color: data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary,
               backgroundColor: withAlpha(accent, data.imageUrl ? 0.85 : 0.15),
               padding: `${scaled(4, viewport, 2)}px ${scaled(12, viewport, 4)}px`,
               borderRadius: `${radius.pill}px`,
@@ -364,7 +375,7 @@ function SplitVariant({
           <h2
             className="font-black"
             style={{
-              color: data.imageUrl ? colors.textInverse : colors.textPrimary,
+              color: data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(
                 typography.baseSizePx * typography.scale3xl * 1.25,
@@ -385,7 +396,7 @@ function SplitVariant({
                   key={idx}
                   className="font-semibold"
                   style={{
-                    color: data.imageUrl ? colors.textInverse : colors.textPrimary,
+                    color: data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary,
                     backgroundColor: withAlpha(
                       data.imageUrl ? colors.surfaceElevated : accent,
                       data.imageUrl ? 0.2 : 0.15,
@@ -410,7 +421,7 @@ function SplitVariant({
               <Stat
                 label="Temperatur"
                 value={`${data.info.temperatureC}°C`}
-                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -419,7 +430,7 @@ function SplitVariant({
               <Stat
                 label="Feuchte"
                 value={`${data.info.humidityPct}%`}
-                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -428,7 +439,7 @@ function SplitVariant({
               <Stat
                 label="Plätze"
                 value={String(data.info.capacity)}
-                color={data.imageUrl ? colors.textInverse : colors.textPrimary}
+                color={data.imageUrl ? PHOTO_TEXT_LIGHT : colors.textPrimary}
                 tokens={tokens}
                 viewport={viewport}
               />
@@ -556,7 +567,7 @@ function HeroVariant({
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surface,
-        color: colors.textInverse,
+        color: PHOTO_TEXT_LIGHT,
         fontFamily: typography.fontBody,
       }}
     >
@@ -632,7 +643,7 @@ function HeroVariant({
         <h2
           className="font-black truncate"
           style={{
-            color: colors.textInverse,
+            color: PHOTO_TEXT_LIGHT,
             fontFamily: typography.fontHeading,
             fontSize: `${scaledFont(
               typography.baseSizePx * typography.scale3xl * 1.1,
@@ -641,6 +652,7 @@ function HeroVariant({
             )}px`,
             lineHeight: 0.95,
             letterSpacing: '-0.02em',
+            textShadow: `0 2px 6px ${withAlpha(colors.textPrimary, 0.7)}, 0 1px 2px ${withAlpha(colors.textPrimary, 0.85)}`,
           }}
         >
           {data.name}
@@ -691,7 +703,7 @@ function HeroVariant({
           <span
             className="font-black uppercase"
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontSize: `${scaledFont(
                 typography.baseSizePx * typography.scaleSm * 0.9,
                 viewport,
@@ -706,7 +718,7 @@ function HeroVariant({
           <span
             className="font-semibold"
             style={{
-              color: withAlpha(colors.textInverse, 0.85),
+              color: withAlpha(PHOTO_TEXT_LIGHT, 0.85),
               fontSize: `${scaledFont(
                 typography.baseSizePx * typography.scaleSm * 0.85,
                 viewport,
@@ -726,8 +738,8 @@ function HeroVariant({
               backgroundColor: withAlpha(colors.surface, 0.4),
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
-              border: `1px solid ${withAlpha(colors.textInverse, 0.2)}`,
-              color: colors.textInverse,
+              border: `1px solid ${withAlpha(PHOTO_TEXT_LIGHT, 0.2)}`,
+              color: PHOTO_TEXT_LIGHT,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleBase, viewport, 10)}px`,
               fontWeight: 700,
             }}
@@ -772,16 +784,18 @@ function HeroInfusionTile({
   const isFinished = entry.isFinished;
 
   // Glassmorphism with stronger contrast: darker glass base + deeper
-  // colour tint on status rows so tiles read clearly on any photo.
+  // colour tint on status rows so tiles read clearly on any photo —
+  // including bright wood / sand sauna interiors where lighter alphas
+  // produce muddy mid-tones that wash out the white text.
   const bg = isLive
-    ? withAlpha(colors.statusLive, 0.55)
+    ? withAlpha(colors.statusLive, 0.7)
     : isPre
-      ? withAlpha(colors.statusWarning, 0.5)
+      ? withAlpha(colors.statusWarning, 0.68)
       : isNext
-        ? withAlpha(colors.statusNext, 0.5)
+        ? withAlpha(colors.statusNext, 0.68)
         : isFinished
-          ? withAlpha(colors.textPrimary, 0.45)
-          : withAlpha(colors.textPrimary, 0.55);
+          ? withAlpha(colors.textPrimary, 0.62)
+          : withAlpha(colors.textPrimary, 0.72);
 
   const border = isLive
     ? withAlpha(colors.statusLive, 0.9)
@@ -789,7 +803,7 @@ function HeroInfusionTile({
       ? withAlpha(colors.statusWarning, 0.75)
       : isNext
         ? withAlpha(colors.statusNext, 0.75)
-        : withAlpha(colors.textInverse, 0.3);
+        : withAlpha(PHOTO_TEXT_LIGHT, 0.3);
 
   const leftBar = isLive
     ? colors.statusLive
@@ -800,20 +814,20 @@ function HeroInfusionTile({
         : accent;
 
   const timeColor = isLive
-    ? colors.textInverse
+    ? PHOTO_TEXT_LIGHT
     : isPre || isNext
-      ? colors.textInverse
+      ? PHOTO_TEXT_LIGHT
       : isFinished
-        ? withAlpha(colors.textInverse, 0.55)
-        : colors.textInverse;
-  const titleColor = isFinished ? withAlpha(colors.textInverse, 0.6) : colors.textInverse;
+        ? withAlpha(PHOTO_TEXT_LIGHT, 0.55)
+        : PHOTO_TEXT_LIGHT;
+  const titleColor = isFinished ? withAlpha(PHOTO_TEXT_LIGHT, 0.6) : PHOTO_TEXT_LIGHT;
 
   const flameActive = isFinished
-    ? withAlpha(colors.textInverse, 0.35)
+    ? withAlpha(PHOTO_TEXT_LIGHT, 0.35)
     : isLive || isPre || isNext
-      ? colors.textInverse
+      ? PHOTO_TEXT_LIGHT
       : accent;
-  const flameIdle = withAlpha(colors.textInverse, 0.2);
+  const flameIdle = withAlpha(PHOTO_TEXT_LIGHT, 0.2);
 
   const badge = isLive
     ? { label: 'LÄUFT', color: colors.statusLive }
@@ -822,7 +836,7 @@ function HeroInfusionTile({
       : isNext
         ? { label: 'GLEICH', color: colors.statusNext }
         : isFinished
-          ? { label: 'VORBEI', color: withAlpha(colors.textInverse, 0.4) }
+          ? { label: 'VORBEI', color: withAlpha(PHOTO_TEXT_LIGHT, 0.4) }
           : null;
 
   const hasAromas = (entry.aromas?.length ?? 0) > 0;
@@ -844,8 +858,7 @@ function HeroInfusionTile({
         padding: `${scaled(14, viewport, 6)}px ${scaled(18, viewport, 7)}px`,
         gap: `${scaled(8, viewport, 3)}px`,
         opacity: isFinished ? 0.82 : 1,
-        boxShadow: `0 10px 28px ${withAlpha(colors.textPrimary, 0.45)}`,
-        color: colors.textInverse,
+        color: PHOTO_TEXT_LIGHT,
       }}
     >
       {/* Row 1 */}
@@ -908,13 +921,13 @@ function HeroInfusionTile({
                   key={aroma.id}
                   className="inline-flex items-center font-bold uppercase"
                   style={{
-                    color: colors.textInverse,
+                    color: PHOTO_TEXT_LIGHT,
                     backgroundColor: withAlpha(
-                      aroma.color ?? colors.textInverse,
+                      aroma.color ?? PHOTO_TEXT_LIGHT,
                       0.28,
                     ),
                     border: `1px solid ${withAlpha(
-                      aroma.color ?? colors.textInverse,
+                      aroma.color ?? PHOTO_TEXT_LIGHT,
                       0.55,
                     )}`,
                     borderRadius: `${radius.pill}px`,
@@ -980,11 +993,11 @@ function HeroChip({
       className="inline-flex items-baseline"
       style={{
         backgroundColor: withAlpha(colors.surface, 0.25),
-        border: `1px solid ${withAlpha(colors.textInverse, 0.35)}`,
+        border: `1px solid ${withAlpha(PHOTO_TEXT_LIGHT, 0.35)}`,
         borderRadius: `${radius.pill}px`,
         padding: `${scaled(5, viewport, 2)}px ${scaled(14, viewport, 5)}px`,
         gap: `${scaled(6, viewport, 2)}px`,
-        color: colors.textInverse,
+        color: PHOTO_TEXT_LIGHT,
       }}
     >
       <span
@@ -1102,7 +1115,7 @@ function PortraitVariant({
           <h2
             className="font-black"
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(
                 typography.baseSizePx * typography.scale2xl * 1.15,

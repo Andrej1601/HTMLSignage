@@ -15,6 +15,15 @@ import {
 } from './utils';
 
 /**
+ * Photo-overlay text is conceptually a light-on-dark moment regardless
+ * of the active theme. The pack's `textInverse` flips to dark on light
+ * themes (correct for filled accent badges, wrong for photo overlays),
+ * so we pin a brand-appropriate ivory here. Matches Editorial Resort's
+ * dark-mode `textInverse` value.
+ */
+const PHOTO_TEXT_LIGHT = '#FAF4E8';
+
+/**
  * Editorial Resort — sauna-detail dispatcher.
  *
  *   split    — magazine spread (image left, itinerary right)
@@ -386,7 +395,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
         >
           <span
             style={kickerStyles(
-              colors.textInverse,
+              PHOTO_TEXT_LIGHT,
               scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
             )}
           >
@@ -394,7 +403,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
           </span>
           <h2
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.2, viewport, 20)}px`,
               fontWeight: 600,
@@ -409,7 +418,7 @@ function SplitVariant({ data, tokens, context }: SlideRendererProps<'sauna-detai
           {data.description ? (
             <p
               style={{
-                color: withAlpha(colors.textInverse, 0.92),
+                color: withAlpha(PHOTO_TEXT_LIGHT, 0.92),
                 fontFamily: typography.fontHeading,
                 fontStyle: 'italic',
                 fontSize: `${scaledFont(typography.baseSizePx * typography.scaleXl, viewport, 13)}px`,
@@ -545,7 +554,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
       className="relative flex h-full w-full flex-col overflow-hidden"
       style={{
         backgroundColor: colors.surface,
-        color: colors.textInverse,
+        color: PHOTO_TEXT_LIGHT,
         fontFamily: typography.fontBody,
       }}
     >
@@ -583,7 +592,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
       >
         <span
           style={kickerStyles(
-            colors.textInverse,
+            PHOTO_TEXT_LIGHT,
             scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
           )}
         >
@@ -592,7 +601,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
         <h2
           className="truncate"
           style={{
-            color: colors.textInverse,
+            color: PHOTO_TEXT_LIGHT,
             fontFamily: typography.fontHeading,
             fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.35, viewport, 22)}px`,
             fontWeight: 600,
@@ -605,17 +614,17 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
           {data.name}
         </h2>
         <div
-          style={{ height: 1, backgroundColor: withAlpha(colors.textInverse, 0.65), width: scaled(96, viewport, 44) }}
+          style={{ height: 1, backgroundColor: withAlpha(PHOTO_TEXT_LIGHT, 0.65), width: scaled(96, viewport, 44) }}
         />
         <div className="flex flex-wrap" style={{ gap: scaled(24, viewport, 8) }}>
           {data.info.temperatureC != null ? (
-            <StatCell label="Temperatur" value={`${data.info.temperatureC}°C`} color={colors.textInverse} tokens={tokens} viewport={viewport} />
+            <StatCell label="Temperatur" value={`${data.info.temperatureC}°C`} color={PHOTO_TEXT_LIGHT} tokens={tokens} viewport={viewport} />
           ) : null}
           {data.info.humidityPct != null ? (
-            <StatCell label="Feuchte" value={`${data.info.humidityPct}%`} color={colors.textInverse} tokens={tokens} viewport={viewport} />
+            <StatCell label="Feuchte" value={`${data.info.humidityPct}%`} color={PHOTO_TEXT_LIGHT} tokens={tokens} viewport={viewport} />
           ) : null}
           {data.info.capacity != null ? (
-            <StatCell label="Plätze" value={String(data.info.capacity)} color={colors.textInverse} tokens={tokens} viewport={viewport} />
+            <StatCell label="Plätze" value={String(data.info.capacity)} color={PHOTO_TEXT_LIGHT} tokens={tokens} viewport={viewport} />
           ) : null}
         </div>
       </div>
@@ -644,7 +653,7 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
             className="tabular-nums"
             style={{
               ...eyebrowStyles(
-                withAlpha(colors.textInverse, 0.92),
+                withAlpha(PHOTO_TEXT_LIGHT, 0.92),
                 scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 10),
                 typography.fontHeading,
               ),
@@ -659,14 +668,14 @@ function HeroVariant({ data, tokens, context }: SlideRendererProps<'sauna-detail
           <div
             className="flex flex-1 items-center justify-center"
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontFamily: typography.fontHeading,
               fontStyle: 'italic',
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
               backgroundColor: withAlpha(colors.surface, 0.3),
               backdropFilter: 'blur(12px) saturate(140%)',
               WebkitBackdropFilter: 'blur(12px) saturate(140%)',
-              border: `1px solid ${withAlpha(colors.textInverse, 0.25)}`,
+              border: `1px solid ${withAlpha(PHOTO_TEXT_LIGHT, 0.25)}`,
               borderRadius: radius.md,
             }}
           >
@@ -847,7 +856,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           <span
             style={{
               ...kickerStyles(
-                colors.textInverse,
+                PHOTO_TEXT_LIGHT,
                 scaledFont(typography.baseSizePx * typography.scaleSm * 0.95, viewport, 9),
               ),
               textShadow: `0 1px 6px ${withAlpha(colors.textPrimary, 0.6)}`,
@@ -858,7 +867,7 @@ function PortraitVariant({ data, tokens, context }: SlideRendererProps<'sauna-de
           <h2
             className="truncate"
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scale2xl * 1.1, viewport, 16)}px`,
               fontWeight: 600,

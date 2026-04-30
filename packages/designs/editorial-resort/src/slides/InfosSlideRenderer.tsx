@@ -7,6 +7,9 @@ import {
   withAlpha,
 } from './utils';
 
+/** Photo-overlay text — see SaunaDetailRenderer for rationale. */
+const PHOTO_TEXT_LIGHT = '#FAF4E8';
+
 /**
  * Editorial Resort — infos renderer.
  *
@@ -27,7 +30,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
         className="relative flex h-full w-full flex-col justify-end overflow-hidden"
         style={{
           backgroundColor: colors.surface,
-          color: colors.textInverse,
+          color: PHOTO_TEXT_LIGHT,
           fontFamily: typography.fontBody,
         }}
       >
@@ -54,7 +57,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           <span
             style={{
               ...kickerStyles(
-                colors.textInverse,
+                PHOTO_TEXT_LIGHT,
                 scaledFont(typography.baseSizePx * typography.scaleSm, viewport, 10),
               ),
               textShadow: `0 1px 6px ${withAlpha(colors.textPrimary, 0.6)}`,
@@ -64,7 +67,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           </span>
           <h2
             style={{
-              color: colors.textInverse,
+              color: PHOTO_TEXT_LIGHT,
               fontFamily: typography.fontHeading,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scale3xl * 1.25, viewport, 22)}px`,
               fontWeight: 600,
@@ -85,7 +88,7 @@ export function InfosSlideRenderer({ data, tokens, context }: SlideRendererProps
           />
           <p
             style={{
-              color: withAlpha(colors.textInverse, 0.94),
+              color: withAlpha(PHOTO_TEXT_LIGHT, 0.94),
               fontFamily: typography.fontBody,
               fontSize: `${scaledFont(typography.baseSizePx * typography.scaleLg, viewport, 12)}px`,
               lineHeight: 1.55,
