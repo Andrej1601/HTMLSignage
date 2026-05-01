@@ -41,6 +41,9 @@ import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
+import { StaleVersionBanner } from '@/components/StaleVersionBanner';
+import { VersionConflictDialog } from '@/components/VersionConflictDialog';
+import { extractVersionConflict } from '@/utils/versionConflict';
 
 type TabId = 'theme' | 'audio' | 'maintenance' | 'aromas' | 'infos' | 'events' | 'system';
 
@@ -80,12 +83,61 @@ export function SettingsPage() {
   };
 
   const [prevSettingsVersion, setPrevSettingsVersion] = useState<number | null>(null);
+  const [staleDismissedForVersion, setStaleDismissedForVersion] = useState<number | null>(null);
   const settingsVersion = settings?.version ?? null;
   if (settingsVersion !== prevSettingsVersion && settings && !isDirty && !draftState.hasStoredDraft) {
     setPrevSettingsVersion(settingsVersion);
     setLocalSettings(settings);
     setIsDirty(false);
   }
+
+  // Stale-Detection: anderer Admin hat parallel gespeichert, während wir
+  // dirty sind. `prevSettingsVersion` ist immer der zuletzt geladene
+  // Server-Stand, `localSettings.version` der Bearbeitungs-Stand.
+  const localVersion = localSettings?.version ?? null;
+  const isStale =
+    isDirty &&
+    typeof settingsVersion === 'number' &&
+    typeof localVersion === 'number' &&
+    settingsVersion > localVersion &&
+    staleDismissedForVersion !== settingsVersion;
+
+  // Versionskonflikt-State: wird gefüllt, sobald `save` mit 409 abgelehnt
+  // wurde. Der Dialog bleibt offen, bis der User aktiv eine Lösung wählt.
+  const [conflictInfo, setConflictInfo] = useState<{ latestVersion: number | null } | null>(null);
+  const [isForcingSave, setIsForcingSave] = useState(false);
+
+  // Liste der grob geänderten Bereiche — für die Anzeige im Dialog,
+  // damit der User sieht, was er gleich verlieren würde, falls er den
+  // Server-Stand übernimmt. Heuristik: Vergleich der Top-Level-Keys
+  // zwischen Live- und Local-Settings via JSON-Stringify.
+  const changedAreas = useMemo<string[]>(() => {
+    if (!settings || !localSettings) return [];
+    const labels: Record<string, string> = {
+      theme: 'Farben & Theme',
+      colorPalette: 'Farbpalette',
+      designStyle: 'Design-Stil',
+      displayAppearance: 'Display-Erscheinung',
+      display: 'Display-Settings',
+      audio: 'Audio',
+      saunas: 'Saunen',
+      aromas: 'Aromen',
+      infos: 'Infos',
+      events: 'Events',
+      header: 'Kopfzeile',
+      maintenanceScreen: 'Wartungsscreen',
+      saunaDetailStyle: 'Sauna-Detail-Style',
+    };
+    const result: string[] = [];
+    const serverRecord = settings as unknown as Record<string, unknown>;
+    const localRecord = localSettings as unknown as Record<string, unknown>;
+    for (const [key, label] of Object.entries(labels)) {
+      const a = serverRecord[key];
+      const b = localRecord[key];
+      if (JSON.stringify(a) !== JSON.stringify(b)) result.push(label);
+    }
+    return result;
+  }, [settings, localSettings]);
 
   const updateField = <K extends keyof Settings>(key: K, value: Settings[K]) => {
     setLocalSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -113,10 +165,68 @@ export function SettingsPage() {
         toast.success(`Einstellungen gespeichert (v${response?.version ?? settingsToSave.version}).`);
       },
       onError: (err) => {
+        const conflict = extractVersionConflict(err);
+        if (conflict) {
+          // 409 → reichhaltigen Dialog statt Toast
+          setConflictInfo({ latestVersion: conflict.latestVersion });
+          return;
+        }
         toast.error(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
       },
     });
   }, [localSettings, save, draftState]);
+
+  // "Server-Stand übernehmen": lokale Änderungen verwerfen, Live-Daten
+  // laden — die useSettings-Query wird via refetch() aktualisiert.
+  const handleAcceptServer = useCallback(() => {
+    setConflictInfo(null);
+    draftState.clearDraft();
+    setIsDirty(false);
+    if (settings) {
+      setLocalSettings(settings);
+      setPrevSettingsVersion(settings.version ?? null);
+    }
+    refetch();
+    setStaleDismissedForVersion(null);
+    toast.info('Server-Stand übernommen. Lokale Änderungen wurden verworfen.');
+  }, [settings, refetch, draftState]);
+
+  // "Erzwingen": baut den Save erneut, diesmal mit `latestVersion + 1`
+  // als Versionsfeld. Damit überschreibt der User bewusst die parallele
+  // Server-Änderung.
+  const handleForceSave = useCallback(() => {
+    if (!localSettings || !conflictInfo?.latestVersion) return;
+    setIsForcingSave(true);
+    const forced = {
+      ...localSettings,
+      version: conflictInfo.latestVersion + 1,
+    };
+    save(forced, {
+      onSuccess: (response) => {
+        setIsForcingSave(false);
+        setConflictInfo(null);
+        draftState.clearDraft();
+        setIsDirty(false);
+        // Lokale Versionsnummer hochziehen, damit die Stale-Erkennung
+        // nicht sofort wieder anschlägt.
+        setLocalSettings((prev) => prev ? { ...prev, version: response?.version ?? forced.version } : prev);
+        setPrevSettingsVersion(response?.version ?? forced.version);
+        toast.success(`Einstellungen erzwungen gespeichert (v${response?.version ?? forced.version}).`);
+      },
+      onError: (err) => {
+        setIsForcingSave(false);
+        // Bei erneuten 409 (sehr unwahrscheinlich): Dialog mit neuer
+        // latestVersion aktualisieren statt zu schließen.
+        const conflict = extractVersionConflict(err);
+        if (conflict) {
+          setConflictInfo({ latestVersion: conflict.latestVersion });
+          toast.warning('Während des Erzwingens hat jemand erneut gespeichert.');
+          return;
+        }
+        toast.error(err instanceof Error ? err.message : 'Erzwingen fehlgeschlagen.');
+      },
+    });
+  }, [localSettings, conflictInfo, save, draftState]);
 
   useSaveShortcut(handleSave, { enabled: !isSaving, isDirty });
 
@@ -124,9 +234,11 @@ export function SettingsPage() {
     draftState.clearDraft();
     if (settings) {
       setLocalSettings(settings);
+      setPrevSettingsVersion(settings.version ?? null);
     }
     refetch();
     setIsDirty(false);
+    setStaleDismissedForVersion(null);
   };
 
   const handleRestoreDraft = () => {
@@ -276,6 +388,16 @@ export function SettingsPage() {
             updatedAt={draftState.draftUpdatedAt}
             onRestore={handleRestoreDraft}
             onDiscard={handleDiscardDraft}
+          />
+        )}
+
+        {isStale && (
+          <StaleVersionBanner
+            entityLabel="Einstellungen"
+            serverVersion={settingsVersion}
+            localVersion={localVersion}
+            onReload={handleReload}
+            onDismiss={() => setStaleDismissedForVersion(settingsVersion)}
           />
         )}
 
@@ -442,6 +564,19 @@ export function SettingsPage() {
         variant="warning"
         onConfirm={unsavedGuard.proceed}
         onCancel={unsavedGuard.reset}
+      />
+
+      {/* Versionskonflikt-Dialog */}
+      <VersionConflictDialog
+        isOpen={conflictInfo !== null}
+        entityLabel="Einstellungen"
+        localVersion={localVersion}
+        serverVersion={conflictInfo?.latestVersion ?? settingsVersion}
+        changedAreas={changedAreas}
+        onClose={() => setConflictInfo(null)}
+        onAcceptServer={handleAcceptServer}
+        onForceSave={conflictInfo?.latestVersion != null ? handleForceSave : undefined}
+        isForcing={isForcingSave}
       />
 
       {/* Tab-switch guard */}

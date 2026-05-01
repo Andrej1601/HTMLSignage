@@ -1,17 +1,26 @@
 import { useState } from 'react';
-import { MoreVertical, Trash2, Download, Music, Copy, Tags, Link2, Play } from 'lucide-react';
+import { MoreVertical, Trash2, Download, Music, Copy, Tags, Link2, Play, Check } from 'lucide-react';
 import type { Media } from '@/types/media.types';
 import { formatFileSize } from '@/types/media.types';
 import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 import { formatRelativeTime } from '@/utils/dateUtils';
+import clsx from 'clsx';
 
 interface MediaCardProps {
   media: Media;
   onDelete: (media: Media) => void;
   onEditTags?: (media: Media) => void;
   usageSummary?: string[];
+  /** Wenn gesetzt, ist die Karte in Multi-Select-Mode. */
+  isSelected?: boolean;
+  onToggleSelect?: (media: Media) => void;
+  /**
+   * Wenn `true`, ist mindestens eine Auswahl aktiv — Klick auf die Karte
+   * toggelt dann selbst, statt die normale Kachel-Aktion auszulösen.
+   */
+  selectionActive?: boolean;
 }
 
 const typeBadgeStyles: Record<string, string> = {
@@ -26,7 +35,15 @@ const typeLabels: Record<string, string> = {
   audio: 'AUDIO',
 };
 
-export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCardProps) {
+export function MediaCard({
+  media,
+  onDelete,
+  onEditTags,
+  usageSummary,
+  isSelected = false,
+  onToggleSelect,
+  selectionActive = false,
+}: MediaCardProps) {
   const [copied, setCopied] = useState(false);
   const mediaUrl = toAbsoluteMediaUrl(media.url);
   const { summary: mediaSummary } = useMediaMetadata(mediaUrl, media.type);
@@ -41,8 +58,39 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
     window.open(mediaUrl, '_blank');
   };
 
+  const supportsSelection = Boolean(onToggleSelect);
+  // Wenn die Auswahl aktiv ist, wird die ganze Karte zur Toggle-Fläche.
+  // Sonst (kein Selektion-Mode) bleibt sie ein passiver Container —
+  // Hover-Aktionen funktionieren wie gewohnt.
+  const handleCardClick = () => {
+    if (supportsSelection && (selectionActive || isSelected) && onToggleSelect) {
+      onToggleSelect(media);
+    }
+  };
+
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!supportsSelection || (!selectionActive && !isSelected)) return;
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      onToggleSelect?.(media);
+    }
+  };
+
   return (
-    <div className="group overflow-hidden rounded-2xl border border-spa-bg-secondary bg-spa-surface shadow-xs transition-all hover:shadow-md">
+    <div
+      className={clsx(
+        'group overflow-hidden rounded-2xl border bg-spa-surface shadow-xs transition-all hover:shadow-md',
+        isSelected
+          ? 'border-spa-primary ring-2 ring-spa-primary/40'
+          : 'border-spa-bg-secondary',
+        supportsSelection && (selectionActive || isSelected) && 'cursor-pointer',
+      )}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role={supportsSelection && (selectionActive || isSelected) ? 'button' : undefined}
+      aria-pressed={supportsSelection && (selectionActive || isSelected) ? isSelected : undefined}
+      tabIndex={supportsSelection && (selectionActive || isSelected) ? 0 : undefined}
+    >
       {/* Thumbnail */}
       <div className="relative aspect-[4/3] bg-spa-bg-primary">
         {media.type === 'image' ? (
@@ -73,13 +121,43 @@ export function MediaCard({ media, onDelete, onEditTags, usageSummary }: MediaCa
           </div>
         )}
 
+        {/* Selection Checkbox (immer sichtbar wenn Auswahl unterstützt + aktiv) */}
+        {supportsSelection && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.(media);
+            }}
+            aria-label={isSelected ? `${media.originalName} abwählen` : `${media.originalName} auswählen`}
+            aria-pressed={isSelected}
+            className={clsx(
+              'absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all z-10',
+              isSelected
+                ? 'border-spa-primary bg-spa-primary text-white opacity-100'
+                : 'border-spa-surface bg-spa-surface/80 text-transparent opacity-0 group-hover:opacity-100 hover:border-spa-primary',
+            )}
+          >
+            <Check className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+
         {/* Type Badge */}
-        <span className={`absolute top-2.5 left-2.5 rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide ${typeBadgeStyles[media.type] || typeBadgeStyles.image}`}>
+        <span
+          className={clsx(
+            'absolute rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wide',
+            supportsSelection ? 'top-2.5 left-10' : 'top-2.5 left-2.5',
+            typeBadgeStyles[media.type] || typeBadgeStyles.image,
+          )}
+        >
           {typeLabels[media.type] || 'FILE'}
         </span>
 
         {/* Menu (visible on hover) */}
-        <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
           <DropdownMenu
             ariaLabel="Medien-Aktionen"
             width="w-48"

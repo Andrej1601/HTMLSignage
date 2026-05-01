@@ -23,6 +23,12 @@ export interface DeviceSlideshowRow {
   slideCount: number;
   lastSeen: string | null;
   isOnline: boolean;
+  /** Wartungsmodus aktiv — Anzeigeflag für die Gerät-Übersicht. */
+  maintenanceMode: boolean;
+  /** Gruppen-Label für Sortierung/Anzeige (`'Ohne Gruppe'` wenn leer). */
+  groupName: string | null;
+  /** Frisch gepairtes Gerät, das noch nie einen Heartbeat geschickt hat. */
+  neverSeen: boolean;
   /** 'global' or 'device:<id>' — used for deep-linking to the slideshow editor */
   editorTarget: string;
 }

@@ -4,6 +4,8 @@ import { useSettings } from '@/hooks/useSettings';
 import { usePersistentEditorDraft } from '@/hooks/usePersistentEditorDraft';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/stores/toastStore';
+import { extractVersionConflict } from '@/utils/versionConflict';
 import { getActiveEvent } from '@/types/settings.types';
 import type { Schedule, PresetKey, Entry } from '@/types/schedule.types';
 import type { Sauna } from '@/types/sauna.types';
@@ -72,6 +74,12 @@ export interface UseScheduleEditorReturn {
   resetToLiveSchedule: () => void;
   handleRestoreDraft: () => void;
   handleDiscardDraft: () => void;
+  // Versionskonflikt-State
+  conflictInfo: { latestVersion: number | null } | null;
+  isForcingSave: boolean;
+  setConflictInfo: React.Dispatch<React.SetStateAction<{ latestVersion: number | null } | null>>;
+  handleAcceptServer: () => void;
+  handleForceSave: () => void;
 }
 
 export function useScheduleEditor(): UseScheduleEditorReturn {
@@ -262,6 +270,9 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
     handleSaveCell(null);
   }, [editingCell, handleSaveCell]);
 
+  const [conflictInfo, setConflictInfo] = useState<{ latestVersion: number | null } | null>(null);
+  const [isForcingSave, setIsForcingSave] = useState(false);
+
   const handleSave = useCallback(() => {
     if (!localSchedule) return;
     const scheduleToSave = withIncrementedScheduleVersion(localSchedule);
@@ -271,8 +282,53 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
         setIsDirty(false);
         // invalidateQueries in the mutation's onSuccess already triggers a refetch
       },
+      onError: (err) => {
+        const conflict = extractVersionConflict(err);
+        if (conflict) {
+          setConflictInfo({ latestVersion: conflict.latestVersion });
+        }
+        // Andere Fehler werden bereits vom Mutation-Hook getoastet.
+      },
     });
   }, [localSchedule, save, draftState]);
+
+  const handleAcceptServer = useCallback(() => {
+    setConflictInfo(null);
+    draftState.clearDraft();
+    setIsDirty(false);
+    if (schedule) setLocalSchedule(schedule);
+    refetch();
+    toast.info('Server-Stand übernommen. Lokale Änderungen wurden verworfen.');
+  }, [schedule, refetch, draftState]);
+
+  const handleForceSave = useCallback(() => {
+    if (!localSchedule || !conflictInfo?.latestVersion) return;
+    setIsForcingSave(true);
+    const forced: Schedule = {
+      ...localSchedule,
+      version: conflictInfo.latestVersion + 1,
+    };
+    save(forced, {
+      onSuccess: () => {
+        setIsForcingSave(false);
+        setConflictInfo(null);
+        draftState.clearDraft();
+        setIsDirty(false);
+        setLocalSchedule((prev) => (prev ? { ...prev, version: forced.version } : prev));
+        toast.success(`Aufgussplan erzwungen gespeichert (v${forced.version}).`);
+      },
+      onError: (err) => {
+        setIsForcingSave(false);
+        const conflict = extractVersionConflict(err);
+        if (conflict) {
+          setConflictInfo({ latestVersion: conflict.latestVersion });
+          toast.warning('Während des Erzwingens hat jemand erneut gespeichert.');
+          return;
+        }
+        toast.error(err instanceof Error ? err.message : 'Erzwingen fehlgeschlagen.');
+      },
+    });
+  }, [localSchedule, conflictInfo, save, draftState]);
 
   const resetToLiveSchedule = useCallback(() => {
     if (!schedule) return;
@@ -341,5 +397,10 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
     resetToLiveSchedule,
     handleRestoreDraft,
     handleDiscardDraft,
+    conflictInfo,
+    isForcingSave,
+    setConflictInfo,
+    handleAcceptServer,
+    handleForceSave,
   };
 }

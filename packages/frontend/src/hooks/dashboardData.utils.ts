@@ -288,6 +288,9 @@ export function buildDeviceSlideshowRows(
       slideCount,
       lastSeen: device.lastSeen || null,
       isOnline,
+      maintenanceMode: Boolean(device.maintenanceMode),
+      groupName: device.groupName ?? null,
+      neverSeen: !device.lastSeen,
       editorTarget: hasDeviceSlideshow ? `slideshow:${device.slideshowId}` : 'global',
     };
   });

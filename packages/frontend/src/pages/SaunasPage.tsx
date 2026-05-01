@@ -8,6 +8,7 @@ import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { StaleVersionBanner } from '@/components/StaleVersionBanner';
 import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
@@ -44,6 +45,10 @@ export function SaunasPage() {
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  // Server-Version, mit der wir lokal arbeiten — wird gesetzt, sobald wir
+  // initial laden. Stale-Detection vergleicht das mit `settings.version`.
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+  const [staleDismissedForVersion, setStaleDismissedForVersion] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -67,7 +72,31 @@ export function SaunasPage() {
   if (!isInitialized && settings) {
     setIsInitialized(true);
     setLocalSaunas(settings.saunas ?? []);
+    setLoadedVersion(settings.version ?? null);
   }
+
+  // Wenn die Liste nicht dirty ist und ein neuer Server-Stand kommt,
+  // synchronisieren wir lautlos. Bei dirty wird stattdessen der Banner
+  // angezeigt — der User entscheidet aktiv.
+  const settingsVersion = settings?.version ?? null;
+  if (
+    isInitialized &&
+    settings &&
+    !isDirty &&
+    typeof settingsVersion === 'number' &&
+    settingsVersion !== loadedVersion
+  ) {
+    setLocalSaunas(settings.saunas ?? []);
+    setLoadedVersion(settingsVersion);
+    setStaleDismissedForVersion(null);
+  }
+
+  const isStale =
+    isDirty &&
+    typeof settingsVersion === 'number' &&
+    typeof loadedVersion === 'number' &&
+    settingsVersion > loadedVersion &&
+    staleDismissedForVersion !== settingsVersion;
 
   const handleAddExampleSaunas = () => {
     const defaultSaunas: Sauna[] = [
@@ -181,6 +210,7 @@ export function SaunasPage() {
   const handleReload = () => {
     setIsInitialized(false);
     setIsDirty(false);
+    setStaleDismissedForVersion(null);
     refetch();
   };
 
@@ -249,6 +279,16 @@ export function SaunasPage() {
             { label: isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert', tone: isDirty ? 'warning' : 'success' },
           ]}
         />
+
+        {isStale && (
+          <StaleVersionBanner
+            entityLabel="Saunen"
+            serverVersion={settingsVersion}
+            localVersion={loadedVersion}
+            onReload={handleReload}
+            onDismiss={() => setStaleDismissedForVersion(settingsVersion)}
+          />
+        )}
 
         {/* Info Box */}
         <SectionCard title="Hinweise" icon={Info}>

@@ -20,8 +20,8 @@ export function DashboardPage() {
     schedule, settings, wsConnected,
     isAdmin,
     liveState, mediaStats, eventStats,
-    runningSlideshows, deviceSlideshowRows, systemChecks, updateLabel,
-    runtimeStatus, runtimeHistory,
+    deviceSlideshowRows, systemChecks, updateLabel,
+    runtimeStatus,
     attentionItems,
     activityItems,
     onboardingState,
@@ -93,13 +93,11 @@ export function DashboardPage() {
           <InlineErrorBoundary fallbackLabel="Betriebsstatus konnte nicht geladen werden.">
             <OperationsPulseWidget
               liveState={liveState}
-              runningSlideshows={runningSlideshows}
               nextEventLabel={nextEventDesc.value}
               activePreset={liveState.activePreset}
               autoPlay={Boolean(schedule?.autoPlay)}
               schedule={schedule ?? null}
               settings={settings ?? null}
-              pairedDevices={liveState.pairedDevices}
             />
           </InlineErrorBoundary>
           <InlineErrorBoundary fallbackLabel="Meldungen konnten nicht geladen werden.">
@@ -113,8 +111,8 @@ export function DashboardPage() {
           <OnboardingChecklistWidget state={onboardingState} />
         </InlineErrorBoundary>
 
-        {/* Row 2: Laufende Slideshows */}
-        <InlineErrorBoundary fallbackLabel="Laufende Slideshows konnten nicht geladen werden.">
+        {/* Row 2: Geräte-Übersicht (vereint Slideshow-Status + Health) */}
+        <InlineErrorBoundary fallbackLabel="Geräte-Übersicht konnte nicht geladen werden.">
           <RunningSlideshowsWidget rows={deviceSlideshowRows} />
         </InlineErrorBoundary>
 
@@ -135,15 +133,16 @@ export function DashboardPage() {
               isAdmin={isAdmin}
               updateLabel={updateLabel}
               runtimeStatus={runtimeStatus}
-              runtimeHistory={runtimeHistory}
             />
           </InlineErrorBoundary>
-          <InlineErrorBoundary fallbackLabel="Medien-Statistiken konnten nicht geladen werden.">
+          <InlineErrorBoundary fallbackLabel="Medien & Speicher konnte nicht geladen werden.">
             <MediaStatsWidget
               images={mediaStats.images}
               audio={mediaStats.audio}
               videos={mediaStats.videos}
               totalSize={mediaStats.totalSize}
+              latestMedia={mediaStats.latestMedia}
+              runtimeStatus={runtimeStatus}
             />
           </InlineErrorBoundary>
         </div>

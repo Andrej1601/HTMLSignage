@@ -10,9 +10,19 @@ interface MediaGridProps {
   onEditTags?: (media: Media) => void;
   mediaUsage?: Map<string, string[]>;
   onUploadClick?: () => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (media: Media) => void;
 }
 
-export function MediaGrid({ media, onDelete, onEditTags, mediaUsage, onUploadClick }: MediaGridProps) {
+export function MediaGrid({
+  media,
+  onDelete,
+  onEditTags,
+  mediaUsage,
+  onUploadClick,
+  selectedIds,
+  onToggleSelect,
+}: MediaGridProps) {
   if (media.length === 0) {
     return (
       <EmptyState
@@ -30,6 +40,8 @@ export function MediaGrid({ media, onDelete, onEditTags, mediaUsage, onUploadCli
     );
   }
 
+  const selectionActive = (selectedIds?.size ?? 0) > 0;
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
       {media.map((item) => (
@@ -39,6 +51,9 @@ export function MediaGrid({ media, onDelete, onEditTags, mediaUsage, onUploadCli
           onDelete={onDelete}
           onEditTags={onEditTags}
           usageSummary={mediaUsage?.get(item.id)}
+          isSelected={selectedIds?.has(item.id) ?? false}
+          onToggleSelect={onToggleSelect}
+          selectionActive={selectionActive}
         />
       ))}
     </div>

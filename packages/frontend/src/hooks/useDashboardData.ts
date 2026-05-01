@@ -69,12 +69,6 @@ export function useDashboardData() {
     refetchInterval: 30000,
   });
 
-  const runtimeHistoryQuery = useQuery({
-    queryKey: ['dashboard-runtime-history'],
-    queryFn: () => systemApi.getRuntimeHistory(24),
-    refetchInterval: 5 * 60 * 1000,
-  });
-
   const systemStatusQuery = useQuery({
     queryKey: ['dashboard-system-update-status'],
     queryFn: () => systemApi.getReleases(),
@@ -162,7 +156,6 @@ export function useDashboardData() {
   );
 
   const runtimeStatus = runtimeStatusQuery.data || null;
-  const runtimeHistory = runtimeHistoryQuery.data || null;
 
   const systemChecks = useMemo(() => buildSystemChecks({
     backendHealthError: backendHealthQuery.isError,
@@ -234,7 +227,6 @@ export function useDashboardData() {
     mediaQuery,
     backendHealthQuery,
     runtimeStatusQuery,
-    runtimeHistoryQuery,
     systemStatusQuery,
     schedule,
     settings,
@@ -251,7 +243,6 @@ export function useDashboardData() {
     deviceSlideshowRows,
     deviceMonitoring,
     runtimeStatus,
-    runtimeHistory,
     systemChecks,
     updateLabel,
     systemJobs,

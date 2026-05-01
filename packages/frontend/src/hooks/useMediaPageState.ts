@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMedia, useDeleteMedia, useMediaTags, useUpdateMediaTags } from '@/hooks/useMedia';
 import { useSettings } from '@/hooks/useSettings';
 import { useMediaUsage, getUsageSummary } from '@/hooks/useMediaUsage';
+import { mediaApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Media, MediaType } from '@/types/media.types';
 
 type ViewMode = 'grid' | 'list';
@@ -32,6 +35,14 @@ export function useMediaPageState() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [taggingMedia, setTaggingMedia] = useState<Media | null>(null);
   const [tagDraft, setTagDraft] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkTagging, setBulkTagging] = useState(false);
+  const [bulkTagDraft, setBulkTagDraft] = useState('');
+  const [bulkTagMode, setBulkTagMode] = useState<'add' | 'replace'>('add');
+  const [bulkTagSaving, setBulkTagSaving] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -99,6 +110,133 @@ export function useMediaPageState() {
     });
   };
 
+  // ─── Bulk-Selection ────────────────────────────────────────────────────
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectAllVisible = useCallback((items: Media[]) => {
+    setSelectedIds(new Set(items.map((item) => item.id)));
+  }, []);
+
+  // Falls die gefilterte Medienliste schrumpft (z. B. Filter ändert sich),
+  // räumen wir IDs aus der Auswahl, die nicht mehr sichtbar sind. So
+  // klickt der User nicht versehentlich ausgeblendete Elemente weg.
+  // Render-phase: tracked Vorgängerwert von `media` triggert den Sync
+  // exakt einmal pro Wechsel (kein setState-in-effect).
+  const [prevMedia, setPrevMedia] = useState(media);
+  if (media !== prevMedia) {
+    setPrevMedia(media);
+    if (selectedIds.size > 0) {
+      const visibleIds = new Set(media.map((item) => item.id));
+      const filtered = new Set<string>();
+      for (const id of selectedIds) if (visibleIds.has(id)) filtered.add(id);
+      if (filtered.size !== selectedIds.size) setSelectedIds(filtered);
+    }
+  }
+
+  const selectedMedia = useMemo(
+    () => media.filter((item) => selectedIds.has(item.id)),
+    [media, selectedIds],
+  );
+
+  const handleBulkDeleteRequest = () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleteOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map((id) => mediaApi.deleteMedia(id)),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    queryClient.invalidateQueries({ queryKey: ['media'] });
+    queryClient.invalidateQueries({ queryKey: ['media-tags'] });
+
+    if (failed === 0) {
+      toast.success(`${succeeded} Datei${succeeded === 1 ? '' : 'en'} gelöscht.`);
+    } else if (succeeded === 0) {
+      toast.error(`Löschen fehlgeschlagen für ${failed} Datei${failed === 1 ? '' : 'en'}.`);
+    } else {
+      toast.warning(`${succeeded} gelöscht, ${failed} fehlgeschlagen.`);
+    }
+
+    setBulkDeleting(false);
+    setBulkDeleteOpen(false);
+    setSelectedIds(new Set());
+  };
+
+  // ─── Bulk-Tag ──────────────────────────────────────────────────────────
+  const openBulkTagEditor = () => {
+    if (selectedIds.size === 0) return;
+    setBulkTagDraft('');
+    setBulkTagMode('add');
+    setBulkTagging(true);
+  };
+
+  const closeBulkTagEditor = () => {
+    setBulkTagging(false);
+    setBulkTagDraft('');
+  };
+
+  const parsedBulkTagDraft = useMemo(() => normalizeTagsInput(bulkTagDraft), [bulkTagDraft]);
+
+  const handleSaveBulkTags = async () => {
+    if (selectedIds.size === 0) return;
+    if (bulkTagMode === 'add' && parsedBulkTagDraft.length === 0) {
+      toast.warning('Mindestens ein Tag eingeben.');
+      return;
+    }
+    setBulkTagSaving(true);
+
+    const updates = selectedMedia.map((item) => {
+      let nextTags: string[];
+      if (bulkTagMode === 'replace') {
+        nextTags = parsedBulkTagDraft;
+      } else {
+        // Add-Mode: bestehende Tags beibehalten und neue hinzufügen,
+        // Duplikate (case-insensitive) ignorieren.
+        const merged = [...(item.tags || [])];
+        for (const tag of parsedBulkTagDraft) {
+          if (!hasTagCaseInsensitive(merged, tag)) merged.push(tag);
+        }
+        nextTags = merged.slice(0, 20);
+      }
+      return mediaApi.updateMediaTags(item.id, nextTags);
+    });
+
+    const results = await Promise.allSettled(updates);
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    queryClient.invalidateQueries({ queryKey: ['media'] });
+    queryClient.invalidateQueries({ queryKey: ['media-tags'] });
+
+    if (failed === 0) {
+      toast.success(`Tags für ${succeeded} Datei${succeeded === 1 ? '' : 'en'} aktualisiert.`);
+    } else if (succeeded === 0) {
+      toast.error(`Tag-Update fehlgeschlagen für ${failed} Datei${failed === 1 ? '' : 'en'}.`);
+    } else {
+      toast.warning(`${succeeded} aktualisiert, ${failed} fehlgeschlagen.`);
+    }
+
+    setBulkTagSaving(false);
+    setBulkTagging(false);
+    setBulkTagDraft('');
+  };
+
   const stats = {
     total: media.length,
     images: media.filter((m) => m.type === 'image').length,
@@ -148,5 +286,28 @@ export function useMediaPageState() {
     toggleExistingTag,
     handleSaveTags,
     updateMediaTags,
+    // Bulk-Selection
+    selectedIds,
+    selectedMedia,
+    toggleSelected,
+    clearSelection,
+    selectAllVisible,
+    // Bulk-Delete
+    bulkDeleteOpen,
+    setBulkDeleteOpen,
+    bulkDeleting,
+    handleBulkDeleteRequest,
+    handleBulkDeleteConfirm,
+    // Bulk-Tag
+    bulkTagging,
+    openBulkTagEditor,
+    closeBulkTagEditor,
+    bulkTagDraft,
+    setBulkTagDraft,
+    bulkTagMode,
+    setBulkTagMode,
+    parsedBulkTagDraft,
+    bulkTagSaving,
+    handleSaveBulkTags,
   };
 }

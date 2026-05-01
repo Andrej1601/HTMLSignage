@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { Skeleton } from '@/components/Skeleton';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
+import { ScheduleStackView } from '@/components/Schedule/ScheduleStackView';
 import { CellEditor } from '@/components/Schedule/CellEditor';
 import { TimeEditor } from '@/components/Schedule/TimeEditor';
 import { PRESET_LABELS } from '@/types/schedule.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { VersionConflictDialog } from '@/components/VersionConflictDialog';
 import { EditorQualityAssistant } from '@/components/EditorQualityAssistant';
 import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 import { Save, Calendar, RefreshCw } from 'lucide-react';
@@ -166,16 +168,32 @@ export function SchedulePage() {
               </span>
             </div>
 
-            <ScheduleGrid
-              daySchedule={editor.currentDaySchedule}
-              aromas={editor.settings?.aromas || []}
-              saunaColors={editor.saunaColors}
-              saunaObjects={editor.settings?.saunas || []}
-              onEditCell={editor.handleEditCell}
-              onEditTime={editor.handleEditTime}
-              onAddTimeRow={editor.handleAddTimeRow}
-              onDeleteTimeRow={editor.handleDeleteTimeRow}
-            />
+            {/* Desktop: vollständige Matrix-Ansicht */}
+            <div className="hidden lg:block">
+              <ScheduleGrid
+                daySchedule={editor.currentDaySchedule}
+                aromas={editor.settings?.aromas || []}
+                saunaColors={editor.saunaColors}
+                saunaObjects={editor.settings?.saunas || []}
+                onEditCell={editor.handleEditCell}
+                onEditTime={editor.handleEditTime}
+                onAddTimeRow={editor.handleAddTimeRow}
+                onDeleteTimeRow={editor.handleDeleteTimeRow}
+              />
+            </div>
+            {/* Mobile/Tablet: vertikaler Card-Stack */}
+            <div className="lg:hidden">
+              <ScheduleStackView
+                daySchedule={editor.currentDaySchedule}
+                aromas={editor.settings?.aromas || []}
+                saunaColors={editor.saunaColors}
+                saunaObjects={editor.settings?.saunas || []}
+                onEditCell={editor.handleEditCell}
+                onEditTime={editor.handleEditTime}
+                onAddTimeRow={editor.handleAddTimeRow}
+                onDeleteTimeRow={editor.handleDeleteTimeRow}
+              />
+            </div>
 
             {/* Status bar */}
             <div className="flex items-center justify-between border-t border-spa-bg-secondary bg-spa-bg-primary/30 px-4 py-2">
@@ -221,6 +239,17 @@ export function SchedulePage() {
           variant="warning"
           onConfirm={editor.unsavedGuard.proceed}
           onCancel={editor.unsavedGuard.reset}
+        />
+
+        <VersionConflictDialog
+          isOpen={editor.conflictInfo !== null}
+          entityLabel="Aufgussplan"
+          localVersion={editor.localSchedule?.version ?? null}
+          serverVersion={editor.conflictInfo?.latestVersion ?? editor.schedule?.version ?? null}
+          onClose={() => editor.setConflictInfo(null)}
+          onAcceptServer={editor.handleAcceptServer}
+          onForceSave={editor.conflictInfo?.latestVersion != null ? editor.handleForceSave : undefined}
+          isForcing={editor.isForcingSave}
         />
 
         <ConfirmDialog
