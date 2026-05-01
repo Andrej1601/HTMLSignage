@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { SkeletonMediaCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -41,6 +42,14 @@ export function MediaPage() {
     handleSaveTags,
     updateMediaTags,
   } = state;
+
+  // Quick-Action-Hook: Command-Palette navigiert mit `#upload` hierher.
+  useEffect(() => {
+    if (window.location.hash === '#upload') {
+      setUploadOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [setUploadOpen]);
 
   return (
     <Layout>
@@ -148,12 +157,14 @@ export function MediaPage() {
             onDelete={setDeletingMedia}
             onEditTags={openTagEditor}
             mediaUsage={mediaUsageSummaries}
+            onUploadClick={() => setUploadOpen(true)}
           />
         ) : (
           <MediaListView
             media={media}
             onDelete={setDeletingMedia}
             onEditTags={openTagEditor}
+            onUploadClick={() => setUploadOpen(true)}
           />
         )}
 
@@ -253,17 +264,26 @@ function MediaListView({
   media,
   onDelete,
   onEditTags,
+  onUploadClick,
 }: {
   media: Media[];
   onDelete: (media: Media) => void;
   onEditTags: (media: Media) => void;
+  onUploadClick?: () => void;
 }) {
   if (media.length === 0) {
     return (
       <EmptyState
         icon={ImageIcon}
         title="Keine Medien gefunden"
-        description="Lade deine ersten Dateien hoch, um loszulegen"
+        description="Lade deine ersten Dateien hoch, um loszulegen."
+        action={
+          onUploadClick ? (
+            <Button icon={Upload} onClick={onUploadClick}>
+              Erste Datei hochladen
+            </Button>
+          ) : undefined
+        }
       />
     );
   }

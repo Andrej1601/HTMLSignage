@@ -1,6 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { OperationsPulseWidget } from '@/components/Dashboard/OperationsPulseWidget';
 import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
+import { OnboardingChecklistWidget } from '@/components/Dashboard/OnboardingChecklistWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaStatsWidget } from '@/components/Dashboard/MediaStatsWidget';
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
@@ -23,6 +24,7 @@ export function DashboardPage() {
     runtimeStatus, runtimeHistory,
     attentionItems,
     activityItems,
+    onboardingState,
   } = useDashboardData();
 
   if (isLoading) {
@@ -104,6 +106,12 @@ export function DashboardPage() {
             <AttentionBoardWidget items={attentionItems} />
           </InlineErrorBoundary>
         </div>
+
+        {/* Onboarding-Checkliste — nur sichtbar solange noch nicht alle
+            Setup-Schritte abgehakt sind. */}
+        <InlineErrorBoundary fallbackLabel="Onboarding-Übersicht konnte nicht geladen werden.">
+          <OnboardingChecklistWidget state={onboardingState} />
+        </InlineErrorBoundary>
 
         {/* Row 2: Laufende Slideshows */}
         <InlineErrorBoundary fallbackLabel="Laufende Slideshows konnten nicht geladen werden.">

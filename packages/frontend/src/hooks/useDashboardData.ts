@@ -107,6 +107,30 @@ export function useDashboardData() {
     [devices, schedule, settings],
   );
 
+  // Onboarding-Status für die "Erste Schritte"-Checkliste. Reine
+  // Ableitung aus den schon vorhandenen Queries — keine zusätzlichen
+  // Roundtrips. Wird vom Widget nur angezeigt, solange noch nicht
+  // alle Schritte erledigt sind.
+  const onboardingState = useMemo(() => {
+    const saunaCount = settings?.saunas?.length ?? 0;
+    const scheduleHasEntries = schedule
+      ? Object.values(schedule.presets ?? {}).some((day) =>
+          (day?.rows ?? []).some((row) => row.entries?.some((e) => e !== null)),
+        )
+      : false;
+    const slideshowConfig = settings?.slideshow;
+    const slideshowHasSlides = Array.isArray(slideshowConfig?.slides)
+      && slideshowConfig.slides.length > 0;
+    const pairedDeviceCount = devices.filter((d) => Boolean(d.pairedAt)).length;
+    return {
+      saunaCount,
+      scheduleHasEntries,
+      mediaCount: media.length,
+      slideshowHasSlides,
+      pairedDeviceCount,
+    };
+  }, [settings, schedule, media, devices]);
+
   const planQuality = useMemo(
     () => buildPlanQuality(schedule),
     [schedule],
@@ -234,5 +258,6 @@ export function useDashboardData() {
     activeSystemJobs,
     attentionItems,
     activityItems,
+    onboardingState,
   };
 }

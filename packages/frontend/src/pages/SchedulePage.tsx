@@ -12,6 +12,7 @@ import { DraftRecoveryBanner } from '@/components/DraftRecoveryBanner';
 import { Save, Calendar, RefreshCw } from 'lucide-react';
 import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { useScheduleEditor } from '@/hooks/useScheduleEditor';
+import { useSaveShortcut } from '@/hooks/useSaveShortcut';
 import { PresetTabs } from '@/components/Schedule/PresetTabs';
 import { AutosaveIndicator } from '@/components/AutosaveIndicator';
 import clsx from 'clsx';
@@ -45,6 +46,7 @@ export function SchedulePage() {
     { id: 'schedule-save', label: 'Aufgussplan speichern', description: 'Ungespeicherte Änderungen sichern', icon: Save, group: 'Aktionen', action: editor.handleSave },
   ] : [], [editor.isDirty, editor.handleSave]);
   useCommandPaletteActions(paletteActions);
+  useSaveShortcut(editor.handleSave, { enabled: !editor.isSaving, isDirty: editor.isDirty });
 
   if (editor.isLoading || !editor.localSchedule) return <SchedulePageSkeleton />;
   if (editor.error) return <SchedulePageError error={editor.error} onRetry={() => editor.refetch()} />;

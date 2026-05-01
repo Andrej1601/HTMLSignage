@@ -4,9 +4,11 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Device } from '@/types/device.types';
 import { useAuth } from '@/contexts/AuthContext';
 import { Dialog } from '@/components/Dialog';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
 import { InputField } from '@/components/FormField';
 import { fetchApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 
 export function PendingPairings() {
   const { logout } = useAuth();
@@ -15,8 +17,9 @@ export function PendingPairings() {
   const [deviceName, setDeviceName] = useState('');
   const [groupName, setGroupName] = useState('');
   const [expanded, setExpanded] = useState(true);
+  const [rejectingDevice, setRejectingDevice] = useState<Device | null>(null);
 
-  const { data: pendingDevices = [], refetch, isLoading } = useQuery<Device[]>({
+  const { data: pendingDevices = [], isLoading } = useQuery<Device[]>({
     queryKey: ['devices', 'pending'],
     retry: false,
     queryFn: async () => {
@@ -46,6 +49,25 @@ export function PendingPairings() {
       setPairingDevice(null);
       setDeviceName('');
       setGroupName('');
+      toast.success('Gerät erfolgreich gekoppelt.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Pairing fehlgeschlagen.');
+    },
+  });
+
+  const rejectDevice = useMutation({
+    mutationFn: async (deviceId: string) => {
+      return fetchApi(`/devices/${deviceId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      queryClient.invalidateQueries({ queryKey: ['devices', 'pending'] });
+      setRejectingDevice(null);
+      toast.success('Pairing-Anfrage abgelehnt.');
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Ablehnen fehlgeschlagen.');
     },
   });
 
@@ -131,8 +153,9 @@ export function PendingPairings() {
                 <div className="flex items-center gap-3 shrink-0">
                   <button
                     type="button"
-                    onClick={() => refetch()}
-                    className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary"
+                    onClick={() => setRejectingDevice(device)}
+                    disabled={rejectDevice.isPending}
+                    className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary disabled:opacity-50"
                   >
                     Ablehnen
                   </button>
@@ -199,6 +222,22 @@ export function PendingPairings() {
           />
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(rejectingDevice)}
+        title="Pairing-Anfrage ablehnen?"
+        message={
+          rejectingDevice
+            ? `Code „${rejectingDevice.pairingCode ?? '?'}" wird verworfen. Das Display kann anschließend einen neuen Code anfordern.`
+            : ''
+        }
+        confirmLabel="Ablehnen"
+        variant="danger"
+        onConfirm={() => {
+          if (rejectingDevice) rejectDevice.mutate(rejectingDevice.id);
+        }}
+        onCancel={() => setRejectingDevice(null)}
+      />
     </>
   );
 }

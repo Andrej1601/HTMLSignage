@@ -168,13 +168,18 @@ export function ScheduleGrid({
     if (!isNaN(idx)) onEditTime(idx);
   }, [onEditTime]);
 
-  const handleCellClick = useCallback((e: React.MouseEvent<HTMLTableCellElement>) => {
+  const handleCellClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     const row   = Number((e.currentTarget as HTMLElement).dataset.rowIdx);
     const sauna = Number((e.currentTarget as HTMLElement).dataset.saunaIdx);
     if (!isNaN(row) && !isNaN(sauna)) onEditCell(row, sauna);
   }, [onEditCell]);
 
-  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLTableCellElement>) => {
+  const handleCellMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    const key = (e.currentTarget as HTMLElement).dataset.cellKey ?? null;
+    setHoveredCell(key);
+  }, []);
+
+  const handleCellFocus = useCallback((e: React.FocusEvent<HTMLButtonElement>) => {
     const key = (e.currentTarget as HTMLElement).dataset.cellKey ?? null;
     setHoveredCell(key);
   }, []);
@@ -242,10 +247,12 @@ export function ScheduleGrid({
                             <span
                               className="inline-flex items-center gap-1 text-[10px] font-medium"
                               style={{ color: 'rgba(255,255,255,0.55)' }}
+                              aria-label={`Status: ${statusLabel}`}
                             >
                               <span
                                 className="h-1.5 w-1.5 rounded-full shrink-0"
                                 style={{ backgroundColor: statusColor }}
+                                aria-hidden="true"
                               />
                               {statusLabel}
                             </span>
@@ -308,35 +315,44 @@ export function ScheduleGrid({
                     </button>
                   </td>
 
-                  {/* Entry cells — click/hover handled here to avoid per-cell callbacks */}
+                  {/* Entry cells — keyboard-reachable via inner button */}
                   {timeRow.entries.map((entry, saunaIndex) => {
                     const cellKey       = `${timeRowIndex}-${saunaIndex}`;
                     const isHovered     = hoveredCell === cellKey;
                     const cellConflicts = getConflictsForCell(conflicts, timeRowIndex, saunaIndex);
+                    const saunaName     = daySchedule.saunas?.[saunaIndex] ?? `Sauna ${saunaIndex + 1}`;
+                    const cellLabel = entry
+                      ? `${timeRow.time}, ${saunaName}: ${entry.title}${entry.subtitle ? ' — ' + entry.subtitle : ''}`
+                      : `${timeRow.time}, ${saunaName}: leerer Slot, zum Hinzufügen aktivieren`;
 
                     return (
-                      <td
-                        key={saunaIndex}
-                        className="px-3 py-2.5 cursor-pointer"
-                        data-row-idx={timeRowIndex}
-                        data-sauna-idx={saunaIndex}
-                        data-cell-key={cellKey}
-                        onClick={handleCellClick}
-                        onMouseEnter={handleCellMouseEnter}
-                        onMouseLeave={handleCellMouseLeave}
-                      >
-                        {entry ? (
-                          <EntryCard
-                            entry={entry}
-                            aromas={aromas}
-                            isHovered={isHovered}
-                            hasConflict={cellConflicts.length > 0}
-                          />
-                        ) : (
-                          <div className="w-full h-[88px] border border-dashed border-spa-bg-secondary rounded-xl text-spa-text-secondary/30 hover:border-spa-primary/35 hover:text-spa-primary/50 hover:bg-spa-bg-primary/50 transition-all flex items-center justify-center">
-                            <Plus className="w-4 h-4" />
-                          </div>
-                        )}
+                      <td key={saunaIndex} className="px-3 py-2.5">
+                        <button
+                          type="button"
+                          data-row-idx={timeRowIndex}
+                          data-sauna-idx={saunaIndex}
+                          data-cell-key={cellKey}
+                          onClick={handleCellClick}
+                          onMouseEnter={handleCellMouseEnter}
+                          onMouseLeave={handleCellMouseLeave}
+                          onFocus={handleCellFocus}
+                          onBlur={handleCellMouseLeave}
+                          aria-label={cellLabel}
+                          className="w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-2 focus-visible:ring-offset-spa-bg-primary"
+                        >
+                          {entry ? (
+                            <EntryCard
+                              entry={entry}
+                              aromas={aromas}
+                              isHovered={isHovered}
+                              hasConflict={cellConflicts.length > 0}
+                            />
+                          ) : (
+                            <div className="w-full h-[88px] border border-dashed border-spa-bg-secondary rounded-xl text-spa-text-secondary/30 hover:border-spa-primary/35 hover:text-spa-primary/50 hover:bg-spa-bg-primary/50 transition-all flex items-center justify-center">
+                              <Plus className="w-4 h-4" aria-hidden="true" />
+                            </div>
+                          )}
+                        </button>
                       </td>
                     );
                   })}

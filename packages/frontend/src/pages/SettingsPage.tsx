@@ -1,4 +1,6 @@
 import { lazy, Suspense, useCallback, useState, useMemo } from 'react';
+import { toast } from '@/stores/toastStore';
+import { useSaveShortcut } from '@/hooks/useSaveShortcut';
 import { Layout } from '@/components/Layout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Skeleton, SkeletonCard } from '@/components/Skeleton';
@@ -105,12 +107,18 @@ export function SettingsPage() {
     };
 
     save(settingsToSave, {
-      onSuccess: () => {
+      onSuccess: (response) => {
         draftState.clearDraft();
         setIsDirty(false);
+        toast.success(`Einstellungen gespeichert (v${response?.version ?? settingsToSave.version}).`);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
       },
     });
   }, [localSettings, save, draftState]);
+
+  useSaveShortcut(handleSave, { enabled: !isSaving, isDirty });
 
   const handleReload = () => {
     draftState.clearDraft();

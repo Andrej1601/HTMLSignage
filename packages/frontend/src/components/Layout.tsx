@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search, Sun, Moon } from 'lucide-react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
+import { KeyboardShortcutsDialog, useKeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,6 +64,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { effectiveTheme, setMode } = useThemeMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const commandPalette = useCommandPaletteContext();
+  const shortcuts = useKeyboardShortcutsDialog();
 
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
@@ -399,6 +401,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
+        <KeyboardShortcutsDialog isOpen={shortcuts.isOpen} onClose={shortcuts.close} />
       </div>
     </div>
   );

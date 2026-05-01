@@ -23,6 +23,7 @@ import { PendingPairings } from '@/components/Devices/PendingPairings';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
+import { toast } from '@/stores/toastStore';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useDevicesPageState, getFilterButtonClass, type DeviceStatusFilter } from '@/hooks/useDevicesPageState';
 import { useSlideshows } from '@/hooks/useSlideshows';
@@ -222,7 +223,27 @@ export function DevicesPage() {
           <EmptyState
             icon={Monitor}
             title="Keine gekoppelten Geräte"
-            description="Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten."
+            description="Öffne die Display-URL auf einem Gerät — der Pairing-Code erscheint dann oben in dieser Liste."
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => window.open('/display', '_blank', 'noopener')}
+                >
+                  Display-URL öffnen
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const url = `${window.location.origin}/display`;
+                    void navigator.clipboard?.writeText(url);
+                    toast.success(`Display-URL kopiert: ${url}`);
+                  }}
+                >
+                  URL kopieren
+                </Button>
+              </div>
+            }
           />
         ) : (
           <DeviceList

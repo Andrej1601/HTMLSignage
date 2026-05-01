@@ -3,6 +3,7 @@ import type { InfoItem } from '@/types/settings.types';
 import { useMedia } from '@/hooks/useMedia';
 import { buildUploadUrl } from '@/utils/mediaUrl';
 import { Info, Plus, X } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface InfoManagerProps {
   infos: InfoItem[];
@@ -23,6 +24,9 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<InfoFormData>({ title: '', text: '' });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deletingInfo = deletingId ? infos.find((i) => i.id === deletingId) ?? null : null;
 
   const handleStartAdd = () => {
     setFormData({ title: 'Abkühlung', text: '' });
@@ -61,10 +65,14 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Möchten Sie diese Info wirklich löschen?')) {
-      onChange(infos.filter((i) => i.id !== id));
-    }
+  const handleRequestDelete = (id: string) => {
+    setDeletingId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingId) return;
+    onChange(infos.filter((i) => i.id !== deletingId));
+    setDeletingId(null);
   };
 
   const getImageUrl = (imageId?: string) => {
@@ -244,7 +252,8 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   </button>
                   <button
-                    onClick={() => handleDelete(item.id)}
+                    type="button"
+                    onClick={() => handleRequestDelete(item.id)}
                     className="w-6 h-6 rounded bg-spa-surface/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-error hover:border-spa-error/40 transition-colors shadow-xs"
                     aria-label="Löschen"
                   >
@@ -311,6 +320,20 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        title="Info löschen?"
+        message={
+          deletingInfo
+            ? `„${deletingInfo.title}" wirklich löschen? Slides, die diese Info anzeigen, werden nach dem Speichern leer.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }

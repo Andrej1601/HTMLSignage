@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,6 +46,7 @@ export function Dialog({
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const onCloseRef = useRef(onClose);
   const closeOnEscRef = useRef(closeOnEsc);
   const closeDisabledRef = useRef(closeDisabled);
@@ -116,7 +117,7 @@ export function Dialog({
       className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
       onClick={closeOnOverlayClick && !closeDisabled ? onClose : undefined}
     >
       <div className="flex min-h-full items-start justify-center py-4">
@@ -139,7 +140,7 @@ export function Dialog({
             <div className="flex items-center gap-3">
               {titleIcon}
               <h2
-                id="dialog-title"
+                id={titleId}
                 className="text-xl font-bold text-spa-text-primary"
               >
                 {title}

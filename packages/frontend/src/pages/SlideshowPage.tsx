@@ -9,9 +9,15 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { CheckCircle2, RefreshCw, Save, SlidersHorizontal } from 'lucide-react';
 import { useSlideshowEditor } from '@/hooks/useSlideshowEditor';
+import { useSaveShortcut } from '@/hooks/useSaveShortcut';
 
 export function SlideshowPage() {
   const editor = useSlideshowEditor();
+
+  useSaveShortcut(editor.handleSaveCurrent, {
+    enabled: !editor.isBusy,
+    isDirty: editor.isDirty,
+  });
 
   if (editor.isLoading || !editor.settings || !editor.editorConfig || !editor.previewPayload) {
     return (

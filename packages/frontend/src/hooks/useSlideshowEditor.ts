@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from '@/stores/toastStore';
 import { useDevices } from '@/hooks/useDevices';
 import { useSlideshows, useUpdateSlideshow, useCreateSlideshow, useDeleteSlideshow } from '@/hooks/useSlideshows';
 import { useSchedule } from '@/hooks/useSchedule';
@@ -168,6 +169,7 @@ export function useSlideshowEditor() {
 
   const handleSaveCurrent = () => {
     if (!editorConfig || !selectedSlideshowId) return;
+    const name = selectedSlideshow?.name ?? 'Slideshow';
     updateSlideshow.mutate(
       {
         id: selectedSlideshowId,
@@ -177,6 +179,10 @@ export function useSlideshowEditor() {
         onSuccess: () => {
           setIsDirty(false);
           void refetch();
+          toast.success(`„${name}" gespeichert.`);
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
         },
       },
     );
@@ -189,6 +195,10 @@ export function useSlideshowEditor() {
         onSuccess: (created) => {
           setExplicitSelection(created.id);
           setIsDirty(false);
+          toast.success(`Slideshow „${created.name}" angelegt.`);
+        },
+        onError: (err) => {
+          toast.error(err instanceof Error ? err.message : 'Erstellen fehlgeschlagen.');
         },
       },
     );

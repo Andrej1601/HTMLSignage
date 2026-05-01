@@ -102,31 +102,58 @@ export function SlideshowSelector({
                 </button>
               )}
 
-              {/* Context menu for non-default slideshows */}
-              {isSelected && !slideshow.isDefault && !isRenaming && (
+              {/* Context menu — always rendered (selected or not). For
+                  the default slideshow we only offer Duplicate (kein
+                  Rename, kein Löschen) damit Standard-Inhalte stabil
+                  bleiben. */}
+              {!isRenaming && (
                 <DropdownMenu
                   ariaLabel={`Aktionen für ${slideshow.name}`}
                   width="w-44"
-                  sections={[
-                    [
-                      { label: 'Umbenennen', icon: Pencil, onClick: () => startRename(slideshow) },
-                      { label: 'Duplizieren', icon: Copy, onClick: () => onCreate(`${slideshow.name} (Kopie)`, slideshow.id) },
-                    ],
-                    [
-                      { label: 'Löschen', icon: Trash2, onClick: () => onDelete(slideshow), variant: 'danger' },
-                    ],
-                  ]}
+                  sections={
+                    slideshow.isDefault
+                      ? [
+                          [
+                            {
+                              label: 'Duplizieren',
+                              icon: Copy,
+                              onClick: () => onCreate(`${slideshow.name} (Kopie)`, slideshow.id),
+                            },
+                          ],
+                        ]
+                      : [
+                          [
+                            { label: 'Umbenennen', icon: Pencil, onClick: () => startRename(slideshow) },
+                            {
+                              label: 'Duplizieren',
+                              icon: Copy,
+                              onClick: () => onCreate(`${slideshow.name} (Kopie)`, slideshow.id),
+                            },
+                          ],
+                          [
+                            {
+                              label: 'Löschen',
+                              icon: Trash2,
+                              onClick: () => onDelete(slideshow),
+                              variant: 'danger',
+                            },
+                          ],
+                        ]
+                  }
                   trigger={(open) => (
                     <button
                       type="button"
-                      className={`inline-flex items-center justify-center rounded-md p-1 transition-colors ${
+                      title="Aktionen"
+                      className={`inline-flex items-center justify-center rounded-md p-1.5 transition-colors ${
                         open
                           ? 'bg-spa-primary/10 text-spa-primary'
-                          : 'text-spa-text-secondary hover:text-spa-text-primary hover:bg-spa-surface/60'
+                          : isSelected
+                            ? 'text-spa-text-secondary hover:text-spa-text-primary hover:bg-spa-surface/60'
+                            : 'text-spa-text-secondary/60 hover:text-spa-text-primary hover:bg-spa-surface/60'
                       }`}
-                      aria-label="Slideshow-Aktionen"
+                      aria-label={`Aktionen für ${slideshow.name}`}
                     >
-                      <MoreVertical className="h-3.5 w-3.5" />
+                      <MoreVertical className="h-4 w-4" />
                     </button>
                   )}
                 />

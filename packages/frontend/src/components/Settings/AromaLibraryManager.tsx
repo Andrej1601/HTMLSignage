@@ -3,6 +3,7 @@ import type { Aroma } from '@/types/settings.types';
 import { AROMA_COLOR_PALETTE, getAromaDisplayColor } from '@/types/settings.types';
 import { Droplets, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import clsx from 'clsx';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface AromaLibraryManagerProps {
   aromas: Aroma[];
@@ -27,6 +28,9 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     color: '',
   });
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deletingAroma = deletingId ? aromas.find((a) => a.id === deletingId) ?? null : null;
 
   const showForm = isAdding || !!editingId;
 
@@ -70,10 +74,14 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     handleCancel();
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Möchten Sie dieses Aroma wirklich löschen?')) {
-      onChange(aromas.filter((a) => a.id !== id));
-    }
+  const handleRequestDelete = (id: string) => {
+    setDeletingId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingId) return;
+    onChange(aromas.filter((a) => a.id !== deletingId));
+    setDeletingId(null);
   };
 
   const activeCategoryEmojis = EMOJI_CATEGORIES.find(c => c.label === activeCategory)?.emojis ?? [];
@@ -300,7 +308,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDelete(aroma.id)}
+                    onClick={() => handleRequestDelete(aroma.id)}
                     className="rounded-md p-1.5 text-spa-text-secondary hover:bg-spa-error-light hover:text-spa-error transition-colors"
                     title="Löschen"
                     aria-label="Aroma löschen"
@@ -313,6 +321,20 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        title="Aroma löschen?"
+        message={
+          deletingAroma
+            ? `„${deletingAroma.emoji} ${deletingAroma.name}" wirklich aus der Aroma-Bibliothek entfernen? Bestehende Aufgüsse mit diesem Aroma behalten den Namen, verlieren aber das Icon.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }

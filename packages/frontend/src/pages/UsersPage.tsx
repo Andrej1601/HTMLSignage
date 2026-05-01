@@ -140,7 +140,7 @@ export function UsersPage() {
                 key={role}
                 className={`px-2 py-1 text-xs font-medium rounded ${
                   role === 'admin'
-                    ? 'bg-spa-warning-light text-spa-warning-dark'
+                    ? 'bg-spa-primary/15 text-spa-primary'
                     : role === 'editor'
                     ? 'bg-spa-info-light text-spa-info-dark'
                     : role === 'saunameister'
@@ -250,7 +250,7 @@ export function UsersPage() {
           )}
           badges={[
             { label: `${users.length} Benutzer`, tone: 'info' },
-            { label: `${users.filter((entry) => entry.roles.includes('admin')).length} Admins`, tone: 'warning' },
+            { label: `${users.filter((entry) => entry.roles.includes('admin')).length} Admins`, tone: 'info' },
           ]}
         />
 

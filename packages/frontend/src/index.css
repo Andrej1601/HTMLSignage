@@ -106,6 +106,19 @@
   body {
     @apply bg-spa-bg-primary text-spa-text-primary antialiased;
   }
+
+  /* Globaler Sichtbarkeits-Fokus für interaktive Elemente.
+     Greift nur, wenn die Komponente nicht selbst einen Fokusring
+     setzt (`focus-visible:ring-*` Klassen überschreiben das hier).
+     Erfüllt WCAG 2.4.7 (Focus Visible) flächendeckend, ohne dass
+     wir jeden Button manuell anfassen müssen. */
+  :where(button, a, [role="button"], [role="link"], summary,
+         input:not([type="checkbox"]):not([type="radio"]),
+         select, textarea):focus-visible {
+    outline: 2px solid var(--color-spa-primary);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
 }
 
 @utility scrollbar-hide {
