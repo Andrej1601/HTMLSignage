@@ -38,7 +38,19 @@ const STATUS_TABS: { key: DeviceStatusFilter; label: string }[] = [
 export function DevicesPage() {
   const state = useDevicesPageState();
   const { data: slideshows = [] } = useSlideshows();
+  // Auto-Open der Flottensteuerung sobald min. 1 Gerät selektiert ist —
+  // sonst hängen Bulk-Aktionen unsichtbar im Accordion und der Saunameister
+  // sucht nach Optionen, die direkt darunter liegen. Manuelles Schließen
+  // bleibt möglich; eine erneute Selektion lässt den Accordion wieder
+  // aufgehen (bewusst, weil das eindeutig signalisiert „hier sind
+  // deine Bulk-Optionen").
   const [fleetOpen, setFleetOpen] = useState(false);
+  const hasSelection = state.selectedDeviceIds.length > 0;
+  const [prevHasSelection, setPrevHasSelection] = useState(hasSelection);
+  if (hasSelection !== prevHasSelection) {
+    setPrevHasSelection(hasSelection);
+    if (hasSelection && !fleetOpen) setFleetOpen(true);
+  }
 
   if (state.isLoading) {
     return (
@@ -135,9 +147,15 @@ export function DevicesPage() {
           >
             <div className="flex items-center gap-3">
               <Wrench className="h-5 w-5 text-spa-primary" />
-              <div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-spa-text-primary">Flottensteuerung</span>
-                <span className="ml-2 text-xs text-spa-text-secondary">Bulk-Aktionen für ausgewählte Geräte</span>
+                {hasSelection ? (
+                  <span className="inline-flex items-center rounded-full bg-spa-primary/15 px-2 py-0.5 text-[11px] font-bold text-spa-primary">
+                    {state.selectedDeviceIds.length} ausgewählt
+                  </span>
+                ) : (
+                  <span className="text-xs text-spa-text-secondary">Bulk-Aktionen für ausgewählte Geräte</span>
+                )}
               </div>
             </div>
             {fleetOpen ? <ChevronUp className="h-4 w-4 text-spa-text-secondary" /> : <ChevronDown className="h-4 w-4 text-spa-text-secondary" />}

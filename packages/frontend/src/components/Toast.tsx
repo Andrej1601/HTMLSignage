@@ -39,6 +39,8 @@ const ariaForType: Record<ToastType, { role: 'alert' | 'status'; live: 'assertiv
 export function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
   const removeToast = useToastStore((s) => s.removeToast);
+  const pauseDismiss = useToastStore((s) => s.pauseDismiss);
+  const resumeDismiss = useToastStore((s) => s.resumeDismiss);
 
   if (toasts.length === 0) return null;
 
@@ -51,13 +53,22 @@ export function ToastContainer() {
       {toasts.map((t) => {
         const Icon = iconMap[t.type];
         const aria = ariaForType[t.type];
+        // WCAG 2.2.1 (Timing Adjustable): Auto-Dismiss-Timer pausieren,
+        // sobald der User mit dem Toast interagiert (Hover oder Fokus
+        // auf dem Schließen-Button). So hat eine Person mit Screen-
+        // Reader oder reduzierter Lesegeschwindigkeit Zeit, den Inhalt
+        // tatsächlich zu erfassen.
         return (
           <div
             key={t.id}
             role={aria.role}
             aria-live={aria.live}
+            onMouseEnter={() => pauseDismiss(t.id)}
+            onMouseLeave={() => resumeDismiss(t.id)}
+            onFocus={() => pauseDismiss(t.id)}
+            onBlur={() => resumeDismiss(t.id)}
             className={clsx(
-              'flex items-start gap-3 rounded-lg border p-4 shadow-lg animate-slide-in-right',
+              'flex items-start gap-3 rounded-lg border p-4 shadow-lg motion-safe:animate-slide-in-right',
               styleMap[t.type]
             )}
           >
@@ -66,7 +77,10 @@ export function ToastContainer() {
             <button
               type="button"
               onClick={() => removeToast(t.id)}
-              className="shrink-0 p-0.5 rounded hover:bg-black/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-spa-bg-primary"
+              // WCAG 2.5.8 (Target Size, Minimum, neu in 2.2):
+              // klickbares Ziel >= 24×24 — vorher 16px Icon mit p-0.5
+              // war knapp drunter; jetzt min-h/min-w 24px mit p-1.
+              className="shrink-0 inline-flex items-center justify-center min-h-[24px] min-w-[24px] p-1 rounded hover:bg-black/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-2 focus-visible:ring-offset-spa-bg-primary"
               aria-label="Benachrichtigung schließen"
             >
               <X className="w-4 h-4" aria-hidden="true" />

@@ -481,14 +481,36 @@ export function UsersPage() {
             <DataTable<User>
               data={filteredUsers}
               keyFn={(u) => u.id}
-              mobileTitle={(u) => (
-                <div className="flex items-center gap-3">
-                  <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
-                    {u.username.charAt(0).toUpperCase()}
+              mobileTitle={(u) => {
+                const isSelected = selectedIds.has(u.id);
+                return (
+                  // Mobile: Avatar fungiert als Tap-Target für die Auswahl,
+                  // damit Bulk-Aktionen aus der Toolbar nicht ins Leere
+                  // laufen. Auf Desktop existiert eine eigene Checkbox-
+                  // Spalte; hier auf Mobile ist der Avatar-Button die
+                  // einzig sinnvolle Selektions-Affordanz, ohne das
+                  // Card-Layout zu sprengen.
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelected(u.id);
+                      }}
+                      aria-pressed={isSelected}
+                      aria-label={isSelected ? `${u.username} abwählen` : `${u.username} auswählen`}
+                      className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold transition-all ${
+                        isSelected
+                          ? 'bg-spa-primary ring-2 ring-spa-primary ring-offset-2'
+                          : 'bg-spa-primary'
+                      }`}
+                    >
+                      {isSelected ? '✓' : u.username.charAt(0).toUpperCase()}
+                    </button>
+                    <span>{u.username}</span>
                   </div>
-                  <span>{u.username}</span>
-                </div>
-              )}
+                );
+              }}
               columns={userColumns}
             />
           )}

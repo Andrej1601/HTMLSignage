@@ -164,6 +164,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-spa-bg-secondary">
           <Search className="h-5 w-5 text-spa-text-secondary shrink-0" aria-hidden="true" />
+          {/* WAI-ARIA 1.2 Combobox-Pattern: das Input bekommt
+              role="combobox" + aria-controls auf die Listbox-ID, damit
+              Screenreader die Verbindung zwischen Suche und Optionen
+              kennen und Pfeil-/Enter-Tasten korrekt ankündigen. */}
           <input
             ref={inputRef}
             type="text"
@@ -172,7 +176,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             onKeyDown={handleKeyDown}
             placeholder="Seite oder Aktion suchen..."
             className="flex-1 bg-transparent text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden text-sm"
+            role="combobox"
             aria-label="Suche"
+            aria-expanded
+            aria-controls="cmd-palette-listbox"
+            aria-autocomplete="list"
             aria-activedescendant={results[selectedIndex] ? `cmd-${results[selectedIndex].id}` : undefined}
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 rounded border border-spa-bg-secondary bg-spa-bg-primary px-1.5 py-0.5 text-[10px] font-medium text-spa-text-secondary">
@@ -181,7 +189,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="max-h-72 overflow-y-auto p-2" role="listbox">
+        <div
+          ref={listRef}
+          id="cmd-palette-listbox"
+          className="max-h-72 overflow-y-auto p-2"
+          role="listbox"
+          aria-label="Befehl- und Navigations-Ergebnisse"
+        >
           {results.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-spa-text-secondary">
               Keine Ergebnisse für &ldquo;{query}&rdquo;

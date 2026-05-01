@@ -103,7 +103,24 @@ export function Dialog({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
-      previousFocusRef.current?.focus();
+      // Fokus-Restore mit Fallback: das Trigger-Element kann während
+      // eines offenen Dialogs aus dem DOM verschwinden (Tabellen-
+      // Refresh, List-Re-Render, Page-Navigation). Wenn es nicht mehr
+      // verbunden ist, würde `.focus()` ins Leere greifen — der Fokus
+      // bliebe „nirgends" und Tab-Navigation startet ab body, statt
+      // an einer sinnvollen Stelle. Fallback: erstes fokussierbares
+      // Element im Layout-Main, sonst body.
+      const previous = previousFocusRef.current;
+      if (previous && previous.isConnected) {
+        previous.focus();
+      } else {
+        const main = document.getElementById('main-content');
+        const fallback =
+          main?.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ) ?? document.body;
+        fallback.focus();
+      }
     };
   }, [isOpen]);
 
