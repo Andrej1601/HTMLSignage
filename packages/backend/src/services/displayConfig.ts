@@ -24,6 +24,7 @@ import {
   readDeviceFleetState,
   type DeviceMode,
 } from '../lib/deviceManagement.js';
+import { mirrorAggregateIntoSettings } from '../lib/settingsAggregate.js';
 import {
   assembleDisplayConfig,
   collectEventSlideshowIds,
@@ -54,7 +55,13 @@ export async function resolveDeviceDisplayConfig(
 
   const { scheduleData, settingsData } = await getCachedGlobalConfig();
   const globalSchedule = normalizeScheduleData(scheduleData);
-  const globalSettings = normalizeSettingsData(settingsData);
+  // Enrich the cached settings JSON with the aggregate tables (saunas,
+  // aromas, info items, events). After the settings-aggregate split,
+  // these arrays no longer live in `settings.data` itself but in their
+  // own tables — pipeline consumers (events with slideshowId, FE
+  // SaunaDetail/Infos renderers) still expect them on `settings`.
+  const baseGlobalSettings = normalizeSettingsData(settingsData);
+  const globalSettings = await mirrorAggregateIntoSettings(prisma, baseGlobalSettings);
 
   // Default slideshow lookup is only needed when the device has no specific
   // slideshow assigned. Avoid the DB hit in the common case.

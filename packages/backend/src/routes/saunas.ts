@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { createVersionedRecord } from '../lib/versionedEntity.js';
 import { broadcastSettingsUpdate } from '../websocket/index.js';
 import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
-import { updateSaunaStatusInSettings, SaunaNotFoundError } from '../lib/saunaManagement.js';
 import { invalidateGlobalConfigCache } from '../lib/globalConfigCache.js';
+import { mirrorAggregateIntoSettings } from '../lib/settingsAggregate.js';
+import { logAuditEvent } from '../lib/audit.js';
 
 const router = Router();
 
@@ -24,32 +24,50 @@ router.patch(
   async (req: AuthRequest, res) => {
     try {
       const { status } = UpdateStatusSchema.parse(req.body);
-      const saunaId = str(req.params.id)!;
-
-      // Load current active settings
-      const current = await prisma.settings.findFirst({
-        where: { isActive: true },
-        orderBy: { version: 'desc' },
-      });
-
-      if (!current) {
-        return res.status(404).json({ error: 'not-found', message: 'Keine aktiven Einstellungen gefunden' });
+      const saunaId = str(req.params.id);
+      if (!saunaId) {
+        return res.status(400).json({ error: 'invalid-id', message: 'Sauna-ID fehlt' });
       }
 
-      const data = { ...(current.data as Record<string, unknown>) };
-      updateSaunaStatusInSettings(data, saunaId, status);
-
-      const { version } = await createVersionedRecord('settings', data);
+      // Saunas now live in their own table; status is a single-field
+      // update with no global Settings version bump required.
+      try {
+        await prisma.sauna.update({
+          where: { id: saunaId },
+          data: { status },
+        });
+      } catch (err) {
+        // Prisma throws P2025 when the record doesn't exist.
+        if ((err as { code?: string }).code === 'P2025') {
+          return res.status(404).json({ error: 'not-found', message: 'Sauna nicht gefunden' });
+        }
+        throw err;
+      }
 
       invalidateGlobalConfigCache();
-      broadcastSettingsUpdate(data);
 
-      res.json({ ok: true, saunaId, status, version });
+      // Broadcast the canonical mirrored settings shape so listeners
+      // stay in sync without each one having to re-fetch.
+      const activeSettings = await prisma.settings.findFirst({
+        where: { isActive: true },
+        orderBy: { version: 'desc' },
+        select: { data: true, version: true },
+      });
+      const baseData = activeSettings
+        ? { ...(activeSettings.data as Record<string, unknown>), version: activeSettings.version }
+        : { version: 1 };
+      const mirrored = await mirrorAggregateIntoSettings(prisma, baseData);
+      broadcastSettingsUpdate(mirrored);
+
+      await logAuditEvent(req, {
+        action: 'sauna.status.update',
+        resource: saunaId,
+        details: { status },
+      });
+
+      res.json({ ok: true, saunaId, status });
       return;
     } catch (error) {
-      if (error instanceof SaunaNotFoundError) {
-        return res.status(404).json({ error: 'not-found', message: 'Sauna nicht gefunden' });
-      }
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: 'validation-failed', details: error.issues });
       }

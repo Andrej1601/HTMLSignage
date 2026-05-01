@@ -61,9 +61,86 @@ model Slideshow {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   devices   Device[]
+  events    Event[]
 
   @@index([isDefault])
   @@map("slideshows")
+}
+
+// Saunas, aromas, info items and events used to live as JSON arrays
+// inside Settings.data. Each is now a first-class table so concurrent
+// admin edits don't collide on a mega-document and the relational shape
+// can be queried/indexed. Settings.data still mirrors them at GET time
+// for backwards compatibility with the existing API consumers.
+model Sauna {
+  id          String   @id
+  name        String
+  // Allowed values: 'active' | 'no-aufguss' | 'out-of-order' | 'hidden'
+  status      String   @default("active")
+  order       Int      @default(0)
+  imageId     String?
+  color       String?
+  description String?
+  // Free-form JSON for temperature/humidity/capacity/features.
+  info        Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+  @@map("saunas")
+}
+
+model Aroma {
+  id        String   @id
+  name      String
+  emoji     String
+  color     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+  @@map("aromas")
+}
+
+model InfoItem {
+  id        String   @id
+  title     String
+  text      String
+  imageId   String?
+  // Allowed values: 'thumbnail' | 'background'
+  imageMode String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+  @@map("info_items")
+}
+
+model Event {
+  id               String     @id
+  name             String
+  description      String?
+  imageId          String?
+  startDate        String
+  startTime        String
+  endDate          String?
+  endTime          String?
+  // Allowed values: 'Evt1' | 'Evt2'
+  assignedPreset   String
+  isActive         Boolean    @default(true)
+  targetDeviceIds  String[]   @default([])
+  slideshowId      String?
+  order            Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  slideshow        Slideshow? @relation(fields: [slideshowId], references: [id], onDelete: SetNull)
+
+  @@index([slideshowId])
+  @@index([isActive])
+  @@index([order])
+  @@map("events")
 }
 
 model Device {

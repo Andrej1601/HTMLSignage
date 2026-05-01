@@ -263,42 +263,12 @@ router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mut
       });
     }
 
-    // Find events (in active settings JSON) that still reference this
-    // slideshow so we can clear those refs as part of the same write —
-    // otherwise deleted slideshows would leave dangling pointers that
-    // silently fall back to the default at display-config resolve time.
-    const activeSettings = await prisma.settings.findFirst({
-      where: { isActive: true },
-      orderBy: { version: 'desc' },
-      select: { id: true, data: true, version: true },
-    });
-
-    let clearedEventCount = 0;
-    if (activeSettings) {
-      const settingsData = { ...(activeSettings.data as Record<string, unknown>) };
-      const events = Array.isArray(settingsData.events) ? settingsData.events : null;
-      if (events) {
-        const updatedEvents = events.map((event) => {
-          if (
-            event && typeof event === 'object' && !Array.isArray(event)
-            && (event as Record<string, unknown>).slideshowId === slideshowId
-          ) {
-            const next = { ...(event as Record<string, unknown>) };
-            delete next.slideshowId;
-            clearedEventCount += 1;
-            return next;
-          }
-          return event;
-        });
-        if (clearedEventCount > 0) {
-          settingsData.events = updatedEvents;
-          await prisma.settings.update({
-            where: { id: activeSettings.id },
-            data: { data: settingsData as Prisma.InputJsonValue },
-          });
-        }
-      }
-    }
+    // Events live in their own table since the settings-aggregate split.
+    // The FK constraint (events.slideshowId → slideshows.id, ON DELETE
+    // SET NULL) handles the actual ref clearing automatically when the
+    // Slideshow row is deleted — we just count and audit-log the impact
+    // here so the response reflects how many events lost their pointer.
+    const clearedEventCount = await prisma.event.count({ where: { slideshowId } });
 
     // Reassign devices that reference this slideshow → null (fall back
     // to the default Standard-Slideshow at display-config resolve time).
