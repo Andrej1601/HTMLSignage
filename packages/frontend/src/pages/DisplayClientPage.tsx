@@ -202,11 +202,27 @@ export function DisplayClientPage() {
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
 
+    // Kiosk-Recovery: in der Live-Auspielung (cursor: none, keine
+    // Tastatur am Display) wird `pointerdown`/`keydown` nie feuern.
+    // Damit das Spa nicht stundenlang stumm läuft, versuchen wir alle
+    // 15 s erneut zu starten — Browser-Autoplay-Policies entsperren
+    // sich z. B. nach Page-Visibility-Wechseln, Settings-Updates oder
+    // wenn der Browser inzwischen einen User-Activation-Token bekommen
+    // hat. Im Preview-Modus lassen wir den Button weiter die Hauptrolle
+    // spielen — der Admin sieht so klar, dass etwas nicht passt.
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    if (!isPreviewMode) {
+      intervalId = setInterval(() => {
+        void tryPlayAudio();
+      }, 15_000);
+    }
+
     return () => {
       window.removeEventListener('pointerdown', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio]);
+  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio, isPreviewMode]);
 
   // Slideshow
   const {
@@ -263,7 +279,7 @@ export function DisplayClientPage() {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center">
-          <div className="text-3xl font-bold mb-4">HTMLSignage</div>
+          <div className="text-3xl font-bold mb-4">Signage Control Center</div>
           <div className="text-lg">Wird geladen...</div>
         </div>
       </div>
@@ -274,12 +290,16 @@ export function DisplayClientPage() {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center max-w-2xl px-8">
-          <div className="text-4xl font-bold mb-8">HTMLSignage</div>
+          <div className="text-4xl font-bold mb-8">Signage Control Center</div>
 
           <div className="bg-spa-surface/10 backdrop-blur-lg rounded-3xl p-12 mb-8">
             <h2 className="text-2xl font-semibold mb-6">Gerät nicht gepairt</h2>
-            <p className="text-lg mb-8 opacity-90">
-              Bitte geben Sie diesen Pairing-Code im Admin-Interface ein:
+            {/* Erklärtext aus 1-2 m Distanz lesbar — `text-base`
+                statt `text-lg` mit voller Opacity statt opacity-90.
+                Das Pairing erfolgt während Erstinstallation, der
+                Saunameister steht direkt vor dem Display. */}
+            <p className="text-base mb-8 leading-relaxed">
+              Bitte geben Sie diesen Code in der Admin-Oberfläche ein:
             </p>
 
             <div className="bg-spa-surface text-spa-primary rounded-2xl p-8 mb-6">
@@ -288,13 +308,16 @@ export function DisplayClientPage() {
               </div>
             </div>
 
-            <p className="text-sm opacity-75">
-              Öffnen Sie das Admin-Interface unter /devices und geben Sie diesen Code ein.
+            <p className="text-base leading-relaxed">
+              Admin öffnen → <span className="font-semibold">Geräte</span> → Code eingeben
             </p>
           </div>
 
-          <div className="text-sm opacity-60">
-            Device ID: {pairingInfo.id.slice(0, 12)}...
+          {/* Device-ID auf opacity-80 statt 60 — der Wert ist eh winzig
+              gerendert; weniger transparent macht ihn ohne mehr Platz
+              überhaupt erst lesbar. */}
+          <div className="text-sm opacity-80 font-mono">
+            Geräte-ID: {pairingInfo.id.slice(0, 12)}…
           </div>
         </div>
       </div>
@@ -413,29 +436,36 @@ export function DisplayClientPage() {
         }}
       />
 
-      {isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
+      {/* Audio-Unlock-Button: nur im Preview-Modus sichtbar.
+          Im Kiosk (cursor: none) wäre er unklickbar und würde Gäste
+          irritieren — dort übernimmt der Auto-Retry-Loop oben. */}
+      {isPreviewMode && isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
         <button
           onClick={() => {
             void tryPlayAudio();
           }}
           className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black"
         >
-          {isPreviewMode ? 'Audio in Vorschau aktivieren' : 'Audio aktivieren'}
+          Audio in Vorschau aktivieren
         </button>
       )}
 
-      {/* Slide Indicators */}
+      {/* Slide Indicators — Container mit dunklem Backdrop, damit die
+          Pillen auch über hellem Foto-Hintergrund aus 3-5 m sichtbar
+          bleiben (vorher: bg-spa-surface/40 verschwand auf Dampf-weiß). */}
       {showSlideIndicators && totalSlides > 1 && !isModernDesign && (
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-50">
+        <div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 inline-flex items-center gap-2 rounded-full bg-black/35 px-3 py-1.5 backdrop-blur-sm"
+          aria-label={`Slide ${currentSlideIndex + 1} von ${totalSlides}`}
+        >
           {Array.from({ length: totalSlides }).map((_, i) => (
             <div
               key={`slide-indicator-${i}`}
               className={classNames(
-                'w-3 h-3 rounded-full transition-all',
-                i === currentSlideIndex
-                  ? 'bg-spa-surface w-8'
-                  : 'bg-spa-surface/40'
+                'h-2 rounded-full transition-all',
+                i === currentSlideIndex ? 'bg-white w-8' : 'bg-white/55 w-2',
               )}
+              aria-hidden="true"
             />
           ))}
         </div>

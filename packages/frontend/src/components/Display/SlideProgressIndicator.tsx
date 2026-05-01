@@ -9,9 +9,11 @@ interface SlideProgressIndicatorProps {
   color: string;
   /** Where to anchor the bar inside the parent. Default: bottom. */
   position?: 'top' | 'bottom';
-  /** Track thickness in px. Default: 1.5. */
+  /** Track thickness in px. Default: 3 (vorher 1.5 — aus 3–5 m
+   *  Distanz im Spa war der dünnere Strich nicht erkennbar). */
   thicknessPx?: number;
-  /** Opacity of the filled portion (0–1). Default: 0.35. */
+  /** Opacity of the filled portion (0–1). Default: 0.6 (vorher 0.35 —
+   *  reicht aus Distanz spürbar besser, ohne den Slide zu überlagern). */
   fillOpacity?: number;
   className?: string;
 }
@@ -32,8 +34,8 @@ export function SlideProgressIndicator({
   durationSec,
   color,
   position = 'bottom',
-  thicknessPx = 1.5,
-  fillOpacity = 0.35,
+  thicknessPx = 3,
+  fillOpacity = 0.6,
   className,
 }: SlideProgressIndicatorProps) {
   const [isActive, setIsActive] = useState(false);
@@ -60,7 +62,7 @@ export function SlideProgressIndicator({
       )}
       style={{
         height: `${thicknessPx}px`,
-        backgroundColor: withAlpha(color, 0.04),
+        backgroundColor: withAlpha(color, 0.12),
       }}
     >
       <div

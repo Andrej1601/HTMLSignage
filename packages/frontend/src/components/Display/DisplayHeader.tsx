@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { HeaderSettings, ThemeColors } from '@/types/settings.types';
 
 interface DisplayHeaderProps {
@@ -16,23 +16,41 @@ interface DisplayHeaderProps {
 export function DisplayHeader({ settings, theme, logoImageUrl }: DisplayHeaderProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Tick only as fine-grained as the UI actually needs. When the clock
-  // is visible we show seconds, so a 1s interval is appropriate; when
-  // the clock is hidden but the date is shown, 60s is plenty; when
-  // nothing time-related is shown, we don't start the interval at all.
+  // 30 s reicht — wir zeigen die Uhrzeit nur als HH:MM ohne Sekunden.
+  // Eine sekündlich tickende Uhr auf einem Wellness-Display ist (a) aus
+  // 3–5 m Distanz unlesbar und (b) ein potenzieller Burn-in-Hotspot, weil
+  // sich die letzten zwei Pixel ständig ändern.
   useEffect(() => {
     if (!settings.showClock && !settings.showDate) return;
-    const intervalMs = settings.showClock ? 1000 : 60_000;
-    const timer = setInterval(() => setCurrentTime(new Date()), intervalMs);
+    const timer = setInterval(() => setCurrentTime(new Date()), 30_000);
     return () => clearInterval(timer);
   }, [settings.showClock, settings.showDate]);
+
+  // Burn-in-Mitigation für 24/7-Displays: alle 30 Min wandert der Header
+  // um 1 px in eine zufällige Richtung. Subpixel-unauffällig im Dampf-Spa,
+  // verhindert aber pixelgenau eingebrannte Logos auf OLED/QLED-Panels.
+  // Nutzt `currentTime` als Tick-Quelle — neu berechnet bei jedem Tick.
+  // MUSS vor dem early-return stehen (Rules-of-Hooks).
+  const burnInShift = useMemo(() => {
+    const slot = Math.floor(currentTime.getTime() / (30 * 60 * 1000));
+    const variants: Array<[number, number]> = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+    ];
+    return variants[slot % variants.length] ?? [0, 0];
+  }, [currentTime]);
 
   if (!settings.enabled) return null;
 
   const formattedTime = currentTime.toLocaleTimeString('de-DE', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
 
   const formattedDate = new Intl.DateTimeFormat('de-DE', {
@@ -59,6 +77,9 @@ export function DisplayHeader({ settings, theme, logoImageUrl }: DisplayHeaderPr
         backgroundColor: theme.dashboardBg || theme.bg,
         borderColor: theme.cardBorder || theme.gridTable,
         color: theme.textMain || theme.fg,
+        // Burn-in-Pixel-Shift, sub-pixel unauffällig
+        transform: `translate(${burnInShift[0]}px, ${burnInShift[1]}px)`,
+        willChange: 'transform',
       }}
     >
       {/* Logo/Title Section */}
@@ -87,8 +108,11 @@ export function DisplayHeader({ settings, theme, logoImageUrl }: DisplayHeaderPr
           )
         )}
         {settings.subtitle && (
+          // Etwas größer als zuvor (10 → 12 px) und reduziertes Tracking
+          // (0.3em → 0.2em), damit die Subtitle aus Spa-Distanz lesbar
+          // bleibt. Opacity 0.9 statt 0.8 für sauberen Kontrast.
           <div
-            className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-80"
+            className="text-xs font-bold uppercase tracking-[0.2em] opacity-90"
             style={{ color: theme.accentGold || theme.accent }}
           >
             {settings.subtitle}
@@ -108,8 +132,11 @@ export function DisplayHeader({ settings, theme, logoImageUrl }: DisplayHeaderPr
             </div>
           )}
           {settings.showDate && (
+            // 12 px statt 10 px + Opacity 0.9 statt 0.7 für besseren
+            // Kontrast aus Distanz; `text-muted` statt voll-textMain ist
+            // OK weil die Datumsangabe sekundär zur Uhrzeit ist.
             <div
-              className="mt-1 text-[10px] font-black uppercase tracking-widest opacity-70"
+              className="mt-1 text-xs font-black uppercase tracking-widest opacity-90"
               style={{ color: theme.textMuted || theme.fg }}
             >
               {formattedDate}

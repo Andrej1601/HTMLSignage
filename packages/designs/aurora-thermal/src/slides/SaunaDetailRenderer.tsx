@@ -326,7 +326,14 @@ function InfusionRow({
     ? withAlpha(colors.textPrimary, 0.55)
     : colors.textPrimary;
 
-  const aromaList = (entry.aromas ?? []).slice(0, 4);
+  // Maximal 4 Aromen sichtbar — der Rest wird als "+N weitere"-Chip
+  // angedeutet, damit der Gast erkennt, dass noch mehr drin steckt
+  // (Saunameister konfigurieren oft 5–6 Aromen, die wir bei stillem
+  // Cut verschwinden ließen).
+  const allAromas = entry.aromas ?? [];
+  const AROMA_LIMIT = 4;
+  const aromaList = allAromas.slice(0, AROMA_LIMIT);
+  const aromaOverflow = Math.max(0, allAromas.length - AROMA_LIMIT);
 
   return (
     <div
@@ -408,6 +415,26 @@ function InfusionRow({
                 </span>
               );
             })}
+            {aromaOverflow > 0 && (
+              <span
+                className="inline-flex items-center"
+                style={{
+                  padding: `${scaled(2, viewport, 1)}px ${scaled(9, viewport, 3)}px`,
+                  borderRadius: 9999,
+                  backgroundColor: withAlpha(colors.textPrimary, 0.06),
+                  border: `1px solid ${withAlpha(colors.textPrimary, 0.25)}`,
+                  color: withAlpha(colors.textPrimary, isFinished ? 0.55 : 0.75),
+                  fontFamily: typography.fontBody,
+                  fontSize: `${scaledFont(typography.baseSizePx * typography.scaleSm * 0.92, viewport, 8)}px`,
+                  fontWeight: 500,
+                  letterSpacing: '0.02em',
+                  lineHeight: 1.1,
+                }}
+                aria-label={`${aromaOverflow} weitere Aromen`}
+              >
+                +{aromaOverflow} weitere
+              </span>
+            )}
           </div>
         ) : null}
       </div>
@@ -1138,10 +1165,16 @@ function HeroInfusionTile({
               fontStyle: 'italic',
             }}
           >
-            {entry.aromas!
-              .slice(0, 3)
-              .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
-              .join(' · ')}
+            {(() => {
+              const HERO_AROMA_LIMIT = 3;
+              const aromas = entry.aromas!;
+              const visible = aromas
+                .slice(0, HERO_AROMA_LIMIT)
+                .map((a) => (a.emoji ? `${a.emoji} ${a.name}` : a.name))
+                .join(' · ');
+              const overflow = aromas.length - HERO_AROMA_LIMIT;
+              return overflow > 0 ? `${visible} · +${overflow}` : visible;
+            })()}
           </span>
         ) : null}
       </div>
