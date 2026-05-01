@@ -10,13 +10,24 @@ import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
-import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3, X, CheckSquare } from 'lucide-react';
+import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3, X, CheckSquare, Layers } from 'lucide-react';
+import { TabGroup, type Tab } from '@/components/TabGroup';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 import { ComboboxField } from '@/components/ComboboxField';
 import { useMediaPageState, normalizeTagsInput, hasTagCaseInsensitive } from '@/hooks/useMediaPageState';
+
+// Type-Filter-Tabs — bewusst auf Modulebene, damit `MEDIA_TYPE_TABS`
+// nicht bei jedem Render neu allokiert wird (TabGroup macht
+// referenzielle Identität nicht zu schaffen, aber sauber ist sauber).
+const MEDIA_TYPE_TABS: Tab<MediaType | 'all'>[] = [
+  { id: 'all', label: 'Alle' },
+  { id: 'image', label: 'Bilder', icon: ImageIcon },
+  { id: 'audio', label: 'Audio', icon: Music },
+  { id: 'video', label: 'Video', icon: Film },
+];
 
 export function MediaPage() {
   const state = useMediaPageState();
@@ -115,27 +126,35 @@ export function MediaPage() {
             />
           </div>
 
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
-            className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
-          >
-            <option value="all">Alle Typen</option>
-            <option value="image">Bilder</option>
-            <option value="audio">Audio</option>
-            <option value="video">Video</option>
-          </select>
+          {/* Type-Filter als TabGroup — gleicher Pattern wie DevicesPage,
+              keine native Select-Optik auf iPad/Android. */}
+          <TabGroup
+            tabs={MEDIA_TYPE_TABS}
+            activeTab={typeFilter}
+            onChange={setTypeFilter}
+          />
 
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
-          >
-            <option value="all">Alle Tags</option>
-            {availableTags.map((tag) => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
+          {/* Tag-Filter bleibt als nativer Select, weil Tags dynamisch
+              wachsen und eine TabGroup mit 30+ Einträgen unbrauchbar wäre.
+              Optik via gleicher Klasse wie das Suchfeld, mit Layers-Icon
+              als Affordanz. */}
+          <div className="relative">
+            <Layers
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary pointer-events-none"
+              aria-hidden="true"
+            />
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              aria-label="Tag-Filter"
+              className="rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-8 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20 appearance-none"
+            >
+              <option value="all">Alle Tags</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="flex items-center gap-1 rounded-lg border border-spa-bg-secondary bg-spa-surface p-1">
             <button

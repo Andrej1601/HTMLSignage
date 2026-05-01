@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { Layout } from '@/components/Layout';
+import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/Button';
 import { Skeleton } from '@/components/Skeleton';
 import { ScheduleGrid } from '@/components/Schedule/ScheduleGrid';
 import { ScheduleStackView } from '@/components/Schedule/ScheduleStackView';
@@ -15,6 +17,7 @@ import { Save, Calendar, RefreshCw } from 'lucide-react';
 import { useCommandPaletteActions } from '@/hooks/useCommandPaletteActions';
 import { useScheduleEditor } from '@/hooks/useScheduleEditor';
 import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 import { PresetTabs } from '@/components/Schedule/PresetTabs';
 import { AutosaveIndicator } from '@/components/AutosaveIndicator';
 import clsx from 'clsx';
@@ -49,6 +52,7 @@ export function SchedulePage() {
   ] : [], [editor.isDirty, editor.handleSave]);
   useCommandPaletteActions(paletteActions);
   useSaveShortcut(editor.handleSave, { enabled: !editor.isSaving, isDirty: editor.isDirty });
+  useDirtyRegistry(editor.isDirty);
 
   if (editor.isLoading || !editor.localSchedule) return <SchedulePageSkeleton />;
   if (editor.error) return <SchedulePageError error={editor.error} onRetry={() => editor.refetch()} />;
@@ -57,70 +61,73 @@ export function SchedulePage() {
     <Layout>
       <div className="space-y-4">
 
-        {/* ── Header ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-spa-primary/10">
-              <Calendar className="h-5 w-5 text-spa-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-spa-text-primary leading-tight">Aufgussplan</h1>
-              <p className="text-xs text-spa-text-secondary mt-0.5">
-                v{editor.localSchedule.version} · Live: {PRESET_LABELS[editor.livePreset]} · Bearb.: {PRESET_LABELS[editor.editingPreset]}
-              </p>
-            </div>
-          </div>
+        {/* ── Header — vereinheitlicht über PageHeader ── */}
+        <PageHeader
+          title="Aufgussplan"
+          description={`Live aktiv: ${PRESET_LABELS[editor.livePreset]}. In Bearbeitung: ${PRESET_LABELS[editor.editingPreset]}.`}
+          icon={Calendar}
+          badges={[
+            {
+              label: editor.localSchedule.autoPlay ? 'Auto-Play aktiv' : 'Manueller Modus',
+              tone: editor.localSchedule.autoPlay ? 'success' : 'warning',
+            },
+            {
+              label: editor.isDirty ? 'Ungespeicherte Änderungen' : 'Alles gespeichert',
+              tone: editor.isDirty ? 'warning' : 'success',
+            },
+          ]}
+          actions={(
+            <>
+              <AutosaveIndicator isDirty={editor.isDirty} lastAutoSavedAt={editor.draftState.lastAutoSavedAt} />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <AutosaveIndicator isDirty={editor.isDirty} lastAutoSavedAt={editor.draftState.lastAutoSavedAt} />
-
-            {/* Auto-Play Toggle */}
-            <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-              <span className="text-sm text-spa-text-secondary">Auto-Play</span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={editor.localSchedule.autoPlay}
-                onClick={editor.handleAutoPlayToggle}
-                className={clsx(
-                  'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200',
-                  editor.localSchedule.autoPlay ? 'bg-spa-success' : 'bg-spa-bg-secondary'
-                )}
-              >
-                <span
+              {/* Auto-Play Toggle bewusst im Action-Slot — Saunameister-
+                  Workflow erwartet ihn am Header-Rechtsrand neben Save. */}
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-sm text-spa-text-secondary">Auto-Play</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={editor.localSchedule.autoPlay}
+                  onClick={editor.handleAutoPlayToggle}
                   className={clsx(
-                    'pointer-events-none inline-block h-4 w-4 rounded-full bg-spa-surface shadow-sm transition-transform duration-200',
-                    editor.localSchedule.autoPlay ? 'translate-x-4' : 'translate-x-0'
+                    'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200',
+                    editor.localSchedule.autoPlay ? 'bg-spa-success' : 'bg-spa-bg-secondary',
                   )}
-                />
-              </button>
-            </label>
+                >
+                  <span
+                    className={clsx(
+                      'pointer-events-none inline-block h-4 w-4 rounded-full bg-spa-surface shadow-sm transition-transform duration-200',
+                      editor.localSchedule.autoPlay ? 'translate-x-4' : 'translate-x-0',
+                    )}
+                  />
+                </button>
+              </label>
 
-            <button
-              onClick={() => { editor.draftState.clearDraft(); editor.resetToLiveSchedule(); }}
-              disabled={!editor.isDirty}
-              className="inline-flex items-center gap-2 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm font-medium text-spa-text-secondary hover:border-spa-error-light hover:text-spa-error transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Ungespeicherte Änderungen verwerfen"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Reset
-            </button>
+              <Button
+                variant="ghost"
+                icon={RefreshCw}
+                onClick={() => {
+                  editor.draftState.clearDraft();
+                  editor.resetToLiveSchedule();
+                }}
+                disabled={!editor.isDirty}
+                title="Ungespeicherte Änderungen verwerfen"
+              >
+                Reset
+              </Button>
 
-            <button
-              onClick={editor.handleSave}
-              disabled={!editor.isDirty || editor.isSaving}
-              className={clsx(
-                'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all',
-                editor.isDirty
-                  ? 'bg-spa-primary text-white shadow-md hover:bg-spa-primary-dark'
-                  : 'bg-spa-bg-secondary text-spa-text-secondary cursor-not-allowed'
-              )}
-            >
-              <Save className="h-4 w-4" />
-              {editor.isSaving ? 'Speichert…' : 'Speichern'}
-            </button>
-          </div>
-        </div>
+              <Button
+                icon={Save}
+                onClick={editor.handleSave}
+                disabled={!editor.isDirty}
+                loading={editor.isSaving}
+                loadingText="Speichert…"
+              >
+                Speichern
+              </Button>
+            </>
+          )}
+        />
 
         {/* ── Dirty Banner ── */}
         {editor.isDirty && (

@@ -15,6 +15,7 @@ import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
 import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 import { usePermission } from '@/hooks/usePermission';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import api from '@/services/api';
@@ -206,6 +207,7 @@ export function SaunasPage() {
   };
 
   useSaveShortcut(handleSaveAll, { enabled: !isSaving, isDirty });
+  useDirtyRegistry(isDirty);
 
   const handleReload = () => {
     setIsInitialized(false);

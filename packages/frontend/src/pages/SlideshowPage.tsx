@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { CheckCircle2, RefreshCw, Save, SlidersHorizontal } from 'lucide-react';
 import { useSlideshowEditor } from '@/hooks/useSlideshowEditor';
 import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 
 export function SlideshowPage() {
   const editor = useSlideshowEditor();
@@ -18,6 +19,7 @@ export function SlideshowPage() {
     enabled: !editor.isBusy,
     isDirty: editor.isDirty,
   });
+  useDirtyRegistry(editor.isDirty);
 
   if (editor.isLoading || !editor.settings || !editor.editorConfig || !editor.previewPayload) {
     return (
@@ -66,17 +68,22 @@ export function SlideshowPage() {
           </div>
         )}
 
-        {editor.slideshowQualityIssues.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-2.5 text-sm text-spa-success-dark">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="font-medium">Qualitätscheck bestanden</span>
-          </div>
-        ) : (
-          <EditorQualityAssistant
-            description={`Prüft „${editor.selectedSlideshow?.name || 'Slideshow'}" auf leere Zonen, tote Referenzen und Audio-Probleme.`}
-            issues={editor.slideshowQualityIssues}
-            okMessage=""
-          />
+        {/* Qualitätscheck nur dann anzeigen, wenn überhaupt eine Slideshow
+            gewählt ist — sonst suggeriert das grüne „bestanden"-Banner
+            unter einem leeren Editor falsche Sicherheit. */}
+        {editor.selectedSlideshow && (
+          editor.slideshowQualityIssues.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-2.5 text-sm text-spa-success-dark">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span className="font-medium">Qualitätscheck bestanden</span>
+            </div>
+          ) : (
+            <EditorQualityAssistant
+              description={`Prüft „${editor.selectedSlideshow.name}" auf leere Zonen, tote Referenzen und Audio-Probleme.`}
+              issues={editor.slideshowQualityIssues}
+              okMessage=""
+            />
+          )
         )}
 
         <SlideshowConfigPanel

@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useState, useMemo } from 'react';
 import { toast } from '@/stores/toastStore';
 import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 import { Layout } from '@/components/Layout';
+import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Skeleton, SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -229,6 +231,7 @@ export function SettingsPage() {
   }, [localSettings, conflictInfo, save, draftState]);
 
   useSaveShortcut(handleSave, { enabled: !isSaving, isDirty });
+  useDirtyRegistry(isDirty);
 
   const handleReload = () => {
     draftState.clearDraft();
@@ -315,7 +318,7 @@ export function SettingsPage() {
     { id: 'theme', label: 'Farben & Design', icon: Palette },
     { id: 'audio', label: 'Audio', icon: Music },
     { id: 'maintenance', label: 'Wartungsscreen', icon: Monitor },
-    { id: 'aromas', label: 'Aromas', icon: Sparkles },
+    { id: 'aromas', label: 'Aromen', icon: Sparkles },
     { id: 'infos', label: 'Infos', icon: Info },
     { id: 'events', label: 'Events', icon: Calendar },
     ...(canSystem ? [{ id: 'system' as const, label: 'System', icon: Wrench }] : []),
@@ -345,9 +348,12 @@ export function SettingsPage() {
   if (!localSettings) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-spa-text-secondary">Keine Einstellungen verfügbar</div>
-        </div>
+        <ErrorAlert
+          error={
+            new Error('Einstellungen konnten nicht geladen werden. Backend-Verbindung prüfen oder erneut versuchen.')
+          }
+          onRetry={() => refetch()}
+        />
       </Layout>
     );
   }

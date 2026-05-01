@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { useWebSocketStatus } from '@/contexts/WebSocketContext';
 import { useThemeMode } from '@/hooks/useThemeMode';
+import { hasAnyDirty } from '@/hooks/useDirtyRegistry';
 
 interface NavItem {
   name: string;
@@ -175,6 +176,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }
 
   const handleLogout = async () => {
+    // Schutz vor versehentlichem Logout mit ungespeicherten Edits.
+    // Pages, die `usePageDirty(isDirty)` aufrufen, registrieren sich
+    // im Dirty-Registry — diese Last-Line-of-Defense fragt vor dem
+    // tatsächlichen `logout()`-Call nach (das `useBlocker`-System der
+    // Pages greift erst beim `navigate('/login')` und damit zu spät —
+    // der User wäre schon ausgeloggt, würde aber auf der Page bleiben).
+    if (hasAnyDirty()) {
+      const ok = window.confirm(
+        'Es gibt ungespeicherte Änderungen. Wirklich abmelden?',
+      );
+      if (!ok) return;
+    }
     await logout();
     navigate('/login');
   };
@@ -305,8 +318,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-6 w-6" aria-hidden="true" />
           )}
         </button>
+        {/* Mobile Top-Bar Brand: bewusst KEIN <h1> — die Page setzt
+            ihren eigenen <h1>. Doppelte H1s verwirren Screenreader-
+            Navigation (a11y). Wir nutzen ein semantisches
+            `<header role="banner">`-Markup mit normaler Schrift. */}
         <div className="ml-4 flex-1">
-          <h1 className="text-xl font-bold">HTMLSignage</h1>
+          <p className="text-xl font-bold leading-tight">Signage Control Center</p>
           {activeNavigation && (
             <p className="mt-0.5 text-[11px] text-white/90">{activeNavigation.name}</p>
           )}

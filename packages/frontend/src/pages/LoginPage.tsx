@@ -68,7 +68,7 @@ export function LoginPage() {
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">
-            HTMLSignage
+            Signage Control Center
           </h1>
           <p className="text-spa-text-secondary">
             {mode === 'login' ? 'Anmelden' : 'Erster Administrator'}
