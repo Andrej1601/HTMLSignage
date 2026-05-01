@@ -83,11 +83,24 @@ export function useDashboardData() {
     refetchInterval: 15000,
   });
 
+  // Adaptives Polling: solange Jobs aktiv laufen (running/queued), pollen
+  // wir aggressiv (5 s) damit Statuswechsel sichtbar werden. Sobald kein
+  // aktiver Job da ist, drosseln wir auf 30 s — auf dem Dashboard liefen
+  // sonst 12 Polls/Min für Daten, die sich nur einmal pro Stunde ändern.
+  // react-query erlaubt eine Funktions-Form, die bei jedem Tick die
+  // aktuelle Query inspiziert; so bleibt das Intervall responsive ohne
+  // einen separaten State-Tick.
   const systemJobsQuery = useQuery({
     queryKey: ['dashboard-system-jobs'],
     queryFn: () => systemApi.listJobs(6),
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      const hasActive = items
+        ? items.some((j) => j.status === 'running' || j.status === 'queued')
+        : false;
+      return hasActive ? 5_000 : 30_000;
+    },
   });
 
   const isLoading =

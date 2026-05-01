@@ -52,13 +52,26 @@ export function DisplayClientPage() {
     deviceToken,
   } = useDisplayClientRuntime(isPreviewMode);
 
-  const effectiveSettings = useMemo(() => {
-    const { settings: base } = applyActiveEventSettings(
+  // Optimierung: `eventClock` tickt alle 30 s. Wenn wir es direkt als
+  // Memo-Dep nutzen, wird `effectiveSettings` jede halbe Minute neu
+  // berechnet — und damit alle nachgelagerten Memos (mediaAssetUrls,
+  // resolvedAudioSettings, …) und der gesamte Display-Render-Baum.
+  // Stattdessen: Active-Event-Berechnung von eventClock abhängig
+  // halten, aber als Dep für `effectiveSettings` nur die *Identität*
+  // des Events verwenden. Damit ändert sich `effectiveSettings` nur
+  // an Event-Grenzen, nicht im Sekundentakt.
+  const eventComputation = useMemo(() => {
+    return applyActiveEventSettings(
       migrateSettings(localSettings || getDefaultSettings()),
       new Date(eventClock),
       displayDeviceId,
     );
-    // Apply design overrides from slideshow config onto top-level settings
+  }, [displayDeviceId, localSettings, eventClock]);
+
+  const activeEventId = eventComputation.activeEvent?.id ?? null;
+
+  const effectiveSettings = useMemo(() => {
+    const base = eventComputation.settings;
     const sc = base.slideshow;
     if (!sc) return base;
     const merged = { ...base };
@@ -73,8 +86,7 @@ export function DisplayClientPage() {
       merged.header = { ...(merged.header ?? {}), ...sc.header } as typeof merged.header;
     }
     // Per-slideshow maintenance-screen override. Missing fields fall
-    // through to the global `settings.maintenanceScreen`, matching the
-    // header-override semantics operators already rely on.
+    // through to the global `settings.maintenanceScreen`.
     if (sc.maintenanceScreen && Object.keys(sc.maintenanceScreen).length > 0) {
       merged.maintenanceScreen = {
         ...(merged.maintenanceScreen ?? {}),
@@ -82,7 +94,10 @@ export function DisplayClientPage() {
       } as typeof merged.maintenanceScreen;
     }
     return merged;
-  }, [displayDeviceId, localSettings, eventClock]);
+    // Bewusst NICHT eventClock: nur die Event-Identität entscheidet, ob
+    // die Slideshow-/Theme-Merge neu gemacht werden muss.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayDeviceId, localSettings, activeEventId]);
 
   // Audio: disabled in preview mode, slideshow audioOverride takes priority over global
   const resolvedAudioSettings = useMemo(() => {

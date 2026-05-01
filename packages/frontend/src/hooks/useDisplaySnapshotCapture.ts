@@ -4,6 +4,23 @@ import { displayDevicesApi } from '@/services/displayApi';
 
 const SLIDE_SNAPSHOT_MIN_INTERVAL_MS = 30_000;
 
+/** Wartet auf einen idle-Slot des Browsers (oder nach max `timeoutMs`).
+ *  `requestIdleCallback` ist nicht in allen Engines verfügbar (Safari) —
+ *  Fallback ist ein simpler `setTimeout`, das ist auf einem Display-
+ *  Client immer noch besser als blockierender sofortiger Render. */
+function whenIdle(timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    const ric = (window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }).requestIdleCallback;
+    if (typeof ric === 'function') {
+      ric(() => resolve(), { timeout: timeoutMs });
+    } else {
+      window.setTimeout(resolve, Math.min(timeoutMs, 1500));
+    }
+  });
+}
+
 interface UseDisplaySnapshotCaptureOptions {
   canCaptureSnapshots: boolean;
   currentSlideIndex: number;
@@ -43,6 +60,14 @@ export function useDisplaySnapshotCapture({
         await (document as Document & { fonts?: FontFaceSet }).fonts?.ready;
       }
       await new Promise((resolve) => window.requestAnimationFrame(() => resolve(undefined)));
+      // Auf einem Raspberry Pi blockiert `toJpeg` den Main-Thread
+      // 200-800 ms — wenn das mit einer laufenden Slide-Transition
+      // kollidiert, gibt es einen sichtbaren Frame-Freeze. Wir warten
+      // bis zu 2 s auf einen idle-Slot, bevor wir den schweren Render
+      // starten. Im worst case (kein Idle in 2s) machen wir trotzdem
+      // weiter — der Snapshot ist nicht so wichtig, dass er beliebig
+      // verschoben werden dürfte.
+      await whenIdle(2_000);
 
       const snapshotOptions = {
         backgroundColor: snapshotBackgroundColor,
@@ -107,9 +132,14 @@ export function useDisplaySnapshotCapture({
   useEffect(() => {
     if (!canCaptureSnapshots || !deviceId) return;
 
+    // Slide-Wechsel-Snapshot: 5 s statt 2.5 s warten, damit die
+    // Transition (typisch 0.6-1.0 s) sicher abgeschlossen ist und
+    // nachfolgende Asset-Loads (Resilient-Image-Fallbacks etc.) Zeit
+    // hatten zu landen. Der `whenIdle`-Gate im Capture selbst sorgt
+    // zusätzlich dafür, dass wir den Browser nicht kalt unterbrechen.
     const timer = window.setTimeout(() => {
       if (!snapshotUploadInFlightRef.current) void captureLiveSnapshot();
-    }, 2500);
+    }, 5_000);
 
     return () => {
       window.clearTimeout(timer);

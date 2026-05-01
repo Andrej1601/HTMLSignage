@@ -321,9 +321,23 @@ export function ScheduleGrid({
                     const isHovered     = hoveredCell === cellKey;
                     const cellConflicts = getConflictsForCell(conflicts, timeRowIndex, saunaIndex);
                     const saunaName     = daySchedule.saunas?.[saunaIndex] ?? `Sauna ${saunaIndex + 1}`;
+                    // a11y: aria-label muss alle visuellen Signale auch
+                    // an Screenreader weitergeben (Konflikt-Icon, Live-
+                    // Pulse). Sonst ist die Zelle nur farblich markiert
+                    // (WCAG 1.4.1 Use of Color).
+                    const statusBits: string[] = [];
+                    if (isCurrentRow) statusBits.push('läuft jetzt');
+                    if (cellConflicts.length > 0) {
+                      statusBits.push(
+                        cellConflicts.length === 1
+                          ? 'Konflikt'
+                          : `${cellConflicts.length} Konflikte`,
+                      );
+                    }
+                    const statusSuffix = statusBits.length > 0 ? ` (${statusBits.join(', ')})` : '';
                     const cellLabel = entry
-                      ? `${timeRow.time}, ${saunaName}: ${entry.title}${entry.subtitle ? ' — ' + entry.subtitle : ''}`
-                      : `${timeRow.time}, ${saunaName}: leerer Slot, zum Hinzufügen aktivieren`;
+                      ? `${timeRow.time}, ${saunaName}: ${entry.title}${entry.subtitle ? ' — ' + entry.subtitle : ''}${statusSuffix}`
+                      : `${timeRow.time}, ${saunaName}: leerer Slot, zum Hinzufügen aktivieren${statusSuffix}`;
 
                     return (
                       <td key={saunaIndex} className="px-3 py-2.5">
