@@ -209,44 +209,69 @@ export function ScheduleGrid({
     <div className="overflow-hidden">
       <div className="overflow-auto max-h-[72vh]">
         <table className="w-full border-collapse">
-          {/* Sticky header */}
+          {/* Sticky header — neu gestaltet:
+              - Sauna-Name groß und prominent (text-base font-bold)
+              - Sauna-Farbe als seitlicher Akzent-Strip am linken Rand
+              - Temperatur als Pill-Badge (`bg-white/15`)
+              - Status als farbcodiertes Pill, dessen Hintergrund die
+                Status-Farbe in 22 % Alpha widerspiegelt — aktiv=grün,
+                keine Aufgüsse=amber, außer Betrieb=rot
+              - Mehr vertikales Padding (py-4 statt py-3) für Atmen
+              - Subtle weißer Trenner zwischen Sauna-Spalten */}
           <thead className="sticky top-0 z-20">
             <tr className="bg-spa-header-bg text-white">
-              <th className="px-4 py-3 text-left w-24 sticky left-0 z-30 bg-spa-header-bg">
-                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/60">
-                  <Clock className="w-3.5 h-3.5" />
+              <th className="px-4 py-4 text-left w-24 sticky left-0 z-30 bg-spa-header-bg">
+                <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/70">
+                  <Clock className="w-3.5 h-3.5" aria-hidden="true" />
                   Zeit
                 </span>
               </th>
 
               {daySchedule.saunas.map((saunaName, idx) => {
-                const color       = saunaColors[saunaName];
-                const sauna       = saunaByName[saunaName];
+                const color = saunaColors[saunaName];
+                const sauna = saunaByName[saunaName];
                 const statusColor = sauna ? SAUNA_STATUS_COLORS[sauna.status] : '#10b981';
                 const statusLabel = sauna ? SAUNA_STATUS_LABELS[sauna.status] : null;
                 const temperature = sauna?.info?.temperature;
+                const isFirst = idx === 0;
 
                 return (
-                  <th key={idx} className="px-4 py-3 text-left min-w-[220px]">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        {color && (
-                          <span
-                            className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white/20"
-                            style={{ backgroundColor: color }}
-                          />
-                        )}
-                        <span className="text-sm font-bold text-white tracking-wide">{saunaName}</span>
-                      </div>
+                  <th
+                    key={idx}
+                    className={clsx(
+                      'px-4 py-4 text-left min-w-[220px] relative',
+                      !isFirst && 'border-l border-white/10',
+                    )}
+                  >
+                    {/* Farb-Akzent-Strip am linken Rand der Spalte */}
+                    {color && (
+                      <span
+                        className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-sm"
+                        style={{ backgroundColor: color }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <div className="flex flex-col gap-1.5 pl-2">
+                      <span className="text-base font-bold text-white tracking-tight leading-tight">
+                        {saunaName}
+                      </span>
                       {(statusLabel || temperature) && (
-                        <div className="flex items-center gap-2 pl-0.5">
-                          {temperature && (
-                            <span className="text-[11px] font-semibold text-white/80">{temperature}°C</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {temperature != null && (
+                            <span
+                              className="inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white"
+                              aria-label={`Temperatur: ${temperature} Grad Celsius`}
+                            >
+                              {temperature}°C
+                            </span>
                           )}
                           {statusLabel && (
                             <span
-                              className="inline-flex items-center gap-1 text-[10px] font-medium"
-                              style={{ color: 'rgba(255,255,255,0.55)' }}
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+                              style={{
+                                backgroundColor: `${statusColor}38`,
+                                boxShadow: `inset 0 0 0 1px ${statusColor}55`,
+                              }}
                               aria-label={`Status: ${statusLabel}`}
                             >
                               <span
@@ -264,7 +289,7 @@ export function ScheduleGrid({
                 );
               })}
 
-              <th className="px-2 py-3 w-12" />
+              <th className="px-2 py-4 w-12" />
             </tr>
           </thead>
 

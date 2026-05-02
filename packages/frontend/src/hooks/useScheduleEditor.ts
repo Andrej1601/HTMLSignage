@@ -13,6 +13,7 @@ import {
   getTodayPresetKey,
   resolveLivePresetKey,
   syncScheduleWithSaunas,
+  PRESET_LABELS,
 } from '@/types/schedule.types';
 import { getScheduleQualityIssues } from '@/utils/editorQuality';
 import {
@@ -193,9 +194,26 @@ export function useScheduleEditor(): UseScheduleEditorReturn {
       onSuccess: () => {
         draftState.clearDraft();
         setIsDirty(false);
+        // Erfolgs-Toast: differenziert je nachdem, ob ein aktives Event
+        // den manuellen Preset gerade noch maskiert. Sonst hat der User
+        // den Eindruck, der Klick hat nichts bewirkt — `livePreset` wird
+        // weiter vom Event diktiert, bis das Event endet.
+        const presetLabel = PRESET_LABELS[editingPreset] ?? editingPreset;
+        if (activeEvent) {
+          const eventEnd = activeEvent.endTime || '23:59';
+          toast.info(
+            `${presetLabel} wird live geschaltet, sobald Event „${activeEvent.name}" um ${eventEnd} endet. Aktuell läuft das Event weiter.`,
+          );
+        } else {
+          toast.success(`${presetLabel} ist jetzt live.`);
+        }
+      },
+      onError: (err) => {
+        const message = err instanceof Error ? err.message : 'Live-Schalten fehlgeschlagen.';
+        toast.error(message);
       },
     });
-  }, [localSchedule, editingPreset, save, draftState]);
+  }, [localSchedule, editingPreset, save, draftState, activeEvent]);
 
   const handleAutoPlayToggle = useCallback(() => {
     if (!localSchedule) return;

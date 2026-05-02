@@ -109,14 +109,24 @@ export function PresetTabs({ editor }: PresetTabsProps) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* "Auswahl live schalten" */}
+        {/* "Auswahl live schalten" — Label/Tooltip differenziert je
+            nachdem, ob ein aktives Event den manuellen Preset gerade
+            maskiert. Im Event-Fall macht der Button trotzdem etwas
+            (er setzt `activePreset`, was nach Event-Ende greift) —
+            der User braucht aber Feedback, dass es kein Sofort-Effekt
+            ist. Toast erscheint nach erfolgreichem Speichern. */}
         {!editor.localSchedule?.autoPlay && editor.editingPreset !== editor.livePreset && (
           <button
             onClick={editor.handleSetLivePreset}
+            title={
+              editor.activeEvent
+                ? `Aktiviert ${PRESET_LABELS[editor.editingPreset]}, sobald Event „${editor.activeEvent.name}" endet`
+                : `${PRESET_LABELS[editor.editingPreset]} sofort live schalten`
+            }
             className="inline-flex items-center gap-1.5 rounded-lg border border-spa-secondary/40 bg-spa-secondary/10 px-3 py-1.5 text-xs font-medium text-spa-secondary-dark hover:bg-spa-secondary/20 transition-colors"
           >
             <Radio className="h-3.5 w-3.5" />
-            Live schalten
+            {editor.activeEvent ? 'Nach Event live schalten' : 'Live schalten'}
           </button>
         )}
 
