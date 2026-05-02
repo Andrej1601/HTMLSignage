@@ -154,9 +154,24 @@ export function OperationsPulseWidget({
         currentRow && scheduleIdx >= 0
           ? currentRow.entries[scheduleIdx] ?? null
           : null;
-      return { sauna, entry };
+      // Nächsten Aufguss DIESER Sauna im aktuellen Tagesplan suchen —
+      // damit zeigen wir bei „leeren" Slots (vor dem ersten Aufguss,
+      // zwischen zwei Slots ohne Belegung, nach dem letzten) konkret
+      // an, wann die Sauna als nächstes wieder dran ist. Statt eines
+      // nichtssagenden „—".
+      const nextEntryTime: string | null = (() => {
+        if (scheduleIdx < 0) return null;
+        for (const r of rows) {
+          const rowMinutes = parseTimeMinutes(r.time);
+          if (rowMinutes <= nowMinutes) continue;
+          const nextEntry = r.entries[scheduleIdx];
+          if (nextEntry) return r.time;
+        }
+        return null;
+      })();
+      return { sauna, entry, nextEntryTime };
     });
-  }, [visibleSaunas, saunaIndexByKey, currentRow]);
+  }, [visibleSaunas, saunaIndexByKey, currentRow, rows, nowMinutes]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -311,10 +326,21 @@ export function OperationsPulseWidget({
             Saunen — aktueller Slot
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {saunaSlots.map(({ sauna, entry }) => {
+            {saunaSlots.map(({ sauna, entry, nextEntryTime }) => {
               const isActiveStatus = sauna.status === 'active';
               const showEntry = isActiveStatus && entry;
               const statusColor = SAUNA_STATUS_COLORS[sauna.status];
+
+              // Fallback-Label für aktive Saunen ohne aktuellen Eintrag.
+              // Reihenfolge: 1) Pause, wenn wir mitten im Tag und in einem
+              // Slot ohne Belegung sind (currentRow vorhanden, aber leer);
+              // 2) Nächst. um HH:MM, wenn die Sauna heute noch dran ist;
+              // 3) „Heute kein Aufguss", wenn nichts mehr kommt.
+              const idleLabel = currentRow
+                ? 'Pause'
+                : nextEntryTime
+                  ? `Nächst. um ${nextEntryTime}`
+                  : 'Heute kein Aufguss';
 
               return (
                 <div
@@ -360,7 +386,7 @@ export function OperationsPulseWidget({
                         aria-hidden="true"
                       />
                       <span className="text-[11px] text-spa-text-secondary">
-                        {isActiveStatus ? (currentRow ? 'Pause' : '—') : SAUNA_STATUS_LABELS[sauna.status]}
+                        {isActiveStatus ? idleLabel : SAUNA_STATUS_LABELS[sauna.status]}
                       </span>
                     </div>
                   )}
