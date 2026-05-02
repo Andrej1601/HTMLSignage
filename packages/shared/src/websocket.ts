@@ -36,6 +36,19 @@ export interface DeviceAuthErrorPayload {
   error: string;
 }
 
+/** Slideshow change notice. We don't ship the full slide list over the wire
+ *  to keep the broadcast small (slideshows can have many slides + image
+ *  refs); subscribers re-fetch their effective display config when this
+ *  arrives. The `id` is included so admin UIs can avoid invalidating
+ *  unrelated slideshows. */
+export interface SlideshowUpdatePayload {
+  id: string;
+  /** Optional reason — `update`, `create`, `delete`, `default-changed`.
+   *  Reserved for future client-side optimisations; clients today simply
+   *  re-fetch on any of these. */
+  action?: 'update' | 'create' | 'delete' | 'default-changed';
+}
+
 // ─── Server → Client ────────────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
@@ -44,6 +57,7 @@ export interface ServerToClientEvents {
   'device:updated': (data: DeviceUpdatePayload) => void;
   'device:command': (data: DeviceCommandPayload) => void;
   'devices:bulk-updated': (devices: BulkDeviceUpdatePayload) => void;
+  'slideshow:updated': (data: SlideshowUpdatePayload) => void;
   'subscribe:error': (payload: SubscribeErrorPayload) => void;
   'device:auth-error': (payload: DeviceAuthErrorPayload) => void;
 }

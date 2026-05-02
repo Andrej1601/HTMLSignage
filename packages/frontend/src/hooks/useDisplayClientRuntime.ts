@@ -356,6 +356,21 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       }
       applySettings(migrateSettings(data));
     },
+    onSlideshowUpdate: () => {
+      // Eine Slideshow änderte sich. Wir wissen nicht zwingend, ob
+      // genau diese Slideshow auf diesem Gerät aktiv ist (default vs.
+      // assigned vs. event-override) — billiger ist daher: einmal die
+      // effektive Display-Config neu holen. `getDisplayConfig` löst die
+      // Override-Hierarchie serverseitig auf, also kommt nur das
+      // wirklich relevante Ergebnis zurück.
+      if (ENV_IS_DEV) {
+        console.log('[Display] Slideshow updated via WebSocket — refreshing display config');
+      }
+      const deviceId = pairedDeviceIdRef.current;
+      if (deviceId) {
+        void refreshDeviceDisplayConfig(deviceId, { silent: true });
+      }
+    },
     onDeviceUpdate: (data) => {
       const deviceId = pairedDeviceIdRef.current;
       if (!deviceId) return;

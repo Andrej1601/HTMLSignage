@@ -20,6 +20,9 @@ interface UseWebSocketOptions {
   onDeviceCommand?: (command: string) => void;
   onDeviceUpdate?: (data: Record<string, unknown>) => void;
   onBulkDeviceUpdate?: (devices: Record<string, unknown>[]) => void;
+  /** Slideshow created/updated/deleted. Display-Clients re-fetch their
+   *  effective config; Admin-UIs invalidate their slideshow caches. */
+  onSlideshowUpdate?: (data: { id: string; action?: string }) => void;
   /** Called after a WebSocket reconnect so stale data can be refetched. */
   onReconnect?: () => void;
 }
@@ -43,6 +46,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceCommand,
     onDeviceUpdate,
     onBulkDeviceUpdate,
+    onSlideshowUpdate,
     onReconnect,
   } = options;
 
@@ -59,6 +63,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onDeviceCommandRef = useRef(onDeviceCommand);
   const onDeviceUpdateRef = useRef(onDeviceUpdate);
   const onBulkDeviceUpdateRef = useRef(onBulkDeviceUpdate);
+  const onSlideshowUpdateRef = useRef(onSlideshowUpdate);
   const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
@@ -67,6 +72,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceCommandRef.current = onDeviceCommand;
     onDeviceUpdateRef.current = onDeviceUpdate;
     onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
+    onSlideshowUpdateRef.current = onSlideshowUpdate;
     onReconnectRef.current = onReconnect;
   });
 
@@ -186,6 +192,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           console.log('[WebSocket] Bulk device update:', devices.length, 'devices');
         }
         onBulkDeviceUpdateRef.current?.(devices);
+      });
+
+      socket.off('slideshow:updated').on('slideshow:updated', (data) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Slideshow update:', data);
+        }
+        onSlideshowUpdateRef.current?.(data);
       });
 
       socketRef.current = socket;

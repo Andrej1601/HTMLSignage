@@ -6,6 +6,7 @@ import type {
   DeviceUpdatePayload,
   InterServerEvents,
   ServerToClientEvents,
+  SlideshowUpdatePayload,
   SocketData,
 } from '@htmlsignage/shared/websocket';
 import { ScheduleSchema } from '@htmlsignage/shared/schedule';
@@ -209,5 +210,26 @@ export function broadcastDeviceCommand(deviceId: string, data: DeviceCommandPayl
     if (LOG_WS) {
       console.log(`[ws] Broadcasted device command for ${deviceId}`);
     }
+  }
+}
+
+/**
+ * Slideshow änderte sich (Slides hinzugefügt/entfernt/umsortiert oder
+ * Default-Flag gewechselt). Bewusst eine schlanke Notice ohne den vollen
+ * Slide-Body — Subscriber holen ihre effektive Display-Config dann via
+ * `/devices/:id/display-config` neu, weil dort die Auflösung
+ * (Maintenance > Event > Device > Default > Global) zentral passiert.
+ *
+ * Verteilung:
+ *   - alle gepairten Geräte (Display-Clients) im `settings-updates`-Raum
+ *   - Admin-UIs im `ADMIN_ROOM`, damit der Slideshow-Editor mitbekommt,
+ *     wenn ein anderer Admin parallel speichert
+ */
+export function broadcastSlideshowUpdate(payload: SlideshowUpdatePayload) {
+  if (!io) return;
+  io.to('settings-updates').emit('slideshow:updated', payload);
+  io.to(ADMIN_ROOM).emit('slideshow:updated', payload);
+  if (LOG_WS) {
+    console.log(`[ws] Broadcasted slideshow update for ${payload.id} (${payload.action ?? 'update'})`);
   }
 }

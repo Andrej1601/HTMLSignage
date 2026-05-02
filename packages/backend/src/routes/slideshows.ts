@@ -6,6 +6,7 @@ import { authMiddleware, type AuthRequest, str } from '../lib/auth.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
+import { broadcastSlideshowUpdate } from '../websocket/index.js';
 
 const router = Router();
 
@@ -165,6 +166,8 @@ router.post('/', authMiddleware, requirePermission('slideshow:manage'), mutation
       },
     });
 
+    broadcastSlideshowUpdate({ id: slideshow.id, action: 'create' });
+
     const { devices: createdDevices, ...createdRest } = slideshow;
     res.json({ ...createdRest, assignedDevices: createdDevices, deviceCount: createdDevices.length });
     return;
@@ -219,6 +222,8 @@ router.patch('/:id', authMiddleware, requirePermission('slideshow:manage'), muta
         configUpdated: validated.config !== undefined,
       },
     });
+
+    broadcastSlideshowUpdate({ id: slideshow.id, action: 'update' });
 
     const { devices: updatedDevices, ...updatedRest } = slideshow;
     res.json({ ...updatedRest, assignedDevices: updatedDevices, deviceCount: updatedDevices.length });
@@ -289,6 +294,11 @@ router.delete('/:id', authMiddleware, requirePermission('slideshow:manage'), mut
         clearedEventCount,
       },
     });
+
+    // Auch beim Delete benachrichtigen — Devices, die auf diese
+    // Slideshow zeigten, wurden eben auf `slideshowId: null` gesetzt
+    // und sollen jetzt die Default-Slideshow laden.
+    broadcastSlideshowUpdate({ id: slideshowId, action: 'delete' });
 
     res.json({
       ok: true,
