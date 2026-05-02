@@ -154,10 +154,17 @@ export function ThemeEditor({
     }
   };
 
-  // Effective pack id — explicit config wins, otherwise the global default.
-  // The legacy `displayAppearance`-derived fallback is gone (Bühne-Konzept
-  // wurde entfernt); fresh installs land on the production default pack.
-  const configuredPackId = display?.designPackId;
+  // Effective pack id für die Selektion: Wenn ein Slideshow-Scope aktiv
+  // ist, gewinnt deren `config.designPackId` über den globalen Default —
+  // sonst zeigt der AppearanceSelector den globalen Pack als aktiv, der
+  // User klickt einen Slideshow-Pack, sieht aber visuell keine Änderung
+  // (obwohl der Pack korrekt gespeichert und der Display tatsächlich
+  // umschaltet). Reihenfolge: Slideshow > Global > Default.
+  const slideshowConfiguredPackId = selectedSlideshow?.config.designPackId;
+  const globalConfiguredPackId = display?.designPackId;
+  const configuredPackId = isKnownDesignId(slideshowConfiguredPackId)
+    ? slideshowConfiguredPackId
+    : globalConfiguredPackId;
   const activeDesignPackId: DesignId = isKnownDesignId(configuredPackId)
     ? configuredPackId
     : DEFAULT_DESIGN_ID;
