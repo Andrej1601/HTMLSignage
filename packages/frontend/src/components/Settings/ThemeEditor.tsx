@@ -17,7 +17,7 @@ import { DEFAULT_DESIGN_ID, isKnownDesignId, type DesignId } from '@/designs';
 import { useSlideshows, useUpdateSlideshow } from '@/hooks/useSlideshows';
 import type { SlideshowDefinition, SlideshowConfig } from '@/types/slideshow.types';
 import type { DesignTokenOverrides } from '@htmlsignage/design-sdk';
-import { Presentation } from 'lucide-react';
+import { Presentation, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface ThemeEditorProps {
   theme: ThemeColors;
@@ -82,6 +82,26 @@ export function ThemeEditor({
     () => slideshows.find((s: SlideshowDefinition) => s.id === selectedSlideshowId) || null,
     [slideshows, selectedSlideshowId],
   );
+
+  // Standardfall ist das globale Design. Die Pro-Slideshow-Anpassung ist eine
+  // Erweiterung, die nur auf Wunsch (oder wenn bereits Overrides existieren)
+  // sichtbar wird — so verschwindet die verwirrende "global vs. Slideshow"-Wahl.
+  const hasAnySlideshowOverride = useMemo(
+    () => slideshows.some((s: SlideshowDefinition) => (
+      s.config.displayAppearance || s.config.designStyle || s.config.saunaDetailStyle ||
+      s.config.colorPalette || s.config.theme || s.config.tokenOverrides ||
+      s.config.designPackId || s.config.header
+    )),
+    [slideshows],
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Render-phase Sync: sobald (asynchron geladene) Overrides erkannt werden,
+  // den Bereich einmal aufklappen, damit bestehende Anpassungen auffindbar sind.
+  const [prevHasOverride, setPrevHasOverride] = useState(hasAnySlideshowOverride);
+  if (hasAnySlideshowOverride !== prevHasOverride) {
+    setPrevHasOverride(hasAnySlideshowOverride);
+    if (hasAnySlideshowOverride) setAdvancedOpen(true);
+  }
 
   // When editing a slideshow, read its design overrides
   const effectiveDesignStyle = selectedSlideshow?.config.designStyle ?? designStyle;
@@ -187,27 +207,53 @@ export function ThemeEditor({
 
   return (
     <div className="space-y-6">
-      {/* Slideshow-Auswahl */}
+      {/* Design-Scope — standardmäßig global; Pro-Slideshow nur im Erweitert-Modus */}
       {slideshows.length > 0 && (
-        <div className="flex items-center gap-3 p-4 rounded-xl bg-spa-bg-secondary border border-spa-border">
-          <Presentation className="w-5 h-5 text-spa-primary shrink-0" />
-          <div className="flex-1 min-w-0">
-            <label htmlFor="theme-scope-select" className="text-sm font-semibold text-spa-text-primary">Design anpassen für</label>
-            <p className="text-xs text-spa-text-secondary">Global oder pro Slideshow</p>
-          </div>
-          <select
-            id="theme-scope-select"
-            value={selectedSlideshowId || ''}
-            onChange={(e) => handleSlideshowSelect(e.target.value || null)}
-            className="min-w-[200px] px-3 py-2 border border-spa-border rounded-lg text-sm bg-spa-surface text-spa-text-primary focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary outline-hidden"
+        <div className="rounded-xl bg-spa-bg-secondary border border-spa-border">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !advancedOpen;
+              setAdvancedOpen(next);
+              if (!next) handleSlideshowSelect(null); // beim Zuklappen zurück auf global
+            }}
+            aria-expanded={advancedOpen}
+            className="flex w-full items-center gap-3 p-4 text-left rounded-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
-            <option value="">Globale Einstellungen</option>
-            {slideshows.map((show: SlideshowDefinition) => (
-              <option key={show.id} value={show.id}>
-                {show.name} {show.isDefault ? '(Standard)' : ''}
-              </option>
-            ))}
-          </select>
+            <Presentation className="w-5 h-5 text-spa-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="block text-sm font-semibold text-spa-text-primary">
+                {selectedSlideshow ? `Design für: ${selectedSlideshow.name}` : 'Globales Design (gilt für alle Slideshows)'}
+              </span>
+              <span className="block text-xs text-spa-text-secondary">
+                {advancedOpen
+                  ? 'Pro-Slideshow-Anpassung aktiv — nicht gesetzte Werte erben vom globalen Design'
+                  : 'Erweitert: einzelne Slideshow abweichend gestalten'}
+              </span>
+            </div>
+            {advancedOpen
+              ? <ChevronDown className="w-4 h-4 text-spa-text-secondary shrink-0" />
+              : <ChevronRight className="w-4 h-4 text-spa-text-secondary shrink-0" />}
+          </button>
+
+          {advancedOpen && (
+            <div className="flex items-center gap-3 border-t border-spa-border px-4 pb-4 pt-3">
+              <label htmlFor="theme-scope-select" className="shrink-0 text-sm text-spa-text-secondary">Anpassen für</label>
+              <select
+                id="theme-scope-select"
+                value={selectedSlideshowId || ''}
+                onChange={(e) => handleSlideshowSelect(e.target.value || null)}
+                className="min-w-[200px] flex-1 px-3 py-2 border border-spa-border rounded-lg text-sm bg-spa-surface text-spa-text-primary focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary outline-hidden"
+              >
+                <option value="">Globale Einstellungen (Standard)</option>
+                {slideshows.map((show: SlideshowDefinition) => (
+                  <option key={show.id} value={show.id}>
+                    {show.name} {show.isDefault ? '(Standard-Slideshow)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
