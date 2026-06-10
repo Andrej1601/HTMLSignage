@@ -20,6 +20,7 @@ import { prisma } from './lib/prisma.js';
 import { startMaintenanceScheduler, stopMaintenanceScheduler } from './lib/maintenance.js';
 import { setupWebSocket } from './websocket/index.js';
 import { csrfTokensMatch } from './lib/auth.js';
+import { errorHandler } from './lib/errorHandler.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 import scheduleRouter from './routes/schedule.js';
 import settingsRouter from './routes/settings.js';
@@ -204,23 +205,8 @@ app.use('/api/slideshow', slideshowWorkflowRouter);
 app.use('/api/slideshows', slideshowsRouter);
 app.use('/api/telemetry', telemetryRouter);
 
-// Error handler
-app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const requestId = (req as typeof req & { requestId?: string }).requestId || null;
-  console.error(JSON.stringify({
-    type: 'http_error',
-    requestId,
-    method: req.method,
-    path: req.path,
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-  }));
-  res.status(500).json({ 
-    error: 'internal-server-error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred',
-    requestId,
-  });
-});
+// Central error handler — normalises Zod / AppError / Prisma / unknown errors.
+app.use(errorHandler);
 
 // WebSocket Setup
 setupWebSocket(io);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { PrismaStore } from '../lib/rateLimiter.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 import { logAuditEvent } from '../lib/audit.js';
 import type { AuthRequest } from '../lib/auth.js';
 
@@ -51,7 +52,7 @@ const DesignErrorReportSchema = z.object({
  * Design-pack renderer crash report.
  *   POST /api/telemetry/display/error
  */
-router.post('/display/error', telemetryLimiter, async (req: AuthRequest, res) => {
+router.post('/display/error', telemetryLimiter, asyncHandler(async (req: AuthRequest, res) => {
   try {
     const validated = DesignErrorReportSchema.parse(req.body);
 
@@ -87,6 +88,6 @@ router.post('/display/error', telemetryLimiter, async (req: AuthRequest, res) =>
     // doesn't retry on success.
     return res.status(202).json({ ok: true });
   }
-});
+}));
 
 export default router;

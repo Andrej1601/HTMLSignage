@@ -15,41 +15,33 @@ import {
   runSystemUpdateJob,
 } from '../lib/systemUpdateRunner.js';
 import { createSystemJob, findRunningSystemJob, runSystemJob } from '../lib/systemJobs.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 const router = Router();
 
 // GET /update/status
-router.get('/update/status', authMiddleware, requireRole('admin'), async (req: AuthRequest, res) => {
-  try {
-    const [activeJob, currentVersion, releases, preflight] = await Promise.all([
-      findRunningSystemJob('system-update'),
-      readLocalVersion(),
-      fetchGitHubReleases(),
-      collectSystemUpdatePreflight(),
-    ]);
+router.get('/update/status', authMiddleware, requireRole('admin'), asyncHandler(async (_req: AuthRequest, res) => {
+  const [activeJob, currentVersion, releases, preflight] = await Promise.all([
+    findRunningSystemJob('system-update'),
+    readLocalVersion(),
+    fetchGitHubReleases(),
+    collectSystemUpdatePreflight(),
+  ]);
 
-    res.json(buildSystemUpdateStatusPayload({
-      currentVersion,
-      releases,
-      preflight,
-      activeJob,
-    }));
-  } catch (error) {
-    console.error('[system] Error checking update status:', error);
-    res.status(500).json({
-      error: 'status-check-failed',
-      message: 'Statusprüfung fehlgeschlagen',
-      requestId: req.requestId ?? null,
-    });
-  }
-});
+  res.json(buildSystemUpdateStatusPayload({
+    currentVersion,
+    releases,
+    preflight,
+    activeJob,
+  }));
+}));
 
 // POST /update/run
 const UpdateRunSchema = z.object({
   targetVersion: z.string().min(1).regex(/^\d+\.\d+\.\d+$/, 'Muss ein Semver-Format sein (z.B. 1.2.3)'),
 });
 
-router.post('/update/run', authMiddleware, requireRole('admin'), requirePermission('system:manage'), async (req: AuthRequest, res) => {
+router.post('/update/run', authMiddleware, requireRole('admin'), requirePermission('system:manage'), asyncHandler(async (req: AuthRequest, res) => {
   const runningJob = await findRunningSystemJob('system-update');
   if (runningJob) {
     return res.status(409).json({
@@ -60,16 +52,7 @@ router.post('/update/run', authMiddleware, requireRole('admin'), requirePermissi
     });
   }
 
-  const parsed = UpdateRunSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({
-      error: 'invalid-request',
-      details: parsed.error.issues,
-      requestId: req.requestId ?? null,
-    });
-  }
-
-  const { targetVersion } = parsed.data;
+  const { targetVersion } = UpdateRunSchema.parse(req.body);
   const tagName = normalizeSystemUpdateTag(targetVersion);
   const auditRequest = createAuditRequestSnapshot(req);
   const preflight = await collectSystemUpdatePreflight();
@@ -117,6 +100,6 @@ router.post('/update/run', authMiddleware, requireRole('admin'), requirePermissi
     job,
     message: `Update auf ${tagName} wurde gestartet.`,
   });
-});
+}));
 
 export default router;

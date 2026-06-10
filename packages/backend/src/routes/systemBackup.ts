@@ -8,6 +8,7 @@ import multer from 'multer';
 import archiver from 'archiver';
 import type { AuthRequest } from '../lib/auth.js';
 import { authMiddleware, requireRole } from '../lib/auth.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 import { logAuditEvent, createAuditRequestSnapshot } from '../lib/audit.js';
 import {
   buildBackupExportManifest,
@@ -168,7 +169,7 @@ router.post('/backup/import/preview', authMiddleware, requireRole('admin'), back
   }
 });
 
-router.post('/backup/import', authMiddleware, requireRole('admin'), backupUploadMiddleware, async (req: AuthRequest, res) => {
+router.post('/backup/import', authMiddleware, requireRole('admin'), backupUploadMiddleware, asyncHandler(async (req: AuthRequest, res) => {
   const backupFile = resolveBackupFile(req);
   const filePath = backupFile?.path;
   const replaceMedia = parseReplaceMedia(req.body?.replaceMedia);
@@ -265,6 +266,6 @@ router.post('/backup/import', authMiddleware, requireRole('admin'), backupUpload
     job,
     message: `Backup-Import für ${backupFile.originalname} wurde gestartet.`,
   });
-});
+}));
 
 export default router;

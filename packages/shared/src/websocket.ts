@@ -49,6 +49,16 @@ export interface SlideshowUpdatePayload {
   action?: 'update' | 'create' | 'delete' | 'default-changed';
 }
 
+/** Media library change notice. Like the slideshow notice, we keep the
+ *  broadcast lean (no full media list — that can be large) and have
+ *  subscribers re-fetch: display clients reload their media list, admin UIs
+ *  invalidate the `['media']` query. Replaces blind 5-minute HTTP polling. */
+export interface MediaUpdatePayload {
+  /** Optional reason — `upload`, `delete`, `tags`. Clients today simply
+   *  re-fetch on any of these. */
+  action?: 'upload' | 'delete' | 'tags';
+}
+
 // ─── Server → Client ────────────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
@@ -58,6 +68,7 @@ export interface ServerToClientEvents {
   'device:command': (data: DeviceCommandPayload) => void;
   'devices:bulk-updated': (devices: BulkDeviceUpdatePayload) => void;
   'slideshow:updated': (data: SlideshowUpdatePayload) => void;
+  'media:updated': (data: MediaUpdatePayload) => void;
   'subscribe:error': (payload: SubscribeErrorPayload) => void;
   'device:auth-error': (payload: DeviceAuthErrorPayload) => void;
 }

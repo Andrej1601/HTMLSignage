@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { broadcastMediaUpdate } from '../websocket/index.js';
 import { upload, UPLOAD_DIR } from '../lib/upload.js';
 import { authMiddleware, authOrDeviceMiddleware, type AuthRequest, str } from '../lib/auth.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter, uploadLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -86,130 +88,109 @@ function getMediaType(mimeType: string): string {
 }
 
 // GET /api/media - List all media (requires user or device auth)
-router.get('/', authOrDeviceMiddleware, async (req, res) => {
-  try {
-    const { type, search, tag } = req.query;
-    const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
-    const parsedOffset = Number.parseInt(String(req.query.offset ?? ''), 10);
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(parsedLimit, 1), MAX_MEDIA_LIMIT)
-      : DEFAULT_MEDIA_LIMIT;
-    const offset = Number.isFinite(parsedOffset)
-      ? Math.min(Math.max(parsedOffset, 0), 10_000)
-      : 0;
+router.get('/', authOrDeviceMiddleware, asyncHandler(async (req, res) => {
+  const { type, search, tag } = req.query;
+  const parsedLimit = Number.parseInt(String(req.query.limit ?? ''), 10);
+  const parsedOffset = Number.parseInt(String(req.query.offset ?? ''), 10);
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, 1), MAX_MEDIA_LIMIT)
+    : DEFAULT_MEDIA_LIMIT;
+  const offset = Number.isFinite(parsedOffset)
+    ? Math.min(Math.max(parsedOffset, 0), 10_000)
+    : 0;
 
-    const where: {
-      type?: string;
-      tags?: { has: string };
-      OR?: Array<{
-        filename?: { contains: string; mode: 'insensitive' };
-        originalName?: { contains: string; mode: 'insensitive' };
-      }>;
-    } = {};
+  const where: {
+    type?: string;
+    tags?: { has: string };
+    OR?: Array<{
+      filename?: { contains: string; mode: 'insensitive' };
+      originalName?: { contains: string; mode: 'insensitive' };
+    }>;
+  } = {};
 
-    if (type && typeof type === 'string') {
-      where.type = type;
-    }
-
-    if (search && typeof search === 'string' && search.trim() !== '') {
-      const normalizedSearch = search.trim().slice(0, 120);
-      where.OR = [
-        { filename: { contains: normalizedSearch, mode: 'insensitive' } },
-        { originalName: { contains: normalizedSearch, mode: 'insensitive' } },
-      ];
-    }
-
-    if (tag && typeof tag === 'string') {
-      const cleanedTag = tag.trim();
-      if (cleanedTag) {
-        where.tags = { has: cleanedTag };
-      }
-    }
-
-    const [media, totalCount] = await Promise.all([
-      prisma.media.findMany({
-        where,
-        include: {
-          user: {
-            select: { username: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.media.count({ where }),
-    ]);
-
-    // Add URL to each media item
-    const mediaWithUrls = media.map((item) => ({
-      ...item,
-      url: `/uploads/${item.filename}`,
-    }));
-
-    res.setHeader('X-Total-Count', String(totalCount));
-    res.setHeader('X-Result-Limit', String(limit));
-    res.setHeader('X-Result-Offset', String(offset));
-    res.json(mediaWithUrls);
-    return;
-  } catch (error) {
-    console.error('[media] Error listing media:', error);
-    res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
-    return;
+  if (type && typeof type === 'string') {
+    where.type = type;
   }
-});
 
-// GET /api/media/tags - List distinct tags (requires user or device auth)
-router.get('/tags', authOrDeviceMiddleware, async (_req, res) => {
-  try {
-    const rows = await prisma.$queryRaw<Array<{ tag: string | null }>>`
-      SELECT DISTINCT unnest("tags") AS tag
-      FROM "media"
-      WHERE cardinality("tags") > 0
-      ORDER BY 1 ASC
-    `;
-    const tags = rows
-      .map((row) => row.tag?.trim() || '')
-      .filter((tag) => tag.length > 0);
-    res.json(tags);
-    return;
-  } catch (error) {
-    console.error('[media] Error listing media tags:', error);
-    res.status(500).json({ error: 'fetch-tags-failed', message: 'Tags konnten nicht geladen werden' });
-    return;
+  if (search && typeof search === 'string' && search.trim() !== '') {
+    const normalizedSearch = search.trim().slice(0, 120);
+    where.OR = [
+      { filename: { contains: normalizedSearch, mode: 'insensitive' } },
+      { originalName: { contains: normalizedSearch, mode: 'insensitive' } },
+    ];
   }
-});
 
-// GET /api/media/:id - Get single media item (requires user or device auth)
-router.get('/:id', authOrDeviceMiddleware, async (req, res) => {
-  try {
-    const media = await prisma.media.findUnique({
-      where: { id: str(req.params.id) },
+  if (tag && typeof tag === 'string') {
+    const cleanedTag = tag.trim();
+    if (cleanedTag) {
+      where.tags = { has: cleanedTag };
+    }
+  }
+
+  const [media, totalCount] = await Promise.all([
+    prisma.media.findMany({
+      where,
       include: {
         user: {
           select: { username: true },
         },
       },
-    });
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.media.count({ where }),
+  ]);
 
-    if (!media) {
-      return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
-    }
+  // Add URL to each media item
+  const mediaWithUrls = media.map((item) => ({
+    ...item,
+    url: `/uploads/${item.filename}`,
+  }));
 
-    res.json({
-      ...media,
-      url: `/uploads/${media.filename}`,
-    });
-    return;
-  } catch (error) {
-    console.error('[media] Error fetching media:', error);
-    res.status(500).json({ error: 'fetch-failed', message: 'Medien konnten nicht geladen werden' });
-    return;
+  res.setHeader('X-Total-Count', String(totalCount));
+  res.setHeader('X-Result-Limit', String(limit));
+  res.setHeader('X-Result-Offset', String(offset));
+  res.json(mediaWithUrls);
+}));
+
+// GET /api/media/tags - List distinct tags (requires user or device auth)
+router.get('/tags', authOrDeviceMiddleware, asyncHandler(async (_req, res) => {
+  const rows = await prisma.$queryRaw<Array<{ tag: string | null }>>`
+    SELECT DISTINCT unnest("tags") AS tag
+    FROM "media"
+    WHERE cardinality("tags") > 0
+    ORDER BY 1 ASC
+  `;
+  const tags = rows
+    .map((row) => row.tag?.trim() || '')
+    .filter((tag) => tag.length > 0);
+  res.json(tags);
+}));
+
+// GET /api/media/:id - Get single media item (requires user or device auth)
+router.get('/:id', authOrDeviceMiddleware, asyncHandler(async (req, res) => {
+  const media = await prisma.media.findUnique({
+    where: { id: str(req.params.id) },
+    include: {
+      user: {
+        select: { username: true },
+      },
+    },
+  });
+
+  if (!media) {
+    return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
   }
-});
+
+  return res.json({
+    ...media,
+    url: `/uploads/${media.filename}`,
+  });
+}));
 
 // POST /api/media/upload - Upload file (auth required)
-router.post('/upload', authMiddleware, requirePermission('media:manage'), uploadLimiter, upload.single('file'), async (req: AuthRequest, res) => {
+router.post('/upload', authMiddleware, requirePermission('media:manage'), uploadLimiter, upload.single('file'), asyncHandler(async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'no-file-uploaded', message: 'Keine Datei hochgeladen' });
@@ -219,7 +200,6 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), upload
     if (!signatureCheck.ok) {
       try {
         await fsPromises.unlink(req.file.path);
-        return;
       } catch (unlinkError) {
         console.error('[media] Error deleting invalid upload:', unlinkError);
       }
@@ -254,32 +234,27 @@ router.post('/upload', authMiddleware, requirePermission('media:manage'), upload
         tags: media.tags,
       },
     });
+    broadcastMediaUpdate({ action: 'upload' });
 
-    res.json({
+    return res.json({
       ...media,
       url: `/uploads/${media.filename}`,
     });
-    return;
   } catch (error) {
-    console.error('[media] Error uploading file:', error);
-
-    // Clean up uploaded file on error
+    // Clean up the orphaned upload before the central error handler responds.
     if (req.file) {
       try {
         await fsPromises.unlink(req.file.path);
-        return;
       } catch (unlinkError) {
         console.error('[media] Error deleting file after error:', unlinkError);
       }
     }
-
-    res.status(500).json({ error: 'upload-failed', message: 'Upload fehlgeschlagen' });
-    return;
+    throw error;
   }
-});
+}));
 
 // PATCH /api/media/:id/tags - Update media tags (auth required)
-router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mutationLimiter, asyncHandler(async (req: AuthRequest, res) => {
   try {
     const tags = normalizeTags(req.body?.tags);
     const media = await prisma.media.update({
@@ -298,66 +273,58 @@ router.patch('/:id/tags', authMiddleware, requirePermission('media:manage'), mut
         tags,
       },
     });
+    broadcastMediaUpdate({ action: 'tags' });
 
-    res.json({
+    return res.json({
       ...media,
       url: `/uploads/${media.filename}`,
     });
-    return;
   } catch (error) {
+    // Preserve the media-specific 404 message; let everything else bubble up.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
     }
-    console.error('[media] Error updating media tags:', error);
-    res.status(500).json({ error: 'update-tags-failed', message: 'Tags konnten nicht aktualisiert werden' });
-    return;
+    throw error;
   }
-});
+}));
 
 // DELETE /api/media/:id - Delete media (auth required)
-router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutationLimiter, async (req: AuthRequest, res) => {
-  try {
-    const media = await prisma.media.findUnique({
-      where: { id: str(req.params.id) },
-    });
+router.delete('/:id', authMiddleware, requirePermission('media:manage'), mutationLimiter, asyncHandler(async (req: AuthRequest, res) => {
+  const media = await prisma.media.findUnique({
+    where: { id: str(req.params.id) },
+  });
 
-    if (!media) {
-      return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
-    }
-
-    // Delete from database first — orphan files on disk are cleaned up by
-    // the maintenance cycle, but a DB record pointing to a missing file is worse.
-    await prisma.media.delete({
-      where: { id: str(req.params.id) },
-    });
-    await logAuditEvent(req, {
-      action: 'media.delete',
-      resource: media.id,
-      details: {
-        filename: media.originalName,
-        type: media.type,
-      },
-    });
-
-    // Best-effort file removal — maintenance handles leftovers
-    const filePath = path.join(UPLOAD_DIR, media.filename);
-    try {
-      await fsPromises.unlink(filePath);
-      return;
-    } catch (fsError) {
-      const code = (fsError as NodeJS.ErrnoException).code;
-      if (code !== 'ENOENT') {
-        console.error('[media] Error deleting file from disk:', fsError);
-      }
-    }
-
-    res.json({ ok: true });
-    return;
-  } catch (error) {
-    console.error('[media] Error deleting media:', error);
-    res.status(500).json({ error: 'delete-failed', message: 'Medium konnte nicht gelöscht werden' });
-    return;
+  if (!media) {
+    return res.status(404).json({ error: 'not-found', message: 'Medium nicht gefunden' });
   }
-});
+
+  // Delete from database first — orphan files on disk are cleaned up by
+  // the maintenance cycle, but a DB record pointing to a missing file is worse.
+  await prisma.media.delete({
+    where: { id: str(req.params.id) },
+  });
+  await logAuditEvent(req, {
+    action: 'media.delete',
+    resource: media.id,
+    details: {
+      filename: media.originalName,
+      type: media.type,
+    },
+  });
+  broadcastMediaUpdate({ action: 'delete' });
+
+  // Best-effort file removal — maintenance handles leftovers
+  const filePath = path.join(UPLOAD_DIR, media.filename);
+  try {
+    await fsPromises.unlink(filePath);
+  } catch (fsError) {
+    const code = (fsError as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') {
+      console.error('[media] Error deleting file from disk:', fsError);
+    }
+  }
+
+  return res.json({ ok: true });
+}));
 
 export default router;

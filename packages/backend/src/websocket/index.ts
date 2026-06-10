@@ -5,6 +5,7 @@ import type {
   DeviceCommandPayload,
   DeviceUpdatePayload,
   InterServerEvents,
+  MediaUpdatePayload,
   ServerToClientEvents,
   SlideshowUpdatePayload,
   SocketData,
@@ -231,5 +232,21 @@ export function broadcastSlideshowUpdate(payload: SlideshowUpdatePayload) {
   io.to(ADMIN_ROOM).emit('slideshow:updated', payload);
   if (LOG_WS) {
     console.log(`[ws] Broadcasted slideshow update for ${payload.id} (${payload.action ?? 'update'})`);
+  }
+}
+
+/**
+ * Media library changed (upload/delete/tags). Lean notice — subscribers
+ * re-fetch rather than receiving the (potentially large) media list:
+ *   - display clients in `settings-updates` reload their media list, replacing
+ *     the previous blind 5-minute HTTP poll
+ *   - admin UIs in `ADMIN_ROOM` invalidate their `['media']` query
+ */
+export function broadcastMediaUpdate(payload: MediaUpdatePayload = {}) {
+  if (!io) return;
+  io.to('settings-updates').emit('media:updated', payload);
+  io.to(ADMIN_ROOM).emit('media:updated', payload);
+  if (LOG_WS) {
+    console.log(`[ws] Broadcasted media update (${payload.action ?? 'update'})`);
   }
 }
