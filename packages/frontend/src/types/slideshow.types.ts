@@ -104,6 +104,7 @@ export interface SlideshowConfig {
   defaultDuration: number; // seconds
   defaultTransition: import('@htmlsignage/shared/settings').TransitionType;
   enableTransitions: boolean;
+  transitionDuration?: number; // transition speed in seconds (0.2–1.5), default 0.6
 
   // Persistent zone settings (for layouts with persistent panel)
   persistentZonePosition?: 'left' | 'right' | 'top' | 'bottom';
@@ -331,6 +332,7 @@ export function createDefaultSlideshowConfig(): SlideshowConfig {
     defaultDuration: 10,
     defaultTransition: 'fade',
     enableTransitions: true,
+    transitionDuration: 0.6,
     persistentZonePosition: 'left',
     persistentZoneSize: 50,
     pauseOnInteraction: false,
@@ -426,9 +428,26 @@ export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex:
   return result.map((slide, index) => ({ ...slide, order: index }));
 }
 
-// Zone helper functions
-export function getZonesForLayout(layoutType: LayoutType): Zone[] {
-  return getLayout(layoutType).zones;
+// Zone helper functions. The persistent zone's size/position come from the
+// static layout registry but can be overridden per-slideshow via
+// `persistentZoneSize` / `persistentZonePosition`.
+export function getZonesForLayout(
+  layoutType: LayoutType,
+  config?: Pick<SlideshowConfig, 'persistentZonePosition' | 'persistentZoneSize'>,
+): Zone[] {
+  const zones = getLayout(layoutType).zones;
+  if (!config || (!config.persistentZonePosition && typeof config.persistentZoneSize !== 'number')) {
+    return zones;
+  }
+  return zones.map((zone) => (
+    zone.id === 'persistent'
+      ? {
+          ...zone,
+          ...(config.persistentZonePosition ? { position: config.persistentZonePosition } : {}),
+          ...(typeof config.persistentZoneSize === 'number' ? { size: config.persistentZoneSize } : {}),
+        }
+      : zone
+  ));
 }
 
 export function getSlidesByZone(slides: SlideConfig[], zoneId: string): SlideConfig[] {

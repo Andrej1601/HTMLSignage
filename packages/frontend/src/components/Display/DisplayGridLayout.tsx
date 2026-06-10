@@ -27,6 +27,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
     zones,
   } = context;
   const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
+  const transitionDurationSec = effectiveSettings.slideshow?.transitionDuration ?? 0.6;
 
   const border = themeColors.gridTable || '#EBE5D3';
   const bgBase = themeColors.dashboardBg || themeColors.bg || '#FDFBF7';
@@ -85,7 +86,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
               <SlideTransition
                 slideKey={slide?.id || `${zone.id}-empty`}
                 enabled={enableTransitions && (info?.shouldRotate || false)}
-                duration={0.6}
+                duration={transitionDurationSec}
                 transition={resolveTransition(slide)}
                 progressDurationSec={
                   info?.shouldRotate ? getEffectiveSlideDuration(slide, defaultDuration) : undefined

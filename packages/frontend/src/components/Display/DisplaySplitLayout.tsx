@@ -21,6 +21,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
     zones,
   } = context;
   const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
+  const transitionDurationSec = effectiveSettings.slideshow?.transitionDuration ?? 0.6;
 
   const splitZones = zones.filter((zone) => zone.id === 'persistent' || zone.id === 'main');
   const persistentZone = splitZones.find((zone) => zone.id === 'persistent');
@@ -63,7 +64,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
                 <SlideTransition
                   slideKey={persistentSlide?.id || 'persistent'}
                   enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                  duration={0.6}
+                  duration={transitionDurationSec}
                   transition={resolveTransition(persistentSlide)}
                   progressDurationSec={persistentInfo?.shouldRotate ? getEffectiveSlideDuration(persistentSlide, defaultDuration) : undefined}
                   progressColor={progressColor}
@@ -83,7 +84,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
                 <SlideTransition
                   slideKey={mainSlide?.id || 'main'}
                   enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                  duration={0.6}
+                  duration={transitionDurationSec}
                   transition={resolveTransition(mainSlide)}
                   progressDurationSec={mainInfo?.shouldRotate ? getEffectiveSlideDuration(mainSlide, defaultDuration) : undefined}
                   progressColor={progressColor}
@@ -107,7 +108,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
                 <SlideTransition
                   slideKey={mainSlide?.id || 'main'}
                   enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                  duration={0.6}
+                  duration={transitionDurationSec}
                   transition={resolveTransition(mainSlide)}
                   progressDurationSec={mainInfo?.shouldRotate ? getEffectiveSlideDuration(mainSlide, defaultDuration) : undefined}
                   progressColor={progressColor}
@@ -127,7 +128,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
                 <SlideTransition
                   slideKey={persistentSlide?.id || 'persistent'}
                   enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                  duration={0.6}
+                  duration={transitionDurationSec}
                   transition={resolveTransition(persistentSlide)}
                   progressDurationSec={persistentInfo?.shouldRotate ? getEffectiveSlideDuration(persistentSlide, defaultDuration) : undefined}
                   progressColor={progressColor}
@@ -158,7 +159,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <SlideTransition
                 slideKey={persistentSlide?.id || 'persistent'}
                 enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                duration={0.6}
+                duration={transitionDurationSec}
                 transition={resolveTransition(persistentSlide)}
                 progressDurationSec={persistentInfo?.shouldRotate ? getEffectiveSlideDuration(persistentSlide, defaultDuration) : undefined}
                 progressColor={progressColor}
@@ -178,7 +179,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <SlideTransition
                 slideKey={mainSlide?.id || 'main'}
                 enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                duration={0.6}
+                duration={transitionDurationSec}
                 transition={resolveTransition(mainSlide)}
                 progressDurationSec={mainInfo?.shouldRotate ? getEffectiveSlideDuration(mainSlide, defaultDuration) : undefined}
                 progressColor={progressColor}
@@ -202,7 +203,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <SlideTransition
                 slideKey={mainSlide?.id || 'main'}
                 enabled={enableTransitions && (mainInfo?.shouldRotate || false)}
-                duration={0.6}
+                duration={transitionDurationSec}
                 transition={resolveTransition(mainSlide)}
                 progressDurationSec={mainInfo?.shouldRotate ? getEffectiveSlideDuration(mainSlide, defaultDuration) : undefined}
                 progressColor={progressColor}
@@ -222,7 +223,7 @@ export function DisplaySplitLayout({ context }: DisplaySplitLayoutProps) {
               <SlideTransition
                 slideKey={persistentSlide?.id || 'persistent'}
                 enabled={enableTransitions && (persistentInfo?.shouldRotate || false)}
-                duration={0.6}
+                duration={transitionDurationSec}
                 transition={resolveTransition(persistentSlide)}
                 progressDurationSec={persistentInfo?.shouldRotate ? getEffectiveSlideDuration(persistentSlide, defaultDuration) : undefined}
                 progressColor={progressColor}

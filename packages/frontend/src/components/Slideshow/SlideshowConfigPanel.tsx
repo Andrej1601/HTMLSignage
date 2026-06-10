@@ -207,6 +207,9 @@ export function SlideshowConfigPanel({
         layout={config.layout}
         disabled={disabled}
         onLayoutChange={handleLayoutChange}
+        persistentZonePosition={config.persistentZonePosition}
+        persistentZoneSize={config.persistentZoneSize}
+        onPersistentZoneChange={(patch) => onChange({ ...config, ...patch })}
       />
 
       <GlobalSlideshowSettings

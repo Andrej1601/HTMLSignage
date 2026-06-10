@@ -30,6 +30,7 @@ export function DisplayFullRotationLayout({
     zones,
   } = context;
   const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
+  const transitionDurationSec = effectiveSettings.slideshow?.transitionDuration ?? 0.6;
 
   const zoneWithSlides = zones.find((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
   const zoneId = zoneWithSlides?.id || zones[0]?.id || 'main';
@@ -56,7 +57,7 @@ export function DisplayFullRotationLayout({
     <SlideTransition
       slideKey={slide.id || currentSlideIndex}
       enabled={enableTransitions}
-      duration={0.6}
+      duration={transitionDurationSec}
       transition={resolveTransition(slide)}
       progressDurationSec={shouldRotate ? getEffectiveSlideDuration(slide, defaultDuration) : undefined}
       progressColor={progressColor}

@@ -97,17 +97,38 @@ function LayoutPreview({ layout }: { layout: LayoutType }) {
   }
 }
 
+type PersistentZonePosition = 'left' | 'right' | 'top' | 'bottom';
+
+const ZONE_POSITIONS: { value: PersistentZonePosition; label: string }[] = [
+  { value: 'left', label: 'Links' },
+  { value: 'right', label: 'Rechts' },
+  { value: 'top', label: 'Oben' },
+  { value: 'bottom', label: 'Unten' },
+];
+
 interface LayoutPickerProps {
   layout: LayoutType;
   disabled?: boolean;
   onLayoutChange: (layout: LayoutType) => void;
+  persistentZonePosition?: PersistentZonePosition;
+  persistentZoneSize?: number;
+  onPersistentZoneChange?: (patch: {
+    persistentZonePosition?: PersistentZonePosition;
+    persistentZoneSize?: number;
+  }) => void;
 }
 
 export function LayoutPicker({
   layout,
   disabled = false,
   onLayoutChange,
+  persistentZonePosition,
+  persistentZoneSize,
+  onPersistentZoneChange,
 }: LayoutPickerProps) {
+  const activeOption = LAYOUT_OPTIONS.find((option) => option.type === layout);
+  const showZoneControls = Boolean(activeOption?.supportsPersistentZone && onPersistentZoneChange);
+
   return (
     <SectionCard title="Display Layout" icon={Layout}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -140,6 +161,59 @@ export function LayoutPicker({
           </button>
         ))}
       </div>
+
+      {showZoneControls && (
+        <div className="mt-5 rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-4">
+          <div className="text-sm font-semibold text-spa-text-primary">Persistenter Bereich</div>
+
+          <div>
+            <label className="mb-1.5 block text-xs text-spa-text-secondary">Position</label>
+            <div className="flex flex-wrap gap-1.5">
+              {ZONE_POSITIONS.map(({ value, label }) => {
+                const active = (persistentZonePosition ?? 'left') === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={active}
+                    onClick={() => onPersistentZoneChange?.({ persistentZonePosition: value })}
+                    className={clsx(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50',
+                      'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-primary',
+                      active
+                        ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
+                        : 'border-spa-border bg-spa-surface text-spa-text-secondary hover:border-spa-primary/40',
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs text-spa-text-secondary">Größe des persistenten Bereichs</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min="30"
+                max="70"
+                step="5"
+                value={persistentZoneSize ?? 50}
+                onChange={(e) => onPersistentZoneChange?.({ persistentZoneSize: parseInt(e.target.value, 10) || 50 })}
+                disabled={disabled}
+                className="flex-1 accent-spa-primary disabled:opacity-50"
+              />
+              <span className="w-12 shrink-0 text-right text-sm font-semibold text-spa-text-primary">
+                {persistentZoneSize ?? 50}%
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-spa-text-secondary">Anteil des persistenten Bereichs; der Rest gehört dem rotierenden Content.</p>
+          </div>
+        </div>
+      )}
     </SectionCard>
   );
 }

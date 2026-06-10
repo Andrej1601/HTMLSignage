@@ -64,7 +64,13 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
   );
   // Important: memoize derived arrays so unrelated re-renders (e.g. pairing polling) don't reset timers.
   const enabledSlides = useMemo(() => getEnabledSlides(slideshowConfig), [slideshowConfig]);
-  const zones = useMemo(() => getZonesForLayout(slideshowConfig.layout), [slideshowConfig.layout]);
+  const zones = useMemo(
+    () => getZonesForLayout(slideshowConfig.layout, {
+      persistentZonePosition: slideshowConfig.persistentZonePosition,
+      persistentZoneSize: slideshowConfig.persistentZoneSize,
+    }),
+    [slideshowConfig.layout, slideshowConfig.persistentZonePosition, slideshowConfig.persistentZoneSize],
+  );
 
   // Schedule clock: re-evaluate per-slide visibility windows (and event
   // availability) on a 30s cadence so slides appear/disappear at their bounds.

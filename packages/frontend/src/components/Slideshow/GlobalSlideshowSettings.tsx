@@ -1,4 +1,4 @@
-import { Settings, Clock, Timer, Sparkles } from 'lucide-react';
+import { Settings, Clock, Timer, Sparkles, Gauge, Power } from 'lucide-react';
 import { SectionCard } from '@/components/SectionCard';
 import type { SlideshowConfig } from '@/types/slideshow.types';
 
@@ -75,6 +75,49 @@ export function GlobalSlideshowSettings({
             ))}
           </div>
           <p className="text-xs text-spa-text-secondary">Effekt beim Wechsel zwischen Slides.</p>
+        </div>
+
+        {/* Übergänge an/aus */}
+        <div className="rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Power className="w-4 h-4 text-spa-primary" />
+            <label className="text-sm font-semibold text-spa-text-primary">Übergänge</label>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.enableTransitions !== false}
+              onChange={(e) => onChange({ ...config, enableTransitions: e.target.checked })}
+              disabled={disabled}
+              className="w-4 h-4 accent-spa-primary"
+            />
+            <span className="text-sm text-spa-text-primary">Animationen aktiviert</span>
+          </label>
+          <p className="text-xs text-spa-text-secondary">Aus = harte Schnitte ohne Animation (für die ganze Slideshow).</p>
+        </div>
+
+        {/* Übergangs-Tempo */}
+        <div className="rounded-xl border border-spa-border bg-spa-bg-primary/30 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Gauge className="w-4 h-4 text-spa-primary" />
+            <label className="text-sm font-semibold text-spa-text-primary">Übergangs-Tempo</label>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min="0.2"
+              max="1.5"
+              step="0.1"
+              value={config.transitionDuration ?? 0.6}
+              onChange={(e) => onChange({ ...config, transitionDuration: parseFloat(e.target.value) })}
+              disabled={disabled || config.enableTransitions === false || config.defaultTransition === 'none'}
+              className="flex-1 accent-spa-primary disabled:opacity-50"
+            />
+            <span className="w-12 shrink-0 text-right text-sm font-semibold text-spa-text-primary">
+              {(config.transitionDuration ?? 0.6).toFixed(1)}s
+            </span>
+          </div>
+          <p className="text-xs text-spa-text-secondary">Geschwindigkeit der Überblendung beim Slidewechsel.</p>
         </div>
 
         {/* Prestart */}

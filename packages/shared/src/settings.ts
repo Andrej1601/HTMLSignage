@@ -258,6 +258,8 @@ export const SlideshowConfigSchema = z.object({
   defaultDuration: z.number().optional(),
   defaultTransition: TransitionTypeSchema.optional(),
   enableTransitions: z.boolean().optional(),
+  /** Crossfade/transition speed in seconds (0.2–1.5). Falls back to 0.6. */
+  transitionDuration: z.number().optional(),
   persistentZonePosition: z.enum(['left', 'right', 'top', 'bottom']).optional(),
   persistentZoneSize: z.number().optional(),
   displayAppearance: DisplayAppearanceSchema.optional(),

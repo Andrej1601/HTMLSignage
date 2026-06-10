@@ -34,6 +34,7 @@ export function DisplayModernTripleLayout({
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
   const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
+  const transitionDurationSec = effectiveSettings.slideshow?.transitionDuration ?? 0.6;
 
   const isPortrait = profile.isPortrait;
   const isCompact = profile.isCompact;
@@ -136,7 +137,7 @@ export function DisplayModernTripleLayout({
         <SlideTransition
           slideKey={left.slide?.id || `content-panel-${designStyle}`}
           enabled={enableTransitions && (left.info?.shouldRotate || false)}
-          duration={0.6}
+          duration={transitionDurationSec}
           transition={resolveTransition(left.slide)}
           progressDurationSec={
             left.info?.shouldRotate ? getEffectiveSlideDuration(left.slide, defaultDuration) : undefined
@@ -159,7 +160,7 @@ export function DisplayModernTripleLayout({
           <SlideTransition
             slideKey={topRight.slide?.id || topRight.info?.currentSlideIndex || 'top-fallback'}
             enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
-            duration={0.6}
+            duration={transitionDurationSec}
             transition={resolveTransition(topRight.slide)}
             progressDurationSec={topRight.info?.shouldRotate ? topDurationSec : undefined}
             progressColor={accentGold}
@@ -180,7 +181,7 @@ export function DisplayModernTripleLayout({
           <SlideTransition
             slideKey={bottomRight.slide?.id || 'bottom-fallback'}
             enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
-            duration={0.6}
+            duration={transitionDurationSec}
             transition={resolveTransition(bottomRight.slide)}
             progressDurationSec={
               bottomRight.info?.shouldRotate ? getEffectiveSlideDuration(bottomRight.slide, defaultDuration) : undefined
