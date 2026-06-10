@@ -9,6 +9,8 @@ import {
   compareVersions,
   collectSystemUpdateVerification,
   createDatabaseBackup,
+  restoreDatabaseBackup,
+  findMissingEnvKeys,
   resolveSystemUpdateRestartPlan,
   runCommand,
   type ReleaseInfo,
@@ -20,6 +22,7 @@ const FINALIZER_SCRIPT_PATH = fileURLToPath(new URL('../scripts/systemUpdateFina
 const BACKEND_WORKDIR = path.join(REPO_ROOT, 'packages/backend');
 
 interface SystemUpdateStep {
+  id: string;
   label: string;
   command: string;
   args: string[];
@@ -62,41 +65,57 @@ export function buildSystemUpdateStatusPayload(input: {
 function createSystemUpdateSteps(tagName: string): SystemUpdateStep[] {
   return [
     {
+      id: 'fetch',
       label: 'Fetching tags and branches',
       command: 'git',
       args: ['fetch', '--all', '--tags', '--prune'],
       timeoutMs: 2 * 60 * 1000,
-      percent: 20,
+      percent: 18,
     },
     {
+      id: 'checkout',
       label: `Checking out ${tagName}`,
       command: 'git',
       args: ['checkout', tagName],
       timeoutMs: 60 * 1000,
-      percent: 30,
+      percent: 28,
     },
     {
+      id: 'install',
       label: 'Installing dependencies',
       command: 'pnpm',
       args: ['install', '--force', '--no-frozen-lockfile', '--ignore-scripts=false'],
       timeoutMs: 20 * 60 * 1000,
-      percent: 45,
+      percent: 42,
     },
     {
+      // Deterministic Prisma client generation — don't rely on the install
+      // postinstall (which is skipped under --ignore-scripts).
+      id: 'generate',
+      label: 'Generating Prisma client',
+      command: 'pnpm',
+      args: ['--filter', 'backend', 'prisma', 'generate'],
+      timeoutMs: 5 * 60 * 1000,
+      percent: 52,
+    },
+    {
+      id: 'migrate',
       label: 'Applying Prisma migrations',
       command: 'pnpm',
       args: ['--filter', 'backend', 'prisma', 'migrate', 'deploy'],
       timeoutMs: 10 * 60 * 1000,
-      percent: 60,
+      percent: 62,
     },
     {
+      id: 'build-backend',
       label: 'Building backend',
       command: 'pnpm',
       args: ['--filter', 'backend', 'build'],
       timeoutMs: 10 * 60 * 1000,
-      percent: 75,
+      percent: 76,
     },
     {
+      id: 'build-frontend',
       label: 'Building frontend',
       command: 'pnpm',
       args: ['--filter', 'frontend', 'build'],
@@ -155,12 +174,24 @@ export async function runSystemUpdateJob(
     }
     context.appendLog(`DB-Backup erstellt: ${path.basename(backupPath)}`);
 
+    // Rollback target: prefer the exact tag HEAD is on; fall back to the raw
+    // commit SHA so a failed update can still be reverted even when HEAD isn't
+    // on a tag (e.g. running off a branch like DEV).
     const previousTagResult = await runCommand(
       'git',
       ['describe', '--tags', '--exact-match', 'HEAD'],
       { timeoutMs: 30 * 1000 },
     );
-    const previousTag = previousTagResult.code === 0 ? previousTagResult.stdout.trim() : null;
+    let rollbackRef = previousTagResult.code === 0 ? previousTagResult.stdout.trim() : null;
+    if (!rollbackRef) {
+      const shaResult = await runCommand('git', ['rev-parse', 'HEAD'], { timeoutMs: 30 * 1000 });
+      rollbackRef = shaResult.code === 0 ? shaResult.stdout.trim() : null;
+    }
+    context.appendLog(rollbackRef
+      ? `Rollback-Referenz: ${rollbackRef}`
+      : 'Warnung: keine Rollback-Referenz ermittelbar — Fehler erfordert manuellen Eingriff.');
+
+    let migrationsTouched = false;
 
     for (const step of createSystemUpdateSteps(tagName)) {
       context.setProgress('update-step', step.label, step.percent);
@@ -171,10 +202,29 @@ export async function runSystemUpdateJob(
         context.appendLog(combinedOutput);
       }
 
+      // Mark once the migration step has been attempted (success or failure) —
+      // from here on the schema may have changed, so a code rollback must be
+      // paired with a DB restore.
+      if (step.id === 'migrate') migrationsTouched = true;
+
       if (result.code === 0) continue;
 
-      if (previousTag) {
-        rolledBack = await attemptRollback(previousTag, context);
+      // 1) Revert the code.
+      if (rollbackRef) {
+        rolledBack = await attemptRollback(rollbackRef, context);
+      }
+
+      // 2) If migrations were already applied/attempted, restore the DB to the
+      //    pre-update snapshot so it matches the rolled-back code (Prisma
+      //    migrations are forward-only — the git checkout can't undo them).
+      let dbRestored = false;
+      if (rolledBack && migrationsTouched && backupPath) {
+        context.setProgress('rollback', 'Datenbank wird aus Backup wiederhergestellt', 95);
+        context.appendLog('== Migrationen berührt — DB-Backup wird zurückgespielt ==');
+        dbRestored = await restoreDatabaseBackup(backupPath);
+        context.appendLog(dbRestored
+          ? 'DB-Backup erfolgreich zurückgespielt.'
+          : `DB-Restore fehlgeschlagen — manueller Eingriff erforderlich (Backup: ${path.basename(backupPath)}).`);
       }
 
       context.fail('update-step-failed', `Schritt fehlgeschlagen: ${step.label}`, {
@@ -182,6 +232,7 @@ export async function runSystemUpdateJob(
         targetVersion: tagName,
         backupPath: backupPath ? path.basename(backupPath) : undefined,
         rolledBack,
+        dbRestored,
       });
 
       await logAuditEvent(auditRequest, {
@@ -191,6 +242,7 @@ export async function runSystemUpdateJob(
           step: step.label,
           backupPath: backupPath ? path.basename(backupPath) : null,
           rolledBack,
+          dbRestored,
           requestId: auditRequest.requestId ?? null,
           jobId: context.job.id,
         },
@@ -228,6 +280,16 @@ export async function runSystemUpdateJob(
       return;
     }
 
+    // Surface env vars the new release's .env.example introduced but the live
+    // .env doesn't set yet — a frequent cause of post-restart crash-loops.
+    const missingEnvKeys = await findMissingEnvKeys();
+    if (missingEnvKeys.length > 0) {
+      context.appendLog(
+        `Warnung: Neue Variablen in .env.example fehlen in packages/backend/.env: ${missingEnvKeys.join(', ')}. `
+        + 'Bitte vor dem Neustart ergänzen, sonst kann das Backend nach dem Restart fehlschlagen.',
+      );
+    }
+
     context.setProgress('finalize', 'Update wird finalisiert und Dienste werden neu gestartet', 98);
     const newVersion = await readLocalVersion();
     const baseResult = {
@@ -237,6 +299,7 @@ export async function runSystemUpdateJob(
       rolledBack,
       preflight,
       buildVerification: verification,
+      missingEnvKeys,
     };
 
     context.appendLog(`Restart-Strategie: ${restartPlan.summary}`);

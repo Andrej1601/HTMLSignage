@@ -234,6 +234,71 @@ export async function createDatabaseBackup(): Promise<string | null> {
   return backupFile;
 }
 
+/**
+ * Restores a plain-SQL dump created by {@link createDatabaseBackup}. The dump
+ * uses `--clean --if-exists`, so replaying it with psql drops + recreates the
+ * objects, returning the database to its pre-update snapshot. Used to keep the
+ * DB and the (git-rolled-back) code in sync when a migration step fails.
+ */
+export async function restoreDatabaseBackup(backupFile: string): Promise<boolean> {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    console.error('[system] DB restore skipped: DATABASE_URL not set');
+    return false;
+  }
+  if (!existsSync(backupFile)) {
+    console.error('[system] DB restore skipped: backup file missing:', backupFile);
+    return false;
+  }
+
+  const url = new URL(dbUrl);
+  const pgEnv = { ...process.env, PGPASSWORD: url.password };
+  const cleanUrl = `${url.protocol}//${url.username}@${url.host}${url.pathname}${url.search}`;
+
+  const result = await runCommand(
+    'psql',
+    ['--set', 'ON_ERROR_STOP=on', '--dbname', cleanUrl, '--file', backupFile],
+    { cwd: REPO_ROOT, timeoutMs: 15 * 60 * 1000, env: pgEnv },
+  );
+  if (result.code !== 0) {
+    console.error('[system] psql restore failed:', result.stderr);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Compares the keys declared in `packages/backend/.env.example` against the
+ * live `.env`. A non-empty result means the (target release's) example
+ * introduced env vars the running instance does not set yet — a frequent cause
+ * of post-update crash-loops on larger releases. Best-effort: returns [] when
+ * either file is unreadable.
+ */
+export async function findMissingEnvKeys(): Promise<string[]> {
+  const extractKeys = async (file: string): Promise<Set<string>> => {
+    try {
+      const raw = await fs.readFile(file, 'utf-8');
+      const keys = new Set<string>();
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const match = /^([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(trimmed);
+        if (match?.[1]) keys.add(match[1]);
+      }
+      return keys;
+    } catch {
+      return new Set();
+    }
+  };
+
+  const exampleKeys = await extractKeys(path.join(REPO_ROOT, 'packages/backend/.env.example'));
+  if (exampleKeys.size === 0) return [];
+  const liveKeys = await extractKeys(path.join(REPO_ROOT, 'packages/backend/.env'));
+  // If the live .env is unreadable we can't make a useful claim — stay quiet.
+  if (liveKeys.size === 0) return [];
+  return [...exampleKeys].filter((key) => !liveKeys.has(key));
+}
+
 export async function getCurrentGitTag(): Promise<string | null> {
   const result = await runCommand('git', ['describe', '--tags', '--exact-match', 'HEAD']);
   return result.code === 0 ? result.stdout.trim() : null;
@@ -272,8 +337,19 @@ export async function resolveSystemUpdateRestartPlan(pid = process.pid): Promise
   const frontendHealthUrl = getEnvValue('SYSTEM_UPDATE_FRONTEND_HEALTH_URL')
     || 'http://127.0.0.1:5173/';
   const restartCommand = getEnvValue('SYSTEM_UPDATE_RESTART_COMMAND');
-  const frontendRestartCommand = getEnvValue('SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND');
   const currentService = await getSystemdServiceFromCgroup(pid);
+
+  // The frontend runs `vite preview`, which serves the built `dist/` from
+  // process start and does NOT pick up a fresh build until it is restarted.
+  // When the backend runs under systemd (self-process restart) we therefore
+  // default to restarting the frontend unit as well — otherwise the backend
+  // updates while the UI keeps serving the old bundle (silent version skew).
+  // Override via SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND. NOTE: the service user
+  // must be allowed to run this (polkit/sudoers) or the restart silently fails.
+  const explicitFrontendRestart = getEnvValue('SYSTEM_UPDATE_FRONTEND_RESTART_COMMAND');
+  const runsUnderSystemd = currentService === backendService || Boolean(restartCommand);
+  const frontendRestartCommand = explicitFrontendRestart
+    || (runsUnderSystemd ? `systemctl restart ${frontendService}` : null);
 
   return buildSystemUpdateRestartPlan({
     currentService,
