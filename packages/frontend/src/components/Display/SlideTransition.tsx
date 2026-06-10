@@ -182,6 +182,11 @@ export function SlideTransition({
     <>{children}</>
   );
 
+  // The incoming layer is ALWAYS rendered at the same tree position (direct
+  // child of the stage) so it is never re-mounted when the outgoing layer is
+  // dropped — otherwise the new slide would replay its enter animation ~600ms
+  // after the switch (a visible second flash). The outgoing layer simply
+  // overlays it absolutely while it fades out.
   const stage = (
     <div className="relative w-full h-full">
       {outgoing && (
@@ -189,11 +194,7 @@ export function SlideTransition({
           {outgoing.node}
         </OutgoingFrame>
       )}
-      {shouldAnimate && outgoing ? (
-        <div className="absolute inset-0 w-full h-full">{incoming}</div>
-      ) : (
-        incoming
-      )}
+      {incoming}
     </div>
   );
 
