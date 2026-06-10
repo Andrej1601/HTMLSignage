@@ -64,9 +64,10 @@ export function AuditLogSection() {
           </p>
         </div>
         <button
+          type="button"
           onClick={() => void loadAuditLog(null)}
           disabled={isLoading || isLoadingMore}
-          className="px-3 py-2 rounded-lg border border-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-primary disabled:opacity-50 flex items-center gap-2"
+          className="px-3 py-2 rounded-lg border border-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-primary disabled:opacity-50 flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           Neu laden
@@ -136,9 +137,10 @@ export function AuditLogSection() {
       {nextCursor && (
         <div className="mt-4 flex justify-center">
           <button
+            type="button"
             onClick={() => void loadAuditLog(nextCursor)}
             disabled={isLoadingMore || isLoading}
-            className="px-4 py-2 rounded-lg bg-spa-secondary text-white hover:bg-spa-secondary-dark disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-spa-secondary text-white hover:bg-spa-secondary-dark disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             {isLoadingMore ? 'Lädt...' : 'Weitere Einträge laden'}
           </button>

@@ -308,7 +308,7 @@ function EventsSlideDispatch({
       designId={designId}
       tokenOverrides={tokenOverrides}
       accentStripe={accentStripe}
-      fallback={<EventsSlide settings={settings} media={media} />}
+      fallback={<EventsSlide settings={settings} media={media} now={effectiveNow} />}
     />
   );
 }

@@ -352,6 +352,7 @@ export function SaunasPage() {
                     <p className="font-semibold text-spa-text-primary">{sauna.name}</p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <span
+                        aria-hidden="true"
                         className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: SAUNA_STATUS_COLORS[sauna.status] }}
                       />
@@ -361,6 +362,7 @@ export function SaunasPage() {
                   <select
                     value={sauna.status}
                     onChange={(e) => handleStatusChange(sauna.id, e.target.value as Sauna['status'])}
+                    aria-label={`Status für ${sauna.name}`}
                     className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                   >
                     <option value="active">Aufgüsse</option>

@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { Skeleton, SkeletonTableRow } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save, Search, X, CheckSquare } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
@@ -48,7 +50,6 @@ export function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkRoleDialogOpen, setBulkRoleDialogOpen] = useState(false);
@@ -202,15 +203,17 @@ export function UsersPage() {
       render: (u) => (
         <>
           <button
+            type="button"
             onClick={() => setEditingUser(u)}
-            className="text-spa-primary hover:text-spa-primary-dark mr-3"
+            className="text-spa-primary hover:text-spa-primary-dark mr-3 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             aria-label={`${u.username} bearbeiten`}
           >
             <Edit2 className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={() => setDeletingUser(u)}
-            className="text-spa-error hover:text-spa-error-dark"
+            className="text-spa-error hover:text-spa-error-dark focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
             aria-label={`${u.username} löschen`}
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -240,41 +243,15 @@ export function UsersPage() {
     );
   }, [users, searchQuery]);
 
-  const allVisibleSelected =
-    filteredUsers.length > 0 && filteredUsers.every((u) => selectedIds.has(u.id));
-  const someVisibleSelected =
-    filteredUsers.some((u) => selectedIds.has(u.id)) && !allVisibleSelected;
-
-  // Selektion auf sichtbare User beschränken: wer aus dem Filter fällt,
-  // verschwindet auch aus der Auswahl. Render-phase Sync (kein
-  // setState-in-effect) via Tracked-Vorgängerwert von filteredUsers.
-  const [prevFilteredUsers, setPrevFilteredUsers] = useState(filteredUsers);
-  if (filteredUsers !== prevFilteredUsers) {
-    setPrevFilteredUsers(filteredUsers);
-    if (selectedIds.size > 0) {
-      const visibleIds = new Set(filteredUsers.map((u) => u.id));
-      const filtered = new Set<string>();
-      for (const id of selectedIds) if (visibleIds.has(id)) filtered.add(id);
-      if (filtered.size !== selectedIds.size) setSelectedIds(filtered);
-    }
-  }
-
-  const toggleSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
-  const selectAllVisible = () => setSelectedIds(new Set(filteredUsers.map((u) => u.id)));
-
-  const selectedUsers = useMemo(
-    () => users.filter((u) => selectedIds.has(u.id)),
-    [users, selectedIds],
-  );
+  const {
+    selectedIds,
+    toggle: toggleSelected,
+    clear: clearSelection,
+    selectAllVisible,
+    allVisibleSelected,
+    someVisibleSelected,
+    selectedItems: selectedUsers,
+  } = useBulkSelection(filteredUsers);
 
   // Sicherheitsregel: den eigenen Account darf man nicht via Bulk-Aktion
   // löschen oder demoten, sonst sperrt sich der User selbst aus.
@@ -340,7 +317,7 @@ export function UsersPage() {
     setBulkRoleSaving(false);
     setBulkRoleDialogOpen(false);
     setBulkRoleSelection([]);
-    setSelectedIds(new Set());
+    clearSelection();
   };
 
   const handleBulkDeleteRequest = () => {
@@ -384,7 +361,7 @@ export function UsersPage() {
 
     setBulkDeleting(false);
     setBulkDeleteOpen(false);
-    setSelectedIds(new Set());
+    clearSelection();
   };
 
   const toggleBulkRole = (role: string) => {
@@ -499,7 +476,7 @@ export function UsersPage() {
                       }}
                       aria-pressed={isSelected}
                       aria-label={isSelected ? `${u.username} abwählen` : `${u.username} auswählen`}
-                      className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold transition-all ${
+                      className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                         isSelected
                           ? 'bg-spa-primary ring-2 ring-spa-primary ring-offset-2'
                           : 'bg-spa-primary'
@@ -547,57 +524,36 @@ export function UsersPage() {
         />
 
         {/* Bulk-Action-Leiste — fixed unten */}
-        {selectedIds.size > 0 && (
-          <div
-            role="toolbar"
-            aria-label="Mehrfach-Aktionen"
-            className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-spa-bg-secondary bg-spa-surface px-4 py-3 shadow-2xl"
+        <BulkActionBar
+          count={selectedIds.size}
+          onSelectAll={selectAllVisible}
+          selectAllDisabled={allVisibleSelected}
+          onClear={clearSelection}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Shield}
+            onClick={() => openBulkRoleDialog('add')}
           >
-            <span className="text-sm font-semibold text-spa-text-primary">
-              {selectedIds.size} ausgewählt
-            </span>
-            <div className="mx-2 h-5 w-px bg-spa-bg-secondary" />
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={CheckSquare}
-              onClick={selectAllVisible}
-              disabled={allVisibleSelected}
-            >
-              Alle sichtbaren
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={Shield}
-              onClick={() => openBulkRoleDialog('add')}
-            >
-              Rolle ergänzen
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => openBulkRoleDialog('remove')}
-            >
-              Rolle entfernen
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={Trash2}
-              onClick={handleBulkDeleteRequest}
-            >
-              Löschen
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={X}
-              onClick={clearSelection}
-              aria-label="Auswahl aufheben"
-            />
-          </div>
-        )}
+            Rolle ergänzen
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => openBulkRoleDialog('remove')}
+          >
+            Rolle entfernen
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={Trash2}
+            onClick={handleBulkDeleteRequest}
+          >
+            Löschen
+          </Button>
+        </BulkActionBar>
 
         {/* Bulk Delete Confirm */}
         <ConfirmDialog

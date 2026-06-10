@@ -147,9 +147,10 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
             {(Object.keys(SAUNA_STATUS_LABELS) as SaunaStatus[]).map((status) => (
               <button
                 key={status}
+                type="button"
                 onClick={() => setFormData({ ...formData, status })}
                 className={clsx(
-                  'px-4 py-3 rounded-lg border-2 transition-colors text-left',
+                  'px-4 py-3 rounded-lg border-2 transition-colors text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                   formData.status === status
                     ? 'border-spa-primary bg-spa-primary text-white'
                     : 'border-spa-bg-secondary hover:border-spa-primary/50'
@@ -215,8 +216,9 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => setShowImagePicker(!showImagePicker)}
-                className="w-full px-4 py-8 border-2 border-dashed border-spa-bg-secondary rounded-lg hover:border-spa-primary transition-colors flex flex-col items-center gap-2"
+                className="w-full px-4 py-8 border-2 border-dashed border-spa-bg-secondary rounded-lg hover:border-spa-primary transition-colors flex flex-col items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 <ImageIcon className="w-8 h-8 text-spa-text-secondary" />
                 <span className="text-spa-text-secondary">Bild auswählen</span>
@@ -340,9 +342,10 @@ export function SaunaEditor({ sauna, isOpen, onClose, onSave, onDelete }: SaunaE
                 >
                   {feature}
                   <button
+                    type="button"
                     onClick={() => handleRemoveFeature(index)}
                     aria-label="Merkmal entfernen"
-                    className="p-0.5 hover:bg-spa-primary/20 rounded-full transition-colors"
+                    className="p-0.5 hover:bg-spa-primary/20 rounded-full transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                   >
                     <X className="w-3 h-3" />
                   </button>

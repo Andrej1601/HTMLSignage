@@ -319,10 +319,11 @@ export function ScheduleGrid({
                     )}
                   >
                     <button
+                      type="button"
                       data-row-idx={timeRowIndex}
                       onClick={handleTimeClick}
                       className={clsx(
-                        'group/time flex items-center gap-1.5 font-mono text-lg font-bold transition-colors min-h-[44px] min-w-[52px]',
+                        'group/time flex items-center gap-1.5 font-mono text-lg font-bold transition-colors min-h-[44px] min-w-[52px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                         isCurrentRow ? 'text-spa-success hover:text-spa-success-dark' : 'text-spa-primary hover:text-spa-primary-dark',
                       )}
                       title="Zeit bearbeiten"
@@ -399,9 +400,10 @@ export function ScheduleGrid({
                   {/* Delete row */}
                   <td className="px-2 py-3">
                     <button
+                      type="button"
                       data-row-idx={timeRowIndex}
                       onClick={handleDeleteClick}
-                      className="p-2 text-spa-text-secondary/20 hover:text-spa-error hover:bg-spa-error-light rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center opacity-0 group-hover:opacity-100"
+                      className="p-2 text-spa-text-secondary/20 hover:text-spa-error hover:bg-spa-error-light rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
                       title="Zeitreihe löschen"
                       aria-label="Zeitreihe löschen"
                     >
@@ -418,8 +420,9 @@ export function ScheduleGrid({
       {/* Add slot */}
       <div className="border-t border-spa-bg-secondary p-3">
         <button
+          type="button"
           onClick={onAddTimeRow}
-          className="w-full px-4 py-2.5 border border-dashed border-spa-primary/20 rounded-xl text-spa-primary hover:border-spa-primary/50 hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+          className="w-full px-4 py-2.5 border border-dashed border-spa-primary/20 rounded-xl text-spa-primary hover:border-spa-primary/50 hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         >
           <Plus className="w-4 h-4" />
           Zeitslot hinzufügen

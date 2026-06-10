@@ -57,7 +57,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
   const { pairingInfo, deviceToken, isPairingLoading } = useDisplayPairing(isPreviewMode);
 
   // ── Media polling ──────────────────────────────────────────────────────────
-  const mediaItems = useDisplayMediaPolling(deviceToken);
+  const { media: mediaItems, refresh: refreshMedia } = useDisplayMediaPolling(deviceToken);
 
   // ── Display config state ───────────────────────────────────────────────────
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
@@ -370,6 +370,12 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
       if (deviceId) {
         void refreshDeviceDisplayConfig(deviceId, { silent: true });
       }
+    },
+    onMediaUpdate: () => {
+      if (ENV_IS_DEV) {
+        console.log('[Display] Media updated via WebSocket — reloading media list');
+      }
+      refreshMedia();
     },
     onDeviceUpdate: (data) => {
       const deviceId = pairedDeviceIdRef.current;

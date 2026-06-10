@@ -16,7 +16,14 @@ import { useEventsPanelData } from '@/slides/data';
 interface EventsSlideProps {
   settings: Settings;
   media?: Media[];
+  /** External clock from the display runtime. When provided, the slide uses it
+   *  instead of spinning its own 30s timer (avoids a redundant clock source). */
+  now?: Date;
 }
+
+// Konstanter Theme-Fallback — einmal beim Import berechnet statt pro Render
+// (getDefaultSettings() allokiert ein großes Objekt inkl. Dashboard-Farben).
+const DEFAULT_SETTINGS = getDefaultSettings();
 
 const TWO_LINE_CLAMP = {
   display: '-webkit-box',
@@ -346,9 +353,8 @@ function LeadEventCard({
   );
 }
 
-export const EventsSlide = memo(function EventsSlide({ settings, media }: EventsSlideProps) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
+export const EventsSlide = memo(function EventsSlide({ settings, media, now: externalNow }: EventsSlideProps) {
+  const theme = settings.theme || DEFAULT_SETTINGS.theme!;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
@@ -361,11 +367,13 @@ export const EventsSlide = memo(function EventsSlide({ settings, media }: Events
   const statusSoon = theme.statusPrestart || '#F59E0B';
   const statusNext = theme.statusNext || accentGold;
 
-  const [now, setNow] = useState(() => new Date());
+  const [internalNow, setInternalNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30_000);
+    if (externalNow) return; // runtime clock drives updates — no private timer
+    const t = setInterval(() => setInternalNow(new Date()), 30_000);
     return () => clearInterval(t);
-  }, []);
+  }, [externalNow]);
+  const now = externalNow ?? internalNow;
 
   const eventsData = useEventsPanelData({ settings, media, now });
   const allEvents: EventPresentation[] = useMemo(() => {

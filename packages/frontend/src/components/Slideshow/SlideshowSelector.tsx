@@ -83,7 +83,7 @@ export function SlideshowSelector({
                   type="button"
                   onClick={() => onSelect(slideshow.id)}
                   disabled={disabled}
-                  className={`group relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`group relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                     isSelected
                       ? 'bg-spa-surface text-spa-text-primary shadow-xs'
                       : 'text-spa-text-secondary hover:text-spa-text-primary'
@@ -144,7 +144,7 @@ export function SlideshowSelector({
                     <button
                       type="button"
                       title="Aktionen"
-                      className={`inline-flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                      className={`inline-flex items-center justify-center rounded-md p-1.5 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                         open
                           ? 'bg-spa-primary/10 text-spa-primary'
                           : isSelected
@@ -180,14 +180,14 @@ export function SlideshowSelector({
             <button
               type="submit"
               disabled={!newName.trim()}
-              className="rounded-lg bg-spa-primary px-2.5 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="rounded-lg bg-spa-primary px-2.5 py-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               OK
             </button>
             <button
               type="button"
               onClick={() => { setIsCreating(false); setNewName(''); }}
-              className="rounded-lg px-2 py-1.5 text-xs font-medium text-spa-text-secondary hover:text-spa-text-primary"
+              className="rounded-lg px-2 py-1.5 text-xs font-medium text-spa-text-secondary hover:text-spa-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               &times;
             </button>
@@ -197,7 +197,7 @@ export function SlideshowSelector({
             type="button"
             onClick={() => setIsCreating(true)}
             disabled={disabled}
-            className="shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-spa-text-secondary hover:text-spa-primary transition-colors disabled:opacity-60"
+            className="shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-spa-text-secondary hover:text-spa-primary transition-colors disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Neue Slideshow</span>

@@ -10,10 +10,12 @@ import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
-import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3, X, CheckSquare, Layers } from 'lucide-react';
+import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3, Layers } from 'lucide-react';
 import { TabGroup, type Tab } from '@/components/TabGroup';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 import { ComboboxField } from '@/components/ComboboxField';
@@ -57,6 +59,7 @@ export function MediaPage() {
     toggleSelected,
     clearSelection,
     selectAllVisible,
+    allVisibleSelected,
     bulkDeleteOpen,
     setBulkDeleteOpen,
     bulkDeleting,
@@ -156,22 +159,15 @@ export function MediaPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg border border-spa-bg-secondary bg-spa-surface p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`rounded-md p-2 transition-colors ${viewMode === 'grid' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-              aria-label="Rasteransicht"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`rounded-md p-2 transition-colors ${viewMode === 'list' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-              aria-label="Listenansicht"
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
+          <SegmentedControl
+            ariaLabel="Ansicht"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'grid', icon: LayoutGrid, ariaLabel: 'Rasteransicht' },
+              { value: 'list', icon: List, ariaLabel: 'Listenansicht' },
+            ]}
+          />
 
           {isFetching && (
             <span className="text-xs text-spa-text-secondary">Aktualisiert...</span>
@@ -212,50 +208,29 @@ export function MediaPage() {
         )}
 
         {/* Bulk-Action-Leiste — fixed, erscheint sobald Auswahl aktiv */}
-        {selectedIds.size > 0 && (
-          <div
-            role="toolbar"
-            aria-label="Mehrfach-Aktionen"
-            className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-spa-bg-secondary bg-spa-surface px-4 py-3 shadow-2xl"
+        <BulkActionBar
+          count={selectedIds.size}
+          onSelectAll={selectAllVisible}
+          selectAllDisabled={allVisibleSelected}
+          onClear={clearSelection}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Tags}
+            onClick={openBulkTagEditor}
           >
-            <span className="text-sm font-semibold text-spa-text-primary">
-              {selectedIds.size} ausgewählt
-            </span>
-            <div className="mx-2 h-5 w-px bg-spa-bg-secondary" />
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={CheckSquare}
-              onClick={() => selectAllVisible(media)}
-              disabled={selectedIds.size === media.length}
-            >
-              Alle sichtbaren
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={Tags}
-              onClick={openBulkTagEditor}
-            >
-              Tags
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={Trash2}
-              onClick={handleBulkDeleteRequest}
-            >
-              Löschen
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={X}
-              onClick={clearSelection}
-              aria-label="Auswahl aufheben"
-            />
-          </div>
-        )}
+            Tags
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={Trash2}
+            onClick={handleBulkDeleteRequest}
+          >
+            Löschen
+          </Button>
+        </BulkActionBar>
 
         {/* Single Delete Confirm */}
         <ConfirmDialog
@@ -325,7 +300,7 @@ export function MediaPage() {
               <button
                 type="button"
                 onClick={() => setBulkTagMode('add')}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   bulkTagMode === 'add'
                     ? 'bg-spa-primary text-white'
                     : 'text-spa-text-secondary hover:text-spa-text-primary'
@@ -336,7 +311,7 @@ export function MediaPage() {
               <button
                 type="button"
                 onClick={() => setBulkTagMode('replace')}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   bulkTagMode === 'replace'
                     ? 'bg-spa-primary text-white'
                     : 'text-spa-text-secondary hover:text-spa-text-primary'
@@ -378,7 +353,7 @@ export function MediaPage() {
                         );
                         setBulkTagDraft(filtered.join(', '));
                       }}
-                      className="rounded-full px-3 py-1 text-xs border bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80 transition-colors"
+                      className="rounded-full px-3 py-1 text-xs border bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                       title="Klicken zum Entfernen"
                     >
                       #{tag} ×
@@ -450,7 +425,7 @@ export function MediaPage() {
                       key={`active-tag-${tag}`}
                       type="button"
                       onClick={() => toggleExistingTag(tag)}
-                      className="rounded-full px-3 py-1 text-xs border transition-colors bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80"
+                      className="rounded-full px-3 py-1 text-xs border transition-colors bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                       title="Klicken zum Entfernen"
                     >
                       #{tag} ×

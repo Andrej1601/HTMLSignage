@@ -91,9 +91,10 @@ export function DataTable<T>({
       </span>
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={() => setPage((p) => Math.max(0, p - 1))}
           disabled={safePageIndex === 0}
-          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           aria-label="Vorherige Seite"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -102,9 +103,10 @@ export function DataTable<T>({
           {safePageIndex + 1} / {totalPages}
         </span>
         <button
+          type="button"
           onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
           disabled={safePageIndex >= totalPages - 1}
-          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-spa-bg-primary disabled:opacity-30 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           aria-label="Nächste Seite"
         >
           <ChevronRight className="w-4 h-4" />
@@ -132,8 +134,9 @@ export function DataTable<T>({
                   >
                     {col.sortFn ? (
                       <button
+                        type="button"
                         onClick={() => handleSort(col.key)}
-                        className="inline-flex items-center gap-1 hover:text-spa-text-primary transition-colors group"
+                        className="inline-flex items-center gap-1 hover:text-spa-text-primary transition-colors group focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                       >
                         {col.header}
                         {sortKey === col.key ? (

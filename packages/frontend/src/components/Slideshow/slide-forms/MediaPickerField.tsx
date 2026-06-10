@@ -37,7 +37,7 @@ export function MediaPickerField({
                 onClick={() => onSelect(video.id)}
                 aria-label={video.originalName}
                 className={clsx(
-                  'relative rounded-lg border-2 overflow-hidden transition-all group',
+                  'relative rounded-lg border-2 overflow-hidden transition-all group focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                   selectedId === video.id
                     ? 'border-spa-primary ring-2 ring-spa-primary'
                     : 'border-spa-bg-secondary hover:border-spa-primary/50'
@@ -73,7 +73,7 @@ export function MediaPickerField({
               key={img.id}
               onClick={() => onSelect(img.id)}
               className={clsx(
-                'relative rounded-lg border-2 overflow-hidden transition-all',
+                'relative rounded-lg border-2 overflow-hidden transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                 selectedId === img.id
                   ? 'border-spa-primary ring-2 ring-spa-primary'
                   : 'border-spa-bg-secondary hover:border-spa-primary/50'

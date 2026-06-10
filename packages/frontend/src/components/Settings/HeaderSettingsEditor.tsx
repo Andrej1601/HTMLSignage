@@ -142,7 +142,7 @@ export function HeaderSettingsEditor({
                 type="button"
                 disabled={disabled || !value.enabled}
                 onClick={() => set('logoImageId', undefined)}
-                className="text-[11px] font-semibold text-spa-text-secondary hover:text-spa-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="text-[11px] font-semibold text-spa-text-secondary hover:text-spa-primary disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 Entfernen
               </button>
@@ -182,7 +182,7 @@ export function HeaderSettingsEditor({
                 type="button"
                 disabled={disabled || !value.enabled}
                 onClick={() => set('logoImageId', undefined)}
-                className={`flex aspect-square items-center justify-center rounded-md border-2 px-2 text-center text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`flex aspect-square items-center justify-center rounded-md border-2 px-2 text-center text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   !value.logoImageId
                     ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
                     : 'border-spa-border text-spa-text-secondary hover:border-spa-primary/40'
@@ -199,7 +199,7 @@ export function HeaderSettingsEditor({
                     disabled={disabled || !value.enabled}
                     onClick={() => set('logoImageId', image.id)}
                     title={image.originalName}
-                    className={`group relative aspect-square overflow-hidden rounded-md border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`group relative aspect-square overflow-hidden rounded-md border-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                       isSelected
                         ? 'border-spa-primary ring-2 ring-spa-primary/20'
                         : 'border-spa-border hover:border-spa-primary/40'

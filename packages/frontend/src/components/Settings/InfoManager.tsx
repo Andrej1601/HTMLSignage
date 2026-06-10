@@ -2,8 +2,9 @@ import { useState } from 'react';
 import type { InfoItem } from '@/types/settings.types';
 import { useMedia } from '@/hooks/useMedia';
 import { buildUploadUrl } from '@/utils/mediaUrl';
-import { Info, Plus, X } from 'lucide-react';
+import { Info, Plus, X, Pencil, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { IconButton } from '@/components/ui/IconButton';
 
 interface InfoManagerProps {
   infos: InfoItem[];
@@ -98,8 +99,9 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
         </div>
         {!showForm && (
           <button
+            type="button"
             onClick={handleStartAdd}
-            className="flex items-center gap-2 bg-spa-primary text-white px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 transition-all shadow-xs"
+            className="flex items-center gap-2 bg-spa-primary text-white px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 transition-all shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
           >
             <Plus className="w-4 h-4" />
             Info hinzufügen
@@ -115,15 +117,20 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
               <span className="text-spa-primary font-bold text-xs uppercase tracking-wider">
                 {isAdding ? 'Neuer Eintrag' : 'Eintrag bearbeiten'}
               </span>
-              <button onClick={handleCancel} className="text-spa-text-secondary hover:text-spa-text-secondary transition-colors">
-                <X className="w-4 h-4" />
-              </button>
+              <IconButton
+                icon={X}
+                aria-label="Formular schließen"
+                variant="ghost"
+                size="sm"
+                onClick={handleCancel}
+              />
             </div>
 
             <div className="p-5 space-y-5">
               <div>
-                <label className="block text-xs font-bold text-spa-text-secondary uppercase tracking-widest mb-1.5">Titel</label>
+                <label htmlFor="info-title" className="block text-xs font-bold text-spa-text-secondary uppercase tracking-widest mb-1.5">Titel</label>
                 <input
+                  id="info-title"
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -134,8 +141,9 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-spa-text-secondary uppercase tracking-widest mb-1.5">Text</label>
+                <label htmlFor="info-text" className="block text-xs font-bold text-spa-text-secondary uppercase tracking-widest mb-1.5">Text</label>
                 <textarea
+                  id="info-text"
                   value={formData.text}
                   onChange={(e) => setFormData({ ...formData, text: e.target.value })}
                   className="w-full border border-spa-border rounded-lg bg-spa-surface text-spa-text-primary focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary text-sm px-3 py-2.5 resize-none outline-hidden"
@@ -156,7 +164,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData, imageId: undefined, imageMode: undefined })}
-                        className={`relative shrink-0 w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors ${
+                        className={`relative shrink-0 w-16 h-16 rounded-lg flex items-center justify-center border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1 ${
                           !formData.imageId
                             ? 'border-spa-primary bg-spa-primary/5 text-spa-primary'
                             : 'bg-spa-bg-secondary border-dashed border-spa-border text-spa-text-secondary'
@@ -169,7 +177,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                           key={img.id}
                           type="button"
                           onClick={() => setFormData({ ...formData, imageId: img.id, imageMode: formData.imageMode || 'thumbnail' })}
-                          className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                          className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1 ${
                             formData.imageId === img.id ? 'border-spa-primary' : 'border-transparent hover:border-spa-primary/50'
                           }`}
                         >
@@ -182,7 +190,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                         <button
                           type="button"
                           onClick={() => setFormData({ ...formData, imageMode: 'thumbnail' })}
-                          className={`py-2 text-xs font-bold rounded-lg transition-colors ${
+                          className={`py-2 text-xs font-bold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1 ${
                             formData.imageMode !== 'background'
                               ? 'bg-spa-surface text-spa-primary shadow-xs border border-spa-border'
                               : 'text-spa-text-secondary hover:text-spa-text-primary'
@@ -193,7 +201,7 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                         <button
                           type="button"
                           onClick={() => setFormData({ ...formData, imageMode: 'background' })}
-                          className={`py-2 text-xs font-bold rounded-lg transition-colors ${
+                          className={`py-2 text-xs font-bold rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1 ${
                             formData.imageMode === 'background'
                               ? 'bg-spa-surface text-spa-primary shadow-xs border border-spa-border'
                               : 'text-spa-text-secondary hover:text-spa-text-primary'
@@ -212,14 +220,14 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
                   type="button"
                   onClick={handleSave}
                   disabled={!formData.title.trim() || !formData.text.trim()}
-                  className="flex-1 bg-spa-primary text-white py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex-1 bg-spa-primary text-white py-2.5 rounded-xl font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
                 >
                   Speichern
                 </button>
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="flex-1 bg-spa-bg-secondary text-spa-text-secondary py-2.5 rounded-xl font-bold text-sm hover:bg-spa-bg-secondary transition-colors"
+                  className="flex-1 bg-spa-bg-secondary text-spa-text-secondary py-2.5 rounded-xl font-bold text-sm hover:bg-spa-bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
                 >
                   Abbrechen
                 </button>
@@ -244,21 +252,22 @@ export function InfoManager({ infos, onChange }: InfoManagerProps) {
 
               const actions = (
                 <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  <button
-                    onClick={() => handleStartEdit(item)}
-                    className="w-6 h-6 rounded bg-spa-surface/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-primary hover:border-spa-primary transition-colors shadow-xs"
+                  <IconButton
+                    icon={Pencil}
                     aria-label="Bearbeiten"
-                  >
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRequestDelete(item.id)}
-                    className="w-6 h-6 rounded bg-spa-surface/90 border border-spa-bg-secondary flex items-center justify-center text-spa-text-secondary hover:text-spa-error hover:border-spa-error/40 transition-colors shadow-xs"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleStartEdit(item)}
+                    className="w-6 h-6 p-0 rounded bg-spa-surface/90 border border-spa-bg-secondary text-spa-text-secondary hover:text-spa-primary hover:border-spa-primary shadow-xs"
+                  />
+                  <IconButton
+                    icon={Trash2}
                     aria-label="Löschen"
-                  >
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                  </button>
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleRequestDelete(item.id)}
+                    className="w-6 h-6 p-0 rounded bg-spa-surface/90 border border-spa-bg-secondary text-spa-text-secondary hover:text-spa-error hover:border-spa-error/40 shadow-xs"
+                  />
                 </div>
               );
 

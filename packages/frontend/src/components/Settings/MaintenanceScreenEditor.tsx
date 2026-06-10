@@ -47,7 +47,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
             <button
               type="button"
               onClick={() => onChange(normalizeMaintenanceScreenSettings(undefined))}
-              className="flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Zurücksetzen
@@ -66,7 +66,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               <button
                 type="button"
                 onClick={() => update({ displayStyle: 'glass' })}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   isGlass
                     ? 'border-spa-primary bg-spa-primary/5 text-spa-primary'
                     : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-primary/40'
@@ -86,7 +86,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
               <button
                 type="button"
                 onClick={() => update({ displayStyle: 'overlay' })}
-                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all ${
+                className={`flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   !isGlass
                     ? 'border-spa-primary bg-spa-primary/5 text-spa-primary'
                     : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-primary/40'
@@ -180,7 +180,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                 <button
                   type="button"
                   onClick={() => update({ backgroundImageId: undefined })}
-                  className={`flex aspect-[4/3] items-center justify-center rounded-lg border-2 px-2 text-center text-xs font-medium transition-colors ${
+                  className={`flex aspect-[4/3] items-center justify-center rounded-lg border-2 px-2 text-center text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                     !normalized.backgroundImageId
                       ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
                       : 'border-spa-bg-secondary text-spa-text-secondary hover:border-spa-primary/40'
@@ -193,7 +193,7 @@ export function MaintenanceScreenEditor({ value, onChange }: MaintenanceScreenEd
                     key={image.id}
                     type="button"
                     onClick={() => update({ backgroundImageId: image.id })}
-                    className={`group relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition-colors ${
+                    className={`group relative aspect-[4/3] overflow-hidden rounded-lg border-2 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                       normalized.backgroundImageId === image.id
                         ? 'border-spa-primary ring-2 ring-spa-primary/20'
                         : 'border-spa-bg-secondary hover:border-spa-primary/40'

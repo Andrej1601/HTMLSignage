@@ -117,18 +117,16 @@ export function DisplayClientPage() {
     [resolvedAudioSettings, mediaItems],
   );
 
-  // `normalizeMaintenanceScreenSettings` is a pure, cheap normaliser.
-  // React Compiler handles the memoization — manual `useMemo` wrappers
-  // around reads from `effectiveSettings.maintenanceScreen` trip its
-  // "preserve manual memoization" lint when the source sometimes comes
-  // from a merge and sometimes from settings directly.
-  const maintenanceScreen = normalizeMaintenanceScreenSettings(
-    effectiveSettings.maintenanceScreen,
+  // Memoised so these reads don't recompute on every render of the 24/7
+  // display client (React Compiler is not enabled in this build).
+  const maintenanceScreen = useMemo(
+    () => normalizeMaintenanceScreenSettings(effectiveSettings.maintenanceScreen),
+    [effectiveSettings.maintenanceScreen],
   );
 
-  const maintenanceBackgroundUrl = getMediaUploadUrl(
-    mediaItems,
-    maintenanceScreen.backgroundImageId,
+  const maintenanceBackgroundUrl = useMemo(
+    () => getMediaUploadUrl(mediaItems, maintenanceScreen.backgroundImageId),
+    [mediaItems, maintenanceScreen.backgroundImageId],
   );
 
   const {
@@ -289,6 +287,11 @@ export function DisplayClientPage() {
     snapshotBackgroundColor: themeColors.dashboardBg || themeColors.bg || '#000000',
   });
 
+  // `eventClock` tickt nur auf Minuten-/30s-Grenzen — die Date-Identität an
+  // diesen Takt zu binden hält alle nachgelagerten `useMemo`s in den Slide-
+  // Datenhooks stabil, statt sie bei jedem Re-Render neu zu berechnen.
+  const displayNow = useMemo(() => new Date(eventClock), [eventClock]);
+
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
     return (
@@ -409,7 +412,6 @@ export function DisplayClientPage() {
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
   const isModernDesign = isModernScheduleDesignStyleValue(designStyle);
-  const displayNow = new Date(eventClock);
 
   return (
     <div
@@ -456,10 +458,11 @@ export function DisplayClientPage() {
           irritieren — dort übernimmt der Auto-Retry-Loop oben. */}
       {isPreviewMode && isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
         <button
+          type="button"
           onClick={() => {
             void tryPlayAudio();
           }}
-          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black"
+          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         >
           Audio in Vorschau aktivieren
         </button>

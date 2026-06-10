@@ -32,12 +32,14 @@ export const SAUNA_STATUS_LABELS: Record<SaunaStatus, string> = {
   hidden: 'Ausgeblendet',
 };
 
-// Status Colors
+// Status Colors — reference the spa theme tokens (CSS variables) so the status
+// dots stay consistent with the palette and adapt to light/dark mode. Used in
+// inline `style={{ backgroundColor }}`, where CSS var references are valid.
 export const SAUNA_STATUS_COLORS: Record<SaunaStatus, string> = {
-  active: '#10b981', // green
-  'no-aufguss': '#f59e0b', // amber
-  'out-of-order': '#ef4444', // red
-  hidden: '#6b7280', // gray
+  active: 'var(--color-spa-success)',
+  'no-aufguss': 'var(--color-spa-warning)',
+  'out-of-order': 'var(--color-spa-error)',
+  hidden: 'var(--color-spa-text-secondary)',
 };
 
 // Helper functions

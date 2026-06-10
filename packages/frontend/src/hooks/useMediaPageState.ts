@@ -3,6 +3,7 @@ import { useMedia, useDeleteMedia, useMediaTags, useUpdateMediaTags } from '@/ho
 import { useSettings } from '@/hooks/useSettings';
 import { useMediaUsage, getUsageSummary } from '@/hooks/useMediaUsage';
 import { mediaApi } from '@/services/api';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { toast } from '@/stores/toastStore';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Media, MediaType } from '@/types/media.types';
@@ -35,7 +36,6 @@ export function useMediaPageState() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [taggingMedia, setTaggingMedia] = useState<Media | null>(null);
   const [tagDraft, setTagDraft] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkTagging, setBulkTagging] = useState(false);
@@ -111,43 +111,16 @@ export function useMediaPageState() {
   };
 
   // ─── Bulk-Selection ────────────────────────────────────────────────────
-  const toggleSelected = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const clearSelection = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
-
-  const selectAllVisible = useCallback((items: Media[]) => {
-    setSelectedIds(new Set(items.map((item) => item.id)));
-  }, []);
-
-  // Falls die gefilterte Medienliste schrumpft (z. B. Filter ändert sich),
-  // räumen wir IDs aus der Auswahl, die nicht mehr sichtbar sind. So
-  // klickt der User nicht versehentlich ausgeblendete Elemente weg.
-  // Render-phase: tracked Vorgängerwert von `media` triggert den Sync
-  // exakt einmal pro Wechsel (kein setState-in-effect).
-  const [prevMedia, setPrevMedia] = useState(media);
-  if (media !== prevMedia) {
-    setPrevMedia(media);
-    if (selectedIds.size > 0) {
-      const visibleIds = new Set(media.map((item) => item.id));
-      const filtered = new Set<string>();
-      for (const id of selectedIds) if (visibleIds.has(id)) filtered.add(id);
-      if (filtered.size !== selectedIds.size) setSelectedIds(filtered);
-    }
-  }
-
-  const selectedMedia = useMemo(
-    () => media.filter((item) => selectedIds.has(item.id)),
-    [media, selectedIds],
-  );
+  // Auswahl wird intern auf die sichtbare (gefilterte) Medienliste begrenzt:
+  // wer aus dem Filter fällt, verlässt auch die Auswahl.
+  const {
+    selectedIds,
+    toggle: toggleSelected,
+    clear: clearSelection,
+    selectAllVisible,
+    allVisibleSelected,
+    selectedItems: selectedMedia,
+  } = useBulkSelection(media);
 
   const handleBulkDeleteRequest = () => {
     if (selectedIds.size === 0) return;
@@ -176,7 +149,7 @@ export function useMediaPageState() {
 
     setBulkDeleting(false);
     setBulkDeleteOpen(false);
-    setSelectedIds(new Set());
+    clearSelection();
   };
 
   // ─── Bulk-Tag ──────────────────────────────────────────────────────────
@@ -292,6 +265,7 @@ export function useMediaPageState() {
     toggleSelected,
     clearSelection,
     selectAllVisible,
+    allVisibleSelected,
     // Bulk-Delete
     bulkDeleteOpen,
     setBulkDeleteOpen,

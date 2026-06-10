@@ -427,9 +427,10 @@ export function SettingsPage() {
                       const isActive = activeTab === tab.id;
                       return (
                         <button
+                          type="button"
                           key={tab.id}
                           onClick={() => handleTabChange(tab.id)}
-                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                             isActive
                               ? 'bg-spa-primary text-white shadow-xs'
                               : 'text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary'

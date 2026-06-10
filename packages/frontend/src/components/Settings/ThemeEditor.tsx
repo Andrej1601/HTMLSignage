@@ -192,10 +192,11 @@ export function ThemeEditor({
         <div className="flex items-center gap-3 p-4 rounded-xl bg-spa-bg-secondary border border-spa-border">
           <Presentation className="w-5 h-5 text-spa-primary shrink-0" />
           <div className="flex-1 min-w-0">
-            <label className="text-sm font-semibold text-spa-text-primary">Design anpassen für</label>
+            <label htmlFor="theme-scope-select" className="text-sm font-semibold text-spa-text-primary">Design anpassen für</label>
             <p className="text-xs text-spa-text-secondary">Global oder pro Slideshow</p>
           </div>
           <select
+            id="theme-scope-select"
             value={selectedSlideshowId || ''}
             onChange={(e) => handleSlideshowSelect(e.target.value || null)}
             className="min-w-[200px] px-3 py-2 border border-spa-border rounded-lg text-sm bg-spa-surface text-spa-text-primary focus:ring-2 focus:ring-spa-primary/20 focus:border-spa-primary outline-hidden"

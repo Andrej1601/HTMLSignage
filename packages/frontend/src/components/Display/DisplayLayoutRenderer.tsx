@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotationLayout';
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
 import { DisplayHeader } from '@/components/Display/DisplayHeader';
@@ -40,7 +40,7 @@ export function DisplayLayoutRenderer({
 }: DisplayLayoutRendererProps) {
   const hasAnyZoneSlides = zones.some((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
 
-  const renderContentPanel = (): ReactElement => {
+  const renderContentPanel = useCallback((): ReactElement => {
     // Route the large content panel through `SlideRenderer` so the active
     // design pack gets a chance to render it. The slide type is fixed as
     // 'content-panel'; the id is synthesised from the designStyle so the
@@ -63,9 +63,9 @@ export function DisplayLayoutRenderer({
         slide={syntheticSlide}
       />
     );
-  };
+  }, [designStyle, localSchedule, effectiveSettings, mediaItems, currentTime, displayDeviceId]);
 
-  const renderSlideWithPadding = (
+  const renderSlideWithPadding = useCallback((
     slide: SlideConfig | null | undefined,
     rendered: ReactElement,
     options?: SlidePaddingOptions,
@@ -90,9 +90,9 @@ export function DisplayLayoutRenderer({
     }
 
     return <div className={options?.outerClassName || 'p-8 w-full h-full'}>{rendered}</div>;
-  };
+  }, [isModernDesign]);
 
-  const renderZoneSlide = (
+  const renderZoneSlide = useCallback((
     slide: SlideConfig | null,
     zone?: Zone,
   ): ReactElement => {
@@ -117,9 +117,9 @@ export function DisplayLayoutRenderer({
     );
 
     return renderSlideWithPadding(slide, rendered);
-  };
+  }, [localSchedule, effectiveSettings, mediaItems, currentTime, displayDeviceId, onVideoEnded, renderSlideWithPadding]);
 
-  const layoutContext: DisplayLayoutContext = {
+  const layoutContext: DisplayLayoutContext = useMemo(() => ({
     currentTime,
     designStyle,
     displayDeviceId,
@@ -138,7 +138,26 @@ export function DisplayLayoutRenderer({
     showZoneBorders,
     themeColors,
     zones,
-  };
+  }), [
+    currentTime,
+    designStyle,
+    displayDeviceId,
+    effectiveSettings,
+    enableTransitions,
+    getZoneInfo,
+    getZoneSlide,
+    isModernDesign,
+    localSchedule,
+    mediaItems,
+    onVideoEnded,
+    renderContentPanel,
+    renderSlideWithPadding,
+    renderZoneSlide,
+    resolveTransition,
+    showZoneBorders,
+    themeColors,
+    zones,
+  ]);
 
   const renderInner = (): ReactElement => {
     if (!hasAnyZoneSlides) {

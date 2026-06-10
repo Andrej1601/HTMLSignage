@@ -33,7 +33,11 @@ export function PendingPairings() {
         throw error;
       }
     },
-    refetchInterval: 5000,
+    // Pairing-Requests/-Bestätigungen broadcasten `device:updated`, was den
+    // WebSocketProvider die ['devices']-Query (inkl. ['devices','pending'])
+    // invalidieren lässt. Dieser langsame Poll ist nur ein Sicherheitsnetz für
+    // verpasste Events / abgerissene Sockets.
+    refetchInterval: 30000,
   });
 
   const pairDevice = useMutation({
@@ -105,7 +109,7 @@ export function PendingPairings() {
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center justify-between border-l-4 border-l-spa-primary px-6 py-4 text-left"
+          className="flex w-full items-center justify-between border-l-4 border-l-spa-primary px-6 py-4 text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         >
           <div className="flex items-center gap-2.5">
             <span className="text-lg">📡</span>
@@ -155,7 +159,7 @@ export function PendingPairings() {
                     type="button"
                     onClick={() => setRejectingDevice(device)}
                     disabled={rejectDevice.isPending}
-                    className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary disabled:opacity-50"
+                    className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-4 py-2 text-sm font-medium text-spa-text-primary transition-colors hover:bg-spa-bg-primary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                   >
                     Ablehnen
                   </button>

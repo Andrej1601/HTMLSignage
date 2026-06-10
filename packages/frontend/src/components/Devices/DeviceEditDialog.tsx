@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Monitor } from 'lucide-react';
 import { Dialog } from '@/components/Dialog';
 import { Button } from '@/components/Button';
-import { InputField, ToggleField } from '@/components/FormField';
+import { InputField, SelectField, ToggleField } from '@/components/FormField';
 import { ComboboxField } from '@/components/ComboboxField';
 import type { Device, UpdateDeviceRequest } from '@/types/device.types';
 import type { SlideshowDefinition } from '@/types/slideshow.types';
@@ -147,31 +147,25 @@ export function DeviceEditDialog({
         </div>
 
         {/* Slideshow Assignment */}
-        <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-1">
-            Slideshow
-          </label>
-          <select
-            value={slideshowId || ''}
-            onChange={(e) => setSlideshowId(e.target.value || null)}
-            disabled={isSaving}
-            className="w-full rounded-xl border border-spa-bg-secondary bg-spa-surface px-3 py-2.5 text-sm text-spa-text-primary focus:border-spa-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary/20 disabled:opacity-60"
-          >
-            <option value="">
-              Standard{defaultSlideshow ? ` (${defaultSlideshow.name})` : ''}
-            </option>
-            {slideshows
-              .filter((s) => !s.isDefault)
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-          </select>
-          <p className="mt-1 text-xs text-spa-text-secondary">
-            Ohne Zuweisung wird die Standard-Slideshow verwendet.
-          </p>
-        </div>
+        <SelectField
+          id="device-slideshow"
+          label="Slideshow"
+          value={slideshowId || ''}
+          onChange={(e) => setSlideshowId(e.target.value || null)}
+          disabled={isSaving}
+          hint="Ohne Zuweisung wird die Standard-Slideshow verwendet."
+        >
+          <option value="">
+            Standard{defaultSlideshow ? ` (${defaultSlideshow.name})` : ''}
+          </option>
+          {slideshows
+            .filter((s) => !s.isDefault)
+            .map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+        </SelectField>
 
         <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-4">
           <ToggleField

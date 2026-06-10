@@ -132,7 +132,7 @@ export function MediaCard({
             aria-label={isSelected ? `${media.originalName} abwählen` : `${media.originalName} auswählen`}
             aria-pressed={isSelected}
             className={clsx(
-              'absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all z-10',
+              'absolute top-2.5 left-2.5 flex h-6 w-6 items-center justify-center rounded-md border-2 transition-all z-10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
               isSelected
                 ? 'border-spa-primary bg-spa-primary text-white opacity-100'
                 : 'border-spa-surface bg-spa-surface/80 text-transparent opacity-0 group-hover:opacity-100 hover:border-spa-primary',
@@ -163,7 +163,7 @@ export function MediaCard({
             width="w-48"
             trigger={() => (
               <button
-                className="rounded-lg bg-spa-surface/90 p-1.5 shadow-xs transition-colors hover:bg-spa-surface"
+                className="rounded-lg bg-spa-surface/90 p-1.5 shadow-xs transition-colors hover:bg-spa-surface focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                 aria-label="Medien-Aktionen"
                 type="button"
               >

@@ -13,9 +13,11 @@ interface InfosSlideProps {
   media?: Media[];
 }
 
+// Konstanter Theme-Fallback — einmal beim Import berechnet statt pro Render.
+const DEFAULT_SETTINGS = getDefaultSettings();
+
 export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
+  const theme = settings.theme || DEFAULT_SETTINGS.theme!;
   const { containerRef, compact } = useCompactDetector(250);
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';

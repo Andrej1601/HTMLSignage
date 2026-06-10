@@ -112,7 +112,7 @@ export function DevicesPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => state.setStatusFilter(tab.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   state.statusFilter === tab.key
                     ? 'bg-spa-primary text-white shadow-xs'
                     : 'text-spa-text-secondary hover:bg-spa-bg-primary'
@@ -143,7 +143,7 @@ export function DevicesPage() {
           <button
             type="button"
             onClick={() => setFleetOpen(!fleetOpen)}
-            className="flex w-full items-center justify-between px-6 py-4 text-left"
+            className="flex w-full items-center justify-between px-6 py-4 text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <div className="flex items-center gap-3">
               <Wrench className="h-5 w-5 text-spa-primary" />
@@ -170,7 +170,7 @@ export function DevicesPage() {
                     key={filter.key}
                     type="button"
                     onClick={() => state.setActiveGroupFilter(filter.key)}
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${getFilterButtonClass(state.activeGroupFilter === filter.key)}`}
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${getFilterButtonClass(state.activeGroupFilter === filter.key)}`}
                   >
                     <span>{filter.label}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${

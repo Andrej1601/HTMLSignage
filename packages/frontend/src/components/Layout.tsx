@@ -3,6 +3,7 @@ import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, L
 import { CommandPalette } from '@/components/CommandPalette';
 import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
 import { KeyboardShortcutsDialog, useKeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,6 +65,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { isConnected: wsConnected } = useWebSocketStatus();
   const { effectiveTheme, setMode } = useThemeMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const commandPalette = useCommandPaletteContext();
   const shortcuts = useKeyboardShortcutsDialog();
 
@@ -175,6 +177,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setIsMobileMenuOpen(false);
   }
 
+  const performLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   const handleLogout = async () => {
     // Schutz vor versehentlichem Logout mit ungespeicherten Edits.
     // Pages, die `usePageDirty(isDirty)` aufrufen, registrieren sich
@@ -183,13 +190,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     // Pages greift erst beim `navigate('/login')` und damit zu spät —
     // der User wäre schon ausgeloggt, würde aber auf der Page bleiben).
     if (hasAnyDirty()) {
-      const ok = window.confirm(
-        'Es gibt ungespeicherte Änderungen. Wirklich abmelden?',
-      );
-      if (!ok) return;
+      setShowLogoutConfirm(true);
+      return;
     }
-    await logout();
-    navigate('/login');
+    await performLogout();
   };
 
   return (
@@ -273,8 +277,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Search + Theme + Logout */}
           <div className="shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
             <button
+              type="button"
               onClick={commandPalette.open}
-              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <span className="flex items-center">
                 <Search className="mr-3 shrink-0 h-5 w-5" />
@@ -283,8 +288,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <kbd className="text-[10px] text-white/85 border border-white/30 rounded px-1.5 py-0.5">⌘K</kbd>
             </button>
             <button
+              type="button"
               onClick={() => setMode(effectiveTheme === 'dark' ? 'light' : 'dark')}
-              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               aria-label={effectiveTheme === 'dark' ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}
             >
               {effectiveTheme === 'dark'
@@ -294,8 +300,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {effectiveTheme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
             </button>
             <button
+              type="button"
               onClick={handleLogout}
-              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <LogOut className="mr-3 shrink-0 h-5 w-5" />
               Abmelden
@@ -307,8 +314,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex h-16 items-center border-b border-white/10 bg-spa-primary text-white shadow-lg">
         <button
+          type="button"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-md hover:bg-spa-primary-light"
+          className="p-2 rounded-md hover:bg-spa-primary-light focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           aria-label={isMobileMenuOpen ? 'Menü schließen' : 'Menü öffnen'}
           aria-expanded={isMobileMenuOpen}
         >
@@ -393,11 +401,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {/* Logout Button */}
               <div className="shrink-0 px-2 py-4 border-t border-spa-primary-light">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors"
+                  className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                 >
                   <LogOut className="mr-3 shrink-0 h-6 w-6" />
                   Abmelden
@@ -419,6 +428,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </main>
         <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
         <KeyboardShortcutsDialog isOpen={shortcuts.isOpen} onClose={shortcuts.close} />
+        <ConfirmDialog
+          isOpen={showLogoutConfirm}
+          title="Ungespeicherte Änderungen"
+          message="Es gibt ungespeicherte Änderungen. Wirklich abmelden?"
+          confirmLabel="Abmelden"
+          variant="warning"
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            void performLogout();
+          }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
       </div>
     </div>
   );

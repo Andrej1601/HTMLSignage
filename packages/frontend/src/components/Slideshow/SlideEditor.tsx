@@ -160,7 +160,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                 key={option.type}
                 onClick={() => handleTypeChange(option.type)}
                 className={clsx(
-                  'p-3 rounded-lg border-2 transition-all text-left',
+                  'p-3 rounded-lg border-2 transition-all text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                   formData.type === option.type
                     ? 'border-spa-primary bg-spa-primary/5'
                     : 'border-spa-bg-secondary hover:border-spa-primary/50'
@@ -224,7 +224,7 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
                     type="button"
                     onClick={() => setFormData({ ...formData, mediaFit: option.value as SlideFormData['mediaFit'] })}
                     className={clsx(
-                      'rounded-xl border p-3 text-left transition-all',
+                      'rounded-xl border p-3 text-left transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                       isActive
                         ? 'border-spa-primary bg-spa-primary/5 shadow-xs'
                         : 'border-spa-bg-secondary hover:border-spa-primary/50'
@@ -299,10 +299,11 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
 
         {/* Transition */}
         <div>
-          <label className="block text-sm font-medium text-spa-text-primary mb-2">
+          <label htmlFor="slide-transition" className="block text-sm font-medium text-spa-text-primary mb-2">
             Übergangseffekt
           </label>
           <select
+            id="slide-transition"
             value={formData.transition || 'fade'}
             onChange={(e) =>
               setFormData({ ...formData, transition: e.target.value as SlideConfig['transition'] })

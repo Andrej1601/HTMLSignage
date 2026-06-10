@@ -224,7 +224,7 @@ function ColorSwatch({
         <button
           type="button"
           onClick={() => onReset(spec.key)}
-          className="absolute top-1 right-1 z-20 p-0.5 rounded bg-black/40 text-white/90 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+          className="absolute top-1 right-1 z-20 p-0.5 rounded bg-black/40 text-white/90 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           title="Auf Paletten-Standard zurücksetzen"
           aria-label={`${spec.label} zurücksetzen`}
         >
@@ -270,7 +270,7 @@ function HeroOverlayIntensitySlider({
             <button
               type="button"
               onClick={() => onChange(1)}
-              className="p-0.5 rounded text-spa-text-secondary hover:text-spa-primary hover:bg-spa-bg-secondary transition-colors"
+              className="p-0.5 rounded text-spa-text-secondary hover:text-spa-primary hover:bg-spa-bg-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               title="Auf Pack-Standard zurücksetzen"
               aria-label="Hero-Wash-Stärke zurücksetzen"
             >
@@ -324,7 +324,7 @@ export function ColorTokenEditor({
       <button
         type="button"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-spa-bg-secondary border border-spa-border hover:bg-spa-surface hover:border-spa-primary/40 transition-all text-sm font-semibold text-spa-text-primary group"
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-spa-bg-secondary border border-spa-border hover:bg-spa-surface hover:border-spa-primary/40 transition-all text-sm font-semibold text-spa-text-primary group focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
       >
         <span>Einzelne Farb-Tokens anpassen</span>
         <span className="text-spa-text-secondary group-hover:text-spa-primary transition-colors">

@@ -261,7 +261,7 @@ export function ScheduleStackView({
               <button
                 type="button"
                 onClick={() => onEditTime(timeRowIndex)}
-                className="p-2 rounded-lg text-spa-text-secondary hover:text-spa-primary hover:bg-spa-bg-primary transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                className="p-2 rounded-lg text-spa-text-secondary hover:text-spa-primary hover:bg-spa-bg-primary transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                 aria-label={`Zeit ${timeRow.time} bearbeiten`}
               >
                 <Pencil className="w-4 h-4" aria-hidden="true" />
@@ -269,7 +269,7 @@ export function ScheduleStackView({
               <button
                 type="button"
                 onClick={() => onDeleteTimeRow(timeRowIndex)}
-                className="p-2 rounded-lg text-spa-text-secondary hover:text-spa-error hover:bg-spa-error-light transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                className="p-2 rounded-lg text-spa-text-secondary hover:text-spa-error hover:bg-spa-error-light transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
                 aria-label={`Zeitreihe ${timeRow.time} löschen`}
               >
                 <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -346,7 +346,7 @@ export function ScheduleStackView({
                 <button
                   type="button"
                   onClick={() => toggleRow(timeRowIndex)}
-                  className="w-full px-3 py-3 text-xs text-spa-text-secondary hover:bg-spa-bg-primary/40 transition-colors"
+                  className="w-full px-3 py-3 text-xs text-spa-text-secondary hover:bg-spa-bg-primary/40 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                 >
                   Aufklappen, um Saunen zu belegen
                 </button>
@@ -360,7 +360,7 @@ export function ScheduleStackView({
       <button
         type="button"
         onClick={onAddTimeRow}
-        className="w-full px-4 py-3 border border-dashed border-spa-primary/30 rounded-xl text-spa-primary hover:border-spa-primary/60 hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+        className="w-full px-4 py-3 border border-dashed border-spa-primary/30 rounded-xl text-spa-primary hover:border-spa-primary/60 hover:bg-spa-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />
         Zeitslot hinzufügen

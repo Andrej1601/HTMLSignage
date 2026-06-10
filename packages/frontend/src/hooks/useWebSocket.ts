@@ -23,6 +23,9 @@ interface UseWebSocketOptions {
   /** Slideshow created/updated/deleted. Display-Clients re-fetch their
    *  effective config; Admin-UIs invalidate their slideshow caches. */
   onSlideshowUpdate?: (data: { id: string; action?: string }) => void;
+  /** Media uploaded/deleted/retagged. Display-Clients reload their media list;
+   *  Admin-UIs invalidate their media cache. Replaces 5-minute HTTP polling. */
+  onMediaUpdate?: (data: { action?: string }) => void;
   /** Called after a WebSocket reconnect so stale data can be refetched. */
   onReconnect?: () => void;
 }
@@ -47,6 +50,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceUpdate,
     onBulkDeviceUpdate,
     onSlideshowUpdate,
+    onMediaUpdate,
     onReconnect,
   } = options;
 
@@ -64,6 +68,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onDeviceUpdateRef = useRef(onDeviceUpdate);
   const onBulkDeviceUpdateRef = useRef(onBulkDeviceUpdate);
   const onSlideshowUpdateRef = useRef(onSlideshowUpdate);
+  const onMediaUpdateRef = useRef(onMediaUpdate);
   const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
@@ -73,6 +78,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceUpdateRef.current = onDeviceUpdate;
     onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
     onSlideshowUpdateRef.current = onSlideshowUpdate;
+    onMediaUpdateRef.current = onMediaUpdate;
     onReconnectRef.current = onReconnect;
   });
 
@@ -199,6 +205,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           console.log('[WebSocket] Slideshow update:', data);
         }
         onSlideshowUpdateRef.current?.(data);
+      });
+
+      socket.off('media:updated').on('media:updated', (data) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Media update:', data);
+        }
+        onMediaUpdateRef.current?.(data);
       });
 
       socketRef.current = socket;

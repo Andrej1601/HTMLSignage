@@ -29,3 +29,29 @@ export function toValidDate(value?: string | Date | null): Date | undefined {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isFinite(date.getTime()) ? date : undefined;
 }
+
+const DE_DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+};
+
+const DE_DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+};
+
+/** Formats a timestamp as `dd.mm.yyyy, hh:mm` (de-DE), or '-' if missing/invalid. */
+export function formatDateTimeDE(value?: string | Date | null): string {
+  const date = toValidDate(value);
+  return date ? date.toLocaleString('de-DE', DE_DATE_TIME_OPTIONS) : '-';
+}
+
+/** Formats a timestamp as `dd.mm.yyyy` (de-DE), or '-' if missing/invalid. */
+export function formatDateDE(value?: string | Date | null): string {
+  const date = toValidDate(value);
+  return date ? date.toLocaleDateString('de-DE', DE_DATE_OPTIONS) : '-';
+}
