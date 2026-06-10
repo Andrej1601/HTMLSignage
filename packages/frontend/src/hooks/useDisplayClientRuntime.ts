@@ -250,6 +250,23 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     void refreshDeviceDisplayConfig(pairedDeviceId);
   }, [deviceToken, isPreviewMode, pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig]);
 
+  // ── Nightly auto-reload (kiosk longevity) ─────────────────────────────────
+  // A display that runs unattended for weeks accumulates state and can leak
+  // memory. Once a day, in a low-traffic window, reload the page to start
+  // fresh. Skipped in preview mode. The minute-granular check fires once when
+  // the wall clock crosses the target hour:00.
+  useEffect(() => {
+    if (isPreviewMode) return;
+    const RELOAD_HOUR = 4; // 04:00 — typically closed / empty
+    const interval = window.setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === RELOAD_HOUR && now.getMinutes() === 0) {
+        window.location.reload();
+      }
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [isPreviewMode]);
+
   // ── Fallback queries (when no device config) ──────────────────────────────
   useEffect(() => {
     if (!shouldUseFallbackConfigQueries) {

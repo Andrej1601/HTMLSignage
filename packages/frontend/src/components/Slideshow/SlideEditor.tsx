@@ -21,6 +21,17 @@ interface SlideEditorProps {
   onSave: (slide: Omit<SlideConfig, 'id'> | SlideConfig) => void;
 }
 
+// JS getDay(): 0=Sun..6=Sat. Display order Mon-first for German UX.
+const WEEKDAYS: { value: number; label: string }[] = [
+  { value: 1, label: 'Mo' },
+  { value: 2, label: 'Di' },
+  { value: 3, label: 'Mi' },
+  { value: 4, label: 'Do' },
+  { value: 5, label: 'Fr' },
+  { value: 6, label: 'Sa' },
+  { value: 0, label: 'So' },
+];
+
 export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps) {
   const { settings } = useSettings();
   const { data: media } = useMedia();
@@ -64,6 +75,9 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
         transition: source.transition,
         customCss: source.customCss,
         notes: source.notes,
+        daysOfWeek: source.daysOfWeek,
+        visibleFrom: source.visibleFrom,
+        visibleTo: source.visibleTo,
       });
     } else {
       setFormData({
@@ -121,6 +135,18 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
       });
     setError('');
   };
+
+  const toggleDay = (day: number) => {
+    const current = formData.daysOfWeek ?? [];
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    setFormData({ ...formData, daysOfWeek: next.length > 0 ? next : undefined });
+  };
+
+  const hasScheduleWindow = Boolean(
+    (formData.daysOfWeek && formData.daysOfWeek.length > 0) || formData.visibleFrom || formData.visibleTo,
+  );
 
   const slideTypeOption = getSlideTypeOption(formData.type);
 
@@ -329,6 +355,68 @@ export function SlideEditor({ slide, isOpen, onClose, onSave }: SlideEditorProps
             />
             <span className="text-sm font-medium text-spa-text-primary">Slide aktiviert</span>
           </label>
+        </div>
+
+        {/* Sichtbarkeit / Zeitfenster (optional) */}
+        <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/60 p-4">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label className="block text-sm font-medium text-spa-text-primary">Sichtbarkeit (optional)</label>
+            {hasScheduleWindow && (
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, daysOfWeek: undefined, visibleFrom: undefined, visibleTo: undefined })}
+                className="rounded text-xs font-semibold text-spa-text-secondary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-primary"
+              >
+                Zurücksetzen
+              </button>
+            )}
+          </div>
+          <p className="mb-3 text-xs text-spa-text-secondary">
+            Ohne Angabe läuft die Slide immer. Mit Wochentagen und/oder Uhrzeit erscheint sie nur im gewählten Fenster.
+          </p>
+
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {WEEKDAYS.map(({ value, label }) => {
+              const active = (formData.daysOfWeek ?? []).includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleDay(value)}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-full text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-primary',
+                    active
+                      ? 'bg-spa-primary text-white'
+                      : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/80',
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-spa-text-secondary">
+              Von
+              <input
+                type="time"
+                value={formData.visibleFrom ?? ''}
+                onChange={(e) => setFormData({ ...formData, visibleFrom: e.target.value || undefined })}
+                className="rounded-md border border-spa-bg-secondary bg-spa-surface px-2 py-1 text-sm text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-spa-text-secondary">
+              Bis
+              <input
+                type="time"
+                value={formData.visibleTo ?? ''}
+                onChange={(e) => setFormData({ ...formData, visibleTo: e.target.value || undefined })}
+                className="rounded-md border border-spa-bg-secondary bg-spa-surface px-2 py-1 text-sm text-spa-text-primary focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Notes */}

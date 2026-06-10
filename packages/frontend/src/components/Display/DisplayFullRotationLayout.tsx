@@ -1,6 +1,7 @@
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import type { DisplayLayoutContext } from '@/components/Display/displayLayoutRenderer.types';
+import { getEffectiveSlideDuration } from '@/types/slideshow.types';
 import type { SlideConfig } from '@/types/slideshow.types';
 
 interface DisplayFullRotationLayoutProps {
@@ -28,6 +29,7 @@ export function DisplayFullRotationLayout({
     resolveTransition,
     zones,
   } = context;
+  const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
 
   const zoneWithSlides = zones.find((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
   const zoneId = zoneWithSlides?.id || zones[0]?.id || 'main';
@@ -56,7 +58,7 @@ export function DisplayFullRotationLayout({
       enabled={enableTransitions}
       duration={0.6}
       transition={resolveTransition(slide)}
-      progressDurationSec={shouldRotate ? (slide.duration ?? 12) : undefined}
+      progressDurationSec={shouldRotate ? getEffectiveSlideDuration(slide, defaultDuration) : undefined}
       progressColor={progressColor}
     >
       {renderSlideWithPadding(slide, rendered)}

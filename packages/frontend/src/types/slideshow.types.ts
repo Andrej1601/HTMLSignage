@@ -89,6 +89,9 @@ export interface SlideFormData {
   transition?: _TransitionType;
   customCss?: string;
   notes?: string;
+  daysOfWeek?: number[];
+  visibleFrom?: string;
+  visibleTo?: string;
 }
 
 // Slideshow configuration
@@ -355,6 +358,63 @@ export function getEffectiveMediaFit(
 
 export function getEnabledSlides(config: SlideshowConfig): SlideConfig[] {
   return config.slides.filter((slide) => slide.enabled).sort((a, b) => a.order - b.order);
+}
+
+/** The duration a slide actually rotates for — used by both the rotation timer
+ *  and the progress indicator so the bar can't desync from the timer. */
+export function getEffectiveSlideDuration(
+  slide: { duration?: number } | null | undefined,
+  defaultDuration?: number,
+): number {
+  return slide?.duration || defaultDuration || 10;
+}
+
+function parseHHMM(value: string | undefined): number | null {
+  if (!value) return null;
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * Whether a slide's optional visibility window (daysOfWeek + visibleFrom/To)
+ * matches `now`. No window set → always true. The time window may wrap past
+ * midnight (e.g. 22:00–06:00).
+ */
+export function isSlideWithinSchedule(slide: SlideConfig, now: Date): boolean {
+  if (slide.daysOfWeek && slide.daysOfWeek.length > 0 && !slide.daysOfWeek.includes(now.getDay())) {
+    return false;
+  }
+  const from = parseHHMM(slide.visibleFrom);
+  const to = parseHHMM(slide.visibleTo);
+  if (from === null && to === null) return true;
+
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const start = from ?? 0;
+  const end = to ?? 24 * 60;
+  if (start <= end) {
+    return minutes >= start && minutes < end;
+  }
+  // Wraps past midnight: visible when after start OR before end.
+  return minutes >= start || minutes < end;
+}
+
+/** Context the rotation filter needs beyond the slide itself. */
+export interface SlideDisplayContext {
+  /** Whether the events slide currently has any live/upcoming events. */
+  hasEvents?: boolean;
+}
+
+/**
+ * Whether a slide should currently take part in the rotation: enabled, inside
+ * its schedule window, and (for events slides) actually has content. Keeps the
+ * rotation core decoupled from event internals — the caller computes hasEvents.
+ */
+export function isSlideDisplayable(slide: SlideConfig, now: Date, ctx: SlideDisplayContext = {}): boolean {
+  if (!slide.enabled) return false;
+  if (!isSlideWithinSchedule(slide, now)) return false;
+  if (slide.type === 'events' && ctx.hasEvents === false) return false;
+  return true;
 }
 
 export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex: number): SlideConfig[] {

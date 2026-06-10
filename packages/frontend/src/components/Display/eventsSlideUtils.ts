@@ -4,6 +4,24 @@ import type { DisplayViewportProfile } from './useDisplayViewportProfile';
 import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { formatEventDateDE, formatEventTimeRangeDE } from './wellnessDisplayUtils';
 
+/**
+ * Whether the events slide currently has anything to show — i.e. at least one
+ * active event that is live or still upcoming. Mirrors the filter in
+ * `useEventsPanelData` so the rotation can skip an events slide that would only
+ * display the "no events" filler. Used for the conditional-events-slide skip.
+ */
+export function hasDisplayableEvents(settings: Settings, now: Date): boolean {
+  return (settings.events ?? []).some((event) => {
+    if (!event.isActive) return false;
+    const start = new Date(`${event.startDate}T${event.startTime}`);
+    const endDate = event.endDate || event.startDate;
+    const endTime = event.endTime || '23:59';
+    const end = new Date(`${endDate}T${endTime}`);
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return false;
+    return now <= end || now <= start;
+  });
+}
+
 export type EventPresentation = {
   id: string;
   name: string;

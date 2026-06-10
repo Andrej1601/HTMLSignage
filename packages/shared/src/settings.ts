@@ -187,6 +187,14 @@ const SlideBaseFields = {
   transition: TransitionTypeSchema.optional(),
   customCss: z.string().optional(),
   notes: z.string().optional(),
+  // Optional visibility window (kiosk scheduling). When set, the slide only
+  // rotates in while the current local time matches. Omitted / empty = always.
+  //   daysOfWeek : allowed weekdays, 0=Sun .. 6=Sat (empty/absent = every day)
+  //   visibleFrom: inclusive start time "HH:MM"
+  //   visibleTo  : exclusive end time "HH:MM" (may wrap past midnight)
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+  visibleFrom: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  visibleTo: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
 } as const;
 
 export const ContentPanelSlideSchema = z.object({

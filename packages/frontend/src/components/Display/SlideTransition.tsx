@@ -58,50 +58,78 @@ const variantMap: Record<TransitionType, AnimationVariants> = {
   none: fadeVariants, // fallback, won't be used since enabled=false for 'none'
 };
 
-interface SlideTransitionFrameProps {
-  children: ReactNode;
-  duration: number;
-  transition: TransitionType;
+function frameStyle(state: AnimationState, duration: number): CSSProperties {
+  return {
+    opacity: state.opacity,
+    transform: `translateX(${state.x ?? 0}px) scale(${state.scale ?? 1})`,
+    transition: `opacity ${duration}s ease-in-out, transform ${duration}s ease-in-out`,
+    willChange: 'opacity, transform',
+  };
 }
 
-function SlideTransitionFrame({
+/** Incoming slide: starts at `initial`, animates to `animate` on mount. */
+function IncomingFrame({
   children,
   duration,
   transition,
-}: SlideTransitionFrameProps) {
+}: {
+  children: ReactNode;
+  duration: number;
+  transition: TransitionType;
+}) {
   const [isVisible, setIsVisible] = useState(false);
-
   const variants = variantMap[transition] || fadeVariants;
 
   useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      setIsVisible(true);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
+    const frame = window.requestAnimationFrame(() => setIsVisible(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  const style = useMemo<CSSProperties>(() => {
-    const from = variants.initial;
-    const to = variants.animate;
-
-    return {
-      opacity: isVisible ? to.opacity : from.opacity,
-      transform: isVisible
-        ? `translateX(${to.x ?? 0}px) scale(${to.scale ?? 1})`
-        : `translateX(${from.x ?? 0}px) scale(${from.scale ?? 1})`,
-      transition: `opacity ${duration}s ease-in-out, transform ${duration}s ease-in-out`,
-      willChange: 'opacity, transform',
-    };
-  }, [duration, isVisible, variants.animate, variants.initial]);
+  const style = useMemo<CSSProperties>(
+    () => frameStyle(isVisible ? variants.animate : variants.initial, duration),
+    [duration, isVisible, variants.animate, variants.initial],
+  );
 
   return (
     <div className="w-full h-full" style={style}>
       {children}
     </div>
   );
+}
+
+/** Outgoing slide: starts at `animate` (fully visible), animates to `exit`. */
+function OutgoingFrame({
+  children,
+  duration,
+  transition,
+}: {
+  children: ReactNode;
+  duration: number;
+  transition: TransitionType;
+}) {
+  const [leaving, setLeaving] = useState(false);
+  const variants = variantMap[transition] || fadeVariants;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setLeaving(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  const style = useMemo<CSSProperties>(
+    () => frameStyle(leaving ? variants.exit : variants.animate, duration),
+    [duration, leaving, variants.animate, variants.exit],
+  );
+
+  return (
+    <div className="absolute inset-0 w-full h-full" style={style}>
+      {children}
+    </div>
+  );
+}
+
+interface OutgoingLayer {
+  node: ReactNode;
+  transition: TransitionType;
 }
 
 export function SlideTransition({
@@ -119,27 +147,65 @@ export function SlideTransition({
     && progressDurationSec > 0
     && !!progressColor;
 
+  // Double-buffer crossfade: when the slide changes, the previously shown slide
+  // is kept mounted as an `outgoing` layer and fades out while the new slide
+  // fades in over it — no flash of empty zone background between slides.
+  // `current.node` snapshots the slide at change time; the live `children` is
+  // rendered on the incoming layer so the active slide still updates.
+  const [current, setCurrent] = useState<OutgoingLayer & { key: string | number }>(
+    () => ({ key: slideKey, node: children, transition }),
+  );
+  const [outgoing, setOutgoing] = useState<OutgoingLayer | null>(null);
+
+  if (current.key !== slideKey) {
+    setOutgoing(shouldAnimate ? { node: current.node, transition: current.transition } : null);
+    setCurrent({ key: slideKey, node: children, transition });
+  }
+  const renderedKey = current.key;
+
+  // Drop the outgoing layer once the crossfade has completed.
+  useEffect(() => {
+    if (!outgoing) return;
+    const timer = window.setTimeout(() => setOutgoing(null), duration * 1000 + 80);
+    return () => window.clearTimeout(timer);
+  }, [outgoing, duration]);
+
   if (!shouldAnimate && !showProgress) {
     return <>{children}</>;
   }
 
-  const inner = shouldAnimate ? (
-    <SlideTransitionFrame key={slideKey} duration={duration} transition={transition}>
+  const incoming = shouldAnimate ? (
+    <IncomingFrame key={renderedKey} duration={duration} transition={transition}>
       {children}
-    </SlideTransitionFrame>
+    </IncomingFrame>
   ) : (
     <>{children}</>
   );
 
+  const stage = (
+    <div className="relative w-full h-full">
+      {outgoing && (
+        <OutgoingFrame duration={duration} transition={outgoing.transition}>
+          {outgoing.node}
+        </OutgoingFrame>
+      )}
+      {shouldAnimate && outgoing ? (
+        <div className="absolute inset-0 w-full h-full">{incoming}</div>
+      ) : (
+        incoming
+      )}
+    </div>
+  );
+
   if (!showProgress) {
-    return inner;
+    return stage;
   }
 
   return (
     <div className="relative w-full h-full">
-      {inner}
+      {stage}
       <SlideProgressIndicator
-        key={`progress:${slideKey}`}
+        key={`progress:${renderedKey}`}
         durationSec={progressDurationSec!}
         color={progressColor!}
       />

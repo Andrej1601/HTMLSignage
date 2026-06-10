@@ -1,6 +1,7 @@
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import { SlideTransition } from '@/components/Display/SlideTransition';
 import type { DisplayLayoutContext } from '@/components/Display/displayLayoutRenderer.types';
+import { getEffectiveSlideDuration } from '@/types/slideshow.types';
 import { classNames } from '@/utils/classNames';
 
 interface DisplayGridLayoutProps {
@@ -25,6 +26,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
     themeColors,
     zones,
   } = context;
+  const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
 
   const border = themeColors.gridTable || '#EBE5D3';
   const bgBase = themeColors.dashboardBg || themeColors.bg || '#FDFBF7';
@@ -86,7 +88,7 @@ export function DisplayGridLayout({ context }: DisplayGridLayoutProps) {
                 duration={0.6}
                 transition={resolveTransition(slide)}
                 progressDurationSec={
-                  info?.shouldRotate ? (slide?.duration ?? 12) : undefined
+                  info?.shouldRotate ? getEffectiveSlideDuration(slide, defaultDuration) : undefined
                 }
                 progressColor={progressColor}
               >

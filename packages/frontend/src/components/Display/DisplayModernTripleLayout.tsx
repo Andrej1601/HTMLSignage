@@ -8,6 +8,7 @@ import {
   renderTripleSaunaDetail,
   renderTripleSlideRenderer,
 } from '@/components/Display/displayTripleLayoutUtils';
+import { getEffectiveSlideDuration } from '@/types/slideshow.types';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
@@ -23,6 +24,7 @@ export function DisplayModernTripleLayout({
 }: DisplayModernTripleLayoutProps) {
   const {
     designStyle,
+    effectiveSettings,
     enableTransitions,
     renderContentPanel,
     resolveTransition,
@@ -31,12 +33,13 @@ export function DisplayModernTripleLayout({
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
+  const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
 
   const isPortrait = profile.isPortrait;
   const isCompact = profile.isCompact;
   const leftSize = isPortrait ? 100 : (left.zone?.size || (designStyle === 'modern-timeline' ? 65 : 60));
   const rightSize = isPortrait ? 100 : 100 - leftSize;
-  const topDurationSec = topRight.slide?.duration ?? 12;
+  const topDurationSec = getEffectiveSlideDuration(topRight.slide, defaultDuration);
 
   const leftBg = themeColors.zebra1 || '#F7F3E9';
   const rightBg = themeColors.zebra2 || '#F2EDE1';
@@ -136,7 +139,7 @@ export function DisplayModernTripleLayout({
           duration={0.6}
           transition={resolveTransition(left.slide)}
           progressDurationSec={
-            left.info?.shouldRotate ? (left.slide?.duration ?? 12) : undefined
+            left.info?.shouldRotate ? getEffectiveSlideDuration(left.slide, defaultDuration) : undefined
           }
           progressColor={accentGold}
         >
@@ -180,7 +183,7 @@ export function DisplayModernTripleLayout({
             duration={0.6}
             transition={resolveTransition(bottomRight.slide)}
             progressDurationSec={
-              bottomRight.info?.shouldRotate ? (bottomRight.slide?.duration ?? 12) : undefined
+              bottomRight.info?.shouldRotate ? getEffectiveSlideDuration(bottomRight.slide, defaultDuration) : undefined
             }
             progressColor={accentGold}
           >

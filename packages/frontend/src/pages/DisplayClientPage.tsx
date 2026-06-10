@@ -398,11 +398,12 @@ export function DisplayClientPage() {
 
   if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-spa-text-primary text-white">
+      <div className="w-full h-screen flex items-center justify-center bg-spa-bg-primary text-spa-text-primary">
         <div className="text-center">
-          <div className="text-2xl font-bold mb-4">HTMLSignage</div>
-          <div className="text-lg">Wird geladen...</div>
-          <div className="text-sm mt-2 opacity-70">
+          <div className="mx-auto mb-5 h-8 w-8 rounded-full border-2 border-spa-bg-secondary border-t-spa-primary animate-spin" />
+          <div className="text-2xl font-bold mb-2 text-spa-primary">HTMLSignage</div>
+          <div className="text-lg text-spa-text-secondary">Wird geladen...</div>
+          <div className="text-sm mt-2 text-spa-text-secondary/70">
             {isPreviewMode ? 'Vorschau' : (isConnected ? 'Verbunden' : 'Verbinde...')}
           </div>
         </div>
