@@ -68,7 +68,7 @@ export function LoginPage() {
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-3xl font-bold text-spa-text-primary mb-2">
-            HTMLSignage
+            Signage Control Center
           </h1>
           <p className="text-spa-text-secondary">
             {mode === 'login' ? 'Anmelden' : 'Erster Administrator'}
@@ -160,11 +160,12 @@ export function LoginPage() {
           <>
             <div className="mt-6 text-center">
               <button
+                type="button"
                 onClick={() => {
                   setMode(mode === 'login' ? 'register' : 'login');
                   setError('');
                 }}
-                className="text-sm text-spa-primary hover:underline"
+                className="text-sm text-spa-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 {mode === 'login'
                   ? 'Erster Administrator? Jetzt einrichten'
@@ -175,7 +176,7 @@ export function LoginPage() {
             {/* Info */}
             {mode === 'register' && (
               <div className="mt-6 p-3 bg-spa-info-light border border-spa-info/30 rounded-lg">
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-spa-info-dark">
                   Dies ist der erste Benutzer und erhält automatisch Administrator-Rechte. Weitere Benutzer können nur von Administratoren angelegt werden.
                 </p>
               </div>

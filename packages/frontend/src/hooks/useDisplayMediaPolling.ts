@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ENV_IS_DEV } from '@/config/env';
 import { displayMediaApi } from '@/services/displayApi';
 import type { Media } from '@/types/media.types';
@@ -9,16 +9,27 @@ import {
   writeDisplayCachedValue,
 } from './displayClientRuntime.utils';
 
+export interface DisplayMediaPolling {
+  media: Media[];
+  /** Forces an immediate media re-fetch — wired to the `media:updated` WS event. */
+  refresh: () => void;
+}
+
 /**
- * Polls the media list every 5 minutes and caches it in localStorage.
- * Falls back to the cached list on first render.
+ * Keeps the display's media list fresh. The canonical freshness signal is the
+ * `media:updated` WebSocket event (call `refresh`); the interval below is only
+ * a long safety net for missed events or a dropped socket. Caches to
+ * localStorage and falls back to the cached list on first render.
  */
-export function useDisplayMediaPolling(deviceToken: string | null): Media[] {
+export function useDisplayMediaPolling(deviceToken: string | null): DisplayMediaPolling {
   const cachedMedia = useMemo(
     () => readDisplayCachedValue<Media[]>(DISPLAY_CACHED_MEDIA_KEY) || [],
     [],
   );
   const [mediaItems, setMediaItems] = useState<Media[]>(() => cachedMedia);
+  // Always points at the latest loader closure so `refresh` stays stable while
+  // still fetching with the current device token.
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let isMounted = true;
@@ -36,10 +47,14 @@ export function useDisplayMediaPolling(deviceToken: string | null): Media[] {
       }
     };
 
+    refreshRef.current = () => { void loadMedia(); };
     void loadMedia();
+
+    // WS `media:updated` drives freshness; this long poll only recovers from
+    // missed events / dropped sockets (down from the previous 5-minute poll).
     const interval = window.setInterval(() => {
       void loadMedia();
-    }, 5 * 60_000);
+    }, 30 * 60_000);
 
     return () => {
       isMounted = false;
@@ -47,5 +62,9 @@ export function useDisplayMediaPolling(deviceToken: string | null): Media[] {
     };
   }, [deviceToken]);
 
-  return mediaItems;
+  const refresh = useCallback(() => {
+    refreshRef.current();
+  }, []);
+
+  return { media: mediaItems, refresh };
 }

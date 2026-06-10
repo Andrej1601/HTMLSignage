@@ -58,9 +58,9 @@ test('workflow target matching and draft detection respect publish boundaries', 
     },
   ];
 
-  assert.equal(matchesWorkflowTarget(logs[0].details, 'device', 'device-1'), true);
-  assert.equal(matchesWorkflowTarget(logs[0].details, 'device', 'device-2'), false);
-  assert.equal(matchesWorkflowTarget(logs[0].details, 'global', null), false);
+  assert.equal(matchesWorkflowTarget(logs[0]!.details, 'device', 'device-1'), true);
+  assert.equal(matchesWorkflowTarget(logs[0]!.details, 'device', 'device-2'), false);
+  assert.equal(matchesWorkflowTarget(logs[0]!.details, 'global', null), false);
   assert.equal(getCurrentWorkflowDraftEntry(logs), logs[0]);
   assert.equal(getCurrentWorkflowDraftEntry(logs.slice(1)), null);
 });

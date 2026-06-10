@@ -147,6 +147,28 @@ export const COLOR_PALETTES: Array<{ id: ColorPaletteName; name: string; colors:
     },
   },
   {
+    // Aurora Thermal — goldene Stunde in der Saunawelt.
+    // Warme Charcoal-Basis, polierte Messing-Akzente, ember-glow Status.
+    // Gepaart mit dem `aurora-thermal` Design-Pack bildet dies die
+    // Produktions-Aushängeschild-Optik.
+    id: 'aurora-thermal',
+    name: 'Aurora Thermal',
+    colors: {
+      bg: '#1B1410', fg: '#F5E9D7', accent: '#D4A057',
+      gridTable: '#3E3124', cellBg: '#2C2219', boxFg: '#F5E9D7', timeColBg: '#241A13',
+      flame: '#EFA765',
+      zebra1: '#221811', zebra2: '#1B1410',
+      timeZebra1: '#2C2219', timeZebra2: '#241A13',
+      headRowBg: '#130E0B', headRowFg: '#D4A057',
+      cornerBg: '#241A13', cornerFg: '#D4A057',
+      dashboardBg: '#1B1410', cardBg: '#2C2219', cardBorder: '#3E3124',
+      textMain: '#F5E9D7', textMuted: '#B5A48E',
+      accentGold: '#D4A057',
+      accentGreen: '#7A9064',
+      statusLive: '#EFA765', statusNext: '#B8874A', statusPrestart: '#CE5E3E',
+    },
+  },
+  {
     // Mineral Noir — kühles Schiefer-Schwarz, Platin-Akzente, architektonischer Minimalismus.
     // Kein Gradient, kein Glow — pure Struktur und Typografie.
     id: 'mineral-noir',
@@ -184,6 +206,7 @@ export function getColorPalette(id: ColorPaletteName): Partial<ThemeColors> {
 
 export function generateDashboardColors(baseColors: Partial<ThemeColors>): ThemeColors {
   const colors = { ...baseColors } as ThemeColors;
+  // Legacy dashboard fields — derive from base palette where missing.
   if (!colors.dashboardBg) colors.dashboardBg = colors.bg;
   if (!colors.cardBg) colors.cardBg = colors.cellBg || colors.bg;
   if (!colors.cardBorder) colors.cardBorder = colors.gridTable;
@@ -194,17 +217,59 @@ export function generateDashboardColors(baseColors: Partial<ThemeColors>): Theme
   if (!colors.statusLive) colors.statusLive = '#10B981';
   if (!colors.statusNext) colors.statusNext = colors.accentGold || colors.accent;
   if (!colors.statusPrestart) colors.statusPrestart = '#F59E0B';
+
+  // ─── SDK-token mirror fields ────────────────────────────────────────────
+  // Auto-populate from the legacy fields so the new ColorTokenEditor and
+  // themeBridge can read the canonical SDK token names directly. Operators
+  // who haven't customised anything get sensible defaults; explicit edits
+  // via the editor write to these fields and win in themeBridge.
+  if (!colors.surface) colors.surface = colors.dashboardBg;
+  if (!colors.surfaceElevated) colors.surfaceElevated = colors.cardBg;
+  if (!colors.border) colors.border = colors.cardBorder;
+  if (!colors.textPrimary) colors.textPrimary = colors.textMain;
+  if (!colors.textSecondary) colors.textSecondary = colors.textMuted;
+  if (!colors.textInverse) colors.textInverse = isLightColor(colors.surface) ? '#1B1410' : '#FFFFFF';
+  if (!colors.accentPrimary) colors.accentPrimary = colors.accentGold;
+  if (!colors.accentSecondary) colors.accentSecondary = colors.accentGreen;
+  if (!colors.statusWarning) colors.statusWarning = colors.statusPrestart;
+  // Renderer-effect tints. Defaults match the legacy implicit behaviour
+  // so the editor shows a sensible value before the operator overrides.
+  if (!colors.accentStripe) colors.accentStripe = colors.accentPrimary;
+  if (!colors.heroOverlay) colors.heroOverlay = colors.textPrimary;
   return colors;
+}
+
+/**
+ * Approx-luminance check. Used solely to pick a sensible default for
+ * `textInverse` (text drawn on filled accent backgrounds): a light surface
+ * means inverse text should be dark, and vice-versa. Operators can always
+ * override the result via the ColorTokenEditor.
+ */
+function isLightColor(hex: string | undefined): boolean {
+  if (!hex || !hex.startsWith('#')) return false;
+  const raw = hex.slice(1);
+  const full = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw;
+  if (full.length !== 6) return false;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  // ITU-R BT.709 relative luminance, no gamma correction needed for a
+  // coarse "is this brighter than middle gray?" test.
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luma > 140;
 }
 
 // ─── Default Settings Factory ─────────────────────────────────────────────────
 
 export function getDefaultSettings(): Settings {
-  const paletteId: ColorPaletteName = 'wellness-warm';
+  const paletteId: ColorPaletteName = 'aurora-thermal';
   const paletteColors = getColorPalette(paletteId);
   return {
     version: 1,
-    displayAppearance: 'wellness-stage',
+    // Aurora Thermal is the production default appearance. Fresh installs
+    // and unconfigured displays land on the flagship warm-charcoal stage
+    // with brass accents.
+    displayAppearance: 'aurora-thermal',
     designStyle: 'modern-wellness',
     colorPalette: paletteId,
     theme: generateDashboardColors(paletteColors) as ThemeColors,
@@ -223,6 +288,10 @@ export function getDefaultSettings(): Settings {
       showSubtitles: true,
       compactMode: false,
       prestartMinutes: 10,
+      // Design packs are the canonical rendering path for fresh installs
+      // — Aurora Thermal ships stable and covers all six slide types.
+      useDesignPacks: true,
+      designPackId: 'aurora-thermal',
     },
     audio: { enabled: false, volume: 0.5, loop: true },
     header: {

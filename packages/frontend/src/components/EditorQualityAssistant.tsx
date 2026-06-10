@@ -63,7 +63,7 @@ export function EditorQualityAssistant({ issues, okMessage, className }: EditorQ
             </span>
           )}
           {infoCount > 0 && (
-            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+            <span className="inline-flex items-center rounded-full bg-spa-info-light px-2 py-0.5 text-[10px] font-bold text-spa-info-dark">
               {infoCount} Hinweis{infoCount > 1 ? 'e' : ''}
             </span>
           )}

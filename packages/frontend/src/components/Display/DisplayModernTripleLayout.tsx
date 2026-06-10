@@ -1,6 +1,4 @@
 import { SlideTransition } from '@/components/Display/SlideTransition';
-import { WellnessBottomPanel } from '@/components/Display/WellnessBottomPanel';
-import { SlideProgressIndicator } from '@/components/Display/SlideProgressIndicator';
 import type {
   DisplayLayoutContext,
   TripleZoneStateMap,
@@ -10,6 +8,7 @@ import {
   renderTripleSaunaDetail,
   renderTripleSlideRenderer,
 } from '@/components/Display/displayTripleLayoutUtils';
+import { getEffectiveSlideDuration } from '@/types/slideshow.types';
 import { classNames } from '@/utils/classNames';
 import { withAlpha } from '@/components/Display/wellnessDisplayUtils';
 import { useDisplayViewportProfile } from '@/components/Display/useDisplayViewportProfile';
@@ -31,29 +30,33 @@ export function DisplayModernTripleLayout({
     resolveTransition,
     showZoneBorders,
     themeColors,
-    mediaItems,
   } = context;
   const { left, topRight, bottomRight } = zoneStates;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
+  const defaultDuration = effectiveSettings.slideshow?.defaultDuration;
+  const transitionDurationSec = effectiveSettings.slideshow?.transitionDuration ?? 0.6;
 
   const isPortrait = profile.isPortrait;
   const isCompact = profile.isCompact;
   const leftSize = isPortrait ? 100 : (left.zone?.size || (designStyle === 'modern-timeline' ? 65 : 60));
   const rightSize = isPortrait ? 100 : 100 - leftSize;
-  const topDurationSec = topRight.slide?.duration ?? 12;
+  const topDurationSec = getEffectiveSlideDuration(topRight.slide, defaultDuration);
 
   const leftBg = themeColors.zebra1 || '#F7F3E9';
   const rightBg = themeColors.zebra2 || '#F2EDE1';
   const border = themeColors.gridTable || '#EBE5D3';
   const bottomBg = withAlpha(rightBg, 0.6);
 
-  const accentGreen = themeColors.accentGreen || themeColors.timeColBg || '#8F9779';
   const accentGold = themeColors.accentGold || themeColors.accent || '#A68A64';
+  // Bottom-right panel fills the zone edge-to-edge. The previous
+  // `p-2.5` / `p-3` / `p-4` outer padding added a visible gutter
+  // around the embedded slide that modern packs already handle
+  // with their own inner spacing.
   const bottomPanelClassName = isPortrait
-    ? 'flex-[0.9] min-h-0 p-2.5'
+    ? 'flex-[0.9] min-h-0'
     : isCompact
-      ? 'h-32 p-3'
-      : 'h-44 p-4';
+      ? 'h-32'
+      : 'h-44';
 
   const renderLeftPanel = () => {
     if (!left.slide || left.slide.type === 'content-panel') {
@@ -71,10 +74,6 @@ export function DisplayModernTripleLayout({
   };
 
   const renderTopRightPanel = () => {
-    if (topRight.slide?.type === 'sauna-detail') {
-      return renderTripleSaunaDetail(context, topRight.slide.saunaId);
-    }
-
     if (topRight.slide) {
       if (topRight.slide.type.startsWith('media-')) {
         return renderTriplePaddedSlide(context, topRight.slide, topRight.zone?.id, {
@@ -83,6 +82,10 @@ export function DisplayModernTripleLayout({
         });
       }
 
+      // sauna-detail and everything else route through the SlideRenderer
+      // dispatcher so the active design pack can render it (e.g. the
+      // wellness-classic SaunaDetailRenderer's image + infusion-list
+      // layout).
       return <div className="w-full h-full">{renderTripleSlideRenderer(context, topRight.slide, topRight.zone?.id)}</div>;
     }
 
@@ -101,13 +104,13 @@ export function DisplayModernTripleLayout({
       return renderTripleSlideRenderer(context, bottomRight.slide, bottomRight.zone?.id);
     }
 
+    // Empty bottom-right zone — show a quiet placeholder so operators
+    // see the gap. The previous Wellness-styled tips/events fallback was
+    // retired with the rest of the legacy chrome pipeline.
     return (
-      <WellnessBottomPanel
-        displayAppearance={context.displayAppearance}
-        settings={effectiveSettings}
-        theme={themeColors}
-        media={mediaItems}
-      />
+      <div className="flex h-full w-full items-center justify-center text-spa-text-secondary text-sm">
+        Keine Slides
+      </div>
     );
   };
 
@@ -134,8 +137,12 @@ export function DisplayModernTripleLayout({
         <SlideTransition
           slideKey={left.slide?.id || `content-panel-${designStyle}`}
           enabled={enableTransitions && (left.info?.shouldRotate || false)}
-          duration={0.6}
+          duration={transitionDurationSec}
           transition={resolveTransition(left.slide)}
+          progressDurationSec={
+            left.info?.shouldRotate ? getEffectiveSlideDuration(left.slide, defaultDuration) : undefined
+          }
+          progressColor={accentGold}
         >
           {renderLeftPanel()}
         </SlideTransition>
@@ -150,26 +157,13 @@ export function DisplayModernTripleLayout({
         }}
       >
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          {(topRight.info?.shouldRotate || false) && (
-            <SlideProgressIndicator
-              key={topRight.slide?.id || topRight.info?.currentSlideIndex || 0}
-              className={classNames(
-                'absolute left-1/2 z-20 -translate-x-1/2',
-                isPortrait ? 'bottom-2.5' : 'bottom-3',
-              )}
-              compact
-              durationSec={topDurationSec}
-              startColor={accentGreen}
-              endColor={accentGold}
-              surfaceColor={rightBg}
-              borderColor={border}
-            />
-          )}
           <SlideTransition
             slideKey={topRight.slide?.id || topRight.info?.currentSlideIndex || 'top-fallback'}
             enabled={enableTransitions && (topRight.info?.shouldRotate || false)}
-            duration={0.6}
+            duration={transitionDurationSec}
             transition={resolveTransition(topRight.slide)}
+            progressDurationSec={topRight.info?.shouldRotate ? topDurationSec : undefined}
+            progressColor={accentGold}
           >
             <div className="absolute inset-0 flex flex-col">
               {renderTopRightPanel()}
@@ -187,8 +181,12 @@ export function DisplayModernTripleLayout({
           <SlideTransition
             slideKey={bottomRight.slide?.id || 'bottom-fallback'}
             enabled={enableTransitions && (bottomRight.info?.shouldRotate || false)}
-            duration={0.6}
+            duration={transitionDurationSec}
             transition={resolveTransition(bottomRight.slide)}
+            progressDurationSec={
+              bottomRight.info?.shouldRotate ? getEffectiveSlideDuration(bottomRight.slide, defaultDuration) : undefined
+            }
+            progressColor={accentGold}
           >
             <div className="w-full h-full">
               {renderBottomRightPanel()}

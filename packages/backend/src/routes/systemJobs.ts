@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getSystemJob, listSystemJobs } from '../lib/systemJobs.js';
 import type { AuthRequest } from '../lib/auth.js';
 import { str } from '../lib/auth.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ const ListJobsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
 });
 
-router.get('/jobs', async (req: AuthRequest, res) => {
+router.get('/jobs', asyncHandler(async (req: AuthRequest, res) => {
   const parsed = ListJobsQuerySchema.safeParse(req.query);
   const limit = parsed.success ? parsed.data.limit ?? 20 : 20;
 
@@ -18,9 +19,9 @@ router.get('/jobs', async (req: AuthRequest, res) => {
     ok: true,
     items: await listSystemJobs(limit),
   });
-});
+}));
 
-router.get('/jobs/:jobId', (req: AuthRequest, res) => {
+router.get('/jobs/:jobId', asyncHandler((req: AuthRequest, res) => {
   const job = getSystemJob(str(req.params.jobId)!);
   if (!job) {
     return res.status(404).json({
@@ -34,6 +35,6 @@ router.get('/jobs/:jobId', (req: AuthRequest, res) => {
     ok: true,
     job,
   });
-});
+}));
 
 export default router;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -7,7 +7,9 @@ import {
   type SystemJob,
 } from '@/services/api';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { getVisibleJobLog } from './jobLog';
+import { SystemJobCard, errorMessage } from './SystemJobCard';
+import { formatDateTimeDE } from '@/utils/dateUtils';
+import { formatFileSize } from '@/types/media.types';
 import {
   Download,
   Upload,
@@ -19,53 +21,12 @@ import {
   GitCompare,
   History,
   Package,
-  Clock3,
-  ShieldAlert,
 } from 'lucide-react';
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string; error?: string; requestId?: string } | undefined;
-    const msg = data?.message || data?.error;
-    if (msg) {
-      return data?.requestId ? `${msg} (Request-ID: ${data.requestId})` : msg;
-    }
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
 
 function backupFilename(): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `htmlsignage-backup-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}.zip`;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return '-';
-  return d.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getJobTone(job: SystemJob | null): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
-  if (!job) return 'neutral';
-  if (job.status === 'succeeded') return 'success';
-  if (job.status === 'failed') return 'error';
-  if (job.status === 'running') return 'info';
-  return 'warning';
 }
 
 interface BackupSectionProps {
@@ -101,10 +62,6 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
   const lastExportDate = localStorage.getItem('lastBackupExport');
   const isImportRunning = latestImportJob?.status === 'queued' || latestImportJob?.status === 'running';
   const importResult = latestImportJob?.result && typeof latestImportJob.result === 'object' ? latestImportJob.result : null;
-  const visibleImportLog = useMemo(
-    () => getVisibleJobLog(latestImportJob?.log || ''),
-    [latestImportJob?.log],
-  );
 
   const resetPreview = () => {
     setPreview(null);
@@ -294,13 +251,14 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
             {lastExportDate && (
               <p className="mb-3 flex items-center gap-1 text-xs text-spa-text-secondary">
                 <Calendar className="h-3 w-3" />
-                Letzter Export: {formatDate(lastExportDate)}
+                Letzter Export: {formatDateTimeDE(lastExportDate)}
               </p>
             )}
             <button
+              type="button"
               onClick={() => void handleExportBackup()}
               disabled={!canRunActions || isExporting || isPreviewing || isImportRunning || isStartingImport}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-spa-secondary px-4 py-2 text-white hover:bg-spa-secondary-dark disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-spa-secondary px-4 py-2 text-white hover:bg-spa-secondary-dark disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               {isExporting ? (
                 <>
@@ -376,9 +334,10 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
+                type="button"
                 onClick={() => void handlePreviewImport()}
                 disabled={!canRunActions || !backupFile || isPreviewing || isImportRunning || isExporting || isStartingImport}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-spa-primary/20 px-4 py-2 text-spa-primary hover:bg-spa-primary/5 disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-spa-primary/20 px-4 py-2 text-spa-primary hover:bg-spa-primary/5 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 {isPreviewing ? (
                   <>
@@ -394,9 +353,10 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               </button>
 
               <button
+                type="button"
                 onClick={handleImportRequest}
                 disabled={!canRunActions || !backupFile || isImportRunning || isExporting || isPreviewing || isStartingImport}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-white hover:bg-spa-primary-dark disabled:opacity-50"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-white hover:bg-spa-primary-dark disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 {isStartingImport ? (
                   <>
@@ -414,76 +374,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
           </div>
         </div>
 
-        {latestImportJob && (
-          <div className="mt-4 rounded-lg border border-spa-bg-secondary bg-spa-bg-primary p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    getJobTone(latestImportJob) === 'success'
-                      ? 'bg-spa-success-light text-spa-success-dark'
-                      : getJobTone(latestImportJob) === 'error'
-                        ? 'bg-spa-error-light text-spa-error-dark'
-                        : getJobTone(latestImportJob) === 'info'
-                          ? 'bg-spa-primary/10 text-spa-primary'
-                          : getJobTone(latestImportJob) === 'warning'
-                            ? 'bg-spa-warning-light text-spa-warning-dark'
-                            : 'bg-spa-bg-secondary text-spa-text-secondary'
-                  }`}>
-                    {latestImportJob.status === 'queued' ? 'Wartet' : latestImportJob.status === 'running' ? 'Läuft' : latestImportJob.status === 'succeeded' ? 'Erfolgreich' : 'Fehlgeschlagen'}
-                  </span>
-                  <span className="text-sm font-semibold text-spa-text-primary">{latestImportJob.title}</span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-spa-text-secondary">
-                  <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> Erstellt: {formatDate(latestImportJob.createdAt)}</span>
-                  {latestImportJob.finishedAt && <span>Fertig: {formatDate(latestImportJob.finishedAt)}</span>}
-                  {latestImportJob.requestId && <span>Request-ID: {latestImportJob.requestId}</span>}
-                </div>
-              </div>
-
-              {latestImportJob.progress && (
-                <div className="min-w-[220px] rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-xs text-spa-text-secondary">
-                  <div className="font-semibold text-spa-text-primary">{latestImportJob.progress.message}</div>
-                  <div className="mt-1">Schritt: {latestImportJob.progress.stage}</div>
-                  {typeof latestImportJob.progress.percent === 'number' && (
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-spa-bg-secondary">
-                      <div
-                        className="h-full rounded-full bg-spa-primary transition-all"
-                        style={{ width: `${Math.max(4, Math.min(100, latestImportJob.progress.percent))}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {latestImportJob.error && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-spa-error/30 bg-spa-error-light p-3 text-sm text-spa-error-dark">
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                <span>
-                  {latestImportJob.error.message}
-                  {latestImportJob.error.requestId ? ` (Request-ID: ${latestImportJob.error.requestId})` : ''}
-                </span>
-              </div>
-            )}
-
-            {visibleImportLog.text && (
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-semibold text-spa-text-secondary">Job-Log</span>
-                  {visibleImportLog.truncated && (
-                    <span className="text-spa-text-secondary">
-                      Es werden nur die letzten 120 Logzeilen angezeigt.
-                    </span>
-                  )}
-                </div>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[#111827] p-3 text-xs text-[#e5e7eb]">
-                  {visibleImportLog.text}
-                </pre>
-              </div>
-            )}
-          </div>
-        )}
+        {latestImportJob && <div className="mt-4"><SystemJobCard job={latestImportJob} /></div>}
 
         {preview && (
           <div className="mt-4 space-y-4 rounded-lg border border-spa-primary/15 bg-spa-primary/5 p-4">
@@ -496,7 +387,7 @@ export function BackupSection({ onFeedback, onImportWarnings }: BackupSectionPro
               <div className="space-y-3 rounded-lg bg-spa-bg-primary p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">Backup</div>
                 <div className="grid grid-cols-2 gap-2">
-                  <PreviewMetric label="Exportiert am" value={formatDate(preview.backup.exportedAt)} />
+                  <PreviewMetric label="Exportiert am" value={formatDateTimeDE(preview.backup.exportedAt)} />
                   <PreviewMetric label="App-Version" value={preview.backup.appVersion || '-'} />
                   <PreviewMetric label="Medien" value={String(preview.backup.mediaCount)} />
                   <PreviewMetric label="Format" value={`v${preview.backup.formatVersion}`} />

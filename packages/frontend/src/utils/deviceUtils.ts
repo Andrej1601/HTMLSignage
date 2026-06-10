@@ -2,28 +2,14 @@ import { isPlainRecord } from './objectUtils';
 import type { Device } from '@/types/device.types';
 
 /**
- * Returns true if the device has any stored overrides (schedule or settings).
- * Used in DashboardPage, SlideshowPage, and DeviceCard.
+ * Returns true if the device has a stored schedule override.
+ * Device-specific *settings* overrides are no longer supported — devices
+ * pick up design/theme exclusively via their assigned slideshow.
  */
 export function hasDeviceOverrides(device: Device): boolean {
-  const hasScheduleOverride = Boolean(
+  return Boolean(
     device.overrides?.schedule &&
       isPlainRecord(device.overrides.schedule) &&
       'presets' in device.overrides.schedule,
   );
-  const hasSettingsOverride = Boolean(
-    device.overrides?.settings &&
-      isPlainRecord(device.overrides.settings) &&
-      Object.keys(device.overrides.settings).length > 0,
-  );
-  return hasScheduleOverride || hasSettingsOverride;
-}
-
-/**
- * Returns the device's settings override as a plain record.
- * Returns an empty object if no override exists.
- */
-export function getDeviceOverrideSettings(device: Device | null): Record<string, unknown> {
-  const settings = device?.overrides?.settings;
-  return isPlainRecord(settings) ? { ...settings } : {};
 }

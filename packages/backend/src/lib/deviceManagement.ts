@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
-import { isPlainRecord, deepMerge } from './utils.js';
+import { isPlainRecord } from './utils.js';
 import { DEFAULT_HEADER } from './schedule.js';
 
 export interface DeviceFleetState {
@@ -25,10 +25,6 @@ export function normalizeSettingsData(raw: unknown): Record<string, unknown> {
   return data;
 }
 
-export function hasSettingsOverrideData(raw: unknown): raw is Record<string, unknown> {
-  return isPlainRecord(raw) && Object.keys(raw).length > 0;
-}
-
 export function normalizeDeviceGroupName(value: string | null | undefined): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -48,7 +44,7 @@ export function readDeviceFleetState(device: unknown): DeviceFleetState {
 
 export function decodeSnapshotDataUrl(imageDataUrl: string): Buffer | null {
   const match = imageDataUrl.match(/^data:image\/jpeg;base64,([a-zA-Z0-9+/=\s]+)$/);
-  if (!match) return null;
+  if (!match || !match[1]) return null;
   return Buffer.from(match[1], 'base64');
 }
 
@@ -161,41 +157,9 @@ export function buildDevicePairAuditDetails(input: {
   };
 }
 
-export function buildDeviceDisplayConfigPayload(input: {
-  deviceId: string;
-  mode: DeviceMode;
-  maintenanceMode: boolean;
-  globalSchedule: unknown;
-  globalSettings: Record<string, unknown>;
-  overrideSchedule: unknown;
-  overrideSettings: unknown;
-}): {
-  deviceId: string;
-  maintenanceMode: boolean;
-  mode: DeviceMode;
-  hasScheduleOverride: boolean;
-  hasSettingsOverride: boolean;
-  schedule: unknown;
-  settings: Record<string, unknown>;
-} {
-  const hasScheduleOverride = Boolean(input.overrideSchedule);
-  const hasSettingsOverride = hasSettingsOverrideData(input.overrideSettings);
-  const isOverrideMode = input.mode === 'override';
-
-  return {
-    deviceId: input.deviceId,
-    maintenanceMode: input.maintenanceMode,
-    mode: input.mode,
-    hasScheduleOverride,
-    hasSettingsOverride,
-    schedule: isOverrideMode && hasScheduleOverride
-      ? input.overrideSchedule
-      : input.globalSchedule,
-    settings: isOverrideMode && hasSettingsOverride
-      ? deepMerge(input.globalSettings, normalizeSettingsData(input.overrideSettings)) as Record<string, unknown>
-      : input.globalSettings,
-  };
-}
+// `buildDeviceDisplayConfigPayload` was moved to `services/displayConfig.ts`
+// as `assembleDisplayConfig` plus pure pipeline stages. The route handler
+// now calls `resolveDeviceDisplayConfig(deviceId)` directly.
 
 function hashBrowserIdToPairingCode(value: string): string {
   return parseInt(

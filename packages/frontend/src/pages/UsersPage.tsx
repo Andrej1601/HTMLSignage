@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { Plus, Edit2, Trash2, Users as UsersIcon, Shield, Save, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/Button';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { Dialog } from '@/components/Dialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { InputField } from '@/components/FormField';
@@ -16,6 +18,7 @@ import { StatCard } from '@/components/StatCard';
 import { SectionCard } from '@/components/SectionCard';
 import { AVAILABLE_ROLES } from '@/utils/permissions';
 import { fetchApi } from '@/services/api';
+import { toast } from '@/stores/toastStore';
 
 interface User {
   id: string;
@@ -41,12 +44,18 @@ interface UpdateUserData {
 }
 
 export function UsersPage() {
-  const { logout } = useAuth();
+  const { user: currentUser, logout } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkRoleDialogOpen, setBulkRoleDialogOpen] = useState(false);
+  const [bulkRoleMode, setBulkRoleMode] = useState<'add' | 'remove'>('add');
+  const [bulkRoleSelection, setBulkRoleSelection] = useState<string[]>([]);
+  const [bulkRoleSaving, setBulkRoleSaving] = useState(false);
 
   // Fetch users
   const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
@@ -106,7 +115,28 @@ export function UsersPage() {
     },
   });
 
-  const userColumns: Column<User>[] = useMemo(() => [
+  // Inline berechnet — React Compiler übernimmt die Memoisierung;
+  // ein manuelles useMemo mit `selectedIds` (Set) als Dep konnte er
+  // nicht preservieren.
+  const userColumns: Column<User>[] = [
+    {
+      key: '__select',
+      header: '',
+      className: 'w-10',
+      render: (u) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(u.id)}
+          onChange={() => toggleSelected(u.id)}
+          aria-label={selectedIds.has(u.id) ? `${u.username} abwählen` : `${u.username} auswählen`}
+          className="h-4 w-4 rounded border-spa-bg-secondary accent-spa-primary"
+        />
+      ),
+      // In der Mobile-Card-View wirkt die Checkbox zwischen den
+      // Stammdaten unbeholfen — wir lassen sie auf Desktop und
+      // verwenden in der Mobile-Card stattdessen die Header-Aktionen.
+      hideOnMobile: true,
+    },
     {
       key: 'username',
       header: 'Benutzer',
@@ -140,7 +170,7 @@ export function UsersPage() {
                 key={role}
                 className={`px-2 py-1 text-xs font-medium rounded ${
                   role === 'admin'
-                    ? 'bg-spa-warning-light text-spa-warning-dark'
+                    ? 'bg-spa-primary/15 text-spa-primary'
                     : role === 'editor'
                     ? 'bg-spa-info-light text-spa-info-dark'
                     : role === 'saunameister'
@@ -173,15 +203,17 @@ export function UsersPage() {
       render: (u) => (
         <>
           <button
+            type="button"
             onClick={() => setEditingUser(u)}
-            className="text-spa-primary hover:text-spa-primary-dark mr-3"
+            className="text-spa-primary hover:text-spa-primary-dark mr-3 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             aria-label={`${u.username} bearbeiten`}
           >
             <Edit2 className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={() => setDeletingUser(u)}
-            className="text-spa-error hover:text-spa-error-dark"
+            className="text-spa-error hover:text-spa-error-dark focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
             aria-label={`${u.username} löschen`}
           >
             <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -199,7 +231,7 @@ export function UsersPage() {
         </div>
       ),
     },
-  ], []);
+  ];
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;
@@ -210,6 +242,133 @@ export function UsersPage() {
       || u.roles.some((r) => r.toLowerCase().includes(q)),
     );
   }, [users, searchQuery]);
+
+  const {
+    selectedIds,
+    toggle: toggleSelected,
+    clear: clearSelection,
+    selectAllVisible,
+    allVisibleSelected,
+    someVisibleSelected,
+    selectedItems: selectedUsers,
+  } = useBulkSelection(filteredUsers);
+
+  // Sicherheitsregel: den eigenen Account darf man nicht via Bulk-Aktion
+  // löschen oder demoten, sonst sperrt sich der User selbst aus.
+  const includesSelf = currentUser ? selectedIds.has(currentUser.id) : false;
+
+  const openBulkRoleDialog = (mode: 'add' | 'remove') => {
+    if (selectedIds.size === 0) return;
+    setBulkRoleMode(mode);
+    setBulkRoleSelection([]);
+    setBulkRoleDialogOpen(true);
+  };
+
+  const closeBulkRoleDialog = () => {
+    setBulkRoleDialogOpen(false);
+    setBulkRoleSelection([]);
+  };
+
+  const handleBulkRoleSave = async () => {
+    if (selectedIds.size === 0 || bulkRoleSelection.length === 0) {
+      toast.warning('Mindestens eine Rolle wählen.');
+      return;
+    }
+    setBulkRoleSaving(true);
+
+    const updates = selectedUsers.map((u) => {
+      let nextRoles: string[];
+      if (bulkRoleMode === 'add') {
+        const merged = new Set(u.roles);
+        for (const r of bulkRoleSelection) merged.add(r);
+        nextRoles = Array.from(merged);
+      } else {
+        nextRoles = u.roles.filter((r) => !bulkRoleSelection.includes(r));
+        // Sicherheitsnetz: ein User darf nie ohne Rolle dastehen
+        if (nextRoles.length === 0) nextRoles = ['viewer'];
+      }
+      // Eigenen Admin-Status nicht versehentlich entfernen
+      if (currentUser && u.id === currentUser.id && bulkRoleMode === 'remove') {
+        if (u.roles.includes('admin') && !nextRoles.includes('admin')) {
+          nextRoles = [...nextRoles, 'admin'];
+        }
+      }
+      return fetchApi(`/users/${u.id}`, {
+        method: 'PATCH',
+        data: { roles: nextRoles },
+      });
+    });
+
+    const results = await Promise.allSettled(updates);
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+
+    if (failed === 0) {
+      toast.success(
+        `${succeeded} Benutzer aktualisiert (${bulkRoleMode === 'add' ? 'Rollen ergänzt' : 'Rollen entfernt'}).`,
+      );
+    } else if (succeeded === 0) {
+      toast.error(`Aktualisierung fehlgeschlagen für ${failed} Benutzer.`);
+    } else {
+      toast.warning(`${succeeded} aktualisiert, ${failed} fehlgeschlagen.`);
+    }
+
+    setBulkRoleSaving(false);
+    setBulkRoleDialogOpen(false);
+    setBulkRoleSelection([]);
+    clearSelection();
+  };
+
+  const handleBulkDeleteRequest = () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleteOpen(true);
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+
+    // Eigenen Account aus dem Bulk-Delete ausschließen — User soll sich
+    // nicht selbst aus dem System schießen können.
+    const idsToDelete = Array.from(selectedIds).filter(
+      (id) => !currentUser || id !== currentUser.id,
+    );
+    const skippedSelf = idsToDelete.length !== selectedIds.size;
+
+    const results = await Promise.allSettled(
+      idsToDelete.map((id) =>
+        fetchApi(`/users/${id}`, {
+          method: 'DELETE',
+        }),
+      ),
+    );
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+
+    if (failed === 0) {
+      toast.success(
+        skippedSelf
+          ? `${succeeded} Benutzer gelöscht (eigener Account übersprungen).`
+          : `${succeeded} Benutzer gelöscht.`,
+      );
+    } else if (succeeded === 0) {
+      toast.error(`Löschen fehlgeschlagen für ${failed} Benutzer.`);
+    } else {
+      toast.warning(`${succeeded} gelöscht, ${failed} fehlgeschlagen.`);
+    }
+
+    setBulkDeleting(false);
+    setBulkDeleteOpen(false);
+    clearSelection();
+  };
+
+  const toggleBulkRole = (role: string) => {
+    setBulkRoleSelection((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
 
   if (isLoading) {
     return (
@@ -250,7 +409,7 @@ export function UsersPage() {
           )}
           badges={[
             { label: `${users.length} Benutzer`, tone: 'info' },
-            { label: `${users.filter((entry) => entry.roles.includes('admin')).length} Admins`, tone: 'warning' },
+            { label: `${users.filter((entry) => entry.roles.includes('admin')).length} Admins`, tone: 'info' },
           ]}
         />
 
@@ -261,16 +420,31 @@ export function UsersPage() {
 
         <SectionCard title="Benutzer" icon={UsersIcon}>
           {users.length > 0 && (
-            <div className="relative max-w-xs mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary" aria-hidden="true" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Benutzer suchen..."
-                aria-label="Benutzer durchsuchen"
-                className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
-              />
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="relative max-w-xs flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary" aria-hidden="true" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Benutzer suchen..."
+                  aria-label="Benutzer durchsuchen"
+                  className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-3 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
+                />
+              </div>
+              <label className="hidden md:inline-flex items-center gap-2 text-sm text-spa-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected;
+                  }}
+                  onChange={() => (allVisibleSelected ? clearSelection() : selectAllVisible())}
+                  className="h-4 w-4 rounded border-spa-bg-secondary accent-spa-primary"
+                  aria-label="Alle sichtbaren Benutzer auswählen"
+                />
+                Alle auswählen
+              </label>
             </div>
           )}
           {users.length === 0 ? (
@@ -284,14 +458,36 @@ export function UsersPage() {
             <DataTable<User>
               data={filteredUsers}
               keyFn={(u) => u.id}
-              mobileTitle={(u) => (
-                <div className="flex items-center gap-3">
-                  <div className="shrink-0 h-10 w-10 bg-spa-primary rounded-full flex items-center justify-center text-white font-bold">
-                    {u.username.charAt(0).toUpperCase()}
+              mobileTitle={(u) => {
+                const isSelected = selectedIds.has(u.id);
+                return (
+                  // Mobile: Avatar fungiert als Tap-Target für die Auswahl,
+                  // damit Bulk-Aktionen aus der Toolbar nicht ins Leere
+                  // laufen. Auf Desktop existiert eine eigene Checkbox-
+                  // Spalte; hier auf Mobile ist der Avatar-Button die
+                  // einzig sinnvolle Selektions-Affordanz, ohne das
+                  // Card-Layout zu sprengen.
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelected(u.id);
+                      }}
+                      aria-pressed={isSelected}
+                      aria-label={isSelected ? `${u.username} abwählen` : `${u.username} auswählen`}
+                      className={`shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white font-bold transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
+                        isSelected
+                          ? 'bg-spa-primary ring-2 ring-spa-primary ring-offset-2'
+                          : 'bg-spa-primary'
+                      }`}
+                    >
+                      {isSelected ? '✓' : u.username.charAt(0).toUpperCase()}
+                    </button>
+                    <span>{u.username}</span>
                   </div>
-                  <span>{u.username}</span>
-                </div>
-              )}
+                );
+              }}
               columns={userColumns}
             />
           )}
@@ -326,6 +522,119 @@ export function UsersPage() {
           onConfirm={() => deletingUser && deleteUser.mutate(deletingUser.id)}
           onCancel={() => setDeletingUser(null)}
         />
+
+        {/* Bulk-Action-Leiste — fixed unten */}
+        <BulkActionBar
+          count={selectedIds.size}
+          onSelectAll={selectAllVisible}
+          selectAllDisabled={allVisibleSelected}
+          onClear={clearSelection}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Shield}
+            onClick={() => openBulkRoleDialog('add')}
+          >
+            Rolle ergänzen
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => openBulkRoleDialog('remove')}
+          >
+            Rolle entfernen
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={Trash2}
+            onClick={handleBulkDeleteRequest}
+          >
+            Löschen
+          </Button>
+        </BulkActionBar>
+
+        {/* Bulk Delete Confirm */}
+        <ConfirmDialog
+          isOpen={bulkDeleteOpen}
+          title={`${selectedIds.size} Benutzer löschen?`}
+          message={(() => {
+            const count = selectedIds.size;
+            const base = `Möchtest du wirklich ${count} Benutzer löschen? Diese Aktion kann nicht rückgängig gemacht werden.`;
+            if (includesSelf) {
+              return `${base}\n\n⚠️ Dein eigener Account ist Teil der Auswahl und wird übersprungen.`;
+            }
+            return base;
+          })()}
+          confirmLabel={bulkDeleting ? 'Wird gelöscht...' : 'Löschen'}
+          variant="danger"
+          onConfirm={handleBulkDeleteConfirm}
+          onCancel={() => setBulkDeleteOpen(false)}
+        />
+
+        {/* Bulk Role Dialog */}
+        <Dialog
+          isOpen={bulkRoleDialogOpen}
+          onClose={closeBulkRoleDialog}
+          title={
+            bulkRoleMode === 'add'
+              ? `Rollen für ${selectedIds.size} Benutzer ergänzen`
+              : `Rollen von ${selectedIds.size} Benutzern entfernen`
+          }
+          size="md"
+          closeDisabled={bulkRoleSaving}
+          footer={(
+            <>
+              <Button variant="ghost" onClick={closeBulkRoleDialog} disabled={bulkRoleSaving}>
+                Abbrechen
+              </Button>
+              <Button
+                icon={Save}
+                onClick={handleBulkRoleSave}
+                loading={bulkRoleSaving}
+                loadingText="Speichert..."
+                disabled={bulkRoleSelection.length === 0}
+              >
+                Anwenden
+              </Button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-spa-text-secondary">
+              {bulkRoleMode === 'add'
+                ? 'Die ausgewählten Rollen werden zu den bestehenden Rollen jedes Benutzers hinzugefügt. Bereits vorhandene Rollen bleiben unverändert.'
+                : 'Die ausgewählten Rollen werden bei den ausgewählten Benutzern entfernt. Wer dann ohne Rolle dasteht, bekommt automatisch "viewer".'}
+            </p>
+            {includesSelf && bulkRoleMode === 'remove' && (
+              <div className="rounded-lg border border-spa-warning/40 bg-spa-warning-light px-3 py-2 text-xs text-spa-warning-dark">
+                Dein eigener Account ist Teil der Auswahl. Die Rolle „admin" wird bei dir nicht entfernt, um eine Selbstaussperrung zu verhindern.
+              </div>
+            )}
+            <fieldset>
+              <legend className="block text-sm font-medium text-spa-text-primary mb-2">
+                Rollen
+              </legend>
+              <div className="space-y-2">
+                {AVAILABLE_ROLES.map((role) => (
+                  <label key={role.value} className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bulkRoleSelection.includes(role.value)}
+                      onChange={() => toggleBulkRole(role.value)}
+                      className="w-4 h-4 mt-0.5 text-spa-primary border-spa-bg-secondary rounded focus:ring-spa-primary"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-spa-text-primary">{role.label}</span>
+                      <p className="text-xs text-spa-text-secondary">{role.description}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+        </Dialog>
       </div>
     </Layout>
   );

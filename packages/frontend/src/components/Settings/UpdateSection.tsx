@@ -12,7 +12,8 @@ import {
   type SystemUpdateVerification,
 } from '@/services/api';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { getVisibleJobLog } from './jobLog';
+import { SystemJobCard, errorMessage } from './SystemJobCard';
+import { formatDateDE } from '@/utils/dateUtils';
 import {
   RefreshCw,
   ArrowUpCircle,
@@ -26,49 +27,8 @@ import {
   Database,
   Info,
   CheckCircle2,
-  Clock3,
   ShieldAlert,
 } from 'lucide-react';
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string; error?: string; requestId?: string } | undefined;
-    const msg = data?.message || data?.error;
-    if (msg) {
-      return data?.requestId ? `${msg} (Request-ID: ${data.requestId})` : msg;
-    }
-  }
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
-}
-
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return '-';
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function formatDateTime(iso?: string | null): string {
-  if (!iso) return '-';
-  const value = new Date(iso);
-  if (!Number.isFinite(value.getTime())) return '-';
-  return value.toLocaleString('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function getJobTone(job: SystemJob | null): 'success' | 'warning' | 'error' | 'info' | 'neutral' {
-  if (!job) return 'neutral';
-  if (job.status === 'succeeded') return 'success';
-  if (job.status === 'failed') return 'error';
-  if (job.status === 'running') return 'info';
-  return 'warning';
-}
 
 function getCheckTone(status: SystemUpdateCheckStatus): string {
   if (status === 'ok') return 'border-spa-success/20 bg-spa-success-light text-spa-success-dark';
@@ -145,10 +105,6 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
     [updateResult],
   );
   const effectiveIsDirty = releases?.isDirty || deriveDirtyFromPreflight(preflight);
-  const visibleJobLog = useMemo(
-    () => getVisibleJobLog(latestJob?.log || ''),
-    [latestJob?.log],
-  );
 
   const loadReleases = useCallback(async () => {
     setIsCheckingStatus(true);
@@ -170,7 +126,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
       const response = await systemApi.listJobs(10);
       const updateJob = response.items.find((job) => job.type === 'system-update') || null;
       setLatestJob(updateJob);
-    } catch {
+    } catch (_err) {
       // Secondary status polling should not spam the UI.
     }
   }, []);
@@ -284,9 +240,10 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
             )}
           </div>
           <button
+            type="button"
             onClick={() => void loadReleases()}
             disabled={!canRunActions || isCheckingStatus || isStartingUpdate}
-            className="flex items-center gap-2 rounded-lg border border-spa-bg-secondary px-3 py-2 text-spa-text-secondary hover:bg-spa-bg-primary disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg border border-spa-bg-secondary px-3 py-2 text-spa-text-secondary hover:bg-spa-bg-primary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <RefreshCw className={`h-4 w-4 ${isCheckingStatus ? 'animate-spin' : ''}`} />
             Prüfen
@@ -394,7 +351,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {formatDate(releases.latestRelease.publishedAt)}
+                    {formatDateDE(releases.latestRelease.publishedAt)}
                   </span>
                 </div>
                 {releases.latestRelease.body && (
@@ -404,9 +361,10 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
                 )}
               </div>
               <button
+                type="button"
                 onClick={() => handleUpdateRequest(releases.latestRelease!, false)}
                 disabled={!canRunActions || isStartingUpdate || isRunningUpdate || isUpdateBlocked}
-                className="flex shrink-0 items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-white hover:bg-spa-primary-dark disabled:opacity-50"
+                className="flex shrink-0 items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-white hover:bg-spa-primary-dark disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 <ArrowUpCircle className="h-4 w-4" />
                 Aktualisieren
@@ -425,8 +383,9 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
         {releases && releases.olderReleases?.length > 0 && (
           <div className="mt-4">
             <button
+              type="button"
               onClick={() => setShowOlderReleases(!showOlderReleases)}
-              className="flex items-center gap-2 text-sm font-medium text-spa-text-secondary transition-colors hover:text-spa-text-primary"
+              className="flex items-center gap-2 text-sm font-medium text-spa-text-secondary transition-colors hover:text-spa-text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               {showOlderReleases ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               Ältere Releases ({releases.olderReleases.length})
@@ -450,13 +409,14 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
                       </div>
                       <span className="mt-0.5 flex items-center gap-1 text-xs text-spa-text-secondary">
                         <Calendar className="h-3 w-3" />
-                        {formatDate(release.publishedAt)}
+                        {formatDateDE(release.publishedAt)}
                       </span>
                     </div>
                     <button
+                      type="button"
                       onClick={() => handleUpdateRequest(release, true)}
                       disabled={!canRunActions || isStartingUpdate || isRunningUpdate || isUpdateBlocked}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                     >
                       <ArrowDownCircle className="h-3.5 w-3.5" />
                       Installieren
@@ -469,48 +429,8 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
         )}
 
         {latestJob && (
-          <div className="mt-4 rounded-lg border border-spa-bg-secondary bg-spa-bg-primary p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    getJobTone(latestJob) === 'success'
-                      ? 'bg-spa-success-light text-spa-success-dark'
-                      : getJobTone(latestJob) === 'error'
-                        ? 'bg-spa-error-light text-spa-error-dark'
-                        : getJobTone(latestJob) === 'info'
-                          ? 'bg-spa-primary/10 text-spa-primary'
-                          : getJobTone(latestJob) === 'warning'
-                            ? 'bg-spa-warning-light text-spa-warning-dark'
-                            : 'bg-spa-bg-secondary text-spa-text-secondary'
-                  }`}>
-                    {latestJob.status === 'queued' ? 'Wartet' : latestJob.status === 'running' ? 'Läuft' : latestJob.status === 'succeeded' ? 'Erfolgreich' : 'Fehlgeschlagen'}
-                  </span>
-                  <span className="text-sm font-semibold text-spa-text-primary">{latestJob.title}</span>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-spa-text-secondary">
-                  <span className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> Erstellt: {formatDateTime(latestJob.createdAt)}</span>
-                  {latestJob.finishedAt && <span>Fertig: {formatDateTime(latestJob.finishedAt)}</span>}
-                  {latestJob.requestId && <span>Request-ID: {latestJob.requestId}</span>}
-                </div>
-              </div>
-
-              {latestJob.progress && (
-                <div className="min-w-[220px] rounded-lg bg-spa-surface px-3 py-2 text-xs text-spa-text-secondary border border-spa-bg-secondary">
-                  <div className="font-semibold text-spa-text-primary">{latestJob.progress.message}</div>
-                  <div className="mt-1">Schritt: {latestJob.progress.stage}</div>
-                  {typeof latestJob.progress.percent === 'number' && (
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-spa-bg-secondary">
-                      <div
-                        className="h-full rounded-full bg-spa-primary transition-all"
-                        style={{ width: `${Math.max(4, Math.min(100, latestJob.progress.percent))}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
+          <div className="mt-4">
+            <SystemJobCard job={latestJob}>
             {updateBackupPath && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-spa-surface p-3 text-sm text-spa-text-secondary border border-spa-bg-secondary">
                 <Database className="h-4 w-4 shrink-0 text-spa-primary" />
@@ -585,31 +505,7 @@ export function UpdateSection({ onFeedback }: UpdateSectionProps) {
               </div>
             )}
 
-            {latestJob.error && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-spa-error/30 bg-spa-error-light p-3 text-sm text-spa-error-dark">
-                <ShieldAlert className="h-4 w-4 shrink-0" />
-                <span>
-                  {latestJob.error.message}
-                  {latestJob.error.requestId ? ` (Request-ID: ${latestJob.error.requestId})` : ''}
-                </span>
-              </div>
-            )}
-
-            {visibleJobLog.text && (
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-semibold text-spa-text-secondary">Job-Log</span>
-                  {visibleJobLog.truncated && (
-                    <span className="text-spa-text-secondary">
-                      Es werden nur die letzten 120 Logzeilen angezeigt.
-                    </span>
-                  )}
-                </div>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-[#111827] p-3 text-xs text-[#e5e7eb]">
-                  {visibleJobLog.text}
-                </pre>
-              </div>
-            )}
+            </SystemJobCard>
           </div>
         )}
       </div>

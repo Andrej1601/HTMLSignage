@@ -2,6 +2,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Settings, Monitor, Image, Flame, Presentation, Users, LogOut, Menu, X, Search, Sun, Moon } from 'lucide-react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useCommandPaletteContext } from '@/contexts/CommandPaletteContext';
+import { KeyboardShortcutsDialog, useKeyboardShortcutsDialog } from '@/components/KeyboardShortcutsDialog';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +12,7 @@ import { useMemo, useState } from 'react';
 import { WifiOff } from 'lucide-react';
 import { useWebSocketStatus } from '@/contexts/WebSocketContext';
 import { useThemeMode } from '@/hooks/useThemeMode';
+import { hasAnyDirty } from '@/hooks/useDirtyRegistry';
 
 interface NavItem {
   name: string;
@@ -44,7 +47,7 @@ function NavSections({
       {sections.map((section) => (
         <div key={section.key} className="space-y-1.5">
           <div className="px-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/85">
               {section.title}
             </p>
           </div>
@@ -62,7 +65,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { isConnected: wsConnected } = useWebSocketStatus();
   const { effectiveTheme, setMode } = useThemeMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const commandPalette = useCommandPaletteContext();
+  const shortcuts = useKeyboardShortcutsDialog();
 
   const navigation = useMemo<NavItem[]>(() => {
     const roles = user?.roles ?? [];
@@ -172,9 +177,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setIsMobileMenuOpen(false);
   }
 
-  const handleLogout = async () => {
+  const performLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleLogout = async () => {
+    // Schutz vor versehentlichem Logout mit ungespeicherten Edits.
+    // Pages, die `usePageDirty(isDirty)` aufrufen, registrieren sich
+    // im Dirty-Registry — diese Last-Line-of-Defense fragt vor dem
+    // tatsächlichen `logout()`-Call nach (das `useBlocker`-System der
+    // Pages greift erst beim `navigate('/login')` und damit zu spät —
+    // der User wäre schon ausgeloggt, würde aber auf der Page bleiben).
+    if (hasAnyDirty()) {
+      setShowLogoutConfirm(true);
+      return;
+    }
+    await performLogout();
   };
 
   return (
@@ -193,7 +212,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Logo/Brand */}
           <div className="flex h-24 shrink-0 flex-col justify-center border-b border-white/10 px-5">
             <h1 className="text-lg font-bold tracking-tight">Signage Control Center</h1>
-            <p className="mt-1 text-xs text-white/70">
+            <p className="mt-1 text-xs text-white/85">
               Displays, Inhalte und Systembetrieb in einem Blick.
             </p>
           </div>
@@ -207,7 +226,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium">{user.username}</p>
-                  <p className="text-xs text-white/70">{user.roles[0]}</p>
+                  <p className="text-xs text-white/85">{user.roles[0]}</p>
                 </div>
               </div>
             </div>
@@ -258,18 +277,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Search + Theme + Logout */}
           <div className="shrink-0 border-t border-white/10 px-2 py-4 space-y-1">
             <button
+              type="button"
               onClick={commandPalette.open}
-              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <span className="flex items-center">
                 <Search className="mr-3 shrink-0 h-5 w-5" />
                 Suche
               </span>
-              <kbd className="text-[10px] text-white/40 border border-white/20 rounded px-1.5 py-0.5">⌘K</kbd>
+              <kbd className="text-[10px] text-white/85 border border-white/30 rounded px-1.5 py-0.5">⌘K</kbd>
             </button>
             <button
+              type="button"
               onClick={() => setMode(effectiveTheme === 'dark' ? 'light' : 'dark')}
-              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               aria-label={effectiveTheme === 'dark' ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}
             >
               {effectiveTheme === 'dark'
@@ -279,8 +300,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {effectiveTheme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
             </button>
             <button
+              type="button"
               onClick={handleLogout}
-              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors"
+              className="group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-xl text-white/90 hover:bg-spa-surface/10 hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <LogOut className="mr-3 shrink-0 h-5 w-5" />
               Abmelden
@@ -292,8 +314,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex h-16 items-center border-b border-white/10 bg-spa-primary text-white shadow-lg">
         <button
+          type="button"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-md hover:bg-spa-primary-light"
+          className="p-2 rounded-md hover:bg-spa-primary-light focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           aria-label={isMobileMenuOpen ? 'Menü schließen' : 'Menü öffnen'}
           aria-expanded={isMobileMenuOpen}
         >
@@ -303,10 +326,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="h-6 w-6" aria-hidden="true" />
           )}
         </button>
+        {/* Mobile Top-Bar Brand: bewusst KEIN <h1> — die Page setzt
+            ihren eigenen <h1>. Doppelte H1s verwirren Screenreader-
+            Navigation (a11y). Wir nutzen ein semantisches
+            `<header role="banner">`-Markup mit normaler Schrift. */}
         <div className="ml-4 flex-1">
-          <h1 className="text-xl font-bold">HTMLSignage</h1>
+          <p className="text-xl font-bold leading-tight">Signage Control Center</p>
           {activeNavigation && (
-            <p className="mt-0.5 text-[11px] text-white/80">{activeNavigation.name}</p>
+            <p className="mt-0.5 text-[11px] text-white/90">{activeNavigation.name}</p>
           )}
         </div>
         {!wsConnected && (
@@ -334,7 +361,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium">{user.username}</p>
-                      <p className="text-xs text-white/70">{user.roles[0]}</p>
+                      <p className="text-xs text-white/85">{user.roles[0]}</p>
                     </div>
                   </div>
                 </div>
@@ -363,7 +390,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         <Icon className="mr-3 h-6 w-6 shrink-0" />
                         <div className="min-w-0">
                           <p>{item.name}</p>
-                          <p className="mt-0.5 text-xs text-white/65">{item.description}</p>
+                          <p className="mt-0.5 text-xs text-white/85">{item.description}</p>
                         </div>
                       </Link>
                     );
@@ -374,11 +401,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {/* Logout Button */}
               <div className="shrink-0 px-2 py-4 border-t border-spa-primary-light">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors"
+                  className="group flex w-full items-center px-3 py-3 text-base font-medium rounded-md text-white/90 hover:bg-spa-primary-light hover:text-white transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                 >
                   <LogOut className="mr-3 shrink-0 h-6 w-6" />
                   Abmelden
@@ -399,6 +427,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <CommandPalette isOpen={commandPalette.isOpen} onClose={commandPalette.close} />
+        <KeyboardShortcutsDialog isOpen={shortcuts.isOpen} onClose={shortcuts.close} />
+        <ConfirmDialog
+          isOpen={showLogoutConfirm}
+          title="Ungespeicherte Änderungen"
+          message="Es gibt ungespeicherte Änderungen. Wirklich abmelden?"
+          confirmLabel="Abmelden"
+          variant="warning"
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            void performLogout();
+          }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
       </div>
     </div>
   );

@@ -17,10 +17,10 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 
 // Configure storage
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     cb(null, UPLOAD_DIR);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueSuffix = randomBytes(16).toString('hex');
     const ext = path.extname(file.originalname);
     cb(null, `${uniqueSuffix}${ext}`);
@@ -28,7 +28,7 @@ const storage = multer.diskStorage({
 });
 
 // File filter
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   // Allowed mime types
   const allowedMimeTypes = [
     // Images

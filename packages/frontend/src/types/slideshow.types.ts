@@ -1,4 +1,24 @@
 // Slideshow Configuration Types
+//
+// Atomic unions (SlideType, LayoutType, VideoPlaybackMode, MediaFitMode,
+// TransitionType) live in @htmlsignage/shared — re-exported here so
+// existing FE imports keep working while having a single source of truth.
+
+import type {
+  SlideType,
+  LayoutType,
+  VideoPlaybackMode,
+  MediaFitMode,
+  TransitionType,
+} from '@htmlsignage/shared/settings';
+
+export type {
+  SlideType,
+  LayoutType,
+  VideoPlaybackMode,
+  MediaFitMode,
+  TransitionType,
+};
 
 export interface SlideshowDefinition {
   id: string;
@@ -10,32 +30,6 @@ export interface SlideshowDefinition {
   deviceCount?: number;
   assignedDevices?: Array<{ id: string; name: string }>;
 }
-
-// Slide types
-export type SlideType =
-  | 'content-panel' // Persistent content panel (e.g. schedule grid)
-  | 'sauna-detail' // Individual sauna with info
-  | 'media-image' // Image from media library
-  | 'media-video' // Video from media library
-  | 'infos' // Info panel (wellness tips, house rules, etc.)
-  | 'events'; // Events panel
-
-// Layout options for the slideshow display
-export type LayoutType =
-  | 'split-view' // Persistent panel + rotating content
-  | 'full-rotation' // Full screen rotation of all slides
-  | 'triple-view' // 1 left, 2 right (stacked) - Dashboard style
-  | 'grid-2x2'; // 4 items in 2x2 grid
-
-// Video playback behavior
-export type VideoPlaybackMode =
-  | 'duration' // Play for specified duration (loop if needed)
-  | 'complete' // Play until video ends
-  | 'loop-duration'; // Loop video for duration
-
-export type MediaFitMode =
-  | 'cover' // Fill available area, may crop edges
-  | 'contain'; // Show full media, may add letterboxing
 
 // Zone types
 export type ZoneType =
@@ -52,30 +46,52 @@ export interface Zone {
   size?: number; // percentage (30-70) for persistent zones
 }
 
-// Individual slide configuration
-export interface SlideConfig {
-  id: string;
+// Individual slide configuration — discriminated union.
+// Variant-specific fields are required on the matching variant only; consumers
+// must narrow by `slide.type` before reading variant-specific fields.
+export type {
+  ContentPanelSlide,
+  SaunaDetailSlide,
+  MediaImageSlide,
+  MediaVideoSlide,
+  InfosSlide,
+  EventsSlide,
+} from '@htmlsignage/shared/settings';
+
+import type {
+  SlideConfigShared,
+  VideoPlaybackMode as _VideoPlaybackMode,
+  MediaFitMode as _MediaFitMode,
+  TransitionType as _TransitionType,
+} from '@htmlsignage/shared/settings';
+
+export type SlideConfig = SlideConfigShared;
+
+/**
+ * Editor-internal form state — flat, all-optional variant fields. The editor
+ * keeps this looser shape because the user is mid-edit and partial state is
+ * expected. On save, the form is collapsed into the strict DU `SlideConfig`
+ * via a runtime type/check that lives in the editor.
+ */
+export interface SlideFormData {
   type: SlideType;
   enabled: boolean;
-  duration: number; // seconds
+  duration: number;
   order: number;
-  zoneId?: string; // Which zone this slide belongs to (for multi-zone layouts)
-
-  // Type-specific config
-  saunaId?: string; // For sauna-detail
-  mediaId?: string; // For media-image, media-video
-  videoPlayback?: VideoPlaybackMode; // For media-video
-  mediaFit?: MediaFitMode; // For media-image, media-video
-  infoId?: string; // For infos
-
-  // Display options
-  title?: string; // Custom title override
+  zoneId?: string;
+  saunaId?: string;
+  mediaId?: string;
+  videoPlayback?: _VideoPlaybackMode;
+  mediaFit?: _MediaFitMode;
+  infoId?: string;
+  title?: string;
   showTitle?: boolean;
-  transition?: 'fade' | 'slide' | 'zoom' | 'none';
-
-  // Advanced
+  transition?: _TransitionType;
   customCss?: string;
   notes?: string;
+  daysOfWeek?: number[];
+  visibleFrom?: string;
+  visibleTo?: string;
 }
 
 // Slideshow configuration
@@ -86,8 +102,9 @@ export interface SlideshowConfig {
 
   // Global settings
   defaultDuration: number; // seconds
-  defaultTransition: 'fade' | 'slide' | 'zoom' | 'none';
+  defaultTransition: import('@htmlsignage/shared/settings').TransitionType;
   enableTransitions: boolean;
+  transitionDuration?: number; // transition speed in seconds (0.2–1.5), default 0.6
 
   // Persistent zone settings (for layouts with persistent panel)
   persistentZonePosition?: 'left' | 'right' | 'top' | 'bottom';
@@ -99,8 +116,39 @@ export interface SlideshowConfig {
   // Design override (per-slideshow, used for event slideshows)
   displayAppearance?: import('@/types/settings.types').DisplayAppearance;
   designStyle?: import('@/types/settings.types').DesignStyle;
+  saunaDetailStyle?: import('@/types/settings.types').SaunaDetailStyle;
   colorPalette?: import('@/types/settings.types').ColorPaletteName;
   theme?: Partial<import('@/types/settings.types').ThemeColors>;
+  /**
+   * Per-slideshow design-pack override. When set, this pack is used for
+   * the slideshow regardless of the global `display.designPackId`. Lets
+   * the same display swap between completely different visual identities
+   * (e.g. event slideshow vs. standard) without per-device hacks.
+   */
+  designPackId?: string;
+  /**
+   * Per-slideshow design-pack token overrides. Layered on top of the
+   * pack's `defaultTokens` and on top of the theme-derived overrides
+   * emitted by `themeToTokenOverrides`. Use this for tenant-specific
+   * tweaks (e.g. brand colour accents, tighter/looser spacing) without
+   * code deploys.
+   */
+  tokenOverrides?: import('@htmlsignage/design-sdk').DesignTokenOverrides;
+  /**
+   * Partial override for the display's header/branding strip. Missing
+   * fields fall through to the global `settings.header`. Use for
+   * per-tenant / per-event branding (e.g. different logo text on an
+   * event-specific slideshow) without touching the global config.
+   */
+  header?: Partial<import('@/types/settings.types').HeaderSettings>;
+  /**
+   * Partial override for the maintenance screen shown when the display
+   * runtime goes into maintenance mode. Missing fields fall through to
+   * `settings.maintenanceScreen`. Lets you ship slideshow-specific
+   * maintenance copy (e.g. different language / event branding) without
+   * touching the global default.
+   */
+  maintenanceScreen?: Partial<import('@/types/settings.types').MaintenanceScreenSettings>;
 
   // Advanced
   pauseOnInteraction?: boolean;
@@ -284,6 +332,7 @@ export function createDefaultSlideshowConfig(): SlideshowConfig {
     defaultDuration: 10,
     defaultTransition: 'fade',
     enableTransitions: true,
+    transitionDuration: 0.6,
     persistentZonePosition: 'left',
     persistentZoneSize: 50,
     pauseOnInteraction: false,
@@ -301,13 +350,73 @@ export function getSlideTypeOption(type: SlideType): SlideTypeOption | undefined
   return SLIDE_TYPE_OPTIONS.find((opt) => opt.type === type);
 }
 
-export function getEffectiveMediaFit(slide: Pick<SlideConfig, 'type' | 'mediaFit'>): MediaFitMode {
+/** Resolves the media-fit for image/video slides; default depends on type. */
+export function getEffectiveMediaFit(
+  slide: { type: SlideType; mediaFit?: import('@htmlsignage/shared/settings').MediaFitMode },
+): MediaFitMode {
   if (slide.mediaFit) return slide.mediaFit;
   return slide.type === 'media-video' ? 'contain' : 'cover';
 }
 
 export function getEnabledSlides(config: SlideshowConfig): SlideConfig[] {
   return config.slides.filter((slide) => slide.enabled).sort((a, b) => a.order - b.order);
+}
+
+/** The duration a slide actually rotates for — used by both the rotation timer
+ *  and the progress indicator so the bar can't desync from the timer. */
+export function getEffectiveSlideDuration(
+  slide: { duration?: number } | null | undefined,
+  defaultDuration?: number,
+): number {
+  return slide?.duration || defaultDuration || 10;
+}
+
+function parseHHMM(value: string | undefined): number | null {
+  if (!value) return null;
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+/**
+ * Whether a slide's optional visibility window (daysOfWeek + visibleFrom/To)
+ * matches `now`. No window set → always true. The time window may wrap past
+ * midnight (e.g. 22:00–06:00).
+ */
+export function isSlideWithinSchedule(slide: SlideConfig, now: Date): boolean {
+  if (slide.daysOfWeek && slide.daysOfWeek.length > 0 && !slide.daysOfWeek.includes(now.getDay())) {
+    return false;
+  }
+  const from = parseHHMM(slide.visibleFrom);
+  const to = parseHHMM(slide.visibleTo);
+  if (from === null && to === null) return true;
+
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const start = from ?? 0;
+  const end = to ?? 24 * 60;
+  if (start <= end) {
+    return minutes >= start && minutes < end;
+  }
+  // Wraps past midnight: visible when after start OR before end.
+  return minutes >= start || minutes < end;
+}
+
+/** Context the rotation filter needs beyond the slide itself. */
+export interface SlideDisplayContext {
+  /** Whether the events slide currently has any live/upcoming events. */
+  hasEvents?: boolean;
+}
+
+/**
+ * Whether a slide should currently take part in the rotation: enabled, inside
+ * its schedule window, and (for events slides) actually has content. Keeps the
+ * rotation core decoupled from event internals — the caller computes hasEvents.
+ */
+export function isSlideDisplayable(slide: SlideConfig, now: Date, ctx: SlideDisplayContext = {}): boolean {
+  if (!slide.enabled) return false;
+  if (!isSlideWithinSchedule(slide, now)) return false;
+  if (slide.type === 'events' && ctx.hasEvents === false) return false;
+  return true;
 }
 
 export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex: number): SlideConfig[] {
@@ -319,9 +428,26 @@ export function reorderSlides(slides: SlideConfig[], fromIndex: number, toIndex:
   return result.map((slide, index) => ({ ...slide, order: index }));
 }
 
-// Zone helper functions
-export function getZonesForLayout(layoutType: LayoutType): Zone[] {
-  return getLayout(layoutType).zones;
+// Zone helper functions. The persistent zone's size/position come from the
+// static layout registry but can be overridden per-slideshow via
+// `persistentZoneSize` / `persistentZonePosition`.
+export function getZonesForLayout(
+  layoutType: LayoutType,
+  config?: Pick<SlideshowConfig, 'persistentZonePosition' | 'persistentZoneSize'>,
+): Zone[] {
+  const zones = getLayout(layoutType).zones;
+  if (!config || (!config.persistentZonePosition && typeof config.persistentZoneSize !== 'number')) {
+    return zones;
+  }
+  return zones.map((zone) => (
+    zone.id === 'persistent'
+      ? {
+          ...zone,
+          ...(config.persistentZonePosition ? { position: config.persistentZonePosition } : {}),
+          ...(typeof config.persistentZoneSize === 'number' ? { size: config.persistentZoneSize } : {}),
+        }
+      : zone
+  ));
 }
 
 export function getSlidesByZone(slides: SlideConfig[], zoneId: string): SlideConfig[] {

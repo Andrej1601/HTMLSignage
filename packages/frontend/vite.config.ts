@@ -41,7 +41,6 @@ export default defineConfig({
             { name: 'router-vendor', test: /\/node_modules\/(?:react-router(?:-dom)?|@remix-run\/router)\// },
             { name: 'query-vendor', test: /\/node_modules\/@tanstack\/(?:react-)?query(?:-core)?\// },
             { name: 'socket-vendor', test: /\/node_modules\/(?:socket\.io(?:-client)?|engine\.io(?:-client|-parser)?|@socket\.io)\// },
-            { name: 'animation-vendor', test: /\/node_modules\/framer-motion\// },
           ],
         },
       },

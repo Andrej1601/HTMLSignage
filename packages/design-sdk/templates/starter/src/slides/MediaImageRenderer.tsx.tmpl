@@ -1,0 +1,38 @@
+import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+
+/**
+ * {{DESIGN_NAME}} — media-image renderer.
+ *
+ * Starter stub: full-bleed image with the `fit` mode applied. Nothing
+ * else on top — the zone wrapper handles framing. Replace this with
+ * your pack's preferred full-screen image presentation if you want
+ * captions, overlays, or chrome.
+ */
+export function MediaImageRenderer({ data, tokens }: SlideRendererProps<'media-image'>) {
+  const { colors } = tokens;
+
+  if (!data.url) {
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center"
+        style={{ backgroundColor: colors.surface, color: colors.textSecondary }}
+      >
+        Kein Bild verfügbar.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="h-full w-full"
+      style={{ backgroundColor: colors.surface }}
+    >
+      <img
+        src={data.url}
+        alt={data.altText ?? ''}
+        className="h-full w-full"
+        style={{ objectFit: data.fit === 'contain' ? 'contain' : 'cover' }}
+      />
+    </div>
+  );
+}

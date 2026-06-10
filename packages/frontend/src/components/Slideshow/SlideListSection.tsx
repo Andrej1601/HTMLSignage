@@ -141,10 +141,11 @@ function SortableSlideItem({
 
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={() => onToggleEnabled(slide.id)}
           disabled={disabled}
           className={clsx(
-            'p-1.5 rounded-md transition-colors disabled:opacity-40',
+            'p-1.5 rounded-md transition-colors disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
             slide.enabled
               ? 'text-spa-primary hover:bg-spa-primary/10'
               : 'text-spa-text-secondary hover:bg-spa-bg-secondary'
@@ -156,9 +157,10 @@ function SortableSlideItem({
         </button>
 
         <button
+          type="button"
           onClick={() => onEdit(slide)}
           disabled={disabled}
-          className="p-1.5 text-spa-secondary hover:bg-spa-secondary/10 rounded-md transition-colors disabled:opacity-40"
+          className="p-1.5 text-spa-secondary hover:bg-spa-secondary/10 rounded-md transition-colors disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           title="Bearbeiten"
           aria-label="Slide bearbeiten"
         >
@@ -166,9 +168,10 @@ function SortableSlideItem({
         </button>
 
         <button
+          type="button"
           onClick={() => onDelete(slide.id)}
           disabled={disabled}
-          className="p-1.5 text-spa-error hover:bg-spa-error-light rounded-md transition-colors disabled:opacity-40"
+          className="p-1.5 text-spa-error hover:bg-spa-error-light rounded-md transition-colors disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
           title="Löschen"
           aria-label="Slide löschen"
         >

@@ -154,7 +154,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                     })
                   }
                   className={clsx(
-                    'flex items-center gap-0.5 px-3 py-2 rounded-xl border-2 transition-all',
+                    'flex items-center gap-0.5 px-3 py-2 rounded-xl border-2 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                     isSelected
                       ? 'border-spa-warning bg-spa-warning-light shadow-sm scale-105'
                       : 'border-spa-bg-secondary bg-spa-surface text-spa-text-secondary hover:border-spa-warning-light hover:bg-spa-warning-light/50'
@@ -177,7 +177,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
               <button
                 type="button"
                 onClick={() => setLocalEntry({ ...localEntry, flames: undefined })}
-                className="ml-auto text-xs text-spa-text-secondary/60 hover:text-spa-text-primary transition-colors px-2"
+                className="ml-auto text-xs text-spa-text-secondary/60 hover:text-spa-text-primary transition-colors px-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               >
                 Zurücksetzen
               </button>
@@ -221,7 +221,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                         type="button"
                         onClick={() => removeAroma(index)}
                         aria-label="Aroma entfernen"
-                        className="ml-0.5 hover:bg-spa-secondary/20 rounded-full p-0.5 transition-colors"
+                        className="ml-0.5 hover:bg-spa-secondary/20 rounded-full p-0.5 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -241,7 +241,7 @@ export function CellEditor({ entry, isOpen, onClose, onSave, onDelete, aromas = 
                     type="button"
                     onClick={() => toggleAroma(aroma)}
                     className={clsx(
-                      'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                      'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                       selected
                         ? 'bg-spa-secondary/20 text-spa-secondary-dark border-spa-secondary/40 shadow-sm'
                         : 'bg-spa-surface text-spa-text-secondary border-spa-bg-secondary hover:border-spa-secondary/40 hover:bg-spa-secondary/5'

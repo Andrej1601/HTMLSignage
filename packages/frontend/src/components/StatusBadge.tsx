@@ -43,6 +43,7 @@ export function StatusBadge({
     >
       {showDot && (
         <span
+          aria-hidden="true"
           className={clsx(
             'h-1.5 w-1.5 rounded-full',
             dotToneClasses[tone],

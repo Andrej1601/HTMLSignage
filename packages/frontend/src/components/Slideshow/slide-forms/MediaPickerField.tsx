@@ -32,10 +32,12 @@ export function MediaPickerField({
           <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
             {videos.map((video) => (
               <button
+                type="button"
                 key={video.id}
                 onClick={() => onSelect(video.id)}
+                aria-label={video.originalName}
                 className={clsx(
-                  'relative rounded-lg border-2 overflow-hidden transition-all group',
+                  'relative rounded-lg border-2 overflow-hidden transition-all group focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                   selectedId === video.id
                     ? 'border-spa-primary ring-2 ring-spa-primary'
                     : 'border-spa-bg-secondary hover:border-spa-primary/50'
@@ -46,7 +48,7 @@ export function MediaPickerField({
                     src={buildUploadUrl(video.filename)}
                     className="w-full h-full object-cover"
                     muted
-                    preload="metadata"
+                    preload="none"
                   />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/10 transition-colors">
                     <Film className="w-8 h-8 text-white" />
@@ -67,10 +69,11 @@ export function MediaPickerField({
         <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto">
           {images.map((img) => (
             <button
+              type="button"
               key={img.id}
               onClick={() => onSelect(img.id)}
               className={clsx(
-                'relative rounded-lg border-2 overflow-hidden transition-all',
+                'relative rounded-lg border-2 overflow-hidden transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
                 selectedId === img.id
                   ? 'border-spa-primary ring-2 ring-spa-primary'
                   : 'border-spa-bg-secondary hover:border-spa-primary/50'

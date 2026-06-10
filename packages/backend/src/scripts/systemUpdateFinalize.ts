@@ -129,7 +129,7 @@ function parseShellCommand(command: string): { cmd: string; args: string[] } | n
   }
 
   if (tokens.length === 0) return null;
-  return { cmd: tokens[0], args: tokens.slice(1) };
+  return { cmd: tokens[0]!, args: tokens.slice(1) };
 }
 
 async function failFinalizeJob(

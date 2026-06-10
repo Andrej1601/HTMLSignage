@@ -6,6 +6,12 @@ import { createServer } from 'http';
 import os from 'os';
 import crypto from 'crypto';
 import { Server as SocketIOServer } from 'socket.io';
+import type {
+  ClientToServerEvents,
+  InterServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from '@htmlsignage/shared/websocket';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -13,6 +19,8 @@ import cookieParser from 'cookie-parser';
 import { prisma } from './lib/prisma.js';
 import { startMaintenanceScheduler, stopMaintenanceScheduler } from './lib/maintenance.js';
 import { setupWebSocket } from './websocket/index.js';
+import { csrfTokensMatch } from './lib/auth.js';
+import { errorHandler } from './lib/errorHandler.js';
 import { UPLOAD_DIR } from './lib/upload.js';
 import scheduleRouter from './routes/schedule.js';
 import settingsRouter from './routes/settings.js';
@@ -25,6 +33,7 @@ import saunasRouter from './routes/saunas.js';
 import palettesRouter from './routes/palettes.js';
 import slideshowWorkflowRouter from './routes/slideshowWorkflow.js';
 import slideshowsRouter from './routes/slideshows.js';
+import telemetryRouter from './routes/telemetry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,10 +93,19 @@ const corsOptions = {
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
+  // Expose CSRF token + request id to the SPA so the cross-origin frontend
+  // can read them from response headers (document.cookie cannot see cookies
+  // set by a different origin).
+  exposedHeaders: ['X-CSRF-Token', 'X-Request-ID'],
 };
 
-// Socket.IO Setup
-export const io = new SocketIOServer(httpServer, {
+// Socket.IO Setup — typed against the shared event contract.
+export const io = new SocketIOServer<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>(httpServer, {
   cors: corsOptions,
 });
 
@@ -104,16 +122,18 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// CSRF protection via custom header check for cookie-based auth
+// CSRF protection via Double-Submit-Cookie pattern (timing-safe header == cookie)
 app.use((req, res, next) => {
   const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   if (isMutation && req.cookies?.auth_token) {
-    const csrfToken = req.headers['x-csrf-token'];
-    if (!csrfToken || typeof csrfToken !== 'string' || !csrfToken.trim()) {
-      return res.status(403).json({
-        error: 'csrf-token-missing',
-        message: 'CSRF token required for mutation requests.',
+    const headerToken = req.headers['x-csrf-token'];
+    const cookieToken = req.cookies?.csrf_token;
+    if (!csrfTokensMatch(headerToken, cookieToken)) {
+      res.status(403).json({
+        error: 'csrf-token-invalid',
+        message: 'CSRF token missing or invalid.',
       });
+      return;
     }
   }
   next();
@@ -155,7 +175,7 @@ app.use('/uploads', (req, res, next) => {
   }
   next();
 }, express.static(UPLOAD_DIR, {
-  dotfiles: 'allow',
+  dotfiles: 'deny',
   immutable: true,
   maxAge: '30d',
   setHeaders: (res, filePath) => {
@@ -167,7 +187,7 @@ app.use('/uploads', (req, res, next) => {
 }));
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -183,24 +203,10 @@ app.use('/api/saunas', saunasRouter);
 app.use('/api/palettes', palettesRouter);
 app.use('/api/slideshow', slideshowWorkflowRouter);
 app.use('/api/slideshows', slideshowsRouter);
+app.use('/api/telemetry', telemetryRouter);
 
-// Error handler
-app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const requestId = (req as typeof req & { requestId?: string }).requestId || null;
-  console.error(JSON.stringify({
-    type: 'http_error',
-    requestId,
-    method: req.method,
-    path: req.path,
-    message: err.message,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-  }));
-  res.status(500).json({ 
-    error: 'internal-server-error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An error occurred',
-    requestId,
-  });
-});
+// Central error handler — normalises Zod / AppError / Prisma / unknown errors.
+app.use(errorHandler);
 
 // WebSocket Setup
 setupWebSocket(io);

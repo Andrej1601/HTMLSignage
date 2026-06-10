@@ -2,9 +2,15 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from '@htmlsignage/shared/websocket';
 import { API_URL } from '@/config/env';
 import { ENV_IS_DEV } from '@/config/env';
 import { WS_RECONNECT } from '@/utils/constants';
+
+type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 interface UseWebSocketOptions {
   url?: string;
@@ -14,6 +20,12 @@ interface UseWebSocketOptions {
   onDeviceCommand?: (command: string) => void;
   onDeviceUpdate?: (data: Record<string, unknown>) => void;
   onBulkDeviceUpdate?: (devices: Record<string, unknown>[]) => void;
+  /** Slideshow created/updated/deleted. Display-Clients re-fetch their
+   *  effective config; Admin-UIs invalidate their slideshow caches. */
+  onSlideshowUpdate?: (data: { id: string; action?: string }) => void;
+  /** Media uploaded/deleted/retagged. Display-Clients reload their media list;
+   *  Admin-UIs invalidate their media cache. Replaces 5-minute HTTP polling. */
+  onMediaUpdate?: (data: { action?: string }) => void;
   /** Called after a WebSocket reconnect so stale data can be refetched. */
   onReconnect?: () => void;
 }
@@ -37,12 +49,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceCommand,
     onDeviceUpdate,
     onBulkDeviceUpdate,
+    onSlideshowUpdate,
+    onMediaUpdate,
     onReconnect,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const socketRef = useRef<TypedSocket | null>(null);
   const connectPromiseRef = useRef<Promise<void> | null>(null);
   const disconnectRequestedRef = useRef(false);
 
@@ -53,6 +67,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const onDeviceCommandRef = useRef(onDeviceCommand);
   const onDeviceUpdateRef = useRef(onDeviceUpdate);
   const onBulkDeviceUpdateRef = useRef(onBulkDeviceUpdate);
+  const onSlideshowUpdateRef = useRef(onSlideshowUpdate);
+  const onMediaUpdateRef = useRef(onMediaUpdate);
   const onReconnectRef = useRef(onReconnect);
 
   useEffect(() => {
@@ -61,6 +77,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     onDeviceCommandRef.current = onDeviceCommand;
     onDeviceUpdateRef.current = onDeviceUpdate;
     onBulkDeviceUpdateRef.current = onBulkDeviceUpdate;
+    onSlideshowUpdateRef.current = onSlideshowUpdate;
+    onMediaUpdateRef.current = onMediaUpdate;
     onReconnectRef.current = onReconnect;
   });
 
@@ -82,13 +100,22 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     }
 
     connectPromiseRef.current = (async () => {
-      const { io } = await loadSocketIoClient();
+      let io: Awaited<ReturnType<typeof loadSocketIoClient>>['io'];
+      try {
+        ({ io } = await loadSocketIoClient());
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Socket.IO client failed to load';
+        console.error('[WebSocket] Client load failed:', err);
+        setIsConnected(false);
+        setError(message);
+        return;
+      }
 
       if (disconnectRequestedRef.current || socketRef.current) {
         return;
       }
 
-      const socket = io(url, {
+      const socket: TypedSocket = io(url, {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: WS_RECONNECT.delayMs,
@@ -129,21 +156,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       });
 
       // Keep listeners stable via refs without reconnecting on each render.
-      socket.off('schedule:updated').on('schedule:updated', (data: Schedule) => {
+      // Event payload types are inferred from the typed Socket — schema drift
+      // breaks the build at compile time instead of runtime.
+      socket.off('schedule:updated').on('schedule:updated', (data) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Schedule updated:', data);
         }
-        onScheduleUpdateRef.current?.(data);
+        onScheduleUpdateRef.current?.(data as Schedule);
       });
 
-      socket.off('settings:updated').on('settings:updated', (data: Settings) => {
+      socket.off('settings:updated').on('settings:updated', (data) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Settings updated:', data);
         }
-        onSettingsUpdateRef.current?.(data);
+        onSettingsUpdateRef.current?.(data as Settings);
       });
 
-      socket.off('device:command').on('device:command', (data: { command?: string }) => {
+      socket.off('device:command').on('device:command', (data) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Device command:', data);
         }
@@ -152,7 +181,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
       });
 
-      socket.off('device:updated').on('device:updated', (data: Record<string, unknown>) => {
+      socket.off('device:updated').on('device:updated', (data) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Device updated:', data);
         }
@@ -164,11 +193,25 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
       });
 
-      socket.off('devices:bulk-updated').on('devices:bulk-updated', (devices: Record<string, unknown>[]) => {
+      socket.off('devices:bulk-updated').on('devices:bulk-updated', (devices) => {
         if (ENV_IS_DEV) {
           console.log('[WebSocket] Bulk device update:', devices.length, 'devices');
         }
         onBulkDeviceUpdateRef.current?.(devices);
+      });
+
+      socket.off('slideshow:updated').on('slideshow:updated', (data) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Slideshow update:', data);
+        }
+        onSlideshowUpdateRef.current?.(data);
+      });
+
+      socket.off('media:updated').on('media:updated', (data) => {
+        if (ENV_IS_DEV) {
+          console.log('[WebSocket] Media update:', data);
+        }
+        onMediaUpdateRef.current?.(data);
       });
 
       socketRef.current = socket;

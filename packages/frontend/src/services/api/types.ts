@@ -21,7 +21,6 @@ export interface ScheduleHistoryItem {
 
 export interface DeviceOverridesPayload {
   schedule?: Schedule;
-  settings?: Partial<Settings>;
 }
 
 export interface DeviceDisplayConfigResponse {
@@ -29,7 +28,6 @@ export interface DeviceDisplayConfigResponse {
   maintenanceMode: boolean;
   mode: 'auto' | 'override';
   hasScheduleOverride: boolean;
-  hasSettingsOverride: boolean;
   schedule: Schedule;
   settings: Settings;
 }

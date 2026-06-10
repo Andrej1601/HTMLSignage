@@ -1,0 +1,24 @@
+{
+  "name": "@htmlsignage/design-aurora-thermal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Aurora Thermal — Goldene-Stunde-Atmosphäre für die Saunawelt. Warmes Charcoal, Messing-Akzente, großzügige Serif-Typografie.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@htmlsignage/design-sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "typescript": "^6.0.2"
+  }
+}

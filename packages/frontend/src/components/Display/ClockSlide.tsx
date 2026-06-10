@@ -30,7 +30,7 @@ export function ClockSlide({ settings }: ClockSlideProps) {
 
   return (
     <div
-      className="w-full h-screen flex flex-col items-center justify-center"
+      className="w-full h-full flex flex-col items-center justify-center"
       style={{
         backgroundColor: theme.bg,
         color: theme.fg,

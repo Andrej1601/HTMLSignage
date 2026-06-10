@@ -33,7 +33,6 @@ export interface SlidePaddingOptions {
 
 export interface DisplayLayoutContext {
   currentTime: Date;
-  displayAppearance: string;
   designStyle: string;
   displayDeviceId?: string;
   effectiveSettings: Settings;
@@ -59,7 +58,6 @@ export interface DisplayLayoutContext {
 
 export interface DisplayLayoutRendererProps {
   currentTime: Date;
-  displayAppearance: string;
   designStyle: string;
   displayDeviceId?: string;
   effectiveSettings: Settings;

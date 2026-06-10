@@ -6,11 +6,18 @@ import {
   getZonesForLayout,
   getSlidesByZone,
   shouldZoneRotate,
+  isSlideDisplayable,
 } from '@/types/slideshow.types';
-import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import type { SlideConfig } from '@/types/slideshow.types';
 import type { Media } from '@/types/media.types';
+import { hasDisplayableEvents } from '@/components/Display/eventsSlideUtils';
 import { buildUploadUrl } from '@/utils/mediaUrl';
 import { ENV_IS_DEV } from '@/config/env';
+
+// Hard cap for `videoPlayback: 'complete'` — if a video's onEnded never fires
+// (stall, codec error, dropped stream) the zone advances anyway after this.
+// Generous so it never cuts off a legitimately long clip, only a stuck one.
+const VIDEO_COMPLETE_SAFETY_MS = 15 * 60 * 1000;
 
 interface UseSlideshowOptions {
   settings: Settings;
@@ -56,8 +63,37 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
     [settings.slideshow]
   );
   // Important: memoize derived arrays so unrelated re-renders (e.g. pairing polling) don't reset timers.
-  const slides = useMemo(() => getEnabledSlides(slideshowConfig), [slideshowConfig]);
-  const zones = useMemo(() => getZonesForLayout(slideshowConfig.layout), [slideshowConfig.layout]);
+  const enabledSlides = useMemo(() => getEnabledSlides(slideshowConfig), [slideshowConfig]);
+  const zones = useMemo(
+    () => getZonesForLayout(slideshowConfig.layout, {
+      persistentZonePosition: slideshowConfig.persistentZonePosition,
+      persistentZoneSize: slideshowConfig.persistentZoneSize,
+    }),
+    [slideshowConfig.layout, slideshowConfig.persistentZonePosition, slideshowConfig.persistentZoneSize],
+  );
+
+  // Schedule clock: re-evaluate per-slide visibility windows (and event
+  // availability) on a 30s cadence so slides appear/disappear at their bounds.
+  const [scheduleNow, setScheduleNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setScheduleNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const hasEvents = useMemo(() => hasDisplayableEvents(settings, scheduleNow), [settings, scheduleNow]);
+
+  // Visible slides = enabled ∩ schedule window ∩ (events have content). Kept at
+  // a STABLE array identity while the membership is unchanged, so the 30s clock
+  // ticks don't churn rotation timers/indexes — only an actual visibility
+  // change produces a new array.
+  const computedVisible = useMemo(
+    () => enabledSlides.filter((slide) => isSlideDisplayable(slide, scheduleNow, { hasEvents })),
+    [enabledSlides, scheduleNow, hasEvents],
+  );
+  const [slides, setSlides] = useState<SlideConfig[]>(computedVisible);
+  if (slides.length !== computedVisible.length || slides.some((s, i) => s !== computedVisible[i])) {
+    setSlides(computedVisible);
+  }
 
   // Track current slide index per zone
   const [zoneSlideIndexes, setZoneSlideIndexes] = useState<Record<string, number>>(() => {
@@ -103,7 +139,6 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
   // Per-zone timers: zones must advance independently (a change in one zone must not reset others).
   const zoneTimersRef = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
   const zoneTimerKeysRef = useRef<Record<string, string | undefined>>({});
-  const lastTimerConfigRef = useRef<{ slides: SlideConfig[]; zones: Zone[]; defaultDuration: number } | null>(null);
 
   const clearAllZoneTimers = useCallback(() => {
     Object.values(zoneTimersRef.current).forEach((t) => {
@@ -231,7 +266,7 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
           type: s.type,
           id: s.id,
           enabled: s.enabled,
-          saunaId: s.saunaId || 'N/A',
+          saunaId: s.type === 'sauna-detail' ? s.saunaId : 'N/A',
           duration: s.duration,
         })),
       };
@@ -263,20 +298,14 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
       delete zoneTimerKeysRef.current[zoneId];
     };
 
-    const timerConfigChanged =
-      !lastTimerConfigRef.current ||
-      lastTimerConfigRef.current.slides !== slides ||
-      lastTimerConfigRef.current.zones !== zones ||
-      lastTimerConfigRef.current.defaultDuration !== (slideshowConfig.defaultDuration || 0);
-
-    if (timerConfigChanged) {
-      clearAllZoneTimers();
-      lastTimerConfigRef.current = {
-        slides,
-        zones,
-        defaultDuration: slideshowConfig.defaultDuration || 0,
-      };
-    }
+    // Note: we used to call `clearAllZoneTimers()` whenever the
+    // `slides` array reference changed. That was way too aggressive —
+    // every parent settings-update produces a new array reference even
+    // when the actual slide list is unchanged (true for the embedded
+    // settings preview, where `migrateSettings` always returns a new
+    // object). The per-zone loop below already handles the real change
+    // cases via `timerKey === ${slide.id}:${duration}` — same key →
+    // keep timer running, different key → reset. Trust it.
 
     if (!enabled || isPaused || slides.length === 0) {
       clearAllZoneTimers();
@@ -298,14 +327,28 @@ export function useSlideshow({ settings, enabled = true, media }: UseSlideshowOp
         return;
       }
 
-      // For videos set to play until complete, wait for video to end
+      // For videos set to play until complete, wait for the video's onEnded —
+      // but arm a generous safety timer so a stalled / never-ending video
+      // (codec error, dropped stream, onEnded never firing) can't freeze the
+      // zone forever. Normal completion advances the slide and clears this.
       if (
         slide.type === 'media-video' &&
         slide.videoPlayback === 'complete' &&
         !videoEndedRefs.current[zone.id]
       ) {
+        const safetyKey = `${slide.id}:video-safety`;
+        if (zoneTimerKeysRef.current[zone.id] === safetyKey && zoneTimersRef.current[zone.id]) {
+          return; // safety timer already armed for this video
+        }
         clearZoneTimer(zone.id);
-        return; // Don't set timer, wait for onVideoEnded
+        zoneTimerKeysRef.current[zone.id] = safetyKey;
+        zoneTimersRef.current[zone.id] = setTimeout(() => {
+          if (isDev) {
+            console.warn(`[useSlideshow] Video in zone "${zone.id}" did not end within safety cap — advancing`);
+          }
+          nextSlide(zone.id);
+        }, VIDEO_COMPLETE_SAFETY_MS);
+        return;
       }
 
       const durationSec = slide.duration || slideshowConfig.defaultDuration || 10; // Default to config/global duration

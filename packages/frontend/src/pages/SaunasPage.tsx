@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Layout } from '@/components/Layout';
 import { SkeletonCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -8,11 +8,14 @@ import type { Sauna } from '@/types/sauna.types';
 import { createEmptySauna, getVisibleSaunas } from '@/types/sauna.types';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { StaleVersionBanner } from '@/components/StaleVersionBanner';
 import { Plus, Save, RefreshCw, Flame, Info } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
 import { useSettings } from '@/hooks/useSettings';
+import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 import { usePermission } from '@/hooks/usePermission';
 import { SAUNA_STATUS_LABELS, SAUNA_STATUS_COLORS } from '@/types/sauna.types';
 import api from '@/services/api';
@@ -43,6 +46,10 @@ export function SaunasPage() {
   const [deletingSaunaId, setDeletingSaunaId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  // Server-Version, mit der wir lokal arbeiten — wird gesetzt, sobald wir
+  // initial laden. Stale-Detection vergleicht das mit `settings.version`.
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
+  const [staleDismissedForVersion, setStaleDismissedForVersion] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -59,37 +66,61 @@ export function SaunasPage() {
     [sortedSaunas],
   );
 
-  // Initialize local saunas from settings only once
+  // Initialize local saunas from settings only once. We deliberately do
+  // NOT inject default saunas here — that would set isDirty=true on first
+  // load and trick the user into thinking they had unsaved changes. The
+  // empty-state below now offers an explicit "Beispiele anlegen" action.
   if (!isInitialized && settings) {
     setIsInitialized(true);
-    if (settings.saunas && settings.saunas.length > 0) {
-      setLocalSaunas(settings.saunas);
-    } else {
-      // Initialize with default saunas if none exist
-      // IMPORTANT: Only set local state, don't auto-save to prevent overwriting accidentally lost data
-      // User must explicitly click Save to persist defaults
-      const defaultSaunas: Sauna[] = [
-        {
-          id: generateId(),
-          name: 'Finnische Sauna',
-          status: 'active',
-          order: 0,
-          color: '#10b981',
-          info: { temperature: 90, humidity: 10, capacity: 12 },
-        },
-        {
-          id: generateId(),
-          name: 'Bio Sauna',
-          status: 'active',
-          order: 1,
-          color: '#3b82f6',
-          info: { temperature: 60, humidity: 40, capacity: 8 },
-        },
-      ];
-      setLocalSaunas(defaultSaunas);
-      setIsDirty(true); // Mark as dirty so user can save
-    }
+    setLocalSaunas(settings.saunas ?? []);
+    setLoadedVersion(settings.version ?? null);
   }
+
+  // Wenn die Liste nicht dirty ist und ein neuer Server-Stand kommt,
+  // synchronisieren wir lautlos. Bei dirty wird stattdessen der Banner
+  // angezeigt — der User entscheidet aktiv.
+  const settingsVersion = settings?.version ?? null;
+  if (
+    isInitialized &&
+    settings &&
+    !isDirty &&
+    typeof settingsVersion === 'number' &&
+    settingsVersion !== loadedVersion
+  ) {
+    setLocalSaunas(settings.saunas ?? []);
+    setLoadedVersion(settingsVersion);
+    setStaleDismissedForVersion(null);
+  }
+
+  const isStale =
+    isDirty &&
+    typeof settingsVersion === 'number' &&
+    typeof loadedVersion === 'number' &&
+    settingsVersion > loadedVersion &&
+    staleDismissedForVersion !== settingsVersion;
+
+  const handleAddExampleSaunas = () => {
+    const defaultSaunas: Sauna[] = [
+      {
+        id: generateId(),
+        name: 'Finnische Sauna',
+        status: 'active',
+        order: 0,
+        color: '#10b981',
+        info: { temperature: 90, humidity: 10, capacity: 12 },
+      },
+      {
+        id: generateId(),
+        name: 'Bio Sauna',
+        status: 'active',
+        order: 1,
+        color: '#3b82f6',
+        info: { temperature: 60, humidity: 40, capacity: 8 },
+      },
+    ];
+    setLocalSaunas(defaultSaunas);
+    setIsDirty(true);
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -113,6 +144,18 @@ export function SaunasPage() {
   const handleAddSauna = () => {
     setIsAddingNew(true);
   };
+
+  // Quick-Action-Hook: Command-Palette navigiert mit `#add` hierher,
+  // wir öffnen den Add-Dialog direkt und putzen den Hash, damit ein
+  // Reload nicht erneut triggert. Set-State im Effect ist hier
+  // beabsichtigt (one-shot Mount-Handler).
+  useEffect(() => {
+    if (window.location.hash === '#add') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mount-time hash trigger
+      setIsAddingNew(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   const handleSaveNew = (saunaData: Omit<Sauna, 'id'>) => {
     const newSauna: Sauna = {
@@ -153,16 +196,23 @@ export function SaunasPage() {
     };
 
     save(updatedSettings, {
-      onSuccess: () => {
+      onSuccess: (response) => {
         setIsDirty(false);
-        // Don't refetch - we already have the latest state
+        toast.success(`Saunen gespeichert (v${response?.version ?? updatedSettings.version}).`);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
       },
     });
   };
 
+  useSaveShortcut(handleSaveAll, { enabled: !isSaving, isDirty });
+  useDirtyRegistry(isDirty);
+
   const handleReload = () => {
     setIsInitialized(false);
     setIsDirty(false);
+    setStaleDismissedForVersion(null);
     refetch();
   };
 
@@ -232,6 +282,16 @@ export function SaunasPage() {
           ]}
         />
 
+        {isStale && (
+          <StaleVersionBanner
+            entityLabel="Saunen"
+            serverVersion={settingsVersion}
+            localVersion={loadedVersion}
+            onReload={handleReload}
+            onDismiss={() => setStaleDismissedForVersion(settingsVersion)}
+          />
+        )}
+
         {/* Info Box */}
         <SectionCard title="Hinweise" icon={Info}>
           <ul className="text-sm text-spa-text-secondary space-y-1">
@@ -252,11 +312,16 @@ export function SaunasPage() {
             <EmptyState
               icon={Flame}
               title="Noch keine Saunas"
-              description="Lege deine erste Sauna an, um sie im Aufgussplan zu verwenden."
+              description="Lege deine erste Sauna an oder lass dir zwei Beispiel-Saunen vorbereiten."
               action={canManage ? (
-                <Button icon={Plus} onClick={handleAddSauna}>
-                  Erste Sauna hinzufügen
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button icon={Plus} onClick={handleAddSauna}>
+                    Erste Sauna anlegen
+                  </Button>
+                  <Button variant="secondary" onClick={handleAddExampleSaunas}>
+                    Beispiele vorbereiten
+                  </Button>
+                </div>
               ) : undefined}
             />
           ) : canManage ? (
@@ -287,6 +352,7 @@ export function SaunasPage() {
                     <p className="font-semibold text-spa-text-primary">{sauna.name}</p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <span
+                        aria-hidden="true"
                         className="w-2.5 h-2.5 rounded-full"
                         style={{ backgroundColor: SAUNA_STATUS_COLORS[sauna.status] }}
                       />
@@ -296,6 +362,7 @@ export function SaunasPage() {
                   <select
                     value={sauna.status}
                     onChange={(e) => handleStatusChange(sauna.id, e.target.value as Sauna['status'])}
+                    aria-label={`Status für ${sauna.name}`}
                     className="rounded-lg border border-spa-bg-secondary px-3 py-1.5 text-sm focus:outline-hidden focus:ring-2 focus:ring-spa-primary"
                   >
                     <option value="active">Aufgüsse</option>

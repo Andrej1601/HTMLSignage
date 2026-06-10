@@ -67,9 +67,9 @@ export class SlideErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="w-full h-full bg-black/90 flex items-center justify-center">
-          <div className="text-center text-white/40 select-none">
-            <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-white/20 border-t-white/60 animate-spin" />
+        <div className="w-full h-full bg-spa-bg-primary/95 flex items-center justify-center">
+          <div className="text-center text-spa-text-secondary select-none">
+            <div className="w-8 h-8 mx-auto mb-3 rounded-full border-2 border-spa-bg-secondary border-t-spa-primary animate-spin" />
             <p className="text-xs tracking-wider uppercase">Wird wiederhergestellt</p>
           </div>
         </div>

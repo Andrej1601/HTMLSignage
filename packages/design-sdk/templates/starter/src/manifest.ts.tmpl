@@ -1,0 +1,22 @@
+import { DESIGN_SDK_API_VERSION, type DesignManifest } from '@htmlsignage/design-sdk';
+import { {{DESIGN_CAMEL}}Tokens } from './tokens';
+
+export const {{DESIGN_CAMEL}}Manifest: DesignManifest = {
+  id: '{{DESIGN_ID}}',
+  version: '0.1.0',
+  apiVersion: DESIGN_SDK_API_VERSION,
+  name: '{{DESIGN_NAME}}',
+  description: '{{DESIGN_DESCRIPTION}}',
+  author: 'HTMLSignage',
+  supportedSlides: [
+    'sauna-detail',
+    'content-panel',
+    'infos',
+    'events',
+    'media-image',
+    'media-video',
+  ],
+  capabilities: ['light-mode', 'landscape'],
+  status: 'beta',
+  defaultTokens: {{DESIGN_CAMEL}}Tokens,
+};

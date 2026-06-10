@@ -109,22 +109,34 @@ export function PresetTabs({ editor }: PresetTabsProps) {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* "Auswahl live schalten" */}
+        {/* "Auswahl live schalten" — Label/Tooltip differenziert je
+            nachdem, ob ein aktives Event den manuellen Preset gerade
+            maskiert. Im Event-Fall macht der Button trotzdem etwas
+            (er setzt `activePreset`, was nach Event-Ende greift) —
+            der User braucht aber Feedback, dass es kein Sofort-Effekt
+            ist. Toast erscheint nach erfolgreichem Speichern. */}
         {!editor.localSchedule?.autoPlay && editor.editingPreset !== editor.livePreset && (
           <button
+            type="button"
             onClick={editor.handleSetLivePreset}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-secondary/40 bg-spa-secondary/10 px-3 py-1.5 text-xs font-medium text-spa-secondary-dark hover:bg-spa-secondary/20 transition-colors"
+            title={
+              editor.activeEvent
+                ? `Aktiviert ${PRESET_LABELS[editor.editingPreset]}, sobald Event „${editor.activeEvent.name}" endet`
+                : `${PRESET_LABELS[editor.editingPreset]} sofort live schalten`
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-secondary/40 bg-spa-secondary/10 px-3 py-1.5 text-xs font-medium text-spa-secondary-dark hover:bg-spa-secondary/20 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <Radio className="h-3.5 w-3.5" />
-            Live schalten
+            {editor.activeEvent ? 'Nach Event live schalten' : 'Live schalten'}
           </button>
         )}
 
         {/* Copy menu */}
         <div className="relative" ref={copyMenuRef}>
           <button
+            type="button"
             onClick={() => setShowCopyMenu((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:border-spa-primary/30 hover:text-spa-text-primary transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-1.5 text-xs font-medium text-spa-text-secondary hover:border-spa-primary/30 hover:text-spa-text-primary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <Copy className="h-3.5 w-3.5" />
             Kopieren
@@ -184,10 +196,11 @@ function PresetChip({ preset, editingPreset, livePreset, activeEventPreset, vari
 
   return (
     <button
+      type="button"
       onClick={() => onPresetChange(preset)}
       title={PRESET_LABELS[preset]}
       className={clsx(
-        'relative inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+        'relative inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
         isActive && variant === 'weekday' && 'bg-spa-primary text-white shadow-sm',
         isActive && variant === 'special' && 'bg-spa-accent text-spa-text-primary shadow-sm',
         !isActive && 'bg-spa-bg-primary text-spa-text-secondary hover:bg-spa-bg-secondary hover:text-spa-text-primary',
@@ -223,10 +236,11 @@ function CopyMenuItem({ preset, editingPreset, onCopyFrom }: CopyMenuItemProps) 
   const isSelf = preset === editingPreset;
   return (
     <button
+      type="button"
       onClick={() => !isSelf && onCopyFrom(preset)}
       disabled={isSelf}
       className={clsx(
-        'w-full rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors',
+        'w-full rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary',
         isSelf
           ? 'cursor-not-allowed text-spa-text-secondary/40'
           : 'text-spa-text-primary hover:bg-spa-bg-primary'

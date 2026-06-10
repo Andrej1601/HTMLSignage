@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Layout } from '@/components/Layout';
 import { SkeletonMediaCard } from '@/components/Skeleton';
 import { PageHeader } from '@/components/PageHeader';
@@ -9,13 +10,26 @@ import { toAbsoluteMediaUrl } from '@/utils/mediaUrl';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Dialog } from '@/components/Dialog';
-import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3 } from 'lucide-react';
+import { ImageIcon, RefreshCw, Upload, Music, Film, LayoutGrid, List, Trash2, Tags, Edit3, Layers } from 'lucide-react';
+import { TabGroup, type Tab } from '@/components/TabGroup';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useMediaMetadata } from '@/hooks/useMediaMetadata';
 import { ComboboxField } from '@/components/ComboboxField';
 import { useMediaPageState, normalizeTagsInput, hasTagCaseInsensitive } from '@/hooks/useMediaPageState';
+
+// Type-Filter-Tabs — bewusst auf Modulebene, damit `MEDIA_TYPE_TABS`
+// nicht bei jedem Render neu allokiert wird (TabGroup macht
+// referenzielle Identität nicht zu schaffen, aber sauber ist sauber).
+const MEDIA_TYPE_TABS: Tab<MediaType | 'all'>[] = [
+  { id: 'all', label: 'Alle' },
+  { id: 'image', label: 'Bilder', icon: ImageIcon },
+  { id: 'audio', label: 'Audio', icon: Music },
+  { id: 'video', label: 'Video', icon: Film },
+];
 
 export function MediaPage() {
   const state = useMediaPageState();
@@ -40,7 +54,36 @@ export function MediaPage() {
     toggleExistingTag,
     handleSaveTags,
     updateMediaTags,
+    // Bulk
+    selectedIds,
+    toggleSelected,
+    clearSelection,
+    selectAllVisible,
+    allVisibleSelected,
+    bulkDeleteOpen,
+    setBulkDeleteOpen,
+    bulkDeleting,
+    handleBulkDeleteRequest,
+    handleBulkDeleteConfirm,
+    bulkTagging,
+    openBulkTagEditor,
+    closeBulkTagEditor,
+    bulkTagDraft,
+    setBulkTagDraft,
+    bulkTagMode,
+    setBulkTagMode,
+    parsedBulkTagDraft,
+    bulkTagSaving,
+    handleSaveBulkTags,
   } = state;
+
+  // Quick-Action-Hook: Command-Palette navigiert mit `#upload` hierher.
+  useEffect(() => {
+    if (window.location.hash === '#upload') {
+      setUploadOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [setUploadOpen]);
 
   return (
     <Layout>
@@ -86,44 +129,45 @@ export function MediaPage() {
             />
           </div>
 
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as MediaType | 'all')}
-            className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
-          >
-            <option value="all">Alle Typen</option>
-            <option value="image">Bilder</option>
-            <option value="audio">Audio</option>
-            <option value="video">Video</option>
-          </select>
+          {/* Type-Filter als TabGroup — gleicher Pattern wie DevicesPage,
+              keine native Select-Optik auf iPad/Android. */}
+          <TabGroup
+            tabs={MEDIA_TYPE_TABS}
+            activeTab={typeFilter}
+            onChange={setTypeFilter}
+          />
 
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-2 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
-          >
-            <option value="all">Alle Tags</option>
-            {availableTags.map((tag) => (
-              <option key={tag} value={tag}>{tag}</option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-1 rounded-lg border border-spa-bg-secondary bg-spa-surface p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`rounded-md p-2 transition-colors ${viewMode === 'grid' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-              aria-label="Rasteransicht"
+          {/* Tag-Filter bleibt als nativer Select, weil Tags dynamisch
+              wachsen und eine TabGroup mit 30+ Einträgen unbrauchbar wäre.
+              Optik via gleicher Klasse wie das Suchfeld, mit Layers-Icon
+              als Affordanz. */}
+          <div className="relative">
+            <Layers
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-spa-text-secondary pointer-events-none"
+              aria-hidden="true"
+            />
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              aria-label="Tag-Filter"
+              className="rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-9 pr-8 text-sm text-spa-text-primary outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20 appearance-none"
             >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`rounded-md p-2 transition-colors ${viewMode === 'list' ? 'bg-spa-primary text-white' : 'text-spa-text-secondary hover:bg-spa-bg-primary'}`}
-              aria-label="Listenansicht"
-            >
-              <List className="h-4 w-4" />
-            </button>
+              <option value="all">Alle Tags</option>
+              {availableTags.map((tag) => (
+                <option key={tag} value={tag}>{tag}</option>
+              ))}
+            </select>
           </div>
+
+          <SegmentedControl
+            ariaLabel="Ansicht"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'grid', icon: LayoutGrid, ariaLabel: 'Rasteransicht' },
+              { value: 'list', icon: List, ariaLabel: 'Listenansicht' },
+            ]}
+          />
 
           {isFetching && (
             <span className="text-xs text-spa-text-secondary">Aktualisiert...</span>
@@ -148,14 +192,45 @@ export function MediaPage() {
             onDelete={setDeletingMedia}
             onEditTags={openTagEditor}
             mediaUsage={mediaUsageSummaries}
+            onUploadClick={() => setUploadOpen(true)}
+            selectedIds={selectedIds}
+            onToggleSelect={(item) => toggleSelected(item.id)}
           />
         ) : (
           <MediaListView
             media={media}
             onDelete={setDeletingMedia}
             onEditTags={openTagEditor}
+            onUploadClick={() => setUploadOpen(true)}
+            selectedIds={selectedIds}
+            onToggleSelect={(item) => toggleSelected(item.id)}
           />
         )}
+
+        {/* Bulk-Action-Leiste — fixed, erscheint sobald Auswahl aktiv */}
+        <BulkActionBar
+          count={selectedIds.size}
+          onSelectAll={selectAllVisible}
+          selectAllDisabled={allVisibleSelected}
+          onClear={clearSelection}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={Tags}
+            onClick={openBulkTagEditor}
+          >
+            Tags
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            icon={Trash2}
+            onClick={handleBulkDeleteRequest}
+          >
+            Löschen
+          </Button>
+        </BulkActionBar>
 
         {/* Single Delete Confirm */}
         <ConfirmDialog
@@ -174,6 +249,127 @@ export function MediaPage() {
           onConfirm={handleDeleteMedia}
           onCancel={() => setDeletingMedia(null)}
         />
+
+        {/* Bulk Delete Confirm */}
+        <ConfirmDialog
+          isOpen={bulkDeleteOpen}
+          title={`${selectedIds.size} Datei${selectedIds.size === 1 ? '' : 'en'} löschen?`}
+          message={(() => {
+            const usedCount = Array.from(selectedIds).filter((id) => {
+              const usage = mediaUsageSummaries.get(id);
+              return usage && usage.length > 0;
+            }).length;
+            const base = `Möchtest du wirklich ${selectedIds.size} Datei${selectedIds.size === 1 ? '' : 'en'} löschen? Diese Aktion kann nicht rückgängig gemacht werden.`;
+            if (usedCount > 0) {
+              return `${base}\n\n⚠️ ${usedCount} davon wird/werden derzeit verwendet (z. B. in Slideshows). Das Löschen kann zu fehlenden Inhalten führen.`;
+            }
+            return base;
+          })()}
+          confirmLabel={bulkDeleting ? 'Wird gelöscht...' : 'Löschen'}
+          variant="danger"
+          onConfirm={handleBulkDeleteConfirm}
+          onCancel={() => setBulkDeleteOpen(false)}
+        />
+
+        {/* Bulk Tag Editor */}
+        <Dialog
+          isOpen={bulkTagging}
+          onClose={closeBulkTagEditor}
+          title={`Tags für ${selectedIds.size} Datei${selectedIds.size === 1 ? '' : 'en'} bearbeiten`}
+          size="md"
+          closeDisabled={bulkTagSaving}
+          footer={(
+            <>
+              <Button variant="ghost" onClick={closeBulkTagEditor} disabled={bulkTagSaving}>
+                Abbrechen
+              </Button>
+              <Button
+                icon={Tags}
+                onClick={handleSaveBulkTags}
+                loading={bulkTagSaving}
+                loadingText="Speichert..."
+              >
+                Anwenden
+              </Button>
+            </>
+          )}
+        >
+          <div className="space-y-4">
+            {/* Mode-Tabs: hinzufügen vs. ersetzen */}
+            <div className="inline-flex rounded-lg border border-spa-bg-secondary bg-spa-surface p-1">
+              <button
+                type="button"
+                onClick={() => setBulkTagMode('add')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
+                  bulkTagMode === 'add'
+                    ? 'bg-spa-primary text-white'
+                    : 'text-spa-text-secondary hover:text-spa-text-primary'
+                }`}
+              >
+                Hinzufügen
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkTagMode('replace')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
+                  bulkTagMode === 'replace'
+                    ? 'bg-spa-primary text-white'
+                    : 'text-spa-text-secondary hover:text-spa-text-primary'
+                }`}
+              >
+                Ersetzen
+              </button>
+            </div>
+            <p className="text-xs text-spa-text-secondary -mt-2">
+              {bulkTagMode === 'add'
+                ? 'Die ausgewählten Tags werden zu allen Dateien hinzugefügt — bestehende Tags bleiben erhalten.'
+                : 'Bestehende Tags werden vollständig durch die unten gewählten Tags ersetzt.'}
+            </p>
+            <ComboboxField
+              label={bulkTagMode === 'add' ? 'Tag hinzufügen' : 'Neuer Tag'}
+              value=""
+              onChange={(val) => {
+                if (!val.trim()) return;
+                const currentTags = normalizeTagsInput(bulkTagDraft);
+                if (!hasTagCaseInsensitive(currentTags, val.trim())) {
+                  setBulkTagDraft([...currentTags, val.trim()].join(', '));
+                }
+              }}
+              options={availableTags.filter((tag) => !hasTagCaseInsensitive(parsedBulkTagDraft, tag))}
+              placeholder="Tag eingeben oder auswählen..."
+              createLabel="Neues Tag"
+            />
+            {parsedBulkTagDraft.length > 0 ? (
+              <div>
+                <p className="text-sm font-medium text-spa-text-primary mb-2">Anzuwendende Tags</p>
+                <div className="flex flex-wrap gap-2">
+                  {parsedBulkTagDraft.map((tag) => (
+                    <button
+                      key={`bulk-tag-${tag}`}
+                      type="button"
+                      onClick={() => {
+                        const filtered = parsedBulkTagDraft.filter(
+                          (entry) => entry.localeCompare(tag, 'de', { sensitivity: 'accent' }) !== 0,
+                        );
+                        setBulkTagDraft(filtered.join(', '));
+                      }}
+                      className="rounded-full px-3 py-1 text-xs border bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80 transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
+                      title="Klicken zum Entfernen"
+                    >
+                      #{tag} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-spa-text-secondary">
+                {bulkTagMode === 'replace'
+                  ? 'Keine Tags ausgewählt — die Dateien werden mit leerer Tag-Liste gespeichert.'
+                  : 'Keine Tags zum Hinzufügen ausgewählt.'}
+              </p>
+            )}
+          </div>
+        </Dialog>
 
         {/* Edit tags */}
         <Dialog
@@ -229,7 +425,7 @@ export function MediaPage() {
                       key={`active-tag-${tag}`}
                       type="button"
                       onClick={() => toggleExistingTag(tag)}
-                      className="rounded-full px-3 py-1 text-xs border transition-colors bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80"
+                      className="rounded-full px-3 py-1 text-xs border transition-colors bg-spa-primary text-white border-spa-primary hover:bg-spa-primary/80 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
                       title="Klicken zum Entfernen"
                     >
                       #{tag} ×
@@ -253,17 +449,30 @@ function MediaListView({
   media,
   onDelete,
   onEditTags,
+  onUploadClick,
+  selectedIds,
+  onToggleSelect,
 }: {
   media: Media[];
   onDelete: (media: Media) => void;
   onEditTags: (media: Media) => void;
+  onUploadClick?: () => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (media: Media) => void;
 }) {
   if (media.length === 0) {
     return (
       <EmptyState
         icon={ImageIcon}
         title="Keine Medien gefunden"
-        description="Lade deine ersten Dateien hoch, um loszulegen"
+        description="Lade deine ersten Dateien hoch, um loszulegen."
+        action={
+          onUploadClick ? (
+            <Button icon={Upload} onClick={onUploadClick}>
+              Erste Datei hochladen
+            </Button>
+          ) : undefined
+        }
       />
     );
   }
@@ -276,6 +485,8 @@ function MediaListView({
           item={item}
           onDelete={onDelete}
           onEditTags={onEditTags}
+          isSelected={selectedIds?.has(item.id) ?? false}
+          onToggleSelect={onToggleSelect}
         />
       ))}
     </div>
@@ -286,16 +497,33 @@ function MediaListRow({
   item,
   onDelete,
   onEditTags,
+  isSelected = false,
+  onToggleSelect,
 }: {
   item: Media;
   onDelete: (media: Media) => void;
   onEditTags: (media: Media) => void;
+  isSelected?: boolean;
+  onToggleSelect?: (media: Media) => void;
 }) {
   const mediaUrl = toAbsoluteMediaUrl(item.url);
   const { summary } = useMediaMetadata(mediaUrl, item.type);
 
   return (
-    <div className="flex items-center gap-4 p-3 hover:bg-spa-bg-primary transition-colors">
+    <div
+      className={`flex items-center gap-4 p-3 hover:bg-spa-bg-primary transition-colors ${
+        isSelected ? 'bg-spa-primary/5' : ''
+      }`}
+    >
+      {onToggleSelect && (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelect(item)}
+          aria-label={isSelected ? `${item.originalName} abwählen` : `${item.originalName} auswählen`}
+          className="h-4 w-4 shrink-0 rounded border-spa-bg-secondary accent-spa-primary"
+        />
+      )}
       <div className="w-12 h-12 rounded-lg bg-spa-bg-primary overflow-hidden shrink-0">
         {item.type === 'image' ? (
           <img

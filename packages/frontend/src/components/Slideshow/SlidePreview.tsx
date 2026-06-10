@@ -155,8 +155,9 @@ interface MediaPreviewProps {
 }
 
 function MediaImagePreview({ className, slide, media }: MediaPreviewProps) {
-  const mediaItem = media?.find((m) => m.id === slide.mediaId);
-  const imageUrl = getMediaUploadUrl(media, slide.mediaId);
+  const mediaId = slide.type === 'media-image' ? slide.mediaId : undefined;
+  const mediaItem = media?.find((m) => m.id === mediaId);
+  const imageUrl = getMediaUploadUrl(media, mediaId);
   const fitMode = getEffectiveMediaFit(slide);
 
   if (!mediaItem || !imageUrl) {
@@ -184,8 +185,9 @@ function MediaImagePreview({ className, slide, media }: MediaPreviewProps) {
 
 // Media Video Preview
 function MediaVideoPreview({ className, slide, media }: MediaPreviewProps) {
-  const mediaItem = media?.find((m) => m.id === slide.mediaId);
-  const videoUrl = getMediaUploadUrl(media, slide.mediaId);
+  const mediaId = slide.type === 'media-video' ? slide.mediaId : undefined;
+  const mediaItem = media?.find((m) => m.id === mediaId);
+  const videoUrl = getMediaUploadUrl(media, mediaId);
   const fitMode = getEffectiveMediaFit(slide);
 
   if (!mediaItem || !videoUrl) {

@@ -321,7 +321,12 @@ function getSlideIssue({
 }): EditorQualityIssue | null {
   const typeMeta = getSlideTypeOption(slide.type);
 
-  if (typeMeta?.requiresSauna && !slide.saunaId) {
+  // Variant-specific field reads — narrow first.
+  const slideSaunaId = slide.type === 'sauna-detail' ? slide.saunaId : undefined;
+  const slideMediaId =
+    slide.type === 'media-image' || slide.type === 'media-video' ? slide.mediaId : undefined;
+
+  if (typeMeta?.requiresSauna && !slideSaunaId) {
     return {
       id: `slide-sauna-missing-${slide.id}`,
       tone: 'danger',
@@ -331,7 +336,7 @@ function getSlideIssue({
     };
   }
 
-  if (slide.type === 'sauna-detail' && slide.saunaId && !hasSauna(settings, slide.saunaId)) {
+  if (slide.type === 'sauna-detail' && slideSaunaId && !hasSauna(settings, slideSaunaId)) {
     return {
       id: `slide-sauna-invalid-${slide.id}`,
       tone: 'danger',
@@ -341,7 +346,7 @@ function getSlideIssue({
     };
   }
 
-  if (typeMeta?.requiresMedia && !slide.mediaId) {
+  if (typeMeta?.requiresMedia && !slideMediaId) {
     return {
       id: `slide-media-missing-${slide.id}`,
       tone: 'danger',
@@ -351,8 +356,8 @@ function getSlideIssue({
     };
   }
 
-  if (slide.mediaId) {
-    const mediaItem = getMediaItem(media, slide.mediaId);
+  if (slideMediaId) {
+    const mediaItem = getMediaItem(media, slideMediaId);
     if (!mediaItem) {
       return {
         id: `slide-media-stale-${slide.id}`,

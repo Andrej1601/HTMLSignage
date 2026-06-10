@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { hashPassword, authMiddleware, type AuthRequest, str } from '../lib/auth.js';
+import { asyncHandler } from '../lib/asyncHandler.js';
 import { requirePermission } from '../lib/permissions.js';
 import { mutationLimiter } from '../lib/rateLimiter.js';
 import { logAuditEvent } from '../lib/audit.js';
@@ -27,29 +28,24 @@ const UpdateUserSchema = z.object({
 });
 
 // GET /api/users - List all users (requires users:manage)
-router.get('/', requirePermission('users:manage'), async (req: AuthRequest, res) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        roles: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+router.get('/', requirePermission('users:manage'), asyncHandler(async (_req: AuthRequest, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      roles: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
-    res.json(users);
-  } catch (error) {
-    console.error('[users] Error listing users:', error);
-    res.status(500).json({ error: 'fetch-failed', message: 'Benutzer konnten nicht geladen werden' });
-  }
-});
+  res.json(users);
+}));
 
 // POST /api/users - Create new user (Admin only)
-router.post('/', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+router.post('/', requirePermission('users:manage'), mutationLimiter, asyncHandler(async (req: AuthRequest, res) => {
   try {
     const validated = CreateUserSchema.parse(req.body);
 
@@ -84,20 +80,17 @@ router.post('/', requirePermission('users:manage'), mutationLimiter, async (req:
     });
 
     res.json(user);
+    return;
   } catch (error) {
     if (error instanceof UserConflictError) {
       return res.status(400).json({ error: error.code, message: error.message });
     }
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.issues });
-    }
-    console.error('[users] Error creating user:', error);
-    res.status(500).json({ error: 'create-failed', message: 'Benutzer konnte nicht erstellt werden' });
+    throw error;
   }
-});
+}));
 
 // PATCH /api/users/:id - Update user (Admin only)
-router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
+router.patch('/:id', requirePermission('users:manage'), mutationLimiter, asyncHandler(async (req: AuthRequest, res) => {
   try {
     const validated = UpdateUserSchema.parse(req.body);
 
@@ -149,52 +142,43 @@ router.patch('/:id', requirePermission('users:manage'), mutationLimiter, async (
       },
     });
 
-    res.json(updatedUser);
+    return res.json(updatedUser);
   } catch (error) {
     if (error instanceof UserConflictError) {
       return res.status(400).json({ error: error.code, message: error.message });
     }
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'validation-failed', details: error.issues });
-    }
-    console.error('[users] Error updating user:', error);
-    res.status(500).json({ error: 'update-failed', message: 'Benutzer konnte nicht aktualisiert werden' });
+    throw error;
   }
-});
+}));
 
 // DELETE /api/users/:id - Delete user (Admin only)
-router.delete('/:id', requirePermission('users:manage'), mutationLimiter, async (req: AuthRequest, res) => {
-  try {
-    // Prevent deleting yourself
-    if (str(req.params.id) === req.userId) {
-      return res.status(400).json({ error: 'cannot-delete-self', message: 'Cannot delete your own account' });
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: str(req.params.id) },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'not-found', message: 'User not found' });
-    }
-
-    await prisma.user.delete({
-      where: { id: str(req.params.id) },
-    });
-    await logAuditEvent(req, {
-      action: 'user.delete',
-      resource: user.id,
-      details: {
-        username: user.username,
-      },
-    });
-
-    res.json({ ok: true });
-  } catch (error) {
-    console.error('[users] Error deleting user:', error);
-    res.status(500).json({ error: 'delete-failed', message: 'Benutzer konnte nicht gelöscht werden' });
+router.delete('/:id', requirePermission('users:manage'), mutationLimiter, asyncHandler(async (req: AuthRequest, res) => {
+  // Prevent deleting yourself
+  if (str(req.params.id) === req.userId) {
+    return res.status(400).json({ error: 'cannot-delete-self', message: 'Cannot delete your own account' });
   }
-});
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { id: str(req.params.id) },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: 'not-found', message: 'User not found' });
+  }
+
+  await prisma.user.delete({
+    where: { id: str(req.params.id) },
+  });
+  await logAuditEvent(req, {
+    action: 'user.delete',
+    resource: user.id,
+    details: {
+      username: user.username,
+    },
+  });
+
+  return res.json({ ok: true });
+}));
 
 export default router;

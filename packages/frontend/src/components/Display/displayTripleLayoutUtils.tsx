@@ -1,5 +1,4 @@
 import type { ReactElement } from 'react';
-import { DisplaySaunaDetailSlide } from '@/components/Display/DisplaySaunaDetailSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
 import type {
   DisplayLayoutContext,
@@ -89,17 +88,16 @@ export function renderTriplePaddedSlide(
   );
 }
 
+/**
+ * Placeholder used by triple layouts when a zone has no slide assigned
+ * but we still need to paint something. The legacy implementation
+ * rendered a full sauna-detail shell (via the retired
+ * `DisplaySaunaDetailSlide`); today the layouts treat this slot as
+ * empty — the zone's background + chrome already carry the design.
+ */
 export function renderTripleSaunaDetail(
-  context: DisplayLayoutContext,
-  saunaId?: string,
+  _context: DisplayLayoutContext,
+  _saunaId?: string,
 ): ReactElement {
-  return (
-    <DisplaySaunaDetailSlide
-      schedule={context.localSchedule}
-      settings={context.effectiveSettings}
-      saunaId={saunaId}
-      media={context.mediaItems}
-      deviceId={context.displayDeviceId}
-    />
-  );
+  return <div className="h-full w-full" aria-hidden="true" />;
 }

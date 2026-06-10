@@ -1,0 +1,143 @@
+import type { SlideRendererProps } from '@htmlsignage/design-sdk';
+
+/**
+ * {{DESIGN_NAME}} — content-panel (schedule) renderer.
+ *
+ * Starter stub: renders a plain time-sorted list of infusions, one
+ * row per entry, taking styling exclusively from `tokens`. Replace
+ * this with your design's actual schedule representation (list /
+ * matrix / timeline etc.) and dispatch on `data.styleHint` if you
+ * ship multiple variants.
+ */
+export function SchedulePanelRenderer({
+  data,
+  tokens,
+  context,
+}: SlideRendererProps<'content-panel'>) {
+  const { colors, typography, radius, spacing } = tokens;
+  const { viewport } = context;
+
+  const entries = data.cells
+    .flatMap((row, saunaIdx) =>
+      (row ?? []).flatMap((cell, slotIdx) => {
+        if (!cell) return [];
+        const time = cell.time ?? data.timeSlots[slotIdx] ?? '';
+        if (!time) return [];
+        return [{
+          key: `${saunaIdx}-${slotIdx}-${time}`,
+          time,
+          title: cell.title,
+          saunaName: data.saunas[saunaIdx]?.name ?? '',
+          isLive: cell.isLive,
+          isNext: cell.isNext,
+        }];
+      }),
+    )
+    .sort((a, b) => a.time.localeCompare(b.time));
+
+  const pad = viewport.isCompact ? spacing.md : spacing.lg;
+
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden"
+      style={{
+        backgroundColor: colors.surface,
+        color: colors.textPrimary,
+        fontFamily: typography.fontBody,
+        padding: `${pad}px`,
+        gap: `${spacing.sm}px`,
+      }}
+    >
+      <span
+        className="font-black uppercase"
+        style={{
+          color: colors.accentPrimary,
+          fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+          letterSpacing: '0.3em',
+        }}
+      >
+        Aufgussplan
+      </span>
+
+      {entries.length === 0 ? (
+        <div
+          className="flex flex-1 items-center justify-center"
+          style={{
+            color: colors.textSecondary,
+            fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+          }}
+        >
+          Heute keine Aufgüsse geplant.
+        </div>
+      ) : (
+        <div
+          className="flex flex-col"
+          style={{ gap: `${spacing.xs}px`, overflowY: 'auto' }}
+        >
+          {entries.map((entry) => (
+            <div
+              key={entry.key}
+              className="flex items-center"
+              style={{
+                backgroundColor: entry.isLive
+                  ? withAlpha(colors.statusLive, 0.12)
+                  : entry.isNext
+                    ? withAlpha(colors.statusNext, 0.12)
+                    : colors.surfaceElevated,
+                border: `1px solid ${colors.border}`,
+                borderRadius: `${radius.md}px`,
+                padding: `${spacing.sm}px ${spacing.md}px`,
+                gap: `${spacing.md}px`,
+              }}
+            >
+              <span
+                className="font-mono font-black tabular-nums"
+                style={{
+                  color: entry.isLive ? colors.statusLive : colors.textPrimary,
+                  fontSize: `${typography.baseSizePx * typography.scaleLg}px`,
+                  minWidth: 72,
+                }}
+              >
+                {entry.time}
+              </span>
+              <span
+                className="font-semibold"
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: `${typography.baseSizePx * typography.scaleSm}px`,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.15em',
+                  minWidth: 140,
+                }}
+              >
+                {entry.saunaName}
+              </span>
+              <span
+                className="font-black uppercase truncate flex-1 min-w-0"
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: `${typography.baseSizePx * typography.scaleBase}px`,
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {entry.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function withAlpha(color: string, alpha: number): string {
+  const c = color.trim();
+  if (!c.startsWith('#')) return c;
+  const raw = c.slice(1);
+  const hex = raw.length === 3 ? raw.split('').map((ch) => ch + ch).join('') : raw;
+  if (hex.length !== 6) return c;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
+}

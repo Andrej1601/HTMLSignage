@@ -29,7 +29,14 @@ export function DisplayScenarioPreview({
         settings={effectiveSettings}
         deviceId={null}
         deviceName={null}
-        previewAt={new Date().toISOString()}
+        // Pass `null` so the preview iframe runs on its own real-time
+        // clock instead of being frozen at a moment we picked at
+        // mount. Previously we passed `new Date().toISOString()` —
+        // recomputed on every parent render — which tripped the
+        // payload `useMemo` on every render, spammed the iframe with
+        // postMessages, and caused slide rotation timers to keep
+        // resetting (hence the "slides don't advance" report).
+        previewAt={null}
         maintenanceMode={false}
         aspectRatio={aspectRatio}
         className={previewClassName}

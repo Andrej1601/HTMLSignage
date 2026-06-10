@@ -86,7 +86,7 @@ function PaletteCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); customOptions.onUpdate(); }}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg bg-spa-accent/10 text-spa-accent hover:bg-spa-accent/20 transition-colors font-medium"
+            className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs rounded-lg bg-spa-accent/10 text-spa-accent hover:bg-spa-accent/20 transition-colors font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             title="Aktuelle Farben in diese Palette speichern"
           >
             <Save className="w-3 h-3" />
@@ -96,7 +96,7 @@ function PaletteCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); customOptions.onDelete(); }}
             disabled={customOptions.isDeleting}
-            className="flex items-center justify-center px-2 py-1 text-xs rounded-lg bg-spa-error-light text-spa-error hover:bg-spa-error-light transition-colors disabled:opacity-50"
+            className="flex items-center justify-center px-2 py-1 text-xs rounded-lg bg-spa-error-light text-spa-error hover:bg-spa-error-light transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-error"
             title="Palette löschen"
             aria-label="Palette löschen"
           >
@@ -191,7 +191,7 @@ export function PaletteSelector({
           <button
             type="button"
             onClick={() => setShowCreateDialog(true)}
-            className="bg-spa-bg-secondary rounded-xl border-2 border-dashed border-spa-border flex flex-col items-center justify-center gap-1 py-3 group hover:bg-spa-surface hover:border-spa-primary/60 transition-all"
+            className="bg-spa-bg-secondary rounded-xl border-2 border-dashed border-spa-border flex flex-col items-center justify-center gap-1 py-3 group hover:bg-spa-surface hover:border-spa-primary/60 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <Plus className="w-4 h-4 text-spa-text-secondary group-hover:text-spa-primary transition-colors" />
             <span className="text-xs font-semibold text-spa-text-secondary group-hover:text-spa-primary transition-colors">
@@ -221,7 +221,7 @@ export function PaletteSelector({
               type="button"
               onClick={handleCreatePalette}
               disabled={!newPaletteName.trim() || savingPalette}
-              className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg bg-spa-accent text-white hover:bg-spa-accent/90 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-2 text-sm rounded-lg bg-spa-accent text-white hover:bg-spa-accent/90 transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <Save className="w-4 h-4" />
               Speichern
@@ -229,7 +229,7 @@ export function PaletteSelector({
             <button
               type="button"
               onClick={() => { setShowCreateDialog(false); setNewPaletteName(''); }}
-              className="px-2 py-2 rounded-lg text-spa-text-secondary hover:text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors"
+              className="px-2 py-2 rounded-lg text-spa-text-secondary hover:text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               <X className="w-4 h-4" />
             </button>

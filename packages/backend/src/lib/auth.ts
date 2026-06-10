@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { createHash, randomInt } from 'crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prisma.js';
 
@@ -182,7 +182,7 @@ export async function deviceAuthMiddleware(req: AuthRequest, res: Response, next
 
   const device = await prisma.device.findUnique({
     where: { id: payload.deviceId },
-    select: { id: true, tokenRevokedAt: true },
+    select: { id: true, tokenRevokedAt: true, pairedAt: true },
   });
   if (!device) {
     res.status(401).json({ error: 'unauthorized', message: 'Device not found' });
@@ -191,6 +191,11 @@ export async function deviceAuthMiddleware(req: AuthRequest, res: Response, next
 
   if (device.tokenRevokedAt) {
     res.status(401).json({ error: 'unauthorized', message: 'Device token has been revoked' });
+    return;
+  }
+
+  if (!device.pairedAt) {
+    res.status(401).json({ error: 'unpaired', message: 'Device is not paired yet' });
     return;
   }
 
@@ -284,9 +289,9 @@ export async function authOrDeviceMiddleware(req: AuthRequest, res: Response, ne
       try {
         const device = await prisma.device.findUnique({
           where: { id: payload.deviceId },
-          select: { id: true, tokenRevokedAt: true },
+          select: { id: true, tokenRevokedAt: true, pairedAt: true },
         });
-        if (device && !device.tokenRevokedAt) {
+        if (device && !device.tokenRevokedAt && device.pairedAt) {
           req.deviceId = payload.deviceId;
           next();
           return;
@@ -302,4 +307,64 @@ export async function authOrDeviceMiddleware(req: AuthRequest, res: Response, ne
 
 export function generatePairingCode(): string {
   return randomInt(100000, 1000000).toString();
+}
+
+const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_TOKEN_BYTES = 32;
+const CSRF_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const CSRF_COOKIE_SECURE = process.env.COOKIE_SECURE !== undefined
+  ? process.env.COOKIE_SECURE === 'true'
+  : process.env.NODE_ENV === 'production';
+
+/**
+ * Issues a per-session CSRF token. Sets it as a non-httpOnly cookie (works
+ * for same-origin SPA setups via `document.cookie`) AND returns it as a
+ * `X-CSRF-Token` response header (works for cross-origin setups where
+ * `document.cookie` cannot read cookies set by a different origin).
+ *
+ * The cookie remains the source of truth on the server side — the middleware
+ * compares the incoming `X-CSRF-Token` header against the cookie value.
+ */
+export function issueCsrfCookie(res: Response): string {
+  const token = randomBytes(CSRF_TOKEN_BYTES).toString('hex');
+  res.cookie(CSRF_COOKIE_NAME, token, {
+    httpOnly: false,
+    secure: CSRF_COOKIE_SECURE,
+    sameSite: 'lax',
+    maxAge: CSRF_COOKIE_MAX_AGE_MS,
+    path: '/',
+  });
+  res.setHeader('X-CSRF-Token', token);
+  return token;
+}
+
+/**
+ * Re-emits the existing CSRF token to the response header without
+ * rotating it (so concurrent tabs that already cached the token keep
+ * working). Used by `/auth/me` so the cross-origin SPA can pick up the
+ * token even when its session cookie was set in a previous load.
+ *
+ * Returns the token if one already exists, or issues a fresh one when
+ * the cookie is absent.
+ */
+export function refreshCsrfTokenHeader(req: Request, res: Response): string {
+  const existing = typeof req.cookies?.csrf_token === 'string' ? req.cookies.csrf_token : '';
+  if (existing) {
+    res.setHeader('X-CSRF-Token', existing);
+    return existing;
+  }
+  return issueCsrfCookie(res);
+}
+
+export function clearCsrfCookie(res: Response): void {
+  res.clearCookie(CSRF_COOKIE_NAME, { path: '/' });
+}
+
+export function csrfTokensMatch(headerValue: unknown, cookieValue: unknown): boolean {
+  if (typeof headerValue !== 'string' || typeof cookieValue !== 'string') return false;
+  if (headerValue.length === 0 || headerValue.length !== cookieValue.length) return false;
+  const a = Buffer.from(headerValue);
+  const b = Buffer.from(cookieValue);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }

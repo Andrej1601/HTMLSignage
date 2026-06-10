@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
 import { SectionCard } from '@/components/SectionCard';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useDevices } from '@/hooks/useDevices';
 import { useMedia } from '@/hooks/useMedia';
 import type { Schedule } from '@/types/schedule.types';
@@ -64,6 +65,9 @@ export function EventManager({ events, settings: _settings, schedule, onChange }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<EventDraft>(() => createBlankEvent());
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deletingEvent = deletingId ? events.find((e) => e.id === deletingId) ?? null : null;
 
   const pairedDevices = useMemo(
     () => (devices || []).filter((device) => Boolean(device.pairedAt)),
@@ -146,10 +150,15 @@ export function EventManager({ events, settings: _settings, schedule, onChange }
     resetAssistant();
   };
 
-  const handleDelete = (id: string) => {
-    if (!window.confirm('Möchten Sie dieses Event wirklich löschen?')) return;
-    onChange(events.filter((event) => event.id !== id));
-    if (editingId === id) resetAssistant();
+  const handleRequestDelete = (id: string) => {
+    setDeletingId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingId) return;
+    onChange(events.filter((event) => event.id !== deletingId));
+    if (editingId === deletingId) resetAssistant();
+    setDeletingId(null);
   };
 
   const handleToggleActive = (id: string) => {
@@ -288,8 +297,22 @@ export function EventManager({ events, settings: _settings, schedule, onChange }
       <EventListCard
         events={events}
         onEdit={handleStartEdit}
-        onDelete={handleDelete}
+        onDelete={handleRequestDelete}
         onToggleActive={handleToggleActive}
+      />
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        title="Event löschen?"
+        message={
+          deletingEvent
+            ? `„${deletingEvent.name}" wirklich löschen? Geräte mit aktivem Event-Slideshow fallen zurück auf den Standard.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
       />
     </div>
   );

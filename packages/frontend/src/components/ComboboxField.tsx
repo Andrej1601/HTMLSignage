@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { FieldWrapper } from '@/components/FormField';
@@ -36,6 +36,8 @@ export function ComboboxField({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const optionId = (i: number) => `${listboxId}-opt-${i}`;
 
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
@@ -116,6 +118,9 @@ export function ComboboxField({
           aria-label={label || placeholder}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
+          aria-controls={isOpen ? listboxId : undefined}
+          aria-activedescendant={isOpen && totalItems > 0 ? optionId(highlightIndex) : undefined}
+          aria-autocomplete="list"
           role="combobox"
           autoComplete="off"
           className="w-full rounded-lg border border-spa-bg-secondary bg-spa-surface py-2 pl-3 pr-8 text-sm text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden focus:border-spa-primary focus:ring-2 focus:ring-spa-primary/20"
@@ -132,12 +137,14 @@ export function ComboboxField({
       {isOpen && totalItems > 0 && (
         <ul
           ref={listRef}
+          id={listboxId}
           role="listbox"
           className="absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-spa-bg-secondary bg-spa-surface shadow-lg"
         >
           {filtered.map((opt, i) => (
             <li
               key={opt}
+              id={optionId(i)}
               role="option"
               aria-selected={highlightIndex === i}
               className={clsx(
@@ -155,6 +162,7 @@ export function ComboboxField({
           ))}
           {showCreateOption && (
             <li
+              id={optionId(filtered.length)}
               role="option"
               aria-selected={highlightIndex === filtered.length}
               className={clsx(

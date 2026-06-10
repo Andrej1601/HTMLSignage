@@ -1,0 +1,49 @@
+{
+  "name": "@htmlsignage/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared Zod schemas and inferred types — single source of truth for HTMLSignage frontend and backend.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./schedule": {
+      "types": "./src/schedule.ts",
+      "import": "./dist/schedule.js",
+      "default": "./dist/schedule.js"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "import": "./dist/settings.js",
+      "default": "./dist/settings.js"
+    },
+    "./slideshow": {
+      "types": "./src/slideshow.ts",
+      "import": "./dist/slideshow.js",
+      "default": "./dist/slideshow.js"
+    },
+    "./websocket": {
+      "types": "./src/websocket.ts",
+      "import": "./dist/websocket.js",
+      "default": "./dist/websocket.js"
+    }
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
+}

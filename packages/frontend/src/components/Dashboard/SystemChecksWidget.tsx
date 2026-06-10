@@ -1,15 +1,38 @@
+/**
+ * System-Checks — Verbindungsstatus, Geräte-Bilanz, Wartung und Warnungen.
+ *
+ * Geänderte Schwerpunkte gegenüber der vorherigen Version:
+ *   - „Verlauf letzte 24h" wurde entfernt. Trend-Kennzahlen waren auf
+ *     dem Operations-Dashboard zu abstrakt; konkrete Echtzeit-Werte
+ *     liefern mehr Nutzen.
+ *   - Speicher-Karte ist nach „Medien & Speicher" umgezogen, weil
+ *     Disk-Belegung und Mediathek dort thematisch zusammen gehören.
+ *   - Neu: Geräte-Bilanz aus `runtimeStatus.devices` als Mini-Stats-
+ *     Strip — Saunameister sehen sofort, ob alle Displays gepairt
+ *     sind und ob welche überfällig sind.
+ *
+ * Layout in vier Bereichen: Verbindungsstatus → (Details-Toggle) →
+ * Geräte-Bilanz → Housekeeping → Laufzeitwarnungen.
+ */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, AlertTriangle, ChevronDown, HardDrive, Wrench } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Database,
+  Globe,
+  MonitorCheck,
+  RefreshCw,
+  Wifi,
+  Wrench,
+} from 'lucide-react';
 import { StatusBadge, type StatusTone } from '@/components/StatusBadge';
-import type { SystemRuntimeHistoryResponse, SystemRuntimeStatusResponse } from '@/services/api';
-import { formatFileSize } from '@/types/media.types';
+import type { SystemRuntimeStatusResponse } from '@/services/api';
 import { formatRelativeTime, toValidDate } from '@/utils/dateUtils';
 import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
-import {
-  RuntimeHistoryDetailDialog,
-  type RuntimeHistoryDetailMetric,
-} from '@/components/Dashboard/RuntimeHistoryDetailDialog';
+import clsx from 'clsx';
 
 interface SystemChecksWidgetProps {
   backendStatus: 'ok' | 'error' | 'unknown';
@@ -21,7 +44,6 @@ interface SystemChecksWidgetProps {
   isAdmin: boolean;
   updateLabel: string;
   runtimeStatus: SystemRuntimeStatusResponse | null;
-  runtimeHistory: SystemRuntimeHistoryResponse | null;
 }
 
 function getMaintenanceBadge(state: SystemRuntimeStatusResponse['maintenance']['state']): {
@@ -40,12 +62,6 @@ function getMaintenanceBadge(state: SystemRuntimeStatusResponse['maintenance']['
   }
 }
 
-function getDiskTone(usagePercent: number): StatusTone {
-  if (usagePercent >= 95) return 'danger';
-  if (usagePercent >= 85) return 'warning';
-  return 'success';
-}
-
 function getCategoryLabel(category: SystemRuntimeStatusResponse['warnings'][number]['category']): string {
   switch (category) {
     case 'disk':
@@ -59,15 +75,50 @@ function getCategoryLabel(category: SystemRuntimeStatusResponse['warnings'][numb
   }
 }
 
-function getDeltaTone(delta: number, positiveIsGood: boolean): string {
-  if (delta === 0) return 'text-spa-text-secondary';
-  const improved = positiveIsGood ? delta > 0 : delta < 0;
-  return improved ? 'text-spa-success-dark' : 'text-spa-error-dark';
+// Mini-Stat-Tile für die Geräte-Bilanz.
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'neutral' | 'success' | 'warning' | 'danger';
+}) {
+  const styles = {
+    neutral: 'border-spa-bg-secondary bg-spa-bg-primary/40 text-spa-text-primary',
+    success: 'border-spa-success/30 bg-spa-success-light/50 text-spa-success-dark',
+    warning: 'border-spa-warning/40 bg-spa-warning-light/60 text-spa-warning-dark',
+    danger: 'border-spa-error/40 bg-spa-error-light/60 text-spa-error-dark',
+  };
+  return (
+    <div className={clsx('rounded-lg border px-2.5 py-2', styles[tone])}>
+      <p className="text-xl font-bold tabular-nums leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider opacity-80">
+        {label}
+      </p>
+    </div>
+  );
 }
 
-function formatSignedValue(delta: number, suffix = ''): string {
-  if (delta === 0) return `0${suffix}`;
-  return `${delta > 0 ? '+' : ''}${delta}${suffix}`;
+// Status-Zeile mit Icon + Label + Badge — kompakter als die alte
+// Vertikal-Liste mit reinem `text-sm`-Label.
+function ConnectivityRow({
+  icon: Icon,
+  label,
+  badge,
+}: {
+  icon: typeof Globe;
+  label: string;
+  badge: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-spa-bg-secondary bg-spa-bg-primary/30 px-3 py-2">
+      <Icon className="h-4 w-4 text-spa-text-secondary shrink-0" aria-hidden="true" />
+      <span className="text-sm font-medium text-spa-text-primary">{label}</span>
+      <span className="ml-auto">{badge}</span>
+    </div>
+  );
 }
 
 export function SystemChecksWidget({
@@ -80,21 +131,46 @@ export function SystemChecksWidget({
   isAdmin,
   updateLabel,
   runtimeStatus,
-  runtimeHistory,
 }: SystemChecksWidgetProps) {
-  const [selectedHistoryMetric, setSelectedHistoryMetric] = useState<RuntimeHistoryDetailMetric | null>(null);
   const warnings = runtimeStatus?.warnings || [];
   const maintenance = runtimeStatus?.maintenance;
+  const devices = runtimeStatus?.devices ?? null;
   const maintenanceBadge = maintenance ? getMaintenanceBadge(maintenance.state) : null;
-  const historySummary = runtimeHistory?.summary || null;
 
   const hasWarnings = warnings.length > 0;
   const [detailOpen, setDetailOpen] = useState(hasWarnings);
 
+  // Render-phase auto-open: wenn nach dem Mount Warnungen reinkommen
+  // (typisch: runtimeStatus pollt alle 30 s und liefert beim ersten
+  // Mount noch null), klappen wir die Details automatisch auf. Ein
+  // tracked Vorgängerwert verhindert, dass wir den User wieder
+  // aufzwingen, falls er manuell zugeklappt hat — wir reagieren nur
+  // auf den Übergang false→true. Nach dem React-Linter ist das die
+  // korrekte Form (kein setState-in-effect).
+  const [prevHadWarnings, setPrevHadWarnings] = useState(hasWarnings);
+  if (hasWarnings && !prevHadWarnings) {
+    setPrevHadWarnings(true);
+    setDetailOpen(true);
+  } else if (!hasWarnings && prevHadWarnings) {
+    setPrevHadWarnings(false);
+  }
+
+  // Tone-Heuristik für die Geräte-Tiles: Pending/Stale/NeverSeen sind
+  // Aufmerksamkeitsbedürftig, sobald > 0; Online ist „success" wenn
+  // welche da sind.
+  const onlineTone: 'neutral' | 'success' = devices && devices.online > 0 ? 'success' : 'neutral';
+  const offlineTone: 'neutral' | 'warning' = devices && devices.offline > 0 ? 'warning' : 'neutral';
+  const staleTone: 'neutral' | 'warning' | 'danger' = !devices
+    ? 'neutral'
+    : devices.stale > 0
+      ? devices.stale > 2 ? 'danger' : 'warning'
+      : 'neutral';
+  const pendingTone: 'neutral' | 'warning' = devices && devices.pending > 0 ? 'warning' : 'neutral';
+
   return (
     <DashboardWidgetFrame
       title="System-Checks"
-      description="API, Laufzeitstatus, Speicherlage und Housekeeping im Blick."
+      description="Verbindungen, Geräte-Bilanz und Wartung im Blick."
       icon={Activity}
       actions={(
         <Link
@@ -105,84 +181,96 @@ export function SystemChecksWidget({
         </Link>
       )}
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-spa-text-secondary">Backend API</span>
-          <StatusBadge
-            label={backendStatus === 'ok' ? 'OK' : 'Fehler'}
-            tone={backendTone}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-spa-text-secondary">Datenbasis</span>
-          <StatusBadge
-            label={dataTone === 'success' ? 'Konsistent' : 'Prüfen'}
-            tone={dataTone}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-spa-text-secondary">WebSocket</span>
-          <StatusBadge
-            label={wsConnected ? 'Verbunden' : 'Getrennt'}
-            tone={websocketTone}
-            pulse={wsConnected}
-          />
-        </div>
+      {/* Verbindungsstatus — kompakte Zeilen mit Icons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <ConnectivityRow
+          icon={Globe}
+          label="Backend API"
+          badge={<StatusBadge label={backendStatus === 'ok' ? 'OK' : 'Fehler'} tone={backendTone} />}
+        />
+        <ConnectivityRow
+          icon={Database}
+          label="Datenbasis"
+          badge={<StatusBadge label={dataTone === 'success' ? 'Konsistent' : 'Prüfen'} tone={dataTone} />}
+        />
+        <ConnectivityRow
+          icon={Wifi}
+          label="WebSocket"
+          badge={
+            <StatusBadge
+              label={wsConnected ? 'Verbunden' : 'Getrennt'}
+              tone={websocketTone}
+              pulse={wsConnected}
+            />
+          }
+        />
         {isAdmin && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-spa-text-secondary">Systemupdate</span>
-            <StatusBadge label={updateLabel} tone={updateTone} />
-          </div>
+          <ConnectivityRow
+            icon={RefreshCw}
+            label="Systemupdate"
+            badge={<StatusBadge label={updateLabel} tone={updateTone} />}
+          />
         )}
       </div>
 
+      {/* Details-Toggle */}
       <div className="mt-4 border-t border-spa-bg-secondary pt-3">
         <button
           type="button"
           onClick={() => setDetailOpen((prev) => !prev)}
           className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-sm font-semibold text-spa-text-secondary transition-colors hover:text-spa-text-primary"
+          aria-expanded={detailOpen}
+          aria-controls="system-checks-details"
         >
-          <span>Details {hasWarnings ? `(${warnings.length} Warnungen)` : ''}</span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${detailOpen ? 'rotate-180' : ''}`} />
+          <span className="inline-flex items-center gap-2">
+            Details
+            {hasWarnings && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-spa-warning-light px-1.5 py-0.5 text-[10px] font-bold uppercase text-spa-warning-dark">
+                <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
+                {warnings.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown
+            className={clsx('h-4 w-4 transition-transform', detailOpen && 'rotate-180')}
+            aria-hidden="true"
+          />
         </button>
       </div>
 
       {detailOpen && (
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="rounded-lg bg-spa-bg-primary p-4">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary flex items-center gap-2">
-                <HardDrive className="w-3.5 h-3.5" />
-                Speicher
-              </p>
-              {runtimeStatus ? (
-                <StatusBadge
-                  label={`${runtimeStatus.disk.usagePercent}% belegt`}
-                  tone={getDiskTone(runtimeStatus.disk.usagePercent)}
-                />
-              ) : (
-                <StatusBadge label="Lädt" tone="neutral" />
+        <div id="system-checks-details" className="mt-3 space-y-4">
+          {/* Geräte-Bilanz aus runtimeStatus.devices */}
+          {devices && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-spa-text-secondary flex items-center gap-1.5">
+                  <MonitorCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  Geräte-Bilanz
+                </p>
+                <span className="text-[11px] text-spa-text-secondary">
+                  {devices.total} gesamt
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <StatTile label="Online" value={devices.online} tone={onlineTone} />
+                <StatTile label="Offline" value={devices.offline} tone={offlineTone} />
+                <StatTile label="Wartend" value={devices.pending} tone={pendingTone} />
+                <StatTile label="Überfällig" value={devices.stale} tone={staleTone} />
+              </div>
+              {devices.neverSeen > 0 && (
+                <p className="mt-2 text-[11px] text-spa-text-secondary">
+                  <span className="font-semibold">{devices.neverSeen}</span> gepairtes Gerät noch nie gesehen — vermutlich neu hinzugefügt.
+                </p>
               )}
             </div>
-            {runtimeStatus ? (
-              <div className="text-xs text-spa-text-secondary space-y-1">
-                <p>
-                  Frei: <span className="font-semibold text-spa-text-primary">{formatFileSize(runtimeStatus.disk.availableBytes)}</span>
-                </p>
-                <p>
-                  Medien: <span className="font-semibold text-spa-text-primary">{runtimeStatus.media.filesOnDisk}</span> Dateien
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-spa-text-secondary">Laufzeitstatus wird geladen.</p>
-            )}
-          </div>
+          )}
 
-          <div className="rounded-lg bg-spa-bg-primary p-4">
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary flex items-center gap-2">
-                <Wrench className="w-3.5 h-3.5" />
+          {/* Housekeeping */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-spa-text-secondary flex items-center gap-1.5">
+                <Wrench className="h-3.5 w-3.5" aria-hidden="true" />
                 Housekeeping
               </p>
               {maintenanceBadge ? (
@@ -192,168 +280,106 @@ export function SystemChecksWidget({
               )}
             </div>
             {maintenance ? (
-              <div className="text-xs text-spa-text-secondary space-y-1">
-                <p>
+              <div className="rounded-xl border border-spa-bg-secondary bg-spa-bg-primary/40 p-3 space-y-1.5">
+                <p className="text-xs text-spa-text-secondary">
                   Letzter Lauf:{' '}
                   <span className="font-semibold text-spa-text-primary">
-                    {maintenance.lastRunAt ? formatRelativeTime(toValidDate(maintenance.lastRunAt)) : 'noch nicht'}
+                    {maintenance.lastRunAt
+                      ? formatRelativeTime(toValidDate(maintenance.lastRunAt))
+                      : 'noch nicht'}
                   </span>
                 </p>
-                <p>
-                  Bereinigt: <span className="font-semibold text-spa-text-primary">{maintenance.deletedExpiredSessions}</span> Sessions,
-                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedOrphanUploadFiles}</span> Uploads,
-                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedStaleDeviceSnapshots}</span> Snapshots
-                </p>
-                <p>
-                  Aufbewahrung: <span className="font-semibold text-spa-text-primary">{maintenance.removedExpiredAuditLogs}</span> Audit-Einträge,
-                  <span className="font-semibold text-spa-text-primary"> {maintenance.removedOldBackupFiles}</span> Backups,
-                  <span className="font-semibold text-spa-text-primary"> {maintenance.trimmedLargeLogFiles}</span> Logs gekürzt
-                </p>
+                {/* Bereinigungs-Counts kompakt als Inline-Chips */}
+                {(() => {
+                  // Single Source of Truth für die Bereinigungs-Counts —
+                  // sowohl die Chip-Liste als auch der Idle-Hinweis lesen
+                  // dasselbe Array. Verhindert Drift, wenn die Maintenance-
+                  // Felder erweitert werden (z. B. neues Counter-Feld
+                  // hinzukommt und in einer der beiden Stellen vergessen
+                  // wird).
+                  const cleanupCounts = [
+                    { label: 'Sessions', value: maintenance.deletedExpiredSessions },
+                    { label: 'Uploads', value: maintenance.removedOrphanUploadFiles },
+                    { label: 'Snapshots', value: maintenance.removedStaleDeviceSnapshots },
+                    { label: 'Audit', value: maintenance.removedExpiredAuditLogs },
+                    { label: 'Backups', value: maintenance.removedOldBackupFiles },
+                    { label: 'Logs alt', value: maintenance.removedOldLogFiles },
+                    { label: 'Logs gekürzt', value: maintenance.trimmedLargeLogFiles },
+                  ];
+                  const activeChips = cleanupCounts.filter((chip) => chip.value > 0);
+                  return (
+                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                      {activeChips.map((chip) => (
+                        <span
+                          key={chip.label}
+                          className="inline-flex items-center gap-1 rounded-full bg-spa-surface px-2 py-0.5 text-spa-text-secondary border border-spa-bg-secondary"
+                        >
+                          <CheckCircle2 className="h-2.5 w-2.5 text-spa-success" aria-hidden="true" />
+                          <span className="font-semibold text-spa-text-primary tabular-nums">{chip.value}</span>
+                          {chip.label}
+                        </span>
+                      ))}
+                      {activeChips.length === 0 && (
+                        <span className="text-spa-text-secondary">Nichts zu bereinigen.</span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <p className="text-xs text-spa-text-secondary">Wartungsstatus wird geladen.</p>
             )}
           </div>
-        </div>
 
-        <div className="rounded-lg bg-spa-bg-primary p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-spa-text-secondary">
-              Verlauf letzte {runtimeHistory?.periodHours || 24}h
-            </p>
-            {historySummary ? (
-              <span className="text-xs text-spa-text-secondary">
-                {historySummary.sampleCount} Punkte
+          {/* Laufzeitwarnungen */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-spa-text-secondary flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                Laufzeitwarnungen
+              </p>
+              <span className="text-[11px] text-spa-text-secondary">
+                {warnings.length > 0 ? `${warnings.length} aktiv` : 'Keine'}
               </span>
+            </div>
+
+            {warnings.length > 0 ? (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1 overscroll-contain">
+                {warnings.map((warning) => (
+                  <div
+                    key={warning.id}
+                    className={clsx(
+                      'rounded-lg border px-3 py-2',
+                      warning.level === 'danger'
+                        ? 'border-spa-error/30 bg-spa-error-light/60'
+                        : 'border-spa-warning/30 bg-spa-warning-light/70',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="text-sm font-semibold text-spa-text-primary truncate">
+                        {warning.title}
+                      </p>
+                      <StatusBadge
+                        label={getCategoryLabel(warning.category)}
+                        tone={warning.level === 'danger' ? 'danger' : 'warning'}
+                        showDot={false}
+                      />
+                    </div>
+                    <p className="text-xs text-spa-text-secondary leading-relaxed">
+                      {warning.detail}
+                    </p>
+                  </div>
+                ))}
+              </div>
             ) : (
-              <StatusBadge label="Lädt" tone="neutral" />
+              <div className="flex items-center gap-2 rounded-lg border border-spa-success/30 bg-spa-success-light/60 px-3 py-2 text-xs text-spa-success-dark">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Keine akuten Speicher-, Medien- oder Heartbeat-Warnungen erkannt.
+              </div>
             )}
           </div>
-
-          {historySummary && historySummary.sampleCount > 0 ? (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setSelectedHistoryMetric('heartbeats')}
-                className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
-                  Heartbeats
-                </p>
-                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
-                  Ø {historySummary.avgOnlineDevices}
-                </p>
-                <p className="text-xs text-spa-text-secondary">
-                  Max. {historySummary.maxStaleDevices} überfällig
-                </p>
-                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.staleDevices, false)}`}>
-                  Überfällig {formatSignedValue(historySummary.deltas.staleDevices)}
-                </p>
-                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
-                  Details öffnen
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedHistoryMetric('warnings')}
-                className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
-                  Warnlagen
-                </p>
-                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
-                  Peak {historySummary.maxSystemWarningCount}
-                </p>
-                <p className="text-xs text-spa-text-secondary">
-                  Aktiver Verlauf seit {historySummary.coverageHours}h · ohne Heartbeats
-                </p>
-                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.systemWarningCount, false)}`}>
-                  Warnungen {formatSignedValue(historySummary.deltas.systemWarningCount)}
-                </p>
-                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
-                  Details öffnen
-                </p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedHistoryMetric('disk')}
-                className="rounded-lg border border-spa-bg-secondary bg-spa-surface px-3 py-3 text-left transition-all hover:border-spa-primary/40 hover:shadow-xs focus:outline-hidden focus:ring-2 focus:ring-spa-primary/30"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
-                  Speichertrend
-                </p>
-                <p className="mt-1 text-lg font-semibold text-spa-text-primary">
-                  Peak {historySummary.maxDiskUsagePercent}%
-                </p>
-                <p className="text-xs text-spa-text-secondary">
-                  Letzte Probe {historySummary.lastPointAt ? formatRelativeTime(toValidDate(historySummary.lastPointAt)) : 'unbekannt'}
-                </p>
-                <p className={`mt-2 text-xs font-semibold ${getDeltaTone(historySummary.deltas.diskUsagePercent, false)}`}>
-                  Speicher {formatSignedValue(historySummary.deltas.diskUsagePercent, '%')}
-                </p>
-                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-spa-primary">
-                  Details öffnen
-                </p>
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-spa-bg-secondary bg-spa-surface px-3 py-3 text-xs text-spa-text-secondary">
-              Noch nicht genug Verlaufsdaten vorhanden. Die Historie füllt sich im laufenden Betrieb automatisch.
-            </div>
-          )}
         </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <p className="text-sm font-semibold text-spa-text-primary flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Laufzeitwarnungen
-            </p>
-            <span className="text-xs text-spa-text-secondary">
-              {warnings.length > 0 ? `${warnings.length} aktiv` : 'Keine aktiven Warnungen'}
-            </span>
-          </div>
-
-          {warnings.length > 0 ? (
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 overscroll-contain">
-              {warnings.map((warning) => (
-                <div
-                  key={warning.id}
-                  className="rounded-lg border px-3 py-2"
-                  style={{
-                    borderColor: warning.level === 'danger' ? 'rgba(220,38,38,0.18)' : 'rgba(217,119,6,0.18)',
-                    backgroundColor: warning.level === 'danger' ? 'rgba(254,242,242,0.75)' : 'rgba(255,251,235,0.75)',
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-3 mb-1">
-                    <p className="text-sm font-semibold text-spa-text-primary">{warning.title}</p>
-                    <StatusBadge
-                      label={getCategoryLabel(warning.category)}
-                      tone={warning.level === 'danger' ? 'danger' : 'warning'}
-                      showDot={false}
-                    />
-                  </div>
-                  <p className="text-xs text-spa-text-secondary leading-relaxed">{warning.detail}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-spa-bg-secondary bg-spa-bg-primary px-3 py-2 text-xs text-spa-text-secondary">
-              Keine akuten Speicher-, Medien- oder Heartbeat-Warnungen erkannt.
-            </div>
-          )}
-        </div>
-      </div>
       )}
-
-      <RuntimeHistoryDetailDialog
-        metric={selectedHistoryMetric}
-        runtimeHistory={runtimeHistory}
-        runtimeStatus={runtimeStatus}
-        onClose={() => setSelectedHistoryMetric(null)}
-      />
     </DashboardWidgetFrame>
   );
 }

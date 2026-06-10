@@ -4,7 +4,9 @@ import Fuse from 'fuse.js';
 import {
   Home, Calendar, Monitor, Presentation, Image, Flame, Settings, Users,
   Search, CornerDownLeft, ArrowUp, ArrowDown,
+  Plus, Upload, ExternalLink, Copy as CopyIcon,
 } from 'lucide-react';
+import { toast } from '@/stores/toastStore';
 import clsx from 'clsx';
 import { useCommandPaletteContext, type CommandItem } from '@/contexts/CommandPaletteContext';
 
@@ -24,6 +26,18 @@ const NAV_ITEMS: Omit<CommandItem, 'action'>[] = [
   { id: 'nav-users', label: 'Benutzer', description: 'Rollen und Zugriff', icon: Users, group: 'Seiten' },
 ];
 
+// Quick-Create-Actions: navigieren zur passenden Page mit Hash, der die
+// Page beim Laden in Add-Mode versetzt. Kein neuer Backend-Roundtrip,
+// keine Race-Conditions — die Page bleibt Owner ihrer Edit-Logik.
+const ACTIONS: Omit<CommandItem, 'action'>[] = [
+  { id: 'action-add-sauna', label: 'Neue Sauna anlegen', description: 'Direkt zur Saunen-Seite springen', icon: Plus, group: 'Aktionen' },
+  { id: 'action-upload-media', label: 'Medien hochladen', description: 'Datei-Upload öffnen', icon: Upload, group: 'Aktionen' },
+  { id: 'action-create-slideshow', label: 'Neue Slideshow', description: 'Slideshow-Editor öffnen', icon: Plus, group: 'Aktionen' },
+  { id: 'action-pair-device', label: 'Gerät koppeln', description: 'Pairing-Übersicht öffnen', icon: Plus, group: 'Aktionen' },
+  { id: 'action-display-url', label: 'Display-URL kopieren', description: 'URL für Pairing in Zwischenablage', icon: CopyIcon, group: 'Aktionen' },
+  { id: 'action-open-display', label: 'Display-Vorschau öffnen', description: 'Live-Display in neuem Tab', icon: ExternalLink, group: 'Aktionen' },
+];
+
 const ROUTE_MAP: Record<string, string> = {
   'nav-dashboard': '/',
   'nav-schedule': '/schedule',
@@ -33,6 +47,12 @@ const ROUTE_MAP: Record<string, string> = {
   'nav-saunas': '/saunas',
   'nav-settings': '/settings',
   'nav-users': '/users',
+  // Quick-Action Routen mit Hash-Markern. Die Pages prüfen bei Mount
+  // den Hash (#add bzw. #upload) und öffnen den passenden Dialog.
+  'action-add-sauna': '/saunas#add',
+  'action-upload-media': '/media#upload',
+  'action-create-slideshow': '/slideshow',
+  'action-pair-device': '/devices',
 };
 
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
@@ -47,6 +67,23 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     ...NAV_ITEMS.map((item) => ({
       ...item,
       action: () => {
+        const route = ROUTE_MAP[item.id];
+        if (route) navigate(route);
+      },
+    })),
+    ...ACTIONS.map((item) => ({
+      ...item,
+      action: () => {
+        if (item.id === 'action-display-url') {
+          const url = `${window.location.origin}/display`;
+          void navigator.clipboard?.writeText(url);
+          toast.success(`Display-URL kopiert: ${url}`);
+          return;
+        }
+        if (item.id === 'action-open-display') {
+          window.open('/display', '_blank', 'noopener');
+          return;
+        }
         const route = ROUTE_MAP[item.id];
         if (route) navigate(route);
       },
@@ -127,6 +164,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-spa-bg-secondary">
           <Search className="h-5 w-5 text-spa-text-secondary shrink-0" aria-hidden="true" />
+          {/* WAI-ARIA 1.2 Combobox-Pattern: das Input bekommt
+              role="combobox" + aria-controls auf die Listbox-ID, damit
+              Screenreader die Verbindung zwischen Suche und Optionen
+              kennen und Pfeil-/Enter-Tasten korrekt ankündigen. */}
           <input
             ref={inputRef}
             type="text"
@@ -135,7 +176,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             onKeyDown={handleKeyDown}
             placeholder="Seite oder Aktion suchen..."
             className="flex-1 bg-transparent text-spa-text-primary placeholder:text-spa-text-secondary/60 outline-hidden text-sm"
+            role="combobox"
             aria-label="Suche"
+            aria-expanded
+            aria-controls="cmd-palette-listbox"
+            aria-autocomplete="list"
             aria-activedescendant={results[selectedIndex] ? `cmd-${results[selectedIndex].id}` : undefined}
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 rounded border border-spa-bg-secondary bg-spa-bg-primary px-1.5 py-0.5 text-[10px] font-medium text-spa-text-secondary">
@@ -144,7 +189,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         </div>
 
         {/* Results */}
-        <div ref={listRef} className="max-h-72 overflow-y-auto p-2" role="listbox">
+        <div
+          ref={listRef}
+          id="cmd-palette-listbox"
+          className="max-h-72 overflow-y-auto p-2"
+          role="listbox"
+          aria-label="Befehl- und Navigations-Ergebnisse"
+        >
           {results.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-spa-text-secondary">
               Keine Ergebnisse für &ldquo;{query}&rdquo;

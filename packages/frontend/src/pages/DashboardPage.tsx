@@ -1,6 +1,7 @@
 import { Layout } from '@/components/Layout';
 import { OperationsPulseWidget } from '@/components/Dashboard/OperationsPulseWidget';
 import { AttentionBoardWidget } from '@/components/Dashboard/AttentionBoardWidget';
+import { OnboardingChecklistWidget } from '@/components/Dashboard/OnboardingChecklistWidget';
 import { SystemChecksWidget } from '@/components/Dashboard/SystemChecksWidget';
 import { MediaStatsWidget } from '@/components/Dashboard/MediaStatsWidget';
 import { ActivityFeedWidget } from '@/components/Dashboard/ActivityFeedWidget';
@@ -19,10 +20,11 @@ export function DashboardPage() {
     schedule, settings, wsConnected,
     isAdmin,
     liveState, mediaStats, eventStats,
-    runningSlideshows, deviceSlideshowRows, systemChecks, updateLabel,
-    runtimeStatus, runtimeHistory,
+    deviceSlideshowRows, systemChecks, updateLabel,
+    runtimeStatus,
     attentionItems,
     activityItems,
+    onboardingState,
   } = useDashboardData();
 
   if (isLoading) {
@@ -91,13 +93,11 @@ export function DashboardPage() {
           <InlineErrorBoundary fallbackLabel="Betriebsstatus konnte nicht geladen werden.">
             <OperationsPulseWidget
               liveState={liveState}
-              runningSlideshows={runningSlideshows}
               nextEventLabel={nextEventDesc.value}
               activePreset={liveState.activePreset}
               autoPlay={Boolean(schedule?.autoPlay)}
               schedule={schedule ?? null}
               settings={settings ?? null}
-              pairedDevices={liveState.pairedDevices}
             />
           </InlineErrorBoundary>
           <InlineErrorBoundary fallbackLabel="Meldungen konnten nicht geladen werden.">
@@ -105,8 +105,14 @@ export function DashboardPage() {
           </InlineErrorBoundary>
         </div>
 
-        {/* Row 2: Laufende Slideshows */}
-        <InlineErrorBoundary fallbackLabel="Laufende Slideshows konnten nicht geladen werden.">
+        {/* Onboarding-Checkliste — nur sichtbar solange noch nicht alle
+            Setup-Schritte abgehakt sind. */}
+        <InlineErrorBoundary fallbackLabel="Onboarding-Übersicht konnte nicht geladen werden.">
+          <OnboardingChecklistWidget state={onboardingState} />
+        </InlineErrorBoundary>
+
+        {/* Row 2: Geräte-Übersicht (vereint Slideshow-Status + Health) */}
+        <InlineErrorBoundary fallbackLabel="Geräte-Übersicht konnte nicht geladen werden.">
           <RunningSlideshowsWidget rows={deviceSlideshowRows} />
         </InlineErrorBoundary>
 
@@ -127,15 +133,16 @@ export function DashboardPage() {
               isAdmin={isAdmin}
               updateLabel={updateLabel}
               runtimeStatus={runtimeStatus}
-              runtimeHistory={runtimeHistory}
             />
           </InlineErrorBoundary>
-          <InlineErrorBoundary fallbackLabel="Medien-Statistiken konnten nicht geladen werden.">
+          <InlineErrorBoundary fallbackLabel="Medien & Speicher konnte nicht geladen werden.">
             <MediaStatsWidget
               images={mediaStats.images}
               audio={mediaStats.audio}
               videos={mediaStats.videos}
               totalSize={mediaStats.totalSize}
+              latestMedia={mediaStats.latestMedia}
+              runtimeStatus={runtimeStatus}
             />
           </InlineErrorBoundary>
         </div>

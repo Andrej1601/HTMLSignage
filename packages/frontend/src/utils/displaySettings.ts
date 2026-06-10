@@ -11,14 +11,9 @@ import {
   type ThemeColors,
 } from '@/types/settings.types';
 import { findMediaById, buildUploadUrl, toAbsoluteMediaUrl } from '@/utils/mediaUrl';
-import { getDeviceOverrideSettings } from '@/utils/deviceUtils';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
 import { deepMergeRecords, isPlainRecord } from '@/utils/objectUtils';
 import { migrateSettings } from '@/utils/slideshowMigration';
-
-function isSlideshowLike(value: unknown): boolean {
-  return isPlainRecord(value) && Array.isArray((value as { slides?: unknown }).slides);
-}
 
 export function applyActiveEventSettings(
   baseSettings: Settings | undefined,
@@ -53,6 +48,9 @@ export function applyActiveEventSettings(
     const sc = slideshowConfig as unknown as Record<string, unknown>;
     if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance as Settings['displayAppearance'];
     if (sc.designStyle) merged.designStyle = sc.designStyle as Settings['designStyle'];
+    if (sc.saunaDetailStyle) {
+      merged.saunaDetailStyle = sc.saunaDetailStyle as Settings['saunaDetailStyle'];
+    }
     if (sc.colorPalette) {
       const palette = sc.colorPalette as ColorPaletteName;
       merged.colorPalette = palette;
@@ -60,6 +58,21 @@ export function applyActiveEventSettings(
         ...getColorPalette(palette),
         ...(isPlainRecord(sc.theme) ? (sc.theme as Partial<ThemeColors>) : {}),
       });
+    }
+    if (isPlainRecord(sc.header) && Object.keys(sc.header).length > 0) {
+      merged.header = {
+        ...(merged.header ?? {}),
+        ...(sc.header as Partial<Settings['header']>),
+      } as Settings['header'];
+    }
+    if (
+      isPlainRecord(sc.maintenanceScreen) &&
+      Object.keys(sc.maintenanceScreen).length > 0
+    ) {
+      merged.maintenanceScreen = {
+        ...(merged.maintenanceScreen ?? {}),
+        ...(sc.maintenanceScreen as Partial<Settings['maintenanceScreen']>),
+      } as Settings['maintenanceScreen'];
     }
   }
 
@@ -88,30 +101,13 @@ export function resolveEffectiveDeviceSettings(
 ): {
   settings: Settings;
   activeEvent: Event | null;
-  hasOverrideSettings: boolean;
-  hasOverrideSlideshow: boolean;
 } {
   const normalizedGlobal = migrateSettings(globalSettings || getDefaultSettings());
-  const overrideSettings = getDeviceOverrideSettings(device ?? null);
-  const hasOverrideSettings = Object.keys(overrideSettings).length > 0;
-  const hasOverrideSlideshow = isSlideshowLike(overrideSettings.slideshow);
-
-  const baseSettings = device?.mode === 'override' && hasOverrideSettings
-    ? migrateSettings(
-        deepMergeRecords(
-          normalizedGlobal as unknown as Record<string, unknown>,
-          overrideSettings,
-        ) as unknown as Settings,
-      )
-    : normalizedGlobal;
-
-  const { settings, activeEvent } = applyActiveEventSettings(baseSettings, now, device?.id);
+  const { settings, activeEvent } = applyActiveEventSettings(normalizedGlobal, now, device?.id);
 
   return {
     settings,
     activeEvent,
-    hasOverrideSettings,
-    hasOverrideSlideshow,
   };
 }
 
@@ -143,7 +139,9 @@ export function collectDisplayAssetUrls(settings: Settings | undefined, media?: 
   const mediaItems = media || [];
 
   settings.slideshow?.slides?.forEach((slide) => {
-    addMediaIdUrl(urls, mediaItems, slide.mediaId);
+    if (slide.type === 'media-image' || slide.type === 'media-video') {
+      addMediaIdUrl(urls, mediaItems, slide.mediaId);
+    }
   });
 
   settings.infos?.forEach((info) => {
@@ -161,7 +159,9 @@ export function collectDisplayAssetUrls(settings: Settings | undefined, media?: 
     const eventSlideshow = event.settingsOverrides?.slideshow;
     if (eventSlideshow?.slides) {
       eventSlideshow.slides.forEach((slide) => {
-        addMediaIdUrl(urls, mediaItems, slide.mediaId);
+        if (slide.type === 'media-image' || slide.type === 'media-video') {
+          addMediaIdUrl(urls, mediaItems, slide.mediaId);
+        }
       });
     }
   });

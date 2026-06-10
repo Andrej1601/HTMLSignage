@@ -6,7 +6,12 @@ import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30000,
+      // Most admin data (schedule, settings, slideshows, devices, media) is
+      // kept fresh by WebSocket-driven invalidation, so a longer staleness
+      // window avoids redundant background refetches. gcTime is set explicitly
+      // so cache for long-lived admin sessions isn't evicted too aggressively.
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
     },
   },

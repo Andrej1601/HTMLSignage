@@ -5,7 +5,6 @@ import {
   buildBulkDeviceUpdateAuditDetails,
   buildDeviceCreateAuditDetails,
   buildDeviceCreateData,
-  buildDeviceDisplayConfigPayload,
   buildDevicePairAuditDetails,
   buildDeviceUpdateAuditDetails,
   buildDeviceUpdateData,
@@ -121,24 +120,6 @@ test('findMissingEntityIds returns only ids that are not present in the result s
     findMissingEntityIds(['a', 'b', 'c'], [{ id: 'a' }, { id: 'c' }]),
     ['b'],
   );
-});
-
-test('buildDeviceDisplayConfigPayload prefers overrides only in override mode', () => {
-  const payload = buildDeviceDisplayConfigPayload({
-    deviceId: 'device-1',
-    mode: 'override',
-    maintenanceMode: true,
-    globalSchedule: { version: 1 },
-    globalSettings: { header: { enabled: true } },
-    overrideSchedule: { version: 2 },
-    overrideSettings: { display: { compactMode: true } },
-  });
-
-  assert.equal(payload.hasScheduleOverride, true);
-  assert.equal(payload.hasSettingsOverride, true);
-  assert.deepEqual(payload.schedule, { version: 2 });
-  assert.equal((payload.settings.header as { enabled?: boolean }).enabled, true);
-  assert.deepEqual(payload.settings.display, { compactMode: true });
 });
 
 test('generateUniquePairingCode retries deterministic alternatives when a code is taken', async () => {

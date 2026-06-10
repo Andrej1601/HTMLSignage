@@ -64,11 +64,11 @@ export const DeviceSnapshotSchema = z.object({
   imageDataUrl: z.string().min(100).max(6_000_000),
 });
 
+// Device-level overrides are now scoped to the schedule only. Design/theme
+// customisation lives on SlideshowConfig and flows to devices via
+// `device.slideshowId` assignment.
 export const OverridesSchema = z.object({
-  schedule: ScheduleSchema.optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
-}).refine((data) => Boolean(data.schedule) || Boolean(data.settings), {
-  message: 'At least one override (schedule or settings) is required',
+  schedule: ScheduleSchema,
 });
 
 export { attachDeviceSnapshotMetaList, findMissingEntityIds };

@@ -3,15 +3,11 @@ import { useSlideshow } from '@/hooks/useSlideshow';
 import { useDisplayClientRuntime } from '@/hooks/useDisplayClientRuntime';
 import { useDisplaySnapshotCapture } from '@/hooks/useDisplaySnapshotCapture';
 import { DisplayLayoutRenderer } from '@/components/Display/DisplayLayoutRenderer';
-import { preloadDisplayModules } from '@/components/Display/displayDynamicModules';
 import { normalizeDisplayLayout } from '@/components/Display/displayLayoutUtils';
 import { generateDashboardColors, getColorPalette, getDefaultSettings } from '@/types/settings.types';
 import type { SlideConfig } from '@/types/slideshow.types';
 import { ENV_IS_DEV } from '@/config/env';
-import {
-  DEFAULT_DISPLAY_APPEARANCE,
-  isModernScheduleDesignStyleValue,
-} from '@/config/displayDesignStyles';
+import { isModernScheduleDesignStyleValue } from '@/config/displayDesignStyles';
 import { migrateSettings } from '@/utils/slideshowMigration';
 import { classNames } from '@/utils/classNames';
 import { normalizeAudioSettings } from '@/utils/audioUtils';
@@ -38,7 +34,6 @@ export function DisplayClientPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const displayRootRef = useRef<HTMLDivElement | null>(null);
   const lastPrefetchedAssetSignatureRef = useRef<string | null>(null);
-  const lastPreloadedModuleSignatureRef = useRef<string | null>(null);
   const {
     displayDeviceId,
     displayDeviceName,
@@ -57,24 +52,52 @@ export function DisplayClientPage() {
     deviceToken,
   } = useDisplayClientRuntime(isPreviewMode);
 
-  const effectiveSettings = useMemo(() => {
-    const { settings: base } = applyActiveEventSettings(
+  // Optimierung: `eventClock` tickt alle 30 s. Wenn wir es direkt als
+  // Memo-Dep nutzen, wird `effectiveSettings` jede halbe Minute neu
+  // berechnet — und damit alle nachgelagerten Memos (mediaAssetUrls,
+  // resolvedAudioSettings, …) und der gesamte Display-Render-Baum.
+  // Stattdessen: Active-Event-Berechnung von eventClock abhängig
+  // halten, aber als Dep für `effectiveSettings` nur die *Identität*
+  // des Events verwenden. Damit ändert sich `effectiveSettings` nur
+  // an Event-Grenzen, nicht im Sekundentakt.
+  const eventComputation = useMemo(() => {
+    return applyActiveEventSettings(
       migrateSettings(localSettings || getDefaultSettings()),
       new Date(eventClock),
       displayDeviceId,
     );
-    // Apply design overrides from slideshow config onto top-level settings
+  }, [displayDeviceId, localSettings, eventClock]);
+
+  const activeEventId = eventComputation.activeEvent?.id ?? null;
+
+  const effectiveSettings = useMemo(() => {
+    const base = eventComputation.settings;
     const sc = base.slideshow;
     if (!sc) return base;
     const merged = { ...base };
     if (sc.displayAppearance) merged.displayAppearance = sc.displayAppearance;
     if (sc.designStyle) merged.designStyle = sc.designStyle;
+    if (sc.saunaDetailStyle) merged.saunaDetailStyle = sc.saunaDetailStyle;
     if (sc.colorPalette) {
       merged.colorPalette = sc.colorPalette;
       merged.theme = generateDashboardColors(getColorPalette(sc.colorPalette));
     }
+    if (sc.header && Object.keys(sc.header).length > 0) {
+      merged.header = { ...(merged.header ?? {}), ...sc.header } as typeof merged.header;
+    }
+    // Per-slideshow maintenance-screen override. Missing fields fall
+    // through to the global `settings.maintenanceScreen`.
+    if (sc.maintenanceScreen && Object.keys(sc.maintenanceScreen).length > 0) {
+      merged.maintenanceScreen = {
+        ...(merged.maintenanceScreen ?? {}),
+        ...sc.maintenanceScreen,
+      } as typeof merged.maintenanceScreen;
+    }
     return merged;
-  }, [displayDeviceId, localSettings, eventClock]);
+    // Bewusst NICHT eventClock: nur die Event-Identität entscheidet, ob
+    // die Slideshow-/Theme-Merge neu gemacht werden muss.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayDeviceId, localSettings, activeEventId]);
 
   // Audio: disabled in preview mode, slideshow audioOverride takes priority over global
   const resolvedAudioSettings = useMemo(() => {
@@ -94,6 +117,8 @@ export function DisplayClientPage() {
     [resolvedAudioSettings, mediaItems],
   );
 
+  // Memoised so these reads don't recompute on every render of the 24/7
+  // display client (React Compiler is not enabled in this build).
   const maintenanceScreen = useMemo(
     () => normalizeMaintenanceScreenSettings(effectiveSettings.maintenanceScreen),
     [effectiveSettings.maintenanceScreen],
@@ -101,7 +126,7 @@ export function DisplayClientPage() {
 
   const maintenanceBackgroundUrl = useMemo(
     () => getMediaUploadUrl(mediaItems, maintenanceScreen.backgroundImageId),
-    [maintenanceScreen.backgroundImageId, mediaItems],
+    [mediaItems, maintenanceScreen.backgroundImageId],
   );
 
   const {
@@ -117,14 +142,6 @@ export function DisplayClientPage() {
     () => displayAssetUrls.join('|'),
     [displayAssetUrls],
   );
-  const displayModulePreloadSignature = useMemo(() => {
-    const slideSignature = (effectiveSettings.slideshow?.slides || [])
-      .map((slide) => `${slide.id}:${slide.type}`)
-      .join('|');
-
-    return `${effectiveSettings.designStyle || 'modern-wellness'}|${slideSignature}`;
-  }, [effectiveSettings.designStyle, effectiveSettings.slideshow?.slides]);
-
   useEffect(() => {
     if (lastPrefetchedAssetSignatureRef.current === displayAssetSignature) {
       return;
@@ -134,21 +151,9 @@ export function DisplayClientPage() {
     void prefetchDisplayAssets(displayAssetUrls);
   }, [displayAssetSignature, displayAssetUrls]);
 
-  useEffect(() => {
-    if (lastPreloadedModuleSignatureRef.current === displayModulePreloadSignature) {
-      return;
-    }
-
-    lastPreloadedModuleSignatureRef.current = displayModulePreloadSignature;
-    preloadDisplayModules({
-      designStyle: effectiveSettings.designStyle,
-      slides: effectiveSettings.slideshow?.slides,
-    });
-  }, [
-    displayModulePreloadSignature,
-    effectiveSettings.designStyle,
-    effectiveSettings.slideshow?.slides,
-  ]);
+  // Design packs handle their own code-split loading via dynamic imports
+  // registered in `@/designs/registry.ts`. The old per-slide-type preload
+  // was specific to the retired `displayDynamicModules` lazy loaders.
 
   const tryPlayAudio = useCallback(async () => {
     const audio = audioRef.current;
@@ -210,11 +215,27 @@ export function DisplayClientPage() {
     window.addEventListener('pointerdown', unlockAudio);
     window.addEventListener('keydown', unlockAudio);
 
+    // Kiosk-Recovery: in der Live-Auspielung (cursor: none, keine
+    // Tastatur am Display) wird `pointerdown`/`keydown` nie feuern.
+    // Damit das Spa nicht stundenlang stumm läuft, versuchen wir alle
+    // 15 s erneut zu starten — Browser-Autoplay-Policies entsperren
+    // sich z. B. nach Page-Visibility-Wechseln, Settings-Updates oder
+    // wenn der Browser inzwischen einen User-Activation-Token bekommen
+    // hat. Im Preview-Modus lassen wir den Button weiter die Hauptrolle
+    // spielen — der Admin sieht so klar, dass etwas nicht passt.
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    if (!isPreviewMode) {
+      intervalId = setInterval(() => {
+        void tryPlayAudio();
+      }, 15_000);
+    }
+
     return () => {
       window.removeEventListener('pointerdown', unlockAudio);
       window.removeEventListener('keydown', unlockAudio);
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio]);
+  }, [isAudioBlocked, effectiveAudio.enabled, effectiveAudioSrc, tryPlayAudio, isPreviewMode]);
 
   // Slideshow
   const {
@@ -241,7 +262,7 @@ export function DisplayClientPage() {
     [defaultTransition]
   );
 
-  const defaults = getDefaultSettings();
+  const defaults = useMemo(() => getDefaultSettings(), []);
   const themeColors = effectiveSettings.theme || defaults.theme!;
   const safeLayout = normalizeDisplayLayout(layout);
   const isLoading =
@@ -266,12 +287,17 @@ export function DisplayClientPage() {
     snapshotBackgroundColor: themeColors.dashboardBg || themeColors.bg || '#000000',
   });
 
+  // `eventClock` tickt nur auf Minuten-/30s-Grenzen — die Date-Identität an
+  // diesen Takt zu binden hält alle nachgelagerten `useMemo`s in den Slide-
+  // Datenhooks stabil, statt sie bei jedem Re-Render neu zu berechnen.
+  const displayNow = useMemo(() => new Date(eventClock), [eventClock]);
+
   // Pairing screen - show if not paired
   if (!isPreviewMode && isPairingLoading) {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center">
-          <div className="text-3xl font-bold mb-4">HTMLSignage</div>
+          <div className="text-3xl font-bold mb-4">Signage Control Center</div>
           <div className="text-lg">Wird geladen...</div>
         </div>
       </div>
@@ -282,12 +308,16 @@ export function DisplayClientPage() {
     return (
       <div className="w-full h-screen flex items-center justify-center bg-linear-to-br from-spa-primary to-spa-primary-dark text-white">
         <div className="text-center max-w-2xl px-8">
-          <div className="text-4xl font-bold mb-8">HTMLSignage</div>
+          <div className="text-4xl font-bold mb-8">Signage Control Center</div>
 
           <div className="bg-spa-surface/10 backdrop-blur-lg rounded-3xl p-12 mb-8">
             <h2 className="text-2xl font-semibold mb-6">Gerät nicht gepairt</h2>
-            <p className="text-lg mb-8 opacity-90">
-              Bitte geben Sie diesen Pairing-Code im Admin-Interface ein:
+            {/* Erklärtext aus 1-2 m Distanz lesbar — `text-base`
+                statt `text-lg` mit voller Opacity statt opacity-90.
+                Das Pairing erfolgt während Erstinstallation, der
+                Saunameister steht direkt vor dem Display. */}
+            <p className="text-base mb-8 leading-relaxed">
+              Bitte geben Sie diesen Code in der Admin-Oberfläche ein:
             </p>
 
             <div className="bg-spa-surface text-spa-primary rounded-2xl p-8 mb-6">
@@ -296,13 +326,16 @@ export function DisplayClientPage() {
               </div>
             </div>
 
-            <p className="text-sm opacity-75">
-              Öffnen Sie das Admin-Interface unter /devices und geben Sie diesen Code ein.
+            <p className="text-base leading-relaxed">
+              Admin öffnen → <span className="font-semibold">Geräte</span> → Code eingeben
             </p>
           </div>
 
-          <div className="text-sm opacity-60">
-            Device ID: {pairingInfo.id.slice(0, 12)}...
+          {/* Device-ID auf opacity-80 statt 60 — der Wert ist eh winzig
+              gerendert; weniger transparent macht ihn ohne mehr Platz
+              überhaupt erst lesbar. */}
+          <div className="text-sm opacity-80 font-mono">
+            Geräte-ID: {pairingInfo.id.slice(0, 12)}…
           </div>
         </div>
       </div>
@@ -365,11 +398,12 @@ export function DisplayClientPage() {
 
   if (isLoading) {
     return (
-      <div className="w-full h-screen flex items-center justify-center bg-spa-text-primary text-white">
+      <div className="w-full h-screen flex items-center justify-center bg-spa-bg-primary text-spa-text-primary">
         <div className="text-center">
-          <div className="text-2xl font-bold mb-4">HTMLSignage</div>
-          <div className="text-lg">Wird geladen...</div>
-          <div className="text-sm mt-2 opacity-70">
+          <div className="mx-auto mb-5 h-8 w-8 rounded-full border-2 border-spa-bg-secondary border-t-spa-primary animate-spin" />
+          <div className="text-2xl font-bold mb-2 text-spa-primary">HTMLSignage</div>
+          <div className="text-lg text-spa-text-secondary">Wird geladen...</div>
+          <div className="text-sm mt-2 text-spa-text-secondary/70">
             {isPreviewMode ? 'Vorschau' : (isConnected ? 'Verbunden' : 'Verbinde...')}
           </div>
         </div>
@@ -378,9 +412,7 @@ export function DisplayClientPage() {
   }
 
   const designStyle = effectiveSettings.designStyle || 'modern-wellness';
-  const displayAppearance = effectiveSettings.displayAppearance || DEFAULT_DISPLAY_APPEARANCE;
   const isModernDesign = isModernScheduleDesignStyleValue(designStyle);
-  const displayNow = new Date(eventClock);
 
   return (
     <div
@@ -394,7 +426,6 @@ export function DisplayClientPage() {
           currentSlide={currentSlide}
           currentSlideIndex={currentSlideIndex}
           currentTime={displayNow}
-          displayAppearance={displayAppearance}
           designStyle={designStyle}
           displayDeviceId={displayDeviceId || undefined}
           effectiveSettings={effectiveSettings}
@@ -423,29 +454,37 @@ export function DisplayClientPage() {
         }}
       />
 
-      {isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
+      {/* Audio-Unlock-Button: nur im Preview-Modus sichtbar.
+          Im Kiosk (cursor: none) wäre er unklickbar und würde Gäste
+          irritieren — dort übernimmt der Auto-Retry-Loop oben. */}
+      {isPreviewMode && isAudioBlocked && effectiveAudio.enabled && Boolean(effectiveAudioSourceUrl) && (
         <button
+          type="button"
           onClick={() => {
             void tryPlayAudio();
           }}
-          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black"
+          className="fixed bottom-6 right-6 z-50 px-4 py-2 rounded-lg bg-black/75 text-white text-sm hover:bg-black focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         >
-          {isPreviewMode ? 'Audio in Vorschau aktivieren' : 'Audio aktivieren'}
+          Audio in Vorschau aktivieren
         </button>
       )}
 
-      {/* Slide Indicators */}
+      {/* Slide Indicators — Container mit dunklem Backdrop, damit die
+          Pillen auch über hellem Foto-Hintergrund aus 3-5 m sichtbar
+          bleiben (vorher: bg-spa-surface/40 verschwand auf Dampf-weiß). */}
       {showSlideIndicators && totalSlides > 1 && !isModernDesign && (
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-50">
+        <div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 inline-flex items-center gap-2 rounded-full bg-black/35 px-3 py-1.5 backdrop-blur-sm"
+          aria-label={`Slide ${currentSlideIndex + 1} von ${totalSlides}`}
+        >
           {Array.from({ length: totalSlides }).map((_, i) => (
             <div
               key={`slide-indicator-${i}`}
               className={classNames(
-                'w-3 h-3 rounded-full transition-all',
-                i === currentSlideIndex
-                  ? 'bg-spa-surface w-8'
-                  : 'bg-spa-surface/40'
+                'h-2 rounded-full transition-all',
+                i === currentSlideIndex ? 'bg-white w-8' : 'bg-white/55 w-2',
               )}
+              aria-hidden="true"
             />
           ))}
         </div>

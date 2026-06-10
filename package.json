@@ -20,10 +20,18 @@
     "kiosk:build": "pnpm --filter @htmlsignage/kiosk build",
     "kiosk:build:linux": "pnpm --filter @htmlsignage/kiosk build:linux",
     "kiosk:build:windows": "pnpm --filter @htmlsignage/kiosk build:windows",
+    "new-design": "node packages/design-sdk/bin/new-design.mjs",
+    "test:visual": "pnpm --filter @htmlsignage/visual-regression test",
+    "test:visual:update": "pnpm --filter @htmlsignage/visual-regression test:update",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "concurrently": "^9.2.1",
+    "eslint": "^10.2.0",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0"
   },
@@ -39,5 +47,17 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch@<3.1.3": ">=3.1.3",
+      "minimatch@>=9.0.0 <9.0.6": ">=9.0.6",
+      "socket.io-parser@<4.2.6": ">=4.2.6",
+      "lodash@<4.18.0": ">=4.18.0",
+      "vite@>=8.0.0 <8.0.5": ">=8.0.5",
+      "flatted@<3.4.2": ">=3.4.2",
+      "defu@<6.1.5": ">=6.1.5",
+      "@xmldom/xmldom@<0.8.13": ">=0.8.13"
+    }
   }
 }

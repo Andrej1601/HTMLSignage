@@ -1,11 +1,11 @@
 import type { SlideConfig } from '@/types/slideshow.types';
-import type { Settings, InfoItem } from '@/types/settings.types';
+import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
-import { getMediaUploadUrl } from '@/utils/mediaUrl';
 import { useCompactDetector } from '@/hooks/useResponsiveLayout';
 import { ShieldCheck } from 'lucide-react';
 import { ResilientImage } from './ResilientImage';
+import { useInfoPanelData } from '@/slides/data';
 
 interface InfosSlideProps {
   slide: SlideConfig;
@@ -13,9 +13,11 @@ interface InfosSlideProps {
   media?: Media[];
 }
 
+// Konstanter Theme-Fallback — einmal beim Import berechnet statt pro Render.
+const DEFAULT_SETTINGS = getDefaultSettings();
+
 export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
+  const theme = settings.theme || DEFAULT_SETTINGS.theme!;
   const { containerRef, compact } = useCompactDetector(250);
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
@@ -23,12 +25,12 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
   const textMain = theme.textMain || theme.fg || '#3E2723';
   const textMuted = theme.textMuted || theme.fg || '#5D4037';
 
-  const infos: InfoItem[] = settings.infos || [];
-  const selected = slide.infoId ? infos.find((i) => i.id === slide.infoId) : null;
-  const fallback = infos[0] || { id: 'default', title: 'Wellness Tipp', text: 'Bitte beachten Sie unsere Hinweise für einen angenehmen Aufenthalt.' };
-  const info = selected || fallback;
-  const imageUrl = info.imageId ? getMediaUploadUrl(media, info.imageId) : null;
-  const isBackground = info.imageMode === 'background' && imageUrl;
+  // `infoId` only exists on the `infos` variant; other variants degrade
+  // to "show all infos" mode by omitting it.
+  const infoId = slide.type === 'infos' ? slide.infoId : undefined;
+  const info = useInfoPanelData({ settings, infoId, media });
+  const imageUrl = info.imageUrl;
+  const isBackground = info.imageMode === 'background';
 
   if (compact) {
     return (
@@ -45,13 +47,17 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
           {info.title || 'Info'}
         </h4>
         <p
-          className="font-bold uppercase tracking-tight italic border-l-3 overflow-hidden"
+          // Lesbar aus Distanz: bewusst KEIN uppercase/italic/tracking-tight
+          // mehr (vier Effekte gleichzeitig waren aus 3 m unleserlich).
+          // Mindestens 16 px in der compact-Variante; line-height etwas
+          // großzügiger für gemischte Lauflängen.
+          className="font-medium border-l-[3px] overflow-hidden"
           style={{
-            fontSize: '14px',
-            lineHeight: '1.35',
-            paddingLeft: '8px',
+            fontSize: '16px',
+            lineHeight: '1.45',
+            paddingLeft: '10px',
             borderLeft: `3px solid ${accentGreen}30`,
-            color: isBackground ? 'rgba(255,255,255,0.9)' : textMuted,
+            color: isBackground ? 'rgba(255,255,255,0.95)' : textMuted,
             display: '-webkit-box',
             WebkitLineClamp: 4,
             WebkitBoxOrient: 'vertical',
@@ -93,12 +99,15 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
             </h4>
           </div>
           <p
-            className="font-bold uppercase tracking-tight italic border-l-4 overflow-hidden"
+            // Background-Variante mit Foto: Fokus auf Lesbarkeit über
+            // dem Bild. Kein uppercase/italic/tracking-tight mehr,
+            // dafür `font-semibold` und großzügige line-height.
+            className="font-semibold border-l-4 overflow-hidden"
             style={{
-              fontSize: 'clamp(14px, 2.2vw, 32px)',
-              lineHeight: '1.6',
-              paddingLeft: 'clamp(8px, 1%, 16px)',
-              color: 'rgba(255,255,255,0.9)',
+              fontSize: 'clamp(18px, 2.4vw, 36px)',
+              lineHeight: '1.5',
+              paddingLeft: 'clamp(10px, 1.2%, 18px)',
+              color: 'rgba(255,255,255,0.95)',
               borderLeftColor: `${accentGreen}40`,
               display: '-webkit-box',
               WebkitLineClamp: 6,
@@ -145,11 +154,13 @@ export function InfosSlide({ slide, settings, media }: InfosSlideProps) {
             </h4>
           </div>
           <p
-            className="font-bold uppercase tracking-tight italic border-l-4 overflow-hidden"
+            // Image-with-Text-Layout: gleiche Lesbarkeits-Regel wie
+            // oben — kein uppercase/italic-Stack, mind. 16 px.
+            className="font-semibold border-l-4 overflow-hidden"
             style={{
-              fontSize: 'clamp(14px, 2.2vw, 32px)',
-              lineHeight: '1.6',
-              paddingLeft: 'clamp(8px, 1%, 16px)',
+              fontSize: 'clamp(16px, 2.2vw, 32px)',
+              lineHeight: '1.5',
+              paddingLeft: 'clamp(10px, 1.2%, 18px)',
               color: textMuted,
               borderLeftColor: `${accentGreen}20`,
               display: '-webkit-box',

@@ -3,6 +3,7 @@ import { Shield, Settings2, Server, Monitor, Users, Image, ChevronDown, ChevronR
 import type { LucideIcon } from 'lucide-react';
 import type { StatusTone } from '@/components/StatusBadge';
 import { DashboardWidgetFrame } from '@/components/Dashboard/DashboardWidgetFrame';
+import { formatDateTimeDE } from '@/utils/dateUtils';
 
 export type ActivityCategory = 'einstellungen' | 'systemjobs' | 'device' | 'benutzer' | 'media';
 
@@ -26,16 +27,16 @@ type FilterKey = 'all' | ActivityCategory;
 const PAGE_SIZE = 10;
 
 const CATEGORY_CONFIG: Record<ActivityCategory, { label: string; colorClass: string; icon: LucideIcon }> = {
-  einstellungen: { label: 'Einstellungen', colorClass: 'text-blue-600',   icon: Settings2 },
-  systemjobs:    { label: 'Systemjobs',    colorClass: 'text-purple-600', icon: Server },
-  device:        { label: 'Geräte',        colorClass: 'text-spa-warning',  icon: Monitor },
-  benutzer:      { label: 'Benutzer',      colorClass: 'text-rose-600',   icon: Users },
-  media:         { label: 'Inhalte',       colorClass: 'text-teal-600',   icon: Image },
+  einstellungen: { label: 'Einstellungen', colorClass: 'text-spa-info',      icon: Settings2 },
+  systemjobs:    { label: 'Systemjobs',    colorClass: 'text-spa-primary',   icon: Server },
+  device:        { label: 'Geräte',        colorClass: 'text-spa-warning',   icon: Monitor },
+  benutzer:      { label: 'Benutzer',      colorClass: 'text-spa-accent',    icon: Users },
+  media:         { label: 'Inhalte',       colorClass: 'text-spa-secondary', icon: Image },
 };
 
 const STATUS_CONFIG: Record<StatusTone, { label: string; colorClass: string }> = {
   success: { label: 'Erfolg',   colorClass: 'text-spa-success font-semibold' },
-  info:    { label: 'Info',     colorClass: 'text-blue-600 font-semibold' },
+  info:    { label: 'Info',     colorClass: 'text-spa-info font-semibold' },
   warning: { label: 'Warnung',  colorClass: 'text-spa-warning font-semibold' },
   danger:  { label: 'Fehler',   colorClass: 'text-spa-error font-semibold' },
   neutral: { label: 'OK',       colorClass: 'text-spa-text-secondary font-semibold' },
@@ -49,13 +50,6 @@ const CATEGORY_PILLS: { key: FilterKey; label: string }[] = [
   { key: 'benutzer',     label: 'Benutzer' },
   { key: 'media',        label: 'Inhalte' },
 ];
-
-function formatDateTime(date: Date): string {
-  return date.toLocaleString('de-DE', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
 
 export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
@@ -84,7 +78,7 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
   const handleExport = () => {
     const header = 'Zeitstempel\tKategorie\tAktion\tBenutzer/System\tStatus\tDetails';
     const rows = items.map((item) => [
-      item.timestamp ? formatDateTime(item.timestamp) : '-',
+      item.timestamp ? formatDateTimeDE(item.timestamp) : '-',
       CATEGORY_CONFIG[item.category]?.label ?? item.category,
       item.title,
       item.actor ?? 'System',
@@ -106,8 +100,9 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
       icon={Shield}
       actions={
         <button
+          type="button"
           onClick={handleExport}
-          className="text-sm font-medium text-spa-accent hover:underline whitespace-nowrap"
+          className="rounded text-sm font-medium text-spa-accent hover:underline whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-accent"
         >
           Alle exportieren
         </button>
@@ -121,8 +116,10 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
           return (
             <button
               key={key}
+              type="button"
               onClick={() => handleFilter(key)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              aria-pressed={isActive}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-accent ${
                 isActive
                   ? 'bg-spa-accent text-white'
                   : 'bg-spa-bg-secondary text-spa-text-secondary hover:bg-spa-bg-secondary/80'
@@ -174,13 +171,20 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
                 <Fragment key={item.id}>
                   <tr
                     onClick={() => hasDetails && toggleRow(item.id)}
-                    className={`border-b border-spa-bg-secondary/60 transition-colors ${
+                    onKeyDown={hasDetails ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleRow(item.id);
+                      }
+                    } : undefined}
+                    {...(hasDetails ? { role: 'button', tabIndex: 0, 'aria-expanded': isExpanded } : {})}
+                    className={`border-b border-spa-bg-secondary/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-spa-primary ${
                       hasDetails ? 'cursor-pointer hover:bg-spa-bg-primary/50' : ''
                     } ${isExpanded ? 'bg-spa-bg-primary/40' : ''}`}
                   >
                     {/* Zeitstempel */}
                     <td className="py-3.5 pl-6 pr-4 font-mono text-xs text-spa-text-secondary whitespace-nowrap align-top">
-                      {item.timestamp ? formatDateTime(item.timestamp) : '—'}
+                      {item.timestamp ? formatDateTimeDE(item.timestamp) : '—'}
                     </td>
 
                     {/* Kategorie */}
@@ -256,16 +260,18 @@ export function ActivityFeedWidget({ items }: ActivityFeedWidgetProps) {
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
             <button
+              type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="px-3 py-1.5 text-xs font-medium border border-spa-bg-secondary rounded-lg text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-xs font-medium border border-spa-bg-secondary rounded-lg text-spa-text-secondary hover:bg-spa-bg-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-primary"
             >
               Zurück
             </button>
             <button
+              type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-spa-accent text-white hover:bg-spa-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-spa-accent text-white hover:bg-spa-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-spa-accent"
             >
               Weiter
             </button>

@@ -69,12 +69,6 @@ export function useDashboardData() {
     refetchInterval: 30000,
   });
 
-  const runtimeHistoryQuery = useQuery({
-    queryKey: ['dashboard-runtime-history'],
-    queryFn: () => systemApi.getRuntimeHistory(24),
-    refetchInterval: 5 * 60 * 1000,
-  });
-
   const systemStatusQuery = useQuery({
     queryKey: ['dashboard-system-update-status'],
     queryFn: () => systemApi.getReleases(),
@@ -89,11 +83,24 @@ export function useDashboardData() {
     refetchInterval: 15000,
   });
 
+  // Adaptives Polling: solange Jobs aktiv laufen (running/queued), pollen
+  // wir aggressiv (5 s) damit Statuswechsel sichtbar werden. Sobald kein
+  // aktiver Job da ist, drosseln wir auf 30 s — auf dem Dashboard liefen
+  // sonst 12 Polls/Min für Daten, die sich nur einmal pro Stunde ändern.
+  // react-query erlaubt eine Funktions-Form, die bei jedem Tick die
+  // aktuelle Query inspiziert; so bleibt das Intervall responsive ohne
+  // einen separaten State-Tick.
   const systemJobsQuery = useQuery({
     queryKey: ['dashboard-system-jobs'],
     queryFn: () => systemApi.listJobs(6),
     enabled: isAdmin,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const items = query.state.data?.items;
+      const hasActive = items
+        ? items.some((j) => j.status === 'running' || j.status === 'queued')
+        : false;
+      return hasActive ? 5_000 : 30_000;
+    },
   });
 
   const isLoading =
@@ -106,6 +113,30 @@ export function useDashboardData() {
     () => buildDashboardLiveState(devices, schedule, settings),
     [devices, schedule, settings],
   );
+
+  // Onboarding-Status für die "Erste Schritte"-Checkliste. Reine
+  // Ableitung aus den schon vorhandenen Queries — keine zusätzlichen
+  // Roundtrips. Wird vom Widget nur angezeigt, solange noch nicht
+  // alle Schritte erledigt sind.
+  const onboardingState = useMemo(() => {
+    const saunaCount = settings?.saunas?.length ?? 0;
+    const scheduleHasEntries = schedule
+      ? Object.values(schedule.presets ?? {}).some((day) =>
+          (day?.rows ?? []).some((row) => row.entries?.some((e) => e !== null)),
+        )
+      : false;
+    const slideshowConfig = settings?.slideshow;
+    const slideshowHasSlides = Array.isArray(slideshowConfig?.slides)
+      && slideshowConfig.slides.length > 0;
+    const pairedDeviceCount = devices.filter((d) => Boolean(d.pairedAt)).length;
+    return {
+      saunaCount,
+      scheduleHasEntries,
+      mediaCount: media.length,
+      slideshowHasSlides,
+      pairedDeviceCount,
+    };
+  }, [settings, schedule, media, devices]);
 
   const planQuality = useMemo(
     () => buildPlanQuality(schedule),
@@ -138,7 +169,6 @@ export function useDashboardData() {
   );
 
   const runtimeStatus = runtimeStatusQuery.data || null;
-  const runtimeHistory = runtimeHistoryQuery.data || null;
 
   const systemChecks = useMemo(() => buildSystemChecks({
     backendHealthError: backendHealthQuery.isError,
@@ -210,7 +240,6 @@ export function useDashboardData() {
     mediaQuery,
     backendHealthQuery,
     runtimeStatusQuery,
-    runtimeHistoryQuery,
     systemStatusQuery,
     schedule,
     settings,
@@ -227,12 +256,12 @@ export function useDashboardData() {
     deviceSlideshowRows,
     deviceMonitoring,
     runtimeStatus,
-    runtimeHistory,
     systemChecks,
     updateLabel,
     systemJobs,
     activeSystemJobs,
     attentionItems,
     activityItems,
+    onboardingState,
   };
 }

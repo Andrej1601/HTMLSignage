@@ -241,7 +241,12 @@ export function runSystemJob(
     await runner(context);
   })().catch(async (error) => {
     const message = error instanceof Error ? error.message : 'Unbekannter Fehler';
-    await appendSystemJobLog(jobId, `Unexpected error: ${message}`);
-    await failSystemJob(jobId, 'job-runner-failed', message);
+    try {
+      await appendSystemJobLog(jobId, `Unexpected error: ${message}`);
+      await failSystemJob(jobId, 'job-runner-failed', message);
+    } catch (recordError) {
+      // Don't let a failure to *record* the failure escape as an unhandled rejection.
+      console.error(`[systemJobs] Failed to record job ${jobId} failure:`, recordError);
+    }
   });
 }

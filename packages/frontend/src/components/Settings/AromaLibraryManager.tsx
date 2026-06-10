@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { Aroma } from '@/types/settings.types';
 import { AROMA_COLOR_PALETTE, getAromaDisplayColor } from '@/types/settings.types';
-import { Droplets, Plus, Edit2, Trash2, X, Save } from 'lucide-react';
+import { Droplets, Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 import clsx from 'clsx';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { IconButton } from '@/components/ui/IconButton';
 
 interface AromaLibraryManagerProps {
   aromas: Aroma[];
@@ -27,6 +29,9 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     color: '',
   });
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deletingAroma = deletingId ? aromas.find((a) => a.id === deletingId) ?? null : null;
 
   const showForm = isAdding || !!editingId;
 
@@ -70,10 +75,14 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
     handleCancel();
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Möchten Sie dieses Aroma wirklich löschen?')) {
-      onChange(aromas.filter((a) => a.id !== id));
-    }
+  const handleRequestDelete = (id: string) => {
+    setDeletingId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingId) return;
+    onChange(aromas.filter((a) => a.id !== deletingId));
+    setDeletingId(null);
   };
 
   const activeCategoryEmojis = EMOJI_CATEGORIES.find(c => c.label === activeCategory)?.emojis ?? [];
@@ -94,8 +103,9 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
         </div>
         {!showForm && (
           <button
+            type="button"
             onClick={handleStartAdd}
-            className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
           >
             <Plus className="w-4 h-4" />
             Neues Aroma
@@ -110,9 +120,13 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             <h4 className="text-sm font-semibold text-spa-text-primary">
               {isAdding ? 'Neues Aroma hinzufügen' : 'Aroma bearbeiten'}
             </h4>
-            <button onClick={handleCancel} className="text-spa-text-secondary hover:text-spa-text-primary transition-colors" aria-label="Formular schließen">
-              <X className="w-4 h-4" />
-            </button>
+            <IconButton
+              icon={X}
+              aria-label="Formular schließen"
+              variant="ghost"
+              size="sm"
+              onClick={handleCancel}
+            />
           </div>
 
           {/* ── Emoji-Auswahl (full width, oben) ── */}
@@ -129,6 +143,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   onClick={() => setActiveCategory(activeCategory === cat.label ? null : cat.label)}
                   className={clsx(
                     'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1',
                     activeCategory === cat.label
                       ? 'border-spa-primary bg-spa-primary/10 text-spa-primary'
                       : 'border-spa-bg-secondary bg-spa-surface text-spa-text-secondary hover:border-spa-primary/50'
@@ -148,6 +163,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                     onClick={() => setFormData({ ...formData, emoji })}
                     className={clsx(
                       'h-9 w-9 rounded-md border-2 text-xl transition-all hover:scale-110',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1',
                       formData.emoji === emoji
                         ? 'border-spa-primary bg-spa-primary/10'
                         : 'border-spa-bg-secondary hover:border-spa-primary/40'
@@ -164,8 +180,9 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                 {formData.emoji || '🌿'}
               </div>
               <div className="flex-1 space-y-1">
-                <label className="block text-xs text-spa-text-secondary">Oder eigenes Emoji eingeben</label>
+                <label htmlFor="aroma-emoji" className="block text-xs text-spa-text-secondary">Oder eigenes Emoji eingeben</label>
                 <input
+                  id="aroma-emoji"
                   type="text"
                   value={formData.emoji}
                   onChange={(e) => setFormData({ ...formData, emoji: e.target.value.slice(0, 2) })}
@@ -179,10 +196,11 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
 
           {/* ── Bezeichnung ── */}
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
+            <label htmlFor="aroma-name" className="block text-[11px] font-semibold uppercase tracking-wide text-spa-text-secondary">
               Bezeichnung *
             </label>
             <input
+              id="aroma-name"
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -207,6 +225,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                     onClick={() => setFormData({ ...formData, color: isSelected ? '' : hex })}
                     className={clsx(
                       'h-7 w-7 rounded-full border-2 transition-all hover:scale-110',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1',
                       isSelected ? 'border-spa-text-primary ring-2 ring-offset-1 ring-spa-primary' : 'border-white shadow-xs'
                     )}
                     style={{ backgroundColor: hex }}
@@ -242,7 +261,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
               type="button"
               onClick={handleSave}
               disabled={!formData.name.trim()}
-              className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-spa-primary px-4 py-2 text-sm font-semibold text-white hover:bg-spa-primary-dark transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
             >
               <Save className="w-4 h-4" />
               Speichern
@@ -250,7 +269,7 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
             <button
               type="button"
               onClick={handleCancel}
-              className="flex items-center gap-2 rounded-lg border border-spa-bg-secondary px-4 py-2 text-sm font-medium text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors"
+              className="flex items-center gap-2 rounded-lg border border-spa-bg-secondary px-4 py-2 text-sm font-medium text-spa-text-secondary hover:bg-spa-bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-spa-primary focus-visible:ring-offset-1"
             >
               <X className="w-4 h-4" />
               Abbrechen
@@ -289,30 +308,44 @@ export function AromaLibraryManager({ aromas, onChange }: AromaLibraryManagerPro
                   {aroma.emoji} {aroma.name}
                 </span>
                 <div className="flex gap-1 shrink-0 ml-2">
-                  <button
-                    type="button"
-                    onClick={() => handleStartEdit(aroma)}
-                    className="rounded-md p-1.5 text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary transition-colors"
-                    title="Bearbeiten"
+                  <IconButton
+                    icon={Pencil}
                     aria-label="Aroma bearbeiten"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(aroma.id)}
-                    className="rounded-md p-1.5 text-spa-text-secondary hover:bg-spa-error-light hover:text-spa-error transition-colors"
-                    title="Löschen"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleStartEdit(aroma)}
+                    title="Bearbeiten"
+                    className="rounded-md text-spa-text-secondary hover:bg-spa-bg-primary hover:text-spa-text-primary"
+                  />
+                  <IconButton
+                    icon={Trash2}
                     aria-label="Aroma löschen"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleRequestDelete(aroma.id)}
+                    title="Löschen"
+                    className="rounded-md text-spa-text-secondary hover:bg-spa-error-light hover:text-spa-error"
+                  />
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deletingId !== null}
+        title="Aroma löschen?"
+        message={
+          deletingAroma
+            ? `„${deletingAroma.emoji} ${deletingAroma.name}" wirklich aus der Aroma-Bibliothek entfernen? Bestehende Aufgüsse mit diesem Aroma behalten den Namen, verlieren aber das Icon.`
+            : ''
+        }
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }

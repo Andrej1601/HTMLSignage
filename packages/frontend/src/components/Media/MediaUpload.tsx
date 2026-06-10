@@ -27,6 +27,13 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
   const uploadMutation = useUploadMedia();
   const isUploading = uploadProgress !== null;
 
+  // Auto-clear success messages after 2.5s, with cleanup so unmounting cancels the timer.
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = window.setTimeout(() => setSuccessMessage(''), 2500);
+    return () => window.clearTimeout(timer);
+  }, [successMessage]);
+
   const acceptedTypes = useMemo(() => ([
     ...ACCEPTED_IMAGE_TYPES,
     ...ACCEPTED_AUDIO_TYPES,
@@ -146,10 +153,6 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
       setSuccessMessage(
         `${uploadedCount} Datei${uploadedCount === 1 ? '' : 'en'} wurde${uploadedCount === 1 ? '' : 'n'} erfolgreich hochgeladen.`
       );
-
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 2500);
       return;
     }
 
@@ -229,9 +232,10 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
               </p>
             </div>
             <button
+              type="button"
               onClick={handleCancel}
               disabled={isUploading}
-              className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors disabled:opacity-50"
+              className="p-2 hover:bg-spa-bg-primary rounded-lg transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
               aria-label="Auswahl löschen"
             >
               <X className="w-5 h-5 text-spa-text-secondary" />
@@ -258,16 +262,18 @@ export function MediaUpload({ onUploadComplete }: MediaUploadProps) {
 
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={handleCancel}
               disabled={isUploading}
-              className="flex-1 px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-spa-bg-secondary text-spa-text-primary rounded-lg hover:bg-spa-secondary/20 transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               Abbrechen
             </button>
             <button
+              type="button"
               onClick={handleUpload}
               disabled={isUploading}
-              className="flex-1 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-spa-primary text-white rounded-lg hover:bg-spa-primary-dark transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
             >
               {isUploading
                 ? `Wird hochgeladen (${uploadProgress?.uploaded ?? 0}/${uploadProgress?.total ?? selectedFiles.length})...`
@@ -333,9 +339,10 @@ function UploadQueueRow({
         </p>
       </div>
       <button
+        type="button"
         onClick={() => onRemove(index)}
         disabled={isUploading}
-        className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50"
+        className="p-1.5 hover:bg-spa-bg-primary rounded-md transition-colors disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
         aria-label={`${file.name} entfernen`}
       >
         <X className="w-4 h-4 text-spa-text-secondary" />

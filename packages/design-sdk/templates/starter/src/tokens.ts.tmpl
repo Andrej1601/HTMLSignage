@@ -1,0 +1,51 @@
+import type { DesignTokens } from '@htmlsignage/design-sdk';
+
+/**
+ * Default tokens for the {{DESIGN_NAME}} pack.
+ *
+ * These are the authoritative visual values. Renderers MUST style via
+ * `tokens.*` (not hardcoded colors) so tenant/palette overrides flow
+ * through consistently.
+ *
+ * Start by tweaking these, then the renderers follow.
+ */
+export const {{DESIGN_CAMEL}}Tokens: DesignTokens = {
+  colors: {
+    surface: '#FDFBF7',
+    surfaceElevated: '#FFFFFF',
+    border: '#EBE5D3',
+    textPrimary: '#3E2723',
+    textSecondary: '#5D4037',
+    textInverse: '#FFFFFF',
+    accentPrimary: '#A68A64',
+    accentSecondary: '#8F9779',
+    statusLive: '#10B981',
+    statusNext: '#0EA5E9',
+    statusWarning: '#F59E0B',
+  },
+  typography: {
+    fontBody:
+      "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    fontHeading:
+      "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    fontMono:
+      "ui-monospace, 'SF Mono', Monaco, Menlo, Consolas, monospace",
+    baseSizePx: 16,
+    baseLineHeight: 1.5,
+    scaleSm: 0.875,
+    scaleBase: 1,
+    scaleLg: 1.125,
+    scaleXl: 1.25,
+    scale2xl: 1.5,
+    scale3xl: 1.875,
+  },
+  spacing: { xs: 4, sm: 8, md: 12, lg: 20, xl: 32 },
+  radius: { sm: 6, md: 10, lg: 16, pill: 9999 },
+  motion: {
+    durationFast: 150,
+    durationBase: 250,
+    durationSlow: 400,
+    easingStandard: 'cubic-bezier(0.2, 0, 0, 1)',
+    easingEmphasized: 'cubic-bezier(0.2, 0, 0, 1.2)',
+  },
+};

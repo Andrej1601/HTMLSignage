@@ -57,7 +57,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
   const { pairingInfo, deviceToken, isPairingLoading } = useDisplayPairing(isPreviewMode);
 
   // ── Media polling ──────────────────────────────────────────────────────────
-  const mediaItems = useDisplayMediaPolling(deviceToken);
+  const { media: mediaItems, refresh: refreshMedia } = useDisplayMediaPolling(deviceToken);
 
   // ── Display config state ───────────────────────────────────────────────────
   const [isDisplayConfigLoading, setIsDisplayConfigLoading] = useState(false);
@@ -124,8 +124,10 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     }
 
     if (parsedPayload.settings) {
+      // postMessage payload is structurally untyped (origin checked in handler);
+      // migrateSettings tolerates Partial<Settings> and fills version + theme defaults.
       applySettings(
-        migrateSettings(parsedPayload.settings as unknown as Settings),
+        migrateSettings(parsedPayload.settings as Partial<Settings>),
         { persist: false },
       );
       setHasPreviewPayload(true);
@@ -213,9 +215,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         const message = error instanceof Error ? error.message : 'Display-Konfiguration konnte nicht geladen werden';
         setScheduleError(message);
         setSettingsError(message);
-        if (ENV_IS_DEV) {
-          console.error('[Display] Failed to load effective display config:', error);
-        }
+        console.error('[Display] Failed to load effective display config:', error);
         const cachedSchedule = readDisplayCachedValue<Schedule>(DISPLAY_CACHED_SCHEDULE_KEY);
         const cachedSettings = readDisplayCachedValue<Settings>(DISPLAY_CACHED_SETTINGS_KEY);
         if (cachedSchedule) applySchedule(cachedSchedule, { persist: false });
@@ -250,6 +250,23 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
     void refreshDeviceDisplayConfig(pairedDeviceId);
   }, [deviceToken, isPreviewMode, pairingInfo?.id, pairingInfo?.paired, refreshDeviceDisplayConfig]);
 
+  // ── Nightly auto-reload (kiosk longevity) ─────────────────────────────────
+  // A display that runs unattended for weeks accumulates state and can leak
+  // memory. Once a day, in a low-traffic window, reload the page to start
+  // fresh. Skipped in preview mode. The minute-granular check fires once when
+  // the wall clock crosses the target hour:00.
+  useEffect(() => {
+    if (isPreviewMode) return;
+    const RELOAD_HOUR = 4; // 04:00 — typically closed / empty
+    const interval = window.setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === RELOAD_HOUR && now.getMinutes() === 0) {
+        window.location.reload();
+      }
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [isPreviewMode]);
+
   // ── Fallback queries (when no device config) ──────────────────────────────
   useEffect(() => {
     if (!shouldUseFallbackConfigQueries) {
@@ -269,9 +286,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
           applySchedule(schedule);
         }
       } catch (error) {
-        if (ENV_IS_DEV) {
-          console.warn('[Display] Fallback schedule load failed:', error);
-        }
+        console.warn('[Display] Fallback schedule load failed:', error);
       } finally {
         if (isMounted) {
           setScheduleLoading(false);
@@ -311,9 +326,7 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
           applySettings(settings);
         }
       } catch (error) {
-        if (ENV_IS_DEV) {
-          console.warn('[Display] Fallback settings load failed:', error);
-        }
+        console.warn('[Display] Fallback settings load failed:', error);
       } finally {
         if (isMounted) {
           setSettingsLoading(false);
@@ -359,6 +372,27 @@ export function useDisplayClientRuntime(isPreviewMode: boolean): DisplayClientRu
         return;
       }
       applySettings(migrateSettings(data));
+    },
+    onSlideshowUpdate: () => {
+      // Eine Slideshow änderte sich. Wir wissen nicht zwingend, ob
+      // genau diese Slideshow auf diesem Gerät aktiv ist (default vs.
+      // assigned vs. event-override) — billiger ist daher: einmal die
+      // effektive Display-Config neu holen. `getDisplayConfig` löst die
+      // Override-Hierarchie serverseitig auf, also kommt nur das
+      // wirklich relevante Ergebnis zurück.
+      if (ENV_IS_DEV) {
+        console.log('[Display] Slideshow updated via WebSocket — refreshing display config');
+      }
+      const deviceId = pairedDeviceIdRef.current;
+      if (deviceId) {
+        void refreshDeviceDisplayConfig(deviceId, { silent: true });
+      }
+    },
+    onMediaUpdate: () => {
+      if (ENV_IS_DEV) {
+        console.log('[Display] Media updated via WebSocket — reloading media list');
+      }
+      refreshMedia();
     },
     onDeviceUpdate: (data) => {
       const deviceId = pairedDeviceIdRef.current;

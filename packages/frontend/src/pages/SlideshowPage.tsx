@@ -9,9 +9,17 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { CheckCircle2, RefreshCw, Save, SlidersHorizontal } from 'lucide-react';
 import { useSlideshowEditor } from '@/hooks/useSlideshowEditor';
+import { useSaveShortcut } from '@/hooks/useSaveShortcut';
+import { useDirtyRegistry } from '@/hooks/useDirtyRegistry';
 
 export function SlideshowPage() {
   const editor = useSlideshowEditor();
+
+  useSaveShortcut(editor.handleSaveCurrent, {
+    enabled: !editor.isBusy,
+    isDirty: editor.isDirty,
+  });
+  useDirtyRegistry(editor.isDirty);
 
   if (editor.isLoading || !editor.settings || !editor.editorConfig || !editor.previewPayload) {
     return (
@@ -60,17 +68,22 @@ export function SlideshowPage() {
           </div>
         )}
 
-        {editor.slideshowQualityIssues.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-2.5 text-sm text-spa-success-dark">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="font-medium">Qualitätscheck bestanden</span>
-          </div>
-        ) : (
-          <EditorQualityAssistant
-            description={`Prüft „${editor.selectedSlideshow?.name || 'Slideshow'}" auf leere Zonen, tote Referenzen und Audio-Probleme.`}
-            issues={editor.slideshowQualityIssues}
-            okMessage=""
-          />
+        {/* Qualitätscheck nur dann anzeigen, wenn überhaupt eine Slideshow
+            gewählt ist — sonst suggeriert das grüne „bestanden"-Banner
+            unter einem leeren Editor falsche Sicherheit. */}
+        {editor.selectedSlideshow && (
+          editor.slideshowQualityIssues.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-xl border border-spa-success/20 bg-spa-success-light/70 px-4 py-2.5 text-sm text-spa-success-dark">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span className="font-medium">Qualitätscheck bestanden</span>
+            </div>
+          ) : (
+            <EditorQualityAssistant
+              description={`Prüft „${editor.selectedSlideshow.name}" auf leere Zonen, tote Referenzen und Audio-Probleme.`}
+              issues={editor.slideshowQualityIssues}
+              okMessage=""
+            />
+          )
         )}
 
         <SlideshowConfigPanel
@@ -99,7 +112,25 @@ export function SlideshowPage() {
             editor.confirmAction?.type === 'switch-slideshow'
               ? 'Ungespeicherte Änderungen verwerfen und Slideshow wechseln?'
               : editor.confirmAction?.type === 'delete-slideshow'
-                ? `„${editor.confirmAction.slideshow.name}" wirklich löschen? Zugewiesene Geräte werden auf die Standard-Slideshow zurückgesetzt.`
+                ? (() => {
+                    const slideshow = editor.confirmAction.slideshow;
+                    const deviceCount = slideshow.assignedDevices?.length ?? 0;
+                    const parts = [`„${slideshow.name}" wirklich löschen?`];
+                    if (deviceCount > 0) {
+                      const deviceNames = slideshow.assignedDevices
+                        ?.map((d) => d.name)
+                        .filter(Boolean)
+                        .join(', ');
+                      parts.push(
+                        `${deviceCount} ${deviceCount === 1 ? 'Gerät wird' : 'Geräte werden'} auf die Standard-Slideshow zurückgesetzt${deviceNames ? ` (${deviceNames})` : ''}.`,
+                      );
+                    } else {
+                      parts.push('Aktuell ist kein Gerät direkt zugewiesen.');
+                    }
+                    parts.push('Verknüpfte Event-Referenzen werden ebenfalls bereinigt.');
+                    parts.push('Diese Aktion kann nicht rückgängig gemacht werden.');
+                    return parts.join('\n\n');
+                  })()
                 : 'Ungespeicherte Änderungen verwerfen?'
           }
           confirmLabel={editor.confirmAction?.type === 'delete-slideshow' ? 'Löschen' : 'Verwerfen'}

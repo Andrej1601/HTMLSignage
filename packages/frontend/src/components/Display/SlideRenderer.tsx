@@ -1,18 +1,30 @@
-import { memo } from 'react';
-import { getEffectiveMediaFit, type SlideConfig } from '@/types/slideshow.types';
+import { memo, useMemo } from 'react';
+import { type SlideConfig } from '@/types/slideshow.types';
 import type { Schedule } from '@/types/schedule.types';
 import type { Settings } from '@/types/settings.types';
-import type { Sauna } from '@/types/sauna.types';
 import type { Media } from '@/types/media.types';
-import { normalizeSaunaNameKey } from '@/types/schedule.types';
-import { DisplayContentPanel } from './DisplayContentPanel';
-import { DisplaySaunaDetailSlide } from './DisplaySaunaDetailSlide';
+import type { SlideRenderContext } from '@htmlsignage/design-sdk';
 import { InfosSlide } from './InfosSlide';
 import { EventsSlide } from './EventsSlide';
 import { ResilientImage } from './ResilientImage';
 import { ResilientVideo } from './ResilientVideo';
 import { SlideErrorBoundary } from './SlideErrorBoundary';
-import { buildUploadUrl } from '@/utils/mediaUrl';
+import {
+  useEventsPanelData,
+  useInfoPanelData,
+  useMediaImageData,
+  useMediaVideoData,
+  useSaunaDetailData,
+  useSchedulePanelData,
+} from '@/slides/data';
+import {
+  DesignHost,
+  DEFAULT_DESIGN_ID,
+  isKnownDesignId,
+  mergeTokenOverrides,
+  themeToTokenOverrides,
+  type DesignId,
+} from '@/designs';
 
 interface SlideRendererProps {
   slide: SlideConfig;
@@ -36,31 +48,49 @@ function SlideRendererComponent({
   const content = (() => {
     switch (slide.type) {
       case 'content-panel':
-        return <ContentPanelSlide schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
+        return (
+          <ContentPanelDispatch
+            slide={slide}
+            schedule={schedule}
+            settings={settings}
+            now={now}
+            deviceId={deviceId}
+          />
+        );
 
       case 'sauna-detail':
         return (
-          <SaunaDetailSlide
-            sauna={getSauna(settings, slide.saunaId)}
+          <SaunaDetailDispatch
             slide={slide}
             schedule={schedule}
             settings={settings}
             media={media}
+            now={now}
             deviceId={deviceId}
           />
         );
 
       case 'media-image':
-        return <MediaImageSlide media={getMedia(media, slide.mediaId)} slide={slide} />;
+        return (
+          <MediaImageDispatch slide={slide} settings={settings} media={media} deviceId={deviceId} />
+        );
 
       case 'media-video':
-        return <MediaVideoSlide media={getMedia(media, slide.mediaId)} slide={slide} onVideoEnded={onVideoEnded} />;
+        return (
+          <MediaVideoDispatch
+            slide={slide}
+            settings={settings}
+            media={media}
+            deviceId={deviceId}
+            onVideoEnded={onVideoEnded}
+          />
+        );
 
       case 'infos':
-        return <InfosSlide slide={slide} settings={settings} media={media} />;
+        return <InfosSlideDispatch slide={slide} settings={settings} media={media} deviceId={deviceId} />;
 
       case 'events':
-        return <EventsSlide settings={settings} media={media} />;
+        return <EventsSlideDispatch slide={slide} settings={settings} media={media} now={now} deviceId={deviceId} />;
 
       default:
         return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Unbekannter Slide-Typ</div>;
@@ -87,83 +117,324 @@ function areSlideRendererPropsEqual(prev: SlideRendererProps, next: SlideRendere
 
 export const SlideRenderer = memo(SlideRendererComponent, areSlideRendererPropsEqual);
 
-// Helper functions
-function getSauna(settings: Settings, saunaId?: string): Sauna | undefined {
-  if (!saunaId) return undefined;
-  const list = settings.saunas || [];
-  return (
-    list.find((s) => s.id === saunaId) ||
-    list.find((s) => s.name === saunaId) ||
-    list.find((s) => normalizeSaunaNameKey(s.name) === normalizeSaunaNameKey(saunaId))
+function resolveDesignFlag(settings: Settings): {
+  enabled: boolean;
+  designId: DesignId;
+  tokenOverrides: ReturnType<typeof mergeTokenOverrides>;
+  accentStripe: boolean;
+} {
+  // Design packs are now the only renderer path — the legacy chrome
+  // pipeline is gone, so this is always on regardless of the stored
+  // `useDesignPacks` flag (kept in the type for backwards-compat with
+  // older settings records).
+  const enabled = true;
+
+  // Pack resolution: per-slideshow override wins over global. Lets event
+  // and standard slideshows swap between completely different visual
+  // identities on the same display.
+  const slideshowPackId = settings.slideshow?.designPackId;
+  const globalPackId = settings.display?.designPackId;
+  const configuredId = slideshowPackId || globalPackId;
+  const designId = isKnownDesignId(configuredId) ? configuredId : DEFAULT_DESIGN_ID;
+
+  // Layer order (lowest → highest priority):
+  //   1. Pack defaults (supplied by the pack itself via DesignHost)
+  //   2. Global theme-derived overrides (from settings.theme palette)
+  //   3. Per-slideshow theme-derived overrides (from slideshow.theme)
+  //   4. Explicit slideshow `tokenOverrides` (hand-typed brand tweaks)
+  // `mergeTokenOverrides` composes the layers; later args win.
+  const globalThemeOverrides = themeToTokenOverrides(settings.theme);
+  const slideshowTheme = settings.slideshow?.theme;
+  // Build a synthetic ThemeColors from the merged theme so per-slideshow
+  // theme tweaks reach the design tokens.
+  const slideshowThemeOverrides = slideshowTheme
+    ? themeToTokenOverrides({ ...settings.theme, ...slideshowTheme } as Settings['theme'])
+    : undefined;
+  const slideshowExplicitOverrides = settings.slideshow?.tokenOverrides;
+  const tokenOverrides = mergeTokenOverrides(
+    globalThemeOverrides,
+    slideshowThemeOverrides,
+    slideshowExplicitOverrides,
   );
+  const accentStripe = settings.display?.accentStripes === true;
+  return { enabled, designId, tokenOverrides, accentStripe };
 }
 
-function getMedia(media: Media[] | undefined, mediaId?: string): Media | undefined {
-  return media?.find(m => m.id === mediaId);
+function buildRenderContext(
+  slide: SlideConfig,
+  deviceId: string | undefined,
+  settings: Settings,
+  extra?: Partial<Omit<SlideRenderContext, 'viewport'>>,
+): Omit<SlideRenderContext, 'viewport'> {
+  return {
+    zoneId: slide.zoneId ?? 'default',
+    durationMs: (slide.duration ?? 5) * 1000,
+    transitionsEnabled: true,
+    locale: 'de-DE',
+    deviceId,
+    // Intensity display preference flows from host settings into every
+    // renderer's context so packs can honour a single operator-level
+    // choice without each slide plumbing it themselves. Default
+    // 'flames' matches the historical wellness-classic behaviour.
+    intensityDisplay: settings.display?.intensityDisplay ?? 'flames',
+    // Operator-tunable hero-overlay strength multiplier. Renderers that
+    // draw a Hero wash multiply their hard-coded alpha values by this
+    // factor; default `1` keeps each pack's built-in look.
+    heroOverlayIntensity: settings.display?.heroOverlayIntensity ?? 1,
+    ...extra,
+  };
 }
 
-// Individual Slide Components
-
-function ContentPanelSlide({
-  schedule,
-  settings,
+function InfosSlideDispatch({
   slide,
-  now,
-  deviceId,
-}: {
-  schedule: Schedule;
-  settings: Settings;
-  slide: SlideConfig;
-  now?: Date;
-  deviceId?: string;
-}) {
-  return <DisplayContentPanel schedule={schedule} settings={settings} slide={slide} now={now} deviceId={deviceId} />;
-}
-
-function SaunaDetailSlide({
-  sauna,
-  slide,
-  schedule,
   settings,
   media,
   deviceId,
 }: {
-  sauna?: Sauna;
   slide: SlideConfig;
-  schedule: Schedule;
   settings: Settings;
   media?: Media[];
   deviceId?: string;
 }) {
-  if (!sauna) {
-    return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Sauna nicht gefunden</div>;
-  }
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const infoId = slide.type === 'infos' ? slide.infoId : undefined;
+  const data = useInfoPanelData({ settings, infoId, media });
+  const context = buildRenderContext(slide, deviceId, settings);
 
   return (
-    <DisplaySaunaDetailSlide
-      sauna={sauna}
-      slide={slide}
-      schedule={schedule}
-      settings={settings}
-      media={media}
-      deviceId={deviceId}
+    <DesignHost
+      slideType="infos"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={<InfosSlide slide={slide} settings={settings} media={media} />}
     />
   );
 }
 
-function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }) {
-  if (!media) {
-    return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Bild nicht gefunden</div>;
+function MediaImageDispatch({
+  slide,
+  settings,
+  media,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  deviceId?: string;
+}) {
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const data = useMediaImageData({ slide, media });
+  const context = buildRenderContext(slide, deviceId, settings);
+
+  const legacy = <MediaImageSlide media={media} slide={slide} />;
+  if (!data) return legacy;
+
+  return (
+    <DesignHost
+      slideType="media-image"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={legacy}
+    />
+  );
+}
+
+function MediaVideoDispatch({
+  slide,
+  settings,
+  media,
+  deviceId,
+  onVideoEnded,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  deviceId?: string;
+  onVideoEnded?: () => void;
+}) {
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const data = useMediaVideoData({ slide, media });
+  const context = buildRenderContext(slide, deviceId, settings, { onVideoEnded });
+
+  const legacy = <MediaVideoSlide media={media} slide={slide} onVideoEnded={onVideoEnded} />;
+  if (!data) return legacy;
+
+  return (
+    <DesignHost
+      slideType="media-video"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={legacy}
+    />
+  );
+}
+
+function EventsSlideDispatch({
+  slide,
+  settings,
+  media,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  settings: Settings;
+  media?: Media[];
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const data = useEventsPanelData({ settings, media, now: effectiveNow });
+  const context = buildRenderContext(slide, deviceId, settings);
+
+  return (
+    <DesignHost
+      slideType="events"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={<EventsSlide settings={settings} media={media} now={effectiveNow} />}
+    />
+  );
+}
+
+function SaunaDetailDispatch({
+  slide,
+  schedule,
+  settings,
+  media,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  schedule: Schedule;
+  settings: Settings;
+  media?: Media[];
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const saunaId = slide.type === 'sauna-detail' ? slide.saunaId : undefined;
+  const data = useSaunaDetailData({
+    settings,
+    schedule,
+    saunaId,
+    media,
+    deviceId,
+    now: effectiveNow,
+  });
+  const context = buildRenderContext(slide, deviceId, settings);
+
+  if (!data) {
+    return <PlaceholderSlide message="Sauna nicht gefunden" />;
   }
 
-  const fitMode = getEffectiveMediaFit(slide);
+  return (
+    <DesignHost
+      slideType="sauna-detail"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={<PlaceholderSlide message="Design-Pack nicht aktiv" />}
+    />
+  );
+}
+
+function ContentPanelDispatch({
+  slide,
+  schedule,
+  settings,
+  now,
+  deviceId,
+}: {
+  slide: SlideConfig;
+  schedule: Schedule;
+  settings: Settings;
+  now?: Date;
+  deviceId?: string;
+}) {
+  const { enabled, designId, tokenOverrides, accentStripe } = resolveDesignFlag(settings);
+  const effectiveNow = useMemo(() => now ?? new Date(), [now]);
+  const data = useSchedulePanelData({
+    settings,
+    schedule,
+    deviceId,
+    now: effectiveNow,
+  });
+  const context = buildRenderContext(slide, deviceId, settings);
+
+  // The pack's SchedulePanelRenderer dispatches on `data.styleHint` and
+  // implements all three host styles (`list` / `matrix` / `timeline`) so
+  // the large and small zones can render identically. When the design
+  // pack flag is off or fails to load, the placeholder is shown.
+  return (
+    <DesignHost
+      slideType="content-panel"
+      data={data}
+      context={context}
+      enabled={enabled}
+      designId={designId}
+      tokenOverrides={tokenOverrides}
+      accentStripe={accentStripe}
+      fallback={<PlaceholderSlide message="Design-Pack nicht aktiv" />}
+    />
+  );
+}
+
+/**
+ * Minimal in-zone placeholder used whenever the design pack can't
+ * render the slide (feature flag off, pack missing renderer, pack
+ * crashed and the boundary swapped us in). Intentionally silent on
+ * colours beyond what the shell already paints — the zone's parent
+ * applies the theme surface.
+ */
+function PlaceholderSlide({ message }: { message: string }) {
+  return (
+    <div
+      className="flex h-full w-full items-center justify-center"
+      style={{ color: 'currentColor', opacity: 0.45 }}
+    >
+      <span
+        className="font-semibold uppercase"
+        style={{ fontSize: 13, letterSpacing: '0.25em' }}
+      >
+        {message}
+      </span>
+    </div>
+  );
+}
+
+function MediaImageSlide({ media, slide }: { media?: Media[]; slide: SlideConfig }) {
+  const data = useMediaImageData({ slide, media });
+  if (!data) {
+    return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Bild nicht gefunden</div>;
+  }
 
   return (
     <div className="w-full h-full relative bg-black">
       <ResilientImage
-        src={buildUploadUrl(media.filename)}
-        alt={media.originalName}
-        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+        src={data.url}
+        alt={data.altText ?? ''}
+        className={`w-full h-full ${data.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         fallback={
           <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">
             Bild konnte nicht geladen werden
@@ -179,22 +450,22 @@ function MediaImageSlide({ media, slide }: { media?: Media; slide: SlideConfig }
   );
 }
 
-function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media; slide: SlideConfig; onVideoEnded?: () => void }) {
-  if (!media) {
+function MediaVideoSlide({ media, slide, onVideoEnded }: { media?: Media[]; slide: SlideConfig; onVideoEnded?: () => void }) {
+  const data = useMediaVideoData({ slide, media });
+  if (!data) {
     return <div className="w-full h-full bg-gray-900 text-white flex items-center justify-center">Video nicht gefunden</div>;
   }
 
-  const shouldLoop = slide.videoPlayback === 'loop-duration' || slide.videoPlayback === 'duration';
-  const fitMode = getEffectiveMediaFit(slide);
+  const shouldLoop = data.playback === 'loop-duration' || data.playback === 'duration';
 
   return (
     <div className="w-full h-full relative bg-black">
       <ResilientVideo
-        src={buildUploadUrl(media.filename)}
-        className={`w-full h-full ${fitMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+        src={data.url}
+        className={`w-full h-full ${data.fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         autoPlay
         loop={shouldLoop}
-        muted
+        muted={data.mutedByDefault}
         playsInline
         onEnded={onVideoEnded}
         fallback={

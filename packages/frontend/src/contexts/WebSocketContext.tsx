@@ -25,18 +25,45 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: ['devices'] });
   }, [queryClient]);
 
+  const onDeviceUpdate = useCallback(() => {
+    // Single device changed (create/update/delete, pairing request, pairing).
+    // Invalidating ['devices'] also refreshes ['devices','pending'] by prefix,
+    // so the pending-pairings list updates live instead of via fast polling.
+    void queryClient.invalidateQueries({ queryKey: ['devices'] });
+  }, [queryClient]);
+
+  const onSlideshowUpdate = useCallback(() => {
+    // Slideshow ändert sich → react-query invalidieren, damit
+    // SlideshowSelector / SlideshowPage / DashboardPage frische Daten
+    // bekommen. Das deckt auch den parallel-Editor-Fall ab: Admin A
+    // speichert, Admin B sieht's automatisch im UI.
+    void queryClient.invalidateQueries({ queryKey: ['slideshows'] });
+  }, [queryClient]);
+
+  const onMediaUpdate = useCallback(() => {
+    // Media geändert (Upload/Löschen/Tags) → Media-Cache invalidieren, damit
+    // MediaPage / Slide-Picker frische Daten bekommen.
+    void queryClient.invalidateQueries({ queryKey: ['media'] });
+    void queryClient.invalidateQueries({ queryKey: ['media-tags'] });
+  }, [queryClient]);
+
   const onReconnect = useCallback(() => {
     // After a WebSocket reconnect, catch up on any changes missed while offline
     void queryClient.invalidateQueries({ queryKey: ['schedule'] });
     void queryClient.invalidateQueries({ queryKey: ['settings'] });
     void queryClient.invalidateQueries({ queryKey: ['devices'] });
+    void queryClient.invalidateQueries({ queryKey: ['slideshows'] });
+    void queryClient.invalidateQueries({ queryKey: ['media'] });
   }, [queryClient]);
 
   const { isConnected, error } = useWebSocket({
     autoConnect: true,
     onScheduleUpdate,
     onSettingsUpdate,
+    onDeviceUpdate,
     onBulkDeviceUpdate,
+    onSlideshowUpdate,
+    onMediaUpdate,
     onReconnect,
   });
 

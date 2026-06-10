@@ -1,21 +1,29 @@
-import { memo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { Settings } from '@/types/settings.types';
 import type { Media } from '@/types/media.types';
 import { getDefaultSettings } from '@/types/settings.types';
+import type { EventSlideEntry, EventStatusRank } from '@htmlsignage/design-sdk';
 import { useDisplayViewportProfile } from './useDisplayViewportProfile';
 import { Calendar, Clock3 } from 'lucide-react';
 import { withAlpha } from './wellnessDisplayUtils';
 import { ResilientImage } from './ResilientImage';
 import {
-  buildEventPresentationData,
   buildEventsSlideLayout,
   type EventPresentation,
 } from './eventsSlideUtils';
+import { useEventsPanelData } from '@/slides/data';
 
 interface EventsSlideProps {
   settings: Settings;
   media?: Media[];
+  /** External clock from the display runtime. When provided, the slide uses it
+   *  instead of spinning its own 30s timer (avoids a redundant clock source). */
+  now?: Date;
 }
+
+// Konstanter Theme-Fallback — einmal beim Import berechnet statt pro Render
+// (getDefaultSettings() allokiert ein großes Objekt inkl. Dashboard-Farben).
+const DEFAULT_SETTINGS = getDefaultSettings();
 
 const TWO_LINE_CLAMP = {
   display: '-webkit-box',
@@ -345,9 +353,8 @@ function LeadEventCard({
   );
 }
 
-export const EventsSlide = memo(function EventsSlide({ settings, media }: EventsSlideProps) {
-  const defaults = getDefaultSettings();
-  const theme = settings.theme || defaults.theme!;
+export const EventsSlide = memo(function EventsSlide({ settings, media, now: externalNow }: EventsSlideProps) {
+  const theme = settings.theme || DEFAULT_SETTINGS.theme!;
   const { containerRef, profile } = useDisplayViewportProfile<HTMLDivElement>();
 
   const accentGold = theme.accentGold || theme.accent || '#A68A64';
@@ -360,13 +367,43 @@ export const EventsSlide = memo(function EventsSlide({ settings, media }: Events
   const statusSoon = theme.statusPrestart || '#F59E0B';
   const statusNext = theme.statusNext || accentGold;
 
-  const allEvents = buildEventPresentationData(settings, media, new Date(), {
-    accentGold,
-    accentGreen,
-    statusLive,
-    statusSoon,
-    statusNext,
-  });
+  const [internalNow, setInternalNow] = useState(() => new Date());
+  useEffect(() => {
+    if (externalNow) return; // runtime clock drives updates — no private timer
+    const t = setInterval(() => setInternalNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, [externalNow]);
+  const now = externalNow ?? internalNow;
+
+  const eventsData = useEventsPanelData({ settings, media, now });
+  const allEvents: EventPresentation[] = useMemo(() => {
+    const rankToBadgeBg = (rank: EventStatusRank): string => {
+      switch (rank) {
+        case 'live':
+          return statusLive;
+        case 'soon':
+          return statusSoon;
+        case 'near':
+          return accentGreen;
+        case 'far':
+        default:
+          return statusNext;
+      }
+    };
+    return eventsData.events.map((entry: EventSlideEntry) => ({
+      id: entry.id,
+      name: entry.title,
+      description: entry.description,
+      imageUrl: entry.imageUrl,
+      dateLabel: entry.dateLabel,
+      timeLabel: entry.timeLabel,
+      badgeLabel: entry.relativeLabel,
+      badgeBackground: rankToBadgeBg(entry.statusRank),
+      badgeTextColor: '#FFFDF8',
+      isLive: entry.isLive,
+      startsSoon: entry.startsSoon,
+    }));
+  }, [eventsData.events, accentGreen, statusLive, statusSoon, statusNext]);
 
   const layout = buildEventsSlideLayout(profile);
   const events = allEvents.slice(0, layout.maxEvents);

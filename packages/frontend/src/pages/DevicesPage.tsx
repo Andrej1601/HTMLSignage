@@ -23,6 +23,7 @@ import { PendingPairings } from '@/components/Devices/PendingPairings';
 import { StatCard } from '@/components/StatCard';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/Button';
+import { toast } from '@/stores/toastStore';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { useDevicesPageState, getFilterButtonClass, type DeviceStatusFilter } from '@/hooks/useDevicesPageState';
 import { useSlideshows } from '@/hooks/useSlideshows';
@@ -37,7 +38,19 @@ const STATUS_TABS: { key: DeviceStatusFilter; label: string }[] = [
 export function DevicesPage() {
   const state = useDevicesPageState();
   const { data: slideshows = [] } = useSlideshows();
+  // Auto-Open der Flottensteuerung sobald min. 1 Gerät selektiert ist —
+  // sonst hängen Bulk-Aktionen unsichtbar im Accordion und der Saunameister
+  // sucht nach Optionen, die direkt darunter liegen. Manuelles Schließen
+  // bleibt möglich; eine erneute Selektion lässt den Accordion wieder
+  // aufgehen (bewusst, weil das eindeutig signalisiert „hier sind
+  // deine Bulk-Optionen").
   const [fleetOpen, setFleetOpen] = useState(false);
+  const hasSelection = state.selectedDeviceIds.length > 0;
+  const [prevHasSelection, setPrevHasSelection] = useState(hasSelection);
+  if (hasSelection !== prevHasSelection) {
+    setPrevHasSelection(hasSelection);
+    if (hasSelection && !fleetOpen) setFleetOpen(true);
+  }
 
   if (state.isLoading) {
     return (
@@ -99,7 +112,7 @@ export function DevicesPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => state.setStatusFilter(tab.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${
                   state.statusFilter === tab.key
                     ? 'bg-spa-primary text-white shadow-xs'
                     : 'text-spa-text-secondary hover:bg-spa-bg-primary'
@@ -130,13 +143,19 @@ export function DevicesPage() {
           <button
             type="button"
             onClick={() => setFleetOpen(!fleetOpen)}
-            className="flex w-full items-center justify-between px-6 py-4 text-left"
+            className="flex w-full items-center justify-between px-6 py-4 text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary"
           >
             <div className="flex items-center gap-3">
               <Wrench className="h-5 w-5 text-spa-primary" />
-              <div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-spa-text-primary">Flottensteuerung</span>
-                <span className="ml-2 text-xs text-spa-text-secondary">Bulk-Aktionen für ausgewählte Geräte</span>
+                {hasSelection ? (
+                  <span className="inline-flex items-center rounded-full bg-spa-primary/15 px-2 py-0.5 text-[11px] font-bold text-spa-primary">
+                    {state.selectedDeviceIds.length} ausgewählt
+                  </span>
+                ) : (
+                  <span className="text-xs text-spa-text-secondary">Bulk-Aktionen für ausgewählte Geräte</span>
+                )}
               </div>
             </div>
             {fleetOpen ? <ChevronUp className="h-4 w-4 text-spa-text-secondary" /> : <ChevronDown className="h-4 w-4 text-spa-text-secondary" />}
@@ -151,7 +170,7 @@ export function DevicesPage() {
                     key={filter.key}
                     type="button"
                     onClick={() => state.setActiveGroupFilter(filter.key)}
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${getFilterButtonClass(state.activeGroupFilter === filter.key)}`}
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-spa-primary ${getFilterButtonClass(state.activeGroupFilter === filter.key)}`}
                   >
                     <span>{filter.label}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs ${
@@ -222,7 +241,27 @@ export function DevicesPage() {
           <EmptyState
             icon={Monitor}
             title="Keine gekoppelten Geräte"
-            description="Öffne die Display-URL auf einem Gerät, um eine Kopplungsanfrage zu starten."
+            description="Öffne die Display-URL auf einem Gerät — der Pairing-Code erscheint dann oben in dieser Liste."
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => window.open('/display', '_blank', 'noopener')}
+                >
+                  Display-URL öffnen
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const url = `${window.location.origin}/display`;
+                    void navigator.clipboard?.writeText(url);
+                    toast.success(`Display-URL kopiert: ${url}`);
+                  }}
+                >
+                  URL kopieren
+                </Button>
+              </div>
+            }
           />
         ) : (
           <DeviceList

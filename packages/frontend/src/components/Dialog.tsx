@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -46,6 +46,7 @@ export function Dialog({
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const onCloseRef = useRef(onClose);
   const closeOnEscRef = useRef(closeOnEsc);
   const closeDisabledRef = useRef(closeDisabled);
@@ -102,7 +103,24 @@ export function Dialog({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
-      previousFocusRef.current?.focus();
+      // Fokus-Restore mit Fallback: das Trigger-Element kann während
+      // eines offenen Dialogs aus dem DOM verschwinden (Tabellen-
+      // Refresh, List-Re-Render, Page-Navigation). Wenn es nicht mehr
+      // verbunden ist, würde `.focus()` ins Leere greifen — der Fokus
+      // bliebe „nirgends" und Tab-Navigation startet ab body, statt
+      // an einer sinnvollen Stelle. Fallback: erstes fokussierbares
+      // Element im Layout-Main, sonst body.
+      const previous = previousFocusRef.current;
+      if (previous && previous.isConnected) {
+        previous.focus();
+      } else {
+        const main = document.getElementById('main-content');
+        const fallback =
+          main?.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+          ) ?? document.body;
+        fallback.focus();
+      }
     };
   }, [isOpen]);
 
@@ -116,7 +134,7 @@ export function Dialog({
       className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
       onClick={closeOnOverlayClick && !closeDisabled ? onClose : undefined}
     >
       <div className="flex min-h-full items-start justify-center py-4">
@@ -139,7 +157,7 @@ export function Dialog({
             <div className="flex items-center gap-3">
               {titleIcon}
               <h2
-                id="dialog-title"
+                id={titleId}
                 className="text-xl font-bold text-spa-text-primary"
               >
                 {title}

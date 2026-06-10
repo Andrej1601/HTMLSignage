@@ -1,22 +1,10 @@
-import type { ReactElement } from 'react';
-import { DisplayContentPanel } from '@/components/Display/DisplayContentPanel';
-import {
-  DisplayEditorialPanel,
-  DisplayEditorialStage,
-  getEditorialStageMeta,
-} from '@/components/Display/displayEditorialChrome';
-import {
-  MineralNoirPanel,
-  MineralNoirStage,
-  getMineralNoirStageMeta,
-} from '@/components/Display/displayMineralNoirChrome';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { DisplayFullRotationLayout } from '@/components/Display/DisplayFullRotationLayout';
 import { DisplayGridLayout } from '@/components/Display/DisplayGridLayout';
+import { DisplayHeader } from '@/components/Display/DisplayHeader';
 import { DisplaySplitLayout } from '@/components/Display/DisplaySplitLayout';
 import { DisplayTripleLayout } from '@/components/Display/DisplayTripleLayout';
-import { OverviewSlide } from '@/components/Display/OverviewSlide';
 import { SlideRenderer } from '@/components/Display/SlideRenderer';
-import { isEditorialDisplayAppearance, isMineralNoirDisplayAppearance } from '@/config/displayDesignStyles';
 import {
   isMediaSlide,
   needsModernSlidePadding,
@@ -27,12 +15,13 @@ import type {
   SlidePaddingOptions,
 } from '@/components/Display/displayLayoutRenderer.types';
 import type { SlideConfig, Zone } from '@/types/slideshow.types';
+import { getDefaultSettings } from '@/types/settings.types';
+import { getMediaUploadUrl } from '@/utils/mediaUrl';
 
 export function DisplayLayoutRenderer({
   currentSlide,
   currentSlideIndex,
   currentTime,
-  displayAppearance,
   designStyle,
   displayDeviceId,
   effectiveSettings,
@@ -51,29 +40,36 @@ export function DisplayLayoutRenderer({
 }: DisplayLayoutRendererProps) {
   const hasAnyZoneSlides = zones.some((zone) => (getZoneInfo(zone.id)?.totalSlides ?? 0) > 0);
 
-  const renderContentPanel = (): ReactElement => {
+  const renderContentPanel = useCallback((): ReactElement => {
+    // Route the large content panel through `SlideRenderer` so the active
+    // design pack gets a chance to render it. The slide type is fixed as
+    // 'content-panel'; the id is synthesised from the designStyle so the
+    // React subtree resets when the host switches styles.
+    const syntheticSlide: SlideConfig = {
+      id: `content-panel-large-${designStyle}`,
+      type: 'content-panel',
+      enabled: true,
+      duration: 0,
+      order: 0,
+      transition: 'none',
+    };
     return (
-      <DisplayContentPanel
+      <SlideRenderer
         schedule={localSchedule}
         settings={effectiveSettings}
+        media={mediaItems}
         now={currentTime}
         deviceId={displayDeviceId}
+        slide={syntheticSlide}
       />
     );
-  };
+  }, [designStyle, localSchedule, effectiveSettings, mediaItems, currentTime, displayDeviceId]);
 
-  const renderSlideWithPadding = (
+  const renderSlideWithPadding = useCallback((
     slide: SlideConfig | null | undefined,
     rendered: ReactElement,
     options?: SlidePaddingOptions,
   ): ReactElement => {
-    if (slide && isMediaSlide(slide) && (
-      isEditorialDisplayAppearance(displayAppearance) ||
-      isMineralNoirDisplayAppearance(displayAppearance)
-    )) {
-      return rendered;
-    }
-
     if (!slide || !needsModernSlidePadding(isModernDesign, slide)) {
       return rendered;
     }
@@ -94,9 +90,9 @@ export function DisplayLayoutRenderer({
     }
 
     return <div className={options?.outerClassName || 'p-8 w-full h-full'}>{rendered}</div>;
-  };
+  }, [isModernDesign]);
 
-  const renderZoneSlide = (
+  const renderZoneSlide = useCallback((
     slide: SlideConfig | null,
     zone?: Zone,
   ): ReactElement => {
@@ -121,11 +117,10 @@ export function DisplayLayoutRenderer({
     );
 
     return renderSlideWithPadding(slide, rendered);
-  };
+  }, [localSchedule, effectiveSettings, mediaItems, currentTime, displayDeviceId, onVideoEnded, renderSlideWithPadding]);
 
-  const layoutContext: DisplayLayoutContext = {
+  const layoutContext: DisplayLayoutContext = useMemo(() => ({
     currentTime,
-    displayAppearance,
     designStyle,
     displayDeviceId,
     effectiveSettings,
@@ -143,79 +138,81 @@ export function DisplayLayoutRenderer({
     showZoneBorders,
     themeColors,
     zones,
+  }), [
+    currentTime,
+    designStyle,
+    displayDeviceId,
+    effectiveSettings,
+    enableTransitions,
+    getZoneInfo,
+    getZoneSlide,
+    isModernDesign,
+    localSchedule,
+    mediaItems,
+    onVideoEnded,
+    renderContentPanel,
+    renderSlideWithPadding,
+    renderZoneSlide,
+    resolveTransition,
+    showZoneBorders,
+    themeColors,
+    zones,
+  ]);
+
+  const renderInner = (): ReactElement => {
+    if (!hasAnyZoneSlides) {
+      // The active design pack handles every `designStyle` through
+      // `renderContentPanel()`. No legacy chrome wrapping any more —
+      // the pack draws its own stage.
+      return renderContentPanel();
+    }
+
+    switch (safeLayout) {
+      case 'full-rotation':
+        return (
+          <DisplayFullRotationLayout
+            context={layoutContext}
+            currentSlide={currentSlide}
+            currentSlideIndex={currentSlideIndex}
+          />
+        );
+
+      case 'triple-view':
+        return <DisplayTripleLayout context={layoutContext} />;
+
+      case 'grid-2x2':
+        return <DisplayGridLayout context={layoutContext} />;
+
+      case 'split-view':
+      default:
+        return <DisplaySplitLayout context={layoutContext} />;
+    }
   };
 
-  if (!hasAnyZoneSlides) {
-    if (isEditorialDisplayAppearance(displayAppearance)) {
-      const stageMeta = getEditorialStageMeta(effectiveSettings, currentTime);
+  const inner = renderInner();
 
-      return (
-        <DisplayEditorialStage
-          theme={themeColors}
-          subtitle={stageMeta.subtitle}
-          title={stageMeta.title}
-          meta={stageMeta.meta}
-        >
-          <DisplayEditorialPanel
-            theme={themeColors}
-            tone="paper"
-          >
-            {renderContentPanel()}
-          </DisplayEditorialPanel>
-        </DisplayEditorialStage>
-      );
-    }
+  // Header (logo + clock + date) is rendered above every layout when
+  // enabled. Legacy pack-specific stage chromes (Editorial / Mineral
+  // Noir) are gone; the active design pack renders its own in-slide
+  // chrome where applicable.
+  const headerSettings =
+    effectiveSettings.header ?? getDefaultSettings().header!;
 
-    if (isMineralNoirDisplayAppearance(displayAppearance)) {
-      const stageMeta = getMineralNoirStageMeta(effectiveSettings, currentTime);
+  if (!headerSettings.enabled) {
+    return inner;
+  }
 
-      return (
-        <MineralNoirStage
-          theme={themeColors}
-          subtitle={stageMeta.subtitle}
-          title={stageMeta.title}
-          meta={stageMeta.meta}
-        >
-          <MineralNoirPanel
-            theme={themeColors}
-            accentTone="emerald"
-          >
-            {renderContentPanel()}
-          </MineralNoirPanel>
-        </MineralNoirStage>
-      );
-    }
+  const logoImageUrl =
+    getMediaUploadUrl(mediaItems, headerSettings.logoImageId) ?? undefined;
 
-    return isModernDesign ? (
-      renderContentPanel()
-    ) : (
-      <OverviewSlide
-        schedule={localSchedule}
-        settings={effectiveSettings}
-        now={currentTime}
-        deviceId={displayDeviceId}
+  return (
+    <div className="flex h-full w-full flex-col">
+      <DisplayHeader
+        settings={headerSettings}
+        theme={themeColors}
+        logoImageUrl={logoImageUrl}
       />
-    );
-  }
-
-  switch (safeLayout) {
-    case 'full-rotation':
-      return (
-        <DisplayFullRotationLayout
-          context={layoutContext}
-          currentSlide={currentSlide}
-          currentSlideIndex={currentSlideIndex}
-        />
-      );
-
-    case 'triple-view':
-      return <DisplayTripleLayout context={layoutContext} />;
-
-    case 'grid-2x2':
-      return <DisplayGridLayout context={layoutContext} />;
-
-    case 'split-view':
-    default:
-      return <DisplaySplitLayout context={layoutContext} />;
-  }
+      <div className="min-h-0 flex-1">{inner}</div>
+    </div>
+  );
 }
